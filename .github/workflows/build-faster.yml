@@ -63,10 +63,21 @@ jobs:
         with:
           path: |
             ~/.ghcup
+            ~/.local
             ~/.cabal/config
             ~/.cabal/packages
-            dist-newstyle
           key: haskell-toolchain-${{ runner.os }}-ghc${{ matrix.ghc-version }}-cabal${{ matrix.cabal-version || 'latest' }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        id: cache-deps
+        with:
+          path: |
+            dist-newstyle
+          key: cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-${{ hashFiles('**/*.cabal', 'cabal.project', 'cabal.project.freeze') }}
+          restore-keys: |
+            cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-
+
 
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
@@ -86,7 +97,7 @@ jobs:
 
       - name: Install dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
 
       - name: Build
