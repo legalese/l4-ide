@@ -19,6 +19,8 @@ jobs:
   build-haskell:
     name: GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    container:
+      image: haskell:${{ matrix.ghc-version }}
     strategy:
       fail-fast: false
       matrix:
@@ -57,22 +59,22 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
-      - name: Cache ghc
-        uses: actions/cache@v4
-        id: cache-ghc
-        with:
-          path: |
-            ~/.ghcup
-          key: ${{ runner.os }}-ghc-${{ matrix.ghc-version }}
-
-      - name: Set up GHC ${{ matrix.ghc-version }}
-        uses: haskell-actions/setup@v2
-        id: setup
-        with:
-          ghc-version: ${{ matrix.ghc-version }}
-          cabal-version: "latest"
-          cabal-update: true
-          enable-stack: false
+#      - name: Cache ghc
+#        uses: actions/cache@v4
+#        id: cache-ghc
+#        with:
+#          path: |
+#            ~/.ghcup
+#          key: ${{ runner.os }}-ghc-${{ matrix.ghc-version }}
+#
+#       - name: Set up GHC ${{ matrix.ghc-version }}
+#         uses: haskell-actions/setup@v2
+#         id: setup
+#         with:
+#           ghc-version: ${{ matrix.ghc-version }}
+#           cabal-version: "latest"
+#           cabal-update: true
+#           enable-stack: false
 
       - name: Configure the build
         run: |
@@ -89,14 +91,7 @@ jobs:
             dist-newstyle
             ~/.cache/cabal
             ~/.cabal
-            ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
-          # if we want to be committed to pinning the full plan. -plan-${{ hashFiles('**/plan.json') }}
-
-      - name: Install dependencies
-        # If we had an exact cache hit, the dependencies will be up to date.
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: cabal build all --only-dependencies
+          key: ${{ runner.os }}-ghc-${{ matrix.ghc-version }}
 
       - name: Build
         run: cabal build all
@@ -106,3 +101,5 @@ jobs:
 
       # - name: Build documentation
       #   run: cabal haddock all
+
+      1000730376
