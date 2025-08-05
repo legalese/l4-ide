@@ -57,6 +57,14 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        id: cache-ghc
+        with:
+          path: |
+            ~/.ghcup
+          key: ${{ runner.os }}-ghc-${{ matrix.ghc-version }}
+
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
         id: setup
@@ -79,6 +87,7 @@ jobs:
         with:
           path: |
             dist-newstyle
+            ~/.ghcup
             ~/.cache/cabal
             ~/.cabal/packages
             ${{ steps.setup.outputs.cabal-store }}
