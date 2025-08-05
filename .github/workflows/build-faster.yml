@@ -78,6 +78,8 @@ jobs:
           restore-keys: |
             cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-
 
+      - name: Update ghcup
+        run: ghcup upgrade
 
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
