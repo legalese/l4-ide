@@ -30,10 +30,10 @@ jobs:
 
     steps:
       - name: Update repositories
-        run: apt update
+        run: sudo apt update
       - name: Install deps
         run: >
-          apt install -y
+          sudo apt install -y
           git
           sudo
           software-properties-common
@@ -59,11 +59,13 @@ jobs:
 
       - name: Cache GHC installation
         uses: actions/cache@v4
+        id: cache
         with:
           path: |
             ~/.ghcup
             ~/.cabal/config
             ~/.cabal/packages
+            dist-newstyle
           key: haskell-toolchain-${{ runner.os }}-ghc${{ matrix.ghc-version }}-cabal${{ matrix.cabal-version || 'latest' }}
 
       - name: Set up GHC ${{ matrix.ghc-version }}
