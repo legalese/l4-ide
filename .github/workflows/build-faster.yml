@@ -82,9 +82,7 @@ jobs:
             ~/.cache/cabal
             ~/.cabal/packages
             ${{ steps.setup.outputs.cabal-store }}
-          env:
-            key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
-          key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
+          key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}-plan-${{ hashFiles('**/plan.json') }}
 
       - name: Install dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
