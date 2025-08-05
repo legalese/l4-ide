@@ -57,7 +57,7 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
-      - name: Cache dependencies
+      - name: Cache ghc
         uses: actions/cache@v4
         id: cache-ghc
         with:
@@ -73,14 +73,6 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
           enable-stack: false
-
-      - name: see what was installed
-        run: |
-          which ghc
-          echo .local
-          ls -l ~/.local/bin
-          echo .ghcup
-          ls -l ~/.ghcup/bin
 
       - name: Configure the build
         run: |
