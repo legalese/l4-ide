@@ -57,19 +57,6 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        id: cache-deps
-        with:
-          path: |
-            dist-newstyle
-            ~/.cache/cabal
-            ~/.cabal/packages
-            ${{ steps.setup.outputs.cabal-store }}
-          key: cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-${{ hashFiles('**/*.cabal', 'cabal.project', 'cabal.project.freeze') }}
-          restore-keys: |
-            cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-
-
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
         id: setup
@@ -84,6 +71,19 @@ jobs:
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        id: cache-deps
+        with:
+          path: |
+            dist-newstyle
+            ~/.cache/cabal
+            ~/.cabal/packages
+            ${{ steps.setup.outputs.cabal-store }}
+          env:
+            key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+          key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
 
       - name: Install dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
