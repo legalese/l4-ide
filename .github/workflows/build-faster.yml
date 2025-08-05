@@ -74,6 +74,11 @@ jobs:
           cabal-update: true
           enable-stack: false
 
+      - name: see what was installed
+        run: |
+          which ghc
+          ls -l ~/.local/bin
+
       - name: Configure the build
         run: |
           cabal update
