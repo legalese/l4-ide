@@ -2,6 +2,9 @@ name: Check Nix
 
 on:
   pull_request:
+  push:
+    branches:
+      - 'mengwong/build**'
   workflow_dispatch:
 
 jobs:
