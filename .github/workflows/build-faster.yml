@@ -62,10 +62,11 @@ jobs:
         id: cache
         with:
           path: |
+            ~/.ghc
             ~/.ghcup
             ~/.local
-            ~/.cabal/config
-            ~/.cabal/packages
+            ~/.cache/cabal
+            ~/.config/cabal
           key: haskell-toolchain-${{ runner.os }}-ghc${{ matrix.ghc-version }}-cabal${{ matrix.cabal-version || 'latest' }}
 
       - name: Cache dependencies
@@ -81,18 +82,18 @@ jobs:
       - name: Update ghcup
         run: ghcup upgrade
 
+
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
         id: setup
         with:
           ghc-version: ${{ matrix.ghc-version }}
-          # Defaults, added for clarity:
           cabal-version: "latest"
-          cabal-update: false
+          cabal-update: true  # This will update the package index
+          enable-stack: false
 
       - name: Configure the build
         run: |
-          cabal update
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
