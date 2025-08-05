@@ -87,7 +87,6 @@ jobs:
         with:
           path: |
             dist-newstyle
-            ~/.ghcup
             ~/.cache/cabal
             ~/.cabal
             ${{ steps.setup.outputs.cabal-store }}
