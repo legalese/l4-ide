@@ -57,24 +57,15 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
-      - name: Cache GHC installation
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            ~/.ghc
-            ~/.ghcup
-            ~/.local
-            ~/.cache/cabal
-            ~/.config/cabal
-          key: haskell-toolchain-${{ runner.os }}-ghc${{ matrix.ghc-version }}-cabal${{ matrix.cabal-version || 'latest' }}
-
       - name: Cache dependencies
         uses: actions/cache@v4
         id: cache-deps
         with:
           path: |
             dist-newstyle
+            ~/.cache/cabal
+            ~/.cabal/packages
+            ${{ steps.setup.outputs.cabal-store }}
           key: cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-${{ hashFiles('**/*.cabal', 'cabal.project', 'cabal.project.freeze') }}
           restore-keys: |
             cabal-deps-${{ runner.os }}-ghc${{ matrix.ghc-version }}-
