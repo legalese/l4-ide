@@ -42,7 +42,7 @@ jobs:
           build-essential
           curl
           libffi-dev
-          libffi8
+          libffi7
           libgmp-dev
           libgmp10
           libncurses-dev
