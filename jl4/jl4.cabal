@@ -22,7 +22,9 @@ common defaults
     -- This is annoying with fourmolu
     NoImportQualifiedPost
   build-depends:
-    base
+    base,
+    optparse-applicative,
+
 
 executable jl4-cli
   import: defaults
@@ -32,7 +34,6 @@ executable jl4-cli
     jl4-lsp,
     directory,
     lsp-types,
-    optparse-applicative,
   main-is: Main.hs
 
 test-suite jl4-test
