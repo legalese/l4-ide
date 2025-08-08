@@ -46,6 +46,7 @@ jobs:
           libgmp-dev
           libgmp10
           libncurses-dev
+          upx
           pkg-config
           zlib1g-dev
           liblzma-dev
