@@ -6,3 +6,11 @@ packages:
   ./jl4-websessions
 
 index-state: 2025-03-31T10:46:26Z
+
+package *
+  executable-static: True
+  ghc-options: -static -optl-static -optl-pthread -fPIC
+  ld-options: -static -pthread
+
+package lzma
+  flags: -pkgconfig
