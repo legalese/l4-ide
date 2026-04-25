@@ -34,25 +34,31 @@ export function buildEditorContextMessage(chipSnapshot?: {
 
   const lines: string[] = []
   lines.push('<editor-context>')
+  // True iff the snapshot's path matches the editor that's currently
+  // active IN THIS extension instance. When false (multi-window
+  // setup, or a focus race between chip update and request
+  // assembly), every auxiliary field — cursor, selection, openFiles
+  // — would describe the WRONG window. We suppress them rather than
+  // emit a coherent-looking but inconsistent block.
+  const snapshotMatchesLiveEditor =
+    !!chipSnapshot &&
+    !!editor &&
+    workspaceRelative(editor.document.uri) === chipSnapshot.path
   if (chipSnapshot) {
     // Snapshot wins — use the path the webview chip was showing at
-    // send time. We can still surface live cursorLine/selection from
-    // the local activeTextEditor IFF its document path matches the
-    // snapshot (otherwise those fields would describe a different
-    // file than the activeFile line).
+    // send time. Live editor state (cursor / selection / openFiles)
+    // only flows through when the snapshot points at the same file
+    // as our local activeTextEditor.
     lines.push(
       `activeFile: ${chipSnapshot.path} (call fs__read_file on this path if you need the body)`
     )
-    if (editor) {
-      const editorRel = workspaceRelative(editor.document.uri)
-      if (editorRel === chipSnapshot.path) {
-        const pos = editor.selection.active
-        lines.push(`cursorLine: ${pos.line + 1}`)
-        const sel = editor.document.getText(editor.selection)
-        if (sel.trim().length > 0) {
-          lines.push('selection: |')
-          for (const sline of sel.split('\n')) lines.push(`  ${sline}`)
-        }
+    if (snapshotMatchesLiveEditor && editor) {
+      const pos = editor.selection.active
+      lines.push(`cursorLine: ${pos.line + 1}`)
+      const sel = editor.document.getText(editor.selection)
+      if (sel.trim().length > 0) {
+        lines.push('selection: |')
+        for (const sline of sel.split('\n')) lines.push(`  ${sline}`)
       }
     }
   } else if (editor) {
@@ -73,7 +79,12 @@ export function buildEditorContextMessage(chipSnapshot?: {
       for (const sline of sel.split('\n')) lines.push(`  ${sline}`)
     }
   }
-  if (visibleFiles.length > 0) {
+  // Only surface `openFiles` from the live window when there's no
+  // snapshot OR the snapshot points at this window's active editor.
+  // Otherwise the visible-files list belongs to a different VSCode
+  // window than the activeFile line and would mislead the model.
+  const showOpenFiles = !chipSnapshot || snapshotMatchesLiveEditor
+  if (showOpenFiles && visibleFiles.length > 0) {
     lines.push('openFiles:')
     for (const f of visibleFiles) lines.push(`  - ${f}`)
   }
