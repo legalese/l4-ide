@@ -161,7 +161,7 @@
 </script>
 
 <div class="assistant-row">
-  <div class="assistant-bubble">
+  <div class="assistant-bubble" class:is-streaming={streaming}>
     {#if blocks && blocks.length > 0}
       {#each blocks as block, i (blockKey(block, i))}
         {#if block.kind === 'text'}
@@ -326,13 +326,23 @@
     border-radius: 0.2em;
     top: -0.15em;
   }
-  /* Pulsate the activity dot on the trailing row only. Once another
-     block (text, tool-call, another activity) lands AFTER this row,
-     it stops being `:last-child` and the dot freezes. Errored rows
-     opt out via the `is-error` class so the user notices the
-     failure visually. Pure CSS — no JS bookkeeping or per-block
-     reactive state. */
-  .tool-activity-row:last-child:not(.is-error) .dot {
+  /* Pulsate the activity dot on the trailing row only, AND only
+     while the turn is still streaming. Three independent gates,
+     all expressed in CSS:
+       1. `:last-child`  — once another block lands AFTER this row
+          (text, tool-call, another activity), it stops being last
+          and the dot freezes. "No new info from the model yet" is
+          encoded as DOM position, no JS bookkeeping.
+       2. `:not(.is-error)` — errored rows opt out so the failure
+          reads visually.
+       3. `.assistant-bubble.is-streaming` — once the turn settles
+          (server `done`, user Stop, new turn supersedes this one),
+          the bubble loses `is-streaming` and every dot under it
+          freezes. No status mutation needed — activity rows aren't
+          really "errored" just because the user stopped the run. */
+  .assistant-bubble.is-streaming
+    .tool-activity-row:last-child:not(.is-error)
+    .dot {
     animation: tool-activity-dot-pulse 1.1s ease-in-out infinite;
   }
   @keyframes tool-activity-dot-pulse {
@@ -347,7 +357,9 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tool-activity-row:last-child:not(.is-error) .dot {
+    .assistant-bubble.is-streaming
+      .tool-activity-row:last-child:not(.is-error)
+      .dot {
       animation-duration: 1.6s;
     }
     @keyframes tool-activity-dot-pulse {
