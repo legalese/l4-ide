@@ -8,7 +8,6 @@ import {
   resolveFileUri,
   workspaceRelative,
 } from './tools/fs.js'
-import { lspDiagnostics } from './tools/lsp.js'
 import { l4Evaluate } from './tools/l4-evaluate.js'
 import { metaAskUser, type AskUserAdapter } from './tools/ask-user.js'
 import { MCP_L4_RULES_PREFIX, type McpToolClient } from './mcp-client.js'
@@ -211,8 +210,6 @@ export class ToolDispatcher {
         return fsEditFile(args as { path: string; old: string; new: string })
       case 'fs__delete_file':
         return fsDeleteFile(args as { path: string })
-      case 'lsp__diagnostics':
-        return lspDiagnostics(args as { path: string })
       case 'l4__evaluate':
         return l4Evaluate(args as { path: string; timeoutMs?: number })
       case 'meta__ask_user':

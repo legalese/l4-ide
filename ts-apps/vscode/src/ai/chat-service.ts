@@ -470,6 +470,20 @@ export class ChatService {
         // the current assistant bubble. The dispatcher's executor for
         // this tool is a no-op that just returns "ok".
         if (ev.name === 'meta__post_status_update') {
+          // Same dedupe story as the regular tool-call branch below:
+          // the proxy emits two SSE frames per call (early
+          // `tool-input-start` + final `tool-call`). Without this
+          // guard we'd push two pendingCalls with the same callId,
+          // POST two `role:"tool"` results to the proxy on the next
+          // turn, and Anthropic would reject with "each tool_use
+          // must have a single result". Also dedupe the inline-text
+          // emission so the user doesn't see the status sentence
+          // twice.
+          const existingCall = pendingCalls.find((c) => c.callId === ev.callId)
+          if (existingCall) {
+            if (ev.argsJson) existingCall.argsJson = ev.argsJson
+            continue
+          }
           const text = extractStatusUpdateText(ev.argsJson)
           if (text) {
             assistantText += text

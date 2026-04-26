@@ -550,7 +550,6 @@ export type AiPermissionCategory =
   | 'fs.create'
   | 'fs.edit'
   | 'fs.delete'
-  | 'lsp.evaluate'
   | 'l4.evaluate'
   | 'mcp.l4Rules'
   | 'meta.askUser'

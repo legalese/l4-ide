@@ -107,25 +107,9 @@ export const BUILTIN_TOOLS: AiProxyTool[] = [
   {
     type: 'function',
     function: {
-      name: 'lsp__diagnostics',
-      description:
-        "Fetch the L4 language server's current diagnostics for a file. Call after every fs__edit_file / fs__create_file to verify the file still type-checks. Returns `{ total, counts, diagnostics[{ line, column, severity, message, source, code }] }` with 1-indexed positions; empty `diagnostics[]` = clean.",
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          path: { type: 'string', description: 'Workspace path.' },
-        },
-        required: ['path'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
       name: 'l4__evaluate',
       description:
-        "Returns the L4 server's latest results for every `#EVAL` / `#CHECK` / `#TRACE` directive in the file: `{ path, count, results[{ directiveId, line, success, value }] }`. Runs lsp diagnostics first internally.",
+        "Type-check + evaluate. If the file has any LSP diagnostics, returns them as a human-readable block (1-indexed line/column, severity, message, source, code) so you can fix the errors first. If the file is clean, returns `{ path, count, results[{ directiveId, line, success, value }] }` — the L4 server's latest results for every `#EVAL` / `#CHECK` / `#TRACE` directive. Call this after every fs__edit_file / fs__create_file to confirm the file still type-checks AND get fresh evaluation results in one round-trip.",
       parameters: {
         type: 'object',
         additionalProperties: false,

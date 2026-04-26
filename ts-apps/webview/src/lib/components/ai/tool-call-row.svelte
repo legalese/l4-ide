@@ -101,15 +101,6 @@
         target: path,
         click: null,
       }
-    if (name === 'lsp__diagnostics')
-      // Same tabular open as read — the user can inspect the file
-      // while its diagnostics are shown in the Problems panel.
-      return {
-        running: 'Checking…',
-        settled: 'Checked',
-        target: path,
-        click: 'open',
-      }
     if (name === 'l4__evaluate')
       return {
         running: 'Evaluating…',

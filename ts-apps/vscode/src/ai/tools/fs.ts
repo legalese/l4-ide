@@ -109,13 +109,11 @@ const PATTERN_CONTEXT_LINES = 2
 
 /**
  * For `.l4` files, append the exact same diagnostics payload the
- * `lsp__diagnostics` tool would produce for this path. Runs on every
- * `fs__read_file` / `fs__create_file` / `fs__edit_file` so the model
- * doesn't need a separate round-trip to confirm the file compiles.
- * Shape stays consistent with `lsp__diagnostics` so agent prompts can
- * parse one JSON format regardless of which tool surfaced it. Failures
- * are swallowed — the primary tool result is more important than the
- * diagnostic annotation.
+ * `l4__evaluate` tool surfaces when the file fails type-check. Runs on
+ * every `fs__read_file` / `fs__create_file` / `fs__edit_file` so the
+ * model doesn't need a separate round-trip to confirm the file
+ * compiles. Failures are swallowed — the primary tool result is more
+ * important than the diagnostic annotation.
  */
 async function appendL4Diagnostics(
   r: ResolvedPath,
@@ -167,7 +165,7 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // Files: one source line per entry. Directories: one entry per
   // entry, with a trailing `/` for subdirs. Diagnostics are NOT
   // auto-appended for .l4 reads any more — earlier versions did
-  // this and trained the model to over-read; use lsp__diagnostics
+  // this and trained the model to over-read; use l4__evaluate
   // explicitly.
   let lines: string[]
   const isDir = stat.isDirectory()
@@ -411,7 +409,7 @@ export async function fsCreateFile(args: FsCreateArgs): Promise<string> {
   }
   // Route through VSCode's WorkspaceEdit so the LSP picks up the new
   // file via its normal didOpen path (otherwise a silent Node write
-  // doesn't get didChange/didOpen events, and lsp__diagnostics can
+  // doesn't get didChange/didOpen events, and l4__evaluate can
   // return stale results for a freshly-created file).
   await fs.mkdir(path.dirname(r.fsPath), { recursive: true })
   const edit = new vscode.WorkspaceEdit()
@@ -458,7 +456,7 @@ export interface FsEditArgs {
  * Claude Code, Aider.
  *
  * Routed through `workspace.applyEdit` so the L4 language server sees
- * the change via didChange (keeps lsp__diagnostics fresh) and the
+ * the change via didChange (keeps l4__evaluate fresh) and the
  * edit joins the VSCode undo stack. We save the buffer afterwards so
  * disk-based readers (`fs__read_file`, other extensions) see the new
  * content immediately.

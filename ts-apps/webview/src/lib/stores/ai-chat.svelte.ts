@@ -971,7 +971,6 @@ export function createAiChatStore(
       'fs.create': 'always',
       'fs.edit': 'always',
       'fs.delete': 'always',
-      'lsp.evaluate': 'always',
       'l4.evaluate': 'always',
       'mcp.l4Rules': 'always',
       'meta.askUser': 'always',
