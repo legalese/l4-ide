@@ -274,7 +274,11 @@
       return null
     }
     if (!call.result) return null
-    const m = call.result.match(/^\[[^\]]*?\s(\d+)-(\d+)(?:\/(\d+))?\]/)
+    // Trailing `[^\]]*` swallows anything between the (optional)
+    // /total and the closing bracket — fs__read_file appends
+    // `, next startLine=<n>` when there's more file to read, so
+    // anchoring on `\]` directly would skip every paginated read.
+    const m = call.result.match(/^\[[^\]]*?\s(\d+)-(\d+)(?:\/(\d+))?[^\]]*\]/)
     if (!m) return null
     const start = parseInt(m[1]!, 10)
     const end = parseInt(m[2]!, 10)

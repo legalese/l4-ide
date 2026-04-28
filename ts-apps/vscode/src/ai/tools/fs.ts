@@ -141,7 +141,7 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  * Response: a compact header line describing what came back, then
  * the selected lines. Header examples:
  *   [<path> 1-40/40]                               — full file/dir
- *   [<path> 1-100/489, next startLine=101]         — paginated
+ *   [<path> 1-100/489]                             — paginated (more after line 100)
  *   [<path> pattern="..." matches=3 chunks=2/2]    — grep result
  *   [<path> pattern="..." matches=0]               — no hits
  *
@@ -224,23 +224,14 @@ function sliceLines(
     body = lines.slice(startLine - 1, endLine).join('\n')
   }
   // Edge case: even a single line exceeds the char cap. Clip
-  // mid-line; the header's next-startLine stays at the same line
-  // so the model can retry with a narrower window.
-  let lineClipped = false
+  // mid-line; the model can retry with a narrower window if needed.
   if (body.length > CHAR_LIMIT) {
     body = body.slice(0, CHAR_LIMIT)
-    lineClipped = true
   }
-  const fitsInOneCall = startLine === 1 && endLine === total && !lineClipped
-  if (fitsInOneCall) {
-    return `[${r.relative} 1-${total}/${total}]\n${body}`
-  }
-  const nextStartLine = lineClipped ? startLine : endLine + 1
-  const hasMore = endLine < total || lineClipped
-  const header = hasMore
-    ? `[${r.relative} ${startLine}-${endLine}/${total}, next startLine=${nextStartLine}]`
-    : `[${r.relative} ${startLine}-${endLine}/${total}]`
-  return `${header}\n${body}`
+  // Header is uniform: `[<path> <start>-<end>/<total>]`. The model
+  // can compute the next call's `startLine` from `<end>` directly, so
+  // a separate "next startLine=…" hint is wasted tokens.
+  return `[${r.relative} ${startLine}-${endLine}/${total}]\n${body}`
 }
 
 /**
