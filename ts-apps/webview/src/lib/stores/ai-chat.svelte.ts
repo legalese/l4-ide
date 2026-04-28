@@ -343,6 +343,13 @@ export function createAiChatStore(
     const m = getMessenger()
     if (!m || !text.trim()) return
     const conv = ensureCurrent()
+    // Freeze any tool-call / tool-activity dots that are still
+    // pulsating on prior turns of this conversation. Usually the prior
+    // assistant turn has already settled, but if the user fires a new
+    // turn before the previous stream's terminal `done` reached us
+    // (rare but possible — disconnect + reattach window) those rows
+    // would otherwise pulse forever next to the new bubble.
+    for (const t of conv.turns) cancelInflightToolCalls(t)
     const turnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
     // Snapshot the staged-context chips — attachments + (when the
     // chip was on) the active file — so the user message can echo
@@ -393,6 +400,14 @@ export function createAiChatStore(
       mediaType: a.mediaType,
       dataBase64: a.dataBase64,
     }))
+    // Snapshot the chip's current active-file state so the extension
+    // can echo it verbatim into the <editor-context> system message
+    // instead of re-querying vscode.window.activeTextEditor (which
+    // can drift across multi-window setups and focus changes).
+    const activeFileSnapshot =
+      wasIncludingActiveFile && activeFile.name && activeFile.path
+        ? { name: activeFile.name, path: activeFile.path }
+        : undefined
     try {
       m.sendNotification(AiChatStart, HOST_EXTENSION, {
         conversationId,
@@ -401,6 +416,7 @@ export function createAiChatStore(
         mentions: mentionsPlain,
         attachments: attachmentsPlain,
         includeActiveFile: wasIncludingActiveFile,
+        ...(activeFileSnapshot ? { activeFile: activeFileSnapshot } : {}),
       })
       // Attaching the active file is one-shot: once this turn's
       // <editor-context> is in flight, flip the toggle off so the
@@ -449,7 +465,44 @@ export function createAiChatStore(
   function continueTurn(): void {
     const m = getMessenger()
     const conv = getConversation()
-    if (!m || !conv || !conv.id) return
+    if (!m || !conv) return
+
+    // No server-assigned conversationId yet → the very first turn
+    // failed before the proxy emitted its `metadata` SSE frame, so
+    // there is no on-disk history to resume against. Fall back to
+    // re-sending the last user message as a fresh request — same
+    // effect as the user retyping it. Without this fallback Retry
+    // silently no-ops, which is the bug the user hit when the proxy
+    // crashed on their first prompt.
+    if (!conv.id) {
+      const lastUserTurn = [...conv.turns]
+        .reverse()
+        .find((t) => t.role === 'user')
+      if (!lastUserTurn || !lastUserTurn.content.trim()) return
+      // Drop trailing errored assistant bubble(s) so the resend lands
+      // a fresh user→assistant pair instead of being sandwiched under
+      // a stale error.
+      while (
+        conv.turns.length > 0 &&
+        conv.turns[conv.turns.length - 1]!.role === 'assistant'
+      ) {
+        conv.turns.pop()
+      }
+      // Drop the user turn — send() will re-append it. Routing
+      // through send() keeps the chips / mentions / attachments
+      // path consistent and avoids duplicating the AiChatStart
+      // construction here. Chips re-derive from current staging,
+      // which is the closest we can get to the original send.
+      const text = lastUserTurn.content
+      conv.turns = conv.turns.filter((t) => t.id !== lastUserTurn.id)
+      send(text)
+      return
+    }
+
+    // Freeze any pulsating tool blocks left over on prior turns
+    // before pushing a fresh assistant bubble — same rationale as in
+    // send().
+    for (const t of conv.turns) cancelInflightToolCalls(t)
     const turnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
     conv.turns.push({
       id: `asst:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
@@ -505,12 +558,39 @@ export function createAiChatStore(
     // event races or never arrives, the UI still unlocks.
     last.streaming = false
     conv.streaming = false
+    cancelInflightToolCalls(last)
     // Stopping the turn also dismisses any pending meta__ask_user
     // card for this conversation — the extension's abort handler
     // drains the resolver on its side; clearing here keeps the
     // webview in sync so the card disappears immediately. Other
     // conversations' cards stay untouched.
     if (currentId) clearPendingQuestionFor(currentId)
+  }
+
+  /** Mark any tool-call blocks on `turn` that are still in flight
+   *  (`running` / `pending-approval`) as errored with a "Stopped"
+   *  message. Called by abort() and by send() / retry when a new
+   *  turn supersedes the prior one without a clean terminal `done`.
+   *
+   *  Why mutate status here (rather than gate the pulse with CSS the
+   *  way `tool-activity` rows do): a tool-call that didn't resolve
+   *  before the turn ended IS in a failure state semantically — the
+   *  call never came back. Flipping to `error` swaps the row from
+   *  the in-flight dot variant to the chevron card with a "Stopped"
+   *  footer the user can read; the dot animation stops as a
+   *  side-effect of the layout switch. tool-activity rows are
+   *  inert ticker labels with no failure UX, so they freeze via
+   *  CSS only (see `.assistant-bubble.is-streaming` rule in
+   *  message-assistant.svelte) and keep their last status text. */
+  function cancelInflightToolCalls(turn: RenderedTurn): void {
+    if (!turn.blocks) return
+    for (const b of turn.blocks) {
+      if (b.kind !== 'tool-call') continue
+      if (b.call.status === 'running' || b.call.status === 'pending-approval') {
+        b.call.status = 'error'
+        b.call.error = b.call.error ?? 'Stopped'
+      }
+    }
   }
 
   /** Drop any pending meta__ask_user card attached to `convId`.
@@ -929,7 +1009,6 @@ export function createAiChatStore(
       'fs.create': 'always',
       'fs.edit': 'always',
       'fs.delete': 'always',
-      'lsp.evaluate': 'always',
       'l4.evaluate': 'always',
       'mcp.l4Rules': 'always',
       'meta.askUser': 'always',

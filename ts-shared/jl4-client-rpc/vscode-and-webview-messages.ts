@@ -431,6 +431,25 @@ export interface AiChatStartParams {
    * system message so the active file doesn't leak into context.
    * Defaults to true if unset. */
   includeActiveFile?: boolean
+  /** Snapshot of the active-file chip the webview was showing at
+   * send time. The extension uses this in
+   * `buildEditorContextMessage` instead of re-querying
+   * `vscode.window.activeTextEditor` at assemble time. Prevents
+   * two divergence cases:
+   *   1. Multi-window setups — each VSCode window has its own
+   *      activeTextEditor, but the user reasons about "what the
+   *      chip showed" in the window they last clicked on.
+   *   2. Focus-change races — between the webview's last chip
+   *      update and the extension assembling the request, the
+   *      activeTextEditor can shift to a different file.
+   *
+   * Live cursor / selection / openFiles still come from the
+   * extension's own window — they're inherently editor-scoped.
+   * The extension only surfaces them when the snapshot's path
+   * matches the live activeTextEditor (i.e. same window, same
+   * file); otherwise it suppresses them so the system message is
+   * a coherent point-in-time view rather than a Frankenstein. */
+  activeFile?: { path: string; name: string }
   /** Retry path: when true, the extension skips adding a user
    * message to the outgoing body and just asks the server to run
    * another turn against the conversation's existing on-disk
@@ -531,7 +550,6 @@ export type AiPermissionCategory =
   | 'fs.create'
   | 'fs.edit'
   | 'fs.delete'
-  | 'lsp.evaluate'
   | 'l4.evaluate'
   | 'mcp.l4Rules'
   | 'meta.askUser'

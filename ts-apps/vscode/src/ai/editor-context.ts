@@ -10,19 +10,58 @@ import type { AuthManager } from '../auth.js'
  * message (after ai-proxy's cached L4 reference) so it doesn't break
  * the provider's prompt cache. Only built when the user has the
  * "attach active file" chip enabled for this turn.
+ *
+ * `chipSnapshot`, when provided, is the active-file state the
+ * webview was showing at send time. It overrides
+ * `vscode.window.activeTextEditor` so the system message reflects
+ * exactly what the user saw on the chip — even across multi-window
+ * setups (each window has its own activeTextEditor) or focus
+ * changes between chip update and request assembly. cursorLine /
+ * selection / openFiles still come from the live editor (those are
+ * inherently editor-scoped and the snapshot doesn't carry them).
  */
-export function buildEditorContextMessage(): AiChatMessage | null {
+export function buildEditorContextMessage(chipSnapshot?: {
+  name: string
+  path: string
+}): AiChatMessage | null {
   const editor = vscode.window.activeTextEditor
   const visibleFiles = vscode.window.visibleTextEditors
     .filter(
       (e) => e.document.languageId === 'l4' || e.document.languageId === 'jl4'
     )
     .map((e) => workspaceRelative(e.document.uri))
-  if (!editor && visibleFiles.length === 0) return null
+  if (!chipSnapshot && !editor && visibleFiles.length === 0) return null
 
   const lines: string[] = []
   lines.push('<editor-context>')
-  if (editor) {
+  // True iff the snapshot's path matches the editor that's currently
+  // active IN THIS extension instance. When false (multi-window
+  // setup, or a focus race between chip update and request
+  // assembly), every auxiliary field — cursor, selection, openFiles
+  // — would describe the WRONG window. We suppress them rather than
+  // emit a coherent-looking but inconsistent block.
+  const snapshotMatchesLiveEditor =
+    !!chipSnapshot &&
+    !!editor &&
+    workspaceRelative(editor.document.uri) === chipSnapshot.path
+  if (chipSnapshot) {
+    // Snapshot wins — use the path the webview chip was showing at
+    // send time. Live editor state (cursor / selection / openFiles)
+    // only flows through when the snapshot points at the same file
+    // as our local activeTextEditor.
+    lines.push(
+      `activeFile: ${chipSnapshot.path} (call fs__read_file on this path if you need the body)`
+    )
+    if (snapshotMatchesLiveEditor && editor) {
+      const pos = editor.selection.active
+      lines.push(`cursorLine: ${pos.line + 1}`)
+      const sel = editor.document.getText(editor.selection)
+      if (sel.trim().length > 0) {
+        lines.push('selection: |')
+        for (const sline of sel.split('\n')) lines.push(`  ${sline}`)
+      }
+    }
+  } else if (editor) {
     const uri = editor.document.uri
     const rel = workspaceRelative(uri)
     const outsideWorkspace =
@@ -40,7 +79,12 @@ export function buildEditorContextMessage(): AiChatMessage | null {
       for (const sline of sel.split('\n')) lines.push(`  ${sline}`)
     }
   }
-  if (visibleFiles.length > 0) {
+  // Only surface `openFiles` from the live window when there's no
+  // snapshot OR the snapshot points at this window's active editor.
+  // Otherwise the visible-files list belongs to a different VSCode
+  // window than the activeFile line and would mislead the model.
+  const showOpenFiles = !chipSnapshot || snapshotMatchesLiveEditor
+  if (showOpenFiles && visibleFiles.length > 0) {
     lines.push('openFiles:')
     for (const f of visibleFiles) lines.push(`  - ${f}`)
   }

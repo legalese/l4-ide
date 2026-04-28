@@ -109,13 +109,11 @@ const PATTERN_CONTEXT_LINES = 2
 
 /**
  * For `.l4` files, append the exact same diagnostics payload the
- * `lsp__diagnostics` tool would produce for this path. Runs on every
- * `fs__read_file` / `fs__create_file` / `fs__edit_file` so the model
- * doesn't need a separate round-trip to confirm the file compiles.
- * Shape stays consistent with `lsp__diagnostics` so agent prompts can
- * parse one JSON format regardless of which tool surfaced it. Failures
- * are swallowed — the primary tool result is more important than the
- * diagnostic annotation.
+ * `l4__evaluate` tool surfaces when the file fails type-check. Runs on
+ * every `fs__read_file` / `fs__create_file` / `fs__edit_file` so the
+ * model doesn't need a separate round-trip to confirm the file
+ * compiles. Failures are swallowed — the primary tool result is more
+ * important than the diagnostic annotation.
  */
 async function appendL4Diagnostics(
   r: ResolvedPath,
@@ -143,7 +141,7 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  * Response: a compact header line describing what came back, then
  * the selected lines. Header examples:
  *   [<path> 1-40/40]                               — full file/dir
- *   [<path> 1-100/489, next startLine=101]         — paginated
+ *   [<path> 1-100/489]                             — paginated (more after line 100)
  *   [<path> pattern="..." matches=3 chunks=2/2]    — grep result
  *   [<path> pattern="..." matches=0]               — no hits
  *
@@ -167,7 +165,7 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // Files: one source line per entry. Directories: one entry per
   // entry, with a trailing `/` for subdirs. Diagnostics are NOT
   // auto-appended for .l4 reads any more — earlier versions did
-  // this and trained the model to over-read; use lsp__diagnostics
+  // this and trained the model to over-read; use l4__evaluate
   // explicitly.
   let lines: string[]
   const isDir = stat.isDirectory()
@@ -226,23 +224,14 @@ function sliceLines(
     body = lines.slice(startLine - 1, endLine).join('\n')
   }
   // Edge case: even a single line exceeds the char cap. Clip
-  // mid-line; the header's next-startLine stays at the same line
-  // so the model can retry with a narrower window.
-  let lineClipped = false
+  // mid-line; the model can retry with a narrower window if needed.
   if (body.length > CHAR_LIMIT) {
     body = body.slice(0, CHAR_LIMIT)
-    lineClipped = true
   }
-  const fitsInOneCall = startLine === 1 && endLine === total && !lineClipped
-  if (fitsInOneCall) {
-    return `[${r.relative} 1-${total}/${total}]\n${body}`
-  }
-  const nextStartLine = lineClipped ? startLine : endLine + 1
-  const hasMore = endLine < total || lineClipped
-  const header = hasMore
-    ? `[${r.relative} ${startLine}-${endLine}/${total}, next startLine=${nextStartLine}]`
-    : `[${r.relative} ${startLine}-${endLine}/${total}]`
-  return `${header}\n${body}`
+  // Header is uniform: `[<path> <start>-<end>/<total>]`. The model
+  // can compute the next call's `startLine` from `<end>` directly, so
+  // a separate "next startLine=…" hint is wasted tokens.
+  return `[${r.relative} ${startLine}-${endLine}/${total}]\n${body}`
 }
 
 /**
@@ -411,7 +400,7 @@ export async function fsCreateFile(args: FsCreateArgs): Promise<string> {
   }
   // Route through VSCode's WorkspaceEdit so the LSP picks up the new
   // file via its normal didOpen path (otherwise a silent Node write
-  // doesn't get didChange/didOpen events, and lsp__diagnostics can
+  // doesn't get didChange/didOpen events, and l4__evaluate can
   // return stale results for a freshly-created file).
   await fs.mkdir(path.dirname(r.fsPath), { recursive: true })
   const edit = new vscode.WorkspaceEdit()
@@ -458,7 +447,7 @@ export interface FsEditArgs {
  * Claude Code, Aider.
  *
  * Routed through `workspace.applyEdit` so the L4 language server sees
- * the change via didChange (keeps lsp__diagnostics fresh) and the
+ * the change via didChange (keeps l4__evaluate fresh) and the
  * edit joins the VSCode undo stack. We save the buffer afterwards so
  * disk-based readers (`fs__read_file`, other extensions) see the new
  * content immediately.
@@ -514,10 +503,16 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
       )
     }
     if (doc.isDirty) await doc.save()
+    // `[<path> 1-N/N]` prefix mirrors fs__read_file's header so the
+    // chat row's parser can lift a "Lines 1-N" suffix out of the
+    // result. /N == total here means "whole file", which the webview
+    // suppresses (a full-file write doesn't need a redundant range
+    // suffix on the row).
+    const newLineCount = args.new.split('\n').length
     return withDocsHintOnError(
       await appendL4Diagnostics(
         r,
-        `Wrote ${r.relative} (${args.new.split('\n').length} lines)`
+        `[${r.relative} 1-${newLineCount}/${newLineCount}] Wrote ${r.relative} (${newLineCount} lines)`
       )
     )
   }
@@ -590,10 +585,19 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
     )
   }
   if (doc.isDirty) await doc.save()
+  // `[<path> <start>-<end>]` prefix carries the post-edit line range
+  // so the chat row can render it as a muted "Lines 23-45" suffix
+  // (matches fs__read_file's surfacing). No `/total` segment here —
+  // total file-line count isn't useful for an edit row, and its
+  // absence tells the webview parser this is an edit-anchor range
+  // (always shown) rather than a read range (suppressed when it
+  // covers the whole file).
+  const editStartLine = range.start.line + 1
+  const editEndLine = editStartLine + args.new.split('\n').length - 1
   return withDocsHintOnError(
     await appendL4Diagnostics(
       r,
-      `Edited ${r.relative} (${args.old.split('\n').length} → ${args.new.split('\n').length} lines changed)`
+      `[${r.relative} ${editStartLine}-${editEndLine}] Edited ${r.relative} (${args.old.split('\n').length} → ${args.new.split('\n').length} lines changed)`
     )
   )
 }

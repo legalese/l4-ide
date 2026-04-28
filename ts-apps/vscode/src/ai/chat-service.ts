@@ -270,6 +270,7 @@ export class ChatService {
         // approvals were auto-denied. Don't start another proxy
         // round-trip — finalize as aborted.
         if (abortController.signal.aborted) {
+          markStoppedToolCalls(turnBlocks)
           if (serverConversationId) {
             await this.persistAssistantTurn(
               serverConversationId,
@@ -291,6 +292,7 @@ export class ChatService {
       }
     } catch (err) {
       if (abortController.signal.aborted) {
+        markStoppedToolCalls(turnBlocks)
         if (serverConversationId && totalAssistantText) {
           await this.persistAssistantTurn(
             serverConversationId,
@@ -470,6 +472,20 @@ export class ChatService {
         // the current assistant bubble. The dispatcher's executor for
         // this tool is a no-op that just returns "ok".
         if (ev.name === 'meta__post_status_update') {
+          // Same dedupe story as the regular tool-call branch below:
+          // the proxy emits two SSE frames per call (early
+          // `tool-input-start` + final `tool-call`). Without this
+          // guard we'd push two pendingCalls with the same callId,
+          // POST two `role:"tool"` results to the proxy on the next
+          // turn, and Anthropic would reject with "each tool_use
+          // must have a single result". Also dedupe the inline-text
+          // emission so the user doesn't see the status sentence
+          // twice.
+          const existingCall = pendingCalls.find((c) => c.callId === ev.callId)
+          if (existingCall) {
+            if (ev.argsJson) existingCall.argsJson = ev.argsJson
+            continue
+          }
           const text = extractStatusUpdateText(ev.argsJson)
           if (text) {
             assistantText += text
@@ -489,11 +505,43 @@ export class ChatService {
           })
           continue
         }
-        pendingCalls.push({
-          callId: ev.callId,
-          name: ev.name,
-          argsJson: ev.argsJson,
-        })
+        // Dedupe by callId: the proxy emits TWO tool_calls SSE chunks
+        // per call now (an early `tool-input-start` frame with empty
+        // args so the webview can pop a pulsating-dot row immediately,
+        // followed by a final `tool-call` frame with the parsed args).
+        // Without dedup we'd end up running the tool twice — and the
+        // dispatcher would POST two tool_result messages back to the
+        // proxy for the same toolCallId, which Anthropic rejects on
+        // the next turn ("each tool_use must have a single result").
+        // Update the existing pendingCall / block in place when the
+        // callId is already known; otherwise push a new entry as
+        // before.
+        const existingCall = pendingCalls.find((c) => c.callId === ev.callId)
+        if (existingCall) {
+          if (ev.argsJson) existingCall.argsJson = ev.argsJson
+          if (ev.name) existingCall.name = ev.name
+        } else {
+          pendingCalls.push({
+            callId: ev.callId,
+            name: ev.name,
+            argsJson: ev.argsJson,
+          })
+        }
+        const existingBlock = blocks.find(
+          (b) => b.kind === 'tool-call' && b.callId === ev.callId
+        )
+        if (existingBlock && existingBlock.kind === 'tool-call') {
+          if (ev.argsJson) existingBlock.argsJson = ev.argsJson
+          if (ev.name) existingBlock.name = ev.name
+        } else {
+          blocks.push({
+            kind: 'tool-call',
+            callId: ev.callId,
+            name: ev.name,
+            argsJson: ev.argsJson,
+            status: 'running',
+          })
+        }
         // Pre-compute the initial status based on the user's permission
         // setting so the tool row renders in its real state from the
         // first frame (no merge race between the initial emit and the
@@ -503,13 +551,10 @@ export class ChatService {
         const permission = category ? getPermission(category) : null
         const initialStatus: 'pending-approval' | 'running' =
           permission === 'ask' ? 'pending-approval' : 'running'
-        blocks.push({
-          kind: 'tool-call',
-          callId: ev.callId,
-          name: ev.name,
-          argsJson: ev.argsJson,
-          status: 'running',
-        })
+        // Re-emit on every frame — the webview's onToolCall merges by
+        // callId, so the early frame creates the row and subsequent
+        // frames update it (notably argsJson goes from "" → real args
+        // when the final tool-call lands).
         this.emit({
           kind: 'tool-call',
           conversationId: local ?? turnId,
@@ -561,7 +606,12 @@ export class ChatService {
     // an explicit `true`; only `false` suppresses. The chat-input UI
     // exposes a per-send toggle for this.
     if (params.includeActiveFile !== false) {
-      const editorCtx = buildEditorContextMessage()
+      // Prefer the chip snapshot the webview captured at send time
+      // (immune to multi-window / focus-race drift). Fall back to
+      // live activeTextEditor when the webview didn't send one
+      // (older builds, or "include active file" toggled on without a
+      // file open at the moment of the send).
+      const editorCtx = buildEditorContextMessage(params.activeFile)
       if (editorCtx) messages.push(editorCtx)
     }
 
@@ -696,6 +746,24 @@ export class ChatService {
 
 function titleFromUserMessage(text: string): string {
   return text.trim().slice(0, 80) || 'New conversation'
+}
+
+/**
+ * Mark any in-flight tool-call blocks as `error: 'Stopped'` before the
+ * turn gets persisted. Mirrors `cancelInflightToolCalls` on the
+ * webview side — keeps the saved `_meta.blocks` honest so a Stop'd
+ * tool call doesn't quietly turn into a `'done'` row when the user
+ * reloads from history (extractPersistedBlocks defaults non-terminal
+ * statuses to `'done'`, which would otherwise erase the Stop signal).
+ */
+function markStoppedToolCalls(blocks: PersistedBlock[]): void {
+  for (const b of blocks) {
+    if (b.kind !== 'tool-call') continue
+    if (b.status === 'running') {
+      b.status = 'error'
+      b.error = b.error ?? 'Stopped'
+    }
+  }
 }
 
 /**

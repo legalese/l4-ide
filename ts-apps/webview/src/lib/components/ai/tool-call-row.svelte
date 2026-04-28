@@ -49,50 +49,100 @@
   })
 
   type ClickMode = 'open' | 'diff' | null
+  /** Each tool gets two labels:
+   *   - `running`: present-continuous, used while the call is
+   *     in-flight ("Editing…"). Conveys "the model is working on
+   *     this right now" instead of just naming the verb.
+   *   - `settled`: noun/past-participle, used once the call resolves
+   *     to done / error ("Edit"). Pairs with the chevron that opens
+   *     the result / diff.
+   */
   const view = $derived.by(() => viewFor(call.name, args))
 
   function viewFor(
     name: string,
     a: Record<string, unknown>
-  ): { label: string; target: string | null; click: ClickMode } {
+  ): {
+    running: string
+    settled: string
+    target: string | null
+    click: ClickMode
+  } {
     const path = typeof a.path === 'string' ? a.path : null
     if (name === 'fs__read_file')
-      return { label: 'Read', target: path, click: 'open' }
+      // "Read" works as both base and past tense (read/read/read) —
+      // settled label stays unchanged.
+      return {
+        running: 'Reading…',
+        settled: 'Read',
+        target: path,
+        click: 'open',
+      }
     if (name === 'fs__create_file')
-      return { label: 'Create', target: path, click: 'open' }
+      return {
+        running: 'Creating…',
+        settled: 'Created',
+        target: path,
+        click: 'open',
+      }
     if (name === 'fs__edit_file')
       return {
-        label: 'Edit',
+        running: 'Editing…',
+        settled: 'Edited',
         target: path,
         // Diff only makes sense once the edit has landed — before that
         // just open the file so the user can see the context.
         click: call.status === 'done' ? 'diff' : 'open',
       }
     if (name === 'fs__delete_file')
-      return { label: 'Delete', target: path, click: null }
-    if (name === 'lsp__diagnostics')
-      // Same tabular open as read — the user can inspect the file
-      // while its diagnostics are shown in the Problems panel.
-      return { label: 'Check', target: path, click: 'open' }
+      return {
+        running: 'Deleting…',
+        settled: 'Deleted',
+        target: path,
+        click: null,
+      }
     if (name === 'l4__evaluate')
-      return { label: 'Evaluate', target: path, click: 'open' }
+      return {
+        running: 'Evaluating…',
+        settled: 'Evaluated',
+        target: path,
+        click: 'open',
+      }
     if (name === 'meta__ask_user')
-      return { label: 'Question', target: null, click: null }
+      return {
+        running: 'Asking…',
+        settled: 'Asked',
+        target: null,
+        click: null,
+      }
     if (name.startsWith('l4-rules__')) {
       const sub = name.slice('l4-rules__'.length)
       // Infrastructure tools (list_files / read_file / search_*) are
       // deployment inventory, not rule evaluations — label them
       // distinctly so the user sees at a glance whether the agent is
-      // browsing deployments or actually running a rule.
+      // browsing deployments or actually running a rule. Same label
+      // running and settled — MCP rule names are user-deployed and
+      // a present-continuous variant doesn't add useful info beyond
+      // the pulsating dot already conveying activity.
       const isInfra = L4_RULES_INFRASTRUCTURE.has(sub)
+      const mcpLabel = isInfra ? 'L4 Deployments' : 'L4 Rule'
       return {
-        label: isInfra ? 'L4 Deployments' : 'L4 Rule',
+        running: mcpLabel,
+        settled: mcpLabel,
         target: sub,
         click: null,
       }
     }
-    return { label: name, target: null, click: null }
+    return { running: name, settled: name, target: null, click: null }
   }
+
+  /** Active label — present-continuous while running / pending
+   *  approval, settled noun once the call resolves. */
+  const label = $derived(
+    call.status === 'running' || call.status === 'pending-approval'
+      ? view.running
+      : view.settled
+  )
 
   function fire(): void {
     if (view.click === 'diff') onOpenDiff(call.callId)
@@ -201,25 +251,60 @@
         : false
   )
 
+  /**
+   * Lift a "Lines N-M" suffix out of the tool result for fs__read_file
+   * and fs__edit_file rows so the row reads "Read foo.l4 (Lines
+   * 12-87)" / "Edited foo.l4 (Lines 23-45)" with the range in subtle
+   * grey after the path. Skipped when the row has no result to parse
+   * yet (pulsating variant) or when the read covered the whole file
+   * — "(Lines 1-N)" on every full-file read is noise, the path alone
+   * already says "I read this file".
+   *
+   * Result header formats (set by tools/fs.ts):
+   *   read slice:       `[<path> <start>-<end>/<total>]…`
+   *   read pattern hit: `[<path> pattern="…" matches=N chunks=K/M]` (skipped)
+   *   edit snippet:     `[<path> <start>-<end>] Edited …`
+   *   edit whole-file:  `[<path> 1-N/N] Wrote …` (skipped via total rule)
+   *
+   * The presence of `/<total>` in the header signals a read-style
+   * range; without it the range is an edit anchor (always shown).
+   */
+  const readLineSuffix = $derived.by<string | null>(() => {
+    if (call.name !== 'fs__read_file' && call.name !== 'fs__edit_file') {
+      return null
+    }
+    if (!call.result) return null
+    // Trailing `[^\]]*` swallows anything between the (optional)
+    // /total and the closing bracket — fs__read_file appends
+    // `, next startLine=<n>` when there's more file to read, so
+    // anchoring on `\]` directly would skip every paginated read.
+    const m = call.result.match(/^\[[^\]]*?\s(\d+)-(\d+)(?:\/(\d+))?[^\]]*\]/)
+    if (!m) return null
+    const start = parseInt(m[1]!, 10)
+    const end = parseInt(m[2]!, 10)
+    const total = m[3] != null ? parseInt(m[3], 10) : null
+    if (total !== null && start === 1 && end === total) return null
+    return `Lines ${start}-${end}`
+  })
+
   let expanded = $state(false)
   function toggle(): void {
     if (!hasDetails) return
     expanded = !expanded
   }
 
-  // While `fs__edit_file` is in flight we render the row in the
+  // While ANY tool call is in flight we render the row in the
   // dot-prefixed style (same chrome as the server-side tool-activity
   // rows in message-assistant.svelte) — no chevron, not expandable,
   // dot pulsating. The instant the call resolves to `done` or
   // `error`, the row swaps to the standard chevron card so the user
-  // can expand the diff or the error message. `fs__create_file`
-  // doesn't pulse because it's now a near-instant no-op (creates a
-  // single-line empty file); the regular chevron row is fine. The
-  // `pending-approval` state also stays on the chevron variant so the
-  // gold "act on me" cue is preserved.
-  const isPulsating = $derived(
-    call.name === 'fs__edit_file' && call.status === 'running'
-  )
+  // can expand the diff or the error message. The proxy now streams
+  // partial tool-call frames as soon as the model commits to a tool
+  // name (toolCallStreaming) so the pulsating dot appears
+  // immediately — even before the args JSON has finished streaming.
+  // `pending-approval` stays on the chevron variant so the gold
+  // "act on me" cue is preserved.
+  const isPulsating = $derived(call.status === 'running')
 </script>
 
 <div class="tool-call" class:is-error={call.status === 'error'}>
@@ -230,9 +315,12 @@
            resolves the row swaps to the chevron variant below and
            becomes expandable. -->
       <span class="dot pulsating" aria-hidden="true"></span>
-      <span class="action">{view.label}</span>
+      <span class="action">{label}</span>
       {#if view.target}
         <span class="target plain">{view.target}</span>
+      {/if}
+      {#if readLineSuffix}
+        <span class="read-range">({readLineSuffix})</span>
       {/if}
     {:else}
       <!-- Leading chevron acts as the expand handle. Same glyph
@@ -268,10 +356,10 @@
           onclick={toggle}
           aria-expanded={expanded}
           aria-label={expanded ? 'Hide details' : 'Show details'}
-          >{view.label}</button
+          >{label}</button
         >
       {:else}
-        <span class="action">{view.label}</span>
+        <span class="action">{label}</span>
       {/if}
       {#if view.target}
         {#if view.click}
@@ -287,6 +375,9 @@
         {:else}
           <span class="target plain">{view.target}</span>
         {/if}
+      {/if}
+      {#if readLineSuffix}
+        <span class="read-range">({readLineSuffix})</span>
       {/if}
     {/if}
   </div>
@@ -406,6 +497,16 @@
     padding: 0;
     cursor: pointer;
     color: var(--vscode-foreground);
+  }
+  /* Subtle suffix for fs__read_file rows: the line range that came
+     back, e.g. "(Lines 1-100)". Uses descriptionForeground (the same
+     muted grey VSCode uses for hints / file-path subtitles) so the
+     filename stays the visual anchor and the range reads as
+     metadata. */
+  .read-range {
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.85em;
   }
   .target-btn:hover {
     text-decoration: underline;
