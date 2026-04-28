@@ -512,10 +512,16 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
       )
     }
     if (doc.isDirty) await doc.save()
+    // `[<path> 1-N/N]` prefix mirrors fs__read_file's header so the
+    // chat row's parser can lift a "Lines 1-N" suffix out of the
+    // result. /N == total here means "whole file", which the webview
+    // suppresses (a full-file write doesn't need a redundant range
+    // suffix on the row).
+    const newLineCount = args.new.split('\n').length
     return withDocsHintOnError(
       await appendL4Diagnostics(
         r,
-        `Wrote ${r.relative} (${args.new.split('\n').length} lines)`
+        `[${r.relative} 1-${newLineCount}/${newLineCount}] Wrote ${r.relative} (${newLineCount} lines)`
       )
     )
   }
@@ -588,10 +594,19 @@ export async function fsEditFile(args: FsEditArgs): Promise<string> {
     )
   }
   if (doc.isDirty) await doc.save()
+  // `[<path> <start>-<end>]` prefix carries the post-edit line range
+  // so the chat row can render it as a muted "Lines 23-45" suffix
+  // (matches fs__read_file's surfacing). No `/total` segment here —
+  // total file-line count isn't useful for an edit row, and its
+  // absence tells the webview parser this is an edit-anchor range
+  // (always shown) rather than a read range (suppressed when it
+  // covers the whole file).
+  const editStartLine = range.start.line + 1
+  const editEndLine = editStartLine + args.new.split('\n').length - 1
   return withDocsHintOnError(
     await appendL4Diagnostics(
       r,
-      `Edited ${r.relative} (${args.old.split('\n').length} → ${args.new.split('\n').length} lines changed)`
+      `[${r.relative} ${editStartLine}-${editEndLine}] Edited ${r.relative} (${args.old.split('\n').length} → ${args.new.split('\n').length} lines changed)`
     )
   )
 }

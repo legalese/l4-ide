@@ -270,6 +270,7 @@ export class ChatService {
         // approvals were auto-denied. Don't start another proxy
         // round-trip — finalize as aborted.
         if (abortController.signal.aborted) {
+          markStoppedToolCalls(turnBlocks)
           if (serverConversationId) {
             await this.persistAssistantTurn(
               serverConversationId,
@@ -291,6 +292,7 @@ export class ChatService {
       }
     } catch (err) {
       if (abortController.signal.aborted) {
+        markStoppedToolCalls(turnBlocks)
         if (serverConversationId && totalAssistantText) {
           await this.persistAssistantTurn(
             serverConversationId,
@@ -744,6 +746,24 @@ export class ChatService {
 
 function titleFromUserMessage(text: string): string {
   return text.trim().slice(0, 80) || 'New conversation'
+}
+
+/**
+ * Mark any in-flight tool-call blocks as `error: 'Stopped'` before the
+ * turn gets persisted. Mirrors `cancelInflightToolCalls` on the
+ * webview side — keeps the saved `_meta.blocks` honest so a Stop'd
+ * tool call doesn't quietly turn into a `'done'` row when the user
+ * reloads from history (extractPersistedBlocks defaults non-terminal
+ * statuses to `'done'`, which would otherwise erase the Stop signal).
+ */
+function markStoppedToolCalls(blocks: PersistedBlock[]): void {
+  for (const b of blocks) {
+    if (b.kind !== 'tool-call') continue
+    if (b.status === 'running') {
+      b.status = 'error'
+      b.error = b.error ?? 'Stopped'
+    }
+  }
 }
 
 /**

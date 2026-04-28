@@ -251,6 +251,38 @@
         : false
   )
 
+  /**
+   * Lift a "Lines N-M" suffix out of the tool result for fs__read_file
+   * and fs__edit_file rows so the row reads "Read foo.l4 (Lines
+   * 12-87)" / "Edited foo.l4 (Lines 23-45)" with the range in subtle
+   * grey after the path. Skipped when the row has no result to parse
+   * yet (pulsating variant) or when the read covered the whole file
+   * — "(Lines 1-N)" on every full-file read is noise, the path alone
+   * already says "I read this file".
+   *
+   * Result header formats (set by tools/fs.ts):
+   *   read slice:       `[<path> <start>-<end>/<total>]…`
+   *   read pattern hit: `[<path> pattern="…" matches=N chunks=K/M]` (skipped)
+   *   edit snippet:     `[<path> <start>-<end>] Edited …`
+   *   edit whole-file:  `[<path> 1-N/N] Wrote …` (skipped via total rule)
+   *
+   * The presence of `/<total>` in the header signals a read-style
+   * range; without it the range is an edit anchor (always shown).
+   */
+  const readLineSuffix = $derived.by<string | null>(() => {
+    if (call.name !== 'fs__read_file' && call.name !== 'fs__edit_file') {
+      return null
+    }
+    if (!call.result) return null
+    const m = call.result.match(/^\[[^\]]*?\s(\d+)-(\d+)(?:\/(\d+))?\]/)
+    if (!m) return null
+    const start = parseInt(m[1]!, 10)
+    const end = parseInt(m[2]!, 10)
+    const total = m[3] != null ? parseInt(m[3], 10) : null
+    if (total !== null && start === 1 && end === total) return null
+    return `Lines ${start}-${end}`
+  })
+
   let expanded = $state(false)
   function toggle(): void {
     if (!hasDetails) return
@@ -282,6 +314,9 @@
       <span class="action">{label}</span>
       {#if view.target}
         <span class="target plain">{view.target}</span>
+      {/if}
+      {#if readLineSuffix}
+        <span class="read-range">({readLineSuffix})</span>
       {/if}
     {:else}
       <!-- Leading chevron acts as the expand handle. Same glyph
@@ -336,6 +371,9 @@
         {:else}
           <span class="target plain">{view.target}</span>
         {/if}
+      {/if}
+      {#if readLineSuffix}
+        <span class="read-range">({readLineSuffix})</span>
       {/if}
     {/if}
   </div>
@@ -455,6 +493,16 @@
     padding: 0;
     cursor: pointer;
     color: var(--vscode-foreground);
+  }
+  /* Subtle suffix for fs__read_file rows: the line range that came
+     back, e.g. "(Lines 1-100)". Uses descriptionForeground (the same
+     muted grey VSCode uses for hints / file-path subtitles) so the
+     filename stays the visual anchor and the range reads as
+     metadata. */
+  .read-range {
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.85em;
   }
   .target-btn:hover {
     text-decoration: underline;
