@@ -40,6 +40,7 @@ import * as nodePath from 'path'
 import * as os from 'os'
 import { promises as fsPromises } from 'fs'
 import type { AuthManager } from '../auth.js'
+import { isLocalMode } from './ai-proxy-client.js'
 import type { ChatService, ChatServiceEvent } from './chat-service.js'
 import type { ConversationStore } from './conversation-store.js'
 import type { AiLogger } from './logger.js'
@@ -137,6 +138,19 @@ export function registerAiChatHandlers(deps: {
     { name: string; argsJson: string; conversationId: string }
   >()
 
+  /** Per-conversation set of "tool activity has fired this turn".
+   *  Used to suppress `thinking-delta` events that arrive AFTER tool
+   *  activity in non-local mode — production OpenRouter presets emit
+   *  reasoning blocks between every tool round, which clutters the
+   *  chat log without adding insight (the model has already chosen
+   *  its next move by the time the user reads the reasoning). Local
+   *  mode keeps every reasoning block since that's what dev mode is
+   *  for: inspecting the model end-to-end. Reset on `started`,
+   *  `done`, or `error` so the next turn starts clean. Tool-activity
+   *  dedupe in the webview store remains intact because suppressed
+   *  thinking blocks never reach it. */
+  const seenToolActivity = new Set<string>()
+
   // ── Forward chat service events to the webview as typed notifications.
   //
   // `sendNow` does the actual postMessage. When the webview is
@@ -150,6 +164,7 @@ export function registerAiChatHandlers(deps: {
   const sendNow = (event: ChatServiceEvent): void => {
     switch (event.kind) {
       case 'started':
+        seenToolActivity.delete(event.conversationId)
         messenger.sendNotification(AiChatStarted, frontend, {
           conversationId: event.conversationId,
           model: event.model,
@@ -167,12 +182,22 @@ export function registerAiChatHandlers(deps: {
         // into one `thinking` block that renders as a
         // collapsed-by-default "Thinking…" toggle in
         // message-assistant.svelte.
+        //
+        // Suppress when we've already seen tool activity this turn
+        // and we're talking to the prod proxy — keeps the chat log
+        // focused on actions taken instead of running commentary
+        // between tool rounds. Local mode (dev) bypasses the gate so
+        // operators can inspect every reasoning chunk end-to-end.
+        if (seenToolActivity.has(event.conversationId) && !isLocalMode()) {
+          break
+        }
         messenger.sendNotification(AiChatThinkingDelta, frontend, {
           conversationId: event.conversationId,
           text: event.text,
         })
         break
       case 'done':
+        seenToolActivity.delete(event.conversationId)
         messenger.sendNotification(AiChatDone, frontend, {
           conversationId: event.conversationId,
           finishReason: event.finishReason,
@@ -180,6 +205,7 @@ export function registerAiChatHandlers(deps: {
         })
         break
       case 'error':
+        seenToolActivity.delete(event.conversationId)
         messenger.sendNotification(AiChatError, frontend, {
           conversationId: event.conversationId,
           message: event.message,
@@ -190,6 +216,7 @@ export function registerAiChatHandlers(deps: {
         logger.debug(
           `tool_activity ${event.status} ${event.tool}: ${event.message}`
         )
+        seenToolActivity.add(event.conversationId)
         messenger.sendNotification(AiChatToolActivity, frontend, {
           conversationId: event.conversationId,
           tool: event.tool,
@@ -198,6 +225,7 @@ export function registerAiChatHandlers(deps: {
         })
         break
       case 'tool-call':
+        seenToolActivity.add(event.conversationId)
         messenger.sendNotification(AiChatToolCall, frontend, {
           conversationId: event.conversationId,
           callId: event.callId,

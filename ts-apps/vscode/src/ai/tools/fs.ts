@@ -92,9 +92,12 @@ export interface FsReadArgs {
    *  matching this pattern — parsed as a case-insensitive regex,
    *  falls back to literal substring when the regex doesn't
    *  compile. For files, matching lines are returned with 2 lines
-   *  of surrounding context; for directories, matching entries
-   *  only. Use this to jump to a named section or symbol without
-   *  paging through preceding lines. */
+   *  of surrounding context. For directories, the tree is walked
+   *  recursively (skipping `.git`, `node_modules`, `.DS_Store`)
+   *  and file *contents* are grepped — results are emitted as
+   *  `<relative-path>:<lineno>: <text>` so the model can jump to
+   *  the file with a follow-up `fs__read_file`. Use this to find
+   *  a symbol or string anywhere under the workspace. */
   pattern?: string
 }
 
@@ -140,14 +143,19 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  *
  * Response: a compact header line describing what came back, then
  * the selected lines. Header examples:
- *   [<path> 1-40/40]                               — full file/dir
- *   [<path> 1-100/489]                             — paginated (more after line 100)
- *   [<path> pattern="..." matches=3 chunks=2/2]    — grep result
- *   [<path> pattern="..." matches=0]               — no hits
+ *   [<path> 1-40/40]                                  — full file/dir
+ *   [<path> 1-100/489]                                — paginated (more after line 100)
+ *   [<path> pattern="..." matches=3 chunks=2/2]       — file grep
+ *   [<path> pattern="..." matches=0]                  — no hits
+ *   [<dir>/ pattern="..." matches=12 files=3]         — recursive dir grep
  *
- * For grep mode, matching lines are prefixed `>>>` and context
+ * For file grep, matching lines are prefixed `>>>` and context
  * lines `   ` so the model can distinguish hits from surroundings;
- * non-contiguous chunks are separated by `---`.
+ * non-contiguous chunks are separated by `---`. For directory grep
+ * the tree is walked recursively (skipping `.git`, `node_modules`,
+ * `.DS_Store`) and matches are emitted as
+ * `<relative-path>:<lineno>: <text>` rows — file contents, not just
+ * entry names.
  */
 export async function fsReadFile(args: FsReadArgs): Promise<string> {
   const r = resolveWorkspacePath(args.path)
@@ -161,6 +169,18 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
     throw err
   }
 
+  const isDir = stat.isDirectory()
+  const hasPattern = typeof args.pattern === 'string' && args.pattern.length > 0
+
+  // Directory + pattern → recursive content grep across the whole
+  // subtree. Different code path because we never want to materialise
+  // the entire subtree as a flat `lines[]` (would defeat the cap and
+  // burn memory on a big repo) — `grepDirRecursive` walks
+  // file-by-file and stops once the cap is hit.
+  if (isDir && hasPattern) {
+    return grepDirRecursive(r, args.pattern!)
+  }
+
   // Materialise the target as a list of lines regardless of kind.
   // Files: one source line per entry. Directories: one entry per
   // entry, with a trailing `/` for subdirs. Diagnostics are NOT
@@ -168,7 +188,6 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // this and trained the model to over-read; use l4__evaluate
   // explicitly.
   let lines: string[]
-  const isDir = stat.isDirectory()
   if (isDir) {
     const raw = await fs.readdir(r.fsPath, { withFileTypes: true })
     const filtered = raw.filter((e) => !DIR_IGNORES.has(e.name))
@@ -186,11 +205,11 @@ export async function fsReadFile(args: FsReadArgs): Promise<string> {
   // Pattern (grep mode) takes precedence — once a pattern is set
   // the output is keyword-focused and startLine/endLine narrow
   // WITHIN that focus.
-  if (typeof args.pattern === 'string' && args.pattern.length > 0) {
+  if (hasPattern) {
     return grepLines(
       r,
       lines,
-      args.pattern,
+      args.pattern!,
       isDir,
       args.startLine,
       args.endLine
@@ -365,6 +384,108 @@ function clampInt(n: number, lo: number, hi: number): number {
   if (rounded < lo) return lo
   if (rounded > hi) return hi
   return rounded
+}
+
+/**
+ * Recursive content grep under a directory. Walks the tree
+ * (depth-first, deterministic order), reads every file as utf-8 and
+ * emits one row per matching line:
+ *
+ *   <relative-path>:<lineno>: <text>
+ *
+ * Skips `DIR_IGNORES` at every level and silently skips files that
+ * fail to decode (binary blobs, broken symlinks). No surrounding
+ * context — across many files the model wants `path:line` to navigate
+ * to with a follow-up `fs__read_file`, not a chunk of code.
+ *
+ * Caps to LINE_LIMIT rows / CHAR_LIMIT chars, signalled in the header
+ * as `shown=X/total`. Stops the walk early once the cap is hit.
+ */
+async function grepDirRecursive(
+  r: ResolvedPath,
+  patternRaw: string
+): Promise<string> {
+  let matcher: (line: string) => boolean
+  try {
+    const re = new RegExp(patternRaw, 'i')
+    matcher = (line) => re.test(line)
+  } catch {
+    const needle = patternRaw.toLowerCase()
+    matcher = (line) => line.toLowerCase().includes(needle)
+  }
+
+  const rows: string[] = []
+  const filesWithMatches = new Set<string>()
+  let totalMatches = 0
+  let renderedChars = 0
+  let truncated = false
+
+  // DFS via an explicit stack so we can break out early once the cap
+  // is hit without unwinding a recursion. `relRoot` is the path
+  // displayed in each row — relative to the workspace, not to `r`.
+  const stack: string[] = [r.fsPath]
+  const baseRel = r.relative
+  while (stack.length > 0) {
+    const dir = stack.pop()!
+    let entries: Array<import('fs').Dirent>
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    entries.sort((a, b) => {
+      const rank = (e: typeof a): number => (e.isDirectory() ? 0 : 1)
+      const d = rank(a) - rank(b)
+      return d !== 0 ? d : a.name.localeCompare(b.name)
+    })
+    // Push directories in reverse so the stack pops them in
+    // alphabetical order, matching the per-directory sort above.
+    const subdirs: string[] = []
+    for (const e of entries) {
+      if (DIR_IGNORES.has(e.name)) continue
+      const full = path.join(dir, e.name)
+      if (e.isDirectory()) {
+        subdirs.push(full)
+        continue
+      }
+      if (!e.isFile()) continue
+      let buf: string
+      try {
+        buf = await fs.readFile(full, 'utf-8')
+      } catch {
+        continue
+      }
+      const fileRel = path.join(baseRel, path.relative(r.fsPath, full))
+      const fileLines = buf.replace(/\r\n/g, '\n').split('\n')
+      for (let i = 0; i < fileLines.length; i++) {
+        if (!matcher(fileLines[i]!)) continue
+        totalMatches++
+        filesWithMatches.add(fileRel)
+        if (truncated) continue
+        const row = `${fileRel}:${i + 1}: ${fileLines[i]!}`
+        if (
+          rows.length + 1 > LINE_LIMIT ||
+          renderedChars + row.length + 1 > CHAR_LIMIT
+        ) {
+          truncated = true
+          continue
+        }
+        rows.push(row)
+        renderedChars += row.length + 1
+      }
+    }
+    for (let i = subdirs.length - 1; i >= 0; i--) stack.push(subdirs[i]!)
+  }
+
+  const patternLabel = JSON.stringify(patternRaw)
+  if (totalMatches === 0) {
+    return `[${r.relative}/ pattern=${patternLabel} matches=0]`
+  }
+  const header =
+    `[${r.relative}/ pattern=${patternLabel} matches=${totalMatches} ` +
+    `files=${filesWithMatches.size}` +
+    (truncated ? `, shown=${rows.length}/${totalMatches}]` : `]`)
+  return `${header}\n${rows.join('\n')}`
 }
 
 export interface FsCreateArgs {
