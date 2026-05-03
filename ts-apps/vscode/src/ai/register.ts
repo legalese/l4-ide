@@ -253,7 +253,7 @@ export function registerAiChatHandlers(deps: {
       case 'queue-consumed':
         messenger.sendNotification(AiChatQueueConsumed, frontend, {
           conversationId: event.conversationId,
-          count: event.count,
+          injectionIds: event.injectionIds,
         })
         break
     }

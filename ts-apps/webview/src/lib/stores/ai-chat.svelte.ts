@@ -56,6 +56,16 @@ export interface RenderedTurn {
    * even before the server assigns a conversationId. Absent on user
    * turns (nothing to cancel). */
   turnId?: string
+  /** For user turns submitted DURING an in-flight pipeline (the
+   *  inject path): the webview-minted id we shipped in the
+   *  AiChatInject notification. The store keeps the matching entry
+   *  in `conv.queuedInjections` until the extension echoes the id
+   *  back via `queue-consumed`; the bubble renders greyed-out and
+   *  is excluded from the scroll-sticky set while the entry is
+   *  live. Absent on the initial user turn of a sub-turn (those go
+   *  straight into the request, never queued) and on assistant
+   *  turns. */
+  injectionId?: string
   role: 'user' | 'assistant'
   /** Concatenated assistant text for retry / copy / persistence. For
    * display the UI iterates `blocks` instead, which preserves the
@@ -130,15 +140,16 @@ interface ConversationState {
    *  message rides on this id rather than starting a fresh
    *  `AiChatStart`. Null between turns. */
   activeTurnId: string | null
-  /** Number of user messages currently queued in the extension's
-   *  inject pipeline for this conversation. Incremented by
-   *  `send()` while `streaming` is true; decremented by the
-   *  extension's `queue-consumed` event once messages are folded
-   *  into the model request. Drives the `pipelineActive` gate so
-   *  per-turn usage badges and the "Files changed" review card
-   *  stay hidden until ALL queued user messages have been
-   *  processed (not just the originally-streaming sub-turn). */
-  queuedCount: number
+  /** Pending user-message injections — one entry per `AiChatInject`
+   *  the webview has dispatched but the extension has not yet
+   *  echoed back via `queue-consumed`. Each entry carries the
+   *  injection's id (the correlation key the extension echoes) and
+   *  the corresponding user-bubble id (so we can grey out / unstyle
+   *  the matching turn). Length drives the `pipelineActive` gate
+   *  and the scroll-sticky exclusion set. The whole array clears on
+   *  `abort()` and on `onError()` since both reasons halt the
+   *  pipeline server-side. */
+  queuedInjections: Array<{ injectionId: string; userTurnId: string }>
 }
 
 /** Parse `_meta.blocks` saved by chat-service into the webview's
@@ -242,7 +253,7 @@ export function createAiChatStore(
           turns: [],
           streaming: false,
           activeTurnId: null,
-          queuedCount: 0,
+          queuedInjections: [],
         }
       }
       currentId = localKey
@@ -322,7 +333,7 @@ export function createAiChatStore(
           }),
         streaming: false,
         activeTurnId: null,
-        queuedCount: 0,
+        queuedInjections: [],
       }
       conversations[conv.id] = state
       currentId = conv.id
@@ -403,12 +414,21 @@ export function createAiChatStore(
 
     // Always push the user bubble immediately for instant visual
     // feedback. The chips snapshot persists with the turn so
-    // re-renders never drift from what the user submitted.
+    // re-renders never drift from what the user submitted. We mint
+    // the user-turn id up front so a queued submit can correlate
+    // the bubble with its pending injection (greyed-out style +
+    // sticky-scroll exclusion until the extension echoes consumption).
+    const userTurnId = `user:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`
+    const isInject = conv.streaming && !!conv.activeTurnId
+    const injectionId = isInject
+      ? `inj_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      : undefined
     conv.turns.push({
-      id: `user:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      id: userTurnId,
       role: 'user',
       content: text,
       ...(turnChips.length > 0 ? { chips: turnChips } : {}),
+      ...(injectionId ? { injectionId } : {}),
     })
 
     // Mid-turn submit: we already have a streaming assistant bubble
@@ -421,12 +441,13 @@ export function createAiChatStore(
     // message into a tool round, the existing bubble keeps growing;
     // if it spawns a sub-turn, the `turn-spawn` event will tell us
     // to mount one.
-    if (conv.streaming && conv.activeTurnId) {
+    if (isInject && injectionId) {
       const conversationIdForInject = conv.id ?? ''
-      conv.queuedCount++
+      conv.queuedInjections.push({ injectionId, userTurnId })
       try {
         m.sendNotification(AiChatInject, HOST_EXTENSION, {
-          turnId: conv.activeTurnId,
+          turnId: conv.activeTurnId!,
+          injectionId,
           conversationId: conversationIdForInject,
           text,
           mentions: mentionsPlain,
@@ -438,14 +459,20 @@ export function createAiChatStore(
         stagedAttachments = []
         console.log('[ai-chat] dispatched AiChatInject', {
           turnId: conv.activeTurnId,
+          injectionId,
           textLen: text.length,
-          queuedCount: conv.queuedCount,
+          queuedLen: conv.queuedInjections.length,
         })
       } catch (err) {
-        // Failed dispatch: roll back the queued count and surface
-        // the error on the user bubble so the user knows their
-        // message didn't reach the model.
-        conv.queuedCount = Math.max(0, conv.queuedCount - 1)
+        // Failed dispatch: roll back the pending entry and clear
+        // the bubble's injectionId so it renders in the normal
+        // "consumed" style. The user can resubmit; the bubble
+        // itself stays so they can copy from it.
+        conv.queuedInjections = conv.queuedInjections.filter(
+          (q) => q.injectionId !== injectionId
+        )
+        const tail = conv.turns[conv.turns.length - 1]
+        if (tail && tail.id === userTurnId) tail.injectionId = undefined
         console.error('[ai-chat] sendNotification(AiChatInject) threw', err)
       }
       if (currentId) delete draftsByConv[currentId]
@@ -660,9 +687,16 @@ export function createAiChatStore(
     conv.activeTurnId = null
     // Stop also wipes any user messages queued in the extension's
     // inject pipeline — the chat-service drops them when its abort
-    // signal trips. Clear the local counter so the pipeline-active
-    // gate releases immediately.
-    conv.queuedCount = 0
+    // signal trips. Clear the local pending list so the
+    // pipeline-active gate releases immediately and any greyed-out
+    // user bubbles pop back to their normal style.
+    if (conv.queuedInjections.length > 0) {
+      const cancelled = new Set(conv.queuedInjections.map((q) => q.userTurnId))
+      for (const t of conv.turns) {
+        if (t.role === 'user' && cancelled.has(t.id)) t.injectionId = undefined
+      }
+      conv.queuedInjections = []
+    }
     if (currentId) clearPendingQuestionFor(currentId)
   }
 
@@ -726,7 +760,7 @@ export function createAiChatStore(
         turns: [],
         streaming: true,
         activeTurnId: null,
-        queuedCount: 0,
+        queuedInjections: [],
       }
     }
   }
@@ -769,18 +803,37 @@ export function createAiChatStore(
     conv.streaming = true
   }
 
-  /** The extension has folded `count` queued user messages into the
-   *  pipeline. Decrement the local counter so the pipeline-active
-   *  gate (which suppresses per-turn usage badges and the "Files
-   *  changed" review card) eventually releases once everything has
-   *  been consumed. */
+  /** The extension has folded the listed `injectionIds` into the
+   *  pipeline. Remove the matching entries from `queuedInjections`
+   *  (so `pipelineActive` releases once everything has been
+   *  consumed) and clear the `injectionId` field on each
+   *  corresponding user bubble so it stops rendering greyed-out and
+   *  becomes eligible for scroll-stickiness.
+   *
+   *  Stale ids (already removed by abort/error, or never enqueued —
+   *  shouldn't happen but cheap to defend against) are silently
+   *  ignored. */
   function onQueueConsumed(params: {
     conversationId: string
-    count: number
+    injectionIds: string[]
   }): void {
     const conv = conversations[params.conversationId]
     if (!conv) return
-    conv.queuedCount = Math.max(0, conv.queuedCount - params.count)
+    if (!params.injectionIds || params.injectionIds.length === 0) return
+    const consumed = new Set(params.injectionIds)
+    const consumedTurnIds = new Set<string>()
+    conv.queuedInjections = conv.queuedInjections.filter((q) => {
+      if (!consumed.has(q.injectionId)) return true
+      consumedTurnIds.add(q.userTurnId)
+      return false
+    })
+    if (consumedTurnIds.size > 0) {
+      for (const t of conv.turns) {
+        if (t.role === 'user' && consumedTurnIds.has(t.id)) {
+          t.injectionId = undefined
+        }
+      }
+    }
   }
 
   function onTextDelta(params: { conversationId: string; text: string }): void {
@@ -838,7 +891,7 @@ export function createAiChatStore(
     // queued user messages waiting to spawn a follow-up sub-turn.
     // The chat-service's `turn-spawn` event will set it back to
     // true if more work is incoming.
-    if (conv.queuedCount === 0) {
+    if (conv.queuedInjections.length === 0) {
       conv.streaming = false
       conv.activeTurnId = null
     }
@@ -867,11 +920,18 @@ export function createAiChatStore(
     }
     // An error halts the whole pipeline — the chat-service exits
     // start() without draining further queued messages — so clear
-    // the queued counter too. The corresponding user bubbles stay
-    // on screen so the user can resubmit if they want.
+    // the pending list. The corresponding user bubbles stay on
+    // screen (un-greyed, with their injectionId cleared) so the
+    // user can copy from them or resubmit.
     conv.streaming = false
     conv.activeTurnId = null
-    conv.queuedCount = 0
+    if (conv.queuedInjections.length > 0) {
+      const cancelled = new Set(conv.queuedInjections.map((q) => q.userTurnId))
+      for (const t of conv.turns) {
+        if (t.role === 'user' && cancelled.has(t.id)) t.injectionId = undefined
+      }
+      conv.queuedInjections = []
+    }
   }
 
   /** Find the most recent assistant turn that's still streaming.
@@ -1345,7 +1405,7 @@ export function createAiChatStore(
     get pipelineActive() {
       const conv = getConversation()
       if (!conv) return false
-      return conv.streaming || conv.queuedCount > 0
+      return conv.streaming || conv.queuedInjections.length > 0
     },
     /** Ids of conversations with an in-flight stream. The history
      *  panel renders a spinner on these rows so the user can see at
@@ -1489,7 +1549,10 @@ export type AiChatStore = {
     message: string
   }) => void
   onTurnSpawn: (params: { conversationId: string; subTurnId: string }) => void
-  onQueueConsumed: (params: { conversationId: string; count: number }) => void
+  onQueueConsumed: (params: {
+    conversationId: string
+    injectionIds: string[]
+  }) => void
   onUsageUpdate: (params: {
     used: number
     limit: number

@@ -67,11 +67,16 @@ export type ChatServiceEvent =
   | { kind: 'turn-spawn'; conversationId: string; subTurnId: string }
   /** Fired each time the chat service folds queued user messages into
    *  the live pipeline (either appended after a tool round or seeded
-   *  into a fresh sub-turn). `count` is the number of messages
-   *  consumed in this batch — the webview decrements its queued
-   *  counter by this amount so the pipeline-active gate eventually
-   *  clears. */
-  | { kind: 'queue-consumed'; conversationId: string; count: number }
+   *  into a fresh sub-turn). `injectionIds` lists the webview-minted
+   *  ids of the messages just consumed — the webview removes the
+   *  matching entries from its pending-queue array. An unack'd id
+   *  stays in the array so a dropped event surfaces as a stuck
+   *  pipeline rather than a silent miscount. */
+  | {
+      kind: 'queue-consumed'
+      conversationId: string
+      injectionIds: string[]
+    }
 
 export type ChatServiceEmitter = (event: ChatServiceEvent) => void
 
@@ -117,8 +122,12 @@ export interface ChatServiceOptions {
 /** A user message queued via `inject()` while a turn is still
  *  in-flight. Mirrors the shape of `AiChatStartParams` but only the
  *  fields the chat-service needs to assemble a follow-up user
- *  message (text + optional content parts). */
+ *  message (text + optional content parts). The `injectionId` is the
+ *  webview's correlation key — echoed back in `queue-consumed` so
+ *  the matching pending-queue entry is removed (and its user bubble
+ *  un-greyed) instead of decrementing a raw counter. */
 interface QueuedUserMessage {
+  injectionId: string
   text: string
   mentions: AiChatStartParams['mentions']
   attachments: AiChatAttachment[]
@@ -163,6 +172,7 @@ export class ChatService {
       this.injections.set(params.turnId, queue)
     }
     queue.push({
+      injectionId: params.injectionId,
       text: params.text,
       mentions: params.mentions,
       attachments: params.attachments,
@@ -170,7 +180,7 @@ export class ChatService {
       activeFile: params.activeFile,
     })
     this.opts.logger.info(
-      `inject: queued message on turn ${params.turnId} (queueLen=${queue.length}, textLen=${params.text.length})`
+      `inject: queued message on turn ${params.turnId} (queueLen=${queue.length}, injectionId=${params.injectionId}, textLen=${params.text.length})`
     )
   }
 
@@ -314,7 +324,7 @@ export class ChatService {
         this.emit({
           kind: 'queue-consumed',
           conversationId: serverConversationId ?? turnId,
-          count: drained.length,
+          injectionIds: drained.map((m) => m.injectionId),
         })
         activeParams = mergeQueuedAsParams(activeParams, drained)
         subTurnIndex++
@@ -535,7 +545,7 @@ export class ChatService {
           this.emit({
             kind: 'queue-consumed',
             conversationId: serverConversationId ?? turnId,
-            count: drained.length,
+            injectionIds: drained.map((m) => m.injectionId),
           })
         }
 

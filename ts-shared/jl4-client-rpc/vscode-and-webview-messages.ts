@@ -531,6 +531,13 @@ export interface AiChatInjectParams {
   /** Turn id of the in-flight turn this message attaches to. The
    *  extension uses this to look up the right queue. */
   turnId: string
+  /** Webview-minted id for THIS specific injection. The extension
+   *  echoes it back in `AiChatQueueConsumed` so the webview can
+   *  remove the right entry from its pending-queue array (and
+   *  unstyle the matching user bubble) instead of decrementing a
+   *  raw counter. Lets a dropped/duplicated event fail loudly
+   *  rather than silently miscount. */
+  injectionId: string
   /** Conversation the in-flight turn belongs to. Used as a sanity
    *  check; the extension drops the inject if this doesn't match the
    *  active turn's conversation. */
@@ -562,14 +569,16 @@ export const AiChatTurnSpawn: NotificationType<{
   method: 'aiChatTurnSpawn',
 }
 
-/** Extension → webview: `count` queued user messages have been
- * folded into the current pipeline (either appended after tool
- * results or used as the seed for a fresh sub-turn). The webview
- * decrements its `queuedCount` so the pipeline-active gate clears
- * once all injected messages have been consumed. */
+/** Extension → webview: the listed `injectionIds` (minted by the
+ * webview at send-time and echoed back here) have been folded into
+ * the current pipeline — either appended after tool results, or
+ * used as the seed for a fresh sub-turn. The webview removes the
+ * matching entries from its pending-queue array; an unack'd id
+ * stays in the array so a dropped event surfaces as a stuck
+ * pipeline rather than a silent miscount. */
 export const AiChatQueueConsumed: NotificationType<{
   conversationId: string
-  count: number
+  injectionIds: string[]
 }> = {
   method: 'aiChatQueueConsumed',
 }
