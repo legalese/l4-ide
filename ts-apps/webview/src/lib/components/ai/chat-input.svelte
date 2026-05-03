@@ -436,12 +436,15 @@
           />
         </svg>
       </button>
-      {#if isStreaming && !(store.pendingQuestion && text.trim())}
-        <!-- Stop button: visible while the turn is streaming UNLESS
-             the model is paused on a meta__ask_user question and the
-             user has typed something — in that case the button flips
-             to a Send so a single Enter submits the answer rather
-             than forcing the user to hunt for a separate affordance. -->
+      {#if isStreaming && !text.trim()}
+        <!-- Stop button: visible while the turn is streaming AND the
+             input is empty. Once the user types anything, the button
+             flips to Send so a single click queues a follow-up
+             (which the store routes through AiChatInject — folded
+             into the next tool round or seeded into a fresh
+             sub-turn). Same behaviour applies when the model is
+             paused on a meta__ask_user question: typed text turns
+             the button into Send so a single Enter answers. -->
         <button
           class="submit-btn stop"
           onclick={abort}
@@ -456,31 +459,6 @@
               height="8"
               rx="1.5"
               fill="currentColor"
-            />
-          </svg>
-        </button>
-        <!-- Mid-stream Send: while the model is still working, let
-             the user queue a follow-up message. The store's send()
-             routes it through AiChatInject so the extension folds
-             it into the next tool round (or spawns a fresh
-             sub-turn once the model finishes naturally). Only
-             enabled when there's actual text to send so an empty
-             click can't double-submit. -->
-        <button
-          class="submit-btn"
-          onclick={submit}
-          disabled={disabled || !text.trim()}
-          title="Queue follow-up (Enter)"
-          aria-label="Queue follow-up"
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M8 13V3.5M3.5 7.5L8 3l4.5 4.5"
-              stroke="currentColor"
-              stroke-width="1.75"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
             />
           </svg>
         </button>
