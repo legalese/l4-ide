@@ -13,6 +13,7 @@
   let {
     turns,
     streaming,
+    pipelineActive,
     pendingApproval,
     pendingQuestion,
     onRetry,
@@ -25,6 +26,11 @@
     /** True while the current conversation has an open stream. Drives
      *  the bottom-of-chat § spinner. */
     streaming: boolean
+    /** True until every queued user message has been folded into the
+     *  pipeline. Forwarded to AssistantMessage to gate the per-turn
+     *  usage badge and the "Files changed" review card so they only
+     *  appear once nothing else is pending. */
+    pipelineActive: boolean
     /** First tool call awaiting approval, if any. When present, the
      *  bottom action bar replaces the spinner with Accept / Reject. */
     pendingApproval: RenderedToolCall | null
@@ -135,6 +141,7 @@
       <AssistantMessage
         content={turn.content}
         streaming={!!turn.streaming}
+        {pipelineActive}
         error={turn.error}
         blocks={turn.blocks}
         usage={turn.usage}

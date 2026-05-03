@@ -10,14 +10,17 @@ import {
   AiChatAskUser,
   AiChatDone,
   AiChatError,
+  AiChatInject,
   AiChatPickAttachment,
   AiChatPreviewAttachment,
+  AiChatQueueConsumed,
   AiChatStart,
   AiChatStarted,
   AiChatTextDelta,
   AiChatThinkingDelta,
   AiChatToolActivity,
   AiChatToolCall,
+  AiChatTurnSpawn,
   AiConversationDelete,
   AiConversationList,
   AiConversationLoad,
@@ -236,6 +239,23 @@ export function registerAiChatHandlers(deps: {
           errorMessage: event.error,
         })
         break
+      case 'turn-spawn':
+        // A queued user message spawned a follow-up sub-turn under
+        // the same conversation. Reset per-turn flags so the next
+        // sub-turn's reasoning blocks aren't pre-suppressed by the
+        // prior one's tool activity.
+        seenToolActivity.delete(event.conversationId)
+        messenger.sendNotification(AiChatTurnSpawn, frontend, {
+          conversationId: event.conversationId,
+          subTurnId: event.subTurnId,
+        })
+        break
+      case 'queue-consumed':
+        messenger.sendNotification(AiChatQueueConsumed, frontend, {
+          conversationId: event.conversationId,
+          count: event.count,
+        })
+        break
     }
   }
   const buffer = new ChatEventBuffer(logger)
@@ -370,6 +390,21 @@ export function registerAiChatHandlers(deps: {
     denyAllPendingApprovals('abort')
     skipAllPendingQuestions('abort')
     service.abort(turnId)
+  })
+
+  // Mid-turn user message: append to the in-flight turn's queue.
+  // The chat-service routes it as either follow-up role:user after a
+  // tool round, or as the seed for a fresh sub-turn once the model
+  // finishes naturally — see ChatService.start() for the routing
+  // logic. The user bubble is already on screen (the webview
+  // pushed it at send-time for instant feedback); this notification
+  // just tells the extension where to plug the text into the model
+  // request.
+  messenger.onNotification(AiChatInject, (params) => {
+    logger.info(
+      `chat/inject received (turn=${params?.turnId ?? '?'}, conv=${params?.conversationId ?? '?'}, textLen=${params?.text?.length ?? 0})`
+    )
+    service.inject(params)
   })
 
   // Webview posts the user's answer to a meta__ask_user question.

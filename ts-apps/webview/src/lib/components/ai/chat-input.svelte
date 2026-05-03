@@ -459,6 +459,31 @@
             />
           </svg>
         </button>
+        <!-- Mid-stream Send: while the model is still working, let
+             the user queue a follow-up message. The store's send()
+             routes it through AiChatInject so the extension folds
+             it into the next tool round (or spawns a fresh
+             sub-turn once the model finishes naturally). Only
+             enabled when there's actual text to send so an empty
+             click can't double-submit. -->
+        <button
+          class="submit-btn"
+          onclick={submit}
+          disabled={disabled || !text.trim()}
+          title="Queue follow-up (Enter)"
+          aria-label="Queue follow-up"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M8 13V3.5M3.5 7.5L8 3l4.5 4.5"
+              stroke="currentColor"
+              stroke-width="1.75"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
       {:else}
         <button
           class="submit-btn"
