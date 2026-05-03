@@ -512,35 +512,77 @@ export class ChatService {
           return { terminate: true, serverConversationId }
         }
 
-        // Drain any user messages queued during this tool round.
-        // They land as `role:'user'` AFTER the tool results so the
-        // ordering rule (assistant tool_calls → tool results → user
-        // follow-up) stays valid. The model gets tool output + user
-        // feedback in one combined POST.
+        // Drain any user messages queued during this tool round and
+        // fold their text INTO the last tool result's content,
+        // wrapped with a `<user-feedback>` marker so the model can
+        // tell apart the tool's own output from the user's
+        // mid-turn comment. Plumbing the feedback through the tool
+        // channel (rather than as a separate `role:'user'` after
+        // the tool results) keeps every provider on the cleanest
+        // expected message shape — assistant(tool_calls) → tool —
+        // and avoids the model occasionally stalling when it sees
+        // an unexpected user turn arrive in the same round it just
+        // requested tools for.
+        //
+        // If a queued message brought attachments, those still
+        // need to ride a separate `role:'user'` after the tool
+        // results — file/image content can't go through the tool
+        // channel. Text-only injections take the fold-into-tool
+        // path; injects with attachments use a hybrid (folded text
+        // marker + role:user content parts for the bytes).
         const queuedDuringTool = this.injections.get(turnId) ?? []
-        let injectedUserMessages: AiChatMessage[] = []
-        if (queuedDuringTool.length > 0) {
+        const userMessagesForAttachments: AiChatMessage[] = []
+        if (queuedDuringTool.length > 0 && toolMessages.length > 0) {
           const drained = queuedDuringTool.splice(0, queuedDuringTool.length)
-          injectedUserMessages = await this.assembleQueuedUserMessages(drained)
-          // Persist injected user messages locally so reload sees
-          // them in the right order. The proxy will persist its own
-          // copy server-side from the same POST body.
-          if (serverConversationId && injectedUserMessages.length > 0) {
-            await this.opts.store
-              .appendMessages(
-                serverConversationId,
-                '',
-                '',
-                '',
-                titleFromUserMessage(drained[0]?.text ?? ''),
-                injectedUserMessages,
-                this.opts.extensionVersion
-              )
-              .catch((err) =>
-                this.opts.logger.warn(
-                  `chat-service: injected-user save failed: ${err instanceof Error ? err.message : String(err)}`
+          const lastToolMessage = toolMessages[toolMessages.length - 1]!
+          const feedbackText = drained
+            .map((m) => m.text)
+            .filter((t) => t.length > 0)
+            .join('\n\n')
+          if (
+            feedbackText.length > 0 &&
+            typeof lastToolMessage.content === 'string'
+          ) {
+            lastToolMessage.content = `${lastToolMessage.content}\n\n<user-feedback>\n${feedbackText}\n</user-feedback>`
+          }
+          // Attachment-bearing injections still need a real user
+          // message for the bytes. Keep them as content-parts; the
+          // text body is stripped down to a backreference so the
+          // model isn't told the same thing twice.
+          for (const m of drained) {
+            if (!m.attachments || m.attachments.length === 0) continue
+            const userMsg = (
+              await this.assembleQueuedUserMessages([
+                { ...m, text: '(attachments for the user-feedback above)' },
+              ])
+            )[0]
+            if (userMsg) userMessagesForAttachments.push(userMsg)
+          }
+          // Persist a normal user-bubble message locally for each
+          // queued submit so the on-disk transcript matches what
+          // the user saw. The proxy's stored history will record
+          // the folded tool content separately — that's the
+          // model-facing shape; this is the user-facing replay.
+          if (serverConversationId) {
+            const userMessagesForReplay: AiChatMessage[] =
+              await this.assembleQueuedUserMessages(drained)
+            if (userMessagesForReplay.length > 0) {
+              await this.opts.store
+                .appendMessages(
+                  serverConversationId,
+                  '',
+                  '',
+                  '',
+                  titleFromUserMessage(drained[0]?.text ?? ''),
+                  userMessagesForReplay,
+                  this.opts.extensionVersion
                 )
-              )
+                .catch((err) =>
+                  this.opts.logger.warn(
+                    `chat-service: injected-user save failed: ${err instanceof Error ? err.message : String(err)}`
+                  )
+                )
+            }
           }
           this.emit({
             kind: 'queue-consumed',
@@ -549,10 +591,12 @@ export class ChatService {
           })
         }
 
-        // Next iteration: tool results, then any queued user
-        // messages. The proxy's stored history already includes the
-        // assistant tool_calls so we don't re-send them.
-        nextMessages = [...toolMessages, ...injectedUserMessages]
+        // Next iteration: tool results (with any user feedback
+        // folded into the last result's content) plus a separate
+        // role:user only when the injection carried attachments.
+        // The proxy's stored history already includes the assistant
+        // tool_calls so we don't re-send them.
+        nextMessages = [...toolMessages, ...userMessagesForAttachments]
       }
     } catch (err) {
       if (abortController.signal.aborted) {
