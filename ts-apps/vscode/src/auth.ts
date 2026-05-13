@@ -194,6 +194,14 @@ export class AuthManager {
     return this.cloudUserId
   }
 
+  /** Org slug for the active Legalese Cloud session. Undefined in
+   *  self-hosted / api-key-only / signed-out modes. Used by the AI tab
+   *  push so the webview can detect an org swap (separate from a user
+   *  swap, since the same user can hop between orgs). */
+  getOrgSlug(): string | undefined {
+    return this.cloudOrgSlug
+  }
+
   /**
    * Filesystem-safe identity key for scoping local state (conversation
    * history, per-user caches). Mirrors the ai-proxy's `creatorId` so

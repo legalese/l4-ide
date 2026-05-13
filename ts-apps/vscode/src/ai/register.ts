@@ -749,16 +749,37 @@ export function registerAiChatHandlers(deps: {
   // AI access, so we don't unlock the AI tab just because the deploy
   // panel happens to be connected to localhost.
   const pushAuthStatus = (): void => {
+    // `userId` is the same storage-key the proxy uses to silo on-disk
+    // state: `apikey-{hash}` when an `legaleseAi.apiKey` is configured,
+    // the WorkOS user id otherwise, or undefined when signed out. The
+    // webview compares this on each push and drops any open chat on a
+    // mismatch, so a session/user/org swap — or just adding/removing
+    // an API key — closes a previous user's conversation rather than
+    // leaving it stranded under a fresh identity.
     messenger.sendNotification(AiAuthStatus, frontend, {
       signedIn: auth.isAiUsable(),
+      userId: auth.getUserStorageKey(),
+      orgSlug: auth.getOrgSlug(),
     })
   }
   // Kick off a connection-state verify so cloudUserId gets populated
   // (or cleared) before we push, but don't gate the push on `connected`.
   void auth.getConnectionState().then(() => pushAuthStatus())
-  const authSub = auth.onDidChange(() => pushAuthStatus())
+  // Any auth-state change can swap the org slug used to forward MCP
+  // requests (jl4 / Legalese Cloud), so the in-process tools/list
+  // cache must drop with it — otherwise a fresh chat right after a
+  // re-sign-in would post the previous session's deployed-rule tool
+  // names in `body.tools` and the proxy would reject the first model
+  // tool_call it can't resolve.
+  const authSub = auth.onDidChange(() => {
+    mcp.invalidate()
+    pushAuthStatus()
+  })
   const aiKeyConfigSub = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (e.affectsConfiguration('legaleseAi.apiKey')) pushAuthStatus()
+    if (e.affectsConfiguration('legaleseAi.apiKey')) {
+      mcp.invalidate()
+      pushAuthStatus()
+    }
   })
 
   // Identify the active editor file for the chat-input's "include

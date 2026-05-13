@@ -233,7 +233,11 @@
       return 'Deploy'
     }
     if (conn.status === 'connecting') return 'Connecting...'
-    if (conn.status === 'error') return 'Connect'
+    // Not-connected and `error` share the same recovery affordance: a
+    // Legalese Cloud sign-in when no service URL is configured, a
+    // generic "Connect" retry otherwise. The previous code returned
+    // 'Connect' unconditionally on `error`, which after a Legalese
+    // Cloud session invalidation hid the sign-in entry point.
     return conn.serviceUrl ? 'Connect' : 'Sign in with Legalese Cloud'
   }
 

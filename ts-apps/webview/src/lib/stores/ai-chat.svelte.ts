@@ -232,6 +232,11 @@ export function createAiChatStore(
   let dailyLimit = $state<number>(0)
   let blockOnOverage = $state<boolean>(false)
   let signedIn = $state<boolean>(false)
+  // Last identity received in `AiAuthStatus` — kept so `onAuthStatus`
+  // can detect user/org swaps and api-key add/remove transitions,
+  // none of which necessarily flip `signedIn` itself.
+  let authUserId = $state<string | undefined>(undefined)
+  let authOrgSlug = $state<string | undefined>(undefined)
   const draftsByConv = $state<Record<string, string>>({})
   // Draft for the not-yet-started conversation. Mirrors
   // `pendingConversation`'s lifecycle: lives while the user is
@@ -1243,16 +1248,32 @@ export function createAiChatStore(
     blockOnOverage = params.blockOnOverage
   }
 
-  function onAuthStatus(params: { signedIn: boolean }): void {
+  function onAuthStatus(params: {
+    signedIn: boolean
+    userId?: string
+    orgSlug?: string
+  }): void {
     const prevSignedIn = signedIn
+    const prevUserId = authUserId
+    const prevOrgSlug = authOrgSlug
     signedIn = params.signedIn
-    // Auth flips (sign in, sign out, user swap) invalidate the cached
-    // history list — it was scoped to the previous user's on-disk
-    // folder. Drop any currently-loaded conversation too: if it
-    // belonged to the previous user it would now 404 on reload, and
-    // leaving its rendered messages on screen under a different
-    // identity is exactly the cross-user leak we're guarding against.
-    if (prevSignedIn !== params.signedIn) {
+    authUserId = params.userId
+    authOrgSlug = params.orgSlug
+    // Auth flips, user swap, org swap, or an API-key add/remove (which
+    // shifts the storage-key prefix to `apikey-…` and back) all
+    // invalidate the cached history list — it was scoped to the
+    // previous identity's on-disk folder. Drop any currently-loaded
+    // conversation too: if it belonged to the previous identity it
+    // would 404 on reload, and leaving its rendered messages on screen
+    // under a different identity is exactly the cross-user leak we're
+    // guarding against. We compare `getUserStorageKey()` (sent as
+    // `userId`) instead of the raw WorkOS id so an api-key swap and a
+    // cloud-user swap are caught by the same check.
+    const identityChanged =
+      prevSignedIn !== params.signedIn ||
+      prevUserId !== params.userId ||
+      prevOrgSlug !== params.orgSlug
+    if (identityChanged) {
       currentId = null
       void refreshHistory()
     }
