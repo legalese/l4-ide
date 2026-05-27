@@ -445,11 +445,22 @@ inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
 
 -- We process imports prior to normal scope- and type-checking. Therefore, this is trivial.
 inferImport :: Import Name -> Check (Import Resolved)
-inferImport (MkImport ann n mr) = do
-  let otherModule = fmap (MkSrcRange zeroSrcPos zeroSrcPos 0) mr
-  m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
-  rn <- ref n m
-  pure (MkImport ann rn mr)
+inferImport = \case
+  MkImport ann n mr -> do
+    let otherModule = fmap (MkSrcRange zeroSrcPos zeroSrcPos 0) mr
+    m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
+    rn <- ref n m
+    pure (MkImport ann rn mr)
+  MkDataImport ann n schema mr -> do
+    -- Data imports behave like regular imports at this stage: the filename
+    -- references the synthetic module that the resolver generates from the
+    -- CSV/TSV file. The row type name and field declarations live inside the
+    -- schema (always at the 'Name' phase) and are handled by type-checking
+    -- the synthetic module itself, not by the IMPORT statement.
+    let otherModule = fmap (MkSrcRange zeroSrcPos zeroSrcPos 0) mr
+    m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
+    rn <- ref n m
+    pure (MkDataImport ann rn schema mr)
 
 inferSection :: Section Name -> Check (Section Resolved, [CheckInfo])
 inferSection (MkSection ann mn maka topdecls) = do

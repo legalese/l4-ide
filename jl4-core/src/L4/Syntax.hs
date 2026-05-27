@@ -181,9 +181,76 @@ data Event n
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 data Import n =
-  MkImport Anno n (Maybe NormalizedUri)
+    MkImport Anno n (Maybe NormalizedUri)
+    -- ^ Regular module import: @IMPORT name@. If the name ends in
+    -- @.csv@ or @.tsv@, the resolver treats it as a tabular data
+    -- import with a fully-inferred schema and an anonymous row type.
+  | MkDataImport Anno n DataImportSchema (Maybe NormalizedUri)
+    -- ^ Tabular data import with an explicit row type and optional
+    -- field declarations.
+    --
+    -- Fields, in order:
+    --
+    --   [1] the filename token (expected to end in @.csv@ / @.tsv@);
+    --   [2] the user-written schema (row type name + optional fields);
+    --   [3] the resolved file URI (populated after import resolution).
+    --
+    -- The schema is intentionally not parameterized on @n@: it is
+    -- consumed by the import resolver to synthesize a 'Module' that
+    -- defines the row type and the bound list, and that synthetic
+    -- module flows through normal type-checking. The schema names
+    -- therefore remain at the 'Name' phase across all phases of
+    -- @Import@.
+    --
+    -- Surface forms:
+    --
+    --   * @IMPORT \`file.csv\` AS Row@ — schema fully auto-inferred.
+    --   * @IMPORT \`file.csv\` AS Row HAS f1 IS A T1, f2 IS A T2@ —
+    --     fully declared schema (fast path).
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | User-written schema for a 'MkDataImport'.
+--
+-- The row type name is required (introduced by @AS@); the field list
+-- is optional (empty means \"auto-infer all columns\"). The schema
+-- intentionally uses its own simpler representation rather than reusing
+-- 'TypedName' so that generic traversals over the surrounding AST do
+-- not accidentally walk into it (which previously caused @gplate@
+-- instance overlap on @Decide Name@ via the MEANS subtree of
+-- 'TypedName').
+data DataImportSchema =
+  MkDataImportSchema Anno Name [DataImportField]
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | One column declaration inside a 'DataImportSchema'.
+--
+-- The field type is one of L4's primitive types ('NUMBER', 'STRING',
+-- 'BOOLEAN', 'DATE', 'TIME', 'DATETIME'), optionally wrapped in
+-- 'MAYBE' to denote that the column can be empty. The parser
+-- rejects anything outside this shape — CSV column types are
+-- intentionally a restricted subset of the full type language.
+data DataImportField =
+  MkDataImportField Anno Name DataImportType
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+data DataImportType =
+    DataImportPrim Anno Name        -- ^ @NUMBER@, @STRING@, @BOOLEAN@, @DATE@, @TIME@, @DATETIME@
+  | DataImportMaybe Anno Name       -- ^ @MAYBE T@, where @T@ is one of the above primitives
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Get the filename/module name from any import variant.
+importName :: Import n -> n
+importName (MkImport _ n _)       = n
+importName (MkDataImport _ n _ _) = n
+
+-- | Get the resolved URI of an import, if it has been resolved.
+importResolvedUri :: Import n -> Maybe NormalizedUri
+importResolvedUri (MkImport _ _ mr)       = mr
+importResolvedUri (MkDataImport _ _ _ mr) = mr
 
 data TypeDecl n =
     RecordDecl Anno (Maybe n) [TypedName n]
@@ -407,9 +474,20 @@ decideBody = lens
              (\(MkDecide dann tys appf _oldBody) body' -> MkDecide dann tys appf body')
 
 updateImport :: Eq n => [(n, NormalizedUri)] -> Import n -> Import n
-updateImport imported i@(MkImport ann n _) = case mapMaybe (\(importName, importUri) -> if importName == n then Just importUri else Nothing) imported of
-  (u' : _) -> MkImport ann n (Just u')
-  [] -> i
+updateImport imported i = case i of
+  MkImport ann n _ -> case lookupUri n of
+    Just u' -> MkImport ann n (Just u')
+    Nothing -> i
+  MkDataImport ann n schema _ -> case lookupUri n of
+    Just u' -> MkDataImport ann n schema (Just u')
+    Nothing -> i
+  where
+    lookupUri n =
+      listToMaybe
+        [ uri
+        | (impName, uri) <- imported
+        , impName == n
+        ]
 
 moduleTopDecls :: Lens' (Module n) [TopDecl n]
 moduleTopDecls = lens
@@ -519,6 +597,12 @@ deriving via L4Syntax (Directive n)
   instance HasAnno (Directive n)
 deriving via L4Syntax (Import n)
   instance HasAnno (Import n)
+deriving via L4Syntax DataImportSchema
+  instance HasAnno DataImportSchema
+deriving via L4Syntax DataImportField
+  instance HasAnno DataImportField
+deriving via L4Syntax DataImportType
+  instance HasAnno DataImportType
 deriving via L4Syntax (TypeDecl n)
   instance HasAnno (TypeDecl n)
 deriving via L4Syntax (ConDecl n)
@@ -590,6 +674,9 @@ deriving anyclass instance ToConcreteNodes PosToken (GivethSig Name)
 deriving anyclass instance ToConcreteNodes PosToken (GivenSig Name)
 deriving anyclass instance ToConcreteNodes PosToken (Directive Name)
 deriving anyclass instance ToConcreteNodes PosToken (Import Name)
+deriving anyclass instance ToConcreteNodes PosToken DataImportSchema
+deriving anyclass instance ToConcreteNodes PosToken DataImportField
+deriving anyclass instance ToConcreteNodes PosToken DataImportType
 
 instance ToConcreteNodes PosToken (Event Name) where
   toNodes (MkEvent ann party does ts atFirst) =
@@ -637,6 +724,8 @@ deriving anyclass instance ToConcreteNodes PosToken (GivethSig Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (GivenSig Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Directive Resolved)
 deriving anyclass instance ToConcreteNodes PosToken (Import Resolved)
+-- DataImportSchema is monomorphic; its Name instance defined above is reused
+-- (no separate Resolved variant is needed).
 instance ToConcreteNodes PosToken (Module Resolved) where
   toNodes (MkModule ann _ secs) = flattenConcreteNodes ann [toNodes secs]
 
@@ -786,6 +875,9 @@ deriving anyclass instance HasSrcRange (Directive a)
 deriving anyclass instance HasSrcRange (RAction a)
 deriving anyclass instance HasSrcRange (Event n)
 deriving anyclass instance HasSrcRange (Import a)
+deriving anyclass instance HasSrcRange DataImportSchema
+deriving anyclass instance HasSrcRange DataImportField
+deriving anyclass instance HasSrcRange DataImportType
 deriving anyclass instance HasSrcRange Lit
 deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
@@ -844,6 +936,9 @@ deriving anyclass instance Serialise n => Serialise (Assume n)
 deriving anyclass instance Serialise n => Serialise (Directive n)
 deriving anyclass instance Serialise n => Serialise (Event n)
 deriving anyclass instance Serialise n => Serialise (Import n)
+deriving anyclass instance Serialise DataImportSchema
+deriving anyclass instance Serialise DataImportField
+deriving anyclass instance Serialise DataImportType
 deriving anyclass instance Serialise n => Serialise (TypeDecl n)
 deriving anyclass instance Serialise n => Serialise (ConDecl n)
 deriving anyclass instance Serialise n => Serialise (Expr n)

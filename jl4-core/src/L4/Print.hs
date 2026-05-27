@@ -238,6 +238,17 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
     MkImport _ n _mr -> "IMPORT" <+> printWithLayout n
+    MkDataImport _ n (MkDataImportSchema _ rowN fields) _mr ->
+      let header = "IMPORT" <+> printWithLayout n <+> "AS" <+> printWithLayout rowN
+      in case fields of
+           [] -> header
+           fs -> header <+> "HAS" <+> hsep (punctuate "," (map printField fs))
+      where
+        printField (MkDataImportField _ fn fty) =
+          printWithLayout fn <+> "IS A" <+> printDataImportType fty
+        printDataImportType = \case
+          DataImportPrim  _ tyN -> printWithLayout tyN
+          DataImportMaybe _ tyN -> "MAYBE" <+> printWithLayout tyN
 
 instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) where
   printWithLayout = \ case

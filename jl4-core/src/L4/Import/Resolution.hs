@@ -133,7 +133,7 @@ extractImportNames = foldTopDecls extractImport
   where
     extractImport :: TopDecl Name -> [Text]
     extractImport = \case
-      Import _ (MkImport _ n _) -> [rawNameToText (rawName n)]
+      Import _ imp -> [rawNameToText (rawName (importName imp))]
       _ -> []
 
 -- ----------------------------------------------------------------------------

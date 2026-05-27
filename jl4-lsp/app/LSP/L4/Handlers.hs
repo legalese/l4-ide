@@ -557,8 +557,9 @@ handlers evalConfig recorder =
                     in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []
 
-              Import _ imp@(MkImport _ n _) ->
-                case rangeOfNode imp of
+              Import _ imp ->
+                let n = importName imp
+                in case rangeOfNode imp of
                   Just rng ->
                     let lspRange = srcRangeToLspRange (Just rng)
                         selRange = nameSelRange n

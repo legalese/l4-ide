@@ -328,7 +328,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         -- Extract imports from first-pass parse (import syntax doesn't need mixfix)
         let extractImport :: TopDecl Name -> [Name]
             extractImport = \case
-              Import _ (MkImport _ n _) -> [n]
+              Import _ imp -> [importName imp]
               _ -> []
             importNames = foldTopDecls extractImport firstProg
 
@@ -429,9 +429,10 @@ jl4Rules evalConfig rootDirectory recorder = do
               pure Nothing
 
         mkImportPath :: Import Name -> Action (Maybe SrcRange, String, [FilePath], [NormalizedUri], Maybe (Either NormalizedUri FilePath))
-        mkImportPath (MkImport a n _mr) = do
-
-          let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+        mkImportPath imp = do
+          let a = getAnno imp
+              n = importName imp
+              modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
           logWith recorder Info $ LogImportResolution $
             "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri uri).getUri
@@ -500,9 +501,9 @@ jl4Rules evalConfig rootDirectory recorder = do
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], ImportResult)]
         mkDiagsAndImports = \ case
-          Import _a i@(MkImport _ n _) -> Ap do
+          Import _a i -> Ap do
             (diag, r, u) <- mkImportUri =<< mkImportPath i
-            pure [(diag, MkImportResult n r u)]
+            pure [(diag, MkImportResult (importName i) r u)]
           _ -> pure []
 
 

@@ -222,6 +222,9 @@ instance ToSemTokens Context PosToken (GivethSig Name) where
 instance ToSemTokens Context PosToken (GivenSig Name) where
 instance ToSemTokens Context PosToken (Directive Name) where
 instance ToSemTokens Context PosToken (Import Name) where
+instance ToSemTokens Context PosToken DataImportSchema where
+instance ToSemTokens Context PosToken DataImportField where
+instance ToSemTokens Context PosToken DataImportType where
 
 instance ToSemTokens Context PosToken NormalizedUri where
   toSemTokens _ = pure []
@@ -329,6 +332,10 @@ instance ToSemTokens () PosToken (GivethSig Resolved) where
 instance ToSemTokens () PosToken (GivenSig Resolved) where
 instance ToSemTokens () PosToken (Directive Resolved) where
 instance ToSemTokens () PosToken (Import Resolved) where
+instance ToSemTokens () PosToken DataImportSchema where
+instance ToSemTokens () PosToken DataImportField where
+instance ToSemTokens () PosToken DataImportType where
+
 instance ToSemTokens () PosToken NormalizedUri where
   toSemTokens _ = pure []
 
