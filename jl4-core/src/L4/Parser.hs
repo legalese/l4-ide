@@ -589,13 +589,66 @@ directive =
 contractEvents :: AnnoParser [Expr Name]
 contractEvents = annoHole $ lmany (const expr)
 
+-- |
+-- @
+-- import ::= 'IMPORT' name ( 'AS' name ( 'HAS' fieldDecl (',' fieldDecl)* )? )?
+-- @
+--
+-- An import without an @AS@ clause is a regular module import
+-- (@'MkImport'@); the resolver decides whether to treat it as a
+-- @.l4@ module or a CSV\/TSV file by inspecting the filename
+-- extension. An import with an @AS@ clause is a tabular data
+-- import (@'MkDataImport'@) and carries a row type name plus an
+-- optional @HAS@ field list.
 import' :: Parser (Import Name)
 import' =
   attachAnno $
-    MkImport emptyAnno
+    buildImport
       <$  annoLexeme (spacedKeyword_ TKImport)
       <*> annoHole name
-      <*> pure Nothing
+      <*> annoHole (optional dataImportSchema)
+  where
+    buildImport n Nothing  = MkImport emptyAnno n Nothing
+    buildImport n (Just s) = MkDataImport emptyAnno n s Nothing
+
+-- | Parse the @AS rowName [HAS f1 IS A T1, f2 IS A T2, …]@ tail of an
+-- 'IMPORT' for a tabular data file.
+dataImportSchema :: Parser DataImportSchema
+dataImportSchema =
+  attachAnno $
+    MkDataImportSchema emptyAnno
+      <$  annoLexeme (spacedKeyword_ TKAs)
+      <*> annoHole name
+      <*> annoHole (fromMaybe [] <$> optional dataImportHas)
+
+dataImportHas :: Parser [DataImportField]
+dataImportHas = do
+  _ <- spacedKeyword_ TKHas
+  (:) <$> dataImportField
+      <*> many (spacedSymbol_ TComma *> dataImportField)
+
+dataImportField :: Parser DataImportField
+dataImportField =
+  attachAnno $
+    MkDataImportField emptyAnno
+      <$> annoHole name
+      <*  annoLexeme (spacedKeyword_ TKIs)
+      <*  annoLexeme (spacedKeyword_ TKA <|> spacedKeyword_ TKAn)
+      <*> annoHole dataImportType
+
+-- | A CSV column type is one of L4's primitive types, optionally
+-- wrapped in @MAYBE@. The token @MAYBE@ is a renamed identifier
+-- (not a keyword), so we match it lexically rather than via a
+-- dedicated token.
+dataImportType :: Parser DataImportType
+dataImportType = do
+  n1 <- name
+  if rawNameToText (rawName n1) == "MAYBE"
+    then do
+      n2 <- name
+      pure $ DataImportMaybe emptyAnno n2
+    else
+      pure $ DataImportPrim emptyAnno n1
 
 -- | Parse @TIMEZONE IS <expr>@
 -- TIMEZONE is not a keyword — it's matched as an identifier so it can
