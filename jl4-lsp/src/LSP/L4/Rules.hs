@@ -30,6 +30,7 @@ import Data.Monoid (Ap (..))
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Base.Text as Text
+import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Mixed.Rope as Rope
 import System.FilePath
 import L4.Utils.IntervalMap (IntervalMap)
@@ -540,8 +541,13 @@ jl4Rules evalConfig rootDirectory recorder = do
         loadDataFile filename = do
           -- Look the data file up by trying, in order:
           --   1. project:/<filename>      (Monaco / WASM VFS scheme)
-          --   2. <importer dir>/<filename> (filesystem, relative)
-          --   3. <root>/<filename>         (filesystem, root-relative)
+          --   2. <importer dir>/<filename> (VFS, then filesystem)
+          --   3. <root>/<filename>         (VFS, then filesystem)
+          --
+          -- The VFS only knows about files the editor has touched. Data
+          -- files (CSV/TSV) usually live on disk next to the source file
+          -- and are never opened in the editor, so we have to fall
+          -- through to the filesystem when 'GetFileContents' misses.
           let projectUri = toNormalizedUri $ Uri $ "project:/" <> filename
               relativeUri = do
                 nfp <- uriToNormalizedFilePath uri
@@ -549,12 +555,36 @@ jl4Rules evalConfig rootDirectory recorder = do
                 pure $ toNormalizedUri $ filePathToUri $ dir </> Text.unpack filename
               rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> Text.unpack filename
               candidates = projectUri : Maybe.maybeToList relativeUri <> [rootUri]
-              firstJust [] = pure Nothing
-              firstJust (u : us) = do
+
+              tryVfs :: NormalizedUri -> Action (Maybe Text)
+              tryVfs u = do
                 m <- use GetFileContents u
                 case m of
                   Just (_, Just rope) -> pure $ Just $ Rope.toText rope
-                  _                   -> firstJust us
+                  _                   -> pure Nothing
+
+              tryFilesystem :: NormalizedUri -> Action (Maybe Text)
+              tryFilesystem u = case uriToNormalizedFilePath u of
+                Nothing  -> pure Nothing
+                Just nfp -> do
+                  let fp = fromNormalizedFilePath nfp
+                  exists <- liftIO $ doesFileExist fp
+                  if exists
+                    then liftIO $ Just <$> Text.IO.readFile fp
+                    else pure Nothing
+
+              tryOne u = do
+                v <- tryVfs u
+                case v of
+                  Just t  -> pure (Just t)
+                  Nothing -> tryFilesystem u
+
+              firstJust [] = pure Nothing
+              firstJust (u : us) = do
+                m <- tryOne u
+                case m of
+                  Just t  -> pure (Just t)
+                  Nothing -> firstJust us
           firstJust candidates
     rewriteResult <- DataImport.rewriteDataImports loadDataFile parsed
     case rewriteResult of
