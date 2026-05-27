@@ -123,6 +123,30 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
       Left CellCoercionFailed { ceType = "NUMBER", ceValue = "oops" } -> pure ()
       other -> expectationFailure $ "expected CellCoercionFailed, got: " <> show other
 
+  it "emits a DECLARE … IS ONE OF for an enum column" $ do
+    let csvSrc = Text.unlines [ "side", "buy", "sell" ]
+    csv <- expectRight (parseCsv csvSrc)
+    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
+    out <- expectRight (synthesizeFromCsv "trades.csv" schema csv)
+    out `shouldSatisfy` Text.isInfixOf "DECLARE Trade_side IS ONE OF buy, sell"
+    out `shouldSatisfy` Text.isInfixOf "side IS A Trade_side"
+
+  it "rejects a cell whose value is not in the enum's set" $ do
+    let csvSrc = Text.unlines [ "side", "hold" ]
+    csv <- expectRight (parseCsv csvSrc)
+    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
+    case synthesizeFromCsv "trades.csv" schema csv of
+      Left EnumCellNotInSet { ceValue = "hold", ceAllowed = ["buy", "sell"] } -> pure ()
+      other -> expectationFailure $ "expected EnumCellNotInSet, got: " <> show other
+
+  it "treats an empty enum cell as a required-column error" $ do
+    let csvSrc = Text.unlines [ "side", "" ]
+    csv <- expectRight (parseCsv csvSrc)
+    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
+    case synthesizeFromCsv "trades.csv" schema csv of
+      Left EmptyCellInRequiredColumn { ceColumn = "side" } -> pure ()
+      other -> expectationFailure $ "expected EmptyCellInRequiredColumn, got: " <> show other
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------

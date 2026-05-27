@@ -633,13 +633,51 @@ dataImportField =
     MkDataImportField emptyAnno
       <$> annoHole name
       <*  annoLexeme (spacedKeyword_ TKIs)
-      <*  annoLexeme (spacedKeyword_ TKA <|> spacedKeyword_ TKAn)
-      <*> annoHole dataImportType
+      <*> annoHole dataImportFieldType
 
--- | A CSV column type is one of L4's primitive types, optionally
--- wrapped in @MAYBE@. The token @MAYBE@ is a renamed identifier
--- (not a keyword), so we match it lexically rather than via a
--- dedicated token.
+-- | The column type clause that follows @IS@ in a HAS field. Two shapes:
+--
+--   * @IS A T@           — a primitive ('NUMBER', 'STRING', 'BOOLEAN',
+--                          'DATE', etc.) optionally wrapped in @MAYBE@.
+--   * @IS ONE OF v1, …@  — an inline enum; the synthesizer generates
+--                          a fresh 'DECLARE' for the enum type and
+--                          validates each cell against the listed
+--                          constructors.
+dataImportFieldType :: Parser DataImportType
+dataImportFieldType =
+      dataImportEnumType
+  <|> ((spacedKeyword_ TKA <|> spacedKeyword_ TKAn) *> dataImportType)
+
+-- | Parse @ONE OF v1, v2, v3@.
+--
+-- The constructor list is terminated by anything that doesn't look like
+-- another @, ctor@ pair. Crucially, we stop when @, name@ is followed by
+-- @IS@, because that signals the start of the /next field/ in the
+-- enclosing @HAS@ clause:
+--
+-- @
+-- HAS
+--   side IS ONE OF buy, sell,   <-- comma here belongs to the HAS list
+--   notional IS A NUMBER         <-- not to the enum's constructor list
+-- @
+dataImportEnumType :: Parser DataImportType
+dataImportEnumType = try $ do
+  _ <- spacedKeyword_ TKOne
+  _ <- spacedKeyword_ TKOf
+  ctors <- (:) <$> name <*> many (try nextCtor)
+  pure $ DataImportEnum emptyAnno ctors
+  where
+    nextCtor = do
+      _ <- spacedSymbol_ TComma
+      n <- name
+      -- If the name we just consumed is actually the first token of
+      -- the next HAS field, back off by failing this 'try'.
+      notFollowedBy (spacedKeyword_ TKIs)
+      pure n
+
+-- | A primitive column type, optionally wrapped in @MAYBE@. The token
+-- @MAYBE@ is a renamed identifier (not a keyword), so we match it
+-- lexically rather than via a dedicated token.
 dataImportType :: Parser DataImportType
 dataImportType = do
   n1 <- name

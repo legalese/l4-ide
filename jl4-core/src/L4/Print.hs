@@ -244,11 +244,19 @@ instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
            [] -> header
            fs -> header <+> "HAS" <+> hsep (punctuate "," (map printField fs))
       where
-        printField (MkDataImportField _ fn fty) =
-          printWithLayout fn <+> "IS A" <+> printDataImportType fty
+        printField (MkDataImportField _ fn fty) = case fty of
+          DataImportEnum _ ctors ->
+            printWithLayout fn <+> "IS ONE OF"
+              <+> hsep (punctuate "," (map printWithLayout ctors))
+          _ ->
+            printWithLayout fn <+> "IS A" <+> printDataImportType fty
         printDataImportType = \case
           DataImportPrim  _ tyN -> printWithLayout tyN
           DataImportMaybe _ tyN -> "MAYBE" <+> printWithLayout tyN
+          -- Handled inline above; this case is unreachable because
+          -- 'printField' picks the enum branch first.
+          DataImportEnum  _ ctors -> "ONE OF" <+>
+            hsep (punctuate "," (map printWithLayout ctors))
 
 instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) where
   printWithLayout = \ case

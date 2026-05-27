@@ -127,3 +127,31 @@ spec = describe "CSV IMPORT end-to-end" $ do
       Right r -> do
         r.tcdSuccess `shouldBe` True
         length r.tcdResolvedImports `shouldBe` 1   -- prelude only; the CSV is inlined
+
+  it "handles enum (ONE OF) columns end-to-end" $ do
+    let csv = Text.unlines
+          [ "side,notional"
+          , "buy,100"
+          , "sell,200"
+          ]
+        dataVfs = vfsFromList [("trades.csv", csv)]
+        source = Text.unlines
+          [ "IMPORT `trades.csv` AS Trade HAS"
+          , "    side     IS ONE OF buy, sell,"
+          , "    notional IS A NUMBER"
+          ]
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> r.tcdSuccess `shouldBe` True
+
+  it "reports an error when an enum cell is outside the declared set" $ do
+    let csv = Text.unlines
+          [ "side"
+          , "hold"
+          ]
+        dataVfs = vfsFromList [("trades.csv", csv)]
+        source = "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell"
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Right _ -> expectationFailure "Expected an 'enum value not in set' error"
+      Left errs ->
+        errs `shouldSatisfy` any (Text.isInfixOf "EnumCellNotInSet")

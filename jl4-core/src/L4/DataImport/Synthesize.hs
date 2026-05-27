@@ -55,6 +55,12 @@ data CoerceError
       , ceColumn :: !Text
       , ceType   :: !Text
       }
+  | EnumCellNotInSet
+      { ceRow      :: !Int
+      , ceColumn   :: !Text
+      , ceValue    :: !Text
+      , ceAllowed  :: ![Text]
+      }
   deriving stock (Eq, Show)
 
 -- ----------------------------------------------------------------------------
@@ -97,15 +103,19 @@ synthesizeFromCsv filename (MkDataImportSchema _ rowN fields) doc = do
   let columnIndex :: Text -> Maybe Int
       columnIndex name' = lookup name' (zip headerCols [0 :: Int ..])
 
+      rowTypeRaw = rawNameToText (rawName rowN)
+
   -- Coerce every row according to the declared schema. A row is a list of
   -- (field-name, expression-text) pairs.
-  rowBodies <- traverse (coerceRow fields columnIndex) (zip [1 :: Int ..] doc.csvRows)
+  rowBodies <- traverse (coerceRow rowTypeRaw fields columnIndex) (zip [1 :: Int ..] doc.csvRows)
 
-  let rowTypeText = renderQuotedIfNeeded (rawNameToText (rawName rowN))
-      fieldsText  = renderFieldDecls fields
+  let rowTypeText = renderQuotedIfNeeded rowTypeRaw
+      fieldsText  = renderFieldDecls rowTypeRaw fields
       listText    = renderList rowTypeText rowBodies
       bindingText = bindingNameFromFilename filename
-  pure $ T.unlines
+      enumDecls   = renderEnumDecls rowTypeRaw fields
+  pure $ T.unlines $
+    enumDecls <>
     [ "DECLARE " <> rowTypeText <> " HAS"
     , indent 4 fieldsText
     , ""
@@ -114,26 +124,51 @@ synthesizeFromCsv filename (MkDataImportSchema _ rowN fields) doc = do
     , indent 4 listText
     ]
 
+-- | Synthetic enum type name for an inline @ONE OF@ column. Uses
+-- @<RowType>_<colName>@ so that two CSV imports defining a column
+-- with the same name but different value sets don't clash. The
+-- @<RowType>@ prefix is the user-written row type name (NOT
+-- back-tick-rewritten), so the user can refer to the enum type from
+-- their own code by guessing the name from the row + column.
+enumTypeName :: Text -> Text -> Text
+enumTypeName rowTypeRaw colName = rowTypeRaw <> "_" <> colName
+
+-- | Emit a top-level @DECLARE EnumName IS ONE OF v1, v2, …@ for every
+-- inline enum column in the schema.
+renderEnumDecls :: Text -> [DataImportField] -> [Text]
+renderEnumDecls rowTypeRaw fs =
+  concat
+    [ [ "DECLARE "
+        <> renderQuotedIfNeeded (enumTypeName rowTypeRaw (rawNameToText (rawName fn)))
+        <> " IS ONE OF "
+        <> T.intercalate ", " (map (rawNameToText . rawName) ctors)
+      , ""
+      ]
+    | MkDataImportField _ fn (DataImportEnum _ ctors) <- fs
+    ]
+
 -- ----------------------------------------------------------------------------
 -- Row-level coercion
 -- ----------------------------------------------------------------------------
 
 -- | Coerce one CSV row into a list of (field-name, expression-text) pairs.
 coerceRow
-  :: [DataImportField]
+  :: Text                       -- ^ row type name (for enum naming)
+  -> [DataImportField]
   -> (Text -> Maybe Int)
   -> (Int, [Text])
   -> Either CoerceError [(Text, Text)]
-coerceRow fields colIdx (rn, cells) =
-  traverse (oneField rn cells colIdx) fields
+coerceRow rowTypeRaw fields colIdx (rn, cells) =
+  traverse (oneField rowTypeRaw rn cells colIdx) fields
 
 oneField
-  :: Int
+  :: Text
+  -> Int
   -> [Text]
   -> (Text -> Maybe Int)
   -> DataImportField
   -> Either CoerceError (Text, Text)
-oneField rowNo cells colIdx (MkDataImportField _ fn ty) = do
+oneField _rowTypeRaw rowNo cells colIdx (MkDataImportField _ fn ty) = do
   let colName = rawNameToText (rawName fn)
       cell    = fromMaybe "" (colIdx colName >>= safeIndex cells)
   exprText <- coerceCell rowNo colName ty cell
@@ -162,6 +197,17 @@ coerceCell rowNo colName ty raw =
         else do
           inner <- coercePrim rowNo colName (rawNameToText (rawName tyN)) trimmed
           pure $ "JUST (" <> inner <> ")"
+    DataImportEnum _ ctors -> coerceEnum rowNo colName ctors trimmed
+
+coerceEnum :: Int -> Text -> [Name] -> Text -> Either CoerceError Text
+coerceEnum rowNo colName ctors raw
+  | T.null raw =
+      Left EmptyCellInRequiredColumn { ceRow = rowNo, ceColumn = colName, ceType = "ONE OF …" }
+  | raw `elem` ctorTexts = Right (renderQuotedIfNeeded raw)
+  | otherwise = Left EnumCellNotInSet
+      { ceRow = rowNo, ceColumn = colName, ceValue = raw, ceAllowed = ctorTexts }
+  where
+    ctorTexts = map (rawNameToText . rawName) ctors
 
 coercePrim :: Int -> Text -> Text -> Text -> Either CoerceError Text
 coercePrim rowNo colName tyName raw
@@ -252,17 +298,20 @@ renderQuotedIfNeeded t
   | needsBackticks t = "`" <> t <> "`"
   | otherwise        = t
 
-renderFieldDecls :: [DataImportField] -> Text
-renderFieldDecls fs = T.intercalate ",\n" (map renderOne fs)
+renderFieldDecls :: Text -> [DataImportField] -> Text
+renderFieldDecls rowTypeRaw fs = T.intercalate ",\n" (map renderOne fs)
   where
     renderOne (MkDataImportField _ fn ty) =
-      renderQuotedIfNeeded (rawNameToText (rawName fn))
-        <> " IS A "
-        <> renderColumnType ty
+      let colName = rawNameToText (rawName fn)
+      in renderQuotedIfNeeded colName
+           <> " IS A "
+           <> renderColumnType rowTypeRaw colName ty
 
-renderColumnType :: DataImportType -> Text
-renderColumnType (DataImportPrim  _ tyN) = rawNameToText (rawName tyN)
-renderColumnType (DataImportMaybe _ tyN) = "MAYBE " <> rawNameToText (rawName tyN)
+renderColumnType :: Text -> Text -> DataImportType -> Text
+renderColumnType _ _ (DataImportPrim  _ tyN) = rawNameToText (rawName tyN)
+renderColumnType _ _ (DataImportMaybe _ tyN) = "MAYBE " <> rawNameToText (rawName tyN)
+renderColumnType rowTypeRaw colName (DataImportEnum _ _) =
+  renderQuotedIfNeeded (enumTypeName rowTypeRaw colName)
 
 -- | Render the list of row constructors. Produces:
 --

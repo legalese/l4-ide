@@ -239,6 +239,10 @@ data DataImportField =
 data DataImportType =
     DataImportPrim Anno Name        -- ^ @NUMBER@, @STRING@, @BOOLEAN@, @DATE@, @TIME@, @DATETIME@
   | DataImportMaybe Anno Name       -- ^ @MAYBE T@, where @T@ is one of the above primitives
+  | DataImportEnum Anno [Name]      -- ^ Inline enum: @ONE OF v1, v2, …@. The
+                                    -- synthesizer emits a fresh @DECLARE@ for
+                                    -- the enum type and validates each cell
+                                    -- against the listed constructor names.
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

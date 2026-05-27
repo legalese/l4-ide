@@ -279,6 +279,9 @@ instance HasNlg DataImportType where
     DataImportMaybe ann tyN -> do
       tyN' <- addNlg tyN
       pure $ DataImportMaybe ann tyN'
+    DataImportEnum ann ctors -> do
+      ctors' <- traverse addNlg ctors
+      pure $ DataImportEnum ann ctors'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
   addNlg a = extendNlgA a $ case a of

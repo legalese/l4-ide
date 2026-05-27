@@ -88,7 +88,31 @@ spec = describe "IMPORT parsing" $ do
               rawNameToText (rawName tyN) `shouldBe` "NUMBER"
             _ -> expectationFailure $ "Expected MAYBE field, got: " <> show field
         _ -> expectationFailure $ "Expected MkDataImport, got: " <> show imp
+
+    it "parses IS ONE OF v1, v2, v3 as an enum column type" $ do
+      imp <- firstImport "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell"
+      case imp of
+        MkDataImport _ _ (MkDataImportSchema _ _ [field]) _ ->
+          case field of
+            MkDataImportField _ fn (DataImportEnum _ ctors) -> do
+              rawNameToText (rawName fn) `shouldBe` "side"
+              map (rawNameToText . rawName) ctors `shouldBe` ["buy", "sell"]
+            _ -> expectationFailure $ "Expected enum field, got: " <> show field
+        _ -> expectationFailure $ "Expected MkDataImport, got: " <> show imp
+
+    it "parses an enum column mixed with primitive columns" $ do
+      imp <- firstImport $ Text.unlines
+        [ "IMPORT `trades.csv` AS Trade HAS"
+        , "    notional IS A NUMBER,"
+        , "    side     IS ONE OF buy, sell,"
+        , "    settled  IS A BOOLEAN"
+        ]
+      case imp of
+        MkDataImport _ _ (MkDataImportSchema _ _ fields) _ ->
+          length fields `shouldBe` 3
+        _ -> expectationFailure $ "Expected MkDataImport, got: " <> show imp
   where
     fieldName (MkDataImportField _ fn _) = rawNameToText (rawName fn)
     fieldTypeName (MkDataImportField _ _ (DataImportPrim  _ tyN)) = rawNameToText (rawName tyN)
     fieldTypeName (MkDataImportField _ _ (DataImportMaybe _ tyN)) = rawNameToText (rawName tyN)
+    fieldTypeName (MkDataImportField _ _ (DataImportEnum  _ _))   = "<enum>"
