@@ -7,6 +7,7 @@ module LSP.L4.Rules where
 import Base hiding (use)
 import L4.Annotation
 import L4.Citations
+import qualified L4.DataImport.Rewrite as DataImport
 import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
@@ -518,61 +519,102 @@ jl4Rules evalConfig rootDirectory recorder = do
 
   defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
 
-    let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
+    -- Expand CSV/TSV data imports (IMPORT `foo.csv` AS Row HAS …) before
+    -- doing anything else with the parsed AST, so the rest of the
+    -- pipeline (dependency resolution, type checking) sees plain
+    -- DECLARE / DECIDE top-level decls in place of the MkDataImport
+    -- nodes. When the rewrite fails (file missing, header mismatch,
+    -- cell coercion failure, …) we emit diagnostics and abort
+    -- type-checking — there is no meaningful module to check.
+    let loadDataFile :: DataImport.DataFileLookup Action
+        loadDataFile filename = do
+          -- Look the data file up by trying, in order:
+          --   1. project:/<filename>      (Monaco / WASM VFS scheme)
+          --   2. <importer dir>/<filename> (filesystem, relative)
+          --   3. <root>/<filename>         (filesystem, root-relative)
+          let projectUri = toNormalizedUri $ Uri $ "project:/" <> filename
+              relativeUri = do
+                nfp <- uriToNormalizedFilePath uri
+                let dir = takeDirectory $ fromNormalizedFilePath nfp
+                pure $ toNormalizedUri $ filePathToUri $ dir </> Text.unpack filename
+              rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> Text.unpack filename
+              candidates = projectUri : Maybe.maybeToList relativeUri <> [rootUri]
+              firstJust [] = pure Nothing
+              firstJust (u : us) = do
+                m <- use GetFileContents u
+                case m of
+                  Just (_, Just rope) -> pure $ Just $ Rope.toText rope
+                  _                   -> firstJust us
+          firstJust candidates
+    rewriteResult <- DataImport.rewriteDataImports loadDataFile parsed
+    case rewriteResult of
+      Left dataErrs ->
+        let diags =
+              [ mkSimpleFileDiagnostic uri $
+                  mkSimpleDiagnostic
+                    (fromNormalizedUri uri).getUri
+                    (renderDataImportError e)
+                    Nothing
+              | e <- dataErrs
+              ]
+        in pure (diags, Nothing)
+      Right rewritten -> do
+        (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
 
-    let unionCheckStates :: TypeCheck.CheckState -> TypeCheckResult -> TypeCheck.CheckState
-        unionCheckStates cState tcRes =
-          TypeCheck.MkCheckState
-          { substitution = tcRes.substitution
-          , supply = cState.supply
-          , infoMap = IV.empty
-          , nlgMap = IV.empty
-          , scopeMap = IV.empty
-          , descMap = IV.empty
-          }
-        unionCheckEnv cEnv tcRes =
-          TypeCheck.MkCheckEnv
-            -- NOTE: the environments behave more like sets than like lists, that's why we need to union them
-            { environment = Map.unionWith List.union cEnv.environment tcRes.environment
-            -- NOTE: we assume that if we have a mapping from a specific unique then it must have come from the
-            -- same module. That means that the rhs of it should be identical.
-            , entityInfo = Map.unionWith (\t1 t2 -> assert (t1 == t2) t1) cEnv.entityInfo tcRes.entityInfo
-            , errorContext = cEnv.errorContext
-            , moduleUri = cEnv.moduleUri
-            , functionTypeSigs = Map.empty -- we can omit environments that are only used internally
-            , declTypeSigs = Map.empty
-            , declareDeclarations = Map.empty
-            , assumeDeclarations = Map.empty
-            , mixfixRegistry = TypeCheck.unionMixfixRegistry cEnv.mixfixRegistry tcRes.mixfixRegistry
-            -- ^ Merge mixfix registries from imported modules so cross-module mixfix calls work
-            , computedFields = Map.empty
-            , sectionStack = []
+        let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) rewritten
+
+        let unionCheckStates :: TypeCheck.CheckState -> TypeCheckResult -> TypeCheck.CheckState
+            unionCheckStates cState tcRes =
+              TypeCheck.MkCheckState
+              { substitution = tcRes.substitution
+              , supply = cState.supply
+              , infoMap = IV.empty
+              , nlgMap = IV.empty
+              , scopeMap = IV.empty
+              , descMap = IV.empty
+              }
+            unionCheckEnv cEnv tcRes =
+              TypeCheck.MkCheckEnv
+                -- NOTE: the environments behave more like sets than like lists, that's why we need to union them
+                { environment = Map.unionWith List.union cEnv.environment tcRes.environment
+                -- NOTE: we assume that if we have a mapping from a specific unique then it must have come from the
+                -- same module. That means that the rhs of it should be identical.
+                , entityInfo = Map.unionWith (\t1 t2 -> assert (t1 == t2) t1) cEnv.entityInfo tcRes.entityInfo
+                , errorContext = cEnv.errorContext
+                , moduleUri = cEnv.moduleUri
+                , functionTypeSigs = Map.empty -- we can omit environments that are only used internally
+                , declTypeSigs = Map.empty
+                , declareDeclarations = Map.empty
+                , assumeDeclarations = Map.empty
+                , mixfixRegistry = TypeCheck.unionMixfixRegistry cEnv.mixfixRegistry tcRes.mixfixRegistry
+                -- ^ Merge mixfix registries from imported modules so cross-module mixfix calls work
+                , computedFields = Map.empty
+                , sectionStack = []
+                }
+            -- NOTE: we don't want to leak the inference variables from the substitution
+            initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
+            initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
+            result = TypeCheck.doCheckProgramWithDependencies initCheckState initCheckEnv parsedAndAnnotated
+            (infos, errors) = partition ((== TypeCheck.SInfo) . TypeCheck.severity) result.errors
+        pure
+          ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+          , Just TypeCheckResult
+            { module' = result.program
+            , substitution = result.substitution
+            , environment = result.environment
+            , entityInfo = applyFinalSubstitution result.substitution uri result.entityInfo
+            , success = null errors
+            , infos
+            , errors  -- Include actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
+            , infoMap = result.infoMap
+            , nlgMap = result.nlgMap
+            , scopeMap = result.scopeMap
+            , descMap = result.descMap
+            , dependencies = dependencies <> foldMap (.dependencies) dependencies
+            , mixfixRegistry = result.mixfixRegistry
             }
-        -- NOTE: we don't want to leak the inference variables from the substitution
-        initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
-        initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
-        result = TypeCheck.doCheckProgramWithDependencies initCheckState initCheckEnv parsedAndAnnotated
-        (infos, errors) = partition ((== TypeCheck.SInfo) . TypeCheck.severity) result.errors
-    pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
-      , Just TypeCheckResult
-        { module' = result.program
-        , substitution = result.substitution
-        , environment = result.environment
-        , entityInfo = applyFinalSubstitution result.substitution uri result.entityInfo
-        , success = null errors
-        , infos
-        , errors  -- Include actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
-        , infoMap = result.infoMap
-        , nlgMap = result.nlgMap
-        , scopeMap = result.scopeMap
-        , descMap = result.descMap
-        , dependencies = dependencies <> foldMap (.dependencies) dependencies
-        , mixfixRegistry = result.mixfixRegistry
-        }
-      )
+          )
 
   define shakeRecorder \ListRootDirectory _emptyUri -> do
     cts <- liftIO $ listL4Files rootDirectory
@@ -758,6 +800,25 @@ jl4Rules evalConfig rootDirectory recorder = do
 
     mkParseErrorDiagnostic :: PError -> Diagnostic
     mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.origin parseError.message (Just parseError.range)
+
+    renderDataImportError :: DataImport.DataImportError -> Text
+    renderDataImportError = \case
+      DataImport.DataFileNotFound fname ->
+        "Could not find data file: " <> fname
+      DataImport.DataFileUnsupportedExtension fname ->
+        "Unsupported data file extension (expected .csv or .tsv): " <> fname
+      DataImport.DataFileParseFailed fname err ->
+        "Failed to parse " <> fname <> ": " <> Text.pack (show err)
+      DataImport.DataFileCoerceFailed fname err ->
+        "Schema mismatch in " <> fname <> ": " <> Text.pack (show err)
+      DataImport.DataFileSynthesisUnparseable fname msgs ->
+        "Internal error synthesising L4 source for "
+          <> fname <> ": " <> Text.intercalate "; " msgs
+      DataImport.DataFileNoSchema fname ->
+        "IMPORT `" <> fname
+          <> "` is missing an AS clause. Schema auto-inference is not yet implemented; \
+             \please declare the row type explicitly, e.g.: \
+             \IMPORT `" <> fname <> "` AS Row HAS col1 IS A NUMBER, ..."
 
     mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
     mkSimpleDiagnostic origin _message range =
