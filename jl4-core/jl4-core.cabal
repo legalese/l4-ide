@@ -144,6 +144,9 @@ library
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution
+    L4.DataImport.Csv
+    L4.DataImport.Synthesize
+    L4.DataImport.Rewrite
     L4.Instances.Serialise
     L4.API
     L4.API.VirtualFS
@@ -164,6 +167,8 @@ test-suite jl4-core-test
     ExportValidationSpec
     NumberLiteralSpec
     CsvImportSpec
+    CsvSynthesizeSpec
+    CsvIntegrationSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

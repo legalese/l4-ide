@@ -32,6 +32,7 @@ module L4.API.VirtualFS
     -- * Type Checking with Imports
   , checkWithImports
   , checkWithImportsAndUri
+  , checkWithImportsAndData
     -- * Re-exports from shared resolution
   , TypeCheckWithDepsResult(..)
   , ResolvedImport(..)
@@ -53,6 +54,7 @@ import L4.Import.Resolution
   , extractImportNames
   , moduleNameToProjectUri
   , typecheckWithDependencies
+  , typecheckWithDependenciesAndData
   , TypeCheckWithDepsResult(..)
   , ResolvedImport(..)
   )
@@ -125,3 +127,26 @@ checkWithImportsAndUri vfs moduleName source =
       lookup' = apiModuleLookup vfs
       Identity result = typecheckWithDependencies lookup' uri source
   in result
+
+-- | Type-check with both a module VFS (for @.l4@ imports) and a data
+-- VFS (for CSV/TSV imports keyed by their full filename, e.g.
+-- @\"trades.csv\"@). Looks data files up directly by filename — no
+-- extension stripping or library search is performed.
+checkWithImportsAndData
+  :: VFS                -- ^ module sources (looked up by module name, no extension)
+  -> VFS                -- ^ data file sources (looked up by full filename)
+  -> Text               -- ^ main module source
+  -> Either [Text] TypeCheckWithDepsResult
+checkWithImportsAndData modVfs dataVfs source =
+  let uri = moduleNameToProjectUri "main"
+      modLookup  = apiModuleLookup modVfs
+      dataLookup name = Identity (vfsLookupExact name dataVfs)
+      Identity result =
+        typecheckWithDependenciesAndData modLookup dataLookup uri source
+  in result
+
+-- | Look up a file by exact filename (no extension fallback). Used by
+-- the data-file lookup path, where the filename in the IMPORT
+-- statement is the canonical key.
+vfsLookupExact :: Text -> VFS -> Maybe Text
+vfsLookupExact name (VFS m) = Map.lookup name m

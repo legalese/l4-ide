@@ -48,6 +48,7 @@ module L4.Import.Resolution
   , ImportResolutionError(..)
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
+  , typecheckWithDependenciesAndData
   , TypeCheckWithDepsResult(..)
   ) where
 
@@ -57,6 +58,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import L4.Annotation (emptyAnno)
+import L4.DataImport.Rewrite (DataFileLookup, DataImportError, rewriteDataImports)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
@@ -278,47 +280,70 @@ typecheckWithDependencies
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies lookupModule = typecheckWithDependenciesAndData lookupModule (\_ -> pure Nothing)
+
+-- | Like 'typecheckWithDependencies', but also accepts a
+-- 'DataFileLookup' that is used to expand any
+-- @IMPORT \`file.csv\` AS Row …@ statements into inline declarations
+-- before type-checking. If the importing module contains no data
+-- imports the lookup is never called.
+typecheckWithDependenciesAndData
+  :: forall m. Monad m
+  => ModuleLookup m
+  -> DataFileLookup m
+  -> NormalizedUri
+  -> Text
+  -> m (Either [Text] TypeCheckWithDepsResult)
+typecheckWithDependenciesAndData lookupModule lookupData uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
       pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
-    
+
     Right (parsed, _hints, _warnings) -> do
-      -- Extract and resolve imports
-      let importNames = extractImportNames parsed
-      
-      importResult <- resolveImports lookupModule Set.empty Set.empty importNames
-      
-      case importResult of
-        Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
-        Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
-        Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
-        
-        Right resolvedImports -> do
-          -- Combine environments from imports
-          let (initState, initEnv) = combineResolvedImports uri resolvedImports
-              updatedParsed = updateModuleImports resolvedImports parsed
-              result = doCheckProgramWithDependencies initState initEnv updatedParsed
-          
-          pure $ Right TypeCheckWithDepsResult
-            { tcdModule = result.program
-            , tcdErrors = result.errors
-            , tcdSubstitution = result.substitution
-            , tcdEnvironment = result.environment
-            , tcdEntityInfo = result.entityInfo
-            , tcdMixfixRegistry = result.mixfixRegistry
-            , tcdInfoMap = result.infoMap
-            , tcdScopeMap = result.scopeMap
-            , tcdNlgMap = result.nlgMap
-            , tcdDescMap = result.descMap
-            , tcdSuccess = null result.errors
-            , tcdResolvedImports = resolvedImports
-            , tcdUri = uri
-            }
+      -- Rewrite CSV/TSV data imports into inlined DECLARE + value bindings.
+      rewriteResult <- rewriteDataImports lookupData parsed
+      case rewriteResult of
+        Left dataErrs ->
+          pure $ Left $ map renderDataImportError dataErrs
+        Right parsedRewritten -> do
+          -- Extract and resolve imports from the rewritten module.
+          let importNames = extractImportNames parsedRewritten
+
+          importResult <- resolveImports lookupModule Set.empty Set.empty importNames
+
+          case importResult of
+            Left (ModuleNotFound modName searched) ->
+              pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+            Left (ParseError modName errs) ->
+              pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+            Left (CyclicImport cycleModules) ->
+              pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+
+            Right resolvedImports -> do
+              -- Combine environments from imports
+              let (initState, initEnv) = combineResolvedImports uri resolvedImports
+                  updatedParsed = updateModuleImports resolvedImports parsedRewritten
+                  result = doCheckProgramWithDependencies initState initEnv updatedParsed
+
+              pure $ Right TypeCheckWithDepsResult
+                { tcdModule = result.program
+                , tcdErrors = result.errors
+                , tcdSubstitution = result.substitution
+                , tcdEnvironment = result.environment
+                , tcdEntityInfo = result.entityInfo
+                , tcdMixfixRegistry = result.mixfixRegistry
+                , tcdInfoMap = result.infoMap
+                , tcdScopeMap = result.scopeMap
+                , tcdNlgMap = result.nlgMap
+                , tcdDescMap = result.descMap
+                , tcdSuccess = null result.errors
+                , tcdResolvedImports = resolvedImports
+                , tcdUri = uri
+                }
+
+renderDataImportError :: DataImportError -> Text
+renderDataImportError = Text.pack . show
 
 -- ----------------------------------------------------------------------------
 -- Internal Helpers
