@@ -15,13 +15,15 @@
 -- share the same logic.
 module L4.DataImport.Rewrite
   ( DataFileLookup
+  , RewriteResult(..)
   , rewriteDataImports
+  , mkAugmentedLookup
   , DataImportError(..)
   ) where
 
 import Base
 import qualified Base.Text as Text
-import qualified Data.Text as T
+import qualified Data.Map.Strict as Map
 
 import L4.DataImport.Csv
 import L4.DataImport.Synthesize
@@ -29,9 +31,6 @@ import L4.Lexer (PError(..))
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Syntax
 
--- Touch a Text module qualified import to avoid unused-import warnings.
-_unusedT :: Text -> Text
-_unusedT = T.strip
 
 -- | How to look up the raw text of a CSV / TSV data file by its
 -- filename token (e.g. @\"trades.csv\"@). Returns 'Nothing' when the
@@ -53,6 +52,23 @@ data DataImportError
     -- bug in the synthesizer, not a user error.
   deriving stock (Eq, Show)
 
+-- | The output of 'rewriteDataImports'.
+--
+-- Carries the rewritten parent module plus a map of /synthesized
+-- module sources/ that the caller should make visible to the import
+-- resolver (typically by wrapping its 'ModuleLookup' with
+-- 'mkAugmentedLookup'). The synthesized-source map is keyed by
+-- module name (the same string the resolver looks up).
+--
+-- Today the rewriter still inlines synthesized declarations into the
+-- parent module and the map is therefore always empty — the structure
+-- is in place to support the upcoming switch to a virtual-module
+-- representation without further API churn at the call sites.
+data RewriteResult = MkRewriteResult
+  { rrParent             :: !(Module Name)
+  , rrSynthesizedSources :: !(Map Text Text)
+  }
+
 -- | Walk a parsed 'Module' and rewrite every 'MkDataImport' into a
 -- value binding by reading the named file, looking up the row type
 -- in the module's existing 'DECLARE's, and coercing each CSV row.
@@ -68,14 +84,37 @@ rewriteDataImports
   :: forall m. Monad m
   => DataFileLookup m
   -> Module Name
-  -> m (Either [DataImportError] (Module Name))
+  -> m (Either [DataImportError] RewriteResult)
 rewriteDataImports lookupData m@(MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
   let env = buildDeclareEnv m
   rewritten <- traverse (rewriteOne lookupData env uri) topdecls
   let (errs, decls) = partitionEithers (concatMapPreserve rewritten)
   if null errs
-    then pure $ Right $ MkModule mAnn uri (MkSection sAnn sName sAka decls)
+    then pure $ Right MkRewriteResult
+      { rrParent             = MkModule mAnn uri (MkSection sAnn sName sAka decls)
+      , rrSynthesizedSources = Map.empty
+      }
     else pure $ Left errs
+
+-- | Wrap a 'ModuleLookup'-shaped lookup function with a map of
+-- pre-resolved sources. The wrapper consults the map first; only on a
+-- miss does it fall through to the underlying lookup. Used by the
+-- import-resolution pipeline to expose 'rrSynthesizedSources' to the
+-- resolver as if those modules existed in the regular VFS / filesystem.
+--
+-- The lookup type is spelled out inline rather than using
+-- 'L4.Import.Resolution.ModuleLookup' so that 'L4.DataImport.Rewrite'
+-- stays below 'L4.Import.Resolution' in the import graph (Resolution
+-- depends on Rewrite, not the other way around).
+mkAugmentedLookup
+  :: Monad m
+  => (Text -> m (Maybe Text))
+  -> Map Text Text
+  -> (Text -> m (Maybe Text))
+mkAugmentedLookup baseLookup extras name =
+  case Map.lookup name extras of
+    Just src -> pure (Just src)
+    Nothing  -> baseLookup name
 
 -- | Per-top-decl rewrite. A plain decl passes through as @Right [d]@;
 -- a data import either expands to a list of synthesized decls or

@@ -326,11 +326,13 @@ jl4Rules evalConfig rootDirectory recorder = do
         -- Get local mixfix hints from this module
         let localHints = Parser.buildMixfixHintRegistry firstProg
 
-        -- Extract imports from first-pass parse (import syntax doesn't need mixfix)
+        -- Extract imports from first-pass parse (import syntax doesn't need mixfix).
+        -- Data imports are handled separately by DataImport.Rewrite and never
+        -- contribute to mixfix-hint resolution, so skip them here.
         let extractImport :: TopDecl Name -> [Name]
             extractImport = \case
-              Import _ imp -> [importName imp]
-              _ -> []
+              Import _ (MkImport _ n _) -> [n]
+              _                         -> []
             importNames = foldTopDecls extractImport firstProg
 
         -- Resolve import URIs using the same logic as GetImports
@@ -502,9 +504,16 @@ jl4Rules evalConfig rootDirectory recorder = do
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], ImportResult)]
         mkDiagsAndImports = \ case
-          Import _a i -> Ap do
+          -- Module imports go through the .l4 file resolver.
+          Import _a i@(MkImport{}) -> Ap do
             (diag, r, u) <- mkImportUri =<< mkImportPath i
             pure [(diag, MkImportResult (importName i) r u)]
+          -- Data imports (IMPORT `foo.csv` IS A …) are handled by the
+          -- DataImport.Rewrite pass in the TypeCheck rule. Skip them
+          -- here so the .l4-module resolver doesn't try to look up
+          -- "foo.csv" as a module (which, after takeBaseName strips
+          -- the extension, would search for "foo.l4").
+          Import _a MkDataImport{} -> pure []
           _ -> pure []
 
 
@@ -559,7 +568,12 @@ jl4Rules evalConfig rootDirectory recorder = do
               | e <- dataErrs
               ]
         in pure (diags, Nothing)
-      Right rewritten -> do
+      -- The synthesized-source map is currently always empty (the rewriter
+      -- still inlines), so the Shake-side wiring to surface synthesized
+      -- modules has nothing to do yet. The pipeline carries it forward
+      -- so we don't have to touch this call site again when the rewriter
+      -- starts emitting virtual modules.
+      Right DataImport.MkRewriteResult { rrParent = rewritten, rrSynthesizedSources = _synthSources } -> do
         (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
 
         let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) rewritten

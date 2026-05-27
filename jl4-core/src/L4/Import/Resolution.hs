@@ -58,7 +58,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import L4.Annotation (emptyAnno)
-import L4.DataImport.Rewrite (DataFileLookup, DataImportError, rewriteDataImports)
+import L4.DataImport.Rewrite
+  ( DataFileLookup
+  , DataImportError
+  , RewriteResult(..)
+  , mkAugmentedLookup
+  , rewriteDataImports
+  )
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
@@ -127,16 +133,19 @@ moduleNameToCandidateUris mBaseUri mRoot modName =
 -- Import Extraction
 -- ----------------------------------------------------------------------------
 
--- | Extract import names from a parsed module.
+-- | Extract module-import names from a parsed module.
 --
--- Returns module names without the .l4 extension.
+-- Returns module names without the .l4 extension. Data imports
+-- (@IMPORT \`foo.csv\` IS A …@) are deliberately /excluded/ — they
+-- are handled by the 'L4.DataImport.Rewrite' pass and the resolver
+-- must never try to treat a CSV/TSV filename as a module name.
 extractImportNames :: Module Name -> [Text]
 extractImportNames = foldTopDecls extractImport
   where
     extractImport :: TopDecl Name -> [Text]
     extractImport = \case
-      Import _ imp -> [rawNameToText (rawName (importName imp))]
-      _ -> []
+      Import _ (MkImport _ n _) -> [rawNameToText (rawName n)]
+      _                         -> []
 
 -- ----------------------------------------------------------------------------
 -- Import Resolution
@@ -301,16 +310,20 @@ typecheckWithDependenciesAndData lookupModule lookupData uri source = do
       pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
 
     Right (parsed, _hints, _warnings) -> do
-      -- Rewrite CSV/TSV data imports into inlined DECLARE + value bindings.
+      -- Rewrite CSV/TSV data imports. Today this still inlines synthesized
+      -- declarations into the parent module and produces an empty
+      -- synthesized-source map; the structure exists so the upcoming
+      -- virtual-module representation can flow extra modules through the
+      -- resolver without further plumbing changes at this call site.
       rewriteResult <- rewriteDataImports lookupData parsed
       case rewriteResult of
         Left dataErrs ->
           pure $ Left $ map renderDataImportError dataErrs
-        Right parsedRewritten -> do
-          -- Extract and resolve imports from the rewritten module.
-          let importNames = extractImportNames parsedRewritten
+        Right MkRewriteResult { rrParent = parsedRewritten, rrSynthesizedSources = synthSources } -> do
+          let augLookup   = mkAugmentedLookup lookupModule synthSources
+              importNames = extractImportNames parsedRewritten
 
-          importResult <- resolveImports lookupModule Set.empty Set.empty importNames
+          importResult <- resolveImports augLookup Set.empty Set.empty importNames
 
           case importResult of
             Left (ModuleNotFound modName searched) ->
