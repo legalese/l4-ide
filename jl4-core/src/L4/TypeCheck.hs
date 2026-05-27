@@ -451,16 +451,18 @@ inferImport = \case
     m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
     rn <- ref n m
     pure (MkImport ann rn mr)
-  MkDataImport ann n schema mr -> do
-    -- Data imports behave like regular imports at this stage: the filename
-    -- references the synthetic module that the resolver generates from the
-    -- CSV/TSV file. The row type name and field declarations live inside the
-    -- schema (always at the 'Name' phase) and are handled by type-checking
-    -- the synthetic module itself, not by the IMPORT statement.
+  MkDataImport ann n ty mr -> do
+    -- Data imports are rewritten into ordinary DECLARE / DECIDE
+    -- declarations before this point in the pipeline. If we still see
+    -- one here it means the rewrite pass was skipped (e.g. in a code
+    -- path that calls the type-checker directly without going through
+    -- 'typecheckWithDependenciesAndData'); treat it just like a plain
+    -- module import — the type expression is left at the 'Name' phase
+    -- because it is consumed by the rewriter, not by name resolution.
     let otherModule = fmap (MkSrcRange zeroSrcPos zeroSrcPos 0) mr
     m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
     rn <- ref n m
-    pure (MkDataImport ann rn schema mr)
+    pure (MkDataImport ann rn ty mr)
 
 inferSection :: Section Name -> Check (Section Resolved, [CheckInfo])
 inferSection (MkSection ann mn maka topdecls) = do

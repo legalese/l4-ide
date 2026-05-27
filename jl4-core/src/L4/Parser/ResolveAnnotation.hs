@@ -252,36 +252,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Import n) where
     MkImport ann n mr -> do
       n' <- addNlg n
       pure $ MkImport ann n' mr
-    MkDataImport ann n schema mr -> do
-      n' <- addNlg n
-      schema' <- addNlg schema
-      pure $ MkDataImport ann n' schema' mr
-
-instance HasNlg DataImportSchema where
-  addNlg a = extendNlgA a $ case a of
-    MkDataImportSchema ann rowN fields -> do
-      rowN' <- addNlg rowN
-      fields' <- traverse addNlg fields
-      pure $ MkDataImportSchema ann rowN' fields'
-
-instance HasNlg DataImportField where
-  addNlg a = extendNlgA a $ case a of
-    MkDataImportField ann fn fty -> do
-      fn'  <- addNlg fn
-      fty' <- addNlg fty
-      pure $ MkDataImportField ann fn' fty'
-
-instance HasNlg DataImportType where
-  addNlg a = extendNlgA a $ case a of
-    DataImportPrim ann tyN -> do
-      tyN' <- addNlg tyN
-      pure $ DataImportPrim ann tyN'
-    DataImportMaybe ann tyN -> do
-      tyN' <- addNlg tyN
-      pure $ DataImportMaybe ann tyN'
-    DataImportEnum ann ctors -> do
-      ctors' <- traverse addNlg ctors
-      pure $ DataImportEnum ann ctors'
+    MkDataImport ann n ty mr -> do
+      n'  <- addNlg n
+      ty' <- addNlg ty
+      pure $ MkDataImport ann n' ty' mr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
   addNlg a = extendNlgA a $ case a of

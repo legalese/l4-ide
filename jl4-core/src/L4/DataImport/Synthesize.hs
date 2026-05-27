@@ -1,28 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | Convert a parsed CSV document plus a user-supplied 'DataImportSchema'
--- into the L4 source text that the rewrite pass splices into the
--- importing module in place of the @IMPORT \`file.csv\` AS …@ statement.
+-- | Convert a parsed CSV document plus an L4 type annotation from the
+-- user's @IMPORT \`file.csv\` IS A …@ statement into the L4 source
+-- text that the rewrite pass splices into the importing module in
+-- place of that statement.
 --
 -- The synthesised text is plain L4 source, so it flows through the
 -- existing parser and type-checker without any new AST surface.
 -- Producing source text (rather than constructing the AST directly)
--- keeps the responsibility for source ranges, annotations, and mixfix
--- registry interactions firmly on the side of the parser.
+-- keeps the responsibility for source ranges, annotations, and
+-- mixfix registry interactions firmly on the side of the parser.
 --
--- This module implements the /fast path/ only: every column in the
--- schema must be declared and the parser coerces each cell strictly
--- according to its declared type, failing on the first non-compliant
--- row. The auto-sense path (whole-file type inference) lives in a
--- sibling module that has not been written yet.
+-- The row type is whatever the user wrote after @IS A@. Two cardinality
+-- shapes are recognised:
+--
+--   * @LIST OF Trade@   — multi-row file → list of records.
+--   * @Trade@           — single-row file → exactly one record.
+--
+-- The row type itself must be 'DECLARE'd elsewhere in the module
+-- (currently the rewriter only scans the local module — looking
+-- through imported modules is a separate follow-up).
 module L4.DataImport.Synthesize
   ( synthesizeFromCsv
   , bindingNameFromFilename
+  , buildDeclareEnv
+  , DeclareEnv
   , CoerceError(..)
   ) where
 
 import Base
 import qualified Base.Text as Text
 import Control.Applicative ((<|>))
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
 
@@ -30,25 +38,91 @@ import L4.DataImport.Csv (CsvDoc(..))
 import L4.Syntax
 
 -- ----------------------------------------------------------------------------
+-- DECLARE environment
+-- ----------------------------------------------------------------------------
+
+-- | Everything the synthesizer needs to know about the user's
+-- previously-DECLAREd types: record types contribute their fields
+-- (used as the per-column coercion schema); enum types contribute
+-- their constructor names (used to validate enum-typed cells).
+data DeclareEnv = MkDeclareEnv
+  { deRecords :: !(Map Text [(Text, Type' Name)])
+    -- ^ row-type-name → ordered list of (field name, field type)
+  , deEnums   :: !(Map Text [Text])
+    -- ^ enum-type-name → constructor names
+  }
+  deriving stock (Eq, Show)
+
+emptyDeclareEnv :: DeclareEnv
+emptyDeclareEnv = MkDeclareEnv Map.empty Map.empty
+
+-- | Walk a parsed module (including nested sections) and collect every
+-- record and enum @DECLARE@ into a 'DeclareEnv'.
+--
+-- Parameterised type DECLAREs and type synonyms are ignored — the
+-- data-import surface restricts row types to ground records.
+buildDeclareEnv :: Module Name -> DeclareEnv
+buildDeclareEnv (MkModule _ _ s) = goSection emptyDeclareEnv s
+  where
+    goSection env (MkSection _ _ _ tds) = foldl' goTopDecl env tds
+
+    goTopDecl env = \case
+      Section _ s'    -> goSection env s'
+      Declare _ d     -> addDeclare env d
+      _               -> env
+
+    addDeclare env (MkDeclare _ _ appForm tyDecl) =
+      case appForm of
+        MkAppForm _ rowN [] _ ->
+          let nameText = rawNameToText (rawName rowN) in
+          case tyDecl of
+            RecordDecl _ _ fields ->
+              env { deRecords =
+                      Map.insert nameText
+                        [ (rawNameToText (rawName fn), ty)
+                        | MkTypedName _ fn ty _ <- fields
+                        ]
+                        env.deRecords
+                  }
+            EnumDecl _ conDecls ->
+              env { deEnums =
+                      Map.insert nameText
+                        [ rawNameToText (rawName cn)
+                        | MkConDecl _ cn _ <- conDecls
+                        ]
+                        env.deEnums
+                  }
+            SynonymDecl{} -> env
+        _ -> env
+
+-- ----------------------------------------------------------------------------
 -- Error type
 -- ----------------------------------------------------------------------------
 
--- | Errors that can occur while coercing a CSV document into L4 source.
 data CoerceError
   = HeaderMismatch
-      { ceMissingColumns  :: ![Text]  -- ^ declared in schema but not in CSV
-      , ceUnknownColumns  :: ![Text]  -- ^ present in CSV but not in schema
+      { ceMissingColumns :: ![Text]   -- ^ declared in schema but not in CSV
+      , ceUnknownColumns :: ![Text]   -- ^ present in CSV but not in schema
       }
+  | RowTypeNotDeclared { ceTypeName :: !Text }
+    -- ^ The row type referenced by the IMPORT is not DECLAREd as a
+    -- record in the current module.
+  | UnsupportedFieldType
+      { ceField   :: !Text
+      , ceTypeDoc :: !Text   -- ^ a short description of the offending type
+      }
+    -- ^ A field of the row type has a Type' Name we can't coerce
+    -- a CSV cell against.
   | UnsupportedPrimType
       { ceTypeName :: !Text
       , ceField    :: !Text
       }
   | CellCoercionFailed
-      { ceRow      :: !Int    -- ^ 1-based row number within data rows
-      , ceColumn   :: !Text   -- ^ column header
-      , ceType     :: !Text   -- ^ declared L4 type
-      , ceValue    :: !Text   -- ^ raw cell text
-      , ceReason   :: !Text   -- ^ short human explanation
+      { ceRow    :: !Int
+      , ceColumn :: !Text
+      , ceType   :: !Text
+      , ceValue  :: !Text
+      , ceReason :: !Text
       }
   | EmptyCellInRequiredColumn
       { ceRow    :: !Int
@@ -56,10 +130,14 @@ data CoerceError
       , ceType   :: !Text
       }
   | EnumCellNotInSet
-      { ceRow      :: !Int
-      , ceColumn   :: !Text
-      , ceValue    :: !Text
-      , ceAllowed  :: ![Text]
+      { ceRow     :: !Int
+      , ceColumn  :: !Text
+      , ceValue   :: !Text
+      , ceAllowed :: ![Text]
+      }
+  | WrongRowCount
+      { ceExpected :: !Text   -- ^ \"exactly one row\"
+      , ceActual   :: !Int
       }
   deriving stock (Eq, Show)
 
@@ -68,146 +146,141 @@ data CoerceError
 -- ----------------------------------------------------------------------------
 
 -- | Derive the binding name from the filename token by stripping the
--- @.csv@ or @.tsv@ extension. The result is wrapped in backticks so
--- that filenames containing punctuation or spaces (which the lexer
--- already accepts inside backticks at the IMPORT site) remain
--- well-formed identifiers in the synthesised source.
+-- @.csv@ or @.tsv@ extension. The result is wrapped in backticks
+-- when necessary so that filenames containing punctuation or spaces
+-- remain well-formed identifiers in the synthesised source.
 bindingNameFromFilename :: Text -> Text
 bindingNameFromFilename t =
   let stripped = fromMaybe t $
         Text.stripSuffix ".csv" t <|> Text.stripSuffix ".tsv" t
   in renderQuotedIfNeeded stripped
 
--- | Synthesise the L4 source text that declares the row type and binds
--- the parsed list of records to a top-level value.
---
--- The output is a snippet (not a complete module) that the rewrite
--- pass splices into the importing module's top-level declarations.
--- It always contains exactly one 'Declare' and one 'Decide'.
+-- | Synthesise the L4 source text that binds the parsed CSV/TSV file
+-- to a value of the user-given type.
 synthesizeFromCsv
-  :: Text          -- ^ filename text (e.g. @\"trades.csv\"@), used to derive the binding name
-  -> DataImportSchema
+  :: Text          -- ^ filename (e.g. @\"trades.csv\"@), used to derive the binding name
+  -> Type' Name    -- ^ the type the user wrote after @IS A@
+  -> DeclareEnv    -- ^ records and enums DECLAREd in the importing module
   -> CsvDoc
   -> Either CoerceError Text
-synthesizeFromCsv filename (MkDataImportSchema _ rowN fields) doc = do
+synthesizeFromCsv filename ty env doc = do
+  (cardinality, rowTypeNameTxt) <- analyseType ty
+  fields <- case Map.lookup rowTypeNameTxt env.deRecords of
+    Nothing -> Left RowTypeNotDeclared { ceTypeName = rowTypeNameTxt }
+    Just fs -> pure fs
+
   -- Column-name validation: every declared field must appear in the header.
-  let declaredCols = [ rawNameToText (rawName fn) | MkDataImportField _ fn _ <- fields ]
+  let declaredCols = map fst fields
       headerCols   = doc.csvHeader
       missing      = filter (`notElem` headerCols) declaredCols
       unknown      = filter (`notElem` declaredCols) headerCols
   unless (null missing && null unknown) $
     Left HeaderMismatch { ceMissingColumns = missing, ceUnknownColumns = unknown }
 
-  -- Build a header→index map so we can pluck declared fields from each row
-  -- regardless of CSV column order.
   let columnIndex :: Text -> Maybe Int
       columnIndex name' = lookup name' (zip headerCols [0 :: Int ..])
 
-      rowTypeRaw = rawNameToText (rawName rowN)
+  -- Coerce every row.
+  rowBodies <- traverse (coerceRow env fields columnIndex)
+                        (zip [1 :: Int ..] doc.csvRows)
 
-  -- Coerce every row according to the declared schema. A row is a list of
-  -- (field-name, expression-text) pairs.
-  rowBodies <- traverse (coerceRow rowTypeRaw fields columnIndex) (zip [1 :: Int ..] doc.csvRows)
-
-  let rowTypeText = renderQuotedIfNeeded rowTypeRaw
-      fieldsText  = renderFieldDecls rowTypeRaw fields
-      listText    = renderList rowTypeText rowBodies
+  let rowTypeText = renderQuotedIfNeeded rowTypeNameTxt
       bindingText = bindingNameFromFilename filename
-      enumDecls   = renderEnumDecls rowTypeRaw fields
-  pure $ T.unlines $
-    enumDecls <>
-    [ "DECLARE " <> rowTypeText <> " HAS"
-    , indent 4 fieldsText
-    , ""
-    , "GIVETH A LIST OF " <> rowTypeText
-    , bindingText <> " MEANS"
-    , indent 4 listText
-    ]
-
--- | Synthetic enum type name for an inline @ONE OF@ column. Uses
--- @<RowType>_<colName>@ so that two CSV imports defining a column
--- with the same name but different value sets don't clash. The
--- @<RowType>@ prefix is the user-written row type name (NOT
--- back-tick-rewritten), so the user can refer to the enum type from
--- their own code by guessing the name from the row + column.
-enumTypeName :: Text -> Text -> Text
-enumTypeName rowTypeRaw colName = rowTypeRaw <> "_" <> colName
-
--- | Emit a top-level @DECLARE EnumName IS ONE OF v1, v2, …@ for every
--- inline enum column in the schema.
-renderEnumDecls :: Text -> [DataImportField] -> [Text]
-renderEnumDecls rowTypeRaw fs =
-  concat
-    [ [ "DECLARE "
-        <> renderQuotedIfNeeded (enumTypeName rowTypeRaw (rawNameToText (rawName fn)))
-        <> " IS ONE OF "
-        <> T.intercalate ", " (map (rawNameToText . rawName) ctors)
-      , ""
+  case cardinality of
+    CardList -> pure $ T.unlines
+      [ bindingText <> " MEANS"
+      , indent 4 (renderList rowTypeText rowBodies)
       ]
-    | MkDataImportField _ fn (DataImportEnum _ ctors) <- fs
-    ]
+    CardSingle ->
+      case rowBodies of
+        [row] -> pure $ T.unlines
+          [ bindingText <> " MEANS"
+          , indent 4 (renderRowConstructor rowTypeText row)
+          ]
+        rows -> Left WrongRowCount
+          { ceExpected = "exactly one row", ceActual = length rows }
 
 -- ----------------------------------------------------------------------------
--- Row-level coercion
+-- Type analysis
 -- ----------------------------------------------------------------------------
 
--- | Coerce one CSV row into a list of (field-name, expression-text) pairs.
+data Cardinality = CardSingle | CardList
+
+-- | Inspect the user's @IS A …@ type expression and extract:
+--
+--   * whether the file is a list (@LIST OF T@) or a single record (@T@);
+--   * the bare row type name @T@.
+analyseType :: Type' Name -> Either CoerceError (Cardinality, Text)
+analyseType = \case
+  TyApp _ n [TyApp _ inner []]
+    | rawNameToText (rawName n) == "LIST"
+    -> Right (CardList, rawNameToText (rawName inner))
+  TyApp _ n []
+    -> Right (CardSingle, rawNameToText (rawName n))
+  other -> Left UnsupportedFieldType
+    { ceField   = "<the IMPORT's IS A clause>"
+    , ceTypeDoc = T.pack (show other)
+    }
+
+-- ----------------------------------------------------------------------------
+-- Row coercion
+-- ----------------------------------------------------------------------------
+
 coerceRow
-  :: Text                       -- ^ row type name (for enum naming)
-  -> [DataImportField]
+  :: DeclareEnv
+  -> [(Text, Type' Name)]
   -> (Text -> Maybe Int)
   -> (Int, [Text])
   -> Either CoerceError [(Text, Text)]
-coerceRow rowTypeRaw fields colIdx (rn, cells) =
-  traverse (oneField rowTypeRaw rn cells colIdx) fields
+coerceRow env fields colIdx (rn, cells) =
+  traverse (oneField env rn cells colIdx) fields
 
 oneField
-  :: Text
+  :: DeclareEnv
   -> Int
   -> [Text]
   -> (Text -> Maybe Int)
-  -> DataImportField
+  -> (Text, Type' Name)
   -> Either CoerceError (Text, Text)
-oneField _rowTypeRaw rowNo cells colIdx (MkDataImportField _ fn ty) = do
-  let colName = rawNameToText (rawName fn)
-      cell    = fromMaybe "" (colIdx colName >>= safeIndex cells)
-  exprText <- coerceCell rowNo colName ty cell
-  pure (colName, exprText)
+oneField env rowNo cells colIdx (colName, ty) = do
+  let cell = fromMaybe "" (colIdx colName >>= safeIndex cells)
+  expr <- coerceCell env rowNo colName ty cell
+  pure (colName, expr)
 
 safeIndex :: [a] -> Int -> Maybe a
 safeIndex xs i
   | i >= 0, i < length xs = Just (xs !! i)
   | otherwise             = Nothing
 
--- | Coerce one cell into its L4 expression text, given the declared
--- column type. Returns either the L4 expression text or an explanation
--- of why the cell could not be interpreted as that type.
-coerceCell :: Int -> Text -> DataImportType -> Text -> Either CoerceError Text
-coerceCell rowNo colName ty raw =
+-- | Coerce one cell against an L4 'Type' Name'. Supports:
+--
+--   * the primitives @NUMBER@, @STRING@, @BOOLEAN@, @DATE@;
+--   * @MAYBE T@ where @T@ is one of those primitives, with empty
+--     cell → @NOTHING@ and non-empty cell → @JUST x@;
+--   * names that resolve to an enum @DECLARE@ in the 'DeclareEnv',
+--     in which case the cell value must be one of the declared
+--     constructors.
+coerceCell :: DeclareEnv -> Int -> Text -> Type' Name -> Text -> Either CoerceError Text
+coerceCell env rowNo colName ty raw =
   let trimmed = T.strip raw
   in case ty of
-    DataImportPrim _ tyN ->
-      coercePrim rowNo colName (rawNameToText (rawName tyN)) trimmed
-    DataImportMaybe _ tyN ->
-      -- MAYBE has two constructors in L4: NOTHING and JUST. There is no
-      -- implicit lift from @T@ to @MAYBE T@, so we must explicitly wrap
-      -- non-empty cells in JUST.
-      if T.null trimmed
-        then Right "NOTHING"
-        else do
-          inner <- coercePrim rowNo colName (rawNameToText (rawName tyN)) trimmed
-          pure $ "JUST (" <> inner <> ")"
-    DataImportEnum _ ctors -> coerceEnum rowNo colName ctors trimmed
-
-coerceEnum :: Int -> Text -> [Name] -> Text -> Either CoerceError Text
-coerceEnum rowNo colName ctors raw
-  | T.null raw =
-      Left EmptyCellInRequiredColumn { ceRow = rowNo, ceColumn = colName, ceType = "ONE OF …" }
-  | raw `elem` ctorTexts = Right (renderQuotedIfNeeded raw)
-  | otherwise = Left EnumCellNotInSet
-      { ceRow = rowNo, ceColumn = colName, ceValue = raw, ceAllowed = ctorTexts }
-  where
-    ctorTexts = map (rawNameToText . rawName) ctors
+    TyApp _ tyN [] ->
+      let tn = rawNameToText (rawName tyN)
+      in case Map.lookup tn env.deEnums of
+        Just ctors -> coerceEnum rowNo colName ctors trimmed
+        Nothing    -> coercePrim rowNo colName tn trimmed
+    TyApp _ tyN [TyApp _ inner []]
+      | rawNameToText (rawName tyN) == "MAYBE" ->
+          if T.null trimmed
+            then Right "NOTHING"
+            else do
+              let innerTxt = rawNameToText (rawName inner)
+              v <- coercePrim rowNo colName innerTxt trimmed
+              pure $ "JUST (" <> v <> ")"
+    _ -> Left UnsupportedFieldType
+      { ceField   = colName
+      , ceTypeDoc = T.pack (show ty)
+      }
 
 coercePrim :: Int -> Text -> Text -> Text -> Either CoerceError Text
 coercePrim rowNo colName tyName raw
@@ -230,7 +303,6 @@ coerceNumber rowNo colName raw =
       , ceReason = "expected a numeric literal"
       }
   where
-    -- Render without trailing zeros or scientific notation when reasonable.
     showNumber d
       | d == fromIntegral (round d :: Integer) = show (round d :: Integer)
       | otherwise = show d
@@ -253,10 +325,6 @@ coerceBoolean rowNo colName raw =
 
 coerceDate :: Int -> Text -> Text -> Either CoerceError Text
 coerceDate rowNo colName raw =
-  -- ISO 8601 only: YYYY-MM-DD. Anything else is rejected — the user can
-  -- always override with a custom converter once we ship one, but
-  -- silent format guessing is the right thing to disallow for a
-  -- law-as-code language.
   case T.splitOn "-" raw of
     [yearT, monthT, dayT]
       | T.length yearT == 4
@@ -276,14 +344,18 @@ coerceDate rowNo colName raw =
       , ceReason = "expected ISO 8601 date (YYYY-MM-DD)"
       }
 
+coerceEnum :: Int -> Text -> [Text] -> Text -> Either CoerceError Text
+coerceEnum rowNo colName ctors raw
+  | T.null raw =
+      Left EmptyCellInRequiredColumn { ceRow = rowNo, ceColumn = colName, ceType = "<enum>" }
+  | raw `elem` ctors = Right (renderQuotedIfNeeded raw)
+  | otherwise = Left EnumCellNotInSet
+      { ceRow = rowNo, ceColumn = colName, ceValue = raw, ceAllowed = ctors }
+
 -- ----------------------------------------------------------------------------
 -- Source rendering
 -- ----------------------------------------------------------------------------
 
--- | A name needs backtick quoting if it contains characters that the
--- L4 lexer would not accept as part of a bare identifier. We err on
--- the safe side and quote whenever the name has anything other than
--- alphanumerics and underscores.
 needsBackticks :: Text -> Bool
 needsBackticks t =
   T.null t || not (T.all goodChar t)
@@ -298,39 +370,14 @@ renderQuotedIfNeeded t
   | needsBackticks t = "`" <> t <> "`"
   | otherwise        = t
 
-renderFieldDecls :: Text -> [DataImportField] -> Text
-renderFieldDecls rowTypeRaw fs = T.intercalate ",\n" (map renderOne fs)
-  where
-    renderOne (MkDataImportField _ fn ty) =
-      let colName = rawNameToText (rawName fn)
-      in renderQuotedIfNeeded colName
-           <> " IS A "
-           <> renderColumnType rowTypeRaw colName ty
-
-renderColumnType :: Text -> Text -> DataImportType -> Text
-renderColumnType _ _ (DataImportPrim  _ tyN) = rawNameToText (rawName tyN)
-renderColumnType _ _ (DataImportMaybe _ tyN) = "MAYBE " <> rawNameToText (rawName tyN)
-renderColumnType rowTypeRaw colName (DataImportEnum _ _) =
-  renderQuotedIfNeeded (enumTypeName rowTypeRaw colName)
-
--- | Render the list of row constructors. Produces:
---
--- @
--- LIST
---     Trade WITH f1 IS v1, f2 IS v2,
---     Trade WITH f1 IS v1, f2 IS v2
--- @
 renderList :: Text -> [[(Text, Text)]] -> Text
 renderList _ [] = "LIST EMPTY"
 renderList rowTypeText rows =
-  "LIST\n" <> T.intercalate ",\n" (map (("    " <>) . renderRowConstructor rowTypeText) rows)
+  "LIST\n" <> T.intercalate ",\n"
+    (map (("    " <>) . renderRowConstructor rowTypeText) rows)
 
 renderRowConstructor :: Text -> [(Text, Text)] -> Text
 renderRowConstructor rowTypeText pairs =
-  -- Each row is parenthesised so the trailing comma between rows is
-  -- read as a list separator instead of being attached to the previous
-  -- row's WITH-clause (which the parser would otherwise treat as
-  -- another field assignment and fail on).
   "(" <> rowTypeText <> " WITH "
     <> T.intercalate ", "
         [ renderQuotedIfNeeded k <> " IS " <> v | (k, v) <- pairs ]
@@ -343,3 +390,4 @@ indent :: Int -> Text -> Text
 indent n t =
   let pad = T.replicate n " "
   in T.intercalate "\n" (map (pad <>) (T.lines t))
+

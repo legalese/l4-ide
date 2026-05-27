@@ -814,11 +814,6 @@ jl4Rules evalConfig rootDirectory recorder = do
       DataImport.DataFileSynthesisUnparseable fname msgs ->
         "Internal error synthesising L4 source for "
           <> fname <> ": " <> Text.intercalate "; " msgs
-      DataImport.DataFileNoSchema fname ->
-        "IMPORT `" <> fname
-          <> "` is missing an AS clause. Schema auto-inference is not yet implemented; \
-             \please declare the row type explicitly, e.g.: \
-             \IMPORT `" <> fname <> "` AS Row HAS col1 IS A NUMBER, ..."
 
     mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
     mkSimpleDiagnostic origin _message range =

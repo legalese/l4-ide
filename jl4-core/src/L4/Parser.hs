@@ -591,102 +591,39 @@ contractEvents = annoHole $ lmany (const expr)
 
 -- |
 -- @
--- import ::= 'IMPORT' name ( 'AS' name ( 'HAS' fieldDecl (',' fieldDecl)* )? )?
+-- import ::= 'IMPORT' name ( 'IS' 'A' type )?
 -- @
 --
--- An import without an @AS@ clause is a regular module import
--- (@'MkImport'@); the resolver decides whether to treat it as a
--- @.l4@ module or a CSV\/TSV file by inspecting the filename
--- extension. An import with an @AS@ clause is a tabular data
--- import (@'MkDataImport'@) and carries a row type name plus an
--- optional @HAS@ field list.
+-- An import without an @IS@ clause is a regular module import
+-- (@'MkImport'@). With an @IS A type@ clause it's a tabular data
+-- import (@'MkDataImport'@) carrying the user-written type
+-- expression; the data-import rewrite pass reads the file and
+-- populates a value binding of that type.
+--
+-- Common type shapes for data imports:
+--
+--   * @IS A LIST OF Trade@   — multi-row file → list of records;
+--   * @IS A Trade@           — single-row file → one record;
+--   * @IS A LIST OF NUMBER@  — single-column file → list of primitives.
+--
+-- The row type itself must be 'DECLARE'd elsewhere in the module.
 import' :: Parser (Import Name)
 import' =
   attachAnno $
     buildImport
       <$  annoLexeme (spacedKeyword_ TKImport)
       <*> annoHole name
-      <*> annoHole (optional dataImportSchema)
+      <*> annoHole (optional dataImportTypeClause)
   where
-    buildImport n Nothing  = MkImport emptyAnno n Nothing
-    buildImport n (Just s) = MkDataImport emptyAnno n s Nothing
+    buildImport n Nothing   = MkImport     emptyAnno n Nothing
+    buildImport n (Just ty) = MkDataImport emptyAnno n ty Nothing
 
--- | Parse the @AS rowName [HAS f1 IS A T1, f2 IS A T2, …]@ tail of an
--- 'IMPORT' for a tabular data file.
-dataImportSchema :: Parser DataImportSchema
-dataImportSchema =
-  attachAnno $
-    MkDataImportSchema emptyAnno
-      <$  annoLexeme (spacedKeyword_ TKAs)
-      <*> annoHole name
-      <*> annoHole (fromMaybe [] <$> optional dataImportHas)
-
-dataImportHas :: Parser [DataImportField]
-dataImportHas = do
-  _ <- spacedKeyword_ TKHas
-  (:) <$> dataImportField
-      <*> many (spacedSymbol_ TComma *> dataImportField)
-
-dataImportField :: Parser DataImportField
-dataImportField =
-  attachAnno $
-    MkDataImportField emptyAnno
-      <$> annoHole name
-      <*  annoLexeme (spacedKeyword_ TKIs)
-      <*> annoHole dataImportFieldType
-
--- | The column type clause that follows @IS@ in a HAS field. Two shapes:
---
---   * @IS A T@           — a primitive ('NUMBER', 'STRING', 'BOOLEAN',
---                          'DATE', etc.) optionally wrapped in @MAYBE@.
---   * @IS ONE OF v1, …@  — an inline enum; the synthesizer generates
---                          a fresh 'DECLARE' for the enum type and
---                          validates each cell against the listed
---                          constructors.
-dataImportFieldType :: Parser DataImportType
-dataImportFieldType =
-      dataImportEnumType
-  <|> ((spacedKeyword_ TKA <|> spacedKeyword_ TKAn) *> dataImportType)
-
--- | Parse @ONE OF v1, v2, v3@.
---
--- The constructor list is terminated by anything that doesn't look like
--- another @, ctor@ pair. Crucially, we stop when @, name@ is followed by
--- @IS@, because that signals the start of the /next field/ in the
--- enclosing @HAS@ clause:
---
--- @
--- HAS
---   side IS ONE OF buy, sell,   <-- comma here belongs to the HAS list
---   notional IS A NUMBER         <-- not to the enum's constructor list
--- @
-dataImportEnumType :: Parser DataImportType
-dataImportEnumType = try $ do
-  _ <- spacedKeyword_ TKOne
-  _ <- spacedKeyword_ TKOf
-  ctors <- (:) <$> name <*> many (try nextCtor)
-  pure $ DataImportEnum emptyAnno ctors
-  where
-    nextCtor = do
-      _ <- spacedSymbol_ TComma
-      n <- name
-      -- If the name we just consumed is actually the first token of
-      -- the next HAS field, back off by failing this 'try'.
-      notFollowedBy (spacedKeyword_ TKIs)
-      pure n
-
--- | A primitive column type, optionally wrapped in @MAYBE@. The token
--- @MAYBE@ is a renamed identifier (not a keyword), so we match it
--- lexically rather than via a dedicated token.
-dataImportType :: Parser DataImportType
-dataImportType = do
-  n1 <- name
-  if rawNameToText (rawName n1) == "MAYBE"
-    then do
-      n2 <- name
-      pure $ DataImportMaybe emptyAnno n2
-    else
-      pure $ DataImportPrim emptyAnno n1
+-- | Parse the @IS A <type>@ tail of an 'IMPORT'. Reuses L4's
+-- top-level type parser so anything you can write in a @GIVEN@ or
+-- @GIVETH@ also works here. The optional article (@A@ / @AN@ /
+-- @THE@) is consumed by 'type'' itself via 'withOptionalArticle'.
+dataImportTypeClause :: Parser (Type' Name)
+dataImportTypeClause = spacedKeyword_ TKIs *> type'
 
 -- | Parse @TIMEZONE IS <expr>@
 -- TIMEZONE is not a keyword — it's matched as an identifier so it can

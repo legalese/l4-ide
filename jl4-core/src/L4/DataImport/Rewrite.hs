@@ -29,6 +29,10 @@ import L4.Lexer (PError(..))
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Syntax
 
+-- Touch a Text module qualified import to avoid unused-import warnings.
+_unusedT :: Text -> Text
+_unusedT = T.strip
+
 -- | How to look up the raw text of a CSV / TSV data file by its
 -- filename token (e.g. @\"trades.csv\"@). Returns 'Nothing' when the
 -- file cannot be found.
@@ -47,25 +51,27 @@ data DataImportError
   | DataFileSynthesisUnparseable !Text ![Text]
     -- ^ The synthesized L4 snippet failed to re-parse. Indicates a
     -- bug in the synthesizer, not a user error.
-  | DataFileNoSchema !Text
-    -- ^ The IMPORT lacked an @AS@ clause; auto-sense is not yet
-    -- implemented.
   deriving stock (Eq, Show)
 
--- | Walk a parsed 'Module' and rewrite every 'MkDataImport' into the
--- corresponding 'Declare' + 'Decide' pair. Imports that are not
--- data imports (i.e. plain 'MkImport') are left untouched.
+-- | Walk a parsed 'Module' and rewrite every 'MkDataImport' into a
+-- value binding by reading the named file, looking up the row type
+-- in the module's existing 'DECLARE's, and coercing each CSV row.
+-- Imports that are not data imports (i.e. plain 'MkImport') are
+-- left untouched.
 --
--- The pass is /shallow/: it only inspects top-level declarations. It
--- does not descend into nested sections (the parser doesn't currently
--- allow IMPORT statements inside sections anyway).
+-- The pass walks top-level decls only (it does not descend into
+-- nested sections — IMPORT statements at the top level are the
+-- normal case). It scans the same module for 'DECLARE' statements
+-- so the row type referenced by the IMPORT must be declared in the
+-- same file. Cross-module type lookup is a separate follow-up.
 rewriteDataImports
   :: forall m. Monad m
   => DataFileLookup m
   -> Module Name
   -> m (Either [DataImportError] (Module Name))
-rewriteDataImports lookupData (MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
-  rewritten <- traverse (rewriteOne lookupData uri) topdecls
+rewriteDataImports lookupData m@(MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
+  let env = buildDeclareEnv m
+  rewritten <- traverse (rewriteOne lookupData env uri) topdecls
   let (errs, decls) = partitionEithers (concatMapPreserve rewritten)
   if null errs
     then pure $ Right $ MkModule mAnn uri (MkSection sAnn sName sAka decls)
@@ -79,12 +85,13 @@ rewriteDataImports lookupData (MkModule mAnn uri (MkSection sAnn sName sAka topd
 rewriteOne
   :: Monad m
   => DataFileLookup m
+  -> DeclareEnv
   -> NormalizedUri
   -> TopDecl Name
   -> m [Either DataImportError (TopDecl Name)]
-rewriteOne lookupData uri = \case
-  Import iAnn (MkDataImport _ fnN schema _) ->
-    expandDataImport lookupData uri iAnn fnN schema
+rewriteOne lookupData env uri = \case
+  Import iAnn (MkDataImport _ fnN ty _) ->
+    expandDataImport lookupData env uri iAnn fnN ty
   d ->
     pure [Right d]
 
@@ -95,12 +102,13 @@ rewriteOne lookupData uri = \case
 expandDataImport
   :: Monad m
   => DataFileLookup m
+  -> DeclareEnv
   -> NormalizedUri
   -> Anno
   -> Name           -- ^ filename token
-  -> DataImportSchema
+  -> Type' Name     -- ^ the @IS A …@ type expression
   -> m [Either DataImportError (TopDecl Name)]
-expandDataImport lookupData uri _iAnn fnN schema = do
+expandDataImport lookupData env uri _iAnn fnN ty = do
   let fnText = rawNameToText (rawName fnN)
   mContent <- lookupData fnText
   case mContent of
@@ -112,7 +120,7 @@ expandDataImport lookupData uri _iAnn fnN schema = do
           case parseFile fnText content of
             Left e -> pure [Left (DataFileParseFailed fnText e)]
             Right doc ->
-              case synthesizeFromCsv fnText schema doc of
+              case synthesizeFromCsv fnText ty env doc of
                 Left e -> pure [Left (DataFileCoerceFailed fnText e)]
                 Right l4Source ->
                   pure $ parseAndExtractTopDecls fnText uri l4Source
@@ -158,6 +166,3 @@ partitionEithers = foldr step ([], [])
     step (Left  a) (as, bs) = (a : as, bs)
     step (Right b) (as, bs) = (as, b : bs)
 
--- avoid an unused-import warning if T isn't referenced
-_unusedT :: Text -> Text
-_unusedT = T.strip

@@ -12,7 +12,7 @@ import Test.Hspec
 
 spec :: Spec
 spec = describe "CSV IMPORT end-to-end" $ do
-  it "type-checks a module that imports a CSV with a fully declared schema" $ do
+  it "type-checks a LIST OF Trade import against an existing DECLARE" $ do
     let csv = Text.unlines
           [ "notional,settled"
           , "100.5,true"
@@ -20,15 +20,17 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("trades.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `trades.csv` AS Trade HAS"
+          [ "DECLARE Trade HAS"
           , "    notional IS A NUMBER,"
           , "    settled  IS A BOOLEAN"
+          , ""
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
           ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
       Right r -> r.tcdSuccess `shouldBe` True
 
-  it "brings the row type and binding into scope for the importing module" $ do
+  it "brings the binding name into scope (filename minus extension)" $ do
     let csv = Text.unlines
           [ "n,b"
           , "1,true"
@@ -36,9 +38,11 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("rows.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `rows.csv` AS Row HAS"
+          [ "DECLARE Row HAS"
           , "    n IS A NUMBER,"
           , "    b IS A BOOLEAN"
+          , ""
+          , "IMPORT `rows.csv` IS A LIST OF Row"
           , ""
           , "GIVETH A LIST OF Row"
           , "myRows MEANS rows"
@@ -47,8 +51,28 @@ spec = describe "CSV IMPORT end-to-end" $ do
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
       Right r -> r.tcdSuccess `shouldBe` True
 
+  it "binds a single record when the type is just T (no LIST)" $ do
+    let csv = Text.unlines
+          [ "key,value"
+          , "secret,123"
+          ]
+        dataVfs = vfsFromList [("config.csv", csv)]
+        source = Text.unlines
+          [ "DECLARE Config HAS"
+          , "    key   IS A STRING,"
+          , "    value IS A NUMBER"
+          , ""
+          , "IMPORT `config.csv` IS A Config"
+          ]
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> r.tcdSuccess `shouldBe` True
+
   it "reports an error when the CSV file is missing" $ do
-    let source = "IMPORT `missing.csv` AS Row HAS x IS A NUMBER"
+    let source = Text.unlines
+          [ "DECLARE Row HAS x IS A NUMBER"
+          , "IMPORT `missing.csv` IS A LIST OF Row"
+          ]
     case checkWithImportsAndData emptyVFS emptyVFS source of
       Right _ -> expectationFailure "Expected a 'file not found' error"
       Left errs ->
@@ -61,9 +85,11 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("x.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `x.csv` AS Row HAS"
+          [ "DECLARE Row HAS"
           , "    a IS A NUMBER,"
           , "    b IS A NUMBER"
+          , ""
+          , "IMPORT `x.csv` IS A LIST OF Row"
           ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Right _ -> expectationFailure "Expected a 'missing column' error"
@@ -76,11 +102,23 @@ spec = describe "CSV IMPORT end-to-end" $ do
           , "oops"
           ]
         dataVfs = vfsFromList [("x.csv", csv)]
-        source = "IMPORT `x.csv` AS Row HAS n IS A NUMBER"
+        source = Text.unlines
+          [ "DECLARE Row HAS n IS A NUMBER"
+          , "IMPORT `x.csv` IS A LIST OF Row"
+          ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Right _ -> expectationFailure "Expected a 'coercion failed' error"
       Left errs ->
         errs `shouldSatisfy` any (Text.isInfixOf "CellCoercionFailed")
+
+  it "errors when the row type isn't DECLAREd in the module" $ do
+    let csv = Text.unlines [ "n", "1" ]
+        dataVfs = vfsFromList [("x.csv", csv)]
+        source = "IMPORT `x.csv` IS A LIST OF Row"
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Right _ -> expectationFailure "Expected a 'row type not declared' error"
+      Left errs ->
+        errs `shouldSatisfy` any (Text.isInfixOf "RowTypeNotDeclared")
 
   it "handles MAYBE NUMBER columns including empty cells" $ do
     let csv = Text.unlines
@@ -90,7 +128,8 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("scores.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `scores.csv` AS Score HAS score IS A MAYBE NUMBER"
+          [ "DECLARE Score HAS score IS A MAYBE NUMBER"
+          , "IMPORT `scores.csv` IS A LIST OF Score"
           ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
@@ -104,31 +143,17 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("trades.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `trades.csv` AS Trade HAS"
+          [ "DECLARE Trade HAS"
           , "    `trade date` IS A DATE,"
           , "    notional     IS A NUMBER"
+          , ""
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
           ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
       Right r -> r.tcdSuccess `shouldBe` True
 
-  it "still resolves a regular IMPORT alongside data imports" $ do
-    let csv = Text.unlines
-          [ "n"
-          , "1"
-          ]
-        dataVfs = vfsFromList [("x.csv", csv)]
-        source = Text.unlines
-          [ "IMPORT prelude"
-          , "IMPORT `x.csv` AS Row HAS n IS A NUMBER"
-          ]
-    case checkWithImportsAndData emptyVFS dataVfs source of
-      Left errs -> expectationFailure $ "Type check failed: " <> show errs
-      Right r -> do
-        r.tcdSuccess `shouldBe` True
-        length r.tcdResolvedImports `shouldBe` 1   -- prelude only; the CSV is inlined
-
-  it "handles enum (ONE OF) columns end-to-end" $ do
+  it "handles enum-typed columns via separate DECLARE" $ do
     let csv = Text.unlines
           [ "side,notional"
           , "buy,100"
@@ -136,9 +161,13 @@ spec = describe "CSV IMPORT end-to-end" $ do
           ]
         dataVfs = vfsFromList [("trades.csv", csv)]
         source = Text.unlines
-          [ "IMPORT `trades.csv` AS Trade HAS"
-          , "    side     IS ONE OF buy, sell,"
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , ""
+          , "DECLARE Trade HAS"
+          , "    side     IS A Side,"
           , "    notional IS A NUMBER"
+          , ""
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
           ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
@@ -150,8 +179,40 @@ spec = describe "CSV IMPORT end-to-end" $ do
           , "hold"
           ]
         dataVfs = vfsFromList [("trades.csv", csv)]
-        source = "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell"
+        source = Text.unlines
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , "DECLARE Trade HAS side IS A Side"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
     case checkWithImportsAndData emptyVFS dataVfs source of
       Right _ -> expectationFailure "Expected an 'enum value not in set' error"
       Left errs ->
         errs `shouldSatisfy` any (Text.isInfixOf "EnumCellNotInSet")
+
+  it "lets the same row type back multiple imports" $ do
+    let csv1 = Text.unlines [ "n", "1", "2" ]
+        csv2 = Text.unlines [ "n", "3", "4" ]
+        dataVfs = vfsFromList [("jan.csv", csv1), ("feb.csv", csv2)]
+        source = Text.unlines
+          [ "DECLARE Row HAS n IS A NUMBER"
+          , ""
+          , "IMPORT `jan.csv` IS A LIST OF Row"
+          , "IMPORT `feb.csv` IS A LIST OF Row"
+          ]
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> r.tcdSuccess `shouldBe` True
+
+  it "still resolves a regular IMPORT alongside data imports" $ do
+    let csv = Text.unlines [ "n", "1" ]
+        dataVfs = vfsFromList [("x.csv", csv)]
+        source = Text.unlines
+          [ "IMPORT prelude"
+          , "DECLARE Row HAS n IS A NUMBER"
+          , "IMPORT `x.csv` IS A LIST OF Row"
+          ]
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> do
+        r.tcdSuccess `shouldBe` True
+        length r.tcdResolvedImports `shouldBe` 1   -- prelude only; the CSV is inlined

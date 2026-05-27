@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 module CsvSynthesizeSpec (spec) where
 
 import Base
@@ -57,95 +58,141 @@ csvParserSpec = describe "CSV parser" $ do
 
 synthesizeSpec :: Spec
 synthesizeSpec = describe "CSV → L4 synthesizer" $ do
-  it "produces parseable L4 source for a simple typed import" $ do
+  it "produces parseable L4 source for a LIST OF Trade with primitive columns" $ do
     let csvSrc = Text.unlines
           [ "notional,settled"
           , "100.5,true"
           , "200,false"
           ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Trade HAS"
+          , "    notional IS A NUMBER,"
+          , "    settled  IS A BOOLEAN"
+          , ""
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS notional IS A NUMBER, settled IS A BOOLEAN")
-    out <- expectRight (synthesizeFromCsv "trades.csv" schema csv)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
     let uri = toNormalizedUri (Uri "file:///synth-test")
-    case execProgramParserWithHintPass uri out of
+    case execProgramParserWithHintPass uri (moduleSrc <> "\n" <> out) of
       Right _ -> pure ()
       Left errs ->
         expectationFailure $
-          "Synthesised source failed to parse:\n" <> Text.unpack out
+          "Combined source failed to parse:\n" <> Text.unpack out
             <> "\n\nParse errors:\n" <> show errs
 
-  it "encodes DATE columns via DATE_FROM_DMY" $ do
+  it "produces a single-record binding when the type is just Config (no LIST)" $ do
     let csvSrc = Text.unlines
-          [ "trade date"
-          , "2026-04-03"
+          [ "key,value"
+          , "secret,123"
+          ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Config HAS"
+          , "    key   IS A STRING,"
+          , "    value IS A NUMBER"
+          , ""
+          , "IMPORT `config.csv` IS A Config"
           ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS `trade date` IS A DATE")
-    out <- expectRight (synthesizeFromCsv "trades.csv" schema csv)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "config.csv" ty env csv)
+    out `shouldSatisfy` Text.isInfixOf "Config WITH"
+    out `shouldNotSatisfy` Text.isInfixOf "LIST"
+
+  it "encodes DATE columns via DATE_FROM_DMY" $ do
+    let csvSrc = Text.unlines [ "trade date", "2026-04-03" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Trade HAS `trade date` IS A DATE"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    csv <- expectRight (parseCsv csvSrc)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
     out `shouldSatisfy` Text.isInfixOf "DATE_FROM_DMY 3 4 2026"
 
-  it "encodes MAYBE NUMBER empty cell as NOTHING" $ do
-    let csvSrc = Text.unlines
-          [ "match price"
-          , ""           -- empty cell
-          , "42"
+  it "encodes MAYBE NUMBER empty cell as NOTHING and full as JUST" $ do
+    let csvSrc = Text.unlines [ "match price", "", "42" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Trade HAS `match price` IS A MAYBE NUMBER"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
           ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS `match price` IS A MAYBE NUMBER")
-    out <- expectRight (synthesizeFromCsv "trades.csv" schema csv)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
     out `shouldSatisfy` Text.isInfixOf "NOTHING"
-    out `shouldSatisfy` Text.isInfixOf "42"
+    out `shouldSatisfy` Text.isInfixOf "JUST (42)"
+
+  it "validates enum columns against the declared enum type" $ do
+    let csvSrc = Text.unlines [ "side", "buy", "sell" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , "DECLARE Trade HAS side IS A Side"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    csv <- expectRight (parseCsv csvSrc)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
+    out `shouldSatisfy` Text.isInfixOf "side IS buy"
+    out `shouldSatisfy` Text.isInfixOf "side IS sell"
+
+  it "rejects an enum cell that's outside the declared set" $ do
+    let csvSrc = Text.unlines [ "side", "hold" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , "DECLARE Trade HAS side IS A Side"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    csv <- expectRight (parseCsv csvSrc)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "trades.csv" ty env csv of
+      Left EnumCellNotInSet { ceValue = "hold" } -> pure ()
+      other -> expectationFailure $ "expected EnumCellNotInSet, got: " <> show other
 
   it "rejects a CSV with extra columns" $ do
-    let csvSrc = Text.unlines
-          [ "a,b"
-          , "1,2"
+    let csvSrc = Text.unlines [ "a,b", "1,2" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Row HAS a IS A NUMBER"
+          , "IMPORT `x.csv` IS A LIST OF Row"
           ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `x.csv` AS Row HAS a IS A NUMBER")
-    case synthesizeFromCsv "x.csv" schema csv of
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "x.csv" ty env csv of
       Left HeaderMismatch { ceUnknownColumns = ["b"] } -> pure ()
       other -> expectationFailure $ "expected HeaderMismatch, got: " <> show other
 
   it "rejects a CSV missing a declared column" $ do
     let csvSrc = Text.unlines [ "a", "1" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Row HAS a IS A NUMBER, b IS A NUMBER"
+          , "IMPORT `x.csv` IS A LIST OF Row"
+          ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `x.csv` AS Row HAS a IS A NUMBER, b IS A NUMBER")
-    case synthesizeFromCsv "x.csv" schema csv of
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "x.csv" ty env csv of
       Left HeaderMismatch { ceMissingColumns = ["b"] } -> pure ()
       other -> expectationFailure $ "expected HeaderMismatch, got: " <> show other
 
   it "rejects a non-numeric cell in a NUMBER column" $ do
     let csvSrc = Text.unlines [ "n", "oops" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Row HAS n IS A NUMBER"
+          , "IMPORT `x.csv` IS A LIST OF Row"
+          ]
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `x.csv` AS Row HAS n IS A NUMBER")
-    case synthesizeFromCsv "x.csv" schema csv of
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "x.csv" ty env csv of
       Left CellCoercionFailed { ceType = "NUMBER", ceValue = "oops" } -> pure ()
       other -> expectationFailure $ "expected CellCoercionFailed, got: " <> show other
 
-  it "emits a DECLARE … IS ONE OF for an enum column" $ do
-    let csvSrc = Text.unlines [ "side", "buy", "sell" ]
+  it "errors when the IMPORT references a row type that isn't DECLAREd" $ do
+    let csvSrc = Text.unlines [ "n", "1" ]
+        moduleSrc = "IMPORT `x.csv` IS A LIST OF Row"
     csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
-    out <- expectRight (synthesizeFromCsv "trades.csv" schema csv)
-    out `shouldSatisfy` Text.isInfixOf "DECLARE Trade_side IS ONE OF buy, sell"
-    out `shouldSatisfy` Text.isInfixOf "side IS A Trade_side"
-
-  it "rejects a cell whose value is not in the enum's set" $ do
-    let csvSrc = Text.unlines [ "side", "hold" ]
-    csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
-    case synthesizeFromCsv "trades.csv" schema csv of
-      Left EnumCellNotInSet { ceValue = "hold", ceAllowed = ["buy", "sell"] } -> pure ()
-      other -> expectationFailure $ "expected EnumCellNotInSet, got: " <> show other
-
-  it "treats an empty enum cell as a required-column error" $ do
-    let csvSrc = Text.unlines [ "side", "" ]
-    csv <- expectRight (parseCsv csvSrc)
-    schema <- expectRight (extractSchema "IMPORT `trades.csv` AS Trade HAS side IS ONE OF buy, sell")
-    case synthesizeFromCsv "trades.csv" schema csv of
-      Left EmptyCellInRequiredColumn { ceColumn = "side" } -> pure ()
-      other -> expectationFailure $ "expected EmptyCellInRequiredColumn, got: " <> show other
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "x.csv" ty env csv of
+      Left RowTypeNotDeclared { ceTypeName = "Row" } -> pure ()
+      other -> expectationFailure $ "expected RowTypeNotDeclared, got: " <> show other
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -154,13 +201,16 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
 expectRight :: Show e => Either e a -> IO a
 expectRight = either (\e -> expectationFailure (show e) >> error "unreachable") pure
 
--- | Parse an IMPORT line and return its DataImportSchema.
-extractSchema :: Text -> Either String DataImportSchema
-extractSchema src = do
+-- | Parse an L4 source string and pull out:
+--
+--   * the user-written type expression from the first 'MkDataImport';
+--   * a 'DeclareEnv' built from the module's existing DECLAREs.
+extractTypeAndEnv :: Text -> Either String (Type' Name, DeclareEnv)
+extractTypeAndEnv src = do
   let uri = toNormalizedUri (Uri "file:///schema-extract")
   case execProgramParserWithHintPass uri src of
     Left errs -> Left ("parse failed: " <> show errs)
-    Right (MkModule _ _ (MkSection _ _ _ decls), _, _) ->
-      case [s | Import _ (MkDataImport _ _ s _) <- decls] of
-        (s : _) -> Right s
-        []      -> Left "no MkDataImport found"
+    Right (m@(MkModule _ _ (MkSection _ _ _ decls)), _, _) ->
+      case [ty | Import _ (MkDataImport _ _ ty _) <- decls] of
+        (ty : _) -> Right (ty, buildDeclareEnv m)
+        []       -> Left "no MkDataImport found"

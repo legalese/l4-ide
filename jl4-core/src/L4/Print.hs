@@ -238,25 +238,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
     MkImport _ n _mr -> "IMPORT" <+> printWithLayout n
-    MkDataImport _ n (MkDataImportSchema _ rowN fields) _mr ->
-      let header = "IMPORT" <+> printWithLayout n <+> "AS" <+> printWithLayout rowN
-      in case fields of
-           [] -> header
-           fs -> header <+> "HAS" <+> hsep (punctuate "," (map printField fs))
-      where
-        printField (MkDataImportField _ fn fty) = case fty of
-          DataImportEnum _ ctors ->
-            printWithLayout fn <+> "IS ONE OF"
-              <+> hsep (punctuate "," (map printWithLayout ctors))
-          _ ->
-            printWithLayout fn <+> "IS A" <+> printDataImportType fty
-        printDataImportType = \case
-          DataImportPrim  _ tyN -> printWithLayout tyN
-          DataImportMaybe _ tyN -> "MAYBE" <+> printWithLayout tyN
-          -- Handled inline above; this case is unreachable because
-          -- 'printField' picks the enum branch first.
-          DataImportEnum  _ ctors -> "ONE OF" <+>
-            hsep (punctuate "," (map printWithLayout ctors))
+    MkDataImport _ n ty _mr ->
+      "IMPORT" <+> printWithLayout n <+> "IS A" <+> printWithLayout ty
 
 instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) where
   printWithLayout = \ case
