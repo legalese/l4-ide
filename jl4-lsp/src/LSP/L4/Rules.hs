@@ -29,6 +29,7 @@ import Data.Hashable (Hashable)
 import Data.Monoid (Ap (..))
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Base.Text as Text
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Mixed.Rope as Rope
@@ -594,11 +595,25 @@ jl4Rules evalConfig rootDirectory recorder = do
     -- RowTypeNotDeclared error.
     (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
 
-    -- For the DataImport rewriter we need the parsed AST of each
-    -- imported module so we can build a combined DeclareEnv. The
-    -- parsed AST is cheap to fetch via GetParsedAst against each
-    -- import's URI.
-    importedAsts <- traverse (use_ GetParsedAst . (.moduleUri)) imported
+    -- The rewriter needs the parsed AST of every /transitively/
+    -- reachable module, not just the direct imports. In the common
+    -- layout main → exports → calcs → domain, a row type in
+    -- domain.l4 is only findable if we walk the full import graph.
+    -- We do a cycle-safe BFS over GetImports, collect unique URIs,
+    -- and fetch each module's parsed AST.
+    let collectTransitive :: Set.Set NormalizedUri
+                          -> [NormalizedUri]
+                          -> Action (Set.Set NormalizedUri)
+        collectTransitive seen []       = pure seen
+        collectTransitive seen (u : us)
+          | u `Set.member` seen = collectTransitive seen us
+          | otherwise = do
+              children <- use_ GetImports u
+              collectTransitive (Set.insert u seen)
+                                (map (.moduleUri) children ++ us)
+    allImportUris <- Set.toList
+      <$> collectTransitive Set.empty (map (.moduleUri) imported)
+    importedAsts <- traverse (use_ GetParsedAst) allImportUris
 
     rewriteResult <- DataImport.rewriteDataImports loadDataFile importedAsts parsed
     case rewriteResult of
