@@ -26,7 +26,7 @@ import qualified L4.Lint.AndOrDepth as Lint
 import Control.Applicative
 import Control.Monad.Trans.Maybe
 import Data.Hashable (Hashable)
-import Data.Monoid (Ap (..))
+import Data.Monoid (Ap (..), Any (..))
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -761,13 +761,29 @@ jl4Rules evalConfig rootDirectory recorder = do
         pure ([], Just tokenized)
 
   define shakeRecorder $ \TypeCheckedSemanticTokens f -> do
-    tcRes <- use_ SuccessfulTypeCheck f
-    case runSemanticTokensM (defaultSemanticTokenCtx ()) tcRes.module' of
-      Left err -> do
-        logWith recorder Error $ LogTraverseAnnoError "TypeCheck" err
-        pure ([], Nothing)
-      Right tokenized -> do
-        pure ([], Just tokenized)
+    -- If the file contains CSV/TSV data imports, the type-checked module
+    -- is the *rewritten* one: the IMPORT statement has been replaced by
+    -- synthesized DECLARE / value-binding declarations whose source
+    -- positions come from a separate parse of synthesized text and do
+    -- NOT line up with the user's file. Emitting semantic tokens from
+    -- that module corrupts highlighting (phantom token positions, and
+    -- the real IMPORT line gets none). In that case we decline here and
+    -- let GetSemanticTokens fall back to ParserSemanticTokens, which
+    -- works off the original parsed AST with correct positions.
+    parsed <- use_ GetParsedAst f
+    let hasDataImport = getAny $ foldTopDecls
+          (\case Import _ MkDataImport{} -> Any True; _ -> Any False)
+          parsed
+    if hasDataImport
+      then pure ([], Nothing)
+      else do
+        tcRes <- use_ SuccessfulTypeCheck f
+        case runSemanticTokensM (defaultSemanticTokenCtx ()) tcRes.module' of
+          Left err -> do
+            logWith recorder Error $ LogTraverseAnnoError "TypeCheck" err
+            pure ([], Nothing)
+          Right tokenized -> do
+            pure ([], Just tokenized)
 
   define shakeRecorder $ \GetSemanticTokens f -> do
     toks <-
