@@ -615,33 +615,48 @@ contractEvents = annoHole $ lmany (const expr)
 --
 -- The row type itself must be 'DECLARE'd in the importing module or
 -- in any transitively-imported module.
+-- |
+-- @
+-- import ::= 'IMPORT' name                                    -- plain module import
+--          | 'IMPORT' name ( 'AS' name )? 'IS' 'A' type       -- data import
+-- @
+--
+-- We commit to /one/ branch up front (with 'try' on the data-import
+-- variant) so that:
+--
+--   * the AS / IS keywords are consumed via 'annoLexeme' at the
+--     /top level/ of the IMPORT's @attachAnno@, ending up as
+--     'AnnoCsn' entries in the resulting Import's Anno. Without
+--     this, semantic-tokens highlighting on the AS / IS keywords
+--     (and on everything that follows) breaks because the
+--     keywords aren't visible to the highlighter;
+--   * the 'annoHole' count per branch matches the field count of
+--     the constructor that branch builds — exact-print's
+--     hole-fitting machinery requires this. 'MkImport' has 1
+--     user-input field (the name), so its parser has 1 'annoHole'.
+--     'MkDataImport' has 3 user-input fields (name, optional
+--     binding, type), so its parser has 3 'annoHole's.
 import' :: Parser (Import Name)
-import' =
-  attachAnno $
-    buildImport
-      <$  annoLexeme (spacedKeyword_ TKImport)
-      <*> annoHole name
-      <*> annoHole (optional dataImportTail)
+import' = try importData <|> importPlain
   where
-    buildImport n Nothing                          = MkImport     emptyAnno n Nothing
-    buildImport n (Just (MkDataImportTail mb ty))  = MkDataImport emptyAnno n mb ty Nothing
+    importPlain :: Parser (Import Name)
+    importPlain =
+      attachAnno $
+        MkImport emptyAnno
+          <$  annoLexeme (spacedKeyword_ TKImport)
+          <*> annoHole name
+          <*> pure Nothing
 
--- | The optional tail of a data import: an @AS \<name\>@ followed by
--- a required @IS A \<type\>@. Wrapped in a small data type so it
--- occupies a single 'annoHole' slot in the parser — keeping the
--- annoHole count matched against the 'MkImport' constructor's field
--- count, which the exact-print machinery requires.
-data DataImportTail = MkDataImportTail (Maybe Name) (Type' Name)
-
-instance HasSrcRange DataImportTail where
-  rangeOf (MkDataImportTail _mBind ty) = rangeOf ty
-
-dataImportTail :: Parser DataImportTail
-dataImportTail = do
-  mBind <- optional (spacedKeyword_ TKAs *> name)
-  _ <- spacedKeyword_ TKIs
-  ty <- type'
-  pure (MkDataImportTail mBind ty)
+    importData :: Parser (Import Name)
+    importData =
+      attachAnno $
+        MkDataImport emptyAnno
+          <$  annoLexeme (spacedKeyword_ TKImport)
+          <*> annoHole name
+          <*> optional (annoLexeme (spacedKeyword_ TKAs) *> annoHole name)
+          <*  annoLexeme (spacedKeyword_ TKIs)
+          <*> annoHole type'
+          <*> pure Nothing
 
 -- | Parse @TIMEZONE IS <expr>@
 -- TIMEZONE is not a keyword — it's matched as an identifier so it can

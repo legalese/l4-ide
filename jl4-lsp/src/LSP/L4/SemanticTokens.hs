@@ -221,27 +221,12 @@ instance ToSemTokens Context PosToken (TypeSig Name) where
 instance ToSemTokens Context PosToken (GivethSig Name) where
 instance ToSemTokens Context PosToken (GivenSig Name) where
 instance ToSemTokens Context PosToken (Directive Name) where
--- The parser lays down exactly 2 AnnoHole slots in IMPORT's Anno
--- (one for the filename/module name, one for the optional data-import
--- tail). The default generic walker would emit 4 hole-fits for
--- MkDataImport's 4 fields, mis-aligning every subsequent semantic
--- token. So we emit exactly 2 hole-fits per call and fold the
--- (Maybe Name binding + Type' Name) into the second slot.
+-- The parser branch for each Import constructor lays down exactly
+-- as many annoHole slots as the constructor has user-input fields
+-- (1 for MkImport, 3 for MkDataImport). The default generic walker
+-- therefore aligns hole-fits with AnnoHoles correctly. No custom
+-- instance needed.
 instance ToSemTokens Context PosToken (Import Name) where
-  toSemTokens = \case
-    MkImport ann n _mr ->
-      traverseCsnWithHoles ann
-        [ toSemTokens n
-        , pure []                              -- Maybe NormalizedUri: no tokens
-        ]
-    MkDataImport ann n mBind ty _mr ->
-      traverseCsnWithHoles ann
-        [ toSemTokens n
-        , do                                   -- tail = (Maybe Name) <> (Type' Name)
-            bindToks <- toSemTokens mBind
-            tyToks   <- toSemTokens ty
-            pure (bindToks <> tyToks)
-        ]
 
 instance ToSemTokens Context PosToken NormalizedUri where
   toSemTokens _ = pure []
@@ -353,23 +338,10 @@ instance ToSemTokens () PosToken (TypeSig Resolved) where
 instance ToSemTokens () PosToken (GivethSig Resolved) where
 instance ToSemTokens () PosToken (GivenSig Resolved) where
 instance ToSemTokens () PosToken (Directive Resolved) where
--- See the Name-phase instance above for why this is explicit rather
--- than default-derived. Same 2-hole-fit layout.
+-- See the Name-phase comment above: the parser's annoHole layout
+-- matches the constructor's field count per branch, so the default
+-- generic walker is correct here too.
 instance ToSemTokens () PosToken (Import Resolved) where
-  toSemTokens = \case
-    MkImport ann n _mr ->
-      traverseCsnWithHoles ann
-        [ toSemTokens n
-        , pure []
-        ]
-    MkDataImport ann n mBind ty _mr ->
-      traverseCsnWithHoles ann
-        [ toSemTokens n
-        , do
-            bindToks <- toSemTokens mBind
-            tyToks   <- toSemTokens ty
-            pure (bindToks <> tyToks)
-        ]
 
 instance ToSemTokens () PosToken NormalizedUri where
   toSemTokens _ = pure []
