@@ -62,7 +62,6 @@ import L4.DataImport.Rewrite
   ( DataFileLookup
   , DataImportError
   , RewriteResult(..)
-  , mkAugmentedLookup
   , rewriteDataImports
   )
 import L4.Lexer (PError(..))
@@ -310,30 +309,36 @@ typecheckWithDependenciesAndData lookupModule lookupData uri source = do
       pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
 
     Right (parsed, _hints, _warnings) -> do
-      -- Rewrite CSV/TSV data imports. Today this still inlines synthesized
-      -- declarations into the parent module and produces an empty
-      -- synthesized-source map; the structure exists so the upcoming
-      -- virtual-module representation can flow extra modules through the
-      -- resolver without further plumbing changes at this call site.
-      rewriteResult <- rewriteDataImports lookupData parsed
-      case rewriteResult of
-        Left dataErrs ->
-          pure $ Left $ map renderDataImportError dataErrs
-        Right MkRewriteResult { rrParent = parsedRewritten, rrSynthesizedSources = synthSources } -> do
-          let augLookup   = mkAugmentedLookup lookupModule synthSources
-              importNames = extractImportNames parsedRewritten
+      -- Resolve regular (.l4) imports first so that DECLAREs they
+      -- introduce are visible to the data-import rewriter. This lets
+      -- the row type for an `IMPORT \`foo.csv\` IS A LIST OF Trade`
+      -- live in an imported module rather than being constrained to
+      -- the importing file.
+      let importNames = extractImportNames parsed
 
-          importResult <- resolveImports augLookup Set.empty Set.empty importNames
+      importResult <- resolveImports lookupModule Set.empty Set.empty importNames
 
-          case importResult of
-            Left (ModuleNotFound modName searched) ->
-              pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
-            Left (ParseError modName errs) ->
-              pure $ Left $ ("Parse error in " <> modName <> ":") : errs
-            Left (CyclicImport cycleModules) ->
-              pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+      case importResult of
+        Left (ModuleNotFound modName searched) ->
+          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+        Left (ParseError modName errs) ->
+          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+        Left (CyclicImport cycleModules) ->
+          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
 
-            Right resolvedImports -> do
+        Right resolvedImports -> do
+          -- Rewrite CSV/TSV data imports with the imported modules'
+          -- parsed ASTs available for DECLARE lookup. Today this still
+          -- inlines synthesized declarations into the parent module
+          -- and produces an empty synthesized-source map; the
+          -- structure is in place for the upcoming virtual-module
+          -- representation.
+          let importedAsts = map (\ri -> ri.riParsed) resolvedImports
+          rewriteResult <- rewriteDataImports lookupData importedAsts parsed
+          case rewriteResult of
+            Left dataErrs ->
+              pure $ Left $ map renderDataImportError dataErrs
+            Right MkRewriteResult { rrParent = parsedRewritten, rrSynthesizedSources = _synthSources } -> do
               -- Combine environments from imports
               let (initState, initEnv) = combineResolvedImports uri resolvedImports
                   updatedParsed = updateModuleImports resolvedImports parsedRewritten

@@ -23,6 +23,8 @@ module L4.DataImport.Synthesize
   ( synthesizeFromCsv
   , bindingNameFromFilename
   , buildDeclareEnv
+  , buildDeclareEnvs
+  , mergeDeclareEnvs
   , DeclareEnv
   , CoerceError(..)
   ) where
@@ -55,6 +57,23 @@ data DeclareEnv = MkDeclareEnv
 
 emptyDeclareEnv :: DeclareEnv
 emptyDeclareEnv = MkDeclareEnv Map.empty Map.empty
+
+-- | Combine two 'DeclareEnv's. The /left/ argument's entries win on
+-- duplicate names — used to give the importing module's local
+-- DECLAREs priority over re-exports from imported modules. (In
+-- practice TDNR handles ambiguity later; this is just a sensible
+-- default for picking one for cell coercion.)
+mergeDeclareEnvs :: DeclareEnv -> DeclareEnv -> DeclareEnv
+mergeDeclareEnvs a b = MkDeclareEnv
+  { deRecords = Map.union a.deRecords b.deRecords
+  , deEnums   = Map.union a.deEnums   b.deEnums
+  }
+
+-- | 'buildDeclareEnv' applied across a list of modules and merged
+-- with @mergeDeclareEnvs@. The earlier modules in the list shadow
+-- later ones on duplicate names.
+buildDeclareEnvs :: [Module Name] -> DeclareEnv
+buildDeclareEnvs = foldr (mergeDeclareEnvs . buildDeclareEnv) emptyDeclareEnv
 
 -- | Walk a parsed module (including nested sections) and collect every
 -- record and enum @DECLARE@ into a 'DeclareEnv'.

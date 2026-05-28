@@ -27,6 +27,13 @@ import qualified Data.Map.Strict as Map
 
 import L4.DataImport.Csv
 import L4.DataImport.Synthesize
+  ( buildDeclareEnv
+  , buildDeclareEnvs
+  , mergeDeclareEnvs
+  , DeclareEnv
+  , CoerceError
+  , synthesizeFromCsv
+  )
 import L4.Lexer (PError(..))
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Syntax
@@ -71,22 +78,28 @@ data RewriteResult = MkRewriteResult
 
 -- | Walk a parsed 'Module' and rewrite every 'MkDataImport' into a
 -- value binding by reading the named file, looking up the row type
--- in the module's existing 'DECLARE's, and coercing each CSV row.
+-- in the module's @DECLARE@ environment, and coercing each CSV row.
 -- Imports that are not data imports (i.e. plain 'MkImport') are
 -- left untouched.
 --
+-- The DECLARE environment is built from the local module plus any
+-- additional parsed modules the caller chooses to expose
+-- (typically: the parent's resolved imports, so a row type
+-- declared in an imported module is in scope for the rewriter).
+-- The local module's DECLAREs shadow imported ones on duplicate
+-- names — see 'mergeDeclareEnvs' for the precise rule.
+--
 -- The pass walks top-level decls only (it does not descend into
 -- nested sections — IMPORT statements at the top level are the
--- normal case). It scans the same module for 'DECLARE' statements
--- so the row type referenced by the IMPORT must be declared in the
--- same file. Cross-module type lookup is a separate follow-up.
+-- normal case).
 rewriteDataImports
   :: forall m. Monad m
   => DataFileLookup m
-  -> Module Name
+  -> [Module Name]      -- ^ additional modules to include in the DECLARE environment (typically the parent's imports)
+  -> Module Name        -- ^ the parent module to rewrite
   -> m (Either [DataImportError] RewriteResult)
-rewriteDataImports lookupData m@(MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
-  let env = buildDeclareEnv m
+rewriteDataImports lookupData additional m@(MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
+  let env = mergeDeclareEnvs (buildDeclareEnv m) (buildDeclareEnvs additional)
   rewritten <- traverse (rewriteOne lookupData env uri) topdecls
   let (errs, decls) = partitionEithers (concatMapPreserve rewritten)
   if null errs

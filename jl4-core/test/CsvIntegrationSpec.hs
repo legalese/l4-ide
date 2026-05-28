@@ -203,6 +203,30 @@ spec = describe "CSV IMPORT end-to-end" $ do
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
       Right r -> r.tcdSuccess `shouldBe` True
 
+  it "looks up the row type in an imported (.l4) module" $ do
+    -- domain.l4 holds the DECLARE; scenario.l4 only IMPORTs it and
+    -- the data file. This mirrors the real-world layout where a
+    -- shared schema lives in its own module.
+    let domain = Text.unlines
+          [ "DECLARE Trade HAS"
+          , "    notional IS A NUMBER,"
+          , "    settled  IS A BOOLEAN"
+          ]
+        csv = Text.unlines
+          [ "notional,settled"
+          , "100,true"
+          , "200,false"
+          ]
+        modVfs  = vfsFromList [("domain", domain)]
+        dataVfs = vfsFromList [("trades.csv", csv)]
+        source = Text.unlines
+          [ "IMPORT domain"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    case checkWithImportsAndData modVfs dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> r.tcdSuccess `shouldBe` True
+
   it "still resolves a regular IMPORT alongside data imports" $ do
     let csv = Text.unlines [ "n", "1" ]
         dataVfs = vfsFromList [("x.csv", csv)]

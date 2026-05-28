@@ -586,7 +586,21 @@ jl4Rules evalConfig rootDirectory recorder = do
                   Just t  -> pure (Just t)
                   Nothing -> firstJust us
           firstJust candidates
-    rewriteResult <- DataImport.rewriteDataImports loadDataFile parsed
+    -- Resolve and typecheck regular .l4 imports FIRST so that DECLAREs
+    -- they introduce are visible to the data-import rewriter. Without
+    -- this ordering, a row type declared in an imported module
+    -- (e.g. `IMPORT domain` containing `DECLARE Trade …`) would not
+    -- be findable by the rewriter and you'd get a spurious
+    -- RowTypeNotDeclared error.
+    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+
+    -- For the DataImport rewriter we need the parsed AST of each
+    -- imported module so we can build a combined DeclareEnv. The
+    -- parsed AST is cheap to fetch via GetParsedAst against each
+    -- import's URI.
+    importedAsts <- traverse (use_ GetParsedAst . (.moduleUri)) imported
+
+    rewriteResult <- DataImport.rewriteDataImports loadDataFile importedAsts parsed
     case rewriteResult of
       Left dataErrs ->
         let diags =
@@ -604,8 +618,6 @@ jl4Rules evalConfig rootDirectory recorder = do
       -- so we don't have to touch this call site again when the rewriter
       -- starts emitting virtual modules.
       Right DataImport.MkRewriteResult { rrParent = rewritten, rrSynthesizedSources = _synthSources } -> do
-        (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
-
         let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) rewritten
 
         let unionCheckStates :: TypeCheck.CheckState -> TypeCheckResult -> TypeCheck.CheckState
