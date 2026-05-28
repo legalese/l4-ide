@@ -186,19 +186,31 @@ data Import n =
     -- @.csv@ or @.tsv@, the resolver treats it as a tabular data
     -- import with a fully-inferred schema and an anonymous row type
     -- (auto-sense path; not yet implemented).
-  | MkDataImport Anno n (Type' Name) (Maybe NormalizedUri)
+  | MkDataImport Anno n (Maybe n) (Type' Name) (Maybe NormalizedUri)
     -- ^ Tabular data import with an explicit type annotation:
     --
     --   * @IMPORT \`trades.csv\` IS A LIST OF Trade@ — multi-row file
-    --     bound to a @LIST OF Trade@.
+    --     bound to a @LIST OF Trade@ under the auto-derived name
+    --     @trades@ (filename minus extension).
+    --   * @IMPORT \`trades.csv\` AS \`all trades\` IS A LIST OF Trade@ —
+    --     same, but the user picks the binding name explicitly.
     --   * @IMPORT \`config.csv\` IS A Config@ — single-row file
     --     bound to a single @Config@ record.
     --
-    -- The 'Type'' is what the user wrote after @IS@; the row type
-    -- (@Trade@ above) must be declared elsewhere in the module (or
-    -- in an imported module). The data-import rewrite pass reads
-    -- the file, coerces cells against the declared row type's
-    -- fields, and replaces this node with a value binding.
+    -- Fields:
+    --
+    --   [2] filename token (carries the file extension);
+    --   [3] optional explicit binding name (the @AS@ clause). When
+    --       absent, the rewriter derives the binding name from the
+    --       filename by stripping @.csv@ / @.tsv@;
+    --   [4] the user-written type expression after @IS@;
+    --   [5] the resolved file URI (populated after import resolution).
+    --
+    -- The row type referenced by the type expression must be declared
+    -- in the importing module or in any transitively-imported module.
+    -- The data-import rewrite pass reads the file, coerces cells
+    -- against the declared row type's fields, and replaces this node
+    -- with a value binding.
     --
     -- The type is intentionally pinned at the @Name@ phase even when
     -- the surrounding 'Import' is parameterised over @n@ — the
@@ -209,13 +221,13 @@ data Import n =
 
 -- | Get the filename/module name from any import variant.
 importName :: Import n -> n
-importName (MkImport _ n _)       = n
-importName (MkDataImport _ n _ _) = n
+importName (MkImport _ n _)         = n
+importName (MkDataImport _ n _ _ _) = n
 
 -- | Get the resolved URI of an import, if it has been resolved.
 importResolvedUri :: Import n -> Maybe NormalizedUri
-importResolvedUri (MkImport _ _ mr)       = mr
-importResolvedUri (MkDataImport _ _ _ mr) = mr
+importResolvedUri (MkImport _ _ mr)         = mr
+importResolvedUri (MkDataImport _ _ _ _ mr) = mr
 
 data TypeDecl n =
     RecordDecl Anno (Maybe n) [TypedName n]
@@ -443,8 +455,8 @@ updateImport imported i = case i of
   MkImport ann n _ -> case lookupUri n of
     Just u' -> MkImport ann n (Just u')
     Nothing -> i
-  MkDataImport ann n ty _ -> case lookupUri n of
-    Just u' -> MkDataImport ann n ty (Just u')
+  MkDataImport ann n mBind ty _ -> case lookupUri n of
+    Just u' -> MkDataImport ann n mBind ty (Just u')
     Nothing -> i
   where
     lookupUri n =

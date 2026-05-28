@@ -177,12 +177,13 @@ bindingNameFromFilename t =
 -- | Synthesise the L4 source text that binds the parsed CSV/TSV file
 -- to a value of the user-given type.
 synthesizeFromCsv
-  :: Text          -- ^ filename (e.g. @\"trades.csv\"@), used to derive the binding name
+  :: Text          -- ^ filename (e.g. @\"trades.csv\"@), used to derive the binding name if no explicit one given
+  -> Maybe Text    -- ^ explicit binding name from the @AS@ clause (when present, used in place of the filename-derived name)
   -> Type' Name    -- ^ the type the user wrote after @IS A@
   -> DeclareEnv    -- ^ records and enums DECLAREd in the importing module
   -> CsvDoc
   -> Either CoerceError Text
-synthesizeFromCsv filename ty env doc = do
+synthesizeFromCsv filename mExplicitBinding ty env doc = do
   (cardinality, rowTypeNameTxt) <- analyseType ty
   fields <- case Map.lookup rowTypeNameTxt env.deRecords of
     Nothing -> Left RowTypeNotDeclared { ceTypeName = rowTypeNameTxt }
@@ -204,7 +205,9 @@ synthesizeFromCsv filename ty env doc = do
                         (zip [1 :: Int ..] doc.csvRows)
 
   let rowTypeText = renderQuotedIfNeeded rowTypeNameTxt
-      bindingText = bindingNameFromFilename filename
+      bindingText = case mExplicitBinding of
+        Just b  -> renderQuotedIfNeeded b
+        Nothing -> bindingNameFromFilename filename
   case cardinality of
     CardList -> pure $ T.unlines
       [ bindingText <> " MEANS"

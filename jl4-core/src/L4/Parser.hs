@@ -591,7 +591,7 @@ contractEvents = annoHole $ lmany (const expr)
 
 -- |
 -- @
--- import ::= 'IMPORT' name ( 'IS' 'A' type )?
+-- import ::= 'IMPORT' name ( 'AS' name )? ( 'IS' 'A' type )?
 -- @
 --
 -- An import without an @IS@ clause is a regular module import
@@ -600,30 +600,48 @@ contractEvents = annoHole $ lmany (const expr)
 -- expression; the data-import rewrite pass reads the file and
 -- populates a value binding of that type.
 --
--- Common type shapes for data imports:
+-- The optional @AS name@ clause lets the user pick the binding
+-- name explicitly. When absent, the binding name is derived from
+-- the filename (extension stripped). @AS@ without @IS@ is a
+-- parse error — naming an import doesn't make sense unless it's
+-- a data import.
 --
---   * @IS A LIST OF Trade@   — multi-row file → list of records;
---   * @IS A Trade@           — single-row file → one record;
---   * @IS A LIST OF NUMBER@  — single-column file → list of primitives.
+-- Common shapes for data imports:
 --
--- The row type itself must be 'DECLARE'd elsewhere in the module.
+--   * @IS A LIST OF Trade@                    — multi-row file → list of records;
+--   * @AS \`all trades\` IS A LIST OF Trade@  — same, custom binding name;
+--   * @IS A Trade@                             — single-row file → one record;
+--   * @IS A LIST OF NUMBER@                    — single-column file → list of primitives.
+--
+-- The row type itself must be 'DECLARE'd in the importing module or
+-- in any transitively-imported module.
 import' :: Parser (Import Name)
 import' =
   attachAnno $
     buildImport
       <$  annoLexeme (spacedKeyword_ TKImport)
       <*> annoHole name
-      <*> annoHole (optional dataImportTypeClause)
+      <*> annoHole (optional dataImportTail)
   where
-    buildImport n Nothing   = MkImport     emptyAnno n Nothing
-    buildImport n (Just ty) = MkDataImport emptyAnno n ty Nothing
+    buildImport n Nothing                          = MkImport     emptyAnno n Nothing
+    buildImport n (Just (MkDataImportTail mb ty))  = MkDataImport emptyAnno n mb ty Nothing
 
--- | Parse the @IS A <type>@ tail of an 'IMPORT'. Reuses L4's
--- top-level type parser so anything you can write in a @GIVEN@ or
--- @GIVETH@ also works here. The optional article (@A@ / @AN@ /
--- @THE@) is consumed by 'type'' itself via 'withOptionalArticle'.
-dataImportTypeClause :: Parser (Type' Name)
-dataImportTypeClause = spacedKeyword_ TKIs *> type'
+-- | The optional tail of a data import: an @AS \<name\>@ followed by
+-- a required @IS A \<type\>@. Wrapped in a small data type so it
+-- occupies a single 'annoHole' slot in the parser — keeping the
+-- annoHole count matched against the 'MkImport' constructor's field
+-- count, which the exact-print machinery requires.
+data DataImportTail = MkDataImportTail (Maybe Name) (Type' Name)
+
+instance HasSrcRange DataImportTail where
+  rangeOf (MkDataImportTail _mBind ty) = rangeOf ty
+
+dataImportTail :: Parser DataImportTail
+dataImportTail = do
+  mBind <- optional (spacedKeyword_ TKAs *> name)
+  _ <- spacedKeyword_ TKIs
+  ty <- type'
+  pure (MkDataImportTail mBind ty)
 
 -- | Parse @TIMEZONE IS <expr>@
 -- TIMEZONE is not a keyword — it's matched as an identifier so it can

@@ -73,7 +73,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
+    out <- expectRight (synthesizeFromCsv "trades.csv" Nothing ty env csv)
     let uri = toNormalizedUri (Uri "file:///synth-test")
     case execProgramParserWithHintPass uri (moduleSrc <> "\n" <> out) of
       Right _ -> pure ()
@@ -96,7 +96,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    out <- expectRight (synthesizeFromCsv "config.csv" ty env csv)
+    out <- expectRight (synthesizeFromCsv "config.csv" Nothing ty env csv)
     out `shouldSatisfy` Text.isInfixOf "Config WITH"
     out `shouldNotSatisfy` Text.isInfixOf "LIST"
 
@@ -108,7 +108,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
+    out <- expectRight (synthesizeFromCsv "trades.csv" Nothing ty env csv)
     out `shouldSatisfy` Text.isInfixOf "DATE_FROM_DMY 3 4 2026"
 
   it "encodes MAYBE NUMBER empty cell as NOTHING and full as JUST" $ do
@@ -119,7 +119,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
+    out <- expectRight (synthesizeFromCsv "trades.csv" Nothing ty env csv)
     out `shouldSatisfy` Text.isInfixOf "NOTHING"
     out `shouldSatisfy` Text.isInfixOf "JUST (42)"
 
@@ -132,7 +132,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    out <- expectRight (synthesizeFromCsv "trades.csv" ty env csv)
+    out <- expectRight (synthesizeFromCsv "trades.csv" Nothing ty env csv)
     out `shouldSatisfy` Text.isInfixOf "side IS buy"
     out `shouldSatisfy` Text.isInfixOf "side IS sell"
 
@@ -145,7 +145,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    case synthesizeFromCsv "trades.csv" ty env csv of
+    case synthesizeFromCsv "trades.csv" Nothing ty env csv of
       Left EnumCellNotInSet { ceValue = "hold" } -> pure ()
       other -> expectationFailure $ "expected EnumCellNotInSet, got: " <> show other
 
@@ -157,7 +157,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    case synthesizeFromCsv "x.csv" ty env csv of
+    case synthesizeFromCsv "x.csv" Nothing ty env csv of
       Left HeaderMismatch { ceUnknownColumns = ["b"] } -> pure ()
       other -> expectationFailure $ "expected HeaderMismatch, got: " <> show other
 
@@ -169,7 +169,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    case synthesizeFromCsv "x.csv" ty env csv of
+    case synthesizeFromCsv "x.csv" Nothing ty env csv of
       Left HeaderMismatch { ceMissingColumns = ["b"] } -> pure ()
       other -> expectationFailure $ "expected HeaderMismatch, got: " <> show other
 
@@ -181,7 +181,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
           ]
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    case synthesizeFromCsv "x.csv" ty env csv of
+    case synthesizeFromCsv "x.csv" Nothing ty env csv of
       Left CellCoercionFailed { ceType = "NUMBER", ceValue = "oops" } -> pure ()
       other -> expectationFailure $ "expected CellCoercionFailed, got: " <> show other
 
@@ -190,7 +190,7 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
         moduleSrc = "IMPORT `x.csv` IS A LIST OF Row"
     csv <- expectRight (parseCsv csvSrc)
     (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
-    case synthesizeFromCsv "x.csv" ty env csv of
+    case synthesizeFromCsv "x.csv" Nothing ty env csv of
       Left RowTypeNotDeclared { ceTypeName = "Row" } -> pure ()
       other -> expectationFailure $ "expected RowTypeNotDeclared, got: " <> show other
 
@@ -211,6 +211,6 @@ extractTypeAndEnv src = do
   case execProgramParserWithHintPass uri src of
     Left errs -> Left ("parse failed: " <> show errs)
     Right (m@(MkModule _ _ (MkSection _ _ _ decls)), _, _) ->
-      case [ty | Import _ (MkDataImport _ _ ty _) <- decls] of
+      case [ty | Import _ (MkDataImport _ _ _ ty _) <- decls] of
         (ty : _) -> Right (ty, buildDeclareEnv m)
         []       -> Left "no MkDataImport found"

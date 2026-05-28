@@ -451,18 +451,20 @@ inferImport = \case
     m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
     rn <- ref n m
     pure (MkImport ann rn mr)
-  MkDataImport ann n ty mr -> do
+  MkDataImport ann n mBind ty mr -> do
     -- Data imports are rewritten into ordinary DECLARE / DECIDE
     -- declarations before this point in the pipeline. If we still see
     -- one here it means the rewrite pass was skipped (e.g. in a code
     -- path that calls the type-checker directly without going through
     -- 'typecheckWithDependenciesAndData'); treat it just like a plain
-    -- module import — the type expression is left at the 'Name' phase
-    -- because it is consumed by the rewriter, not by name resolution.
+    -- module import — the type expression and optional explicit
+    -- binding name are left at the 'Name' phase because they are
+    -- consumed by the rewriter, not by name resolution.
     let otherModule = fmap (MkSrcRange zeroSrcPos zeroSrcPos 0) mr
     m <- def (overAnno (\(Anno extra _mrange _csns) -> Anno extra otherModule [mkHoleWithSrcRangeHint otherModule]) n)
     rn <- ref n m
-    pure (MkDataImport ann rn ty mr)
+    mBind' <- traverse (`ref` m) mBind
+    pure (MkDataImport ann rn mBind' ty mr)
 
 inferSection :: Section Name -> Check (Section Resolved, [CheckInfo])
 inferSection (MkSection ann mn maka topdecls) = do

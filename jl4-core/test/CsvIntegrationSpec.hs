@@ -203,6 +203,25 @@ spec = describe "CSV IMPORT end-to-end" $ do
       Left errs -> expectationFailure $ "Type check failed: " <> show errs
       Right r -> r.tcdSuccess `shouldBe` True
 
+  it "honours an explicit AS binding for the imported list" $ do
+    let csv = Text.unlines
+          [ "n"
+          , "1"
+          , "2"
+          ]
+        dataVfs = vfsFromList [("trades.csv", csv)]
+        source = Text.unlines
+          [ "DECLARE Row HAS n IS A NUMBER"
+          , ""
+          , "IMPORT `trades.csv` AS `all trades` IS A LIST OF Row"
+          , ""
+          , "GIVETH A LIST OF Row"
+          , "everything MEANS `all trades`"
+          ]
+    case checkWithImportsAndData emptyVFS dataVfs source of
+      Left errs -> expectationFailure $ "Type check failed: " <> show errs
+      Right r -> r.tcdSuccess `shouldBe` True
+
   it "looks up the row type transitively through multiple imports" $ do
     -- scenario → exports → domain (Trade is declared at the bottom).
     let domain = Text.unlines

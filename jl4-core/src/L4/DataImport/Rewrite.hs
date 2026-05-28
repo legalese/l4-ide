@@ -145,8 +145,8 @@ rewriteOne
   -> TopDecl Name
   -> m [Either DataImportError (TopDecl Name)]
 rewriteOne lookupData env uri = \case
-  Import iAnn (MkDataImport _ fnN ty _) ->
-    expandDataImport lookupData env uri iAnn fnN ty
+  Import iAnn (MkDataImport _ fnN mBindN ty _) ->
+    expandDataImport lookupData env uri iAnn fnN mBindN ty
   d ->
     pure [Right d]
 
@@ -161,10 +161,12 @@ expandDataImport
   -> NormalizedUri
   -> Anno
   -> Name           -- ^ filename token
+  -> Maybe Name     -- ^ optional explicit binding name (from @AS@)
   -> Type' Name     -- ^ the @IS A …@ type expression
   -> m [Either DataImportError (TopDecl Name)]
-expandDataImport lookupData env uri _iAnn fnN ty = do
-  let fnText = rawNameToText (rawName fnN)
+expandDataImport lookupData env uri _iAnn fnN mBindN ty = do
+  let fnText            = rawNameToText (rawName fnN)
+      mBindText         = rawNameToText . rawName <$> mBindN
   mContent <- lookupData fnText
   case mContent of
     Nothing -> pure [Left (DataFileNotFound fnText)]
@@ -175,7 +177,7 @@ expandDataImport lookupData env uri _iAnn fnN ty = do
           case parseFile fnText content of
             Left e -> pure [Left (DataFileParseFailed fnText e)]
             Right doc ->
-              case synthesizeFromCsv fnText ty env doc of
+              case synthesizeFromCsv fnText mBindText ty env doc of
                 Left e -> pure [Left (DataFileCoerceFailed fnText e)]
                 Right l4Source ->
                   pure $ parseAndExtractTopDecls fnText uri l4Source

@@ -252,10 +252,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Import n) where
     MkImport ann n mr -> do
       n' <- addNlg n
       pure $ MkImport ann n' mr
-    MkDataImport ann n ty mr -> do
-      n'  <- addNlg n
-      ty' <- addNlg ty
-      pure $ MkDataImport ann n' ty' mr
+    MkDataImport ann n mBind ty mr -> do
+      n'     <- addNlg n
+      mBind' <- traverse addNlg mBind
+      ty'    <- addNlg ty
+      pure $ MkDataImport ann n' mBind' ty' mr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
   addNlg a = extendNlgA a $ case a of

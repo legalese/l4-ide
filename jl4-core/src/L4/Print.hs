@@ -238,8 +238,11 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
     MkImport _ n _mr -> "IMPORT" <+> printWithLayout n
-    MkDataImport _ n ty _mr ->
-      "IMPORT" <+> printWithLayout n <+> "IS A" <+> printWithLayout ty
+    MkDataImport _ n mBind ty _mr ->
+      let asPart = case mBind of
+            Nothing -> mempty
+            Just b  -> "AS" <+> printWithLayout b <> " "
+      in "IMPORT" <+> printWithLayout n <+> asPart <> "IS A" <+> printWithLayout ty
 
 instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, Section a) where
   printWithLayout = \ case

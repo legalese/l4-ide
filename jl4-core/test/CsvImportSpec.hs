@@ -43,7 +43,7 @@ spec = describe "IMPORT parsing" $ do
     it "parses IMPORT `file.csv` IS A Trade as MkDataImport (single row)" $ do
       imp <- firstImport "IMPORT `trades.csv` IS A Trade"
       case imp of
-        MkDataImport _ n ty _ -> do
+        MkDataImport _ n _mBind ty _ -> do
           rawNameToText (rawName n) `shouldBe` "trades.csv"
           case ty of
             TyApp _ rowN [] -> rawNameToText (rawName rowN) `shouldBe` "Trade"
@@ -53,7 +53,7 @@ spec = describe "IMPORT parsing" $ do
     it "parses IMPORT `file.csv` IS A LIST OF Trade as MkDataImport (multi-row)" $ do
       imp <- firstImport "IMPORT `trades.csv` IS A LIST OF Trade"
       case imp of
-        MkDataImport _ _ ty _ ->
+        MkDataImport _ _ _ ty _ ->
           case ty of
             TyApp _ listN [TyApp _ rowN []] -> do
               rawNameToText (rawName listN) `shouldBe` "LIST"
@@ -64,7 +64,7 @@ spec = describe "IMPORT parsing" $ do
     it "parses IS A type with a quoted row-type name" $ do
       imp <- firstImport "IMPORT `trades.csv` IS A LIST OF `ACTUS Trade`"
       case imp of
-        MkDataImport _ _ ty _ ->
+        MkDataImport _ _ _ ty _ ->
           case ty of
             TyApp _ _ [TyApp _ rowN []] ->
               rawNameToText (rawName rowN) `shouldBe` "ACTUS Trade"
@@ -76,6 +76,24 @@ spec = describe "IMPORT parsing" $ do
         [ "IMPORT `acme-orders.csv` IS A LIST OF Order"
         ]
       case imp of
-        MkDataImport _ n _ _ ->
+        MkDataImport _ n _ _ _ ->
           rawNameToText (rawName n) `shouldBe` "acme-orders.csv"
         _ -> expectationFailure $ "Expected MkDataImport, got: " <> show imp
+
+    it "parses an optional AS clause to set the binding name explicitly" $ do
+      imp <- firstImport "IMPORT `trades.tsv` AS `all trades` IS A LIST OF Trade"
+      case imp of
+        MkDataImport _ _ (Just bind) _ _ ->
+          rawNameToText (rawName bind) `shouldBe` "all trades"
+        MkDataImport _ _ Nothing _ _ ->
+          expectationFailure "Expected explicit AS binding, got Nothing"
+        MkImport {} ->
+          expectationFailure "Expected MkDataImport, got MkImport"
+
+    it "leaves the AS binding as Nothing when absent" $ do
+      imp <- firstImport "IMPORT `trades.tsv` IS A LIST OF Trade"
+      case imp of
+        MkDataImport _ _ Nothing _ _ -> pure ()
+        MkDataImport _ _ (Just _) _ _ ->
+          expectationFailure "Expected no AS binding"
+        MkImport {} -> expectationFailure "Expected MkDataImport"
