@@ -629,8 +629,8 @@ jl4Rules evalConfig rootDirectory recorder = do
               [ mkSimpleFileDiagnostic uri $
                   mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
-                    (renderDataImportError e)
-                    Nothing
+                    (renderDataImportError e.ldieError)
+                    (fromSrcRange <$> e.ldieRange)
               | e <- dataErrs
               ]
         in pure (diags, Nothing)

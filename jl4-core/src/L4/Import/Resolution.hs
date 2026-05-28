@@ -61,6 +61,7 @@ import L4.Annotation (emptyAnno)
 import L4.DataImport.Rewrite
   ( DataFileLookup
   , DataImportError
+  , LocatedDataImportError(..)
   , RewriteResult(..)
   , rewriteDataImports
   )
@@ -337,7 +338,7 @@ typecheckWithDependenciesAndData lookupModule lookupData uri source = do
           rewriteResult <- rewriteDataImports lookupData importedAsts parsed
           case rewriteResult of
             Left dataErrs ->
-              pure $ Left $ map renderDataImportError dataErrs
+              pure $ Left $ map (\e -> renderDataImportError e.ldieError) dataErrs
             Right MkRewriteResult { rrParent = parsedRewritten, rrSynthesizedSources = _synthSources } -> do
               -- Combine environments from imports
               let (initState, initEnv) = combineResolvedImports uri resolvedImports

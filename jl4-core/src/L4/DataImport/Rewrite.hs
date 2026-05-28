@@ -22,6 +22,7 @@ module L4.DataImport.Rewrite
     -- Re-exported so LSP diagnostic renderers can format the inner
     -- CoerceError without importing 'L4.DataImport.Synthesize'.
   , CoerceError(..)
+  , LocatedDataImportError(..)
   ) where
 
 import Base
@@ -37,8 +38,10 @@ import L4.DataImport.Synthesize
   , CoerceError(..)
   , synthesizeFromCsv
   )
+import L4.Annotation (rangeOf)
 import L4.Lexer (PError(..))
 import L4.Parser (execProgramParserWithHintPass)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 
 
@@ -60,6 +63,16 @@ data DataImportError
   | DataFileSynthesisUnparseable !Text ![Text]
     -- ^ The synthesized L4 snippet failed to re-parse. Indicates a
     -- bug in the synthesizer, not a user error.
+  deriving stock (Eq, Show)
+
+-- | A 'DataImportError' paired with the source range of the IMPORT
+-- statement that produced it, so callers (the LSP especially) can
+-- attach the diagnostic to the right line instead of defaulting to
+-- the start of the file.
+data LocatedDataImportError = MkLocatedDataImportError
+  { ldieRange :: !(Maybe SrcRange)
+  , ldieError :: !DataImportError
+  }
   deriving stock (Eq, Show)
 
 -- | The output of 'rewriteDataImports'.
@@ -100,7 +113,7 @@ rewriteDataImports
   => DataFileLookup m
   -> [Module Name]      -- ^ additional modules to include in the DECLARE environment (typically the parent's imports)
   -> Module Name        -- ^ the parent module to rewrite
-  -> m (Either [DataImportError] RewriteResult)
+  -> m (Either [LocatedDataImportError] RewriteResult)
 rewriteDataImports lookupData additional m@(MkModule mAnn uri (MkSection sAnn sName sAka topdecls)) = do
   let env = mergeDeclareEnvs (buildDeclareEnv m) (buildDeclareEnvs additional)
   rewritten <- traverse (rewriteOne lookupData env uri) topdecls
@@ -143,10 +156,10 @@ rewriteOne
   -> DeclareEnv
   -> NormalizedUri
   -> TopDecl Name
-  -> m [Either DataImportError (TopDecl Name)]
+  -> m [Either LocatedDataImportError (TopDecl Name)]
 rewriteOne lookupData env uri = \case
-  Import iAnn (MkDataImport _ fnN mBindN ty _) ->
-    expandDataImport lookupData env uri iAnn fnN mBindN ty
+  Import _iAnn imp@(MkDataImport _ fnN mBindN ty _) ->
+    expandDataImport lookupData env uri (rangeOf imp) fnN mBindN ty
   d ->
     pure [Right d]
 
@@ -159,28 +172,29 @@ expandDataImport
   => DataFileLookup m
   -> DeclareEnv
   -> NormalizedUri
-  -> Anno
+  -> Maybe SrcRange -- ^ source range of the IMPORT statement, for diagnostics
   -> Name           -- ^ filename token
   -> Maybe Name     -- ^ optional explicit binding name (from @AS@)
   -> Type' Name     -- ^ the @IS A …@ type expression
-  -> m [Either DataImportError (TopDecl Name)]
-expandDataImport lookupData env uri _iAnn fnN mBindN ty = do
+  -> m [Either LocatedDataImportError (TopDecl Name)]
+expandDataImport lookupData env uri mRange fnN mBindN ty = do
   let fnText            = rawNameToText (rawName fnN)
       mBindText         = rawNameToText . rawName <$> mBindN
+      located e         = Left (MkLocatedDataImportError mRange e)
   mContent <- lookupData fnText
   case mContent of
-    Nothing -> pure [Left (DataFileNotFound fnText)]
+    Nothing -> pure [located (DataFileNotFound fnText)]
     Just content
       | not (isSupportedExtension fnText) ->
-          pure [Left (DataFileUnsupportedExtension fnText)]
+          pure [located (DataFileUnsupportedExtension fnText)]
       | otherwise ->
           case parseFile fnText content of
-            Left e -> pure [Left (DataFileParseFailed fnText e)]
+            Left e -> pure [located (DataFileParseFailed fnText e)]
             Right doc ->
               case synthesizeFromCsv fnText mBindText ty env doc of
-                Left e -> pure [Left (DataFileCoerceFailed fnText e)]
+                Left e -> pure [located (DataFileCoerceFailed fnText e)]
                 Right l4Source ->
-                  pure $ parseAndExtractTopDecls fnText uri l4Source
+                  pure $ parseAndExtractTopDecls mRange fnText uri l4Source
 
 -- | Parse the data file using the parser appropriate to its extension.
 parseFile :: Text -> Text -> Either CsvParseError CsvDoc
@@ -195,14 +209,15 @@ isSupportedExtension t = Text.isSuffixOf ".csv" t || Text.isSuffixOf ".tsv" t
 -- declarations, each wrapped in 'Right'. Parse failure indicates a
 -- bug in the synthesizer (since it produced the source itself).
 parseAndExtractTopDecls
-  :: Text                       -- ^ originating filename, for diagnostics
+  :: Maybe SrcRange             -- ^ source range of the originating IMPORT, for diagnostics
+  -> Text                       -- ^ originating filename, for diagnostics
   -> NormalizedUri              -- ^ URI of the importing module (reused as the synthetic module URI)
   -> Text                       -- ^ synthesized L4 source
-  -> [Either DataImportError (TopDecl Name)]
-parseAndExtractTopDecls fname uri src =
+  -> [Either LocatedDataImportError (TopDecl Name)]
+parseAndExtractTopDecls mRange fname uri src =
   case execProgramParserWithHintPass uri src of
     Left errs ->
-      [Left $ DataFileSynthesisUnparseable fname
+      [Left $ MkLocatedDataImportError mRange $ DataFileSynthesisUnparseable fname
         [ msg | PError msg _ _ <- toList errs ]
       ]
     Right (MkModule _ _ (MkSection _ _ _ decls), _, _) ->

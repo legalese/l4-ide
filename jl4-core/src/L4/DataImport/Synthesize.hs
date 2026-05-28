@@ -305,13 +305,16 @@ coerceCell env rowNo colName ty raw =
               coerceRecordRef rowNo colName tn trimmed
           | otherwise ->
               coercePrim rowNo colName tn trimmed   -- falls through to UnsupportedPrimType
-    TyApp _ tyN [TyApp _ inner []]
+    TyApp _ tyN [innerTy@(TyApp _ _ [])]
       | rawNameToText (rawName tyN) == "MAYBE" ->
           if T.null trimmed
             then Right "NOTHING"
             else do
-              let innerTxt = rawNameToText (rawName inner)
-              v <- coercePrim rowNo colName innerTxt trimmed
+              -- Recurse through the full coercion logic for the inner
+              -- type so MAYBE works uniformly over primitives, enums,
+              -- and record references — not just primitives. A
+              -- non-empty cell is wrapped in JUST.
+              v <- coerceCell env rowNo colName innerTy trimmed
               pure $ "JUST (" <> v <> ")"
     _ -> Left UnsupportedFieldType
       { ceField   = colName

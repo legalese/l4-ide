@@ -123,6 +123,32 @@ synthesizeSpec = describe "CSV → L4 synthesizer" $ do
     out `shouldSatisfy` Text.isInfixOf "NOTHING"
     out `shouldSatisfy` Text.isInfixOf "JUST (42)"
 
+  it "encodes a MAYBE enum column: empty → NOTHING, value → JUST ctor" $ do
+    let csvSrc = Text.unlines [ "side", "", "buy" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , "DECLARE Trade HAS side IS A MAYBE Side"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    csv <- expectRight (parseCsv csvSrc)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    out <- expectRight (synthesizeFromCsv "trades.csv" Nothing ty env csv)
+    out `shouldSatisfy` Text.isInfixOf "NOTHING"
+    out `shouldSatisfy` Text.isInfixOf "JUST (buy)"
+
+  it "rejects a MAYBE enum cell that's outside the declared set" $ do
+    let csvSrc = Text.unlines [ "side", "hold" ]
+        moduleSrc = Text.unlines
+          [ "DECLARE Side IS ONE OF buy, sell"
+          , "DECLARE Trade HAS side IS A MAYBE Side"
+          , "IMPORT `trades.csv` IS A LIST OF Trade"
+          ]
+    csv <- expectRight (parseCsv csvSrc)
+    (ty, env) <- expectRight (extractTypeAndEnv moduleSrc)
+    case synthesizeFromCsv "trades.csv" Nothing ty env csv of
+      Left EnumCellNotInSet { ceValue = "hold" } -> pure ()
+      other -> expectationFailure $ "expected EnumCellNotInSet, got: " <> show other
+
   it "validates enum columns against the declared enum type" $ do
     let csvSrc = Text.unlines [ "side", "buy", "sell" ]
         moduleSrc = Text.unlines
