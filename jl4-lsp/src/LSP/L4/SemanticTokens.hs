@@ -221,12 +221,26 @@ instance ToSemTokens Context PosToken (TypeSig Name) where
 instance ToSemTokens Context PosToken (GivethSig Name) where
 instance ToSemTokens Context PosToken (GivenSig Name) where
 instance ToSemTokens Context PosToken (Directive Name) where
--- The parser branch for each Import constructor lays down exactly
--- as many annoHole slots as the constructor has user-input fields
--- (1 for MkImport, 3 for MkDataImport). The default generic walker
--- therefore aligns hole-fits with AnnoHoles correctly. No custom
--- instance needed.
+-- The parser lays down a VARIABLE number of AnnoHole slots for an
+-- IMPORT depending on its shape:
+--
+--   * MkImport                       → 1 hole  (the name)
+--   * MkDataImport without AS clause → 2 holes (name, type)
+--   * MkDataImport with    AS clause → 3 holes (name, binding, type)
+--
+-- The default generic walker emits one hole-fit per record field
+-- (4 for MkDataImport), which only lines up in the AS case and
+-- mis-assigns the type's tokens to the empty binding slot otherwise.
+-- We therefore emit a hole-fit list that matches what the parser
+-- actually laid down, keyed on whether the binding is present.
 instance ToSemTokens Context PosToken (Import Name) where
+  toSemTokens = \case
+    MkImport ann n _mr ->
+      traverseCsnWithHoles ann [toSemTokens n]
+    MkDataImport ann n mBind ty _mr ->
+      traverseCsnWithHoles ann $ case mBind of
+        Just b  -> [toSemTokens n, toSemTokens b, toSemTokens ty]
+        Nothing -> [toSemTokens n, toSemTokens ty]
 
 instance ToSemTokens Context PosToken NormalizedUri where
   toSemTokens _ = pure []
@@ -338,10 +352,17 @@ instance ToSemTokens () PosToken (TypeSig Resolved) where
 instance ToSemTokens () PosToken (GivethSig Resolved) where
 instance ToSemTokens () PosToken (GivenSig Resolved) where
 instance ToSemTokens () PosToken (Directive Resolved) where
--- See the Name-phase comment above: the parser's annoHole layout
--- matches the constructor's field count per branch, so the default
--- generic walker is correct here too.
+-- See the Name-phase instance above: the IMPORT's AnnoHole count
+-- varies with the data-import shape, so we emit a matching hole-fit
+-- list rather than relying on the generic per-field walker.
 instance ToSemTokens () PosToken (Import Resolved) where
+  toSemTokens = \case
+    MkImport ann n _mr ->
+      traverseCsnWithHoles ann [toSemTokens n]
+    MkDataImport ann n mBind ty _mr ->
+      traverseCsnWithHoles ann $ case mBind of
+        Just b  -> [toSemTokens n, toSemTokens b, toSemTokens ty]
+        Nothing -> [toSemTokens n, toSemTokens ty]
 
 instance ToSemTokens () PosToken NormalizedUri where
   toSemTokens _ = pure []
