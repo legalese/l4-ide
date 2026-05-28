@@ -569,6 +569,13 @@ jl4Rules evalConfig rootDirectory recorder = do
                 Nothing  -> pure Nothing
                 Just nfp -> do
                   let fp = fromNormalizedFilePath nfp
+                  -- Register a Shake dependency on the file's modification
+                  -- time so that when the CSV/TSV file is edited externally
+                  -- (i.e. not through the editor's VFS), our rule re-runs
+                  -- and the user sees fresh diagnostics. Without this the
+                  -- liftIO read is invisible to Shake and stale errors
+                  -- linger until the .l4 source itself is touched.
+                  _ <- use_ (GetModificationTime_ False) u
                   exists <- liftIO $ doesFileExist fp
                   if exists
                     then liftIO $ Just <$> Text.IO.readFile fp
