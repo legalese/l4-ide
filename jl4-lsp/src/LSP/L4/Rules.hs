@@ -888,10 +888,49 @@ jl4Rules evalConfig rootDirectory recorder = do
       DataImport.DataFileParseFailed fname err ->
         "Failed to parse " <> fname <> ": " <> Text.pack (show err)
       DataImport.DataFileCoerceFailed fname err ->
-        "Schema mismatch in " <> fname <> ": " <> Text.pack (show err)
+        fname <> ": " <> renderCoerceError err
       DataImport.DataFileSynthesisUnparseable fname msgs ->
         "Internal error synthesising L4 source for "
           <> fname <> ": " <> Text.intercalate "; " msgs
+
+    renderCoerceError :: DataImport.CoerceError -> Text
+    renderCoerceError = \case
+      DataImport.HeaderMismatch{DataImport.ceMissingColumns = missing, DataImport.ceUnknownColumns = unknown} ->
+        let missingPart =
+              if null missing then ""
+              else "missing column(s): " <> Text.intercalate ", " missing
+            unknownPart =
+              if null unknown then ""
+              else "unexpected column(s): " <> Text.intercalate ", " unknown
+            both = filter (not . Text.null) [missingPart, unknownPart]
+        in "header does not match the row type — " <> Text.intercalate "; " both
+      DataImport.RowTypeNotDeclared{DataImport.ceTypeName = n} ->
+        "row type `" <> n <> "` is not declared in this module or any reachable import"
+      DataImport.UnsupportedFieldType{DataImport.ceField = f, DataImport.ceTypeDoc = doc} ->
+        "field `" <> f <> "` has a type the CSV loader does not understand: " <> doc
+      DataImport.UnsupportedPrimType{DataImport.ceTypeName = tn, DataImport.ceField = f} ->
+        "field `" <> f <> "` is declared as `" <> tn
+          <> "`, which the CSV loader can't coerce a single cell into. \
+             \Supported primitive column types: NUMBER, STRING, BOOLEAN, DATE \
+             \(plus MAYBE T for optional cells). For a column whose declared type \
+             \is a record like `" <> tn <> "`, give a named value of that type a \
+             \top-level binding (e.g. `" <> tn <> "Foo MEANS " <> tn
+          <> " WITH …`) and put its name in the cell — the loader will emit it as a \
+             \reference. Alternatively, declare a slim row type whose `" <> f
+          <> "` field is a STRING and look up the record by name in your own code."
+      DataImport.CellCoercionFailed{DataImport.ceRow = r, DataImport.ceColumn = c, DataImport.ceType = tn, DataImport.ceValue = v, DataImport.ceReason = why} ->
+        "row " <> Text.pack (show r) <> ", column `" <> c <> "`: cannot read `"
+          <> v <> "` as " <> tn <> " — " <> why
+      DataImport.EmptyCellInRequiredColumn{DataImport.ceRow = r, DataImport.ceColumn = c, DataImport.ceType = tn} ->
+        "row " <> Text.pack (show r) <> ", column `" <> c
+          <> "` is empty but declared as " <> tn
+          <> " (use `MAYBE " <> tn <> "` if empty is allowed)"
+      DataImport.EnumCellNotInSet{DataImport.ceRow = r, DataImport.ceColumn = c, DataImport.ceValue = v, DataImport.ceAllowed = allowed} ->
+        "row " <> Text.pack (show r) <> ", column `" <> c <> "`: `"
+          <> v <> "` is not one of the allowed values ("
+          <> Text.intercalate ", " allowed <> ")"
+      DataImport.WrongRowCount{DataImport.ceExpected = exp', DataImport.ceActual = n} ->
+        "expected " <> exp' <> " but the file has " <> Text.pack (show n) <> " row(s)"
 
     mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
     mkSimpleDiagnostic origin _message range =

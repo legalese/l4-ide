@@ -19,6 +19,9 @@ module L4.DataImport.Rewrite
   , rewriteDataImports
   , mkAugmentedLookup
   , DataImportError(..)
+    -- Re-exported so LSP diagnostic renderers can format the inner
+    -- CoerceError without importing 'L4.DataImport.Synthesize'.
+  , CoerceError(..)
   ) where
 
 import Base
@@ -31,7 +34,7 @@ import L4.DataImport.Synthesize
   , buildDeclareEnvs
   , mergeDeclareEnvs
   , DeclareEnv
-  , CoerceError
+  , CoerceError(..)
   , synthesizeFromCsv
   )
 import L4.Lexer (PError(..))

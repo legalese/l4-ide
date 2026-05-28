@@ -278,7 +278,15 @@ safeIndex xs i
 --     cell → @NOTHING@ and non-empty cell → @JUST x@;
 --   * names that resolve to an enum @DECLARE@ in the 'DeclareEnv',
 --     in which case the cell value must be one of the declared
---     constructors.
+--     constructors;
+--   * names that resolve to a record @DECLARE@ in the 'DeclareEnv',
+--     in which case the cell is emitted as a /bare identifier/ — the
+--     user is expected to have a named value of that type in scope
+--     (e.g. cell @\"TSLA\"@ → identifier @TSLA@, which the
+--     type-checker resolves to whatever @TSLA MEANS …@ binding is
+--     reachable). This lets a CSV column store ticker-style
+--     references to top-level value bindings rather than the full
+--     record inline.
 coerceCell :: DeclareEnv -> Int -> Text -> Type' Name -> Text -> Either CoerceError Text
 coerceCell env rowNo colName ty raw =
   let trimmed = T.strip raw
@@ -287,7 +295,13 @@ coerceCell env rowNo colName ty raw =
       let tn = rawNameToText (rawName tyN)
       in case Map.lookup tn env.deEnums of
         Just ctors -> coerceEnum rowNo colName ctors trimmed
-        Nothing    -> coercePrim rowNo colName tn trimmed
+        Nothing
+          | tn `elem` primitiveTypeNames ->
+              coercePrim rowNo colName tn trimmed
+          | Map.member tn env.deRecords ->
+              coerceRecordRef rowNo colName tn trimmed
+          | otherwise ->
+              coercePrim rowNo colName tn trimmed   -- falls through to UnsupportedPrimType
     TyApp _ tyN [TyApp _ inner []]
       | rawNameToText (rawName tyN) == "MAYBE" ->
           if T.null trimmed
@@ -300,6 +314,21 @@ coerceCell env rowNo colName ty raw =
       { ceField   = colName
       , ceTypeDoc = T.pack (show ty)
       }
+
+primitiveTypeNames :: [Text]
+primitiveTypeNames = ["NUMBER", "STRING", "BOOLEAN", "DATE"]
+
+-- | Emit a cell as a bare identifier reference to a named value in
+-- scope. Used for columns whose declared type is a user-defined
+-- record — the typechecker will resolve the identifier and report
+-- a clear out-of-scope error if the cell value doesn't match any
+-- known binding.
+coerceRecordRef :: Int -> Text -> Text -> Text -> Either CoerceError Text
+coerceRecordRef rowNo colName tyName raw
+  | T.null raw =
+      Left EmptyCellInRequiredColumn { ceRow = rowNo, ceColumn = colName, ceType = tyName }
+  | otherwise =
+      Right (renderQuotedIfNeeded raw)
 
 coercePrim :: Int -> Text -> Text -> Text -> Either CoerceError Text
 coercePrim rowNo colName tyName raw
