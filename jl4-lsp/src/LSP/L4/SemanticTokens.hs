@@ -221,7 +221,27 @@ instance ToSemTokens Context PosToken (TypeSig Name) where
 instance ToSemTokens Context PosToken (GivethSig Name) where
 instance ToSemTokens Context PosToken (GivenSig Name) where
 instance ToSemTokens Context PosToken (Directive Name) where
+-- The parser lays down exactly 2 AnnoHole slots in IMPORT's Anno
+-- (one for the filename/module name, one for the optional data-import
+-- tail). The default generic walker would emit 4 hole-fits for
+-- MkDataImport's 4 fields, mis-aligning every subsequent semantic
+-- token. So we emit exactly 2 hole-fits per call and fold the
+-- (Maybe Name binding + Type' Name) into the second slot.
 instance ToSemTokens Context PosToken (Import Name) where
+  toSemTokens = \case
+    MkImport ann n _mr ->
+      traverseCsnWithHoles ann
+        [ toSemTokens n
+        , pure []                              -- Maybe NormalizedUri: no tokens
+        ]
+    MkDataImport ann n mBind ty _mr ->
+      traverseCsnWithHoles ann
+        [ toSemTokens n
+        , do                                   -- tail = (Maybe Name) <> (Type' Name)
+            bindToks <- toSemTokens mBind
+            tyToks   <- toSemTokens ty
+            pure (bindToks <> tyToks)
+        ]
 
 instance ToSemTokens Context PosToken NormalizedUri where
   toSemTokens _ = pure []
@@ -333,7 +353,23 @@ instance ToSemTokens () PosToken (TypeSig Resolved) where
 instance ToSemTokens () PosToken (GivethSig Resolved) where
 instance ToSemTokens () PosToken (GivenSig Resolved) where
 instance ToSemTokens () PosToken (Directive Resolved) where
+-- See the Name-phase instance above for why this is explicit rather
+-- than default-derived. Same 2-hole-fit layout.
 instance ToSemTokens () PosToken (Import Resolved) where
+  toSemTokens = \case
+    MkImport ann n _mr ->
+      traverseCsnWithHoles ann
+        [ toSemTokens n
+        , pure []
+        ]
+    MkDataImport ann n mBind ty _mr ->
+      traverseCsnWithHoles ann
+        [ toSemTokens n
+        , do
+            bindToks <- toSemTokens mBind
+            tyToks   <- toSemTokens ty
+            pure (bindToks <> tyToks)
+        ]
 
 instance ToSemTokens () PosToken NormalizedUri where
   toSemTokens _ = pure []
