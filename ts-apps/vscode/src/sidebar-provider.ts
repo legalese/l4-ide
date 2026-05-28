@@ -5,6 +5,7 @@ import type { VSCodeL4LanguageClient } from './vscode-l4-language-client.js'
 import { type AuthManager, LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import type { McpProxy } from './mcp-proxy.js'
+import { installDeploymentSkill } from './deployment-install.js'
 import { getWebviewContent } from './webview-panel.js'
 import {
   showTimedInformationMessage,
@@ -20,7 +21,6 @@ import {
   RequestSidebarDeploy,
   RequestSidebarUndeploy,
   RequestSidebarDownloadDeployment,
-  GetSidebarDeploymentOpenApi,
   GetSidebarDeploymentSchemas,
   GetSidebarDeploymentStatus,
   GetSidebarUpdateStatus,
@@ -31,6 +31,7 @@ import {
   RequestOpenConsole,
   RequestOpenExtensionSettings,
   RequestAddL4ToolsToClaudeCode,
+  RequestInstallDeploymentSkill,
   RequestInstallL4Cli,
   RequestCopySignInLink,
   RequestDisconnect,
@@ -45,6 +46,16 @@ import {
 import { getTokenColors } from './theme-colors.js'
 
 export const SIDEBAR_WEBVIEW_TYPE = 'l4.deployView'
+
+/** Read the MCP proxy port from settings, matching the default in
+ *  mcp-proxy.ts and the package.json contribution. Surfaced in the
+ *  sidebar's connection-status payload so the deployment panel can
+ *  tell users which localhost port agents should connect to. */
+function getMcpPort(): number {
+  return (
+    vscode.workspace.getConfiguration('jl4').get<number>('mcpPort') ?? 19415
+  )
+}
 
 export const sidebarWebviewFrontend: WebviewTypeMessageParticipant = {
   type: 'webview',
@@ -84,6 +95,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           status: state.status,
           isLegaleseCloud: auth.isLegaleseCloudSession(),
           orgSlug: auth.getCloudOrgSlug(),
+          mcpPort: getMcpPort(),
           error: state.error,
         }
         this.messenger.sendNotification(
@@ -100,6 +112,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    *  resolve don't drop frames on the floor. */
   isVisible(): boolean {
     return this.view?.visible ?? false
+  }
+
+  /**
+   * Re-emit the connection-status notification with the current
+   * snapshot. Called from outside the provider when something the
+   * sidebar displays — but that isn't an auth state change — has
+   * changed (e.g. the MCP port was reconfigured at runtime).
+   */
+  async refreshConnectionStatus(): Promise<void> {
+    if (!this.view) return
+    const state = await this.auth.getConnectionState()
+    const response: GetSidebarConnectionStatusResponse = {
+      serviceUrl: state.serviceUrl,
+      connected: state.connected,
+      status: state.status,
+      isLegaleseCloud: this.auth.isLegaleseCloudSession(),
+      orgSlug: this.auth.getCloudOrgSlug(),
+      mcpPort: getMcpPort(),
+      error: state.error,
+    }
+    this.messenger.sendNotification(
+      SidebarConnectionStatusChanged,
+      sidebarWebviewFrontend,
+      response
+    )
   }
 
   resolveWebviewView(
@@ -251,6 +288,11 @@ export function initializeSidebarMessenger(
   serviceClient: ServiceClient,
   outputChannel: vscode.OutputChannel,
   mcpProxy: McpProxy,
+  // VS Code's user-data path (the one containing `mcp.json`). Required
+  // by the deployment-skill install flow that writes per-deployment MCP
+  // entries for the VS Code Chat target. Derived from
+  // `context.globalStorageUri` by the caller.
+  userDataPath: string | undefined,
   onInspectorSectionRemoved?: (directiveId: string) => void
 ) {
   // Handle exported functions request from sidebar
@@ -281,6 +323,7 @@ export function initializeSidebarMessenger(
       status: state.status,
       isLegaleseCloud: auth.isLegaleseCloudSession(),
       orgSlug: auth.getCloudOrgSlug(),
+      mcpPort: getMcpPort(),
       error: state.error,
     }
   })
@@ -538,49 +581,32 @@ export function initializeSidebarMessenger(
     }
   })
 
-  // Handle deployment OpenAPI request (for breaking change detection)
-  messenger.onRequest(GetSidebarDeploymentOpenApi, async (params) => {
-    try {
-      const openapi = await serviceClient.getDeploymentOpenApi(
-        params.deploymentId
-      )
-      return { openapi }
-    } catch (err) {
-      outputChannel.appendLine(
-        `[sidebar] Error fetching deployment OpenAPI: ${err instanceof Error ? err.message : String(err)}`
-      )
-      return { openapi: null }
-    }
-  })
-
-  // Fetch the deployed functions' full schemas (per-function endpoint) so
-  // the sidebar can recursively diff them against the local interface.
+  // Fetch the deployed functions' full schemas in one round-trip so the
+  // sidebar can recursively diff them against the local interface.
   // Returns { functions: null } when the deployment does not exist yet
   // (or is unreachable) — a first deploy can't break anything.
   messenger.onRequest(GetSidebarDeploymentSchemas, async (params) => {
     try {
-      const fns = await serviceClient.listDeploymentFunctions(
-        params.deploymentId
+      const status = await serviceClient.getDeploymentStatus(
+        params.deploymentId,
+        'full'
       )
-      const functions = await Promise.all(
-        fns.map(async (f) => {
-          const schema = (await serviceClient.getFunctionSchema(
-            params.deploymentId,
-            f.name
-          )) as {
-            name?: string
-            parameters?: RemoteFunctionSchema['parameters']
-            returnType?: string
-            returnSchema?: RemoteFunctionSchema['returnSchema']
+      const meta = status.metadata as
+        | {
+            functions?: Array<{
+              name: string
+              parameters?: RemoteFunctionSchema['parameters']
+              returnType?: string
+              returnSchema?: RemoteFunctionSchema['returnSchema']
+            }>
           }
-          return {
-            name: schema.name ?? f.name,
-            parameters: schema.parameters,
-            returnType: schema.returnType,
-            returnSchema: schema.returnSchema,
-          }
-        })
-      )
+        | undefined
+      const functions = (meta?.functions ?? []).map((f) => ({
+        name: f.name,
+        parameters: f.parameters,
+        returnType: f.returnType,
+        returnSchema: f.returnSchema,
+      }))
       return { functions }
     } catch (err) {
       outputChannel.appendLine(
@@ -709,6 +735,36 @@ export function initializeSidebarMessenger(
   messenger.onNotification(RequestAddL4ToolsToClaudeCode, async () => {
     await mcpProxy.addL4ToolsToClaudeCode()
   })
+
+  // Install a per-deployment plugin bundle (SKILL.md + hosted MCP entry)
+  // into either Claude Code or VS Code Chat. The bundle is downloaded
+  // from the auth-proxy's .skill endpoint with the user's session token.
+  messenger.onNotification(
+    RequestInstallDeploymentSkill,
+    async ({ deploymentId, target }) => {
+      outputChannel.appendLine(
+        `[sidebar] Install deployment ${deploymentId} → ${target}`
+      )
+      try {
+        await installDeploymentSkill({
+          deploymentId,
+          target,
+          auth,
+          serviceClient,
+          outputChannel,
+          userDataPath,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        outputChannel.appendLine(
+          `[sidebar] Install ${deploymentId} → ${target} failed: ${msg}`
+        )
+        void vscode.window.showErrorMessage(
+          `Could not install ${deploymentId}: ${msg}`
+        )
+      }
+    }
+  )
 
   // Install the bundled l4 CLI on PATH.
   // The sidebar dropdown fires this separately from "Add L4 Tools …"

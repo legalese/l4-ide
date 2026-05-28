@@ -173,6 +173,10 @@ export interface GetSidebarConnectionStatusResponse {
    *  session. Undefined for self-hosted jl4-service / API-key-only.
    *  Drives the Deployment tab's deployment-scoped integration URLs. */
   orgSlug?: string
+  /** Localhost port the extension's MCP proxy is listening on. Read
+   *  from `jl4.mcpPort` (default 19415) at status time so the sidebar
+   *  can surface the address agents should connect to. */
+  mcpPort: number
   error?: string
 }
 
@@ -308,14 +312,6 @@ export const GetSidebarUpdateStatus: RequestType<
   method: 'getSidebarUpdateStatus',
 }
 
-/** Sidebar requests deployment OpenAPI spec (for breaking change detection) */
-export const GetSidebarDeploymentOpenApi: RequestType<
-  { deploymentId: string },
-  { openapi: unknown }
-> = {
-  method: 'getSidebarDeploymentOpenApi',
-}
-
 /**
  * A deployed function's interface, normalized from jl4-service's
  * per-function schema endpoint (`GET /deployments/{id}/functions/{fn}`)
@@ -380,6 +376,23 @@ export const RequestOpenExtensionSettings: NotificationType<void> = {
 /** Sidebar asks extension to add L4 tools (MCP server + skill) to Claude Code */
 export const RequestAddL4ToolsToClaudeCode: NotificationType<void> = {
   method: 'requestAddL4ToolsToClaudeCode',
+}
+
+/**
+ * Sidebar asks extension to install a specific deployment as a Claude Code
+ * plugin or a VS Code Chat MCP server. The extension downloads the plugin
+ * bundle from `mcp.legalese.cloud/{slug}/{deploymentId}/.skill` using the
+ * user's session token, then writes the relevant config for the chosen
+ * target (skill folder + ~/.claude.json for Claude Code; per-deployment
+ * entry in VS Code's user-level mcp.json for VS Code Chat).
+ *
+ * Cloud mode only — both targets reference the hosted MCP URL.
+ */
+export const RequestInstallDeploymentSkill: NotificationType<{
+  deploymentId: string
+  target: 'claude-code' | 'vscode-chat' | 'download-zip'
+}> = {
+  method: 'requestInstallDeploymentSkill',
 }
 
 /** Sidebar asks extension to install the bundled `l4` CLI onto the user's PATH */
@@ -759,6 +772,19 @@ export const AiChatToolCall: NotificationType<{
   status: 'pending-approval' | 'running' | 'done' | 'error'
   result?: string
   errorMessage?: string
+  /** For `l4-rules__<sanitised>` calls only: the original (unsanitised)
+   *  L4 function name as written in the user's source — parsed out of
+   *  the MCP tool description trailer. Carries the spaces / mixed case
+   *  the wire-level sanitised tool name had to drop to satisfy the
+   *  `^[a-zA-Z0-9_-]{1,64}$` regex. Lets the row's display align with
+   *  the server-side rule-activity card, which already shows the
+   *  original. Absent for infra tools (`list_files`, etc.) and any
+   *  non-rule call. */
+  ruleFnName?: string
+  /** Deployment id parsed from the same trailer. Lets the chat
+   *  tool-call card resolve render-meta directly from the deployment
+   *  without going through the IDE's sanitized MCP target map. */
+  deploymentId?: string
 }> = {
   method: 'aiChatToolCall',
 }
@@ -779,6 +805,7 @@ export type AiPermissionCategory =
   | 'fs.edit'
   | 'fs.delete'
   | 'l4.evaluate'
+  | 'l4.refactor'
   | 'mcp.l4Rules'
   | 'meta.askUser'
 
@@ -799,6 +826,27 @@ export const AiPermissionsSet: NotificationType<{
   value: AiPermissionValue
 }> = {
   method: 'aiPermissionsSet',
+}
+
+/** Chat-panel UI preferences. Persisted on the extension side via
+ *  `vscode.workspace.getConfiguration` under `legaleseAi.<key>`, so
+ *  Settings Sync carries them across machines — same mechanism as
+ *  permissions. New entries: add a field here, a default in the
+ *  webview store, and a key mapping in the extension handler. */
+export interface AiPreferences {
+  showReasoning: boolean
+}
+
+/** Webview asks for all current preference values. */
+export const AiPreferencesGet: RequestType<void, { values: AiPreferences }> = {
+  method: 'aiPreferencesGet',
+}
+
+/** Webview pushes a partial preference update. */
+export const AiPreferencesSet: NotificationType<{
+  values: Partial<AiPreferences>
+}> = {
+  method: 'aiPreferencesSet',
 }
 
 /** Webview asks the extension for the L4 render-meta of an MCP tool.
@@ -838,14 +886,21 @@ export const AiChatToolActivity: NotificationType<{
   conversationId: string
   tool: string
   status: 'running' | 'done' | 'error'
+  /** Bold action prefix the webview shows in front of `message`
+   *  (e.g. "L4 Deployments", "Compacting...", "Legalesing...",
+   *  "L4 Rule"). Set by the proxy so the webview doesn't need a
+   *  per-tool name → label map. Absent on activities emitted by
+   *  older proxy builds — webview falls back to a sane default. */
+  label?: string
   message: string
-  /** Verbatim model-supplied arguments — present only for inspectable
-   *  server tools (L4 rule evaluations). When set alongside `ruleId`
-   *  (or for `evaluate_rule`), the webview renders this activity as an
+  /** Verbatim model-supplied arguments — present only for L4 Rule
+   *  activities (the proxy emits this only when its descriptor is
+   *  `kind: "rule"`). Combined with `ruleId` (or `evaluate_rule`'s
+   *  `input.function_name`), the webview renders this activity as an
    *  L4 Rule card identical to a client-side tool-call instead of the
    *  minimal status row. */
   input?: unknown
-  /** Verbatim tool result (set on `done`). */
+  /** Verbatim rule result (set on `done`). L4 Rule activities only. */
   output?: unknown
   /** Deployed L4 function name when the activity wraps a rule. */
   ruleId?: string
@@ -853,6 +908,13 @@ export const AiChatToolActivity: NotificationType<{
   deploymentId?: string
   /** Error detail when status is `error`. */
   error?: string
+  /** URL citations carried by a synthetic `web_search` activity — the
+   *  upstream provider ran a native web search (Anthropic's
+   *  `web_search_20250305` via OpenRouter) and the proxy aggregated
+   *  the resulting `url_citation` annotations into this list. Empty /
+   *  absent on every other activity; the webview renders these as the
+   *  "Sources:" section of the turn's review card. */
+  sources?: Array<{ url: string; title?: string }>
 }> = {
   method: 'aiChatToolActivity',
 }

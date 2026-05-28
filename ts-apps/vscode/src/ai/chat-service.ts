@@ -35,12 +35,20 @@ export type ChatServiceEvent =
       conversationId: string
       tool: string
       status: 'running' | 'done' | 'error'
+      /** Proxy-supplied bold action prefix (e.g. "L4 Deployments",
+       *  "Compacting...", "Legalesing..."). The webview renders it
+       *  verbatim — no per-tool name mapping on this side. */
+      label?: string
       message: string
+      /** L4 Rule activities only. */
       input?: unknown
       output?: unknown
       ruleId?: string
       deploymentId?: string
       error?: string
+      /** Synthetic `web_search` activities only — URL citations the
+       *  upstream model's provider-native web search produced. */
+      sources?: Array<{ url: string; title?: string }>
     }
   | {
       kind: 'tool-call'
@@ -51,6 +59,13 @@ export type ChatServiceEvent =
       status: 'pending-approval' | 'running' | 'done' | 'error'
       result?: string
       error?: string
+      /** For `l4-rules__<sanitised>` calls: original L4 function name
+       *  + deployment id parsed from the MCP description trailer.
+       *  Threaded through to the webview so the tool-call row shows
+       *  the unsanitised name (matching the server-side rule-activity
+       *  card) instead of the wire-level slug with dashes. */
+      ruleFnName?: string
+      deploymentId?: string
     }
   | {
       kind: 'done'
@@ -97,24 +112,37 @@ export type PersistedBlock =
       status: 'running' | 'done' | 'error'
       result?: string
       error?: string
+      /** Original (unsanitised) L4 function name for `l4-rules__*`
+       *  rule calls — preserved so a reloaded transcript shows the
+       *  same row label the user saw live. */
+      ruleFnName?: string
+      /** Deployment id parsed from the MCP description trailer. */
+      deploymentId?: string
     }
-  // Only L4-rule server activities are persisted (the proxy ran a
-  // deployed rule). Plain status tickers (doc search etc.) are
-  // intentionally not recorded — they're ephemeral progress noise
-  // with nothing to reconstruct on reload. `ruleKey` mirrors the
-  // webview store's merge key so a `running → done` burst persists
-  // as ONE block.
+  // Server activities worth preserving across a history reload. Two
+  // shapes share the variant:
+  //
+  //  - L4 Rule activities (the proxy ran a deployed rule): `ruleId` +
+  //    `ruleKey` are both set; `ruleKey` mirrors the webview store's
+  //    merge key so a `running → done` burst persists as ONE block.
+  //  - Synthetic `web_search` activities: `tool === 'web_search'`,
+  //    `sources` carries the URL citation list. No rule fields.
+  //
+  // Other plain status tickers (doc search, compaction, deployment
+  // browsing) are intentionally not recorded — they're ephemeral
+  // progress noise with nothing to reconstruct on reload.
   | {
       kind: 'tool-activity'
       tool: string
-      ruleId: string
-      ruleKey: string
+      ruleId?: string
+      ruleKey?: string
       status: 'running' | 'done' | 'error'
       message: string
       input?: unknown
       output?: unknown
       deploymentId?: string
       error?: string
+      sources?: Array<{ url: string; title?: string }>
     }
 
 export interface ChatServiceOptions {
@@ -844,13 +872,39 @@ export class ChatService {
           conversationId: local ?? turnId,
           tool: ev.tool,
           status: ev.status,
+          label: ev.label,
           message: ev.message,
           input: ev.input,
           output: ev.output,
           ruleId: ev.ruleId,
           deploymentId: ev.deploymentId,
           error: ev.error,
+          sources: ev.sources,
         })
+        // Persist synthetic `web_search` activities — the sources list
+        // is the evidence chain for the assistant's answer, so it must
+        // survive a history reload. Single row per turn keyed on the
+        // fixed `web_search` tool name; `running → done` collapses in
+        // place (the running event has no sources, the done event
+        // carries the full list).
+        if (ev.tool === 'web_search') {
+          const existing = blocks.find(
+            (b) => b.kind === 'tool-activity' && b.tool === 'web_search'
+          )
+          if (existing && existing.kind === 'tool-activity') {
+            existing.status = ev.status
+            existing.message = ev.message
+            if (ev.sources !== undefined) existing.sources = ev.sources
+          } else {
+            blocks.push({
+              kind: 'tool-activity',
+              tool: 'web_search',
+              status: ev.status,
+              message: ev.message,
+              sources: ev.sources,
+            })
+          }
+        }
         // Persist L4-rule activities so they survive a history
         // reload (the user explicitly wants server rule calls kept;
         // plain status tickers don't need to be). Identity + merge
@@ -959,6 +1013,15 @@ export class ChatService {
             argsJson: ev.argsJson,
           })
         }
+        // For `l4-rules__*` calls, resolve the original L4 function
+        // name + deployment from the MCP target map so the row can
+        // display the unsanitised name instead of the wire-level
+        // sanitised slug. listTools() ran earlier in this turn (the
+        // proxy received the tools array), so the map is populated.
+        // For infra tools (list_files / read_file / etc.) and any
+        // non-`l4-rules__` call this returns null and we leave the
+        // fields undefined.
+        const ruleTarget = this.opts.mcp.getToolTarget(ev.name)
         const existingBlock = blocks.find(
           (b) => b.kind === 'tool-call' && b.callId === ev.callId
         )
@@ -972,6 +1035,12 @@ export class ChatService {
             name: ev.name,
             argsJson: ev.argsJson,
             status: 'running',
+            ...(ruleTarget
+              ? {
+                  ruleFnName: ruleTarget.fnName,
+                  deploymentId: ruleTarget.deployId,
+                }
+              : {}),
           })
         }
         // Pre-compute the initial status based on the user's permission
@@ -994,6 +1063,12 @@ export class ChatService {
           name: ev.name,
           argsJson: ev.argsJson,
           status: initialStatus,
+          ...(ruleTarget
+            ? {
+                ruleFnName: ruleTarget.fnName,
+                deploymentId: ruleTarget.deployId,
+              }
+            : {}),
         })
       } else if (ev.kind === 'done') {
         finishReason = ev.finishReason

@@ -25,6 +25,10 @@ module Types (
   -- * Health
   HealthResponse (..),
   HealthDeploymentCounts (..),
+  -- * MCP Tasks extension
+  TaskId (..),
+  TaskStatus (..),
+  TaskState (..),
   -- * Environment
   AppEnv (..),
   AppM,
@@ -36,6 +40,7 @@ import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
 import BundleStore (BundleStore)
 import Control.Applicative ((<|>))
+import Control.Concurrent.Async (Async)
 import Control.Concurrent.STM (TVar)
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Aeson as Aeson
@@ -132,9 +137,10 @@ data FunctionSummary = FunctionSummary
   -- ^ Display name of the return type (e.g. "BOOLEAN", "NUMBER", "DEONTIC").
   , fsReturnSchema :: !(Maybe Parameter)
   -- ^ Structured JSON Schema of the return type, with x-l4-type annotations
-  -- on each record/enum node. Populated only by the function-schema endpoint
-  -- response from the live in-memory Function; left 'Nothing' in cached
-  -- metadata to avoid unnecessary persistence (always recomputable on compile).
+  -- on each record/enum node. Computed at compile time and persisted in the
+  -- metadata cache so read endpoints (incl. the per-function schema and
+  -- proxy-side EFS rendering) can be served without recompiling. 'Nothing'
+  -- only when the return type has no structured schema.
   , fsSection     :: !(Maybe Text)
   -- ^ L4 section header (§§) this function belongs to.
   , fsIsDeontic   :: !Bool
@@ -152,19 +158,33 @@ instance ToJSON FunctionSummary where
     , "parameters"  .= fs.fsParameters
     , "returnType"  .= fs.fsReturnType
     , "section"     .= fs.fsSection
+    , "isDeontic"   .= fs.fsIsDeontic
     ] <> maybe [] (\rs -> ["returnSchema" .= rs]) fs.fsReturnSchema
 
 instance FromJSON FunctionSummary where
-  parseJSON = Aeson.withObject "FunctionSummary" $ \o ->
-    FunctionSummary
-      <$> (o .: "name"        <|> o .: "fsName")
-      <*> (o .: "description" <|> o .: "fsDescription")
-      <*> (o .: "parameters"  <|> o .: "fsParameters")
-      <*> (o .: "returnType"  <|> o .: "fsReturnType")
-      <*> o .:? "returnSchema"
-      <*> (o .:? "section"    <|> o .:? "fsSection")
-      <*> pure False  -- isDeontic: internal only, not in JSON
-      <*> (o .:? "sourceFile" <|> o .:? "fsSourceFile")
+  parseJSON = Aeson.withObject "FunctionSummary" $ \o -> do
+    name         <- o .: "name"        <|> o .: "fsName"
+    description  <- o .: "description" <|> o .: "fsDescription"
+    parameters   <- o .: "parameters"  <|> o .: "fsParameters"
+    returnType   <- o .: "returnType"  <|> o .: "fsReturnType"
+    returnSchema <- o .:? "returnSchema"
+    section      <- o .:? "section"    <|> o .:? "fsSection"
+    -- isDeontic is now persisted in the metadata cache. For caches written
+    -- before this field existed, fall back to deriving it from the return
+    -- type (the same signal McpServer uses) so older deployments are still
+    -- correct without waiting for a recompile.
+    isDeontic    <- o .:? "isDeontic" .!= ("DEONTIC" `Text.isPrefixOf` returnType)
+    sourceFile   <- o .:? "sourceFile" <|> o .:? "fsSourceFile"
+    pure FunctionSummary
+      { fsName         = name
+      , fsDescription  = description
+      , fsParameters   = parameters
+      , fsReturnType   = returnType
+      , fsReturnSchema = returnSchema
+      , fsSection      = section
+      , fsIsDeontic    = isDeontic
+      , fsSourceFile   = sourceFile
+      }
 
 -- | A source file entry within a deployment.
 data FileEntry = FileEntry
@@ -519,6 +539,48 @@ instance ToJSON BatchResponse where
       , "summary" .= br.summary
       ]
 
+-- ----------------------------------------------------------------------------
+-- MCP Tasks extension types (2026-07-28 RC)
+-- ----------------------------------------------------------------------------
+
+-- | Opaque identifier for an MCP task.
+newtype TaskId = TaskId { unTaskId :: Text }
+  deriving newtype (Eq, Ord, Show, FromJSON, ToJSON)
+
+-- | Status of an MCP task in its lifecycle.
+data TaskStatus
+  = TaskPending    -- ^ Not yet running (e.g. waiting for compilation to finish).
+  | TaskWorking    -- ^ Active work (evaluation in progress).
+  | TaskCompleted  -- ^ Finished successfully; 'tsResult' carries the @tools/call@ result.
+  | TaskFailed     -- ^ Terminal error; 'tsError' carries the message.
+  | TaskCancelled  -- ^ Cancelled by the client via @tasks/cancel@.
+  deriving stock (Eq, Show)
+
+instance ToJSON TaskStatus where
+  toJSON = Aeson.String . taskStatusText
+
+taskStatusText :: TaskStatus -> Text
+taskStatusText = \case
+  TaskPending -> "pending"
+  TaskWorking -> "working"
+  TaskCompleted -> "completed"
+  TaskFailed -> "failed"
+  TaskCancelled -> "cancelled"
+
+-- | Runtime state for an MCP task. The 'tsAsync' handle is retained so
+-- @tasks/cancel@ can abort in-flight work. Tasks past 'tsTtlSeconds' from
+-- 'tsCreatedAt' are reaped by a background sweeper.
+data TaskState = TaskState
+  { tsStatus     :: !TaskStatus
+  , tsResult     :: !(Maybe Aeson.Value)
+  -- ^ The eventual MCP @tools/call@ result content (already structured
+  -- as @{ content: [...], isError? }@). 'Just' iff status is 'TaskCompleted'.
+  , tsError      :: !(Maybe Text)
+  , tsCreatedAt  :: !UTCTime
+  , tsTtlSeconds :: !Int
+  , tsAsync      :: !(Maybe (Async ()))
+  }
+
 -- | Shared application environment threaded through all handlers.
 data AppEnv = MkAppEnv
   { deploymentRegistry :: TVar (Map DeploymentId DeploymentState)
@@ -531,6 +593,12 @@ data AppEnv = MkAppEnv
   , serverName         :: Maybe Text
   , logger             :: Logger
   , options            :: Options.Options
+  , mcpTasks           :: TVar (Map TaskId TaskState)
+  -- ^ MCP @tools/call@ tasks (2026-07-28 Tasks extension). Keyed by an
+  -- opaque task id. Lifetime is per-process; tasks tied to a deployment
+  -- naturally pin to whichever instance has that deployment loaded
+  -- because the auth proxy already routes deployment-scoped MCP traffic
+  -- with affinity.
   }
 
 -- | The handler monad for all Servant routes.

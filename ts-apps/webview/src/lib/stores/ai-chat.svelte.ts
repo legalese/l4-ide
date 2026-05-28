@@ -28,6 +28,7 @@ import {
   type AiPermissionCategory,
   type AiPermissionValue,
 } from 'jl4-client-rpc'
+import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
 
 export interface PendingQuestion {
   callId: string
@@ -120,6 +121,11 @@ export interface RenderedToolActivity {
   tool: string
   /** Most recent status across the merged run — `done`/`error` stick. */
   status: 'running' | 'done' | 'error'
+  /** Bold action prefix the row shows in front of `message`. Stamped
+   *  by the proxy ("L4 Deployments", "Compacting...", "Legalesing...").
+   *  Absent for activities emitted by older proxy builds — the row
+   *  falls back to a default label. */
+  label?: string
   /** Most recent message; prior messages of the same run are dropped
    *  once the next one arrives. */
   message: string
@@ -140,6 +146,10 @@ export interface RenderedToolActivity {
    *  by callId). Set only for rule activities; `undefined` for plain
    *  status activities, which keep the legacy tool+message dedupe. */
   ruleKey?: string
+  /** URL citations carried by a synthetic `web_search` activity. The
+   *  message-assistant component aggregates these across the turn and
+   *  renders them as the "Sources:" section of the review card. */
+  sources?: Array<{ url: string; title?: string }>
 }
 
 /** Identify an L4-rule tool activity and compute its merge key + the
@@ -247,6 +257,10 @@ function extractPersistedBlocks(meta: unknown): AssistantBlock[] | null {
           status,
           result: typeof b.result === 'string' ? b.result : undefined,
           error: typeof b.error === 'string' ? b.error : undefined,
+          ruleFnName:
+            typeof b.ruleFnName === 'string' ? b.ruleFnName : undefined,
+          deploymentId:
+            typeof b.deploymentId === 'string' ? b.deploymentId : undefined,
         },
       })
     } else if (
@@ -278,6 +292,33 @@ function extractPersistedBlocks(meta: unknown): AssistantBlock[] | null {
             typeof b.deploymentId === 'string' ? b.deploymentId : undefined,
           error: typeof b.error === 'string' ? b.error : undefined,
           ruleKey: b.ruleKey,
+        },
+      })
+    } else if (b.kind === 'tool-activity' && b.tool === 'web_search') {
+      // Persisted web-search activity. No rule fields — the only
+      // payload that needs to survive a reload is the citations list;
+      // the dot itself is rendered as the standard plain status row.
+      const status =
+        b.status === 'done' || b.status === 'error' ? b.status : 'done'
+      const sources = Array.isArray(b.sources)
+        ? (b.sources as Array<{ url?: unknown; title?: unknown }>)
+            .filter(
+              (s) =>
+                s && typeof s.url === 'string' && (s.url as string).length > 0
+            )
+            .map((s) => ({
+              url: s.url as string,
+              ...(typeof s.title === 'string' ? { title: s.title } : {}),
+            }))
+        : undefined
+      out.push({
+        kind: 'tool-activity',
+        activity: {
+          tool: 'web_search',
+          status,
+          label: 'Web search',
+          message: typeof b.message === 'string' ? b.message : '',
+          sources,
         },
       })
     }
@@ -1258,12 +1299,14 @@ export function createAiChatStore(
     conversationId: string
     tool: string
     status: 'running' | 'done' | 'error'
+    label?: string
     message: string
     input?: unknown
     output?: unknown
     ruleId?: string
     deploymentId?: string
     error?: string
+    sources?: Array<{ url: string; title?: string }>
   }): void {
     // Route strictly by conversationId. Falling back to `currentId`
     // crosstalks multiple concurrent streams into whichever chat the
@@ -1306,6 +1349,7 @@ export function createAiChatStore(
           // that omits it doesn't blank the card.
           b.activity.status = params.status
           b.activity.message = params.message
+          if (params.label !== undefined) b.activity.label = params.label
           if (params.input !== undefined) b.activity.input = params.input
           if (params.output !== undefined) b.activity.output = params.output
           if (params.deploymentId) b.activity.deploymentId = params.deploymentId
@@ -1318,6 +1362,7 @@ export function createAiChatStore(
         activity: {
           tool: params.tool,
           status: params.status,
+          label: params.label,
           message: params.message,
           input: params.input,
           output: params.output,
@@ -1325,6 +1370,37 @@ export function createAiChatStore(
           deploymentId: params.deploymentId,
           error: params.error,
           ruleKey: ruleIdentity.ruleKey,
+        },
+      })
+      return
+    }
+
+    // Web-search activities merge by tool name (not by message) so
+    // the initial empty-message running event and the final "N sources"
+    // done event collapse into ONE row. Without this branch the
+    // generic dedupe below would split them (different `message`),
+    // showing two web-search rows for a single search burst.
+    if (params.tool === 'web_search') {
+      for (let i = turn.blocks.length - 1; i >= 0; i--) {
+        const b = turn.blocks[i]
+        if (b.kind === 'tool-activity' && b.activity.tool === 'web_search') {
+          b.activity.status = params.status
+          if (params.message) b.activity.message = params.message
+          if (params.label !== undefined) b.activity.label = params.label
+          if (params.sources !== undefined) b.activity.sources = params.sources
+          if (params.error !== undefined) b.activity.error = params.error
+          return
+        }
+      }
+      turn.blocks.push({
+        kind: 'tool-activity',
+        activity: {
+          tool: 'web_search',
+          status: params.status,
+          label: params.label,
+          message: params.message,
+          sources: params.sources,
+          error: params.error,
         },
       })
       return
@@ -1339,7 +1415,21 @@ export function createAiChatStore(
     //     real progress, so push a new row even if the previous one
     //     is still "running" (it effectively terminates when the next
     //     message arrives).
-    const tail = turn.blocks[turn.blocks.length - 1]
+    //
+    // When the user has hidden reasoning ("Show model reasoning"
+    // toggle off in chat settings), the dedupe scan walks past
+    // intervening thinking blocks. Otherwise two identical activity
+    // events sandwiching a hidden think look like duplicate rows.
+    // When reasoning is visible, we want a thinking block to act
+    // as a divider so the user can see "model thought, then status
+    // re-emitted" — so the scan only looks at the immediate tail.
+    let tailIdx = turn.blocks.length - 1
+    if (!aiPrefs.showReasoning) {
+      while (tailIdx >= 0 && turn.blocks[tailIdx]?.kind === 'thinking') {
+        tailIdx--
+      }
+    }
+    const tail = turn.blocks[tailIdx]
     if (
       tail &&
       tail.kind === 'tool-activity' &&
@@ -1354,6 +1444,7 @@ export function createAiChatStore(
       activity: {
         tool: params.tool,
         status: params.status,
+        label: params.label,
         message: params.message,
       },
     })
@@ -1367,6 +1458,12 @@ export function createAiChatStore(
     status: 'pending-approval' | 'running' | 'done' | 'error'
     result?: string
     errorMessage?: string
+    /** Original L4 function name (with spaces) for `l4-rules__*` calls;
+     *  threaded through from the MCP target map so the row displays
+     *  the unsanitised name. */
+    ruleFnName?: string
+    /** Deployment id parsed from the MCP description trailer. */
+    deploymentId?: string
   }): void {
     // Status updates for an EXISTING tool call must merge into the
     // block wherever it already lives — not just the latest turn or
@@ -1388,6 +1485,9 @@ export function createAiChatStore(
       if (params.errorMessage !== undefined) c.error = params.errorMessage
       if (params.name) c.name = params.name
       if (params.argsJson) c.argsJson = params.argsJson
+      if (params.ruleFnName !== undefined) c.ruleFnName = params.ruleFnName
+      if (params.deploymentId !== undefined)
+        c.deploymentId = params.deploymentId
       return true
     }
 
@@ -1440,6 +1540,12 @@ export function createAiChatStore(
         status: params.status,
         result: params.result,
         error: params.errorMessage,
+        ...(params.ruleFnName !== undefined
+          ? { ruleFnName: params.ruleFnName }
+          : {}),
+        ...(params.deploymentId !== undefined
+          ? { deploymentId: params.deploymentId }
+          : {}),
       },
     })
   }
@@ -1504,8 +1610,20 @@ export function createAiChatStore(
     // belonged to the previous user it would now 404 on reload, and
     // leaving its rendered messages on screen under a different
     // identity is exactly the cross-user leak we're guarding against.
+    //
+    // Reset to a fresh-chat view explicitly — clearing only
+    // `currentId` would leave a stale `pendingConversation` buffer or
+    // an active `deploymentBinding` ("Use in chat") in place, so the
+    // panel would still render the previous session's deployment
+    // banner / empty-state after signing back in. Also wipe the
+    // in-memory conversation cache so a stale id never resurfaces.
     if (prevSignedIn !== params.signedIn) {
-      currentId = null
+      newConversation()
+      for (const k of Object.keys(conversations)) delete conversations[k]
+      for (const k of Object.keys(pendingQuestionsByConv))
+        delete pendingQuestionsByConv[k]
+      for (const k of Object.keys(pendingQuestionConvByCallId))
+        delete pendingQuestionConvByCallId[k]
       void refreshHistory()
     }
   }
@@ -1617,6 +1735,7 @@ export function createAiChatStore(
       'fs.edit': 'always',
       'fs.delete': 'always',
       'l4.evaluate': 'always',
+      'l4.refactor': 'always',
       'mcp.l4Rules': 'always',
       'meta.askUser': 'always',
     } as Record<AiPermissionCategory, AiPermissionValue>
@@ -1897,11 +2016,14 @@ export type AiChatStore = {
     status: 'pending-approval' | 'running' | 'done' | 'error'
     result?: string
     errorMessage?: string
+    ruleFnName?: string
+    deploymentId?: string
   }) => void
   onToolActivity: (params: {
     conversationId: string
     tool: string
     status: 'running' | 'done' | 'error'
+    label?: string
     message: string
     input?: unknown
     output?: unknown

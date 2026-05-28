@@ -126,6 +126,27 @@
       })
     }
   })
+
+  // Submitting a new prompt always snaps the chat to the bottom,
+  // even if the user had scrolled up to read older history. A fresh
+  // user turn (incl. one queued via inject while a stream is in
+  // flight) is the unambiguous "I want to see what happens next"
+  // signal, so we override `stickToBottom` for that one event and
+  // re-engage auto-stick going forward. Tracked by user-turn count
+  // rather than total-turn count so an assistant reply or a
+  // streamed-in tool block doesn't accidentally re-snap a user who
+  // is deliberately reading earlier messages.
+  let lastUserTurnCount = $state(0)
+  $effect(() => {
+    const userCount = turns.filter((t) => t.role === 'user').length
+    if (userCount > lastUserTurnCount && scrollEl) {
+      stickToBottom = true
+      queueMicrotask(() => {
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight
+      })
+    }
+    lastUserTurnCount = userCount
+  })
 </script>
 
 <div class="message-list" bind:this={scrollEl} onscroll={onScroll}>
@@ -212,6 +233,11 @@
     overflow-x: hidden;
     padding: 0 10px 16px;
     display: block;
+    /* Establish a size container so non-sticky user bubbles can cap
+       themselves at a fraction of the chat's visible height (via `cqh`)
+       rather than the viewport, since the AI chat lives in a sidebar
+       whose height is independent of `vh`. */
+    container-type: size;
   }
   .bottom-spinner {
     display: flex;

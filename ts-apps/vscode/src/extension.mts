@@ -43,11 +43,13 @@ import { AuthManager } from './auth.js'
 import { ServiceClient } from './service-client.js'
 import { AiLogger } from './ai/logger.js'
 import { AiProxyClient } from './ai/ai-proxy-client.js'
+import { registerChatParticipant } from './chat-participant.js'
 import { ConversationStore } from './ai/conversation-store.js'
 import { ChatService } from './ai/chat-service.js'
 import { ToolDispatcher } from './ai/tool-dispatcher.js'
 import { registerAiChatHandlers } from './ai/register.js'
 import { recordDirectiveResults } from './ai/tools/l4-evaluate.js'
+import { commandRenameIdentifier } from './ai/tools/refactor.js'
 import { McpToolClient } from './ai/mcp-client.js'
 
 /***********************************************
@@ -460,14 +462,20 @@ export async function activate(context: ExtensionContext) {
   const auth = new AuthManager(context.secrets, outputChannel)
   const serviceClient = new ServiceClient(auth)
 
-  // Start local MCP proxy — always running, returns empty tools when disconnected
+  // Start local MCP proxy — always running, returns empty tools when disconnected.
+  // `context.globalStorageUri` is `<userDataDir>/globalStorage/<publisher>.<ext>`,
+  // so its grandparent is the user data dir that holds `mcp.json`.
+  const userDataPath = path.dirname(
+    path.dirname(context.globalStorageUri.fsPath)
+  )
   const mcpProxy = new McpProxy(
     auth,
     outputChannel,
     // globalState slot kept for call-site compatibility; no persistent
     // Claude-setup flag is stored any more.
     undefined,
-    context.extensionUri.fsPath
+    context.extensionUri.fsPath,
+    userDataPath
   )
   context.subscriptions.push(mcpProxy)
   mcpProxy.start()
@@ -484,6 +492,17 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('l4.installCli', async () => {
       await installL4Cli(context.extensionPath, outputChannel)
+    })
+  )
+
+  // Cross-file rename: anchor on the identifier under the cursor,
+  // ask the user for a new name, then drive the LSP references
+  // provider to substitute every occurrence (including in importing
+  // files). Exposed in the editor context menu and command palette
+  // for L4 files — see package.json `commands` / `menus` entries.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('l4.renameIdentifier', async () => {
+      await commandRenameIdentifier()
     })
   )
 
@@ -507,6 +526,7 @@ export async function activate(context: ExtensionContext) {
     serviceClient,
     outputChannel,
     mcpProxy,
+    userDataPath,
     (directiveId) => openInspectorSections.delete(directiveId)
   )
 
@@ -516,6 +536,15 @@ export async function activate(context: ExtensionContext) {
   const aiLogger = new AiLogger()
   context.subscriptions.push(aiLogger)
   const aiProxy = new AiProxyClient({ auth, logger: aiLogger })
+
+  // `l4.login` is the stable command id the `@legalese` chat participant
+  // hands to `stream.button` when the user isn't signed in. The sidebar
+  // calls `auth.login()` directly via its own messenger, so before now
+  // there was no need for a command form.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('l4.login', () => auth.login())
+  )
+
   const aiStore = new ConversationStore(context, aiLogger, () =>
     auth.getUserStorageKey()
   )
@@ -553,6 +582,20 @@ export async function activate(context: ExtensionContext) {
   // connected jl4-service might expose a different set of deployed
   // rules than we had cached from the disconnected fallback path.
   context.subscriptions.push(auth.onDidChange(() => aiMcpClient.invalidate()))
+
+  // Register the `@legalese` chat participant. Tool discovery happens
+  // inside the participant via `vscode.lm.tools` + BUILTIN_TOOLS, so no
+  // explicit MCP client is wired through here — VS Code's MCP layer
+  // surfaces the L4 Rules server (registered in mcp.json) alongside
+  // any other tools the user has installed.
+  context.subscriptions.push(
+    registerChatParticipant({
+      auth,
+      proxy: aiProxy,
+      logger: aiLogger,
+      iconPath: vscode.Uri.joinPath(context.extensionUri, 'static', 'icon.png'),
+    })
+  )
   const dispatcher = new ToolDispatcher({
     logger: aiLogger,
     requestApproval: async (call) =>
@@ -624,6 +667,28 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
+  )
+
+  // When the user changes the MCP port in Settings, rebind the proxy
+  // on the new port and refresh the sidebar so the displayed port
+  // matches. The MCP server is bound at startup and stays put
+  // otherwise — without this listener, a setting change wouldn't
+  // take effect until the extension is reloaded.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (!e.affectsConfiguration('jl4.mcpPort')) return
+      outputChannel.appendLine(
+        '[extension] jl4.mcpPort changed — restarting MCP proxy'
+      )
+      try {
+        await mcpProxy.restart()
+      } catch (err) {
+        outputChannel.appendLine(
+          `[extension] MCP proxy restart failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+      await sidebarProvider.refreshConnectionStatus()
+    })
   )
 
   // Register command to open/focus the L4 sidebar from the editor title bar
