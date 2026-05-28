@@ -3,6 +3,7 @@ module CsvImportSpec (spec) where
 
 import Base
 import qualified Data.Text as Text
+import L4.Annotation (HasAnno(..))
 import L4.Parser (execProgramParserWithHintPass)
 import L4.Syntax
 import Test.Hspec
@@ -89,6 +90,17 @@ spec = describe "IMPORT parsing" $ do
           expectationFailure "Expected explicit AS binding, got Nothing"
         MkImport {} ->
           expectationFailure "Expected MkDataImport, got MkImport"
+
+    it "carries AS/IS keywords in the IMPORT Anno's source representation" $ do
+      -- Regression guard: AS and IS must appear in the IMPORT's
+      -- token stream so the semantic-tokens highlighter renders
+      -- them as keyword-coloured. If they're consumed inside a
+      -- nested parser without annoLexeme, they disappear from the
+      -- Anno and the whole line renders in default text colour.
+      imp <- firstImport "IMPORT `trades.tsv` AS `all trades` IS A LIST OF Trade"
+      let dumped = Text.pack (show (getAnno imp))
+      dumped `shouldSatisfy` Text.isInfixOf "TKAs"
+      dumped `shouldSatisfy` Text.isInfixOf "TKIs"
 
     it "leaves the AS binding as Nothing when absent" $ do
       imp <- firstImport "IMPORT `trades.tsv` IS A LIST OF Trade"
