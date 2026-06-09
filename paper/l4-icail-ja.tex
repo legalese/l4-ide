@@ -1,0 +1,1090 @@
+% ===================================================================
+%  L4: 計算法学のための関数型プログラミング言語
+%  （英語版 l4-icail.tex の忠実な日本語訳）
+%
+%  Build (Japanese toolchain):
+%    lualatex l4-icail-ja ; bibtex l4-icail-ja ; lualatex l4-icail-ja ; lualatex l4-icail-ja
+%
+%  注: 本訳は英語ドラフトを佐藤健先生と共有するために用意したものである。
+%      コード（L4 / PROLEG / Haskell）は原文のまま英語表記を保つ。
+% ===================================================================
+\documentclass[11pt,a4paper]{ltjsarticle}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{url}
+
+% --- L4 listings スタイル（英語版と同一）---------------------------
+\definecolor{l4kw}{RGB}{0,68,136}
+\definecolor{l4reg}{RGB}{150,30,120}
+\definecolor{l4cmt}{RGB}{110,110,110}
+\definecolor{l4str}{RGB}{0,120,60}
+\definecolor{l4bg}{RGB}{248,248,248}
+
+\lstdefinelanguage{L4}{
+  morekeywords={GIVEN,GIVES,GIVETH,MEANS,DECIDE,DECLARE,HAS,IS,ONE,OF,A,AN,THE,
+    WITH,WHERE,CONSIDER,WHEN,THEN,ELSE,OTHERWISE,MATCHES,BRANCH,IF,AND,OR,NOT,
+    TRUE,FALSE,IMPORT,ASSUME,LIST,EMPTY,FOLLOWED,BY,MAYBE,JUST,NOTHING,TYPE,
+    PLUS,MINUS,TIMES,DIVIDED,MODULO,AT,LEAST,MOST,GREATER,THAN,LESS,EQUALS,APPEND},
+  morekeywords=[2]{PARTY,MUST,MAY,SHANT,DO,WITHIN,BEFORE,AFTER,UPON,HENCE,LEST,
+    BREACH,FULFILLED,BECAUSE,PROVIDED,EXACTLY,RAND,ROR,UPDATE,DOES},
+  morekeywords=[3]{@export,@desc},
+  sensitive=true,
+  morecomment=[l]{--},
+  morestring=[b]",
+}
+\lstset{
+  language=L4,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{l4kw}\bfseries,
+  keywordstyle=[2]\color{l4reg}\bfseries,
+  keywordstyle=[3]\color{l4kw}\itshape,
+  commentstyle=\color{l4cmt}\itshape,
+  stringstyle=\color{l4str},
+  backgroundcolor=\color{l4bg},
+  frame=tb,
+  framesep=4pt,
+  rulecolor=\color{l4cmt},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  literate={`}{{\char96}}1 {§}{{\S}}1 {'}{{\char39}}1 {>=}{{$\geq$}}1,
+  aboveskip=6pt,
+  belowskip=4pt,
+}
+\newcommand{\bq}{\char96\relax}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\renewcommand{\abstractname}{要旨}
+
+\title{\bfseries L4: 計算法学のための関数型プログラミング言語\\[2pt]
+\large ――制定的規則を全域関数として，規制的契約を並行プロセスとして――}
+
+\author{Wong Meng Weng\thanks{計算法センター（Centre for Computational Law），
+シンガポール経営大学（Singapore Management University），および Legalese。
+\texttt{mengwong@legalese.com}}
+\and L4 開発チーム}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本稿では，計算法学のための静的型付き関数型プログラミング言語\emph{L4}と，その意味論的基盤，
+ならびに法分野の専門家が利用できるようにするための制御自然言語（controlled natural language）的な
+表層構文を提示する。L4は，法文に対して従来から区別されてきたが先行する形式体系がしばしば混同してきた
+二つの読みを明確に分離する。\emph{制定的}（constitutive）規則――何が何として数えられるか――は，
+Haskell流の関数型プログラミングの系譜に連なる全域型付き関数として符号化され，型安全性，網羅的な
+場合分け，そしてあらゆる判断に対する監査可能な評価トレースをもたらす。\emph{規制的}（regulative）
+規則――誰が，いつまでに，何をなすべきか，さもなくば何が起こるか――は，その表示的意味が時刻付き
+事象トレースの集合となる義務論理的・時相論理的な層に符号化され，Hvitvedの契約仕様言語（CSL）から，
+そしてそれを通じてHoareの通信逐次プロセス（CSP）と事象計算（event calculus）から多くを借りている。
+同一のソースプログラムは，MercuryやCurryでおなじみの関数から関係への標準的変換を介して，第二の
+関係的な読みをも許す。これにより，L4は決定手続として前向きに評価され，仮説形成的計画のために
+後ろ向きに走らせ，さらに記号的モデル検査器へ遷移関係として書き出すことができ，法の抜け穴の探索は
+到達可能な「二重拘束」状態の探索となる。本稿では，この言語と，その実装（構文解析器，型検査器，
+評価器，言語サーバ，REST/MCP判断サービス，および複数のコンパイル基盤），そして句読点を最小化した
+構文――括弧の代わりの字下げ，ditto記号，句としての識別子――の設計理念を，
+非プログラマが法を黒白の文字で読み書きできるようにするという目標とともに述べる。
+\end{abstract}
+
+\noindent\textbf{キーワード：} 計算法学，rules as code，制御自然言語，関数型プログラミング，
+義務論理，プロセス計算，契約の形式化，法的知識表現
+
+% ===================================================================
+\section{序論}
+% ===================================================================
+十分な距離をおいて眺めれば，企業とはその契約の総和である――株主，債権者，顧客，仕入先，従業員，
+そして国家との契約の。ところが，この最も根源的な企業資産の管理者である法務部門は，ワープロから
+ほとんど進歩していない道具立ての中で仕事をしている。グラフィックデザイナにはAdobeのスイートが，
+プログラマには言語・コンパイラ・バージョン管理・デバッガ・テスト基盤の数々があるのに対し，弁護士には
+Microsoft Wordしかない。これは際立った非対称である。なぜなら，両者の仕事はそれほど違わないからだ。
+プログラマも起草者も，もつれ合った事業上の目標を，多数の可動部品と敵対的な参加者からなる複雑な
+システムの振る舞いを先取りしなければならない精密な文章的成果物へと翻訳しているのである。
+
+本稿は，この溝を埋めるために構築されたプログラミング言語\emph{L4}について報告する。L4は文書形式でも，
+条項ライブラリでも，契約ライフサイクル管理のデータベースでもない。それは，デスクトップ・パブリッシング
+という製品が現れる前にPostScriptが言語であったのと同じ意味での，一つの言語である。その設計は，
+互いに相まってAI・法分野の既存研究と一線を画す三つの方針に立脚している。第一に，制定的規則と規制的
+規則という古典的区別\cite{searle1969speech,hart1961concept}を真剣に受け止め，両者を単一の論理に
+押し込めるのではなく，それぞれにふさわしい形式的扱いを与える。第二に，その規制層を契約DSLとプロセス
+計算に由来するトレースに基づく並行性を意識した意味論\cite{hvitved2011thesis,hoare1978csp}に
+根ざさせ，多者間の義務・期限・救済（reparation）を第一級の対象とする。第三に，それを意図的に
+制御自然言語\cite{kuhn2014cnl}として設計する。その具象構文は句読点を最小化し，括弧を字下げで置き換え，
+法文の句そのものを識別子として許すことで，法令とその形式化を並べて同一の文章だと認められるようにする。
+
+\paragraph{貢献}　本稿の貢献は以下のとおりである。
+\begin{itemize}
+\item L4の設計と，その二層アーキテクチャ――制定的規則のための全域型付き関数型中核
+  （\ref{sec:constitutive}節）と規制的規則のための義務論理的・時相論理的層
+  （\ref{sec:regulative}節）――の論拠を述べる。
+\item 規制層の意味論的基盤をトレースに基づく表示的モデルとして与え，L4の表層キーワード
+  （\code{HENCE}，\code{LEST}，\code{WITHIN}，\code{RAND}，\code{ROR}）と，
+  HvitvedのCSLおよびHoareのCSPの演算子との対応を示す（\ref{sec:regulative}節）。
+\item 単一のL4プログラムが，MercuryやCurryで用いられる「関数のグラフ」変換を介して
+  関数的・関係的の二つの読みを支えること，そして関係的読みが仮説形成的計画とモデル検査に基づく
+  抜け穴検出を支えることを示す（\ref{sec:relational}節）。
+\item L4の表層構文の制御自然言語としての設計と，各選択の経験的動機を記録する（\ref{sec:cnl}節）。
+\item 実装と，公的・私的部門における初期導入について報告する（\ref{sec:impl}節および
+  \ref{sec:experience}節）。
+\end{itemize}
+
+% ===================================================================
+\section{動機――LLMの時代に，なぜ言語か}\label{sec:motivation}
+% ===================================================================
+2026年に新たなプログラミング言語を提案すれば，もっともな反論が待っている。いまさら何のために，と。
+大規模言語モデル（LLM）はすでに重要なあらゆる言語でプログラムを書けるし，いわゆる「vibe coder」
+（雰囲気でコードを書く者）の一世代は，事実上もう手で書くのをやめ，意図を散文で述べてモデルに構文を
+埋めさせている。機械がコードを書くのなら，人間が読むための新しい記法をなぜ設計するのか。
+
+答えは，法は普通のソフトウェアとは違う，それも法が\emph{噛みついてくる}ときに違う，という点にある。
+たいていの場合，市民は自分を律する規則について合理的な無知のままでいることに満足している。税の表や
+保険証券を理解する費用の期待値が便益の期待値を上回るので，署名して先へ進むのだ。だが，この計算は，
+利害が具体的かつ個人的なものになった瞬間に反転する――その人が収監されかねないとき，あるいは600ドルの
+請求を予期して封を切ったら6{,}000ドルだったとき。その瞬間，普通の人々は，膨大で，しかも完全に合理的な，
+細部への能力を発揮する。彼らは規則を\emph{自分自身で}理解したいと望む。もはやブラックボックス――それが
+官僚であれ，チャットボットであれ，実際の権利を追跡しているかどうか定かでない自信ありげな言い換えを返す
+不透明なモデルであれ――に委ねることをよしとしない。もっともらしく聞こえる生成された答えこそ，まさに
+信用できないものである。なぜなら，争いはいまや敵対的であり，相手方は語を別様に読むあらゆる動機を
+もっているからだ。
+
+そうした状況が要求するのは，\emph{二重に}読める規則である。すなわち，自分の状況に照らして推論を
+確かめたい非技術者が読める規則であり，かつ，それを評価し，テストし，幻覚なしに説明できる計算機が
+読める規則である。この二重可読性の要請は新しいものではない。それはまさに，経営者が読めるものとして
+業務規則を表現しようとしたCOBOLや，アナリストが――エンジニアだけでなく――データに問いを発せられる
+ように宣言的な表層をもたせたSQLを生んだ志である。どちらも，ある種の規則は黒白の文字で書き残すことを
+人々が常に求めるほど重要だ，という賭けに出た。L4はその賭けを引き継ぎ，一つの精緻化を加える。すなわち，
+その黒白は\emph{形式}言語であるべきだ，と。自然言語による起草は，回避可能な，自ら招いた欠陥――語彙的
+曖昧性，並列節における係り受けの曖昧性，悪名高い句読点の不安定さ\footnote{コンマの欠落をめぐる
+事件は一つのジャンルを成している。\emph{O'Connor v.\ Oakhurst Dairy}は，連続コンマの不在が500万ドルの
+残業代紛争を左右した。}――を抱えており，設計された記法はそれらをそもそも禁じることができる。本稿の
+アーキテクチャにおいてLLMが担うのは，この記法を置き換えることではなく，それを著し，説明するのを
+助けることである。すなわち，原文から最初の形式化を起草し，厳密な評価トレースを利用者にわかりやすい
+散文へと言語化する。神経的な「右脳」が言語を，決定論的な「左脳」が規則を担う。L4は左脳である。
+
+% ===================================================================
+\section{背景と設計目標}\label{sec:background}
+% ===================================================================
+\paragraph{制定的規則と規制的規則}
+Searleは，先行して存在する行動を統制する規制的規則（「左側を運転せよ」）と，その行動の可能性そのものを
+創り出す制定的規則（「この駒の配置はチェックメイト\emph{として数えられる}」）とを区別する
+\cite{searle1969speech}。Hartの一次・二次規則や，Hohfeldの法的関係も近縁の線を引く
+\cite{hart1961concept,hohfeld1913}。この区別は，形式化を行う者にとって学問上のものにとどまらない。
+制定的規則――「施行後に英国で生まれた者は，……ならば英国市民で\emph{ある}」――は定義であり，
+事実を法的分類に関係づけるものであって，自然に状況から結論への\emph{関数}となる。規制的規則――
+「買主は30日以内に支払わ\emph{なければならない}，これを怠れば……」――は，時間の経過にわたる行為，
+非難，そして救済に関わり，自然に\emph{プロセス}となる。両者は異なる数学を要求する。単一形式体系による
+手法の常なる弱みは，二つのうち一方が他方に合わせて歪められることにある。義務論的概念が通常の述語として
+符号化されてその時相的・救済的構造を失うか，あるいは定義的計算が，それがふさわしくないモーダル論理に
+無理やり押し込められるのである。L4の中心的なアーキテクチャ上の決断は，それぞれに固有の層を与えることだ。
+
+\paragraph{同型性}
+英国国籍法を論理プログラムとして表した伝統\cite{sergot1986bna}と，より広いrules-as-code運動
+\cite{mohun2020rulesascode}に従い，L4は\emph{同型}（isomorphic）な符号化を目指す。すなわち，
+形式テキストの構造は原文の構造を反映すべきである。ある条が(a)(b)(c)の段落を「かつ」「または」で
+結んでいるなら，符号化も同じ連言・選言の木を呈し，分野の専門家が条項ごとに対応を監査でき，後の改正が
+コードの局所的変更に対応するようにすべきである。同型性は正しさの規律であると同時に保守の戦略でもあり，
+また表層構文のいくつかの選択を導く（\ref{sec:cnl}節）。
+
+\paragraph{二つの読者}
+L4は，相容れない習慣をもつ二人の読者を満たさねばならない。機械は，表示的意味論を備えた曖昧さのない
+文法を望む。弁護士は散文を，あるいは厳密さが許す限りそれに近いものを望み，記号には我慢がならない。
+本稿の主張は，これらの目標が対立ではなく両立可能だということである。言語は，完全に通常の形式的意味論を
+もちながら，\emph{同時に}，制御自然言語として調律された表層構文をもちうる。\ref{sec:constitutive}節から
+\ref{sec:relational}節が前者を，\ref{sec:cnl}節が後者を論じる。
+
+% ===================================================================
+\section{制定的中核――型付き関数型言語}\label{sec:constitutive}
+% ===================================================================
+L4の制定的中核は，静的型付きで全域的な高階関数型言語である。型は\code{DECLARE}で導入する。
+\code{IS ONE OF}による列挙型・代数的データ型と，\code{HAS}によるレコードである。
+
+\begin{lstlisting}
+DECLARE RiskCategory IS ONE OF
+    LowRisk
+    MediumRisk
+    HighRisk
+    Uninsurable
+
+DECLARE Driver HAS
+    name           IS A STRING
+    age            IS A NUMBER
+    accidentCount  IS A NUMBER
+    hasTickets     IS A BOOLEAN
+\end{lstlisting}
+
+関数は，入力を名指す\code{GIVEN}と結果を名指す\code{GIVETH}（同義語\code{GIVES}）から成る
+シグネチャに続き，\code{MEANS}による定義を，あるいは真偽値をとる規則では\code{DECIDE\,\ldots\,IF}を
+置いて導入する。パターン照合には，型安全で網羅性が検査される場合分けである
+\code{CONSIDER}\,/\,\code{WHEN}を用いる。
+
+\begin{lstlisting}
+GIVEN driver IS A Driver
+GIVETH A RiskCategory
+`assess risk` driver MEANS
+    CONSIDER driver's accidentCount
+    WHEN 0 THEN IF driver's hasTickets
+                THEN MediumRisk
+                ELSE LowRisk
+    WHEN 1 THEN MediumRisk
+    WHEN 2 THEN HighRisk
+    OTHERWISE   Uninsurable
+\end{lstlisting}
+
+この中核の三つの性質が法にとって重要である。\emph{全域性と網羅性}――型検査器は場合を尽くさない
+\code{CONSIDER}を拒絶するので，形式化された規則がある区分の申請者を黙って見落とすことはありえない。
+未処理のエッジケースに相当するものは，誤った給付の小切手ではなく，コンパイル時のエラーである。
+\emph{型安全性}――支払額の計算式が日付を通貨に誤って加えることはできない。\emph{説明可能性}――
+中核が純粋な関数型評価器であるため，あらゆる結果は，最上位の問いから決め手となる部分条件に至るまでの
+トレースを伴い，各ステップにはそれを正当化した規則の注釈が付く。このトレースこそ，システムが利用者に
+示すものであり，また，法そのものについてモデルに推論させるのではなく，地に足のついた事実として
+言語モデルに手渡すものである。
+
+\paragraph{同型符号化の例}
+AI・法分野の代表的ベンチマークである英国国籍法の一断片を考えよう\cite{sergot1986bna}。法令の入れ子に
+なった「または」と「かつ」が符号化に直接現れ，識別子は法令の句そのものである
+（バッククォートにより識別子に空白を含められる）。
+
+\begin{lstlisting}
+GIVEN p IS A Person
+GIVES A BOOLEAN
+DECIDE `is a British citizen` IF
+         `is born in the United Kingdom after commencement` p
+      OR `is born in a qualifying territory after the appointed day` p
+  AND       `is a British citizen`        OF `father of` p
+         OR `is a British citizen`        OF `mother of` p
+      OR    `is settled in the United Kingdom` OF `father of` p
+         OR `is settled in the United Kingdom` OF `mother of` p
+\end{lstlisting}
+
+ここで，真偽値の木の優先順位を担うのは括弧ではなく字下げである点に注意したい
+（\ref{sec:cnl}節で立ち返る）。\code{@export}を付した関数は，RESTエンドポイント，OpenAPIスキーマ，
+そしてLLMエージェントが呼び出せるツールへと自動的に持ち上げられる。したがって単一のソースファイルが，
+各分岐を決定した規則への引用付きで，対話的な適格性ウィザードを生み出す。
+
+% ===================================================================
+\section{規制層――並行プロセスとしての契約}\label{sec:regulative}
+% ===================================================================
+定義的関数では義務を表現できない。「買主は支払わねばならない」は，ある状況について真でも偽でもない。
+それは将来の行為に対する要求であり，事象が展開するにつれて履行されたり違反されたりし，場合によっては
+救済を引き起こす。このためにL4は，五つのキーワードからなる骨格を備えた規制的部分言語を提供する。
+
+\begin{lstlisting}
+PARTY   actor
+MUST    action            -- または MAY, SHANT, DO
+WITHIN  deadline
+HENCE   successContinuation
+LEST    failureContinuation
+\end{lstlisting}
+
+\code{MUST}，\code{MAY}，\code{SHANT}は義務論的様相（義務・許可・禁止）であり，\code{DO}は
+拘束を伴わない行為である。\code{WITHIN}は期限を付す。\code{HENCE}と\code{LEST}は，義務がそれぞれ
+履行された場合・されなかった場合にとられる継続であり――決定的なことに，\emph{何が履行に数えられるかは
+様相に依存する}。\code{MUST}では，期限までに行為をなせば\code{HENCE}の枝を，期限を徒過すれば
+\code{LEST}の枝をとる。\code{SHANT}では極性が反転し，禁止はその行為のないまま期限が過ぎたときにこそ
+守られる。\code{LEST}は典型的には\emph{救済}を連鎖させる。それは違反を償う後続の義務であり，
+標準義務論理を悩ませる義務違反時（contrary-to-duty）構造の形式的な居場所である
+\cite{chisholm1963ctd,vonwright1951deontic}。
+
+\begin{figure}[t]
+\begin{lstlisting}
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+    delivery
+    payment HAS amount IS A NUMBER
+
+saleContract MEANS
+    PARTY  Seller
+    MUST   delivery
+    WITHIN 3
+    HENCE ( PARTY  Buyer
+            MUST   payment 100
+            WITHIN 7
+            HENCE  FULFILLED
+            LEST   BREACH BY Buyer BECAUSE "payment not made within 7 days" )
+    LEST   BREACH BY Seller BECAUSE "delivery deadline exceeded"
+
+#TRACE saleContract AT 0 WITH
+    PARTY Seller DOES delivery     AT 2
+    PARTY Buyer  DOES payment 100  AT 5
+-- 結果: FULFILLED
+\end{lstlisting}
+\caption{規制的契約としての二者間売買。\code{HENCE}が売主の引渡しを買主の支払義務へと繋ぐ。
+\code{\#TRACE}は時刻付き事象列を再生し，\code{FULFILLED}，非難を帯びた\code{BREACH}，あるいは
+残存する義務を報告する。}
+\label{fig:sale}
+\end{figure}
+
+\paragraph{トレースに基づく意味論}
+規制的契約の表示的意味は，時刻付き事象トレースから結果への関数である。結果とは\code{FULFILLED}か，
+非難と理由を担う\code{BREACH}か，あるいは何が依然として負われているかを記述する\emph{残存}契約である。
+これはまさに，Hvitvedが契約仕様言語（CSL）において多者間契約に与えるトレースに基づくモデル
+\cite{hvitved2011thesis,hvitved2012trace}であり，それ自体，Andersen，Elsman，Henglein，および
+Peyton JonesとEberの合成的な商契約・金融契約DSLの末裔である
+\cite{andersen2006compositional,pjeber2000composing}。契約とは，それに適合する事象トレースの集合
+\emph{である}。適合性検査はトレースの所属判定であり，残存とは事象の接頭辞を消費した後の契約の状態，
+すなわち「いま誰が，何を，いつまでに，なお負っているか」への機械可読な答えである。L4の\code{\#TRACE}
+（図\ref{fig:sale}）は，まさに観測された事象を表示的意味へ畳み込むこの操作である。我々はCSLから多くを
+直接借りている。義務・許可・禁止の目録，期限と救済（義務違反時）構造，そして何より，契約とはそれに適合する
+トレースの集合\emph{である}という根本的な立場である。CSLの契約DSLに対してL4が加えるのは，それが
+意図していなかった二つのもの――制御自然言語の表層と，統合された制定的関数型中核――であり，これにより
+契約が分岐の根拠とする述語自身が，不透明な原子ではなく，型検査された実行可能な法となる。時刻付き
+事象が義務を発生・消滅させる物語として契約を捉えるこの双対的な見方は，事象計算
+\cite{kowalski1986events}の設定そのものでもあり，我々はこれを同じトレースの論理的読みとして採る
+（\ref{sec:relational}節）。
+
+\paragraph{CSPの系譜}
+作用的に読めば，規制層はHoareの通信逐次プロセス（CSP）の伝統に連なる小さなプロセス計算である
+\cite{hoare1978csp,hoare1985csp,roscoe1997theory}。対応は直接的である（表\ref{tab:csp}）。義務
+\code{PARTY p MUST a HENCE k}は，番兵付きの事象前置 $p.a \rightarrow k$である。\code{HENCE}と
+\code{LEST}は，環境――トレース――が実際に何をなすかによって解決される選択を成し，CSPの外部選択に
+あたる。\code{RAND}は完了において同期する並行合成であり，どちらか一方が違反すれば合成全体が違反する。
+\code{ROR}は部分契約間の選択である。\code{FULFILLED}は成功終了（$\mathit{SKIP}$）であり，
+\code{BREACH}は非難を割り当てる終了である。唯一の本質的な追加は\emph{時間}である。\code{WITHIN}は
+期限を課し，L4をTimed CSP\cite{reed1988timedcsp}や，UPPAALのようなツールの基礎をなす時間オートマトン
+\cite{alur1994timed,behrmann2004uppaal}とともに位置づける。再帰は反復的な義務を与える。ローンの
+月々の分割払いは，\code{HENCE}の枝で次期の義務を，\code{LEST}の枝で違約金付きの義務を再発行し，
+\code{FULFILLED}を底とする関数である。
+
+\begin{table}[t]
+\caption{L4の規制的キーワードとそのCSL／CSPにおける対応物。}
+\label{tab:csp}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{L4} & \textbf{CSL／CSPの対応物} \\
+\midrule
+\code{PARTY p MUST a HENCE k} & 番兵付き前置 $p.a \rightarrow k$ \\
+\code{WITHIN t}               & 時間付き期限（Timed CSPのクロック番兵） \\
+\code{HENCE k}                & 成功継続 \\
+\code{LEST k'}                & 失敗・時限切れ継続；救済（義務違反時） \\
+\code{A RAND B}               & 同期並行 $A \parallel B$ \\
+\code{A ROR B}                & 選択 $A \,\Box\, B$ \\
+\code{FULFILLED}              & 成功終了（$\mathit{SKIP}$） \\
+\code{BREACH}                 & 非難を割り当てる終了 \\
+\code{\#TRACE c WITH es}      & トレース所属判定 $es \in \mathrm{traces}(c)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{なぜこれが重要か}
+規制層が時間付きの並行システムであるがゆえに，弁護士が契約について発する問いは，検証ツールが答えうる
+問いとなる。「ある条項が義務づける行為を別の条項が禁ずる状態は存在するか」という問いは，各当事者の
+プロセスの直積上の到達可能性の問い――競合状態，義務論的にいえば矛盾する抵触――である。我々の公的部門
+導入の一つ（\ref{sec:experience}節）では，まさにそのような義務論的・時相論理的な二重拘束が，現行の規制の
+中に自動的に発見された。ある稀な交錯のもとで，当事者が同一の行為について同時に義務づけられかつ禁じられて
+いたのである。抜け穴探索を状態空間探索として捉え直すことが，次節で扱う関係的読みへの架け橋となる。
+
+% ===================================================================
+\section{一つのプログラム，二つの読み――関数的と関係的}\label{sec:relational}
+% ===================================================================
+関数 $f : A \to B$ は，集合論的にはそのグラフ，すなわち関係 $\{(a, f\,a) : a \in A\}$ である。
+関数論理型言語はこの同一性を活用する。Mercuryは述語に\emph{モード}（どの引数が入力でどれが出力か）と
+\emph{決定性}の注釈を付け，関係を要求されたモードに応じて効率的なコードへコンパイルする
+\cite{somogyi1996mercury}。Curryは狭義化（narrowing）と残留（residuation）を通じて関数と関係を
+統合し，関数を未知の入力で走らせて望む出力を与える入力を系が探索できるようにする
+\cite{antoy2010flp,hanus2013curry}。L4はこの見方を受け継ぐ。その制定的規則は，全域型付き関数で
+あるがゆえに，前向きの評価器だけでなく関係的形式――ホーン節，あるいは規制層については遷移関係――にも
+コンパイルされる。すなわち，PROLEG流のホーン節，あるいは規制層については事象とフルーエントの上の
+遷移関係であって，これは事象計算の流儀である\cite{kowalski1986events}。Logical English
+\cite{kowalski2021logicalenglish}は，この宣言的基盤それ自体が自然言語の表層をまというることを示した。
+L4は逆方向から，型付き関数型プログラミングから出発してこの関係的読みを変換によって回復し，Mercuryと
+Curryを二つのパラダイムを橋渡しする概念的な橋とする。
+
+この第二の読みは余興ではない。それこそが，L4を単なる実行のためのものではなく\emph{分析}のための道具と
+する。三つの能力が従う。
+
+\emph{後ろ向き・仮説形成的問い合わせ}　前向きに走らせれば，\code{`is a British citizen`}は与えられた
+人物を分類する。後ろ向きに走らせれば，同じ規則は市民権が成り立つ状況を特徴づける。これは説明（「どの
+事実を変えればこの判断は反転するか」）にも，規制層における計画にも有用である。「ローンの申込みは，
+なお間に合うように行える\emph{最も遅い}時点はいつか」という問いは，契約の遷移関係上の仮説形成的な
+問いであり，論理プログラミングが本来的に答えるが一方向の評価器には答えられない種類のものだ。
+
+\emph{網羅的なシナリオ生成}　規則を関係として扱えば，性質に基づくテスタが状況の空間を枚挙し，それら
+すべてにわたって不変条件を検査できる。法的なコードに通常付随する，手で書かれた一握りの例ではなく。
+ある初期実験では，元来ごく少数の単体テストしか伴わないPythonの規則ライブラリであった国家給付の計算を
+関数型の環境へ取り込み，シナリオの領域全体にわたるテストを生成して，手書きの疎なテスト群が見落として
+いた誤計算を表面化させた。
+
+\emph{モデル検査}　遷移関係は，記号的モデル検査器――NuSMV，SPIN，TLA+，UPPAAL
+\cite{cimatti2002nusmv,holzmann1997spin,lamport2002specifying,behrmann2004uppaal}――に
+手渡して，仕様レベルで書かれた性質に違反する状態を探索させることができる。ここでは，法の文言が
+対象レベルに，法の精神が性質の表明として存在する。反例トレースは抜け穴であり，セキュリティ研究者が
+脆弱性を見つけるのと同じ仕方で見つかる。\ref{sec:regulative}節の義務論的・時相論理的抵触は，そうした
+反例の一つである。
+
+L4の実装はすでにこの多目的戦略の萌芽を備えている。問い合わせプランナは関係的ゴールを並べ替え，MLIR/WASM
+基盤は判断論理を可搬なバイナリへコンパイルする（\ref{sec:impl}節）。原理的に重要なのは，分野の専門家が
+\emph{一度}著した\emph{単一}の同型ソースが，これらすべての分析を養うことである。関数的読みと関係的読みは，
+同一テキストの二つの眺めであって，同期を保つべき二つの成果物ではない。
+
+% ===================================================================
+\section{制御自然言語としての表層構文}\label{sec:cnl}
+% ===================================================================
+ここまではすべて意味論に関わり，それを担う具象構文はいくらでもありうる。L4の賭けは，具象構文こそが
+採用の成否を決する場であり，形式言語を，その形式的性格を犠牲にすることなく\emph{制御自然言語}――
+制限されてはいるが厳密な英語の断片\cite{kuhn2014cnl}――へと整形できる，という点にある。設計はいくつかの
+原則に従い，各々に固有の動機がある。
+
+\paragraph{記号ではなく語}
+L4は，句読点や記号よりも馴染みのある語を好む。$\geq$には\code{AT LEAST}，$+$には\code{PLUS}，
+フィールド参照には\code{'s}（\code{driver's age}），適用には\code{OF}。型シグネチャは
+\code{Person -> Bool}としてではなく，英語の節――「人物を\code{GIVEN}とし，真偽値を\code{GIVES}」――
+として読める。代償は冗長さであり，便益は，型シグネチャを見たことのない読者でも文として解せることである。
+これはまさに\ref{sec:motivation}節の二重可読性の要請に資する。属格の接語\code{'s}は，この精神における
+小さな，しかし心地よい多重定義である。英語は\code{'s}を所有のためにも，また\emph{is}（である）の短縮形
+としても書く。ゆえに\code{driver's age}は，運転者が\emph{もつ}フィールドという\emph{has-a}として自然に
+読める一方，まさに同じ接語が\emph{is-a}の述語付けにおいて繋辞として注釈されうる――オブジェクト指向が
+合成（composition）と部分型付け（subtyping）として別々に保つ二つの関係を，一つの記号がちょうど跨ぐ
+のである。
+
+\paragraph{括弧ではなく字下げ}
+オフサイド規則\cite{landin1966next700}に従い，L4はレイアウトに敏感であり，そのレイアウトを特定の
+法的用途に供する。連言・選言の字下げが真偽値の木の優先順位を符号化するので，コードの視覚的な形が規則の
+論理的な形となる。\ref{sec:constitutive}節の英国国籍法の断片では，\code{AND}の下と横に\code{OR}が
+揃えられていることが構造を曖昧さなく定める。読者は括弧の対応をとる必要がなく，字下げを原文の段落番号に
+反映させて同型性を進めることができる。
+
+\paragraph{Ditto記号}
+法的・財務的な表組みのテキストは構造を列方向に繰り返す。書記は古くからその繰り返しをditto記号で略記
+してきた。L4はこの慣行をキャレット\code{\textasciicircum}で借りる。これは直上のトークンを表し，
+揃えられた表組みのデータ――領域の一覧，在庫，料金表――を，人が帳票を埋めるように，繰り返される素材を
+列へ畳んで書けるようにする（図\ref{fig:ditto}）。要点は打鍵の節約ではなく認知的負荷であり，目が列を
+一つの単位として読む。
+
+\begin{figure}[t]
+\begin{lstlisting}
+myDeal MEANS
+  Deal WITH
+    buyer  IS Party WITH name IS "Alice Avocado"
+    seller IS Party WITH name IS "Robert Rich"
+    item   IS LIST InventoryItem OF "potato",  12,  Nothing
+                                ^ OF "corn",    120, Nothing
+                                ^ OF "avocado", 2,   Nothing
+    price  IS Money OF usd, MoneyAmount OF 100, 00
+\end{lstlisting}
+\caption{ditto用キャレット\code{\textasciicircum}は直上のトークンを繰り返し，揃えられた表組みの
+データを列として読ませる。}
+\label{fig:ditto}
+\end{figure}
+
+\paragraph{句としての識別子とミックスフィックス}
+バッククォートで囲った識別子は空白を含みうるので，識別子が法令の句そのもの
+（\code{\bq is settled in the United Kingdom\bq}）になりうる。そうした名前は\emph{ミックスフィックス}
+でありうる。引数が名前と交互に並び，述語が文として読める――\code{worksFor(employee, employer)}では
+なく\code{\bq employee\bq{} \bq works for\bq{} \bq employer\bq}である。これらが相まって，形式化が
+原文を引用できるようになる。これは，コードが法の述べることを述べていると弁護士が認めるための，
+表層上の条件である。
+
+これらの選択が代償なしだとは主張しない。冗長さ，レイアウト敏感性，句としての識別子は，それぞれ簡潔さや
+エディタ支援において何かを犠牲にする。だが我々は，それらが，最初の読者が分野の専門家である言語にとって
+正しい選択であること，そしてそれらが\emph{表層において}なされ，\ref{sec:constitutive}節から
+\ref{sec:relational}節の意味論を手つかずに残すことを主張する。
+
+\paragraph{系譜}
+L4の表層設計は，規則のための制御言語・計算言語の豊かな伝統を受け継いでいる。Grammatical Framework
+\cite{ranta2004gf}からは，表層構文を型理論的文法――抽象構文とその具象的実現――として扱う規律を，
+すなわち同一規則の多言語的描画への道を採る。C\&CとBoxerの広被覆構文解析の伝統
+\cite{curran2007cc,bos2008boxer}からは，逆方向に走らせて言語を論理形式へ写すという，いまやLLMが
+容易にする取り込みの目標を採る。企業標準であるSBVR\cite{omg_sbvr}とDMN\cite{omg_dmn}からは，
+プログラマだけでなく業務アナリストの間にも，構造化された語彙・規則・判断表への確かな需要があることを学ぶ。
+そして，業務規則の制御言語をSBVRへコンパイルするRuleCNL\cite{feuto2014rulecnl}のようなCNLの試みからは，
+制御された表層が，形式的中核を露出させることなくそれを標的にできるという具体的な教訓を得る。これらに対する
+L4の独自の賭けは，CNLの表層を，制定的関数と規制的契約の双方にまたがる\emph{実行可能で型検査された}
+意味論と組み合わせ，かつ表層を，業務アナリストの語彙ではなく法文に対して\emph{同型}にすることである。
+
+% ===================================================================
+\section{実装とツール}\label{sec:impl}
+% ===================================================================
+L4はHaskellで実装されている。中核（\textsf{jl4-core}）は，レイアウトに敏感な構文解析器，
+Hindley--Milner流の型検査器，そして\ref{sec:constitutive}節の説明的トレースを生成する評価器から成る。
+その周囲に，単一の\code{.l4}ファイルを生産的にするためのツール群が配される。エディタ内での型検査・
+インライン評価・定義への移動のための言語サーバ（LSP），トレースと問い合わせプラン用コマンドを備えた
+REPL，\code{@export}注釈付き関数をRESTエンドポイントおよびLLMエージェント向けのModel Context
+Protocolツールとして公開する判断サービス，ブラウザ内・サーバレス評価のためのWebAssemblyビルド，そして
+判断論理を可搬な\code{.wasm}バイナリへコンパイルするMLIR基盤である。ツールチェーンはあらゆる評価を
+GraphVizの\emph{ラダー図}として描画し，規則集合を人間によるレビューのためにMarkdownへトランスパイルし，
+同一ソースから消費者向けのウェブ・ウィザードを生成できる。静的解析器は金融契約をACTUSおよびFIBO標準に
+照らして分類する。\textsf{jl4.legalese.com}のウェブエディタは，このパイプライン全体をクライアント側で
+走らせる。
+
+このスタックにおけるLLMの役割は意図的に限定されている。モデルは\emph{取り込み}――PDFや法令から最初の
+L4形式化を起草すること（\ref{sec:ingestion}節）――と\emph{説明}――完了した決定論的な評価トレースを
+素人の利用者のために言語化すること――を支援する。モデルは推論のループの中にはいない。推論器はL4の
+評価器であり，その各ステップは監査可能である。モデルの自然言語による出力は，そのトレースによって
+ガードレールを課され，それに照らして検査されうる。これが，L4が法的AIにおける幻覚に対抗する仕方である。
+モデルに法について推論させることを信頼するのではなく，モデルに語るべき厳密な成果物を与えるのである。
+
+% ===================================================================
+\section{取り込み――知識獲得ボトルネックの再考}\label{sec:ingestion}
+% ===================================================================
+1980年代のエキスパートシステムは\emph{知識獲得のボトルネック}に座礁した
+\cite{feigenbaum1984,hayesroth1983}。ある領域を符号化するには，知識エンジニアが分野の専門家との
+緩慢で高価な対話を要し，しかも出来上がる脆いシステムが労力に見合うことはまれだった。法的エキスパート
+システムも例外ではない。英国国籍法を論理プログラムとして表した仕事の見事さ\cite{sergot1986bna}にも
+かかわらず，希少なプログラマと弁護士の組によって一度に一つの法令を形式化していくやり方は，法そのものの
+規模には決して近づかなかった。L4はこのボトルネックに二方向から挑む。
+
+\paragraph{手作業で，ただしより良く}
+手作業の符号化でさえ，同型性を第一級の目標とする制御自然言語として作られた言語では容易になる
+（\ref{sec:background}節・\ref{sec:cnl}節）。形式テキストが原文の構造を反映しその文言を引用するので，
+分野の専門家はプログラマにならずとも条項ごとに監査できる。我々はこの架け橋が現実に荷重を支えることを
+見出した。非技術者の業務担当者が，L4の規則集合を\emph{読み}，それを自分たちが意図する規則の忠実な
+言明として\emph{承認}できるのである。これは重大な成果である。なぜなら，承認とはまさに，コードを書いた
+エンジニアから，規則を所有する責任者へと法的責任が移される行為だからだ――その分野の専門家にとって不透明な
+形式体系には決して築けない架け橋である。知識エンジニアと専門家の組が消えるわけではないが，その間の溝は
+狭まる。そして我々の経験が示唆するように，要件分析を仕込まれたソフトウェアエンジニア自身が，業務の専門家が
+読み飛ばすであろう曖昧さを表面化させる有能な言葉の職人である。強い型と網羅性検査は，欠けた場合を本番では
+なく符号化の瞬間に捕らえる。手作業の符号化にできないのは規模化である。それは希少な専門家の時間に対して
+線形のままにとどまる。
+
+\paragraph{規模において，型システムを神託として}
+大規模言語モデルは最初の一手の経済を変える。モデルは法令や規程の形式化を数秒で提案でき，人間の役割を
+著述からレビューへと移す。危険はおなじみのもの――流暢だが微妙に誤った符号化――であり，ここでL4の静的型
+システムと言語サーバが決定的なガードレールとなる。型検査器は，型の合わない・網羅的でない形式化を即座に
+拒絶する健全で決定論的な神託であり，LSPは各違反を正確な位置とともにインラインで報告する。そうしてモデルは，
+ファイルが型検査を通るまで，さらにその\code{\#ASSERT}のゴールデンテストが通るまで，生成・検査・修復の
+ループの中で駆動でき，神託は型の正しさから振る舞いへと拡張される。これは本稿の神経記号的（neuro-symbolic）
+主張を取り込みそれ自体に適用したものである。LLMが提案し，型システムが処理する。強い型付けは，開かれた
+自然言語からコードへの生成を検証器に対する制約付き探索へと変える。これは型主導のプログラム合成を扱い
+やすくする規律と同じであり，モデルの自信に正しさを明け渡すことなく取り込みを規模化させる。
+
+\paragraph{規模における資料体}
+型でガードされた取り込みのループにも，なお原材料――機械可読な一次法令――が要る。補完的な実現要因は，
+それを解放しようとする数十年来の運動である。Carl MalamudのPublic.Resource.OrgとLaw.gov，そして法と
+それに組み込まれた標準が著作権の背後に閉ざされてはいないことを確立した訴訟\cite{publicresource}は，
+膨大な一次法令資料を公に利用可能にしてきた。その系譜に連なるプロジェクト――Legal Data Hunterの取り組みなど
+――は，いまや法令・規則・法典を規模において取り込み可能な形へと送り出している。一方に開かれた資料体を，
+他方に型でガードされたLLMのループを置けば，法の同型形式化は，かつて知識獲得ボトルネックが閉ざした規模に
+おいて，扱いやすく見えてくる。とはいえ，それで自動になるわけではない。構造ではなく立法上・契約上の\emph{意図}
+への忠実さは，依然として人間の判断と承認の問題である（\ref{sec:experience}節）。しかし，形式化はもはや，
+希少な組に律速されて一度に一つの法令ずつ進む必要はない。
+
+% ===================================================================
+\section{応用}\label{sec:apps}
+% ===================================================================
+単一の\code{.l4}ソースが多くの基盤を養う（\ref{sec:impl}節）がゆえに，一つの形式化は，単一の製品では
+なく，法のライフサイクル全体――起草，分析，市民の自助，運用上の判断――にわたる応用の幅を支える。
+四つの原型を素描する。\ref{sec:experience}節の実証はそれらを具体化したものである。
+
+\paragraph{市民向けエキスパートシステム}
+型検査器が検証するのと同じソースから，ツールチェーンは対話的なウェブ・ウィザードを自動生成する。
+市民が自分の状況の事実を入力すると，自分の義務や権利が，決め手となった規則への引用と，平易な言葉での
+説明としての評価トレースを伴って示される。これは\ref{sec:motivation}節の破壊的な楔である――署名はしたが
+読まなかった規制や証券のもとで，自分がどこに立っているかをただ知りたい，過剰に供給された非消費者である。
+L4では，そのようなエキスパートシステムを構築することは，そもそも規則を書き下したことの副産物であって，
+別個のエンジニアリング事業ではない。
+
+\paragraph{形式検証と静的解析}
+関係的読み（\ref{sec:relational}節）は，規則集合や契約の草案を，モデル検査基盤――NuSMV，SPIN，TLA+，
+UPPAAL――に手渡してコンパイル時の静的解析にかけることを可能にする。すなわち，競合状態や義務論的・
+時相論理的な二重拘束，決して発火しえない条項や決して履行しえない義務，そして起草中の立法や交渉中の契約に
+おける明白な矛盾の発見である。抜け穴探しが脆弱性探しになる。同じ機構は，各当事者の「最も気にかける十数の
+シナリオ」を，改訂のたびに走る回帰テスト群へと変える。これにより，いずれの側からの編集であれ，以前合意した
+性質を壊すものは，後から争われるのではなく直ちに捕らえられる。
+
+\paragraph{自然言語へ戻す生成的起草}
+取り込みの方向――自然言語から形式的規則へ――はLLMの自明な用途だが，逆方向こそより興味深い。規則集合が
+形式的になり，\emph{無矛盾であると証明された}なら，生成的AIはそれを流暢な英語へ描き戻せる。議会が審議し
+制定できる法令の散文，あるいは相手方が署名する条項である。ここでは検証された形式的成果物が真実の源であり，
+英語はその忠実で再生成可能な描画である――rules-as-codeの議題が長く求めてきた反転\cite{mohun2020rulesascode}
+であって，散文が権威をもち論理が後付けの注釈として黙って食い違うのではない。モデルは固定された成果物を
+言語化するよう制約されるので，散文が論理から逸れることはなく，文法工学的な手法\cite{ranta2004gf}を介して，
+同一規則を一つのソースから複数の自然言語へ描画できる。
+
+\paragraph{監査に耐える企業の意思決定}
+反対の大量処理の端では，判断サービスが企業の業務規則エンジンに接続し，運用上の判断――ローン申込みの承認・
+否認，保険金請求の査定，給付の適格性判定――を担う。差別化要因は処理能力ではなく説明責任である。あらゆる
+判断が，最上位の問いから決め手となる条件に至るまでの決定論的なトレースを伴うので，結果は\emph{構成上}
+説明可能かつ監査可能である。これは，自動意思決定に関するGDPRの規定が示唆する\cite{gdpr2016}――その正確な
+射程は争われているが\cite{wachter2017explanation}――透明性の期待に，そしてEU AI法が高リスクシステムに
+ついて具体化するもの\cite{aiact2024}に，直接応える。申請者は理由を受ける権利があり，L4は理由を第一級の
+成果物として産出する。それは，事実上その人について「勘で」判断したモデルの事後的な合理化ではなく，引用
+可能な導出である。
+
+これらの原型は四つの製品ではなく，一つのソースの四つの眺めである。プラットフォームとしての野心
+（\ref{sec:conclusion}節）はまさに，一度著された規則の上に，エコシステムがこれらすべてを，そしてまだ
+想像されていない他のものを構築できるということにある。
+
+% ===================================================================
+\section{経験と未解決の問題}\label{sec:experience}
+% ===================================================================
+L4は公的・私的部門にまたがる実証で試されてきた。ある政府機関とともに，規制遵守のために副次的立法の一片を
+符号化し，市民が自分の状況を入力して義務を見られるウェブ・ウィザードを生成した。各回答は出典規則への引用を
+伴い，形式検証の工程が\ref{sec:regulative}節で述べた義務論的・時相論理的抵触を露わにした。私的部門では，
+ある大手保険会社の証券の形式化が，相当の財務的エクスポージャを伴う支払額計算式の曖昧性を明らかにした。
+ある立法起草部局は，OECDが促してきた種のrules-as-codeの実践として，将来の起草にL4を検討してきた
+\cite{mohun2020rulesascode}。ある決済フィンテックは，料金表で密な商契約をL4に取り込み，運用システムとの
+統合のためにSQL様のAPIを介して提供した。
+
+これらの取り組みは，言語の粗削りな部分も露わにした。同型性のために重んじられるレイアウト敏感性は，空白を
+損なうワープロから貼り付ける著者を苛立たせることがある。句としての識別子は，トークン状の名前を前提とする
+エディタのツールに負荷をかける。規制層の，省略された\code{HENCE}・\code{LEST}に対する既定値は，便利では
+あるが，「成功」の様相依存的な極性を内面化していない著者を驚かせうる。各々が生きた設計上の問いである。
+より根本的には，同型な形式化と\emph{忠実な}それとの隔たり――テキストの構造に合わせることと，その背後の
+意図に合わせることの隔たり――は，言語が単独で埋められるものではない。それは，本来そうあるべきように，
+人間の法的判断の問題にとどまり，いまやより良く道具で支えられている。
+
+% ===================================================================
+\section{関連研究}\label{sec:related}
+% ===================================================================
+L4はいくつかの研究の流れの合流点に位置する。その貢献は，個々の流れというより，それらの組合せにある。
+
+\paragraph{契約DSLとプロセス計算}
+Peyton JonesとEberの金融契約のパール\cite{pjeber2000composing}と，Andersenらの商契約の代数
+\cite{andersen2006compositional}は，HvitvedのCSL\cite{hvitved2011thesis,hvitved2012trace}が
+トレース意味論と非難の割当てを伴う多者間契約へと一般化した，合成的なコンビネータ流を確立した。L4の規制層は
+その直系の末裔であり，制御自然言語の表層と制定的関数型中核との統合を加える。Stipula\cite{crafa2022stipula}も
+また，状態と時間を伴うプロセス計算として法的契約をモデル化し，オートマトンの角度から契約＝プロセスの見方を
+補強する。
+
+\paragraph{法の論理プログラミング}
+英国国籍法プロジェクト\cite{sergot1986bna}は，同型な立法符号化の基礎的な実演であり，PROLEG
+\cite{satoh2011proleg}と，より広い論証の伝統\cite{prakken2015law,bench2012history}がそれを継ぐ。
+Logical English\cite{kowalski2021logicalenglish}はL4の制御自然言語の志を共有しつつ論理プログラミングの
+内にとどまる。L4は，型付き関数型プログラミングから出発し，関係的読みを基盤としてではなく変換によって達する
+（\ref{sec:relational}節）点で異なる。
+
+\paragraph{義務論的・反証可能な推論}
+反証可能義務論理とRegorousの一連の仕事\cite{governatori2005regorous,governatori2016semantics}は，
+規範的位置・許可・義務違反時構造を細心に扱う。L4の\code{LEST}による救済は，同じ義務違反時現象
+\cite{chisholm1963ctd}を，実行可能性とトレース意味論への適合のために選んだ，意図的に作用的で表現力の
+劣る扱いである。
+
+\paragraph{法と契約のための言語}
+Catala\cite{merigoux2021catala}は精神において最も近い同時代の隣人である。立法のための言語であり，
+デフォルト論理に根ざし，強固な正しさの物語をもつ。L4は，制定的・規制的の明示的分割，並行性を意識した契約
+意味論，そしてCNLの表層において異なる。DAML\cite{daml}は，Haskell由来の関数型言語を台帳契約にもたらすが，
+既存の法の同型形式化ではなく，分散台帳上の実行を標的とする。記号的起草の伝統はAllen\cite{allen1957symbolic}に，
+さらに遡れば立法の文を解剖したCoodeの19世紀の仕事\cite{coode1843}に連なる。
+
+% ===================================================================
+\section{結論と今後の課題}\label{sec:conclusion}
+% ===================================================================
+本稿では，計算法学のための関数型プログラミング言語L4を提示した。L4は，全域型付き関数として扱う制定的規則を，
+CSLとCSPの系譜に連なるトレースに基づく表示的意味をもつ時間付き並行プロセスとして扱う規制的規則から分離する。
+我々は，単一の同型ソースが，評価と説明のための関数的読みと，仮説形成的計画とモデル検査に基づく抜け穴検出の
+ための関係的読みの双方を許すことを示し，表層構文を制御自然言語として――句読点が少なく，レイアウトで構造化され，
+句で名付けられた――設計でき，同一テキストが弁護士にも機械にも読めることを論じた。動機は，それ自体のための
+技術的新規性ではなく，生成的AIの時代に鋭くなった，まさに法が噛みついてくるときに人が自分自身で確かめられる
+規則への根強い需要である。
+
+今後の課題は三つの軸に沿って走る。規制的意味論の十全な妥当性証明に向けたCSLおよびTimed CSPとの形式的対応の
+深化，抵触検出と仮説形成的計画が非専門家にとってボタン一つになるような関係的基盤の成熟，そして，L4のCNL設計が
+法的に訓練された非プログラマの著者にとって障壁を実際に下げるかを測る統制された著作可能性の研究である。より広い
+目標はプラットフォームである。PostScriptの流儀でスタックの底に言語を置き，その上に，一度，黒白の文字で書かれ，
+誰もが読める規則の上に，法的アプリケーション――ウィザード，検査器，計画器，統合――のエコシステムを構築できる
+ようにすることだ。
+
+\subsection*{謝辞}
+% TODO: 助成，計算法センター，協働者，実証パートナー。
+著者らは，計算法センターの同僚，および本稿で述べた実証に協力した法務・工学の協働者に感謝する。
+
+% ===================================================================
+\appendix
+% ===================================================================
+\section{L4のPROLEGへの拡張――立証責任モナド}\label{app:proleg}
+% TODO: 本付録は進行中の作業（並行する取り組みが双方向の構文解析器／トランスパイラを構築中）を
+%       記述している。投稿前にさらに主張を和らげること。
+
+本付録では，L4を\emph{PROLEG}\cite{satoh2011proleg}――佐藤健（Satoh）による，日本民法の「主要事実
+推定理論（presupposed ultimate fact theory）」の論理プログラミング的描出――へと拡張する試みと，両者の
+間に我々が構築しつつある橋の理論を素描する。\footnote{双方向のPROLEG$\leftrightarrow$L4構文解析器および
+トランスパイラは，並行する取り組みにおいて活発に開発中である。以下は設計・理論のノートであって，完成した
+システムに関する報告ではない。フロントエンドはすでに正準PROLEGを以下で論じる事例上で往復させ
+（\code{parse . print = id}），\ref{app:burden}節の立証責任ライブラリは型検査を通り参照判決を再現する。
+Mode Bのエミッタは作成中である。}　PROLEGが標的として魅力的なのは，本稿の主題と整合する三つの理由による。
+それは形式化された法の大規模で実在の資料体（およそ2{,}500の規則からなり，数十年分の司法試験に照らして
+検証されている）であり，したがって規模における取り込みを試す（\ref{sec:ingestion}節）。それは純粋に
+\emph{制定的}であり，したがってL4の関数型中核とその関係的読みを行使する（\ref{sec:relational}節）。そして
+その\emph{立証責任}の固有の扱いは，本稿の本体が暗黙のままにしてきた区別――制定的定義でも規制的義務でもない
+第三の法的役割――を迫る。
+
+\subsection{正準PROLEG}
+正準PROLEGは，規則の矢印\code{<=}と反証可能性演算子\code{exception(H,E)}で拡張した通常のPrologである。
+規則\code{H}は，その反証子\code{E}が証明可能なとき覆され，例外は入れ子になる。その上に，訴訟の語彙――
+\code{allege}，\code{provide\_evidence}，\code{admission}，\code{plausible}――が重ねられ，各主要事実を
+誰がどの基準で立証せねばならないかを符号化する。図\ref{fig:proleg}は，正準的な賃貸借事例の核を示す。
+賃貸人の解除請求，転貸の承諾という抗弁，そして賃借人の\emph{非}背信抗弁を覆す背信行為の例外――例外の例外
+――である。この事例は現実の日本法に由来する。民法612条は，賃借人が賃貸人の承諾を得なければ賃借権を
+譲り渡し又は賃借物を転貸できないこと，そして賃借人が無断で第三者に賃借物を使用・収益させたときは賃貸人が
+契約を解除できることを定める。最高裁昭和41年1月27日判決（民集20巻1号136頁）はこれに背信行為論（信頼関係
+破壊の法理）を付し，転貸が当事者間の信頼関係を破壊するに至らない特段の事情があるときは解除が認められない
+とした。これが事例の符号化する例外の例外である。条文の原文を次に掲げる。
+
+\begin{quote}\small\sffamily
+\textbf{民法第612条}\par
+賃借人は、賃貸人の承諾を得なければ、その賃借権を譲り渡し、又は賃借物を転貸することができない。\par
+２　賃借人が前項の規定に違反して第三者に賃借物の使用又は収益をさせたときは、賃貸人は、契約の解除をする
+ことができる。
+\end{quote}
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+cancellation_due_to_sublease <=
+    agreement_of_lease_contract, handover_to_lessee,
+    agreement_of_sublease_contract, handover_to_sublessee,
+    using_leased_thing, manifestation_cancellation.
+exception(cancellation_due_to_sublease, get_approval_of_sublease).
+exception(cancellation_due_to_sublease, nonabuse_of_confidence).
+nonabuse_of_confidence <= fact_of_nonabuse_of_confidence.
+exception(nonabuse_of_confidence, abuse_of_confidence).
+abuse_of_confidence    <= fact_of_abuse_of_confidence.
+\end{lstlisting}
+\caption{正準PROLEG。賃貸借解除の規則集合\cite{satoh2011proleg}。二つの反証子と例外の例外を伴う。}
+\label{fig:proleg}
+\end{figure}
+
+\subsection{二つの翻訳モード}
+我々は二つのモードで翻訳するが，重要なことに，それらは二つのコンパイラではない。
+
+\emph{Mode B（判断のみ）}　立証責任の層を消去し，各規則を純粋に制定的に読む。\code{H <= B}は
+\code{DECIDE H IF B}となり，一つの頭部に対する複数の規則は選言となり，各\code{exception(H,E)}は連言される
+\code{AND NOT E}となる。図\ref{fig:modeb}は図\ref{fig:proleg}のMode B像である。この翻訳は層化された否定失敗
+（negation-as-failure）の古典的な読み\cite{clark1978naf,gelfond1988stable}であり，符号付き依存グラフが
+層化されているとき，そのときに限り健全である――トランスパイラが仮定するのではなく検査せねばならない条件である。
+
+\begin{figure}[t]
+\begin{lstlisting}
+DECIDE `cancellation due to sublease` IF
+        `agreement of lease contract`
+    AND `handover to lessee`
+    AND `agreement of sublease contract`
+    AND `handover to sublessee`
+    AND `using leased thing`
+    AND `manifestation cancellation`
+    AND NOT `get approval of sublease`    -- exception
+    AND NOT `nonabuse of confidence`      -- exception
+
+DECIDE `nonabuse of confidence` IF
+        `fact of nonabuse of confidence`
+    AND NOT `abuse of confidence`         -- 例外の例外
+\end{lstlisting}
+\caption{Mode BのL4。反証可能性は\code{AND NOT}となり，例外の例外は構造的に立ち現れる。出力は素の制定的
+L4であり，\code{jl4-cli}で検証される。}
+\label{fig:modeb}
+\end{figure}
+
+\emph{Mode A（判決に忠実）}　立証責任を保持し，それをL4のライブラリとして具象化する。鍵となる観察は，
+Mode AがMode Bに，各事実を責任を担う値として型付けし\code{resolve}の工程を加えたもの\emph{である}という
+ことだ。\code{resolve}こそが，まさにMode AからMode Bへの脱糖である。一つのコンパイラ，二つの忠実度である。
+
+\subsection{条項ごとの逐次解説}\label{app:walkthrough}
+翻訳が\emph{同型}の語に値するのは，読者が二つのテキストを並べ，条項ごとに照合できるときに限る。対応を
+明示するため，図\ref{fig:proleg}の賃貸借事例を，規則集合から事実基底，そして判決まで辿る。
+
+\paragraph{規則}　対応は局所的かつ構造的である。頭部を共有する二つのPROLEG規則――
+\code{contract\_end <= cancellation\_due\_to\_sublease}と\code{contract\_end <= expiration\_\ldots}――は，
+本体がそれらの選言である一つの\code{DECIDE}となる。規則と，その反証子を名指す\code{exception/2}節――
+PROLEGはこれを\emph{別個の}トップレベル節として書く――は，規則の前提に反証子ごとの\code{AND NOT}を一つ
+ずつ連言した本体をもつ単一の\code{DECIDE}へと集約される。この頭部ごとの集約が，翻訳の行う唯一の正規化で
+あり，L4の規則を，その頭部がいつ成り立つかの自己完結的な言明として読めるようにするものである。かくして
+六前提の\code{cancellation\_due\_to\_sublease}規則とその二つの例外は，図\ref{fig:modeb}の単一の宣言へ
+畳み込まれ，\code{nonabuse <= fact\_of\_nonabuse} / \code{exception(nonabuse, abuse)} /
+\code{abuse <= fact\_of\_abuse}の連鎖は，それを締めくくる二つの宣言となる。規則ごとに，L4のファイルは
+PROLEGのそれと同じ形をもつ。
+
+\paragraph{事実}　事実基底（図\ref{fig:leasefacts}）こそ，責任の語彙が働く場である。事実は，その主張者が
+基準を満たすとき――\code{plausible(F)}が成り立つとき――あるいは相手方が\code{admission}によって認める
+とき，\emph{立証済み}と数えられる。この規則を通して賃貸借の事実基底を読む。解除請求の六つの制定的事実は
+被告に\code{admission}されており，立証済みである。二つの承諾の事実は被告に\code{allege}され証拠も出されて
+いるが，決して\code{plausible}とされず，\emph{未}立証である。一方，\code{fact\_of\_nonabuse}と
+\code{fact\_of\_abuse}はそれぞれ\code{plausible}であり，立証済みである。Mode Bでは，これらは\code{DECIDE}が
+消費する真偽値へ解決され，Mode Aでは，図\ref{fig:burdenlease}の\code{established}／\code{unestablished}の
+注入であって，各々がその負担者を台帳へ運ぶ。
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+admission(agreement_of_lease_contract, defendant). % +5 constitutive
+allege(approval_of_sublease, defendant).
+provide_evidence(approval_of_sublease, defendant). % but NOT plausible
+allege(fact_of_nonabuse_of_confidence, defendant).
+plausible(fact_of_nonabuse_of_confidence).         % => established
+allege(fact_of_abuse_of_confidence, plaintiff).
+plausible(fact_of_abuse_of_confidence).            % => established
+\end{lstlisting}
+\caption{賃貸借の事実基底（抜粋）。相手方による\code{admission}と\code{plausible}はともに事実を立証する。
+\code{allege}されながら\code{plausible}とされない事実は未立証のままであり，その負担者がそれについて敗れる。}
+\label{fig:leasefacts}
+\end{figure}
+
+\paragraph{判決}　\code{contract\_end}の評価は，いまや規則を決定論的に降りていく。
+\begin{itemize}
+\item \code{contract\_end}は\code{cancellation} \code{OR} \code{expiration}に簡約される。expirationの枝は
+  立証済みの事実をもたず失敗するので，すべては解除にかかる。
+\item \code{cancellation}は，六つの制定的事実（すべて自白により立証済み）と，\code{AND NOT get\_approval}，
+  \code{AND NOT nonabuse}を要する。
+\item \code{get\_approval}は二つの承諾の事実を要するが，これらは未立証なので失敗する――よって
+  \code{NOT get\_approval}が成り立つ。被告の第一の抗弁は退けられる。
+\item \code{nonabuse}は\code{fact\_of\_nonabuse}（立証済み）と\code{AND NOT abuse}を要する。だが\code{abuse}は
+  \code{fact\_of\_abuse}を要し，これは\emph{立証済み}なので，\code{abuse}が成り立ち，\code{NOT abuse}が
+  失敗し，\code{nonabuse}が失敗する――よって\code{NOT nonabuse}が成り立つ。これが例外の例外である。原告の
+  背信行為が被告の非背信の抗弁を覆すのだ。
+\item 二つの反証子がともに退けられ，\code{cancellation}が成り立ち，\code{contract\_end}が成り立ち，賃貸人が
+  勝つ。
+\end{itemize}
+この降下\emph{こそ}がL4の評価トレース――\ref{sec:impl}節のラダー図――であり，図\ref{fig:burdenlease}の
+\code{\#ASSERT}が検査するものそのものである。各ステップが原典に一対一で存在する規則を引くがゆえに，
+トレースはPROLEGプログラムの監査を兼ねる。レビュアが読む説明は，法令それ自身の構造の上の文字どおりの
+歩みである。責任台帳はそこに，Mode Bが捨てる次元を加える――\code{fact\_of\_abuse}は原告に，
+\code{fact\_of\_nonabuse}は被告に――各事実が立証されなかったなら誰が敗れたかという問いを，無償で回復し
+ながら。
+
+\subsection{一階の規則と型再構成}
+賃貸借事例は命題的だが，PROLEGの大半は一階である。述語は位置で定まる型のない引数を担う。図\ref{fig:minorduress}は
+第二の事例――未成年者による売買の取消しが強迫により覆される――の断片を示す。引数は買主・売主・契約・日付である。
+関数が型付きでフィールドが名付けられたL4へこれを翻訳するには，\emph{型再構成}が要る。
+\code{rescission\_by\_minor\_buyer}の第一引数が，\code{minor}や\code{manifestation}へ流れ込む\code{Buyer}と
+同じ種であることを利用法から推論し，その位置に名前と型を与えるのである。これは述語シグネチャをまたいで走る
+Hindley--Milner流の推論であり，型のないPROLEGと型付きL4が最も目に見えて分かれる所だ。たとえば時間に関する
+引数は，不透明な原子ではなく，本物の順序をもつL4の\code{Date}値となる（\ref{sec:regulative}節）。
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Prolog,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+rescission_by_minor_buyer(Buyer,Seller,CID,Tc,Tr) <=
+    minor(Buyer),
+    manifestation(rescission(CID),Buyer,Seller,Tr),
+    before_the_day(Tc,Tr).
+exception(manifestation(A,Mfr,Mfe,Ta),
+          manifestation_by_duress(Thr,Mfr,Mfe,A,Ta,Td,Tr)).
+\end{lstlisting}
+\noindent\textit{\footnotesize L4（Mode B，型を再構成）：}
+\begin{lstlisting}
+GIVEN buyer IS A Person, seller IS A Person,
+      contract IS A ContractId,
+      tContract IS A Date, tRescission IS A Date
+GIVETH A BOOLEAN
+DECIDE `rescission by minor buyer`
+       buyer seller contract tContract tRescission IF
+        `minor` buyer
+    AND `manifestation` (rescission contract) buyer seller tRescission
+    AND tContract `before` tRescission
+
+DECIDE `manifestation` action mfr mfe tAction IF
+        `manifestation fact` action mfr mfe tAction
+    AND NOT `manifestation by duress` ...   -- 強迫がこれを覆す
+\end{lstlisting}
+\caption{一階のPROLEGとそのMode B像。位置で定まる型のない引数は，名前付き・型付きの仮引数へ再構成される。
+例外の例外（強迫が未成年者の取消しを覆し，売買が立つ）は翻訳を生き延びる。}
+\label{fig:minorduress}
+\end{figure}
+
+再構成は単なる便宜ではない。それは\emph{リンタ}である。まさにこの例のために公刊された資料には誤記がある――
+反証子が\code{minifestation\_by\_duress}と綴られ，変数が\code{Maniester}・\code{Mnifestee}となっている――。
+型のないPrologはこれらを黙って受け入れる。綴り違いの関手は，単に決して単一化しない新規の述語（決して発火しえない
+反証子，それゆえ判決を静かに変えるバグ）だからだ。L4の名前解決器と型検査器は，まさにこれらを未束縛または
+型不一致として拒絶する。\ref{sec:ingestion}節の型を神託とする取り込みのループは，ここで第二の配当を払う。
+PROLEGの資料体をL4で往復させることが，資料体に自らを監査させ，大量の型のない規則が不可避に堆積させる静かな
+起草の誤りを表面化させるのである。
+
+\subsection{立証責任モナド}\label{app:burden}
+本稿が触れる三つの伝統――義務論的義務，残余的支配，立証責任――すべてに繰り返し現れる手は，規範的位置を
+責任ある当事者で添字付けること，$(\textit{位置},\textit{当事者})$である。Hohfeldによれば\cite{hohfeld1913}，
+これらは三つの\emph{相異なる}位置である。違反時に非難される義務負担者（duty。CSLとL4の
+\code{PARTY \ldots MUST}の主体的当事者，\ref{sec:regulative}節）。隙間において決定する残余的支配の保持者
+（power）。そして，事実が立証されなければ\emph{敗れる}非説得の危険の負担者（liability）である。ここで形式化
+するのは第三のもの\emph{のみ}であり，トランスパイラを律する規則は，PROLEGの当事者が立証責任の役割であって
+L4の義務へ\emph{決して}合成してはならない，というものである。
+
+ある命題の証拠的状態には独立な二次元がある。その\emph{真理}（立証済み・反証済み・未決――自然に
+\code{Maybe}で，\code{Nothing}が未決の場合）と，その\emph{責任}（誰が立証せねばならないか）である。
+「証拠的主体を担う値」は余読み手（coreader）・環境コモナド$(\textit{Subject}, a)$
+\cite{uustalu2008comonadic}であり，それは主体がモノイドを担うとき，すなわち二つの責任がどう結合するかを
+決めたときに，ちょうど\emph{モナド}となる。$\textit{plaintiff} \mathbin{\diamond} \textit{defendant}$に
+意味あるものはないので，我々は主体を併合せず\emph{蓄積}する。基本的な責任の上の自由モノイドは\emph{義務台帳}
+であり，モノイド的出力を伴うコモナドはそのとき\code{Writer}モナド\cite{wadler1992essence}となる。真理の
+次元の上に，証明に失敗してもなお台帳を保つ順序で――非難が失敗を生き延びるように――積むと，これは
+\code{MaybeT (Writer [Obligation])}である（図\ref{fig:provable}）。\code{Writer}の出力として放たれる台帳
+\emph{こそ}が責任地図であり，合成によって無償で生成される。そして連言が短絡せず蓄積的であるがゆえに，その
+地図は構造的である（実行ではなく規則を反映する）。
+
+\begin{figure}[t]
+\begin{lstlisting}[language=Haskell,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{l4kw}\bfseries,commentstyle=\color{l4cmt}\itshape]
+data Subject    = Plaintiff | Defendant
+data Obligation = Obligation { onWhom :: Subject, what :: Text }
+
+-- truth (Maybe) over a ledger of burdens (Writer); MaybeT is
+-- outside, so Provable a  =  ([Obligation], Maybe a)
+type Provable = MaybeT (Writer [Obligation])
+
+prove      :: Subject -> Text -> Maybe a -> Provable a -- a borne fact
+notProven  :: Provable a -> Provable ()  -- negation as failure
+flipBurden :: Provable a -> Provable a   -- involution = opposite(P)
+absent     :: Provable a -> Provable ()  -- defeater, opposing party
+resolve    :: Provable a -> Bool         -- close the world
+\end{lstlisting}
+\caption{立証責任モナド\code{L4.Proleg.Burden}。\code{flipBurden}はPROLEGの\code{opposite(P)}を例外境界へ
+局所化したものであり，\code{absent = notProven . flipBurden}は相手方が立証せねばならない反証子である。}
+\label{fig:provable}
+\end{figure}
+
+\subsection{L4自身における構成}\label{app:burdenl4}
+この構成はHaskellの理論にとどまらない。それはL4自身で実現されている。図\ref{fig:burdenl4}は
+\code{burden.l4}からの抜粋である。L4には\code{Monad}型クラスがないので，モナドは評価器の中に宿り，
+同じ代数がソースレベルでは，真理の次元（\code{MAYBE BOOLEAN}，\code{NOTHING}が未決の場合）と蓄積される
+義務台帳を担うレコードとして，明示的なコンビネータとともに立ち現れる。\code{notProven}は否定失敗であり，
+\code{flipBurden}は部分導出の義務を相手方へ付け替え，\code{resolve}は世界を閉じて\code{NOTHING}を
+\code{FALSE}にする――負担者が敗れる。属格のアクセサ\code{p's truth}――まさに\ref{sec:cnl}節の\code{'s}の
+多重定義――がレコードのフィールドを読む。
+
+\begin{figure}[t]
+\begin{lstlisting}
+DECLARE Subject IS ONE OF Plaintiff, Defendant
+
+DECLARE Obligation HAS
+    onWhom IS A Subject
+    what   IS A STRING
+
+-- Haskell: Provable = MaybeT (Writer [Obligation]).  L4 has no Monad
+-- typeclass, so the algebra surfaces as a record: a truth dimension
+-- (NOTHING = undecided) plus an accumulating obligation ledger.
+DECLARE Provable HAS
+    truth       IS A MAYBE BOOLEAN
+    obligations IS A LIST OF Obligation
+
+GIVEN p IS A Subject, claim IS A STRING, mx IS A MAYBE BOOLEAN
+GIVETH A Provable
+prove p claim mx MEANS
+    Provable WITH
+        truth       IS mx
+        obligations IS LIST (Obligation WITH onWhom IS p, what IS claim)
+
+-- negation as failure: holds iff its argument is not established
+GIVEN p IS A Provable
+GIVETH A Provable
+notProven p MEANS
+    Provable WITH
+        truth       IS (IF isTrue (p's truth) THEN NOTHING ELSE JUST TRUE)
+        obligations IS p's obligations
+
+-- relabel obligations to the opposite party (an involution)
+GIVEN p IS A Provable
+GIVETH A Provable
+flipBurden p MEANS
+    Provable WITH
+        truth       IS p's truth
+        obligations IS flipAll (p's obligations)
+
+-- close the world: established => TRUE, else the burden default
+resolve p MEANS isTrue (p's truth)
+\end{lstlisting}
+\caption{\code{burden.l4}の抜粋。L4で書かれた立証責任の構成。レコード\code{Provable}は
+\code{MaybeT (Writer [Obligation])}のL4像であり，コンビネータはソースレベルのモナド演算である。}
+\label{fig:burdenl4}
+\end{figure}
+
+紙の上ではなくL4で書くことの要点は，処理された判決が実行可能になることである。図\ref{fig:burdenlease}は
+図\ref{fig:proleg}の賃貸借事例を直接符号化し，期待される結果を\code{jl4-cli}が検査する\code{\#ASSERT}として
+言明する。\code{contractEnd}と\code{cancellation}は成り立ち，承諾の抗弁と非背信の抗弁は成り立たない――後者は
+原告の背信行為によって覆される，例外の例外である。末尾の\code{\#EVAL}は責任台帳を印字する。\code{flipBurden}が
+それを双対化し，各事実をその裏を負う当事者へ付け替える。
+
+\begin{figure}[t]
+\begin{lstlisting}
+-- defendant's first defence: alleged but NOT plausible => unestablished
+getApproval MEANS
+  conj (LIST (unestablished Defendant "approval_of_sublease"),
+             (unestablished Defendant "approval_before_cancellation"))
+
+-- plaintiff's exception-of-exception
+abuse MEANS conj (LIST (established Plaintiff "fact_of_abuse_of_confidence"))
+
+-- defendant's second defence, itself defeated by the plaintiff's abuse
+nonabuse MEANS
+  conj (LIST (established Defendant "fact_of_nonabuse_of_confidence"),
+             (notProven abuse))
+
+cancellation MEANS
+  conj (LIST (established Plaintiff "agreement_of_lease_contract"),
+             -- ... the other five constitutive facts ...
+             (established Plaintiff "manifestation_cancellation"),
+             (notProven getApproval),
+             (notProven nonabuse))
+
+contractEnd MEANS disj (LIST cancellation)
+
+#ASSERT      resolve contractEnd
+#ASSERT      resolve cancellation
+#ASSERT NOT (resolve getApproval)
+#ASSERT NOT (resolve nonabuse)
+
+#EVAL contractEnd's obligations          -- the responsibility ledger
+#EVAL (flipBurden abuse)'s obligations   -- burdens flipped to the opponent
+\end{lstlisting}
+\caption{\cite{satoh2011proleg}の賃貸借判決を実行可能なL4として。\code{\#ASSERT}が報告された結果を符号化し，
+\code{\#EVAL}が\code{Writer}次元の蓄積する責任台帳を印字する。}
+\label{fig:burdenlease}
+\end{figure}
+
+\subsection{推定はモノイドの単位元である}
+構造を半群からモノイドへ昇格させることは，半群が決して迫られない選択を迫る。すなわち単位元――いかなる証拠も
+結合される\emph{前}の命題の値――である。法的には，この単位こそが\emph{推定}であり，それを定めることは
+憲法的行為である。台\code{Bool}は二つのモノイドを許す。互いにDe Morgan双対である（表\ref{tab:presumption}）。
+$(\vee, \textit{False})$のもとでは，十分な根拠が真へ反転させるまで嫌疑は立証されない――無罪推定である。
+$(\wedge, \textit{True})$のもとでは，反証まで主張が立つ。同じ要素，同じ演算，\emph{異なる単位――異なる道徳}。
+\code{flipBurden}は一方を他方へDe Morgan双対化し，$\neg\neg = \mathrm{id}$を映す。\emph{反証可能な}推定は
+単位元（証拠がそこから動かしうる）であり，\emph{確定的}推定や\emph{強行規範（jus cogens）}は吸収元（いかなる
+証拠も動かさない）である。したがって法的体制は対$(\textit{単位元}, \textit{閾値})$――誰が疑わしきの利益を
+受けるか，どれだけの疑いが許容されるか――である。刑事法は$(\textit{無罪}, \textit{合理的な疑いを超えて})$を
+定め，Blackstoneの比率\cite{blackstone1769}を，誤りの非対称な費用に対する事実上の決定理論的損失関数として
+符号化する\cite{hayspier1997burdens}。モナドの単位律は法学的に読める。推定それ自体は何も動かさない。動かすのは
+証拠（$\mathbin{>\!\!>\!\!=}$）のみである。
+
+\begin{table}[t]
+\caption{命題ごとのモノイド単位元の選択としての立証責任。}
+\label{tab:presumption}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{\texttt{Bool}上のモノイド} & \textbf{単位元} & \textbf{法的解釈} \\
+\midrule
+$(\vee, \textit{False})$  & \textit{False} & 無罪推定 \\
+$(\wedge, \textit{True})$ & \textit{True}  & 主張の反証可能な推定 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{対応と解集合像}
+同じ非単調な内容は，橋が整合を保たねばならない三つの顔をもつ（表\ref{tab:correspondence}）。
+\ref{sec:relational}節のようにL4を関係化すること――A正規形の平坦化によって関数を述語へ，出力引数を加えて――は，
+\code{Provable}とその否定失敗を解集合のデフォルト否定へ送る\cite{gelfond1988stable,dung1995argumentation}。
+安定モデルの枚挙はシナリオ探索となり，\ref{sec:regulative}節の義務論的・時相論理的な二重拘束は充足不能核として
+再び現れる。これは，いまや立証責任の層を覆うまでに拡張された，同じ「抜け穴＝脆弱性」の枠組みである。賃貸借の
+事実基底を符号化し，これらのコンビネータで\code{contract\_end}を評価すると（図\ref{fig:burdenlease}），報告された判決が再現される。賃貸人が
+勝ち，転貸承諾の抗弁は十分な蓋然性を欠いて失敗し，非背信の抗弁は背信行為によって自ら覆され，台帳は各事実をその
+負担者に帰する――付随的に，\emph{誰が責任を負うか}（制定的事実については原告）が，\emph{誰がそれを立証するか}
+（ここでは被告の自白による）と独立であることを確立しながら。
+
+\begin{table}[t]
+\caption{同じ反証可能な内容の三つの顔。}
+\label{tab:correspondence}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & \textbf{PROLEG} & \textbf{\texttt{Provable}} & \textbf{ASP} \\
+\midrule
+反証子     & \code{exception} & \code{notProven}  & \code{not e} \\
+閉世界     & 暗黙             & \code{resolve}    & デフォルト否定 \\
+証明基準   & \code{plausible} & \code{Maybe} 部分 & 弱制約 \\
+責任負担者 & \code{opposite}  & \code{flipBurden} & タイブレーク \\
+責任地図   & ---              & \code{Writer}     & 当事者ごとのリテラル \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+本稿の主張にとっての含意は，\ref{sec:background}節の制定的・規制的分割が第三の車線――証拠性――を得る，という
+ことである。自然な利用者向けの成果物は，三つの射影（誰が責を負うか，誰が決めるか，誰が立証せねばならないか）を
+もつ\emph{責任地図}であって，各々が異なるHohfeld的領域から引かれた$(\textit{位置},\textit{当事者})$の対である。
+それらを別々の型としてもつことの価値は，まさに，トランスパイラが一方を他方へ黙って崩壊させられないことにある。
+
+% --- 参考文献 -------------------------------------------------------
+\bibliographystyle{plain}
+\bibliography{l4-icail}
+
+\end{document}
