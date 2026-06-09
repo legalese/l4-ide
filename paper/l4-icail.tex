@@ -120,7 +120,7 @@ parentheses, ditto marks, and phrase-shaped identifiers---intended to let
 non-programmers read and write law in black and white.
 \end{abstract}
 
-\keywords{computational law, rules as code, controlled natural language,
+\keywords{computational law, rules as code, low-code, controlled natural language,
 functional programming, deontic logic, process calculi, contract
 formalisation, legal knowledge representation}
 
@@ -214,7 +214,8 @@ What such situations demand is a rule that is legible \emph{twice over}:
 readable by a non-technical human who needs to check the reasoning against
 their own circumstances, and readable by a computer that can evaluate it,
 test it, and explain it without hallucinating. This dual-legibility
-requirement is not new. It is exactly the aspiration that gave us COBOL,
+requirement is not new; it is the recurring ambition of what we would now call
+\emph{low-code}. It is exactly the aspiration that gave us COBOL,
 whose designers wanted business rules expressed in something a manager
 could read, and SQL, whose declarative surface was meant to let analysts,
 not just engineers, ask questions of their data. Both bet that some rules
@@ -583,6 +584,18 @@ same clitic glosses as the copula in \emph{is-a} predications---one mark
 spanning exactly the two relations that object orientation keeps apart as
 composition and subtyping.
 
+\paragraph{Two registers.}
+The words that replace the sigils are set in upper case, and the choice is not
+merely cosmetic: it splits the surface into two visual registers. \code{UPPERCASE}
+tokens are the fixed vocabulary of the \emph{language}---\code{AND}, \code{OR},
+\code{NOT}, \code{AT LEAST}, \code{GIVEN}, \code{MEANS}---while
+\bq backtick-quoted lowercase phrases\bq{} are the vocabulary of the \emph{law},
+the terms lifted from the source instrument. A reader can therefore tell at a
+glance which words carry logical force and which merely name domain concepts,
+without yet knowing the grammar---the same typographic convention by which COBOL
+and SQL set their keywords apart from the programmer's own identifiers. The case
+distinction does double duty as documentation.
+
 \paragraph{Indentation, not parentheses.}
 Following the offside rule \cite{landin1966next700}, L4 is
 layout-sensitive, and it puts the layout to specific legal use: the
@@ -592,7 +605,52 @@ the rule. In the British Nationality fragment of
 Section~\ref{sec:constitutive}, the alignment of the \code{OR}s under and
 beside the \code{AND} is what disambiguates the structure---no reader need
 balance a parenthesis, and the indentation can be made to mirror the
-sub-paragraph numbering of the source, advancing isomorphism.
+sub-paragraph numbering of the source, advancing isomorphism. This is less the
+import of a programming habit into law than the reverse: indented, enumerated
+sub-paragraphs are how the written law has been set out since the Victorian
+reforms of legislative drafting \cite{coode1843}, and an ordinary word processor
+already indents a statutory list the same way---L4 only makes that indentation
+carry the precedence.
+
+\paragraph{Inert scaffolding and asyndeton.}
+Two further devices let a formalisation reproduce its source almost word for
+word. Where a statute joins its limbs without repeating a connective on every
+line---the \emph{asyndetic} enumeration typical of drafted lists---L4 offers
+\code{...} (three dots) and \code{..} (two dots) as lightweight infix synonyms
+for \code{AND} and \code{OR}. The dot counts are deliberate: three for the three
+letters of \code{AND}, two for the two of \code{OR}, so that in the fixed-width
+register the implicit mark and its spelled-out form occupy the same column and
+the limbs align. The connective can thus sit unobtrusively at the head of a
+continuation line. And a quoted string in a boolean position is treated as
+\emph{inert}: it evaluates to \code{TRUE} inside an \code{AND} and to
+\code{FALSE} inside an \code{OR}, either way leaving the surrounding condition's
+truth value untouched. Inert text lets the drafter paste the chapeau and
+connecting prose of the source---``shall subsist for the life of the author
+and'', ``whichever expires first''---directly into the rule as material the type
+checker accepts and the evaluator ignores. Together with the layout, these let an
+enumerated provision be transcribed limb for limb (Figure~\ref{fig:asyndeton}),
+which is the surface condition for a lawyer to agree that the code is the law.
+
+\begin{figure}[t]
+\begin{lstlisting}
+`grant is allowed` MEANS
+        "the grant is allowed where all of the following hold---"
+    ... `the form was filed on time`
+    ... `the fee was paid`
+    AND `the applicant is eligible`
+
+`is eligible` MEANS
+       "the applicant is eligible if any of---"
+    .. `a citizen`
+    .. `a permanent resident`
+    OR `the holder of a valid pass`
+\end{lstlisting}
+\caption{Asyndeton and inert scaffolding. \code{...} is an implicit \code{AND}
+and \code{..} an implicit \code{OR}, with the final limb spelling out the
+conjunction as a drafted list does; the quoted chapeau is inert---it contributes
+nothing to the truth value---and carries verbatim source text into the rule.}
+\label{fig:asyndeton}
+\end{figure}
 
 \paragraph{Ditto marks.}
 Tabular legal and financial text repeats structure down columns; clerks have
@@ -620,17 +678,41 @@ aligned tabular data read as columns.}
 \end{figure}
 
 \paragraph{Phrase-shaped identifiers and mixfix.}
-Backtick-delimited identifiers may contain spaces, so an identifier can be
-the exact statutory phrase (\code{\bq is settled in the United Kingdom\bq}).
+Backtick-delimited identifiers may contain spaces---borrowing the convention,
+familiar to every writer of Markdown, by which backticks fence a span of literal
+text---so an identifier can be the exact statutory phrase
+(\code{\bq is settled in the United Kingdom\bq}).
 Such names may be \emph{mixfix}: arguments interleave with the name, so a
 predicate reads as a sentence---\code{\bq employee\bq{} \bq works for\bq{} \bq employer\bq}
 rather than \code{worksFor(employee, employer)}. Together these let the
 formalisation quote its source, the surface condition for a lawyer to accept
-that the code says what the law says.
+that the code says what the law says (Figure~\ref{fig:mixfix}).
+
+\begin{figure}[t]
+\begin{lstlisting}
+GIVEN `the worker` IS A Person
+      `the firm`   IS A STRING
+GIVES A BOOLEAN
+`the worker` `works for` `the firm` MEANS
+    `the worker`'s employer EQUALS `the firm`
+
+DECIDE `Alice is entitled to leave` IF
+    `Alice` `works for` "Acme"
+\end{lstlisting}
+\caption{Mixfix: the keyword \code{\bq works for\bq} interleaves with its two
+arguments, so both the definition and the call site
+(\code{\bq Alice\bq{} \bq works for\bq{} \bq Acme\bq}) read as English clauses
+rather than as \code{worksFor(...)}.}
+\label{fig:mixfix}
+\end{figure}
 
 \paragraph{Lineage.}
 L4's surface design inherits from a substantial tradition of controlled and
-computational language for rules. From Grammatical Framework
+computational language for rules. Its low-code ancestors are COBOL and SQL
+(Section~\ref{sec:motivation}), which first wagered that an uppercase,
+English-shaped surface could let non-programmers read business rules; the
+controlled-language tradition since has refined that wager. From Grammatical
+Framework
 \cite{ranta2004gf} we take the discipline of treating a surface syntax as a
 type-theoretical grammar---an abstract syntax with concrete realisations---
 which points toward multilingual rendering of the same rule. From the
