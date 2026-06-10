@@ -17,6 +17,12 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+  -- * Ledger substrate (M0). Exposed for the test suite; not part of the
+  -- stable public API.
+, Eval
+, tellEvent
+, currentLedger
+, runEvalAction
 )
 where
 
@@ -27,6 +33,7 @@ import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
+import L4.Evaluate.Ledger (Ledger, LedgerEvent, emptyLedger)
 import L4.Evaluate.ValueLazy
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
@@ -51,6 +58,8 @@ data EvalState =
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
+    , envLedger  :: !(IORef Ledger) -- append-only event log (M0 ledger substrate);
+                                     -- always collected (non-optional, unlike evalTrace)
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -254,6 +263,18 @@ traceEval ta = do
     Nothing -> pure ()
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
 
+-- | Append an event to the ledger (M0 ledger substrate).
+--
+-- Modeled exactly on 'traceEval', but the ledger is non-optional, so there is
+-- no 'Maybe' branch: every write is recorded. Newest-last, via 'DList.snoc'.
+tellEvent :: LedgerEvent -> Eval ()
+tellEvent ev =
+  asks (.envLedger) >>= liftIO . flip modifyIORef' (`DList.snoc` ev)
+
+-- | Read the current ledger (the full event log, newest-last).
+currentLedger :: Eval Ledger
+currentLedger = readRef (.envLedger)
+
 -- | For the given eval action, enable tracing and accumulate a trace.
 --
 -- We try to make it so that in principle, nested calls to `captureTrace`
@@ -295,10 +316,24 @@ runConfig = \ case
   DoneMachine whnf ->
     pure whnf
 
+-- | Run an action with a freshly-empty ledger, restoring the caller's ledger
+-- afterwards. This is what guarantees ledger isolation between top-level
+-- directives: each #EVAL / #ASSERT / #TRACE evaluates against its own empty
+-- event log, so assignments cannot leak from one directive into the next.
+--
+-- We follow the same save/swap/restore idiom as 'captureTrace' and
+-- 'withEvalClauses': swap in a fresh IORef via 'local' for the duration of the
+-- action. Because we hand the action a brand-new IORef, the caller's ledger is
+-- left completely untouched, even on exceptions.
+withFreshLedger :: Eval a -> Eval a
+withFreshLedger m = do
+  fresh <- liftIO (newIORef emptyLedger)
+  local (\s -> s { envLedger = fresh }) m
+
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective (MkEvalDirective r traced isAssert expr env) = do
+nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -481,7 +516,8 @@ execEvalModuleWithEnv evalConfig entityInfo env m@(MkModule _ moduleUri _) = do
       let temporalCtx = initialTemporalContext actualTime
       temporalContext <- newIORef temporalCtx
       let evalTrace = Nothing
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+      envLedger <- newIORef emptyLedger
+      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
       case r of
         Left exc -> do
           hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -531,13 +567,41 @@ execEvalModuleWithJSON evalConfig entityInfo json m@(MkModule _ moduleUri _) = d
       let temporalCtx = initialTemporalContext actualTime
       temporalContext <- newIORef temporalCtx
       let evalTrace = Nothing
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+      envLedger <- newIORef emptyLedger
+      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
       case r of
         Left exc -> do
           hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
           traverse_ (hPutStrLn stderr . Text.unpack) (prettyEvalException exc)
           pure (emptyEnvironment, [])
         Right result -> pure result
+
+-- | Build a minimal 'EvalState' and run an 'Eval' action against it.
+--
+-- This is a test seam for exercising the ledger substrate (and other 'Eval'
+-- effects) end-to-end through the monad, without standing up a full module
+-- evaluation. Like the real entry points, it initializes the ledger EMPTY.
+--
+-- Not part of the stable public API; exposed for the test suite only.
+runEvalAction :: EvalConfig -> Eval a -> IO (Either EvalException a)
+runEvalAction evalConfig (MkEval f) = do
+  stack           <- newIORef emptyStack
+  supply          <- newIORef 0
+  actualTime      <- resolveEvalTime evalConfig
+  temporalContext <- newIORef (initialTemporalContext actualTime)
+  envLedger       <- newIORef emptyLedger
+  f MkEvalState
+    { moduleUri = toNormalizedUri (Uri "test:runEvalAction")
+    , stack
+    , supply
+    , evalTrace = Nothing
+    , envLedger
+    , entityInfo = mempty
+    , evalTime = actualTime
+    , temporalContext
+    , tracePolicy = evalConfig.tracePolicy
+    , safeMode = evalConfig.safeMode
+    }
 
 {- | Evaluate an expression in the context of a module and initial environment.
 
