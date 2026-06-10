@@ -60,7 +60,7 @@ data Tab
 
 data Conj = CAnd | COr
 
-data Doc
+data Block
   = DocHeading Int Text
   | DocProvision
       { anchor :: Text
@@ -102,7 +102,7 @@ renderModuleTnr opts (MkModule _ _ topSection) =
 -- Walking the module
 ----------------------------------------------------------------------------
 
-sectionDocs :: Int -> Acc -> Section Resolved -> (Acc, [Doc])
+sectionDocs :: Int -> Acc -> Section Resolved -> (Acc, [Block])
 sectionDocs depth acc0 (MkSection _ mname _maka decls) =
   let
     heading = case mname of
@@ -120,7 +120,7 @@ sectionDocs depth acc0 (MkSection _ mname _maka decls) =
   in
     (acc1, heading <> childDocs)
 
-topDeclDocs :: Int -> Acc -> TopDecl Resolved -> (Acc, [Doc])
+topDeclDocs :: Int -> Acc -> TopDecl Resolved -> (Acc, [Block])
 topDeclDocs depth acc = \case
   Section _ sub -> sectionDocs depth acc sub
   Decide _ d -> provision acc (decideDoc d)
@@ -137,7 +137,7 @@ topDeclDocs depth acc = \case
 -- | Bare BOOLEAN assumptions are atoms whose names already read as full
 -- clauses inside provisions; rendering them again as definitions would be
 -- noise. Everything else becomes an undefined-term entry.
-assumeDocs :: Acc -> Assume Resolved -> (Acc, [Doc])
+assumeDocs :: Acc -> Assume Resolved -> (Acc, [Block])
 assumeDocs acc (MkAssume _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ name _args _) mty)
   | null givens, isBooleanType mty =
       (acc{inlinedAtoms = acc.inlinedAtoms + 1}, [])
@@ -175,7 +175,7 @@ isBooleanType = \case
 -- DECIDE → provision
 ----------------------------------------------------------------------------
 
-decideDoc :: Decide Resolved -> Int -> Doc
+decideDoc :: Decide Resolved -> Int -> Block
 decideDoc d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ name _args _) body) n =
   DocProvision
     { anchor = "decide:" <> resolvedText name
@@ -247,7 +247,7 @@ localDeclText = \case
 -- DECLARE → definition provision
 ----------------------------------------------------------------------------
 
-declareDoc :: Declare Resolved -> Int -> Doc
+declareDoc :: Declare Resolved -> Int -> Block
 declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
   DocProvision
     { anchor = "declare:" <> resolvedText name
@@ -264,9 +264,9 @@ declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
       ( "In this Act, " <> quoted <> " means a record consisting of\x2014"
       , Just (TGroup Nothing CAnd (map fieldTab fields))
       )
-    EnumDecl _ cons ->
+    EnumDecl _ conDecls ->
       ( "In this Act, " <> quoted <> " means one of the following\x2014"
-      , Just (TGroup Nothing COr (map conTab cons))
+      , Just (TGroup Nothing COr (map conTab conDecls))
       )
     SynonymDecl _ ty ->
       ("In this Act, " <> quoted <> " means " <> typeText ty <> ".", Nothing)
@@ -353,9 +353,9 @@ negateClause t
 swapFirst :: Text -> Text -> Text -> Maybe Text
 swapFirst needle replacement t =
   case Text.breakOn needle t of
-    (pre, post)
-      | Text.null post -> Nothing
-      | otherwise -> Just (pre <> replacement <> Text.drop (Text.length needle) post)
+    (before', after')
+      | Text.null after' -> Nothing
+      | otherwise -> Just (before' <> replacement <> Text.drop (Text.length needle) after')
 
 ----------------------------------------------------------------------------
 -- Deontics and prose fallback
@@ -401,7 +401,7 @@ proseExpr e = case carameliseNode e of
 -- Rendering the Doc IR to Markdown
 ----------------------------------------------------------------------------
 
-renderDoc :: TnrOptions -> Doc -> [Text]
+renderDoc :: TnrOptions -> Block -> [Text]
 renderDoc opts = \case
   DocHeading depth t ->
     [Text.replicate (min depth 6) "#" <> " " <> t]
@@ -488,10 +488,19 @@ indent depth = Text.replicate ((depth + 1) * 4) " "
 -- (no backticks): TNR output is prose, not code.
 flatLinTree :: LinTree -> Text
 flatLinTree tree =
-  Text.strip $ case tree.tokens of
+  Text.strip $ case dropSpaceBeforePossessive tree.tokens of
     [] -> ""
     (x : xs) -> Text.stripStart (tok x) <> mconcat (fmap tok xs)
  where
+  -- "p 's English name" → "p's English name"
+  dropSpaceBeforePossessive = \case
+    (a : b : rest)
+      | a.type' == LinText
+      , Text.all (== ' ') a.payload
+      , b.type' == LinPossessive ->
+          dropSpaceBeforePossessive (b : rest)
+    (a : rest) -> a : dropSpaceBeforePossessive rest
+    [] -> []
   tok t = case t.type' of
     LinPossessive -> "'" <> t.payload
     LinPunctuation -> t.payload <> " "

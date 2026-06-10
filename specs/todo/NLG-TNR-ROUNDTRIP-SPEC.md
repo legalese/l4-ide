@@ -100,6 +100,11 @@ later):
   requires — 'Person' means …", drawing prose from `@desc`.
 - **Citations:** `@ref` annotations render as marginal notes / parenthetical
   cites once REF-ANNOTATION-SPEC lands attachment.
+- **Schedules** (Phase 2): data-valued `DECIDE`s — lists and tables of
+  constants (e.g. british-citizen-act's list of British Overseas
+  Territories) — render as numbered Schedules at the end of the instrument,
+  referenced from the provision ("the territories listed in Schedule 1"),
+  rather than as run-on prose.
 
 ### 2.2 Worked target example (north star golden)
 
@@ -235,6 +240,46 @@ Golden tests: `foo.tnr.golden` alongside the existing `.nlg.golden` files in
   v1 generation path (they enter in round-trip ingestion, §3.4, where
   output is validated).
 
+### 2.6 The AI gloss: annotation authoring, not render-time paraphrase
+
+The deterministic renderer will produce awkward constructions wherever atom
+names are mechanical ("if the person is a person and not a nonperson…").
+We want idiomatic output — but a render-time LLM smoothing pass would break
+determinism (same L4 ↛ same TNR), minimal-diff regeneration (every re-gloss
+re-rolls phrasing document-wide), and auditability (the shipped English
+would no longer have a mechanical derivation from the L4).
+
+Instead, **the gloss is an authoring assistant whose output is `@nlg`/`@desc`
+hint patches committed into the L4 source**:
+
+1. deterministic render (Phase 1);
+2. a gloss agent reads the output, flags awkward fragments, and proposes
+   annotation patches — atom phrasings, negative forms, group lead-ins;
+3. each proposal is validated before landing: annotations cannot change
+   logic by construction (typecheck + goldens confirm), and a
+   **back-translation check** verifies the proposed phrasing still denotes
+   the same atom ("not a public house" ≠ "a private residence");
+4. a human accepts; the hints are committed; the deterministic renderer
+   replays them forever.
+
+*The GPU drafts the phrasing once; the CPU replays it forever.* Fluency
+compounds in source control — diffable, reviewable, stable across
+regenerations — rather than being re-rolled per render. Mechanically this is
+the Class A round-trip path (§3.3) running in self-edit mode.
+
+Constraints:
+
+- **Granularity:** the gloss touches leaf clauses and lead-ins only.
+  Numbering, tabulation structure, and the and/or/not skeleton stay
+  CPU-only. Whole-provision `@nlg` overrides remain an escape hatch with
+  stricter review (they hide structure).
+- **Deterministic aggregation first:** common-subject factoring
+  ("the person— (i) has X; (ii) has Y") and similar GF-style aggregations
+  are pure-Haskell improvements; the AI handles only the genuinely
+  linguistic residue.
+- The MCP answer path never reads the gloss: English stays a view, logic
+  stays the model.
+
 ## 3. Goal 2: Round-Tripping
 
 ### 3.1 Correctness criteria — lens laws
@@ -316,7 +361,7 @@ at the `.l4` level and keeps `git diff` on the L4 side as small as the edit.
 | Phase | Deliverable | Exit criterion |
 | --- | --- | --- |
 | **1. TNR/MD renderer** | `L4.TNR` Doc IR + Markdown backend + `l4 tnr` + `.tnr.golden` harness | `imaginary-alcohol-act.tnr.golden` judged faithful & readable against the in-comment original; coverage report clean on pilot corpus |
-| **2. Hints & polish** | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC) | british-citizen-act and ny-environmental renders pass review |
+| **2. Hints & polish** | negation hints, whole-rule overrides, definitions section, `@ref` cites (after REF-ANNOTATION-SPEC); deterministic subject-factoring; **AI gloss pass** (§2.6) proposing `@nlg` patches gated by back-translation + goldens | british-citizen-act and ny-environmental renders pass review |
 | **3. docx backend** | pandoc JSON writer + `tnr-reference.docx` styles | opens in Word with correct paragraph styles |
 | **4. Round-trip: Class A** | anchor alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations |
 | **5. Round-trip: Class B/C** | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX | demo: strike a condition in Word, confirm proposed L4 change, regen stable |
