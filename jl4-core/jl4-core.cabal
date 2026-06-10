@@ -126,6 +126,7 @@ library
     L4.ParserCombinators
     L4.Print
     L4.Syntax
+    L4.TNR
     L4.TemporalContext
     L4.TracePolicy
     L4.Transform

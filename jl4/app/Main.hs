@@ -32,6 +32,7 @@ import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
+import L4.Cli.Tnr (TnrCliOptions, tnrCmd, tnrOptionsParser)
 import L4.Cli.Trace (TraceOptions, traceCmd, traceOptionsParser)
 
 ----------------------------------------------------------------------------
@@ -46,6 +47,7 @@ data Command
   | CmdBatch      BatchOptions
   | CmdTrace      TraceOptions
   | CmdStateGraph StateGraphOptions
+  | CmdTnr        TnrCliOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -76,6 +78,9 @@ commandParser =
       <> command "state-graph"
            (info (CmdStateGraph <$> stateGraphOptionsParser)
              (progDesc "Extract regulative-rule state transition graphs as GraphViz DOT"))
+      <> command "tnr"
+           (info (CmdTnr <$> tnrOptionsParser)
+             (progDesc "Render an L4 file as legislative-style prose (Markdown)"))
 
 commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> commandParser)
@@ -116,6 +121,7 @@ main = do
     CmdBatch      opts -> batchCmd      opts
     CmdTrace      opts -> traceCmd      opts
     CmdStateGraph opts -> stateGraphCmd opts
+    CmdTnr        opts -> tnrCmd        opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

@@ -18,6 +18,27 @@ the updated L4 is as similar as possible to the previous generation, modulo
 the edits. This is a bidirectional-transformation ("lens") problem and we
 adopt the lens laws as our correctness criteria.
 
+## Positioning: the neurosymbolic premise
+
+L4's differentiator — already live via the MCP exposure of deployed L4 — is
+**audit-grade, deterministic, logic-based answers via AI**: the AI gets the
+logic out of the L4, not out of the English. Don't ask a GPU to do what a CPU
+can. The industry keeps handwaving at this under many names (hybrid AI,
+neurosymbolic, "LLMs need a business-rules engine / ontology layer"); L4 is
+the concrete artifact those hand-waves are missing.
+
+The TNR layer must respect that premise absolutely:
+
+- **English is a view; L4 is the model.** The TNR document is a *projection*
+  of the L4, never an alternative source of semantics. Any agent answering
+  questions about the rules calls the reasoner (via MCP / `jl4-service`),
+  not its own reading of the generated prose.
+- Round-trip ingestion (§3) is the one place neural drafting touches the
+  model — and there every patch is gated by the symbolic half (typecheck,
+  `#EVAL` regressions, human confirmation) before it lands.
+- This is also why faithfulness (§2.5) is a CI property, not an aspiration:
+  if the projection drifts from the model, the audit chain breaks.
+
 ## 1. Current State (survey)
 
 ### 1.1 Annotation mechanisms already in the language
@@ -299,6 +320,7 @@ at the `.l4` level and keeps `git diff` on the L4 side as small as the edit.
 | **3. docx backend** | pandoc JSON writer + `tnr-reference.docx` styles | opens in Word with correct paragraph styles |
 | **4. Round-trip: Class A** | anchor alignment, wording-edit detection, surgical `@nlg`/`@desc` updates; GetPut + idempotence property tests | edit-a-phrase → regen produces minimal diff, `.l4` diff touches only annotations |
 | **5. Round-trip: Class B/C** | LLM-assisted semantic patch proposal + typecheck/#EVAL validation gate + human confirmation UX | demo: strike a condition in Word, confirm proposed L4 change, regen stable |
+| **6. Web playground** (§6.1) | split-pane jl4-web: L4 editor left, live TNR render right; later TNR-side editing via the ingestion path | edit L4 in browser → only the corresponding TNR block changes |
 
 ## 6. Delivery Vehicle: Agent Skill
 
@@ -336,6 +358,22 @@ against original statutory text (§7).
 Deliverable: a `SKILL.md` (plus reference docs) added in Phase 5, once
 Phases 1–4 give it real commands to drive.
 
+### 6.1 Web playground
+
+A second delivery vehicle, reusing `ts-apps/jl4-web`: a split-pane view with
+the existing L4 web editor on the left and an auto-refreshing rendered
+Markdown pane on the right — the **prototype TNR**. Sequencing:
+
+1. **L4-edits-first:** left pane editable; on each successful typecheck the
+   right pane re-renders (`l4 tnr` behind the existing language-server /
+   websessions plumbing). This alone demonstrates GetPut stability live:
+   the right pane only changes where the L4 changed.
+2. **TNR-edits-later:** make the right pane editable and wire the edits
+   through the ingestion path (§3) — classification, annotation updates,
+   AI-drafted semantic patches — reusing the mass-AI-ingestion tooling we
+   already have. The left pane updating in response is the lens running
+   in reverse, on screen.
+
 ## 7. Testing
 
 - **Goldens:** `.tnr.golden` per pilot file, same harness as `.nlg.golden`.
@@ -347,15 +385,38 @@ Phases 1–4 give it real commands to drive.
 - **Human eval:** side-by-side of generated TNR vs. original statutory text
   for the alcohol act and british-citizen-act.
 
-## 8. Open Questions
+## 8. Open Questions — provisionally resolved (2026-06-10)
 
-1. Negation-hint syntax: second `@nlg` slot vs. structured `@nlg` payload?
-2. Where do `#EVAL`s surface, if at all — explanatory-notes appendix, or
-   strictly suppressed?
-3. House-style pluggability: hardcode Commonwealth style for v1, or make the
-   connective/numbering table data-driven from day one?
-4. Should anchors in Markdown be visible (`{#sec-1-1}` heading attributes)
-   or hidden (HTML comments)? Hidden is cleaner; visible is more robust to
-   editors that strip comments.
-5. Docx round-trip: bookmarks vs. content controls vs. a sidecar map keyed on
-   fuzzy text matching as a fallback when Word mangles markers.
+1. **Negation-hint syntax** — *deferred to Phase 2.* v1 negates atoms with a
+   conservative copula/auxiliary swap (" is " → " is not ", " has " →
+   " does not have ", likewise are/have, first occurrence only) and falls
+   back to the clumsy-but-faithful "it is not the case that …". On the
+   alcohol act this already yields "the person is not a public house".
+2. **`#EVAL`s** — *strictly suppressed* in v1; counted in the trailing
+   `tnr-coverage` comment so suppression is visible, not silent. An
+   explanatory-notes appendix can come later.
+3. **House style** — *hardcoded Commonwealth* for v1, but every connective /
+   lead-in / marker string lives in one place (`L4.TNR`'s house-style
+   helpers) so making it data-driven later is mechanical.
+4. **Anchor visibility** — *hidden HTML comments*, on by default,
+   `--no-anchors` to suppress. Robustness against comment-stripping editors
+   is a docx-era problem (see 5).
+5. **Docx round-trip markers** — *deferred to Phase 3* (bookmarks vs.
+   content controls vs. fuzzy-match sidecar).
+
+## 9. Status
+
+- **2026-06-10** — Phase 1 implemented:
+  - `jl4-core/src/L4/TNR.hs`: Doc IR + module walker + Coode tabulation +
+    Markdown backend, reusing `L4.Nlg`'s annotation-aware linearizer for
+    leaf text (`LinTree` internals now exported from `L4.Nlg`).
+  - `l4 tnr FILE [--no-anchors]` CLI subcommand (`jl4/app/L4/Cli/Tnr.hs`).
+  - **Not yet compiled**: the GHC toolchain lives on `/Volumes/transcend`
+    and the working session lacked macOS permission to read removable
+    volumes. Build + `.tnr.golden` harness wiring is the immediate next
+    step.
+  - `specs/todo/tnr-prototype/tnr_proto.py`: throwaway Python demonstrator
+    of the same algorithm (micro-parser, alcohol-act subset only); its
+    output on the alcohol act (`imaginary-alcohol-act.tnr.md` alongside)
+    matches the original statutory text in the file's comments nearly
+    word-for-word. Delete once the Haskell golden exists.

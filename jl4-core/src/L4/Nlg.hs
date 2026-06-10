@@ -2,6 +2,10 @@ module L4.Nlg (
   simpleLinearizer,
   Linearize (..),
   lin,
+  -- * Linearization trees (consumed by document renderers, e.g. "L4.TNR")
+  LinTree (..),
+  LinToken (..),
+  LinType (..),
 ) where
 
 import Base
