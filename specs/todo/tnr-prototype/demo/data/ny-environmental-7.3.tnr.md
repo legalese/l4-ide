@@ -52,7 +52,7 @@
 
     (b) “Notice of EIS Completion”, being a Notice; and
 
-    (c) “Prepared draft copy of EIS”, being a MAYBE Environmental Impact Statement.
+    (c) “Prepared draft copy of EIS”, being an optional Environmental Impact Statement.
 
 <!-- l4: declare:Action that may have a significant adverse effect on the environment -->
 
@@ -76,7 +76,7 @@
 
     (a) “Draft filing date”, being a DATE; and
 
-    (b) “Final filing date”, being a MAYBE DATE.
+    (b) “Final filing date”, being an optional DATE.
 
 <!-- l4: decide:Filing of draft copy of EIS and causing notice of hearing to be published -->
 
@@ -166,11 +166,11 @@
 
 <!-- l4: decide:Determining issuance for final EIS -->
 
-**23.** In relation to a Tentative or recommended decision “The decision” and a MAYBE Final EIS Issuance Extension Cause “Cause for extension”, Determining issuance for final EIS means if not Tentative or recommended decision will contain a final EIS with The decision, then No issuance; otherwise, consider the case distinctions of Cause for extension :  when NOTHING has  then Issued within 45 days of the close of the record. when JUST has cause then Issued extended beyond 45 days of the close of the record.
+**23.** In relation to a Tentative or recommended decision “The decision” and an optional Final EIS Issuance Extension Cause “Cause for extension”, Determining issuance for final EIS means if not Tentative or recommended decision will contain a final EIS with The decision, then No issuance; otherwise, consider the case distinctions of Cause for extension :  when NOTHING has  then Issued within 45 days of the close of the record. when JUST has cause then Issued extended beyond 45 days of the close of the record.
 
 <!-- l4: decide:Determining days till issuance for final EIS -->
 
-**24.** In relation to a Tentative or recommended decision “The decision”, a MAYBE Final EIS Issuance Extension Cause “Cause for extension” and a NUMBER “Days of extension”, Determining days till issuance for final EIS means if Tentative or recommended decision will contain a final EIS with The decision, then Never; otherwise, consider the case distinctions of Cause for extension :  when NOTHING has  then Day with Closing date. when JUST has cause then Day with the sum of Closing date and the sum of 45 and Days of extension.
+**24.** In relation to a Tentative or recommended decision “The decision”, an optional Final EIS Issuance Extension Cause “Cause for extension” and a NUMBER “Days of extension”, Determining days till issuance for final EIS means if Tentative or recommended decision will contain a final EIS with The decision, then Never; otherwise, consider the case distinctions of Cause for extension :  when NOTHING has  then Day with Closing date. when JUST has cause then Day with the sum of Closing date and the sum of 45 and Days of extension.
 
 For the purposes of this provision—
 
