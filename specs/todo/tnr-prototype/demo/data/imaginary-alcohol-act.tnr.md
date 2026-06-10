@@ -2,23 +2,23 @@
 
 <!-- l4: decide:the person must not sell alcohol -->
 
-**1.** The person must not sell alcohol if—
+**1.** No person may sell alcohol who—
 
-    (a) the person is a body corporate;
+    (a) is a body corporate;
 
-    (b) the person engages in business for profit;
+    (b) engages in business for profit;
 
-    (c) the person is not a public house;
+    (c) is not a public house;
 
-    (d) the person is not a hotel; and
+    (d) is not a hotel; and
 
-    (e) any of the following applies—
+    (e) has—
 
-        (i) the person has an unspent conviction for fraud;
+        (i) an unspent conviction for fraud;
 
-        (ii) the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment; or
+        (ii) an unspent conviction for providing misleading information in relation to an application for a licence under an enactment; or
 
-        (iii) the person has an alcohol banning order.
+        (iii) an alcohol banning order.
 
 <!-- l4: decide:the enforcement officer may issue a warning to the proprietor of premises -->
 

@@ -203,6 +203,10 @@ decideDoc d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) _) (MkAppForm _ name 
     e
       | isBooleanStructure e ->
           case toTab mainBody of
+            TGroup Nothing conj items
+              | null givens
+              , Just (lead, items') <- negativeUniversal (resolvedText name) items ->
+                  (lead, Just (TGroup Nothing conj items'))
             TGroup mlead conj items ->
               ( conclusion <> " if" <> maybe "\x2014" (\l -> " " <> l) mlead
               , Just (TGroup Nothing conj items)
@@ -291,6 +295,94 @@ declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
                 [ "a \x201C" <> resolvedText fn <> "\x201D (" <> typeText ft <> ")"
                 | MkTypedName _ fn ft _ <- cfields
                 ]
+
+----------------------------------------------------------------------------
+-- Negative-universal rewriting (deterministic de-stilting)
+----------------------------------------------------------------------------
+
+-- | Classical negative-universal drafting: a conclusion of the form
+-- \"the X must not VP\" whose conditions are all predicated of \"the X\"
+-- rewrites as
+--
+-- > No X may VP who—
+-- >     (a) is a body corporate;
+-- >     ...
+-- >     (e) has—
+-- >         (i) an unspent conviction for fraud; ...
+--
+-- The subject is hoisted out of every condition; nested groups are
+-- verb-factored (longest common word-prefix, trailing function words
+-- trimmed). Purely syntactic and total: if any condition does not carry
+-- the subject prefix, the whole rewrite declines and the provision falls
+-- back to the \"X if—\" form.
+negativeUniversal :: Text -> [Tab] -> Maybe (Text, [Tab])
+negativeUniversal conclusion items = do
+  rest <- Text.stripPrefix "the " conclusion
+  let (subj, m) = Text.breakOn " must not " rest
+  vp <- Text.stripPrefix " must not " m
+  if Text.null subj || Text.null vp
+    then Nothing
+    else do
+      items' <- traverse (elideSubject ("the " <> subj <> " ")) items
+      pure
+        ( "No " <> subj <> " may " <> vp <> " " <> relPron subj <> "\x2014"
+        , items'
+        )
+
+-- | Strip the subject from a condition; for one level of nested grouping,
+-- additionally factor out the common verb phrase as the group lead-in.
+elideSubject :: Text -> Tab -> Maybe Tab
+elideSubject subjPfx = \case
+  TLeaf t -> TLeaf <$> Text.stripPrefix subjPfx t
+  TGroup Nothing c subs -> do
+    stripped <-
+      traverse
+        ( \case
+            TLeaf t -> Text.stripPrefix subjPfx t
+            TGroup{} -> Nothing
+        )
+        subs
+    (verb, subs') <- factorVerb stripped
+    pure (TGroup (Just (verb <> "\x2014")) c (map TLeaf subs'))
+  TGroup (Just _) _ _ -> Nothing -- author-supplied lead-in: leave alone
+
+-- | Longest common word-prefix across clauses, with trailing function
+-- words trimmed back so we never factor mid-noun-phrase
+-- (\"has an unspent…\" / \"has an alcohol…\" factors as \"has\", not \"has an\").
+factorVerb :: [Text] -> Maybe (Text, [Text])
+factorVerb ts =
+  case dropTrailingStop (lcpWords (map Text.words ts)) of
+    [] -> Nothing
+    common -> do
+      let pfxText = Text.unwords common
+      rest <- traverse (Text.stripPrefix (pfxText <> " ")) ts
+      pure (pfxText, rest)
+ where
+  dropTrailingStop = reverse . dropWhile (`elem` stopWords) . reverse
+  stopWords :: [Text]
+  stopWords = ["a", "an", "the", "of", "for", "to", "in", "with", "or", "and", "not", "no"]
+
+lcpWords :: [[Text]] -> [Text]
+lcpWords [] = []
+lcpWords xs = foldr1 lcp2 xs
+ where
+  lcp2 a b = map fst (takeWhile (uncurry (==)) (zip a b))
+
+-- | \"who\" for natural-person subjects, \"that\" otherwise.
+relPron :: Text -> Text
+relPron subj
+  | lastWord `elem` personWords = "who"
+  | otherwise = "that"
+ where
+  lastWord = case reverse (Text.words subj) of
+    (w : _) -> w
+    [] -> subj
+  personWords :: [Text]
+  personWords =
+    [ "person", "individual", "applicant", "officer", "proprietor"
+    , "citizen", "employee", "director", "member", "child", "parent"
+    , "driver", "owner", "occupier", "operator", "licensee"
+    ]
 
 ----------------------------------------------------------------------------
 -- Coode tabulation

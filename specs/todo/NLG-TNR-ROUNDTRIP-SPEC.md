@@ -465,3 +465,15 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
     output on the alcohol act (`imaginary-alcohol-act.tnr.md` alongside)
     matches the original statutory text in the file's comments nearly
     word-for-word. Delete once the Haskell golden exists.
+- **2026-06-10 (later)** — built and verified: `l4 tnr` output is
+  byte-identical to the scaffold; possessive spacing fixed; static
+  two-pane demo at `specs/todo/tnr-prototype/demo/` (L4 left, TNR on
+  statute paper right, anchor toggle). First de-stilting transform
+  landed: **negative-universal rewrite** — "the X must not VP" with all
+  conditions predicated of "the X" renders as "No X may VP who—" with
+  subject elision and verb-factored nested groups ("(e) has— (i) an
+  unspent conviction…"). Purely syntactic, total (declines on mixed
+  subjects: alcohol-act provisions 2–3 unchanged), and minimal-diff
+  (regeneration touched only the rewritten provision). The Python
+  scaffold does NOT implement this transform and is now behind the
+  Haskell.
