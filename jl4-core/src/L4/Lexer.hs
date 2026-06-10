@@ -205,6 +205,9 @@ data TKeywords
   | TKFetch
   | TKPost
   | TKEnv
+  | TKRecord
+  | TKCommit
+  | TKAttest
   | TKConcat
   | TKAs
   | TKLet
@@ -289,6 +292,9 @@ keywords = Map.fromList
   , ("FETCH"      , TKFetch      )
   , ("POST"       , TKPost       )
   , ("ENV"        , TKEnv        )
+  , ("RECORD"     , TKRecord     )
+  , ("COMMIT"     , TKCommit     )
+  , ("ATTEST"     , TKAttest     )
   , ("CONCAT"     , TKConcat     )
   , ("AS"         , TKAs         )
   , ("LET"        , TKLet        )

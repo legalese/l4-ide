@@ -1437,6 +1437,7 @@ baseExpr' =
   <|> fetchExpr
   <|> envExpr
   <|> postExpr
+  <|> recordOrCommitExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -1689,6 +1690,36 @@ postExpr = do
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
+
+-- | @RECORD <cell> IS <expr>@ (own ledger) and
+-- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1.
+-- Both lower to the same 'Record' node; the keyword choice sets the
+-- @isOfficial@ flag ('False' for @RECORD@, 'True' for @COMMIT@/@ATTEST@).
+recordOrCommitExpr :: Parser (Expr Name)
+recordOrCommitExpr = do
+  current <- Lexer.indentLevel
+  attachAnno $
+    (\isOfficial cell val -> Record emptyAnno cell val isOfficial)
+      <$> ( (False <$ annoLexeme (spacedKeyword_ TKRecord))
+        <|> (True  <$ annoLexeme (spacedKeyword_ TKCommit))
+        <|> (True  <$ annoLexeme (spacedKeyword_ TKAttest))
+          )
+      <*> annoHole cellExpr
+      <*  annoLexeme (spacedKeyword_ TKIs)
+      <*> annoHole (indentedExpr current)
+
+-- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
+-- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a
+-- plain string literal, lowering BOTH to a 'StringLit'. This keeps the cell
+-- out of name resolution: it is data (a key), not a variable reference.
+cellExpr :: Parser (Expr Name)
+cellExpr =
+  attachAnno (Lit emptyAnno <$> annoHole cellLit)
+
+cellLit :: Parser Lit
+cellLit =
+      attachAnno (StringLit emptyAnno <$> annoEpa (spacedToken (#_TIdentifiers % #_TQuoted) "quoted cell name"))
+  <|> stringLit
 
 negation :: Parser (Expr Name)
 negation = do

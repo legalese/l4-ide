@@ -57,6 +57,7 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
+import L4.Evaluate.Ledger (LedgerEvent (..), Provenance (..))
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
@@ -80,6 +81,11 @@ data Frame =
   | Post1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | Post2 WHNF {- -} (Expr Resolved) Environment
   | Post3 WHNF WHNF {- -}
+  -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST. Record1 waits for the cell to
+  -- evaluate (holds the still-unevaluated value expr, its env, and isOfficial);
+  -- Record2 waits for the value (holds the evaluated cell WHNF and isOfficial).
+  | Record1 {- -} (Expr Resolved) Environment Bool
+  | Record2 WHNF {- -} Bool
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -173,6 +179,7 @@ data Machine a where
   GetModuleUri :: Machine NormalizedUri
   GetTracePolicy :: Machine TracePolicy
   GetSafeMode :: Machine Bool  -- ^ Returns True when HTTP operations should be disabled
+  TellEvent :: LedgerEvent -> Machine ()  -- ^ append an event to the ledger (STATE-AS-LEDGER)
   PokeThunk :: Reference
     -> (ThreadId -> Thunk -> (Thunk, a))
     -> Machine a
@@ -383,6 +390,11 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     PushFrame (Post1 e2 e3 env)
     ForwardExpr env e1
+  Record _ann cell val isOfficial -> do
+    -- STATE-AS-LEDGER M1: evaluate the cell to a String path, then the value to
+    -- WHNF, append an Assign event to the ledger, and return the written value.
+    PushFrame (Record1 val env isOfficial)
+    ForwardExpr env cell
   Concat _ann [] ->
     Backward (ValString "")
   Concat _ann (e : es) -> do
@@ -420,6 +432,14 @@ backward val = WithPoppedFrame $ \ case
     ForwardExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
+  Just (Record1 valExpr env isOfficial) -> do
+    -- the cell has evaluated to 'val'; now evaluate the value expression
+    PushFrame (Record2 val isOfficial)
+    ForwardExpr env valExpr
+  Just (Record2 cellVal isOfficial) -> do
+    -- both the cell ('cellVal') and the value ('val') are evaluated: append the
+    -- Assign event to the ledger and return the written value (D2 / Rung 3).
+    runRecord cellVal val isOfficial
   Just (BinBuiltin1 binOp r) -> do
     PushFrame (BinBuiltin2 binOp val)
     EvalRef r
@@ -1454,6 +1474,27 @@ jsonListToWHNF (x:xs) = do
   tailVal <- jsonListToWHNF xs
   tailRef <- AllocateValue tailVal
   pure $ ValCons headRef tailRef
+
+-- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (typed nested schemas are deferred).
+-- We append an 'Assign' event to the ledger (D2 / Rung 3 — an APPEND, not a
+-- store) and return the written value so it can chain in a HENCE continuation.
+--
+-- For M1 both own ('RECORD') and official ('COMMIT'/'ATTEST') writes go to the
+-- single 'envLedger'; the @isOfficial@ flag is recorded faithfully in the
+-- provenance source ("RECORD" vs "COMMIT") so M4 can split the ledgers later.
+runRecord :: WHNF -> WHNF -> Bool -> Machine Config
+runRecord cellVal val isOfficial = do
+  cell <- expectString cellVal
+  let prov = MkProvenance
+        { party    = ""
+        , source   = if isOfficial then "COMMIT" else "RECORD"
+        , position = Nothing
+        }
+  TellEvent (Assign [cell] val prov)
+  Backward val
 
 -- | Convert list of Text values to L4 list (ValCons/ValNil)
 textListToWHNF :: [Text] -> Machine WHNF

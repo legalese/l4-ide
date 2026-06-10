@@ -23,6 +23,7 @@ module L4.EvaluateLazy
 , tellEvent
 , currentLedger
 , runEvalAction
+, evalExprForLedger
 )
 where
 
@@ -245,6 +246,8 @@ interpMachine = \ case
     asks (.tracePolicy)
   GetSafeMode ->
     asks (.safeMode)
+  TellEvent ev ->
+    tellEvent ev
   Bind act k -> interpMachine act >>= interpMachine . k
   LiftIO m -> liftIO m >>= interpMachine . pure
   PushFrame f -> do
@@ -602,6 +605,15 @@ runEvalAction evalConfig (MkEval f) = do
     , tracePolicy = evalConfig.tracePolicy
     , safeMode = evalConfig.safeMode
     }
+
+-- | Forward-evaluate a single 'Expr Resolved' to 'WHNF' in the empty
+-- environment, as an 'Eval' action. This is the test seam that lets the
+-- ledger-write path (M1 @RECORD@/@COMMIT@/@ATTEST@) be exercised end-to-end:
+-- run this, then observe the ledger with 'currentLedger' in the same action.
+--
+-- Not part of the stable public API; exposed for the test suite only.
+evalExprForLedger :: Expr Resolved -> Eval WHNF
+evalExprForLedger expr = runConfig (ForwardMachine emptyEnvironment expr)
 
 {- | Evaluate an expression in the context of a module and initial environment.
 

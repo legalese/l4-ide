@@ -233,6 +233,10 @@ instance ToSemTokens Context PosToken Int where
 instance ToSemTokens Context PosToken Text where
   toSemTokens _ = pure []
 
+-- Bool has no tokens to highlight (the RECORD/COMMIT isOfficial flag on Expr)
+instance ToSemTokens Context PosToken Bool where
+  toSemTokens _ = pure []
+
 instance ToSemTokens Context PosToken Name where
   toSemTokens (MkName ann _) =
     traverseCsnWithHoles ann []
@@ -337,6 +341,10 @@ instance ToSemTokens () PosToken Int where
 
 -- Text has no tokens to highlight (used in Inert expressions)
 instance ToSemTokens () PosToken Text where
+  toSemTokens _ = pure []
+
+-- Bool has no tokens to highlight (the RECORD/COMMIT isOfficial flag on Expr)
+instance ToSemTokens () PosToken Bool where
   toSemTokens _ = pure []
 
 instance ToSemTokens () PosToken Name where

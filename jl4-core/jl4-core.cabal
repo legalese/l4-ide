@@ -166,6 +166,7 @@ test-suite jl4-core-test
     NumberLiteralSpec
     DirectiveRenameSpec
     LedgerSubstrateSpec
+    RecordLedgerSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

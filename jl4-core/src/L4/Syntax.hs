@@ -237,6 +237,12 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
+  | Record     Anno (Expr n) (Expr n) Bool
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). Cell expr, value expr, and
+    -- an isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger),
+    -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). For M1 both go to
+    -- the single 'envLedger' (the own/official split is M4); the flag is stored
+    -- faithfully so M4 can split later.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
@@ -736,6 +742,11 @@ instance ToConcreteNodes PosToken Text where
 
 -- InertContext has no concrete syntax nodes (derived during desugaring)
 instance ToConcreteNodes PosToken InertContext where
+  toNodes _ = pure []
+
+-- Bool has no concrete syntax nodes (used in Record for the isOfficial flag;
+-- the RECORD/COMMIT/ATTEST keyword is already captured in the surrounding Anno)
+instance ToConcreteNodes PosToken Bool where
   toNodes _ = pure []
 
 instance ToConcreteNodes PosToken Name where

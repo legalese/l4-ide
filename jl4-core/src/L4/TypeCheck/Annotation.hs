@@ -189,6 +189,10 @@ nlgExpr = \ case
       e2' <- nlgExpr e2
       e3' <- nlgExpr e3
       pure $ Post ann e1' e2' e3'
+    Record ann cell val isOfficial -> do
+      cell' <- nlgExpr cell
+      val' <- nlgExpr val
+      pure $ Record ann cell' val' isOfficial
     Concat ann es -> do
       es' <- traverse nlgExpr es
       pure $ Concat ann es'

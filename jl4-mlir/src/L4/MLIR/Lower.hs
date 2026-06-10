@@ -1844,6 +1844,7 @@ lowerExprCases expr expectedTy = case expr of
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
   Env{}        -> markUnsupported "ENV not supported by the WASM backend"
+  Record{}     -> markUnsupported "RECORD/COMMIT (ledger write) not supported by the WASM backend"
 
   -- Exponent
   Exponent _ base exp_ -> do
@@ -2580,6 +2581,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Fetch _ a -> go bound a
       Env _ a -> go bound a
       Post _ a b c -> Set.unions [go bound a, go bound b, go bound c]
+      Record _ cell val _ -> Set.unions [go bound cell, go bound val]
       Breach _ ma mb -> Set.unions (maybe Set.empty (go bound) ma : [maybe Set.empty (go bound) mb])
 
     stepLocal (bnd, frees) (LocalDecide _ (MkDecide _ _ af bdy)) =

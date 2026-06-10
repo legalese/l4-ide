@@ -428,6 +428,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "ENV" <+> printWithLayout e
     Post _ e1 e2 e3 ->
       "POST" <+> printWithLayout e1 <+> printWithLayout e2 <+> printWithLayout e3
+    Record _ cell val isOfficial ->
+      (if isOfficial then "COMMIT" else "RECORD")
+        <+> printWithLayout cell <+> "IS" <+> printWithLayout val
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AsString _ e ->

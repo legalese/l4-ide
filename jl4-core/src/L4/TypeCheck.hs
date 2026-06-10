@@ -1490,6 +1490,13 @@ inferExpr' g =
       e2' <- checkExpr ExpectPostHeadersContext e2 string
       e3' <- checkExpr ExpectPostBodyContext e3 string
       pure (Post ann e1' e2' e3', string)
+    Record ann cell val isOfficial -> do
+      -- STATE-AS-LEDGER M1: the cell is a string-keyed path; the value may be of
+      -- any type, and the whole RECORD/COMMIT/ATTEST expression has the type of
+      -- the value (so it can sit in a HENCE continuation and chain).
+      cell' <- checkExpr ExpectRecordCellContext cell string
+      (val', valT) <- inferExpr val
+      pure (Record ann cell' val' isOfficial, valT)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -2935,6 +2942,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Fetch ann e -> Fetch ann (go False ctx e)
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
+      Record ann cell val off -> Record ann (go False ctx cell) (go False ctx val) off
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
@@ -3434,6 +3442,8 @@ prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
+prettyTypeMismatch ExpectRecordCellContext expected given =
+  standardTypeMismatch [ "The cell of a RECORD/COMMIT/ATTEST is expected to be of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
