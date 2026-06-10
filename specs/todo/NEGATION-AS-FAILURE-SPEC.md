@@ -1,7 +1,8 @@
 # Specification: Negation as Failure via `MAYBE BOOLEAN`
 
-**Status:** 📝 PROPOSED (draft, 2026-06-09)
+**Status:** ✅ IMPLEMENTED (prelude combinators, 2026-06-10) · Kleene lift remains an experiment
 **Scope:** Prelude combinators + documentation. No compiler/lexer/parser changes required.
+**Implementation:** `holds` / `naf` / `presumed` added to `jl4-core/libraries/prelude.l4`; worked, runnable demo (including the Kleene lift) at `jl4/experiments/negation-as-failure.l4`.
 **Related:** `TYPICALLY-DEFAULTS-SPEC.md` (rebuttable presumptions), `BOUNDED-DEONTICS-SPEC.md` (deontic modalities), `doc/reference/libraries/prelude.md`
 
 ## Executive Summary
@@ -255,19 +256,21 @@ p `kand` q MEANS
 #ASSERT holds (NOTHING `kand` (JUST TRUE)) EQUALS FALSE
 ```
 
-## Proposed prelude additions
+## Prelude additions (implemented)
 
-Minimal, additive, no breaking changes. Candidate home: `jl4-core/libraries/prelude.l4`
-(alongside the existing `fromMaybe` / `isJust` Maybe-eliminators).
+Minimal, additive, no breaking changes. Added to `jl4-core/libraries/prelude.l4`
+immediately after the existing `fromMaybe` / `isJust` Maybe-eliminators:
 
-1. `holds : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe FALSE` — closed-world grounding.
-2. `naf   : MAYBE BOOLEAN -> BOOLEAN` ≝ `NOT (holds p)` — negation as failure.
-3. *(optional)* `presumed : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe TRUE` — open-world dual.
-4. *(optional, separate module)* Kleene three-valued `kand` / `kor` / `knot` over
-   `MAYBE BOOLEAN` for users who want NAF to propagate through connectives.
+1. `holds : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe FALSE` — closed-world grounding. ✅
+2. `naf   : MAYBE BOOLEAN -> BOOLEAN` ≝ `NOT (holds p)` — negation as failure. ✅
+3. `presumed : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe TRUE` — open-world dual. ✅
+4. *(experiment, not core)* Kleene three-valued `kand` / `kor` / `knot` over
+   `MAYBE BOOLEAN` for users who want NAF to propagate through connectives — demonstrated
+   in `jl4/experiments/negation-as-failure.l4`. Deliberately kept out of the core prelude
+   (it introduces a second algebra; see Open question 2).
 
-`DefBool` itself need not be added as a named type — `MAYBE BOOLEAN` is already legible —
-but a documented alias may aid teaching.
+`DefBool` itself was **not** added as a named prelude type — `MAYBE BOOLEAN` is already
+legible — but the experiment file declares it locally as a teaching alias.
 
 ## Open questions / design decisions
 

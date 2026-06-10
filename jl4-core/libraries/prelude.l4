@@ -506,6 +506,31 @@ catMaybes list MEANS
     WHEN NOTHING THEN catMaybes xs
     WHEN JUST y  THEN y FOLLOWED BY catMaybes xs
 
+-- Negation as failure, the functional way.
+-- A MAYBE BOOLEAN is a proposition that may or may not have been settled:
+--   JUST TRUE   proven true
+--   JUST FALSE  proven false
+--   NOTHING     no proof either way (the open question / the default)
+-- `holds` grounds it under the closed-world assumption: absence of proof is FALSE.
+-- This is exactly `fromMaybe FALSE`; the legal reading earns it a name of its own.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+holds p MEANS fromMaybe FALSE p
+
+-- Negation as failure: succeeds exactly when p cannot be proven true.
+-- Both the refuted case (JUST FALSE) and the unknown case (NOTHING) make `naf`
+-- succeed, mirroring Prolog's `\+` under SLDNF resolution.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+naf p MEANS NOT (holds p)
+
+-- The open-world dual of `holds`: an undecided proposition defaults to TRUE
+-- ("not forbidden => permitted"). Flipping the default FALSE <-> TRUE is exactly
+-- the closed-world / open-world switch.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+presumed p MEANS fromMaybe TRUE p
+
 DECLARE PAIR OF a, b
   HAS fst IS AN a
       snd IS A  b
