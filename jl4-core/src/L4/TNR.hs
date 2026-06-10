@@ -616,6 +616,9 @@ typeText :: Type' Resolved -> Text
 typeText = \case
   Type _ -> "a type"
   TyApp _ r [] -> withArticle (resolvedText r)
+  TyApp _ r [arg]
+    | resolvedText r == "MAYBE" -> "an optional " <> typeTextBare arg
+    | resolvedText r == "LIST" -> "a list of " <> typeTextBare arg
   TyApp _ r args -> withArticle (Text.unwords (resolvedText r : map typeTextBare args))
   Fun _ _ res -> "a function yielding " <> typeText res
   Forall _ _ ty -> typeText ty

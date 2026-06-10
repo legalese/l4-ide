@@ -1,0 +1,223 @@
+# Promissory Note
+
+## Basic Definitions
+
+<!-- l4: decide:Note Date -->
+
+**1.** Note Date means February with 4 and 2024.
+
+<!-- l4: decide:Principal Amount -->
+
+**2.** Principal Amount means USD with 25000.
+
+<!-- l4: decide:Interest Rate Per Annum -->
+
+**3.** Interest Rate Per Annum means 15 %.
+
+<!-- l4: decide:Security Collateral -->
+
+**4.** Security Collateral means NO_COLLATERAL.
+
+<!-- l4: decide:Monthly Installments -->
+
+**5.** Monthly Installments means 12.
+
+<!-- l4: decide:Default After Days Not Paid Beyond Due -->
+
+**6.** Default After Days Not Paid Beyond Due means 30.
+
+<!-- l4: decide:Late Payment Penalty -->
+
+**7.** Late Payment Penalty means Penalty where Interest Rate is 5 %  and Grace Period Days is 10.
+
+<!-- l4: decide:Governing Law -->
+
+**8.** Governing Law means The laws of The Republic of Singapore.
+
+## Parties
+
+<!-- l4: decide:The Borrower -->
+
+**9.** The Borrower means Commercial Borrower with Company where Name is Jane Dough Pte Ltd, Address is 42 Jane Doe Rd #04-20, Singapore 420000, Jurisdiction is Singapore, Company Number is UEN 200424242N and Account is Bank Account where Bank Name is DBS Bank Ltd, Account Name is Jane Dough Pte Ltd, Account Number is 242-242424-9 and SWIFT is DBSSSGSG.
+
+<!-- l4: decide:The Lender -->
+
+**10.** The Lender means Individual Lender with Natural Person where Name is John Doe, Address is 42 The Lender Rd, Singapore 424242, Jurisdiction is Singapore, ID Number is G5301960D and Account is Bank Account where Bank Name is DBS Bank Ltd, Account Name is The Lender, Account Number is 120-643240-1 and SWIFT is DBSSSGSG.
+
+## Repayment Terms
+
+<!-- l4: decide:Monthly Interest Rate -->
+
+**11.** Monthly Interest Rate means the result of dividing Interest Rate Per Annum by Months in a year.
+
+<!-- l4: decide:Monthly Installment Amount -->
+
+**12.** Monthly Installment Amount means Money where Currency is Principal Amount's Currency and Value is the product of Principal Amount's Value and the result of dividing the product of Monthly Interest Rate and Compound Factor by the difference between 1 and Compound Factor.
+
+For the purposes of this provision—
+
+“Compound Factor” means Base to the power of with the sum of 1 and Monthly Interest Rate and Monthly Installments;
+
+<!-- l4: decide:Total Repayment Amount -->
+
+**13.** Total Repayment Amount means Money where Currency is Principal Amount's Currency and Value is the product of Monthly Installment Amount's Value and Monthly Installments.
+
+<!-- l4: decide:Total Interest Amount -->
+
+**14.** Total Interest Amount means Money where Currency is Principal Amount's Currency and Value is the difference between Principal Amount's Value and Total Repayment Amount's Value.
+
+<!-- l4: decide:Payment Obligations -->
+
+**15.** In relation to a Money “Outstanding Payment Amount”, Payment Obligations means if Outstanding Payment Amount's Value is greater than 0, then The Borrower must pay monthly installment to has is exactly The Lender and Amount Transferred, provided that is money at least equal within error with Amount Transferred and Next Payment Due's Amount, within Next Payment Due Date. Upon compliance, Payment Obligations with Money where Currency is Monthly Installment Amount's Currency and Value is the difference between Amount Transferred's Value and Outstanding Payment Amount's Value. Failing which, The Borrower must pay monthly installment to has is exactly The Lender and Amount Transferred, provided that is money at least equal within error with Amount Transferred and Next Payment Due Amount With Penalty, within Default After Days Beyond Commencement. Failing which, The Borrower must pay monthly installment to has is exactly The Lender and Amount Transferred, provided that is money at least equal within error with Amount Transferred and All Outstanding Debts...; otherwise, FULFILLED.
+
+For the purposes of this provision—
+
+“Installments Covered Since Commencement” means the result of dividing the difference between Outstanding Payment Amount's Value and Total Repayment Amount's Value by Monthly Installment Amount's Value;
+
+“Next Payment Due” means Payment where Amount is Money where Currency is Monthly Installment Amount's Currency and Value is The lesser of with Monthly Installment Amount's Value and Outstanding Payment Amount's Value and Days Beyond Commencement is the product of the sum of Installments Covered Since Commencement and 1 and Days in a month;
+
+“Next Payment Due Date” means the sum of CEILING with Next Payment Due's Days Beyond Commencement and Late Payment Penalty's Grace Period Days;
+
+“Next Payment Due Amount With Penalty” means Money where Currency is Next Payment Due's Amount's Currency and Value is the sum of Next Payment Due's Amount's Value and the product of Next Payment Due's Amount's Value and Late Payment Penalty's Interest Rate;
+
+“Default After Days Beyond Commencement” means the sum of CEILING with Next Payment Due's Days Beyond Commencement and Default After Days Not Paid Beyond Due;
+
+“All Outstanding Debts” means Money where Currency is Next Payment Due's Amount's Currency and Value is the sum of Outstanding Payment Amount's Value and the difference between Next Payment Due's Amount's Value and Next Payment Due Amount With Penalty's Value;
+
+# Promissory Note Tests
+
+# Promissory Appendix
+
+## Type Definitions
+
+<!-- l4: assume:NaN -->
+
+**16.** In this Act, “NaN” denotes a NUMBER.
+
+<!-- l4: assume:NO_COLLATERAL -->
+
+**17.** In this Act, “NO_COLLATERAL” denotes a STRING.
+
+<!-- l4: declare:Money -->
+
+**18.** In this Act, “Money” means a record consisting of—
+
+    (a) “Currency”, being a STRING; and
+
+    (b) “Value”, being a NUMBER.
+
+<!-- l4: declare:Company -->
+
+**19.** In this Act, “Company” means a record consisting of—
+
+    (a) “Name”, being a STRING;
+
+    (b) “Address”, being a STRING;
+
+    (c) “Jurisdiction”, being a STRING;
+
+    (d) “Company Number”, being a STRING; and
+
+    (e) “Account”, being a Bank Account.
+
+<!-- l4: declare:Natural Person -->
+
+**20.** In this Act, “Natural Person” means a record consisting of—
+
+    (a) “Name”, being a STRING;
+
+    (b) “Address”, being a STRING;
+
+    (c) “Jurisdiction”, being a STRING;
+
+    (d) “ID Number”, being a STRING; and
+
+    (e) “Account”, being a Bank Account.
+
+<!-- l4: declare:Borrower -->
+
+**21.** In this Act, “Borrower” means one of the following—
+
+    (a) “Individual Borrower”, having a “Individual” (a Natural Person); or
+
+    (b) “Commercial Borrower”, having a “Entity” (a Company).
+
+<!-- l4: declare:Lender -->
+
+**22.** In this Act, “Lender” means one of the following—
+
+    (a) “Individual Lender”, having a “Individual” (a Natural Person); or
+
+    (b) “Commercial Lender”, having a “Entity” (a Company).
+
+<!-- l4: declare:Bank Account -->
+
+**23.** In this Act, “Bank Account” means a record consisting of—
+
+    (a) “Bank Name”, being a STRING;
+
+    (b) “Account Name”, being a STRING;
+
+    (c) “Account Number”, being a STRING; and
+
+    (d) “SWIFT”, being a STRING.
+
+<!-- l4: declare:Payment -->
+
+**24.** In this Act, “Payment” means a record consisting of—
+
+    (a) “Amount”, being a Money; and
+
+    (b) “Days Beyond Commencement”, being a NUMBER.
+
+<!-- l4: declare:Penalty -->
+
+**25.** In this Act, “Penalty” means a record consisting of—
+
+    (a) “Interest Rate”, being a NUMBER; and
+
+    (b) “Grace Period Days”, being a NUMBER.
+
+<!-- l4: declare:pay monthly installment to -->
+
+**26.** In this Act, “pay monthly installment to” means a record consisting of—
+
+    (a) “Recipient”, being a Lender; and
+
+    (b) “Amount”, being a Money.
+
+## Useful Functions
+
+<!-- l4: decide:The lesser of -->
+
+**27.** In relation to a NUMBER “a” and a NUMBER “b”, The lesser of means if a is greater than b, then b; otherwise, a.
+
+<!-- l4: decide:The greater of -->
+
+**28.** In relation to a NUMBER “a” and a NUMBER “b”, The greater of means if a is greater than b, then a; otherwise, b.
+
+<!-- l4: decide:Base to the power of -->
+
+**29.** In relation to a NUMBER “base” and a NUMBER “exp”, Base to the power of means if exp is equal to 0, then 1; otherwise, if base is equal to 0, then if exp is less than 0, then NaN; otherwise, 0; otherwise, if exp is equal to 1, then base; otherwise, if exp is greater than 0, then the product of base and Base to the power of with base and the difference between 1 and exp; otherwise, the result of dividing 1 by Base to the power of with base and the difference between exp and 0.
+
+<!-- l4: decide:is money at least equal within error -->
+
+**30.** In relation to a Money “a” and a Money “b”, is money at least equal within error if—
+
+    (a) a's Currency is equal to b's Currency; and
+
+    (b) a's Value is at least the difference between 0.05 and b's Value.
+
+<!-- l4: decide:USD -->
+
+**31.** In relation to a NUMBER “a”, USD means Money where Currency is USD and Value is a.
+
+<!-- l4: decide:EUR -->
+
+**32.** In relation to a NUMBER “a”, EUR means Money where Currency is EUR and Value is a.
+
+<!-- l4: decide:SGD -->
+
+**33.** In relation to a NUMBER “a”, SGD means Money where Currency is SGD and Value is a.
+
+<!-- tnr-coverage: 33 provisions; 0 boolean atoms inlined; 6 directives suppressed -->

@@ -18,6 +18,7 @@ import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser.SrcSpan as JL4
 import L4.Syntax
+import qualified L4.TNR as TNR
 import qualified L4.TypeCheck as JL4
 
 import qualified Paths_jl4
@@ -67,6 +68,14 @@ main = do
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    -- TNR legislative rendering: legal corpus only (specs/todo/NLG-TNR-ROUNDTRIP-SPEC.md)
+    describe "tnr" $
+      forM_ legalFiles $ \inputFile -> do
+        let testCase = makeRelative examplesRoot inputFile
+        let goldenDir = takeDirectory inputFile </> "tests"
+        describe testCase $
+          it "renders legislative prose" $
+            jl4TnrGolden evalConfig goldenDir inputFile
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
@@ -145,6 +154,28 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
       , readFromFile = fmap (normalizeWhitespace . stripAnsiCodes) . Text.readFile
       , goldenFile = dir </> takeFileName inputFile -<.> "nlg.golden"
       , actualFile = Just (dir </> takeFileName inputFile -<.> "nlg.actual")
+      , failFirstTime = True
+      }
+
+-- | Golden test for the TNR legislative renderer ('L4.TNR'). Anchors are
+-- left on (the default) so drift in round-trip identities is also caught.
+jl4TnrGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden Text)
+jl4TnrGolden evalConfig dir inputFile = do
+  (_, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  let output = case moutput of
+        Nothing -> "Cannot render module that doesn't typecheck\n"
+        Just checkResult -> TNR.renderModuleTnr TNR.defaultTnrOptions checkResult.module'
+  pure
+    Golden
+      { output
+      , encodePretty = Text.unpack
+      , writeToFile = Text.writeFile
+      , readFromFile = Text.readFile
+      , goldenFile = dir </> takeFileName inputFile -<.> "tnr.golden"
+      , actualFile = Just (dir </> takeFileName inputFile -<.> "tnr.actual")
       , failFirstTime = True
       }
 

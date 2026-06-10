@@ -1,0 +1,115 @@
+# Types
+
+<!-- l4: declare:Person -->
+
+**1.** In this Act, “Person” means a record consisting of—
+
+    (a) “name”, being a STRING; and
+
+    (b) “age”, being a NUMBER.
+
+<!-- l4: declare:Color -->
+
+**2.** In this Act, “Color” means one of the following—
+
+    (a) “Red”;
+
+    (b) “Green”; or
+
+    (c) “Blue”.
+
+<!-- l4: declare:DataPoint -->
+
+**3.** In this Act, “DataPoint” means a record consisting of—
+
+    (a) “label”, being a STRING; and
+
+    (b) “value”, being a NUMBER.
+
+<!-- l4: declare:TimelineEvent -->
+
+**4.** In this Act, “TimelineEvent” means a record consisting of—
+
+    (a) “year”, being a STRING; and
+
+    (b) “event”, being a STRING.
+
+# Test Data
+
+<!-- l4: decide:alice -->
+
+**5.** Alice means Person where name is Alice and age is 30.
+
+<!-- l4: decide:bob -->
+
+**6.** Bob means Person where name is Bob and age is 17.
+
+# Functions
+
+<!-- l4: decide:is adult -->
+
+**7.** In relation to a Person “p”, is adult means p's age is at least 18.
+
+<!-- l4: decide:age category of -->
+
+**8.** In relation to a Person “p”, age category of means if p's age is at least 65, then Senior; otherwise, if p's age is at least 18, then Adult; otherwise, Minor.
+
+# #EVAL – Strings
+
+# #EVAL – Numbers
+
+# #EVAL – Booleans
+
+# #EVAL – Lists
+
+# #EVAL – Records
+
+# #EVAL – Enums
+
+# #EVAL – Function Results
+
+# #EVAL – Pairs
+
+# #EVAL – List of Pairs (chart data)
+
+<!-- l4: decide:q1 revenue -->
+
+**9.** Q1 revenue means DataPoint where label is Q1 2025 and value is 120.
+
+<!-- l4: decide:q2 revenue -->
+
+**10.** Q2 revenue means DataPoint where label is Q2 2025 and value is 250.
+
+<!-- l4: decide:q3 revenue -->
+
+**11.** Q3 revenue means DataPoint where label is Q3 2025 and value is 180.
+
+<!-- l4: decide:q4 revenue -->
+
+**12.** Q4 revenue means DataPoint where label is Q4 2025 and value is 320.
+
+<!-- l4: decide:event 1 -->
+
+**13.** Event 1 means TimelineEvent where year is 2020 and event is Company founded.
+
+<!-- l4: decide:event 2 -->
+
+**14.** Event 2 means TimelineEvent where year is 2021 and event is Series A funding.
+
+<!-- l4: decide:event 3 -->
+
+**15.** Event 3 means TimelineEvent where year is 2022 and event is Product launch.
+
+<!-- l4: decide:event 4 -->
+
+**16.** Event 4 means TimelineEvent where year is 2023 and event is IPO.
+
+<!-- l4: decide:event 5 -->
+
+**17.** Event 5 means TimelineEvent where year is 2024 and event is Global expansion.
+
+# #ASSERT – Pass / Fail
+
+# #EVALTRACE – Evaluation with Trace
+
+<!-- tnr-coverage: 17 provisions; 0 boolean atoms inlined; 33 directives suppressed -->

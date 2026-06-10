@@ -1,0 +1,85 @@
+# Anti Social
+
+<!-- l4: assume:Person -->
+
+**1.** In this Act, “Person” denotes a type.
+
+<!-- l4: assume:is authorised -->
+
+**2.** In this Act, “is authorised” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:Receiver -->
+
+**3.** In this Act, “Receiver” denotes a type.
+
+<!-- l4: assume:is an individual aged 16 or over -->
+
+**4.** In this Act, “is an individual aged 16 or over” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:is a body -->
+
+**5.** In this Act, “is a body” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:Effect -->
+
+**6.** In this Act, “Effect” denotes a type.
+
+<!-- l4: assume:EffectTarget -->
+
+**7.** In this Act, “EffectTarget” denotes a type.
+
+<!-- l4: assume:is detrimental -->
+
+**8.** In this Act, “is detrimental” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:is of a persistent or continuing nature -->
+
+**9.** In this Act, “is of a persistent or continuing nature” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:affects the quality of life of those in the locality -->
+
+**10.** In this Act, “affects the quality of life of those in the locality” denotes a function yielding a BOOLEAN.
+
+<!-- l4: assume:Conduct -->
+
+**11.** In this Act, “Conduct” denotes a type.
+
+<!-- l4: assume:conduct -->
+
+**12.** In this Act, “conduct” denotes a function yielding a Conduct.
+
+<!-- l4: assume:effect -->
+
+**13.** In this Act, “effect” denotes a function yielding an Effect.
+
+<!-- l4: assume:is unreasonable -->
+
+**14.** In this Act, “is unreasonable” denotes a function yielding a BOOLEAN.
+
+<!-- l4: decide:may issue a community protection notice -->
+
+**15.** In relation to a Person “person” and a Receiver “receiver”, may issue a community protection notice if—
+
+    (a) is authorised with person;
+
+    (b) any of the following applies—
+
+        (i) is an individual aged 16 or over with receiver; or
+
+        (ii) is a body with receiver;
+
+    (c) is detrimental with the effect;
+
+    (d) is of a persistent or continuing nature with the effect;
+
+    (e) affects the quality of life of those in the locality with the effect; and
+
+    (f) is unreasonable with the conduct.
+
+For the purposes of this provision—
+
+“the conduct” means conduct with receiver;
+
+“the effect” means effect with the conduct;
+
+<!-- tnr-coverage: 15 provisions; 0 boolean atoms inlined; 0 directives suppressed -->
