@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L4 ⇢ TNR — the Times New Roman projection</title>
+<style>
+  :root {
+    --paper: #f5efe1;
+    --paper-deep: #ece3cd;
+    --ink: #211c12;
+    --ink-faint: #6e6450;
+    --oxblood: #7c2214;
+    --pencil: #a09680;
+    --term-bg: #0c120e;
+    --term-bg2: #101a14;
+    --term-text: #becfbe;
+    --kw: #76dd84;
+    --nm: #e6cf78;
+    --cm: #5c715f;
+    --an: #6fc3d8;
+    --st: #d79ab0;
+    --sec: #f0a44b;
+    --seam: #2a2317;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Times New Roman", Times, serif;
+    background: var(--seam);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ───────────────────────── masthead ───────────────────────── */
+  header {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 2px, rgba(124,34,20,.025) 2px 4px),
+      linear-gradient(var(--paper-deep), var(--paper));
+    border-bottom: 1px solid var(--oxblood);
+    box-shadow: 0 1px 0 var(--paper), 0 2px 0 var(--oxblood), 0 6px 18px rgba(0,0,0,.45);
+    padding: .9rem 1.6rem .8rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1.4rem;
+    z-index: 5;
+  }
+  header h1 {
+    font-size: 1.45rem;
+    font-weight: normal;
+    font-variant: small-caps;
+    letter-spacing: .14em;
+    white-space: nowrap;
+  }
+  header h1 .arrow { color: var(--oxblood); font-family: monospace; letter-spacing: 0; }
+  header .motto {
+    font-style: italic;
+    color: var(--ink-faint);
+    font-size: .95rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  header .controls {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    font-size: .85rem;
+    font-variant: small-caps;
+    letter-spacing: .08em;
+  }
+  header select {
+    font-family: inherit;
+    font-size: .95rem;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--pencil);
+    border-radius: 0;
+    padding: .15rem .4rem;
+  }
+  header label.toggle { cursor: pointer; user-select: none; color: var(--ink-faint); }
+  header label.toggle input { accent-color: var(--oxblood); margin-right: .3rem; vertical-align: -1px; }
+
+  /* ───────────────────────── panes ───────────────────────── */
+  main { flex: 1; display: flex; min-height: 0; }
+
+  .pane { flex: 1 1 50%; min-width: 0; overflow-y: auto; }
+
+  /* the seam */
+  .seam {
+    flex: 0 0 26px;
+    background: linear-gradient(90deg, #060906, var(--seam) 40%, #1b1409 60%, #00000055);
+    position: relative;
+  }
+  .seam::after {
+    content: "⇌";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--pencil);
+    font-size: .9rem;
+    background: var(--seam);
+    border: 1px solid #00000066;
+    border-radius: 50%;
+    width: 1.6rem; height: 1.6rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* left: the machine */
+  #l4pane {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 3px, rgba(140,255,170,.012) 3px 4px),
+      radial-gradient(120% 90% at 30% 0%, var(--term-bg2), var(--term-bg));
+    color: var(--term-text);
+    animation: rise .5s ease-out both;
+  }
+  #l4pane .pane-head {
+    position: sticky; top: 0;
+    background: linear-gradient(#0c120ef2, #0c120ee0);
+    backdrop-filter: blur(2px);
+    border-bottom: 1px solid #1f2c22;
+    padding: .55rem 1.4rem;
+    font-family: ui-monospace, "Berkeley Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, monospace;
+    font-size: .72rem;
+    letter-spacing: .12em;
+    color: #5f7a64;
+    text-transform: uppercase;
+  }
+  #l4pane pre {
+    font-family: ui-monospace, "Berkeley Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, monospace;
+    font-size: .82rem;
+    line-height: 1.55;
+    padding: 1.2rem 1.6rem 4rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .kw { color: var(--kw); font-weight: bold; }
+  .nm { color: var(--nm); }
+  .cm { color: var(--cm); font-style: italic; }
+  .an { color: var(--an); }
+  .st { color: var(--st); }
+  .sec { color: var(--sec); font-weight: bold; }
+
+  /* right: the statute book */
+  #tnrpane {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 28px, rgba(124,34,20,.03) 28px 29px),
+      radial-gradient(140% 100% at 70% 0%, #faf5e9, var(--paper) 55%, var(--paper-deep));
+    box-shadow: inset 14px 0 30px -18px rgba(0,0,0,.55);
+    animation: rise .5s .12s ease-out both;
+  }
+  #tnrpane .sheet {
+    max-width: 46rem;
+    margin: 2.2rem auto 5rem;
+    padding: 0 2.6rem 0 3.2rem;
+    border-left: 1px solid rgba(124,34,20,.25); /* docket margin rule */
+    font-size: 1.02rem;
+    line-height: 1.62;
+    text-align: justify;
+    hyphens: auto;
+  }
+  .tnr-h1 {
+    text-align: center;
+    font-variant: small-caps;
+    font-weight: normal;
+    font-size: 1.7rem;
+    letter-spacing: .12em;
+    margin: 1rem 0 .4rem;
+  }
+  .tnr-h1::after {
+    content: "";
+    display: block;
+    width: 9rem;
+    margin: .7rem auto 1.2rem;
+    border-top: 3px double var(--oxblood);
+  }
+  .tnr-h2, .tnr-h3, .tnr-h4, .tnr-h5, .tnr-h6 {
+    font-variant: small-caps;
+    font-weight: normal;
+    letter-spacing: .06em;
+    text-align: center;
+    margin: 1.5rem 0 .6rem;
+  }
+  .tnr-h2 { font-size: 1.3rem; }
+  .tnr-h3 { font-size: 1.15rem; }
+  .tnr-h4 { font-size: 1.05rem; }
+  .tnr-h5, .tnr-h6 { font-size: 1rem; color: var(--ink-faint); }
+  .prov { margin: .85rem 0 0; }
+  .prov strong { font-weight: bold; }
+  .tab1 { margin: .55rem 0 0; padding-left: 4.4em;  text-indent: -2.2em; }
+  .tab2 { margin: .55rem 0 0; padding-left: 6.6em;  text-indent: -2.2em; }
+  .tab3 { margin: .55rem 0 0; padding-left: 8.8em;  text-indent: -2.2em; }
+  .tab4 { margin: .55rem 0 0; padding-left: 11em;   text-indent: -2.2em; }
+  .anchor-chip {
+    display: block;
+    text-align: right;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: .62rem;
+    color: var(--pencil);
+    letter-spacing: .04em;
+    margin: 1.1rem 0 -.6rem;
+    user-select: all;
+  }
+  body:not(.show-anchors) .anchor-chip { display: none; }
+  .colophon {
+    margin-top: 3rem;
+    padding-top: .8rem;
+    border-top: 1px solid var(--pencil);
+    font-style: italic;
+    font-size: .85rem;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+  .colophon::before { content: "— "; }
+  .colophon::after { content: " —"; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  ::selection { background: #7c221422; }
+  #l4pane ::selection { background: #76dd8433; }
+
+  .pane::-webkit-scrollbar { width: 10px; }
+  .pane::-webkit-scrollbar-thumb { background: #00000033; border-radius: 5px; }
+  #l4pane::-webkit-scrollbar-thumb { background: #ffffff18; }
+</style>
+</head>
+<body class="">
+<header>
+  <h1>L4 <span class="arrow">⇢</span> TNR</h1>
+  <div class="motto">the Times New Roman projection — deterministic legislative rendering; English is a view, logic is the model</div>
+  <div class="controls">
+    <label for="instrument">Instrument</label>
+    <select id="instrument">
+      <option value="imaginary-alcohol-act">Imaginary Alcohol Act</option>
+      <option value="british-citizen-act">British Citizen Act</option>
+      <option value="ny-environmental-7.3">NYCRR 16 §7.3 (Environmental Review)</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="anchors"> anchors</label>
+  </div>
+</header>
+
+<main>
+  <section class="pane" id="l4pane" aria-label="L4 source">
+    <div class="pane-head">l4 source · the model</div>
+    <pre id="l4src">loading…</pre>
+  </section>
+  <div class="seam" role="presentation"></div>
+  <section class="pane" id="tnrpane" aria-label="TNR rendering">
+    <div class="sheet" id="tnrdoc">loading…</div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ── L4 syntax highlighting (demo-grade) ─────────────────────────── */
+
+const L4_LEX = new RegExp(
+  [
+    String.raw`(\{-[\s\S]*?-\})`,        // 1 block comment
+    String.raw`(--[^\n]*)`,              // 2 line comment
+    "(`[^`]*`)",                         // 3 backtick name
+    String.raw`("(?:[^"\\]|\\.)*")`,     // 4 string
+    String.raw`(@[a-zA-Z-]+|#[A-Z]+)`,   // 5 annotation / directive
+    String.raw`(§+)`,                    // 6 section mark
+    String.raw`(\b[A-Z][A-Z'’-]{1,}\b|\bA\b)`, // 7 keyword-ish (ALLCAPS)
+  ].join("|"),
+  "g"
+);
+const L4_CLASSES = [null, "cm", "cm", "nm", "st", "an", "sec", "kw"];
+
+const esc = (s) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function highlightL4(src) {
+  let out = "", last = 0;
+  for (const m of src.matchAll(L4_LEX)) {
+    out += esc(src.slice(last, m.index));
+    for (let g = 1; g < m.length; g++) {
+      if (m[g] !== undefined) {
+        out += `<span class="${L4_CLASSES[g]}">${esc(m[g])}</span>`;
+        break;
+      }
+    }
+    last = m.index + m[0].length;
+  }
+  return out + esc(src.slice(last));
+}
+
+/* ── restricted-Markdown renderer for TNR output ─────────────────── */
+/* understands exactly what L4.TNR emits: #-headings, **bold**,
+   4-space-per-level tabulation, <!-- l4: --> anchors, coverage colophon */
+
+function inline(s) {
+  return esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function renderTNR(md) {
+  const blocks = md.split(/\n\n+/);
+  const out = [];
+  for (const raw of blocks) {
+    const block = raw.replace(/\s+$/, "");
+    if (!block) continue;
+
+    let m;
+    if ((m = block.match(/^(#{1,6}) (.*)$/s))) {
+      const lvl = m[1].length;
+      out.push(`<h${lvl} class="tnr-h${lvl}">${inline(m[2])}</h${lvl}>`);
+    } else if ((m = block.match(/^<!-- tnr-coverage: (.*) -->$/))) {
+      out.push(`<p class="colophon">${esc(m[1])}</p>`);
+    } else if ((m = block.match(/^<!-- l4: (.*) -->$/))) {
+      out.push(`<span class="anchor-chip">⟨${esc(m[1])}⟩</span>`);
+    } else {
+      const lead = (block.match(/^ */) || [""])[0].length;
+      const lvl = Math.min(Math.max(Math.round(lead / 4), 0), 4);
+      const cls = lvl === 0 ? "prov" : `tab${lvl}`;
+      out.push(`<p class="${cls}">${inline(block.trim())}</p>`);
+    }
+  }
+  return out.join("\n");
+}
+
+/* ── wiring ──────────────────────────────────────────────────────── */
+
+async function load(name) {
+  const [l4, md] = await Promise.all([
+    fetch(`data/${name}.l4`).then((r) => r.text()),
+    fetch(`data/${name}.tnr.md`).then((r) => r.text()),
+  ]);
+  document.getElementById("l4src").innerHTML = highlightL4(l4);
+  document.getElementById("tnrdoc").innerHTML = renderTNR(md);
+  document.getElementById("l4pane").scrollTop = 0;
+  document.getElementById("tnrpane").scrollTop = 0;
+}
+
+const sel = document.getElementById("instrument");
+sel.addEventListener("change", () => load(sel.value));
+document.getElementById("anchors").addEventListener("change", (e) =>
+  document.body.classList.toggle("show-anchors", e.target.checked)
+);
+load(sel.value);
+</script>
+</body>
+</html>
