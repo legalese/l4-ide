@@ -1501,10 +1501,23 @@ jsonListToWHNF (x:xs) = do
 runRecord :: WHNF -> WHNF -> Bool -> Machine Config
 runRecord cellVal val isOfficial = do
   cell <- expectString cellVal
+  -- M2 provenance enrichment: stamp the write with the directive's evaluation
+  -- time ('GetEvalTime', the same clock the deontic state machine and
+  -- @EVAL AS OF SYSTEM TIME@ already use) and the real write kind in 'source'.
+  --
+  -- 'party' is left empty here. A RECORD fired inside a deontic HENCE/LEST
+  -- continuation IS performed by a matched party, but that party (a 'WHNF'
+  -- bound in the contract-frame scrutiny, ContractFrame.hs) is never threaded
+  -- into 'EvalState' — the followup is evaluated with a plain 'ForwardExpr'
+  -- ('continueWithFollowup'), so 'runRecord' has no reach to it without adding
+  -- a "current acting party" cell to 'EvalState' and a save/restore frame
+  -- around the followup. That is the invasive refactor M2 defers (see
+  -- openIssues); top-level RECORDs (the #EVAL case) genuinely have no party.
+  evalNow <- GetEvalTime
   let prov = MkProvenance
         { party    = ""
         , source   = if isOfficial then "COMMIT" else "RECORD"
-        , position = Nothing
+        , position = Just (formatUTCTimeIso evalNow)
         }
   TellEvent (Assign [cell] val prov)
   Backward val
@@ -3161,6 +3174,13 @@ parseDatetimeText raw =
 formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
+
+-- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
+-- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
+-- only have the evaluation clock and no tz context.
+formatUTCTimeIso :: UTCTime -> Text
+formatUTCTimeIso utc =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text

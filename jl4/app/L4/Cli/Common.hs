@@ -66,6 +66,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , parseFixedNow
   , prettyEvalException
+  , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
   )
@@ -237,10 +238,11 @@ traceTextModeReader = eitherReader \input ->
     other -> Left $ "Invalid trace MODE: " <> Text.unpack other <> " (expected none|full)"
 
 renderEvalOutput :: TraceTextMode -> Int -> EvalDirectiveResult -> Text
-renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace} =
+renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led} =
   Text.intercalate "\n\n" $ catMaybes
     [ Just headerLine
     , Just ("Result:\n" <> indentBlockText (renderEvalValue result))
+    , ledgerSection
     , traceSection
     ]
   where
@@ -248,6 +250,12 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
       let idxText = Text.pack (show idx)
           rangeText = maybe "" (\rng -> " @ " <> prettySrcRange rng) mRange
       in "Evaluation[" <> idxText <> "]" <> rangeText
+    -- STATE-AS-LEDGER M2: surface the ledger this directive produced (the
+    -- RECORD/COMMIT/ATTEST writes). 'prettyLedger' returns empty for a directive
+    -- that wrote nothing, so we drop the section in that case.
+    ledgerSection =
+      let body = prettyLedger led
+      in if Text.null body then Nothing else Just (Text.dropWhile (== '\n') body)
     traceSection = case traceMode of
       TraceTextNone -> Nothing
       TraceTextFull ->

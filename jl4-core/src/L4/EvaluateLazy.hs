@@ -17,6 +17,7 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyLedger
   -- * Ledger substrate (M0). Exposed for the test suite; not part of the
   -- stable public API.
 , Eval
@@ -34,7 +35,7 @@ import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
-import L4.Evaluate.Ledger (Ledger, LedgerEvent, emptyLedger)
+import L4.Evaluate.Ledger (Ledger, LedgerEvent (..), Path, Provenance (..), emptyLedger)
 import L4.Evaluate.ValueLazy
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
@@ -348,6 +349,13 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
+  -- STATE-AS-LEDGER M2: snapshot the per-directive ledger BEFORE
+  -- 'withFreshLedger' restores the caller's (empty) ledger and discards this
+  -- one. This is the directive's own event log — the RECORD/COMMIT 'Assign's it
+  -- produced. D5 (keep-on-breach) falls out for free: 'tellEvent' is an append
+  -- and 'ValBreached' does not roll back, so any pre-breach 'Assign' is already
+  -- in here.
+  directiveLedger <- currentLedger
   let
     finalTrace = postprocessTrace <$> mt
     v' =
@@ -357,7 +365,7 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
             Right (MkNF (ValBool True)) -> True
             _                           -> False
         else Reduction v
-  pure (MkEvalDirectiveResult r v' finalTrace)
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
@@ -379,6 +387,12 @@ data EvalDirectiveResult =
     { range  :: Maybe SrcRange -- ^ of the (L)EVAL / DEONTIC directive
     , result :: EvalDirectiveValue
     , trace  :: Maybe EvalTrace
+    , ledger :: !Ledger
+      -- ^ STATE-AS-LEDGER M2: the event log this directive produced (the
+      -- RECORD/COMMIT/ATTEST 'Assign's), captured before 'withFreshLedger'
+      -- discarded the per-directive ledger. Newest-last. Empty for a directive
+      -- that wrote nothing (pure reads / ordinary expressions) — rendered as
+      -- nothing in that case so reads do not clutter the output.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -395,12 +409,53 @@ prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
 prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
 
+-- | STATE-AS-LEDGER M2: render the ledger a directive produced, as a labelled
+-- section. Returns the empty 'Text' when the directive wrote nothing, so that
+-- pure reads / ordinary expressions are not cluttered with an empty section.
+--
+-- One row per 'Assign', oldest-first (the ledger is newest-last as a 'DList',
+-- and 'toList' yields oldest-first — the order the writes happened):
+--
+-- > Ledger:
+-- >   RECORD `freezing point of water` IS 273.15   [source=RECORD, at=2026-06-12T08:30:00Z]
+prettyLedger :: Ledger -> Text
+prettyLedger led =
+  case DList.toList led of
+    []     -> Text.empty
+    events -> "\nLedger:\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
+
+prettyLedgerEvent :: LedgerEvent -> Text
+prettyLedgerEvent (Assign path val prov) =
+  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyLayout val
+    <> "   " <> renderProvenance prov
+  where
+    -- The provenance source distinguishes RECORD (own ledger) from
+    -- COMMIT/ATTEST (official record); echo it as the surface verb.
+    verb = case prov.source of
+      "COMMIT" -> "COMMIT"
+      _        -> "RECORD"
+
+-- | Render a cell 'Path' back to its backtick surface form, e.g.
+-- @`freezing point of water`@. M1/M1.5 cells are single-segment; nested
+-- segments (a later milestone) join with @'s@ to mirror the genitive read.
+renderPath :: Path -> Text
+renderPath segs = Text.intercalate "'s " (map (\s -> "`" <> s <> "`") segs)
+
+renderProvenance :: Provenance -> Text
+renderProvenance prov =
+  "[" <> Text.intercalate ", " (catMaybes [partyField, sourceField, atField]) <> "]"
+  where
+    partyField  = if Text.null prov.party then Nothing else Just ("party=" <> prov.party)
+    sourceField = Just ("source=" <> prov.source)
+    atField     = ("at=" <>) <$> prov.position
+
 -- | Prints the results but not the range of an eval directive, including
--- the trace if present.
+-- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led) =
    prettyEvalDirectiveValue res
+   <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -408,8 +463,9 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace) =
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led) =
    prettyEvalDirectiveValueWithFields fields res
+   <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -419,7 +475,7 @@ prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtr
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace) = Aeson.object
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger) = Aeson.object
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]

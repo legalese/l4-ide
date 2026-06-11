@@ -293,7 +293,7 @@ checkFile evalConfig isOk file = do
 
  where
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
-  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _) =
+  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 
