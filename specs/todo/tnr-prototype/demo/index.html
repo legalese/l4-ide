@@ -81,7 +81,7 @@
     font-variant: small-caps;
     letter-spacing: .08em;
   }
-  header select, header button {
+  header select, header button, header a#aknBtn {
     font-family: inherit;
     font-size: .92rem;
     background: var(--paper);
@@ -90,8 +90,9 @@
     border-radius: 0;
     padding: .18rem .55rem;
     cursor: pointer;
+    text-decoration: none;
   }
-  header button:hover { border-color: var(--oxblood); color: var(--oxblood); }
+  header button:hover, header a#aknBtn:hover { border-color: var(--oxblood); color: var(--oxblood); }
   header button:disabled { opacity: .45; cursor: default; }
   header button.primary { background: var(--oxblood); color: var(--paper); border-color: var(--oxblood); }
   header button.primary:hover { background: #5e190e; color: var(--paper); }
@@ -306,6 +307,7 @@
     <button id="applyBtn" class="primary" style="display:none">Apply → L4</button>
     <button id="cancelBtn" style="display:none">Cancel</button>
     <button id="resetBtn" title="Discard working copy; restore the original L4">Reset</button>
+    <a id="aknBtn" href="#" target="_blank" title="Export as Akoma Ntoso (LegalDocML) XML">AKN ⤓</a>
   </div>
 </header>
 
@@ -477,6 +479,8 @@ async function api(path, opts) {
 async function load(name) {
   setEditing(false);
   notice.className = "";
+  document.getElementById("aknBtn").href =
+    `/api/akn?name=${encodeURIComponent(name)}`;
   setStatus("busy", `loading ${name}…`);
   try {
     show(await api(`/api/load?name=${encodeURIComponent(name)}`));
