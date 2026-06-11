@@ -168,6 +168,7 @@ test-suite jl4-core-test
     LedgerSubstrateSpec
     RecordLedgerSpec
     LedgerRenderingSpec
+    M4PartyLedgerSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

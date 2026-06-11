@@ -23,6 +23,7 @@ module L4.EvaluateLazy
 , Eval
 , tellEvent
 , currentLedger
+, currentStore
 , runEvalAction
 , evalExprForLedger
 )
@@ -35,7 +36,19 @@ import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
-import L4.Evaluate.Ledger (Ledger, LedgerEvent (..), Path, Provenance (..), emptyLedger)
+import L4.Evaluate.Ledger
+  ( EventRoute (..)
+  , Ledger
+  , LedgerEvent (..)
+  , LedgerStore (..)
+  , Path
+  , Provenance (..)
+  , anonymousParty
+  , emptyStore
+  , storeAppendOfficial
+  , storeAppendOwn
+  , storeOwnLedger
+  )
 import L4.Evaluate.ValueLazy
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
@@ -60,8 +73,15 @@ data EvalState =
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
-    , envLedger  :: !(IORef Ledger) -- append-only event log (M0 ledger substrate);
-                                     -- always collected (non-optional, unlike evalTrace)
+    , envLedger  :: !(IORef LedgerStore) -- append-only event store (M0 substrate, M4
+                                         -- per-party + official record); always collected
+                                         -- (non-optional, unlike evalTrace)
+    , currentParty :: !(IORef (Maybe Text))
+                                     -- ^ M4: the party whose deontic HENCE/LEST we are
+                                     -- currently inside, so a RECORD fired there routes to
+                                     -- that party's own ledger. 'Nothing' = no enclosing
+                                     -- party (a top-level RECORD), routed to the anonymous
+                                     -- own ledger. Set/restored around 'continueWithFollowup'.
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -247,10 +267,14 @@ interpMachine = \ case
     asks (.tracePolicy)
   GetSafeMode ->
     asks (.safeMode)
-  TellEvent ev ->
-    tellEvent ev
+  TellEvent route ev ->
+    routeEvent route ev
   CurrentLedger ->
-    currentLedger
+    currentOwnLedger
+  GetCurrentParty ->
+    readRef (.currentParty)
+  PutCurrentParty mp ->
+    writeRef (.currentParty) mp
   Bind act k -> interpMachine act >>= interpMachine . k
   LiftIO m -> liftIO m >>= interpMachine . pure
   PushFrame f -> do
@@ -269,17 +293,44 @@ traceEval ta = do
     Nothing -> pure ()
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
 
--- | Append an event to the ledger (M0 ledger substrate).
+-- | Append an event to the appropriate ledger (M4 routing).
 --
--- Modeled exactly on 'traceEval', but the ledger is non-optional, so there is
--- no 'Maybe' branch: every write is recorded. Newest-last, via 'DList.snoc'.
-tellEvent :: LedgerEvent -> Eval ()
-tellEvent ev =
-  asks (.envLedger) >>= liftIO . flip modifyIORef' (`DList.snoc` ev)
+-- A @RECORD@ ('RouteOwn') lands in the /current acting party's/ own ledger
+-- (keyed by 'currentParty', defaulting to 'anonymousParty' at top level). A
+-- @COMMIT@/@ATTEST@ ('RouteOfficial') lands in the shared official record.
+-- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
+routeEvent :: EventRoute -> LedgerEvent -> Eval ()
+routeEvent route ev = do
+  store <- asks (.envLedger)
+  case route of
+    RouteOfficial ->
+      liftIO (modifyIORef' store (storeAppendOfficial ev))
+    RouteOwn -> do
+      party <- fromMaybe anonymousParty <$> readRef (.currentParty)
+      liftIO (modifyIORef' store (storeAppendOwn party ev))
 
--- | Read the current ledger (the full event log, newest-last).
+-- | Append an event to the acting party's own ledger (a @RECORD@). Kept for the
+-- test seam and any caller that knows it wants the own ledger.
+tellEvent :: LedgerEvent -> Eval ()
+tellEvent = routeEvent RouteOwn
+
+-- | Read the /current acting party's/ own ledger (the M1.5 @RECALL@ semantics:
+-- a read sees the current party's own record, falling back to the anonymous own
+-- ledger at top level). Cross-party and official reads are M4.5.
+currentOwnLedger :: Eval Ledger
+currentOwnLedger = do
+  party <- fromMaybe anonymousParty <$> readRef (.currentParty)
+  storeOwnLedger party <$> currentStore
+
+-- | Read the current ledger as seen by a @RECALL@ (the current party's own log).
+-- Retained name for the test suite / public API.
 currentLedger :: Eval Ledger
-currentLedger = readRef (.envLedger)
+currentLedger = currentOwnLedger
+
+-- | Read the whole per-party store (own ledgers + official record). Used by
+-- 'nfDirective' to capture the full state and by the test suite.
+currentStore :: Eval LedgerStore
+currentStore = readRef (.envLedger)
 
 -- | For the given eval action, enable tracing and accumulate a trace.
 --
@@ -333,8 +384,9 @@ runConfig = \ case
 -- left completely untouched, even on exceptions.
 withFreshLedger :: Eval a -> Eval a
 withFreshLedger m = do
-  fresh <- liftIO (newIORef emptyLedger)
-  local (\s -> s { envLedger = fresh }) m
+  fresh      <- liftIO (newIORef emptyStore)
+  freshParty <- liftIO (newIORef Nothing)
+  local (\s -> s { envLedger = fresh, currentParty = freshParty }) m
 
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
@@ -349,13 +401,14 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
-  -- STATE-AS-LEDGER M2: snapshot the per-directive ledger BEFORE
-  -- 'withFreshLedger' restores the caller's (empty) ledger and discards this
-  -- one. This is the directive's own event log — the RECORD/COMMIT 'Assign's it
-  -- produced. D5 (keep-on-breach) falls out for free: 'tellEvent' is an append
-  -- and 'ValBreached' does not roll back, so any pre-breach 'Assign' is already
-  -- in here.
-  directiveLedger <- currentLedger
+  -- STATE-AS-LEDGER M2/M4: snapshot the per-directive ledger STORE (per-party
+  -- own ledgers + the official record) BEFORE 'withFreshLedger' restores the
+  -- caller's (empty) store and discards this one. This is the directive's whole
+  -- event log — the RECORD 'Assign's per party plus the COMMIT/ATTEST 'Assign's
+  -- in the official record. D5 (keep-on-breach) falls out for free: 'tellEvent'
+  -- is an append and 'ValBreached' does not roll back, so any pre-breach
+  -- 'Assign' is already in here.
+  directiveLedger <- currentStore
   let
     finalTrace = postprocessTrace <$> mt
     v' =
@@ -387,12 +440,13 @@ data EvalDirectiveResult =
     { range  :: Maybe SrcRange -- ^ of the (L)EVAL / DEONTIC directive
     , result :: EvalDirectiveValue
     , trace  :: Maybe EvalTrace
-    , ledger :: !Ledger
-      -- ^ STATE-AS-LEDGER M2: the event log this directive produced (the
-      -- RECORD/COMMIT/ATTEST 'Assign's), captured before 'withFreshLedger'
-      -- discarded the per-directive ledger. Newest-last. Empty for a directive
-      -- that wrote nothing (pure reads / ordinary expressions) — rendered as
-      -- nothing in that case so reads do not clutter the output.
+    , ledger :: !LedgerStore
+      -- ^ STATE-AS-LEDGER M2/M4: the event store this directive produced (each
+      -- party's own RECORD 'Assign's plus the official COMMIT/ATTEST 'Assign's),
+      -- captured before 'withFreshLedger' discarded the per-directive store.
+      -- Newest-last within each ledger. Empty for a directive that wrote nothing
+      -- (pure reads / ordinary expressions) — rendered as nothing in that case
+      -- so reads do not clutter the output.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -409,20 +463,41 @@ prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
 prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
 
--- | STATE-AS-LEDGER M2: render the ledger a directive produced, as a labelled
--- section. Returns the empty 'Text' when the directive wrote nothing, so that
--- pure reads / ordinary expressions are not cluttered with an empty section.
+-- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
+-- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
+-- so that pure reads / ordinary expressions are not cluttered.
 --
--- One row per 'Assign', oldest-first (the ledger is newest-last as a 'DList',
--- and 'toList' yields oldest-first — the order the writes happened):
+-- Each non-empty own ledger renders as a @Ledger (<party>):@ block (the
+-- anonymous own ledger, from a top-level @RECORD@, renders as a bare @Ledger:@
+-- block), and a non-empty official record renders as an @Official record:@
+-- block. One row per 'Assign', oldest-first (each ledger is newest-last as a
+-- 'DList', and 'toList' yields oldest-first — the order the writes happened):
 --
--- > Ledger:
--- >   RECORD `freezing point of water` IS 273.15   [source=RECORD, at=2026-06-12T08:30:00Z]
-prettyLedger :: Ledger -> Text
-prettyLedger led =
-  case DList.toList led of
-    []     -> Text.empty
-    events -> "\nLedger:\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
+-- > Ledger (Alice):
+-- >   RECORD `freezing point of water` IS 273.15   [party=Alice, source=RECORD, at=...]
+-- > Official record:
+-- >   COMMIT `fp` IS 273.15   [party=Court, source=COMMIT, at=...]
+prettyLedger :: LedgerStore -> Text
+prettyLedger store =
+  Text.concat (ownBlocks <> [officialBlock])
+  where
+    ownBlocks =
+      [ renderBlock (ownHeader party) led
+      | (party, led) <- Map.toList store.ownLedgers
+      , not (null (DList.toList led))
+      ]
+    officialBlock = renderBlock "Official record" store.officialLedger
+
+    -- The anonymous own ledger (top-level RECORD, empty party key) has no party
+    -- name, so it renders as a bare "Ledger:" header.
+    ownHeader party
+      | Text.null party = "Ledger"
+      | otherwise       = "Ledger (" <> party <> ")"
+
+    renderBlock header led =
+      case DList.toList led of
+        []     -> Text.empty
+        events -> "\n" <> header <> ":\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
 
 prettyLedgerEvent :: LedgerEvent -> Text
 prettyLedgerEvent (Assign path val prov) =
@@ -577,8 +652,9 @@ execEvalModuleWithEnv evalConfig entityInfo env m@(MkModule _ moduleUri _) = do
       let temporalCtx = initialTemporalContext actualTime
       temporalContext <- newIORef temporalCtx
       let evalTrace = Nothing
-      envLedger <- newIORef emptyLedger
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+      envLedger <- newIORef emptyStore
+      currentParty <- newIORef Nothing
+      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
       case r of
         Left exc -> do
           hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -628,8 +704,9 @@ execEvalModuleWithJSON evalConfig entityInfo json m@(MkModule _ moduleUri _) = d
       let temporalCtx = initialTemporalContext actualTime
       temporalContext <- newIORef temporalCtx
       let evalTrace = Nothing
-      envLedger <- newIORef emptyLedger
-      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+      envLedger <- newIORef emptyStore
+      currentParty <- newIORef Nothing
+      r <- f MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
       case r of
         Left exc -> do
           hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -650,13 +727,15 @@ runEvalAction evalConfig (MkEval f) = do
   supply          <- newIORef 0
   actualTime      <- resolveEvalTime evalConfig
   temporalContext <- newIORef (initialTemporalContext actualTime)
-  envLedger       <- newIORef emptyLedger
+  envLedger       <- newIORef emptyStore
+  currentParty    <- newIORef Nothing
   f MkEvalState
     { moduleUri = toNormalizedUri (Uri "test:runEvalAction")
     , stack
     , supply
     , evalTrace = Nothing
     , envLedger
+    , currentParty
     , entityInfo = mempty
     , evalTime = actualTime
     , temporalContext

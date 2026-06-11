@@ -47,6 +47,7 @@ import L4.Syntax
   )
 import L4.Evaluate.Ledger
   ( LedgerEvent (..)
+  , LedgerStore (..)
   , Provenance (..)
   , snapshot
   )
@@ -55,6 +56,7 @@ import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
   , currentLedger
+  , currentStore
   , evalExprForLedger
   , execEvalModuleWithEnv
   , resolveEvalConfig
@@ -161,17 +163,20 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
             Nothing -> expectationFailure "expected one Record node"
             Just (_cell, _val, isOfficial) -> isOfficial `shouldBe` True
 
-    it "records source = COMMIT in the ledger provenance, via the seam" $
+    it "records source = COMMIT in the OFFICIAL ledger provenance, via the seam (M4 routing)" $
       case checkWithImports vfs (src True) of
         Left errs -> expectationFailure ("typecheck failed: " <> show errs)
         Right r ->
           case directiveExprs r.tcdModule of
             [recordExpr] -> do
-              res <- runEvalAction cfg (evalExprForLedger recordExpr >> currentLedger)
+              res <- runEvalAction cfg (evalExprForLedger recordExpr >> currentStore)
               case res of
                 Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
-                Right ledger ->
-                  map provSource (provenances ledger) `shouldBe` ["COMMIT"]
+                Right store -> do
+                  -- M4: a COMMIT routes to the official record, not an own ledger.
+                  map provSource (provenances store.officialLedger) `shouldBe` ["COMMIT"]
+                  -- and nothing landed in any own ledger.
+                  null store.ownLedgers `shouldBe` True
             other -> expectationFailure ("expected one Record directive, got " <> show (length other))
 
   describe "RECALL (M1.5 read): MAYBE-typed cell read" $ do

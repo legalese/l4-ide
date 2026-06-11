@@ -40,7 +40,9 @@ import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
-import L4.Evaluate.Ledger (LedgerEvent (..), Provenance (..))
+import qualified Data.Map.Strict as Map
+
+import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , execEvalModuleWithEnv
@@ -74,11 +76,16 @@ runDirectives now src = do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
       pure results
 
--- | The 'Assign' provenances in a directive's captured ledger.
--- ('Ledger' is a 'DList', which is 'Foldable'; @foldr (:) []@ materialises it
--- oldest-first without an explicit @dlist@ dependency, as RecordLedgerSpec does.)
+-- | The 'Assign' provenances in a directive's captured store, across every
+-- party's own ledger and the official record (M4: 'ledger' is now a
+-- 'LedgerStore'). Each ledger is a 'DList', which is 'Foldable'; @foldr (:) []@
+-- materialises it oldest-first.
 ledgerProvenances :: EvalDirectiveResult -> [Provenance]
-ledgerProvenances res = [ p | Assign _ _ p <- foldr (:) [] res.ledger ]
+ledgerProvenances res =
+  [ p
+  | led <- Map.elems res.ledger.ownLedgers <> [res.ledger.officialLedger]
+  , Assign _ _ p <- foldr (:) [] led
+  ]
 
 spec :: Spec
 spec = describe "STATE-AS-LEDGER M2: ledger surfacing + real provenance" $ do

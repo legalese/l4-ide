@@ -24,9 +24,18 @@ module L4.Evaluate.Ledger
   , emptyLedger
   , snapshot
   , readCell
+    -- * Per-party store (M4)
+  , LedgerStore (..)
+  , emptyStore
+  , anonymousParty
+  , EventRoute (..)
+  , storeAppendOwn
+  , storeAppendOfficial
+  , storeOwnLedger
   ) where
 
 import Base
+import qualified Base.DList as DList
 import qualified Base.Map as Map
 
 import L4.Evaluate.ValueLazy (WHNF)
@@ -84,3 +93,61 @@ snapshot =
 -- cell has never been assigned.
 readCell :: Path -> Ledger -> Maybe WHNF
 readCell p = Map.lookup p . snapshot
+
+-----------------------------------------------------------------------------
+-- M4: per-party store + a shared official record (R1)
+-----------------------------------------------------------------------------
+
+-- | The whole event-sourced state for one directive (STATE-AS-LEDGER M4, R1).
+--
+-- R1 ratified the per-party model: each acting party accumulates its /own/
+-- private append-only ledger (keyed by the party's rendered text), and a single
+-- distinguished /official/ ledger holds the shared record that @COMMIT@/@ATTEST@
+-- promote values into. This is what keeps the deontic-race-becomes-data-race
+-- surface small and named: two parties' @RECORD@s touch different own ledgers
+-- and cannot race; the only shared write is the official @COMMIT@.
+--
+-- A @RECORD@ fired with no enclosing party (a top-level @#EVAL RECORD@) routes
+-- to the own ledger keyed by 'anonymousParty' (the empty string).
+data LedgerStore =
+  MkLedgerStore
+    { ownLedgers     :: !(Map Text Ledger)
+      -- ^ per-party private ledgers, keyed by the rendered acting party
+    , officialLedger :: !Ledger
+      -- ^ the single shared record (COMMIT/ATTEST target)
+    }
+  deriving stock (Show, Generic)
+  deriving anyclass NFData
+
+-- | The empty store: no party has recorded anything, and the official record
+-- is empty.
+emptyStore :: LedgerStore
+emptyStore = MkLedgerStore Map.empty emptyLedger
+
+-- | The key used for an own write that has no enclosing acting party (a
+-- top-level @#EVAL RECORD@). Kept as the empty string so it is visually
+-- distinct from any real party name and renders as the anonymous block.
+anonymousParty :: Text
+anonymousParty = ""
+
+-- | M4: how a ledger write is routed. 'RouteOwn' appends to the acting party's
+-- own ledger (a @RECORD@); 'RouteOfficial' appends to the shared official
+-- record (a @COMMIT@/@ATTEST@).
+data EventRoute = RouteOwn | RouteOfficial
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Append an 'Assign' (or any 'LedgerEvent') to a party's own ledger, keyed by
+-- the (already rendered) acting party. Creates the party's ledger on first use.
+storeAppendOwn :: Text -> LedgerEvent -> LedgerStore -> LedgerStore
+storeAppendOwn party ev store =
+  store { ownLedgers = Map.insertWith (\new old -> old <> new) party (DList.singleton ev) store.ownLedgers }
+
+-- | Append an event to the shared official ledger.
+storeAppendOfficial :: LedgerEvent -> LedgerStore -> LedgerStore
+storeAppendOfficial ev store =
+  store { officialLedger = store.officialLedger `DList.snoc` ev }
+
+-- | Read one party's own ledger (empty if that party has recorded nothing).
+storeOwnLedger :: Text -> LedgerStore -> Ledger
+storeOwnLedger party store = Map.findWithDefault emptyLedger party store.ownLedgers

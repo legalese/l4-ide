@@ -57,7 +57,7 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
-import L4.Evaluate.Ledger (Ledger, LedgerEvent (..), Provenance (..), readCell)
+import L4.Evaluate.Ledger (EventRoute (..), Ledger, LedgerEvent (..), Provenance (..), readCell)
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
@@ -89,6 +89,12 @@ data Frame =
   -- STATE-AS-LEDGER M1.5: RECALL. ReadCell1 waits for the cell to evaluate;
   -- when it has, we read the cell back from the ledger and yield MAYBE.
   | ReadCell1 {- -}
+  -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
+  -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
+  -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
+  -- mirroring the 'EvalAsOfSystemTime2' save/restore-frame idiom. Carries the
+  -- party to restore TO (the enclosing party, or Nothing at the outer level).
+  | RestoreCurrentParty (Maybe Text)
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -182,8 +188,10 @@ data Machine a where
   GetModuleUri :: Machine NormalizedUri
   GetTracePolicy :: Machine TracePolicy
   GetSafeMode :: Machine Bool  -- ^ Returns True when HTTP operations should be disabled
-  TellEvent :: LedgerEvent -> Machine ()  -- ^ append an event to the ledger (STATE-AS-LEDGER)
-  CurrentLedger :: Machine Ledger  -- ^ read the current ledger snapshot (STATE-AS-LEDGER M1.5, RECALL)
+  TellEvent :: EventRoute -> LedgerEvent -> Machine ()  -- ^ append an event to the routed ledger (STATE-AS-LEDGER M4)
+  CurrentLedger :: Machine Ledger  -- ^ read the current acting party's own ledger (STATE-AS-LEDGER M1.5, RECALL)
+  GetCurrentParty :: Machine (Maybe Text)  -- ^ the party whose HENCE/LEST we are inside (M4)
+  PutCurrentParty :: Maybe Text -> Machine ()  -- ^ set the current acting party (M4); restored via a frame
   PokeThunk :: Reference
     -> (ThreadId -> Thunk -> (Thunk, a))
     -> Machine a
@@ -453,6 +461,11 @@ backward val = WithPoppedFrame $ \ case
     -- the cell has evaluated to 'val' (a String path): read the ledger and
     -- return MAYBE — JUST the stored value, or NOTHING (M1.5).
     runReadCell val
+  Just (RestoreCurrentParty mOriginal) -> do
+    -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
+    -- restore the enclosing acting party and pass the value on unchanged (M4).
+    PutCurrentParty mOriginal
+    Backward val
   Just (BinBuiltin1 binOp r) -> do
     PushFrame (BinBuiltin2 binOp val)
     EvalRef r
@@ -889,10 +902,10 @@ backwardContractFrame val = \ case
         DMustNot ->
           -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
           -- Continue with HENCE (followup), which defaults to FULFILLED
-          AllocateValue ev'time >>= continueWithFollowup env followup events
+          AllocateValue ev'time >>= continueWithFollowup (partyKeyMaybeEvaluated party) env followup events
         DMay ->
           -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED
-          AllocateValue ev'time >>= continueWithFollowup env followup events
+          AllocateValue ev'time >>= continueWithFollowup (partyKeyMaybeEvaluated party) env followup events
         _ -> -- DMust, DDo: deadline passed = failure
           case lest of
             Nothing -> do
@@ -900,7 +913,7 @@ backwardContractFrame val = \ case
               partyR <- either (`allocate_` env) AllocateValue party
               Backward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
             Just lestFollowup -> AllocateValue ev'time
-              >>= continueWithFollowup env lestFollowup events
+              >>= continueWithFollowup (partyKeyMaybeEvaluated party) env lestFollowup events
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -944,7 +957,7 @@ backwardContractFrame val = \ case
           DMustNot -> case lest of
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> AllocateValue time
-              >>= continueWithFollowup (env `Map.union` henceEnv) lestFollowup events
+              >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) lestFollowup events
             -- No LEST clause: immediate breach
             Nothing -> do
               -- Extract timestamp from time (which has been updated to event time)
@@ -957,7 +970,7 @@ backwardContractFrame val = \ case
               Backward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
           -- MUST, MAY, DO: action done = success
           _ -> AllocateValue time
-            >>= continueWithFollowup (env `Map.union` henceEnv) followup events
+            >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) followup events
       ValBool False -> do
         newTime <- AllocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
@@ -1050,8 +1063,23 @@ backwardContractFrame val = \ case
 
     pushCFrame = PushFrame . ContractFrame
 
-    continueWithFollowup :: Environment -> RExpr -> Reference -> Reference -> Machine Config
-    continueWithFollowup env followup events time = do
+    -- M4 party-threading hinge: set the acting party for the DURATION of the
+    -- HENCE/LEST body, so a RECORD fired inside it routes to that party's own
+    -- ledger and stamps its provenance. Because the CEK machine is trampolined
+    -- (the followup is forced later by 'runConfig', not inline here), a plain
+    -- monadic bracket would restore the party BEFORE the followup runs. So we
+    -- use the SAME save/restore-FRAME idiom as 'EvalAsOfSystemTime': capture the
+    -- enclosing party, set the new one, and push 'RestoreCurrentParty' FIRST (so
+    -- it is processed LAST — after the followup and its App1 continuation have
+    -- fully evaluated). The party is rendered to a 'Text' key by 'partyKey…'; an
+    -- unevaluated/unkeyable party yields 'Nothing' (the RECORD then falls back to
+    -- the anonymous own ledger), and a nested obligation's own followup re-sets
+    -- and re-restores the party around its body.
+    continueWithFollowup :: Maybe Text -> Environment -> RExpr -> Reference -> Reference -> Machine Config
+    continueWithFollowup mParty env followup events time = do
+      mOriginal <- GetCurrentParty
+      PutCurrentParty mParty
+      PushFrame (RestoreCurrentParty mOriginal)
       PushFrame (App1 [time, events] Nothing)
       ForwardExpr env followup
 
@@ -1488,6 +1516,28 @@ jsonListToWHNF (x:xs) = do
   tailRef <- AllocateValue tailVal
   pure $ ValCons headRef tailRef
 
+-- | M4: render an (already-evaluated) acting party 'WHNF' to the 'Text' key
+-- under which its own ledger is stored and its provenance is stamped. A
+-- 'ValString' party uses its raw text (no quotes); any other party (commonly a
+-- nullary constructor like @S@/@Alice@ from @DECLARE … IS ONE OF …@) uses
+-- 'prettyLayout', which yields the constructor name. This is the "simplest
+-- faithful key" the M4 spec calls for — two events from the same party land in
+-- the same own ledger because they render identically.
+partyKeyWHNF :: WHNF -> Text
+partyKeyWHNF = \ case
+  ValString t -> t
+  v           -> prettyLayout v
+
+-- | The party key for a 'MaybeEvaluated' obligation party (@Either RExpr WHNF@).
+-- We can only render a party that has already been evaluated to 'WHNF'; an
+-- unevaluated party expression ('Left') yields 'Nothing' (the followup then runs
+-- with no acting party and a RECORD falls back to the anonymous own ledger).
+-- In practice the deadline-passed/LEST paths that use this carry the obligation
+-- party as a 'Left' expression, so they currently key as 'Nothing'; the matched
+-- HENCE path (Contract10) always has the party as a 'WHNF' and keys precisely.
+partyKeyMaybeEvaluated :: MaybeEvaluated -> Maybe Text
+partyKeyMaybeEvaluated = either (const Nothing) (Just . partyKeyWHNF)
+
 -- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
 --
 -- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
@@ -1495,31 +1545,27 @@ jsonListToWHNF (x:xs) = do
 -- We append an 'Assign' event to the ledger (D2 / Rung 3 — an APPEND, not a
 -- store) and return the written value so it can chain in a HENCE continuation.
 --
--- For M1 both own ('RECORD') and official ('COMMIT'/'ATTEST') writes go to the
--- single 'envLedger'; the @isOfficial@ flag is recorded faithfully in the
--- provenance source ("RECORD" vs "COMMIT") so M4 can split the ledgers later.
+-- M4: own ('RECORD') writes route to the acting party's own ledger, official
+-- ('COMMIT'/'ATTEST') writes route to the shared official record. The acting
+-- party is read from 'GetCurrentParty' (set by 'continueWithFollowup' around the
+-- HENCE/LEST body) and recorded in the provenance @party@ — closing M2's
+-- deferred field. A top-level @#EVAL RECORD@ has no enclosing party, so @party@
+-- is "" and it routes to the anonymous own ledger.
 runRecord :: WHNF -> WHNF -> Bool -> Machine Config
 runRecord cellVal val isOfficial = do
   cell <- expectString cellVal
   -- M2 provenance enrichment: stamp the write with the directive's evaluation
   -- time ('GetEvalTime', the same clock the deontic state machine and
   -- @EVAL AS OF SYSTEM TIME@ already use) and the real write kind in 'source'.
-  --
-  -- 'party' is left empty here. A RECORD fired inside a deontic HENCE/LEST
-  -- continuation IS performed by a matched party, but that party (a 'WHNF'
-  -- bound in the contract-frame scrutiny, ContractFrame.hs) is never threaded
-  -- into 'EvalState' — the followup is evaluated with a plain 'ForwardExpr'
-  -- ('continueWithFollowup'), so 'runRecord' has no reach to it without adding
-  -- a "current acting party" cell to 'EvalState' and a save/restore frame
-  -- around the followup. That is the invasive refactor M2 defers (see
-  -- openIssues); top-level RECORDs (the #EVAL case) genuinely have no party.
   evalNow <- GetEvalTime
+  mParty  <- GetCurrentParty
   let prov = MkProvenance
-        { party    = ""
+        { party    = fromMaybe "" mParty
         , source   = if isOfficial then "COMMIT" else "RECORD"
         , position = Just (formatUTCTimeIso evalNow)
         }
-  TellEvent (Assign [cell] val prov)
+      route = if isOfficial then RouteOfficial else RouteOwn
+  TellEvent route (Assign [cell] val prov)
   Backward val
 
 -- | STATE-AS-LEDGER M1.5: perform a RECALL (cell read).
