@@ -198,6 +198,12 @@ renderPandocJSON :: Doc -> Value          -- → docx via pandoc, v2
   `SectionHeading`, `Subsection`, `Paragraph`, `Definition`) carry the actual
   Times New Roman formatting. The IR is designed so no information is lost
   between the MD and docx backends.
+- **Akoma Ntoso (LegalDocML)** is a third backend over the same IR:
+  hierarchical containers map 1:1 (section/paragraph/subparagraph/point,
+  `<intro>` for Coode lead-ins), and round-trip anchors ride natively in
+  `@GUID` alongside standard `eId`s. Prototyped in the demo server
+  (markdown→AKN transform, `/api/akn`); the production exporter renders
+  from `Block` directly.
 
 CLI surface:
 
@@ -477,3 +483,15 @@ Markdown pane on the right — the **prototype TNR**. Sequencing:
   (regeneration touched only the rewritten provision). The Python
   scaffold does NOT implement this transform and is now behind the
   Haskell.
+- **2026-06-11** — round-trip prototype live (demo/server.py + editable
+  TNR pane): human edits TNR in browser → `claude -p` proposes L4 →
+  `l4 check` gates with diagnostics-feedback retry → canonical re-render.
+  E2E verified on wording, numeric and semantic edits (typecheck attempt
+  1, minimal diffs). Hierarchical segmentation: edited TNR aligns to the
+  canonical render by anchor; only changed sections go to the LLM as
+  before/after pairs (whole L4 stays as context so renames remain
+  global); zero changed sections short-circuits in ~30ms with no LLM
+  call; skeleton changes fall back to full-document mode. Akoma Ntoso
+  export (`/api/akn`) added; all six demo instruments well-formed per
+  xmllint. Latency: `claude -p` varies 10–90s; tiered model escalation
+  (haiku→sonnet) is the obvious untried lever.
