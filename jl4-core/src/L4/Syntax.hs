@@ -243,6 +243,12 @@ data Expr n =
     -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). For M1 both go to
     -- the single 'envLedger' (the own/official split is M4); the flag is stored
     -- faithfully so M4 can split later.
+  | ReadCell   Anno (Expr n)
+    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5). @RECALL <cell>@.
+    -- The cell expr is a string-keyed path (a backtick ident or string literal,
+    -- the same surface as 'Record'). It forward-evaluates the cell to a 'Path',
+    -- reads the latest 'snapshot' projection of the M0 ledger, and yields
+    -- @MAYBE a@ — @JUST v@ if the cell has been written, @NOTHING@ otherwise.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]

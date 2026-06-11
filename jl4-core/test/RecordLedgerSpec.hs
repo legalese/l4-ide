@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | M1 surface-WRITE tests: @RECORD@ / @COMMIT@ / @ATTEST@ end-to-end.
+-- | M1 surface-WRITE and M1.5 surface-READ tests for the event-sourced ledger.
 --
--- These prove the whole write path — parse, typecheck, eval, ledger append —
--- for the new 'Record' AST node:
+-- The WRITE half (@RECORD@ / @COMMIT@ / @ATTEST@ → the 'Record' AST node)
+-- proves the whole write path — parse, typecheck, eval, ledger append:
 --
 --   (a) @RECORD \`x\` IS 273.15@ parses to a 'Record' node (isOfficial = False);
 --   (b) it type-checks (the cell is a STRING path; the whole expression has the
@@ -16,6 +16,20 @@
 -- A @COMMIT@ variant asserts that the official/own distinction is recorded
 -- (faithfully stored on the node as isOfficial = True and surfaced in the
 -- provenance source as "COMMIT", ready for the M4 own/official ledger split).
+--
+-- The READ half (@RECALL@ → the 'ReadCell' AST node) proves the read path
+-- end-to-end (M1.5):
+--
+--   (1) after @RECORD \`x\` IS 273.15@, @RECALL \`x\`@ evaluates to @JUST 273.15@;
+--   (2) @RECALL \`missing\`@ evaluates to @NOTHING@;
+--   (3) ISOLATION: a @RECALL@ evaluated in a FRESH directive/ledger, after a
+--       write in a SEPARATE directive, returns @NOTHING@ — proving that
+--       'withFreshLedger' still isolates per-directive (the M0 invariant).
+--
+-- Tests (1) and (2) drive the write and the read through the 'evalExprForLedger'
+-- seam in ONE 'runEvalAction' (sharing one 'EvalState'/ledger, so no
+-- 'withFreshLedger' wipes between them). Test (3) drives both directives through
+-- 'execEvalModuleWithEnv', which wraps every directive in 'withFreshLedger'.
 module RecordLedgerSpec (spec) where
 
 import qualified Data.Map.Strict as Map
@@ -29,6 +43,7 @@ import L4.Syntax
   , Resolved
   , Section (..)
   , TopDecl (..)
+  , getUnique
   )
 import L4.Evaluate.Ledger
   ( LedgerEvent (..)
@@ -46,6 +61,7 @@ import L4.EvaluateLazy
   , runEvalAction
   )
 import L4.EvaluateLazy.Machine (emptyEnvironment)
+import qualified L4.TypeCheck as TypeCheck
 import L4.TracePolicy (apiDefaultPolicy)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
@@ -76,8 +92,23 @@ theRecord m = case directiveExprs m of
 showVal :: WHNF -> String
 showVal = show
 
+-- | Is this WHNF a @JUST _@ (the prelude MAYBE constructor)?
+isJustWHNF :: WHNF -> Bool
+isJustWHNF (ValConstructor r [_]) = getUnique r == TypeCheck.justUnique
+isJustWHNF _                      = False
+
+-- | Is this WHNF a @NOTHING@ (the prelude MAYBE constructor)?
+isNothingWHNF :: WHNF -> Bool
+isNothingWHNF (ValConstructor r []) = getUnique r == TypeCheck.nothingUnique
+isNothingWHNF _                     = False
+
+-- | Is this fully-forced NF a @NOTHING@?
+isNothingNF :: NF -> Bool
+isNothingNF (MkNF (ValConstructor r [])) = getUnique r == TypeCheck.nothingUnique
+isNothingNF _                            = False
+
 spec :: Spec
-spec = describe "M1 surface WRITE (RECORD / COMMIT / ATTEST)" $ do
+spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5 read)" $ do
   cfg <- runIO (resolveEvalConfig (Just fixedNow) apiDefaultPolicy)
 
   let src isOfficialKw =
@@ -142,6 +173,78 @@ spec = describe "M1 surface WRITE (RECORD / COMMIT / ATTEST)" $ do
                 Right ledger ->
                   map provSource (provenances ledger) `shouldBe` ["COMMIT"]
             other -> expectationFailure ("expected one Record directive, got " <> show (length other))
+
+  describe "RECALL (M1.5 read): MAYBE-typed cell read" $ do
+    -- One module, two directives: the WRITE then the READ. We collect both
+    -- resolved exprs and choose how to sequence them depending on the test.
+    let writeThenReadSrc = "#EVAL RECORD `x` IS 273.15\n#EVAL RECALL `x`\n"
+        readMissingSrc   = "#EVAL RECALL `missing`\n"
+
+    it "parses RECALL to a ReadCell node and type-checks (cell : STRING ⇒ MAYBE a)" $
+      case checkWithImports vfs readMissingSrc of
+        Left errs -> expectationFailure ("expected a clean typecheck, got: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [ReadCell _ _cell] -> pure ()
+            other -> expectationFailure ("expected exactly one ReadCell directive, got: " <> show (length other))
+
+    it "(1) after RECORD `x` IS 273.15, RECALL `x` evaluates to JUST 273.15 (shared ledger, via the seam)" $
+      case checkWithImports vfs writeThenReadSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [writeExpr, readExpr] -> do
+              -- Both run in ONE runEvalAction => one EvalState => one ledger.
+              -- The read MUST see the prior write (no withFreshLedger between).
+              res <- runEvalAction cfg $ do
+                _ <- evalExprForLedger writeExpr        -- RECORD `x` IS 273.15
+                readWHNF <- evalExprForLedger readExpr  -- RECALL `x`
+                ledger <- currentLedger
+                pure (readWHNF, ledger)
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right (readWHNF, ledger) -> do
+                  -- the read is JUST _ ...
+                  isJustWHNF readWHNF `shouldBe` True
+                  -- ... and the value it wraps is the 273.15 that was written
+                  -- (the JUST payload is the very WHNF stored in the ledger).
+                  let snap = snapshot ledger
+                  fmap showVal (Map.lookup ["x"] snap)
+                    `shouldBe` Just (showVal (ValNumber (5463 / 20)))
+            other -> expectationFailure ("expected a write + a read directive, got " <> show (length other))
+
+    it "(2) RECALL `missing` evaluates to NOTHING (never written, via the seam)" $
+      case checkWithImports vfs readMissingSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [readExpr] -> do
+              res <- runEvalAction cfg (evalExprForLedger readExpr)
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right readWHNF -> isNothingWHNF readWHNF `shouldBe` True
+            other -> expectationFailure ("expected one RECALL directive, got " <> show (length other))
+
+    it "(3) ISOLATION: RECALL in a FRESH directive does NOT see a RECORD from an earlier directive (withFreshLedger)" $
+      -- Two #EVAL directives in one module. execEvalModuleWithEnv runs each
+      -- through nfDirective => withFreshLedger, so the read directive starts
+      -- from an EMPTY ledger and must return NOTHING despite the prior write.
+      case checkWithImports vfs writeThenReadSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r -> do
+          (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+          case results of
+            [writeRes, readRes] -> do
+              -- the write directive still returns its written value ...
+              case writeRes.result of
+                Reduction (Right (MkNF (ValNumber n))) -> n `shouldBe` (5463 / 20)
+                other -> expectationFailure ("write directive: expected 273.15, got " <> show other)
+              -- ... but the read directive, isolated, sees NOTHING.
+              case readRes.result of
+                Reduction (Right nfVal) ->
+                  isNothingNF nfVal `shouldBe` True
+                other -> expectationFailure ("read directive: expected NOTHING, got " <> show other)
+            _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
   where
     provenances ledger = [ p | Assign _ _ p <- foldr (:) [] ledger ]
     provSource p = p.source

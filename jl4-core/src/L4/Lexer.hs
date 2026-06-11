@@ -208,6 +208,7 @@ data TKeywords
   | TKRecord
   | TKCommit
   | TKAttest
+  | TKRecall
   | TKConcat
   | TKAs
   | TKLet
@@ -295,6 +296,7 @@ keywords = Map.fromList
   , ("RECORD"     , TKRecord     )
   , ("COMMIT"     , TKCommit     )
   , ("ATTEST"     , TKAttest     )
+  , ("RECALL"     , TKRecall     )
   , ("CONCAT"     , TKConcat     )
   , ("AS"         , TKAs         )
   , ("LET"        , TKLet        )

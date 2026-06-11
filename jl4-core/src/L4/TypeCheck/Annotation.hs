@@ -193,6 +193,9 @@ nlgExpr = \ case
       cell' <- nlgExpr cell
       val' <- nlgExpr val
       pure $ Record ann cell' val' isOfficial
+    ReadCell ann cell -> do
+      cell' <- nlgExpr cell
+      pure $ ReadCell ann cell'
     Concat ann es -> do
       es' <- traverse nlgExpr es
       pure $ Concat ann es'

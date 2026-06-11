@@ -1438,6 +1438,7 @@ baseExpr' =
   <|> envExpr
   <|> postExpr
   <|> recordOrCommitExpr
+  <|> recallExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -1707,6 +1708,17 @@ recordOrCommitExpr = do
       <*> annoHole cellExpr
       <*  annoLexeme (spacedKeyword_ TKIs)
       <*> annoHole (indentedExpr current)
+
+-- | @RECALL <cell>@ — STATE-AS-LEDGER M1.5. Reads a cell back from the ledger,
+-- yielding @MAYBE a@. The cell uses the SAME 'cellExpr' surface as
+-- RECORD/COMMIT/ATTEST (a backtick ident or a string literal), so a read and a
+-- write name a cell the same way.
+recallExpr :: Parser (Expr Name)
+recallExpr =
+  attachAnno $
+    ReadCell emptyAnno
+      <$  annoLexeme (spacedKeyword_ TKRecall)
+      <*> annoHole cellExpr
 
 -- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
 -- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a

@@ -499,6 +499,9 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       cell' <- addNlg cell
       val' <- addNlg val
       pure $ Record ann cell' val' isOfficial
+    ReadCell ann cell -> do
+      cell' <- addNlg cell
+      pure $ ReadCell ann cell'
     Concat ann es -> do
       es' <- traverse addNlg es
       pure $ Concat ann es'

@@ -248,6 +248,8 @@ interpMachine = \ case
     asks (.safeMode)
   TellEvent ev ->
     tellEvent ev
+  CurrentLedger ->
+    currentLedger
   Bind act k -> interpMachine act >>= interpMachine . k
   LiftIO m -> liftIO m >>= interpMachine . pure
   PushFrame f -> do

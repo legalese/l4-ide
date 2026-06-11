@@ -1401,6 +1401,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Env{}                  -> (a, r, n)
       Post{}                 -> (a, r, n)
       Record{}               -> (a, r, n)
+      ReadCell{}             -> (a, r, n)
       Breach{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
 

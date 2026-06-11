@@ -431,6 +431,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Record _ cell val isOfficial ->
       (if isOfficial then "COMMIT" else "RECORD")
         <+> printWithLayout cell <+> "IS" <+> printWithLayout val
+    ReadCell _ cell ->
+      "RECALL" <+> printWithLayout cell
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AsString _ e ->

@@ -57,7 +57,7 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
-import L4.Evaluate.Ledger (LedgerEvent (..), Provenance (..))
+import L4.Evaluate.Ledger (Ledger, LedgerEvent (..), Provenance (..), readCell)
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
@@ -86,6 +86,9 @@ data Frame =
   -- Record2 waits for the value (holds the evaluated cell WHNF and isOfficial).
   | Record1 {- -} (Expr Resolved) Environment Bool
   | Record2 WHNF {- -} Bool
+  -- STATE-AS-LEDGER M1.5: RECALL. ReadCell1 waits for the cell to evaluate;
+  -- when it has, we read the cell back from the ledger and yield MAYBE.
+  | ReadCell1 {- -}
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -180,6 +183,7 @@ data Machine a where
   GetTracePolicy :: Machine TracePolicy
   GetSafeMode :: Machine Bool  -- ^ Returns True when HTTP operations should be disabled
   TellEvent :: LedgerEvent -> Machine ()  -- ^ append an event to the ledger (STATE-AS-LEDGER)
+  CurrentLedger :: Machine Ledger  -- ^ read the current ledger snapshot (STATE-AS-LEDGER M1.5, RECALL)
   PokeThunk :: Reference
     -> (ThreadId -> Thunk -> (Thunk, a))
     -> Machine a
@@ -395,6 +399,11 @@ forwardExpr env = \ case
     -- WHNF, append an Assign event to the ledger, and return the written value.
     PushFrame (Record1 val env isOfficial)
     ForwardExpr env cell
+  ReadCell _ann cell -> do
+    -- STATE-AS-LEDGER M1.5: evaluate the cell to a String path, then read it
+    -- back from the ledger snapshot and return MAYBE (JUST/NOTHING).
+    PushFrame ReadCell1
+    ForwardExpr env cell
   Concat _ann [] ->
     Backward (ValString "")
   Concat _ann (e : es) -> do
@@ -440,6 +449,10 @@ backward val = WithPoppedFrame $ \ case
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
     -- Assign event to the ledger and return the written value (D2 / Rung 3).
     runRecord cellVal val isOfficial
+  Just ReadCell1 -> do
+    -- the cell has evaluated to 'val' (a String path): read the ledger and
+    -- return MAYBE — JUST the stored value, or NOTHING (M1.5).
+    runReadCell val
   Just (BinBuiltin1 binOp r) -> do
     PushFrame (BinBuiltin2 binOp val)
     EvalRef r
@@ -1495,6 +1508,27 @@ runRecord cellVal val isOfficial = do
         }
   TellEvent (Assign [cell] val prov)
   Backward val
+
+-- | STATE-AS-LEDGER M1.5: perform a RECALL (cell read).
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (mirroring 'runRecord') and read the
+-- latest projection of the ledger via 'readCell' (D2: a fold over the append
+-- log, last-write-wins). The result is @MAYBE a@: @JUST v@ when the cell has
+-- been written (the stored 'WHNF' is allocated into a fresh reference, exactly
+-- as the @ENV@/date-parse builtins do for their JUST values), or @NOTHING@ when
+-- the cell has never been assigned (e.g. a read before any RECORD, or a read in
+-- a fresh per-directive ledger — 'withFreshLedger' isolation).
+runReadCell :: WHNF -> Machine Config
+runReadCell cellVal = do
+  cell <- expectString cellVal
+  ledger <- CurrentLedger
+  case readCell [cell] ledger of
+    Just storedVal -> do
+      valueRef <- AllocateValue storedVal
+      Backward (ValConstructor TypeCheck.justRef [valueRef])
+    Nothing ->
+      Backward (ValConstructor TypeCheck.nothingRef [])
 
 -- | Convert list of Text values to L4 list (ValCons/ValNil)
 textListToWHNF :: [Text] -> Machine WHNF

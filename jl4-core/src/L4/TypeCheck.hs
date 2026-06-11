@@ -1497,6 +1497,14 @@ inferExpr' g =
       cell' <- checkExpr ExpectRecordCellContext cell string
       (val', valT) <- inferExpr val
       pure (Record ann cell' val' isOfficial, valT)
+    ReadCell ann cell -> do
+      -- STATE-AS-LEDGER M1.5: the cell is a string-keyed path; the read is
+      -- polymorphic in the stored value (the flat ledger is untyped at runtime),
+      -- so @RECALL <cell>@ has type @MAYBE a@ for a fresh @a@ pinned by the use
+      -- site — exactly what M3's @fromMaybe <presumption> (RECALL cell)@ consumes.
+      cell' <- checkExpr ExpectRecordCellContext cell string
+      a <- fresh (NormalName "cell")
+      pure (ReadCell ann cell', maybeType a)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -2943,6 +2951,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
       Record ann cell val off -> Record ann (go False ctx cell) (go False ctx val) off
+      ReadCell ann cell -> ReadCell ann (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
