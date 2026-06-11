@@ -272,4 +272,4 @@ if __name__ == "__main__":
     print(f"[tnr-demo] claude = {CLAUDE_BIN} (model {MODEL})")
     print(f"[tnr-demo] instruments: {', '.join(instruments())}")
     print(f"[tnr-demo] http://localhost:{PORT}/")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
