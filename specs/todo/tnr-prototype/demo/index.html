@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>L4 ⇢ TNR — the Times New Roman projection</title>
+<title>L4 ⇌ TNR — the Times New Roman projection</title>
 <style>
   :root {
     --paper: #f5efe1;
@@ -41,10 +41,10 @@
       linear-gradient(var(--paper-deep), var(--paper));
     border-bottom: 1px solid var(--oxblood);
     box-shadow: 0 1px 0 var(--paper), 0 2px 0 var(--oxblood), 0 6px 18px rgba(0,0,0,.45);
-    padding: .9rem 1.6rem .8rem;
+    padding: .8rem 1.6rem .7rem;
     display: flex;
-    align-items: baseline;
-    gap: 1.4rem;
+    align-items: center;
+    gap: 1.1rem;
     z-index: 5;
   }
   header h1 {
@@ -55,41 +55,50 @@
     white-space: nowrap;
   }
   header h1 .arrow { color: var(--oxblood); font-family: monospace; letter-spacing: 0; }
-  header .motto {
+  #status {
+    flex: 1;
     font-style: italic;
     color: var(--ink-faint);
-    font-size: .95rem;
-    flex: 1;
+    font-size: .92rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  #status.busy { color: var(--oxblood); }
+  #status.busy::before { content: "⟳ "; display: inline-block; animation: spin 1.4s linear infinite; }
+  #status.ok::before { content: "✓ "; color: #3c6e3c; }
+  #status.err { color: var(--oxblood); font-style: normal; }
+  #status.err::before { content: "✗ "; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   header .controls {
     display: flex;
     align-items: center;
-    gap: 1.1rem;
+    gap: .7rem;
     font-size: .85rem;
     font-variant: small-caps;
     letter-spacing: .08em;
   }
-  header select {
+  header select, header button {
     font-family: inherit;
-    font-size: .95rem;
+    font-size: .92rem;
     background: var(--paper);
     color: var(--ink);
     border: 1px solid var(--pencil);
     border-radius: 0;
-    padding: .15rem .4rem;
+    padding: .18rem .55rem;
+    cursor: pointer;
   }
+  header button:hover { border-color: var(--oxblood); color: var(--oxblood); }
+  header button:disabled { opacity: .45; cursor: default; }
+  header button.primary { background: var(--oxblood); color: var(--paper); border-color: var(--oxblood); }
+  header button.primary:hover { background: #5e190e; color: var(--paper); }
   header label.toggle { cursor: pointer; user-select: none; color: var(--ink-faint); }
   header label.toggle input { accent-color: var(--oxblood); margin-right: .3rem; vertical-align: -1px; }
 
   /* ───────────────────────── panes ───────────────────────── */
   main { flex: 1; display: flex; min-height: 0; }
-
   .pane { flex: 1 1 50%; min-width: 0; overflow-y: auto; }
 
-  /* the seam */
   .seam {
     flex: 0 0 26px;
     background: linear-gradient(90deg, #060906, var(--seam) 40%, #1b1409 60%, #00000055);
@@ -115,7 +124,6 @@
       repeating-linear-gradient(0deg, transparent 0 3px, rgba(140,255,170,.012) 3px 4px),
       radial-gradient(120% 90% at 30% 0%, var(--term-bg2), var(--term-bg));
     color: var(--term-text);
-    animation: rise .5s ease-out both;
   }
   #l4pane .pane-head {
     position: sticky; top: 0;
@@ -128,14 +136,20 @@
     letter-spacing: .12em;
     color: #5f7a64;
     text-transform: uppercase;
+    z-index: 2;
   }
-  #l4pane pre {
+  #l4src {
     font-family: ui-monospace, "Berkeley Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, monospace;
     font-size: .82rem;
     line-height: 1.55;
     padding: 1.2rem 1.6rem 4rem;
-    white-space: pre-wrap;
-    word-break: break-word;
+    overflow-x: auto;
+  }
+  .ln { white-space: pre; min-height: 1.55em; }
+  .ln.chg {
+    background: linear-gradient(90deg, rgba(118,221,132,.14), transparent 85%);
+    box-shadow: inset 3px 0 0 var(--kw);
+    margin-left: -1.6rem; padding-left: calc(1.6rem - 3px);
   }
   .kw { color: var(--kw); font-weight: bold; }
   .nm { color: var(--nm); }
@@ -150,18 +164,56 @@
       repeating-linear-gradient(0deg, transparent 0 28px, rgba(124,34,20,.03) 28px 29px),
       radial-gradient(140% 100% at 70% 0%, #faf5e9, var(--paper) 55%, var(--paper-deep));
     box-shadow: inset 14px 0 30px -18px rgba(0,0,0,.55);
-    animation: rise .5s .12s ease-out both;
+    display: flex;
+    flex-direction: column;
   }
   #tnrpane .sheet {
     max-width: 46rem;
     margin: 2.2rem auto 5rem;
     padding: 0 2.6rem 0 3.2rem;
-    border-left: 1px solid rgba(124,34,20,.25); /* docket margin rule */
+    border-left: 1px solid rgba(124,34,20,.25);
     font-size: 1.02rem;
     line-height: 1.62;
     text-align: justify;
     hyphens: auto;
+    width: 100%;
   }
+  body.editing #tnrpane .sheet { display: none; }
+  #tnredit {
+    display: none;
+    flex: 1;
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    background: transparent;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink);
+    padding: 2.2rem 3rem;
+    caret-color: var(--oxblood);
+  }
+  body.editing #tnredit { display: block; }
+  body.editing #tnrpane {
+    box-shadow: inset 14px 0 30px -18px rgba(0,0,0,.55), inset 0 0 0 3px var(--oxblood);
+  }
+
+  #notice {
+    display: none;
+    margin: 1rem 1.4rem 0;
+    border: 1px solid var(--oxblood);
+    background: #f7e9e0;
+    color: #5e190e;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: .72rem;
+    padding: .7rem .9rem;
+    white-space: pre-wrap;
+    max-height: 11rem;
+    overflow-y: auto;
+  }
+  #notice.show { display: block; }
+
   .tnr-h1 {
     text-align: center;
     font-variant: small-caps;
@@ -189,7 +241,6 @@
   .tnr-h4 { font-size: 1.05rem; }
   .tnr-h5, .tnr-h6 { font-size: 1rem; color: var(--ink-faint); }
   .prov { margin: .85rem 0 0; }
-  .prov strong { font-weight: bold; }
   .tab1 { margin: .55rem 0 0; padding-left: 4.4em;  text-indent: -2.2em; }
   .tab2 { margin: .55rem 0 0; padding-left: 6.6em;  text-indent: -2.2em; }
   .tab3 { margin: .55rem 0 0; padding-left: 8.8em;  text-indent: -2.2em; }
@@ -217,97 +268,126 @@
   .colophon::before { content: "— "; }
   .colophon::after { content: " —"; }
 
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: none; }
-  }
-
   ::selection { background: #7c221422; }
   #l4pane ::selection { background: #76dd8433; }
-
   .pane::-webkit-scrollbar { width: 10px; }
   .pane::-webkit-scrollbar-thumb { background: #00000033; border-radius: 5px; }
   #l4pane::-webkit-scrollbar-thumb { background: #ffffff18; }
 </style>
 </head>
-<body class="">
+<body>
 <header>
-  <h1>L4 <span class="arrow">⇢</span> TNR</h1>
-  <div class="motto">the Times New Roman projection — deterministic legislative rendering; English is a view, logic is the model</div>
+  <h1>L4 <span class="arrow">⇌</span> TNR</h1>
+  <div id="status">English is a view; logic is the model.</div>
   <div class="controls">
     <label for="instrument">Instrument</label>
-    <select id="instrument">
-      <option value="imaginary-alcohol-act">Imaginary Alcohol Act</option>
-      <option value="british-citizen-act">British Citizen Act</option>
-      <option value="ny-environmental-7.3">NYCRR 16 §7.3 (Environmental Review)</option>
-    </select>
+    <select id="instrument"></select>
     <label class="toggle"><input type="checkbox" id="anchors"> anchors</label>
+    <button id="editBtn">Edit TNR</button>
+    <button id="applyBtn" class="primary" style="display:none">Apply → L4</button>
+    <button id="cancelBtn" style="display:none">Cancel</button>
+    <button id="resetBtn" title="Discard working copy; restore the original L4">Reset</button>
   </div>
 </header>
 
 <main>
   <section class="pane" id="l4pane" aria-label="L4 source">
     <div class="pane-head">l4 source · the model</div>
-    <pre id="l4src">loading…</pre>
+    <div id="l4src">loading…</div>
   </section>
   <div class="seam" role="presentation"></div>
   <section class="pane" id="tnrpane" aria-label="TNR rendering">
+    <div id="notice"></div>
     <div class="sheet" id="tnrdoc">loading…</div>
+    <textarea id="tnredit" spellcheck="false"></textarea>
   </section>
 </main>
 
 <script>
 "use strict";
 
-/* ── L4 syntax highlighting (demo-grade) ─────────────────────────── */
+/* ── L4 syntax highlighting (demo-grade), per line ───────────────── */
 
 const L4_LEX = new RegExp(
   [
-    String.raw`(\{-[\s\S]*?-\})`,        // 1 block comment
-    String.raw`(--[^\n]*)`,              // 2 line comment
-    "(`[^`]*`)",                         // 3 backtick name
-    String.raw`("(?:[^"\\]|\\.)*")`,     // 4 string
-    String.raw`(@[a-zA-Z-]+|#[A-Z]+)`,   // 5 annotation / directive
-    String.raw`(§+)`,                    // 6 section mark
-    String.raw`(\b[A-Z][A-Z'’-]{1,}\b|\bA\b)`, // 7 keyword-ish (ALLCAPS)
+    String.raw`(--[^\n]*)`,              // 1 line comment
+    "(`[^`]*`)",                         // 2 backtick name
+    String.raw`("(?:[^"\\]|\\.)*")`,     // 3 string
+    String.raw`(@[a-zA-Z-]+|#[A-Z]+)`,   // 4 annotation / directive
+    String.raw`(§+)`,                    // 5 section mark
+    String.raw`(\b[A-Z][A-Z'’-]{1,}\b|\bA\b)`, // 6 keyword-ish (ALLCAPS)
   ].join("|"),
   "g"
 );
-const L4_CLASSES = [null, "cm", "cm", "nm", "st", "an", "sec", "kw"];
+const L4_CLASSES = [null, "cm", "nm", "st", "an", "sec", "kw"];
 
 const esc = (s) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const span = (cls, s) => `<span class="${cls}">${esc(s)}</span>`;
 
-function highlightL4(src) {
+function hlFragment(src) {
   let out = "", last = 0;
   for (const m of src.matchAll(L4_LEX)) {
     out += esc(src.slice(last, m.index));
     for (let g = 1; g < m.length; g++) {
-      if (m[g] !== undefined) {
-        out += `<span class="${L4_CLASSES[g]}">${esc(m[g])}</span>`;
-        break;
-      }
+      if (m[g] !== undefined) { out += span(L4_CLASSES[g], m[g]); break; }
     }
     last = m.index + m[0].length;
   }
   return out + esc(src.slice(last));
 }
 
+/* per-line highlighter with block-comment state across lines */
+function highlightLines(src) {
+  let inCm = false;
+  return src.split("\n").map((line) => {
+    let html = "", rest = line;
+    while (rest.length) {
+      if (inCm) {
+        const i = rest.indexOf("-}");
+        if (i === -1) { html += span("cm", rest); rest = ""; }
+        else { html += span("cm", rest.slice(0, i + 2)); rest = rest.slice(i + 2); inCm = false; }
+      } else {
+        const i = rest.indexOf("{-");
+        if (i === -1) { html += hlFragment(rest); rest = ""; }
+        else { html += hlFragment(rest.slice(0, i)); rest = rest.slice(i); inCm = true; }
+      }
+    }
+    return html;
+  });
+}
+
+/* multiset line-diff: which lines of `next` are new relative to `prev` */
+function changedLines(prev, next) {
+  const counts = new Map();
+  for (const l of prev.split("\n")) counts.set(l, (counts.get(l) || 0) + 1);
+  const changed = new Set();
+  next.split("\n").forEach((l, i) => {
+    const c = counts.get(l) || 0;
+    if (c > 0) counts.set(l, c - 1);
+    else changed.add(i);
+  });
+  return changed;
+}
+
+function renderL4(src, changed = new Set()) {
+  const lines = highlightLines(src);
+  document.getElementById("l4src").innerHTML = lines
+    .map((h, i) => `<div class="ln${changed.has(i) ? " chg" : ""}">${h || "&nbsp;"}</div>`)
+    .join("");
+}
+
 /* ── restricted-Markdown renderer for TNR output ─────────────────── */
-/* understands exactly what L4.TNR emits: #-headings, **bold**,
-   4-space-per-level tabulation, <!-- l4: --> anchors, coverage colophon */
 
 function inline(s) {
   return esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 function renderTNR(md) {
-  const blocks = md.split(/\n\n+/);
   const out = [];
-  for (const raw of blocks) {
+  for (const raw of md.split(/\n\n+/)) {
     const block = raw.replace(/\s+$/, "");
     if (!block) continue;
-
     let m;
     if ((m = block.match(/^(#{1,6}) (.*)$/s))) {
       const lvl = m[1].length;
@@ -323,28 +403,135 @@ function renderTNR(md) {
       out.push(`<p class="${cls}">${inline(block.trim())}</p>`);
     }
   }
-  return out.join("\n");
+  document.getElementById("tnrdoc").innerHTML = out.join("\n");
 }
 
-/* ── wiring ──────────────────────────────────────────────────────── */
+/* ── state & wiring ──────────────────────────────────────────────── */
+
+const sel = document.getElementById("instrument");
+const statusEl = document.getElementById("status");
+const notice = document.getElementById("notice");
+const editBtn = document.getElementById("editBtn");
+const applyBtn = document.getElementById("applyBtn");
+const cancelBtn = document.getElementById("cancelBtn");
+const resetBtn = document.getElementById("resetBtn");
+const tnredit = document.getElementById("tnredit");
+
+let current = { name: null, l4: "", tnr: "" };
+let ticker = null;
+
+function setStatus(cls, msg) {
+  statusEl.className = cls;
+  statusEl.textContent = msg;
+}
+
+function startTicker(verb) {
+  const t0 = Date.now();
+  clearInterval(ticker);
+  ticker = setInterval(() => {
+    setStatus("busy", `${verb}… ${Math.round((Date.now() - t0) / 1000)}s`);
+  }, 250);
+}
+function stopTicker() { clearInterval(ticker); ticker = null; }
+
+function setEditing(on) {
+  document.body.classList.toggle("editing", on);
+  editBtn.style.display = on ? "none" : "";
+  applyBtn.style.display = on ? "" : "none";
+  cancelBtn.style.display = on ? "" : "none";
+  if (on) { tnredit.value = current.tnr; tnredit.focus(); }
+}
+
+function show(data, changed = new Set()) {
+  current = { name: data.name ?? current.name, l4: data.l4, tnr: data.tnr };
+  renderL4(data.l4, changed);
+  renderTNR(data.tnr);
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j;
+}
 
 async function load(name) {
-  const [l4, md] = await Promise.all([
-    fetch(`data/${name}.l4`).then((r) => r.text()),
-    fetch(`data/${name}.tnr.md`).then((r) => r.text()),
-  ]);
-  document.getElementById("l4src").innerHTML = highlightL4(l4);
-  document.getElementById("tnrdoc").innerHTML = renderTNR(md);
+  setEditing(false);
+  notice.className = "";
+  setStatus("busy", `loading ${name}…`);
+  try {
+    show(await api(`/api/load?name=${encodeURIComponent(name)}`));
+    setStatus("", "English is a view; logic is the model.");
+  } catch (e) { setStatus("err", e.message); }
   document.getElementById("l4pane").scrollTop = 0;
   document.getElementById("tnrpane").scrollTop = 0;
 }
 
-const sel = document.getElementById("instrument");
+async function apply() {
+  applyBtn.disabled = cancelBtn.disabled = editBtn.disabled = true;
+  notice.className = "";
+  startTicker("GPU drafting; CPU will verify");
+  try {
+    const res = await api("/api/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: current.name, tnr: tnredit.value }),
+    });
+    stopTicker();
+    if (res.ok) {
+      const changed = changedLines(current.l4, res.l4);
+      show({ l4: res.l4, tnr: res.tnr }, changed);
+      setEditing(false);
+      setStatus("ok", `typecheck passed (attempt ${res.attempts}); ` +
+        `${changed.size} L4 line${changed.size === 1 ? "" : "s"} changed; TNR re-rendered`);
+    } else {
+      setStatus("err", `rejected: typecheck failed after ${res.attempts} attempts`);
+      notice.textContent = res.diagnostics || res.log.join("\n");
+      notice.className = "show";
+    }
+  } catch (e) {
+    stopTicker();
+    setStatus("err", e.message);
+  }
+  applyBtn.disabled = cancelBtn.disabled = editBtn.disabled = false;
+}
+
+async function reset() {
+  setEditing(false);
+  notice.className = "";
+  startTicker("restoring original");
+  try {
+    const res = await api("/api/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: current.name }),
+    });
+    stopTicker();
+    show(res);
+    setStatus("ok", "working copy discarded; original restored");
+  } catch (e) { stopTicker(); setStatus("err", e.message); }
+}
+
 sel.addEventListener("change", () => load(sel.value));
 document.getElementById("anchors").addEventListener("change", (e) =>
-  document.body.classList.toggle("show-anchors", e.target.checked)
-);
-load(sel.value);
+  document.body.classList.toggle("show-anchors", e.target.checked));
+editBtn.addEventListener("click", () => setEditing(true));
+cancelBtn.addEventListener("click", () => setEditing(false));
+applyBtn.addEventListener("click", apply);
+resetBtn.addEventListener("click", reset);
+
+(async () => {
+  try {
+    const { instruments } = await api("/api/instruments");
+    sel.innerHTML = instruments
+      .map((n) => `<option value="${n}">${n.replace(/-/g, " ")}</option>`)
+      .join("");
+    const pick = instruments.includes("imaginary-alcohol-act")
+      ? "imaginary-alcohol-act" : instruments[0];
+    sel.value = pick;
+    await load(pick);
+  } catch (e) { setStatus("err", e.message); }
+})();
 </script>
 </body>
 </html>

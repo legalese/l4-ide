@@ -292,7 +292,8 @@ declareDoc d@(MkDeclare _ _ (MkAppForm _ name _args _) tydecl) n =
           _ ->
             ", having "
               <> commaAnd
-                [ "a \x201C" <> resolvedText fn <> "\x201D (" <> typeText ft <> ")"
+                [ articleFor (resolvedText fn)
+                    <> " \x201C" <> resolvedText fn <> "\x201D (" <> typeText ft <> ")"
                 | MkTypedName _ fn ft _ <- cfields
                 ]
 
@@ -382,6 +383,8 @@ relPron subj
     [ "person", "individual", "applicant", "officer", "proprietor"
     , "citizen", "employee", "director", "member", "child", "parent"
     , "driver", "owner", "occupier", "operator", "licensee"
+    , "borrower", "lender", "keeper", "tenant", "landlord"
+    , "buyer", "seller", "vendor", "purchaser"
     ]
 
 ----------------------------------------------------------------------------
@@ -459,12 +462,34 @@ deontonText (MkDeonton _ party (MkAction _ modal pat mprovided) due hence lest) 
     <> " "
     <> modalText modal
     <> " "
-    <> flatLinTree (linearize pat)
+    <> actionText pat
     <> maybe "" (\p -> ", provided that " <> proseExpr p) mprovided
     <> maybe "" (\d -> ", within " <> proseExpr d) due
     <> "."
-    <> maybe "" (\h -> " Upon compliance, " <> proseExpr h <> ".") hence
-    <> maybe "" (\l -> " Failing which, " <> proseExpr l <> ".") lest
+    <> followup " Upon compliance, " hence
+    <> followup " Failing which, " lest
+ where
+  -- HENCE/LEST FULFILLED is the implicit terminal: drafting leaves it unsaid
+  followup lead = maybe "" \e -> case carameliseNode e of
+    Var _ r | resolvedText r == "FULFILLED" -> ""
+    _ -> lead <> proseExpr e <> "."
+
+-- | The action of a deontic: the event-constructor name reads as the verb
+-- phrase; plain variable binders are dropped (they are introduced
+-- implicitly and referenced from the PROVIDED clause); structured
+-- sub-patterns are kept.
+actionText :: Pattern Resolved -> Text
+actionText = \case
+  PatApp _ ctor args ->
+    Text.unwords
+      ( resolvedText ctor
+          : [flatLinTree (linearize a) | a <- args, not (isVarPat a)]
+      )
+   where
+    isVarPat = \case
+      PatVar{} -> True
+      _ -> False
+  p -> flatLinTree (linearize p)
 
 modalText :: DeonticModal -> Text
 modalText = \case
@@ -629,10 +654,13 @@ typeText = \case
     other -> typeText other
 
 withArticle :: Text -> Text
-withArticle t = case Text.uncons t of
+withArticle t = articleFor t <> " " <> t
+
+articleFor :: Text -> Text
+articleFor t = case Text.uncons t of
   Just (c, _)
-    | Text.toLower (Text.singleton c) `Text.isInfixOf` "aeiou" -> "an " <> t
-  _ -> "a " <> t
+    | Text.toLower (Text.singleton c) `Text.isInfixOf` "aeiou" -> "an"
+  _ -> "a"
 
 ----------------------------------------------------------------------------
 -- Small text helpers

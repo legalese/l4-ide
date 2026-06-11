@@ -192,7 +192,7 @@
 
     (f) “vest immediately”, having a “Reason” (a STRING);
 
-    (g) “pay offset amount”, having a “Amount” (a NUMBER); or
+    (g) “pay offset amount”, having an “Amount” (a NUMBER); or
 
     (h) “hold shares for period”, having a “Years” (a NUMBER).
 
@@ -396,15 +396,15 @@ For the purposes of this provision—
 
 **45.  export Check what service requiremends apply**
 
-In relation to a CEO Award State “award state”, Eligible Service Requirement means if Forfeiture Applies with award state, then Elon Musk must forfeit unvested shares has is exactly Forfeiture Reason with award state.; otherwise, if Immediate Vesting Applies with award state, then Elon Musk may vest immediately has is exactly Immediate Vesting Reason with award state.; otherwise, Elon Musk must maintain eligible service status has Service Status, provided that Service Status is equal to Chief Executive Officer or Service Status is equal to Executive Officer Product Development, within Date to days with the difference between award state's Current Date and Performance End Date. Failing which, Elon Musk must forfeit unvested shares has is exactly Cessation of Eligible Service...
+In relation to a CEO Award State “award state”, Eligible Service Requirement means if Forfeiture Applies with award state, then Elon Musk must forfeit unvested shares is exactly Forfeiture Reason with award state.; otherwise, if Immediate Vesting Applies with award state, then Elon Musk may vest immediately is exactly Immediate Vesting Reason with award state.; otherwise, Elon Musk must maintain eligible service status, provided that Service Status is equal to Chief Executive Officer or Service Status is equal to Executive Officer Product Development, within Date to days with the difference between award state's Current Date and Performance End Date. Failing which, Elon Musk must forfeit unvested shares is exactly Cessation of Eligible Service...
 
 <!-- l4: decide:Milestone Achievement Requirement -->
 
-**46.** In relation to a NUMBER “tranche” and a CEO Award State “award state”, Milestone Achievement Requirement means if Tranche Can Be Earned with tranche and award state, then Elon Musk may achieve market cap milestone has tranche no and mkt cap, provided that mkt cap is greater than Required Market Cap For Tranche with tranche no and Market Cap Milestone Met with tranche no and award state's Performance Metrics or Market Cap Milestone Met For Change In Control with tranche no and award state's Performance Metrics, within Date to days with the difference between award state's Current Date and Performance End Date. Upon compliance, Elon Musk may achieve operational milestone has tranche n and Milestone Type, provided that Operational Milestone Met with tranche n and award state's Performance Metrics or Deemed Achievement Applies with tranche n and award state, within Date to days with the difference between award state's Current Date and Performance End Date..; otherwise, FULFILLED.
+**46.** In relation to a NUMBER “tranche” and a CEO Award State “award state”, Milestone Achievement Requirement means if Tranche Can Be Earned with tranche and award state, then Elon Musk may achieve market cap milestone, provided that mkt cap is greater than Required Market Cap For Tranche with tranche no and Market Cap Milestone Met with tranche no and award state's Performance Metrics or Market Cap Milestone Met For Change In Control with tranche no and award state's Performance Metrics, within Date to days with the difference between award state's Current Date and Performance End Date. Upon compliance, Elon Musk may achieve operational milestone, provided that Operational Milestone Met with tranche n and award state's Performance Metrics or Deemed Achievement Applies with tranche n and award state, within Date to days with the difference between award state's Current Date and Performance End Date..; otherwise, FULFILLED.
 
 <!-- l4: decide:Vesting Requirement -->
 
-**47.** In relation to a NUMBER “tranche” and a CEO Award State “award state”, Vesting Requirement means if Tranche Is Earned with tranche and award state and award state's Current Date is at least vesting date, then Elon Musk must vest earned shares has tranche no and date, provided that tranche no is equal to tranche and date is at least vesting date, within 1. Upon compliance, Elon Musk must pay offset amount has is exactly Offset Amount For Tranche with tranche, within 30. Upon compliance, Elon Musk must hold shares for period has is exactly 5, within Date to days with the difference between award state's Current Date and holding period end...; otherwise, FULFILLED.
+**47.** In relation to a NUMBER “tranche” and a CEO Award State “award state”, Vesting Requirement means if Tranche Is Earned with tranche and award state and award state's Current Date is at least vesting date, then Elon Musk must vest earned shares, provided that tranche no is equal to tranche and date is at least vesting date, within 1. Upon compliance, Elon Musk must pay offset amount is exactly Offset Amount For Tranche with tranche, within 30. Upon compliance, Elon Musk must hold shares for period is exactly 5, within Date to days with the difference between award state's Current Date and holding period end...; otherwise, FULFILLED.
 
 For the purposes of this provision—
 

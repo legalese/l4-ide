@@ -1,0 +1,54 @@
+§ `Library Lending Act`
+
+-- A small bespoke act for the TNR demo: definitions (DECLARE / MEANS),
+-- a prohibition that exercises the negative-universal rewrite, and a
+-- pair of chained obligations (PARTY / MUST / HENCE / LEST).
+
+§§ `Definitions`
+
+DECLARE Borrower HAS
+    Name IS A STRING
+
+DECLARE Book HAS
+    Title              IS A STRING
+    `Replacement cost` IS A NUMBER
+
+`The loan period in days` MEANS 28
+
+`The late fee per day` MEANS 0.50
+
+ASSUME `the borrower` IS A Borrower
+
+ASSUME `the borrower is a member of the library` IS A BOOLEAN
+ASSUME `the borrower has unpaid fines exceeding ten dollars` IS A BOOLEAN
+ASSUME `the borrower has been banned by the head librarian` IS A BOOLEAN
+
+§§ `Eligibility`
+
+DECIDE `the borrower must not borrow a book`
+IF  NOT `the borrower is a member of the library`
+    OR  `the borrower has unpaid fines exceeding ten dollars`
+    OR  `the borrower has been banned by the head librarian`
+
+§§ `Obligations`
+
+DECLARE `Loan event` IS ONE OF
+    `return the book`
+        HAS `Returned copy` IS A Book
+    `pay the accrued late fee`
+        HAS `Amount paid` IS A NUMBER
+
+GIVEN borrowed IS A Book
+`The duty to return` MEANS
+    PARTY `the borrower`
+    MUST  `return the book` `Returned copy`
+              PROVIDED `Returned copy`'s Title EQUALS borrowed's Title
+    HENCE FULFILLED
+    LEST  `The duty to pay the late fee` borrowed
+
+GIVEN borrowed IS A Book
+`The duty to pay the late fee` MEANS
+    PARTY `the borrower`
+    MUST  `pay the accrued late fee` `Amount paid`
+              PROVIDED `Amount paid` AT LEAST `The late fee per day`
+    HENCE FULFILLED
