@@ -99,7 +99,23 @@
   header label.toggle input { accent-color: var(--oxblood); margin-right: .3rem; vertical-align: -1px; }
 
   /* ───────────────────────── panes ───────────────────────── */
-  main { flex: 1; display: flex; min-height: 0; }
+  main { flex: 1; display: flex; min-height: 0; position: relative; }
+  main::after {
+    content: "⟳  GPU drafting · CPU will verify · the model is the L4";
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(12, 18, 14, .62);
+    backdrop-filter: blur(1.5px);
+    color: var(--nm);
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: .95rem;
+    letter-spacing: .12em;
+    z-index: 10;
+    animation: breathe 1.3s ease-in-out infinite alternate;
+  }
+  body.applying main::after { display: flex; }
+  @keyframes breathe { from { opacity: .7; } to { opacity: 1; } }
   .pane { flex: 1 1 50%; min-width: 0; overflow-y: auto; }
 
   .seam {
@@ -472,6 +488,7 @@ async function load(name) {
 
 async function apply() {
   applyBtn.disabled = cancelBtn.disabled = editBtn.disabled = true;
+  document.body.classList.add("applying");
   notice.className = "";
   startTicker("GPU drafting; CPU will verify");
   try {
@@ -487,6 +504,8 @@ async function apply() {
       setEditing(false);
       setStatus("ok", `typecheck passed (attempt ${res.attempts}); ` +
         `${changed.size} L4 line${changed.size === 1 ? "" : "s"} changed; TNR re-rendered`);
+      const first = document.querySelector("#l4src .chg");
+      if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
     } else {
       setStatus("err", `rejected: typecheck failed after ${res.attempts} attempts`);
       notice.textContent = res.diagnostics || res.log.join("\n");
@@ -496,6 +515,7 @@ async function apply() {
     stopTicker();
     setStatus("err", e.message);
   }
+  document.body.classList.remove("applying");
   applyBtn.disabled = cancelBtn.disabled = editBtn.disabled = false;
 }
 
