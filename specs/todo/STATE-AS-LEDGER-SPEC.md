@@ -211,6 +211,7 @@ The plan is **substrate-first**: prove the load-bearing claim (D2/Rung 3) end-to
   - **Remaining known limitations (→ M4.5):** party keys are rendered `Text` (two parties rendering identically would collide); a mid-directive evaluator exception skips the party restore (blast radius contained to that one directive by `withFreshLedger`).
 
 - **M4.5 — Cross-party + official reads, `local` quarantine, and the breach-path party.** Deferred from M4 to keep it a coherent unit: (a) cross-party read syntax `<party>'s <cell>` and explicit official-record reads; (b) the `local` write-quarantine (Q5) — env *writes* inside a Reader `local` go to a scratch ledger dropped on unwind; (c) ~~deadline-passed `LEST` party attribution~~ **✅ done (`e3b476e8`)**; (d) consider typed party keys to remove the render-collision risk.
+- **M5 — Deontic sequencing of state effects (`p HENCE RECORD HENCE q`).** Make `RECORD`/`COMMIT`/`ATTEST` first-class *steps* in a `HENCE` chain by giving them an optional `HENCE` continuation, so a write becomes a real statement in the deontic do-block rather than a value that smuggles its continuation. Design + redteam in **Appendix B**.
 
 The numbered steps below are the M0–M2 detail.
 
@@ -441,3 +442,85 @@ gatherEvidence MEANS
 Desugar: `RECORD X` writes — and a bare read `X` reads — the *current party's* ledger (the snapshot is now per-party); `COMMIT X IS V` (or `ATTEST`) is an `Assign` into the distinguished shared *official* ledger, emitted only at the named commit point. The cross-party reads `Alice's fp` / `Bob's fp` keep the genitive because they reach into *another* party's record. Alice's and Bob's private writes **cannot race** — they touch different ledgers; the only shared write is the Court's single `COMMIT`. This is **R1**: the deontic-race-becomes-data-race surface shrinks to one named commit, and the three Hohfeldian lanes stay distinct — Alice and Bob *supply*, the Court *decides*, and (were `fp` a burden fact) some party *bears* it.
 
 > **Footgun watch (open Q5).** If `gatherEvidence` were evaluated under a Reader `local` (a hypothetical "what if jurisdiction were X"), should Alice's and Bob's `RECORD`s be real or discarded on unwind? Proposed: env *reads* under `local` are fine; env *writes* (`RECORD`/`COMMIT`) are quarantined to a scratch ledger dropped on unwind, so a what-if can never silently mutate the official record.
+
+---
+
+## Appendix B — M5: Deontic sequencing of state effects
+
+### B.1 The problem
+
+A regulative rule is a chain: `p HENCE q HENCE r HENCE s`, where `p`/`q` are usually `PARTY … MUST/MAY …`. With M1–M4 we can also write to the ledger — but a write is currently a *value-expression* (`RECORD <cell> IS <v>` evaluates to `v`), not a *step*. So you cannot write the obvious thing:
+
+```l4
+PARTY Alice MUST deliver
+HENCE RECORD `delivery done` IS <data>     -- a step in the middle of the chain
+HENCE PARTY Bob MUST pay 50
+```
+
+because `HENCE` is part of the `Deonton` grammar, not a postfix operator on an expression. M4's own test threads a write-before-an-obligation with a **hack** — cram the continuation into the recorded *value*:
+
+```l4
+RECORD `delivery done` IS (PARTY Bob MUST pay 50 HENCE …)   -- value conflated with continuation
+```
+
+(The M4 implementer labelled this "the only way … without the M5 sequencing syntax.") It is wrong: you are recording the cell to the *value* "Bob's obligation," when the value should be the data and `q` the next step.
+
+### B.2 The design: `RECORD`/`COMMIT` as an *event-free deontic step*
+
+The deontic chain already *is* a continuation monad: `continueWithFollowup` (`Machine.hs:1079`) pushes `App1 [time, events]` and evaluates the followup; `App1` (`Machine.hs:474`) then *applies* the followup's value to `[time, events]` — a `ValObligation` scrutinizes the event stream, `ValFulfilled` passes through. So `p HENCE q HENCE r` ≡ `p >>= \_ -> q >>= \_ -> r`, with the threaded state being `(clock, event-stream)` and the effect being the ledger.
+
+M5 gives `RECORD`/`COMMIT`/`ATTEST` an **optional `HENCE`**, making them steps:
+
+```l4
+PARTY Alice MUST deliver
+HENCE RECORD `delivery done` IS <data>          -- fires tellEvent, consumes NO event
+HENCE PARTY Bob MUST pay 50
+HENCE COMMIT `total paid` IS FULFILLED
+```
+
+The correspondence is exactly monadic do-notation:
+
+> `p HENCE RECORD \`x\` IS v HENCE q`  ≡  `do { p; tell (x ↦ v); q }`
+
+A `MUST` step is an *event-consuming* bind (it `await`s the matching event); a `RECORD`/`COMMIT` step is an *event-free* bind (a pure `tell`/`put`). Both are sequenced by the same `HENCE`. The "instruction pointer flows out of the state effect" because the write step performs its effect and hands the *same* `[time, events]` straight to its `HENCE`.
+
+### B.3 Mechanism (almost no new machinery)
+
+The effect fires during the **forward-eval** of the `Record` node — which, in a chain, is exactly when `continueWithFollowup` forwards to it (i.e. when control reaches the step). Then the node *forwards to its `HENCE`* instead of returning the written value:
+
+```
+runRecord …:
+  tellEvent (Assign path whnf prov)          -- route by isOfficial, key by currentParty (M4)
+  case mHence of
+    Nothing    -> Backward writtenValue       -- M1 behaviour: terminal / expression use
+    Just hence -> ForwardExpr env hence       -- M5: become the continuation
+```
+
+Trace of `p HENCE (RECORD x HENCE q)`: `p` fulfils → `continueWithFollowup` pushes `App1 [time,events]` and `ForwardExpr`s the `RECORD` node → `runRecord` fires `tellEvent`, then `ForwardExpr`s `hence` → `hence` reduces to `q` (a `ValObligation`) → the `App1` still on the stack applies `q` to `[time,events]` → `q` scrutinizes events. **No new value type, no new `App1` case.** Party scoping composes: `p`'s `continueWithFollowup` set `currentParty=Alice` (so the `RECORD` keys Alice); when `q` fulfils, *its* `continueWithFollowup` sets `currentParty=Bob` (so a later `COMMIT` keys Bob) — precisely M4's two-party routing.
+
+### B.4 Type rule
+
+- `RECORD <cell> IS <value>` (no `HENCE`) : the **value's type** (M1, for expression use). `cell : STRING`.
+- `RECORD <cell> IS <value> HENCE <k>` : the **type of `k`** (a `DEONTIC …`), because in the chain it stands where a deontic step stands. `cell : STRING`, `value : τ` (τ recorded, not returned).
+
+`COMMIT`/`ATTEST` identically, routing to the official ledger.
+
+### B.5 Redteam design critique
+
+1. **Effect-on-force timing (the `unsafePerformIO` worry).** The write now fires when the `Record` node is *forced*. In a `HENCE` chain that is deterministic and in-order (`continueWithFollowup` forces it exactly when control arrives). But a `RECORD … HENCE …` placed in a non-followup position would fire on demand, which is surprising. **Mitigation:** the type rule makes a `HENCE`-carrying `RECORD` a `DEONTIC` value, so it only *type-checks* in step position; and D1 already marks writes as visible. *Decision needed:* hard-restrict `RECORD…HENCE` to followup position, or merely lint it elsewhere. **Recommend: restrict** (reject `RECORD…HENCE` outside a `HENCE`/`LEST` followup) so timing is always deterministic.
+2. **Idempotency under event backtracking (the sharp one).** The contract scrutiny retries events (`tryNextEvent`). Could a write fire twice? In the design it fires *before* the downstream obligation `q` scrutinizes events, and the retry loops inside `q`'s `Contract1 ScrutinizeEvents` — it does **not** re-evaluate the `RECORD` node. But this rests on the `Record` node being forced exactly once. **Obligation on the implementation:** prove `tellEvent` fires once per step execution (a `RECORD HENCE RECORD HENCE q` with an event-backtracking `q` must show exactly two `Assign`s, not more). This is the #1 thing the adversary must verify.
+3. **Composition with `LEST`.** `p MUST a HENCE (RECORD x HENCE q) LEST r`: on `p`'s success the `RECORD` fires then `q` runs; on `p`'s breach the `RECORD` does **not** fire (its `LEST` `r` does). Conversely a `RECORD` *inside* a `LEST` reparation must fire on breach and continue — which is exactly the path the `ResolveParty` fix (`e3b476e8`) already party-attributes. M5 must keep both correct.
+4. **Event-free really means event-free.** The `RECORD` step must not enter `Contract1 ScrutinizeEvents` itself — it forwards `[time, events]` untouched to its `HENCE`. Verify no event is consumed by the write (a single-event trace must still satisfy a `MUST` placed *after* a `RECORD`).
+5. **Chained writes & termination.** `RECORD x HENCE RECORD y HENCE q` must produce two writes then run `q`. An unbounded `RECORD HENCE RECORD HENCE …` with no obligation is author-error (a non-event-consuming loop) — no new risk, but worth a note.
+6. **Grammar / `HENCE` associativity.** In `p HENCE RECORD x IS v HENCE q`, the second `HENCE` must bind to the `RECORD` (its continuation), and the *value* parser must stop at `HENCE` (not swallow it). `HENCE` is a keyword, so the expression parser should already stop; the adversary must confirm `v` doesn't greedily consume `HENCE q`.
+7. **`#TRACE`/D5 interaction.** A `RECORD` step that fires then the chain later breaches: the pre-step `Assign` survives (append + no rollback, D5). Already guaranteed structurally; add a chain-position test.
+8. **Exhaustiveness blast radius.** Adding the `Maybe (Expr n)` `HENCE` field changes `Record`'s arity → every explicit `Record` match (Desugar, Machine forward/backward, TypeCheck, Print, Nlg, **jl4-mlir** Schema/Lower) needs updating; build `cabal build all`. (No new base instance — `Maybe (Expr n)` derives.)
+
+### B.6 Implementation plan
+
+1. **AST** (`Syntax.hs`): `Record Anno (Expr n) (Expr n) Bool` → add a `Maybe (Expr n)` HENCE field. Auto-derives.
+2. **Parser** (`Parser.hs` `recordOrCommitExpr`): after `RECORD <cell> IS <value>`, optionally parse `HENCE <expr>` → the `Maybe` field; ensure the value parser stops at `HENCE`.
+3. **Eval** (`Machine.hs`): thread the `Maybe HENCE` through the `Record1`/`Record2` frames; in `runRecord`, after `tellEvent`, branch — `Nothing` → `Backward` written value (M1); `Just hence` → `ForwardExpr env hence` (M5). Reuses `App1`/`continueWithFollowup` unchanged.
+4. **Typecheck** (`TypeCheck.hs`): `RECORD…HENCE k` has `k`'s type; restrict to followup position (redteam #1).
+5. **Exhaustiveness** across jl4-core + jl4-mlir (redteam #8); `cabal build all` green.
+6. **Tests**: `p HENCE RECORD HENCE q` (write then obligation, data ≠ continuation); chained `RECORD HENCE RECORD HENCE q` fires **exactly twice** under an event-backtracking `q` (redteam #2); a `MUST` placed *after* a `RECORD` still consumes its event (redteam #4); D5 with a `RECORD` step then a downstream breach.
