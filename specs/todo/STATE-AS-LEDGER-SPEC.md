@@ -211,7 +211,8 @@ The plan is **substrate-first**: prove the load-bearing claim (D2/Rung 3) end-to
   - **Remaining known limitations (→ M4.5):** party keys are rendered `Text` (two parties rendering identically would collide); a mid-directive evaluator exception skips the party restore (blast radius contained to that one directive by `withFreshLedger`).
 
 - **M4.5 — Cross-party + official reads, `local` quarantine, and the breach-path party.** Deferred from M4 to keep it a coherent unit: (a) cross-party read syntax `<party>'s <cell>` and explicit official-record reads; (b) the `local` write-quarantine (Q5) — env *writes* inside a Reader `local` go to a scratch ledger dropped on unwind; (c) ~~deadline-passed `LEST` party attribution~~ **✅ done (`e3b476e8`)**; (d) consider typed party keys to remove the render-collision risk.
-- **M5 — Deontic sequencing of state effects (`p HENCE RECORD HENCE q`).** Make `RECORD`/`COMMIT`/`ATTEST` first-class *steps* in a `HENCE` chain by giving them an optional `HENCE` continuation, so a write becomes a real statement in the deontic do-block rather than a value that smuggles its continuation. Design + redteam in **Appendix B**.
+- **M5 — Deontic sequencing of state effects (`p HENCE RECORD HENCE q`). ✅ DONE (2026-06-12, commit `6686a3be`).** `RECORD`/`COMMIT`/`ATTEST` gained an optional `HENCE` (a `Maybe (Expr n)` field on `Record`), becoming event-free steps in a deontic chain — `do { p; tell (x↦v); q }`, the recorded value now the *data* (the M4 nesting hack is gone). `runRecord` fires `tellEvent` exactly once then branches `Nothing → Backward value` (M1) / `Just hence → ForwardExpr env hence` (M5); the enclosing `continueWithFollowup`'s `App1 [time,events]` carries the continuation — **no new `App1` case or value type**. The **idempotency** redteam (#2) was independently confirmed: chained writes under an event-backtracking downstream obligation fire exactly once (they fire on forward-eval, *before* the obligation scrutinizes events). 7 tests; whole workspace green; jl4-core 77/77. Design + redteam in **Appendix B**.
+  - **Decision (redteam #1): soft, type-directed restriction** (not the hard syntactic one Appendix B.5(1) recommended). A `RECORD…HENCE` has a deontic type, so it only type-checks where a deontic *value* is expected — which covers the `HENCE`/`LEST` followup position and rejects the obvious misuse (`(RECORD … HENCE …) + 1` is rejected), but is broader than followup-only. A hard followup-only well-formedness pass (fully closing the effect-on-force timing worry) is deferred.
 
 The numbered steps below are the M0–M2 detail.
 
@@ -477,6 +478,8 @@ HENCE RECORD `delivery done` IS <data>          -- fires tellEvent, consumes NO 
 HENCE PARTY Bob MUST pay 50
 HENCE COMMIT `total paid` IS FULFILLED
 ```
+
+> **Concrete-syntax note (found during M5):** the fully-flat same-column `HENCE … HENCE …` layout above is *illustrative*. L4's existing deontic grammar anchors each `HENCE` to its `PARTY` column, so a real chain uses **progressive indentation** (each step indented under the previous) — this is a **pre-existing** limitation (it fails identically on a pure-deontic chain with no `RECORD`), not introduced by M5. All M5 tests and CLI examples use the progressive-indentation idiom.
 
 The correspondence is exactly monadic do-notation:
 
