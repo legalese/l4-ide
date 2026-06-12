@@ -272,7 +272,7 @@ instance Linearize (Expr Resolved) where
     Fetch _ e -> hcat [ text "fetch", lin e ]
     Env _ e -> hcat [ text "environment variable", lin e ]
     Post _ e1 e2 e3 -> hcat [ text "post", lin e1, lin e2, lin e3 ]
-    Record _ cell val isOfficial -> hcat [ text (if isOfficial then "commit" else "record"), lin cell, text "is", lin val ]
+    Record _ cell val isOfficial mHence -> hcat ([ text (if isOfficial then "commit" else "record"), lin cell, text "is", lin val ] <> maybe [] (\k -> [ text "hence", lin k ]) mHence)
     ReadCell _ cell -> hcat [ text "recall", lin cell ]
     Concat _ exprs -> hcat [ text "concatenate", enumerate (punctuate ",") (spaced $ text "and") (fmap lin exprs) ]
     AsString _ e -> hcat [ lin e, text "as", text "string" ]

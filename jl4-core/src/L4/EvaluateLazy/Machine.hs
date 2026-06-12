@@ -82,10 +82,14 @@ data Frame =
   | Post2 WHNF {- -} (Expr Resolved) Environment
   | Post3 WHNF WHNF {- -}
   -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST. Record1 waits for the cell to
-  -- evaluate (holds the still-unevaluated value expr, its env, and isOfficial);
-  -- Record2 waits for the value (holds the evaluated cell WHNF and isOfficial).
-  | Record1 {- -} (Expr Resolved) Environment Bool
-  | Record2 WHNF {- -} Bool
+  -- evaluate (holds the still-unevaluated value expr, its env, isOfficial, and
+  -- the optional M5 HENCE continuation); Record2 waits for the value (holds the
+  -- evaluated cell WHNF, isOfficial, the HENCE, and the env to evaluate it in).
+  -- The 'Maybe (Expr Resolved)' is the M5 HENCE: 'Nothing' is M1 expression use
+  -- (the write returns its value); @Just k@ makes the write an event-free deontic
+  -- step (after 'tellEvent', forward @[time, events]@ to @k@).
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved))
   -- STATE-AS-LEDGER M1.5: RECALL. ReadCell1 waits for the cell to evaluate;
   -- when it has, we read the cell back from the ledger and yield MAYBE.
   | ReadCell1 {- -}
@@ -402,10 +406,13 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     PushFrame (Post1 e2 e3 env)
     ForwardExpr env e1
-  Record _ann cell val isOfficial -> do
+  Record _ann cell val isOfficial mHence -> do
     -- STATE-AS-LEDGER M1: evaluate the cell to a String path, then the value to
-    -- WHNF, append an Assign event to the ledger, and return the written value.
-    PushFrame (Record1 val env isOfficial)
+    -- WHNF, append an Assign event to the ledger. M5: if a HENCE continuation is
+    -- present, forward [time, events] to it (event-free deontic step); otherwise
+    -- return the written value (M1 expression use). The 'env' is carried so the
+    -- HENCE can be forwarded in the RECORD's lexical environment.
+    PushFrame (Record1 val env isOfficial mHence)
     ForwardExpr env cell
   ReadCell _ann cell -> do
     -- STATE-AS-LEDGER M1.5: evaluate the cell to a String path, then read it
@@ -449,14 +456,16 @@ backward val = WithPoppedFrame $ \ case
     ForwardExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
-  Just (Record1 valExpr env isOfficial) -> do
-    -- the cell has evaluated to 'val'; now evaluate the value expression
-    PushFrame (Record2 val isOfficial)
+  Just (Record1 valExpr env isOfficial mHence) -> do
+    -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
+    -- the env and the M5 HENCE so 'runRecord' can forward to the continuation.
+    PushFrame (Record2 val isOfficial env mHence)
     ForwardExpr env valExpr
-  Just (Record2 cellVal isOfficial) -> do
+  Just (Record2 cellVal isOfficial env mHence) -> do
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
-    -- Assign event to the ledger and return the written value (D2 / Rung 3).
-    runRecord cellVal val isOfficial
+    -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
+    -- continuation (forward [time, events] to it); without, return the value (M1).
+    runRecord cellVal val isOfficial env mHence
   Just ReadCell1 -> do
     -- the cell has evaluated to 'val' (a String path): read the ledger and
     -- return MAYBE — JUST the stored value, or NOTHING (M1.5).
@@ -1556,8 +1565,24 @@ partyKeyWHNF = \ case
 -- HENCE/LEST body) and recorded in the provenance @party@ — closing M2's
 -- deferred field. A top-level @#EVAL RECORD@ has no enclosing party, so @party@
 -- is "" and it routes to the anonymous own ledger.
-runRecord :: WHNF -> WHNF -> Bool -> Machine Config
-runRecord cellVal val isOfficial = do
+--
+-- M5: 'runRecord' fires the 'TellEvent' EXACTLY ONCE per forward-eval of the
+-- 'Record' node — it is reached precisely when the 'Record2' frame is popped
+-- (once). It then branches on the optional HENCE continuation @mHence@:
+--
+--   * 'Nothing' (M1, expression position): 'Backward' the written value, so the
+--     write can chain in a value context (@RECORD … IS v@ evaluates to @v@).
+--   * @Just hence@ (M5, deontic step): 'ForwardExpr' the continuation in the
+--     RECORD's lexical @env@. The 'App1 [time, events]' that the ENCLOSING
+--     'continueWithFollowup' already pushed before forwarding to this RECORD is
+--     still on the stack, so once @hence@ reduces to a 'ValObligation'/etc. that
+--     'App1' applies it to @[time, events]@ — i.e. the next step scrutinizes the
+--     SAME event stream. No new value type, no new 'App1' case. The write
+--     consumes no event; the downstream obligation's own event backtracking
+--     ('Contract1 ScrutinizeEvents') loops below this point and never re-forwards
+--     the 'Record' node, so the effect cannot re-fire (idempotency, redteam #2).
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Machine Config
+runRecord cellVal val isOfficial env mHence = do
   cell <- expectString cellVal
   -- M2 provenance enrichment: stamp the write with the directive's evaluation
   -- time ('GetEvalTime', the same clock the deontic state machine and
@@ -1571,7 +1596,9 @@ runRecord cellVal val isOfficial = do
         }
       route = if isOfficial then RouteOfficial else RouteOwn
   TellEvent route (Assign [cell] val prov)
-  Backward val
+  case mHence of
+    Nothing    -> Backward val            -- M1: terminal / expression use
+    Just hence -> ForwardExpr env hence   -- M5: become the deontic continuation
 
 -- | STATE-AS-LEDGER M1.5: perform a RECALL (cell read).
 --

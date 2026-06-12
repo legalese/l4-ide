@@ -1693,14 +1693,28 @@ postExpr = do
       <*> annoHole (indentedExpr current)
 
 -- | @RECORD <cell> IS <expr>@ (own ledger) and
--- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1.
+-- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1,
+-- with an optional trailing @HENCE <expr>@ continuation (M5).
 -- Both lower to the same 'Record' node; the keyword choice sets the
 -- @isOfficial@ flag ('False' for @RECORD@, 'True' for @COMMIT@/@ATTEST@).
+--
+-- M5: the value is parsed with 'indentedExpr current', which STOPS at the
+-- reserved @HENCE@ keyword (the deontic-followup parser relies on the same
+-- property) and may not dedent past the RECORD, so the value never swallows
+-- @HENCE k@. When a @HENCE@ follows, it is parsed into the 'Record' node's
+-- optional continuation, making the write an event-free deontic step.
+--
+-- The HENCE *continuation* is parsed at the lenient block threshold @mkPos 1@
+-- (exactly as top-level 'expr' is), NOT at @current@: in the idiomatic flat
+-- chain the chained @HENCE@ sits to the LEFT of @RECORD@ (aligned with the
+-- enclosing obligation's @HENCE@s), so anchoring to the RECORD's own column
+-- would wrongly reject it. @mkPos 1@ still halts cleanly at the next col-1 token
+-- (e.g. a following @#TRACE@ or top-level declaration).
 recordOrCommitExpr :: Parser (Expr Name)
 recordOrCommitExpr = do
   current <- Lexer.indentLevel
   attachAnno $
-    (\isOfficial cell val -> Record emptyAnno cell val isOfficial)
+    (\isOfficial cell val mHence -> Record emptyAnno cell val isOfficial mHence)
       <$> ( (False <$ annoLexeme (spacedKeyword_ TKRecord))
         <|> (True  <$ annoLexeme (spacedKeyword_ TKCommit))
         <|> (True  <$ annoLexeme (spacedKeyword_ TKAttest))
@@ -1708,6 +1722,7 @@ recordOrCommitExpr = do
       <*> annoHole cellExpr
       <*  annoLexeme (spacedKeyword_ TKIs)
       <*> annoHole (indentedExpr current)
+      <*> optionalWithHole (hence (mkPos 1))
 
 -- | @RECALL <cell>@ — STATE-AS-LEDGER M1.5. Reads a cell back from the ledger,
 -- yielding @MAYBE a@. The cell uses the SAME 'cellExpr' surface as

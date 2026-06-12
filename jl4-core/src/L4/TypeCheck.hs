@@ -1490,13 +1490,30 @@ inferExpr' g =
       e2' <- checkExpr ExpectPostHeadersContext e2 string
       e3' <- checkExpr ExpectPostBodyContext e3 string
       pure (Post ann e1' e2' e3', string)
-    Record ann cell val isOfficial -> do
+    Record ann cell val isOfficial mHence -> do
       -- STATE-AS-LEDGER M1: the cell is a string-keyed path; the value may be of
-      -- any type, and the whole RECORD/COMMIT/ATTEST expression has the type of
-      -- the value (so it can sit in a HENCE continuation and chain).
+      -- any type. Without a HENCE (M1, expression position) the whole
+      -- RECORD/COMMIT/ATTEST expression has the *value's* type.
+      --
+      -- STATE-AS-LEDGER M5: with a HENCE continuation @k@, the write is an
+      -- event-free deontic *step*, so the expression has the *type of @k@* (a
+      -- @CONTRACT …@ / DEONTIC type), not the value's type. The value's type is
+      -- recorded only (it is told to the ledger, not returned). Making the type
+      -- deontic gives a SOFT placement restriction (redteam #1): a @RECORD…HENCE@
+      -- only type-checks where a deontic VALUE is expected. That includes the
+      -- HENCE/LEST followup position we care about, but is broader than it (any
+      -- deontic-typed context would also accept it); it will NOT type-check in an
+      -- expression position wanting the value's type, which rules out the obvious
+      -- misuse. A HARD followup-ONLY restriction (closing the effect-on-force
+      -- timing worry completely) would need a separate well-formedness pass and is
+      -- deferred — see STATE-AS-LEDGER-SPEC Appendix B.5(1).
       cell' <- checkExpr ExpectRecordCellContext cell string
       (val', valT) <- inferExpr val
-      pure (Record ann cell' val' isOfficial, valT)
+      case mHence of
+        Nothing -> pure (Record ann cell' val' isOfficial Nothing, valT)
+        Just hence -> do
+          (hence', henceT) <- inferExpr hence
+          pure (Record ann cell' val' isOfficial (Just hence'), henceT)
     ReadCell ann cell -> do
       -- STATE-AS-LEDGER M1.5: the cell is a string-keyed path; the read is
       -- polymorphic in the stored value (the flat ledger is untyped at runtime),
@@ -2950,7 +2967,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Fetch ann e -> Fetch ann (go False ctx e)
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
-      Record ann cell val off -> Record ann (go False ctx cell) (go False ctx val) off
+      Record ann cell val off mHence -> Record ann (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
       ReadCell ann cell -> ReadCell ann (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)

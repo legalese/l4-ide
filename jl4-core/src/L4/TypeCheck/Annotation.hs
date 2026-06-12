@@ -189,10 +189,11 @@ nlgExpr = \ case
       e2' <- nlgExpr e2
       e3' <- nlgExpr e3
       pure $ Post ann e1' e2' e3'
-    Record ann cell val isOfficial -> do
+    Record ann cell val isOfficial mHence -> do
       cell' <- nlgExpr cell
       val' <- nlgExpr val
-      pure $ Record ann cell' val' isOfficial
+      mHence' <- traverse nlgExpr mHence
+      pure $ Record ann cell' val' isOfficial mHence'
     ReadCell ann cell -> do
       cell' <- nlgExpr cell
       pure $ ReadCell ann cell'

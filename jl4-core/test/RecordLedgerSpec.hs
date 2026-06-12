@@ -87,8 +87,8 @@ directiveExprs (MkModule _ _ sec) = goSection sec
 -- | The single 'Record' node we expect from a one-directive module.
 theRecord :: Module Resolved -> Maybe (Expr Resolved, Expr Resolved, Bool)
 theRecord m = case directiveExprs m of
-  [Record _ cell val isOfficial] -> Just (cell, val, isOfficial)
-  _                              -> Nothing
+  [Record _ cell val isOfficial _mHence] -> Just (cell, val, isOfficial)
+  _                                       -> Nothing
 
 -- 'WHNF'/'NF' have no 'Eq' (they carry IORef thunks), so we compare via Show.
 showVal :: WHNF -> String

@@ -237,12 +237,19 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
-  | Record     Anno (Expr n) (Expr n) Bool
-    -- ^ append to the ledger (STATE-AS-LEDGER M1). Cell expr, value expr, and
-    -- an isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger),
-    -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). For M1 both go to
-    -- the single 'envLedger' (the own/official split is M4); the flag is stored
-    -- faithfully so M4 can split later.
+  | Record     Anno (Expr n) (Expr n) Bool (Maybe (Expr n))
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). Cell expr, value expr, an
+    -- isOfficial flag, and an optional @HENCE@ continuation (M5).
+    --
+    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger),
+    -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). The flag is stored
+    -- faithfully so M4 can split own/official.
+    --
+    -- The final 'Maybe (Expr n)' is the M5 @HENCE@ continuation: 'Nothing' is the
+    -- M1 expression-position form (@RECORD <cell> IS <v>@ evaluates to @v@);
+    -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
+    -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
+    -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
   | ReadCell   Anno (Expr n)
     -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5). @RECALL <cell>@.
     -- The cell expr is a string-keyed path (a backtick ident or string literal,
