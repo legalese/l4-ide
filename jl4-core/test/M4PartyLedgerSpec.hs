@@ -134,6 +134,30 @@ breachSrc = Text.unlines
   , "  (`WAIT UNTIL` 100)"
   ]
 
+-- | A LEST reparation that RECORDs. Alice MUST report within 5; she never does,
+-- so the deadline-miss fires the LEST, which RECORDs a cell. The RECORD must be
+-- attributed to Alice (her OWN ledger), NOT the anonymous "" ledger. This is the
+-- regression guard for the deadline-passed party bug: on that path the obligation
+-- party was still an unevaluated expression, so it keyed as anonymous; it is now
+-- forced (via the ResolveParty frame) and keyed precisely, like the HENCE path.
+lestRecordSrc :: Text.Text
+lestRecordSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Alice, Bob"
+  , "DECLARE Action IS ONE OF"
+  , "  report"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "lestRecordsParty MEANS"
+  , "  PARTY Alice"
+  , "  MUST report"
+  , "  WITHIN 5"
+  , "  LEST"
+  , "    RECORD `penalty recorded` IS FULFILLED"
+  , ""
+  , "#TRACE lestRecordsParty AT 0 WITH"
+  , "  (`WAIT UNTIL` 100)"
+  ]
+
 -- | Is this fully-forced normal form a 'ValBreached'?
 isBreachedNF :: NF -> Bool
 isBreachedNF (MkNF (ValBreached _)) = True
@@ -183,3 +207,13 @@ spec = describe "STATE-AS-LEDGER M4: per-party ledgers + official record (R1)" $
       cellsOf (store.ownLedgers Map.! "Alice") `shouldBe` [["delivery recorded"]]
       -- nothing was committed to the official record on this failed run.
       cellsOf store.officialLedger `shouldBe` []
+
+  describe "(c) a RECORD in a LEST reparation (deadline-miss path) attributes to the real party" $ do
+    it "the deadline-miss LEST RECORD lands in Alice's OWN ledger (party=Alice), not the anonymous \"\" ledger" $ do
+      [res] <- runDirectives lestRecordSrc
+      let store = res.ledger
+      -- Before the deadline-path party fix this keyed under "" (anonymous); the
+      -- ResolveParty frame now forces the obligation party first, so it is Alice.
+      Map.keys store.ownLedgers `shouldBe` ["Alice"]
+      cellParties (store.ownLedgers Map.! "Alice")
+        `shouldBe` [(["penalty recorded"], "Alice")]

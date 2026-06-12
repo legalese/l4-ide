@@ -899,21 +899,31 @@ backwardContractFrame val = \ case
       -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
       -- MAY: deadline passed without exercising permission = FULFILLED (or HENCE if specified)
       then case act.modal of
-        DMustNot ->
+        DMustNot -> do
           -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
-          -- Continue with HENCE (followup), which defaults to FULFILLED
-          AllocateValue ev'time >>= continueWithFollowup (partyKeyMaybeEvaluated party) env followup events
-        DMay ->
-          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED
-          AllocateValue ev'time >>= continueWithFollowup (partyKeyMaybeEvaluated party) env followup events
+          -- Continue with HENCE (followup), which defaults to FULFILLED.
+          -- Force the obligation party first so the followup is attributed to it.
+          t <- AllocateValue ev'time
+          pushCFrame (ResolveParty ResolvePartyFrame {followup, env, events, time = t})
+          maybeEvaluate env party
+        DMay -> do
+          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED.
+          -- Force the obligation party first so the followup is attributed to it.
+          t <- AllocateValue ev'time
+          pushCFrame (ResolveParty ResolvePartyFrame {followup, env, events, time = t})
+          maybeEvaluate env party
         _ -> -- DMust, DDo: deadline passed = failure
           case lest of
             Nothing -> do
               -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
               partyR <- either (`allocate_` env) AllocateValue party
               Backward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
-            Just lestFollowup -> AllocateValue ev'time
-              >>= continueWithFollowup (partyKeyMaybeEvaluated party) env lestFollowup events
+            Just lestFollowup -> do
+              -- Force the obligation party first so a RECORD in the LEST reparation
+              -- attributes to it, not the anonymous ledger.
+              t <- AllocateValue ev'time
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = lestFollowup, env, events, time = t})
+              maybeEvaluate env party
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -976,6 +986,11 @@ backwardContractFrame val = \ case
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> InternalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
+  ResolveParty ResolvePartyFrame {..} ->
+    -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
+    -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
+    -- does, so a RECORD in the followup/reparation attributes to the real party.
+    continueWithFollowup (Just (partyKeyWHNF val)) env followup events time
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -1527,16 +1542,6 @@ partyKeyWHNF :: WHNF -> Text
 partyKeyWHNF = \ case
   ValString t -> t
   v           -> prettyLayout v
-
--- | The party key for a 'MaybeEvaluated' obligation party (@Either RExpr WHNF@).
--- We can only render a party that has already been evaluated to 'WHNF'; an
--- unevaluated party expression ('Left') yields 'Nothing' (the followup then runs
--- with no acting party and a RECORD falls back to the anonymous own ledger).
--- In practice the deadline-passed/LEST paths that use this carry the obligation
--- party as a 'Left' expression, so they currently key as 'Nothing'; the matched
--- HENCE path (Contract10) always has the party as a 'WHNF' and keys precisely.
-partyKeyMaybeEvaluated :: MaybeEvaluated -> Maybe Text
-partyKeyMaybeEvaluated = either (const Nothing) (Just . partyKeyWHNF)
 
 -- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
 --
