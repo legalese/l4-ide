@@ -1506,6 +1506,71 @@ $(\textit{position},\textit{party})$ pair drawn from a different Hohfeldian
 register, and the value of having them as separate types is precisely that
 the transpiler cannot silently collapse one into another.
 
+\subsection{Discharging the burden over time: proof actions and an event-sourced factbase}\label{app:proofaction}
+The construct so far is static: it resolves a \emph{fixed} factbase to a
+judgement. But a burden is discharged \emph{over time}, by acts performed before
+deadlines---which is the regulative layer's home ground
+(\S\ref{sec:regulative}), not the constitutive core's. This suggests siting the
+\emph{act of proving} as a deontic action while leaving the \emph{fact} itself
+constitutive. The modality must be \code{MAY}, not \code{MUST}: proving is a
+privilege, not a duty---a party is not sanctioned for failing to prove, it
+simply loses the point---so the Hohfeldian separation above survives even as the
+deontic machinery, which carries a party index, is reused to name the
+burden-bearer. A \emph{proof action}
+\begin{lstlisting}
+PARTY  Plaintiff
+MAY    `prove` `abuse of confidence`
+WITHIN evidenceDeadline
+HENCE  `abuse of confidence is established`
+\end{lstlisting}
+\noindent feeds the constitutive decision: its \code{HENCE} continuation records
+the fact a downstream \code{DECIDE} consumes. This splits the burden into its two
+classical halves---the deadline-bounded \code{MAY} is the burden of
+\emph{production} (act in time or lose the point), and the standard of proof
+gating the \code{HENCE} is the burden of \emph{persuasion}---and renders a
+defeater as a \emph{counter} proof action by the opposing party, ordered by
+deadline, so that the static \code{flipBurden} involution becomes literal
+turn-taking: claim, defence, reply, the shape of pleading itself.
+
+The question this raises is not syntactic---\code{HENCE} already carries an
+arbitrary expression---but semantic: how does the \code{HENCE} record a fact a
+later \code{DECIDE} will read? The answer is \emph{not} a mutable cell and an
+\code{UPDATE} keyword. Establishing facts is state that must never be
+overwritten, for two reasons that pull together. The first is \emph{epistemic
+revision}: evidence is found forged, a witness recants, an appeal admits new
+facts, so a fact once believed established may later be believed false. On top of
+the \emph{logical} non-monotonicity already present---the \code{AND NOT}
+defeaters, which flip a conclusion \emph{within} a knowledge state---this adds a
+second, \emph{temporal} non-monotonicity \emph{across} knowledge states. The
+second reason is audit: the wedge of Section~\ref{sec:apps}, a decision one can
+replay and explain, demands answering \emph{what did the system conclude on date
+$T$, and on what basis}---and a destructive update is precisely what makes that
+question unanswerable.
+
+Both point to an \emph{event-sourced}, \emph{bitemporal} factbase. Nothing is
+mutated: a proof action appends an event stamped with both \emph{valid time}
+(when the fact holds in the world) and \emph{transaction time} (when we recorded
+believing it) \cite{snodgrass2000temporal}, and a correction is a later,
+superseding event rather than an overwrite. The facts a decision reads are then a
+pure projection, \code{established(F) AS OF (validTime, knownAt)}, non-monotone
+in either axis yet computed without mutation---and L4's multi-axis
+\code{TemporalContext} (\S\ref{sec:regulative}) already supplies exactly these
+stamps. The burden ledger of Figure~\ref{fig:provable} is already append-only;
+all that changes is that \code{resolve} graduates from a fold into a temporal,
+supersession-aware projection.
+
+This is \emph{event sourcing}, and for this paper's audience it has a familiar
+logical name: the \emph{event calculus} \cite{kowalski1986events}, whose
+\code{HoldsAt(f,t)} is exactly \code{established(f) AS OF t} and from which the
+regulative layer already descends (\S\ref{sec:regulative}). The same object
+wears several hats---event sourcing for the engineer, the event calculus for the
+logician, a \emph{trace} for the process reading of \S\ref{sec:regulative}, and,
+for the lawyer, \emph{the record}: append-only, corrections filed rather than
+expunged, interrogable as of any date. The capability L4 would need is therefore
+not mutation but its dual---letting a constitutive \code{DECIDE} \emph{query the
+regulative trace}---and we leave it to the work in progress flagged at the head
+of this appendix.
+
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{l4-icail}
 
