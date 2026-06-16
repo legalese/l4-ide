@@ -1935,33 +1935,6 @@ lowerLit (StringLit _ s) _ = do
     [PointerType] []
   ptrToF64 ptr
 
--- | Test whether an expression's L4 type is @NUMBER@ — i.e. its SSA value is
--- a rational handle. Uses the typechecker's 'InfoMap' first; falls back to
--- syntactic shape recognition (arithmetic ops, numeric literals, percent)
--- so the dispatch still works even if 'typeOfExpr' can't find an exact
--- range match for the node (which happens for some compound expressions).
-isNumberExpr :: Expr Resolved -> LowerM Bool
-isNumberExpr e = do
-  mt <- typeOfExpr e
-  case mt of
-    Just t  -> pure $ isNumberType t
-    Nothing -> case e of
-      -- A bare @Var@ reference (App with no args) — look the name up
-      -- in 'bindingL4Types' to get its source-level type. This matters
-      -- inside prelude bodies (max/min/count/…), where the param's
-      -- type is absent from the main module's 'InfoMap'. Without it,
-      -- 'isNumberExprShape' returns False for Var and 'lowerCmp'
-      -- falls through to direct @arith.cmpf@ on the f64 bit-pattern
-      -- — almost always producing the wrong truth value when the
-      -- operands are rational-pool handles.
-      App _ n [] -> do
-        let name = resolvedName n
-        mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
-        case mL4Ty of
-          Just t  -> pure $ isNumberType t
-          Nothing -> pure $ isNumberExprShape e
-      _ -> pure $ isNumberExprShape e
-
 -- | Syntactic-shape NUMBER recognition. Conservative — only returns True
 -- when the shape /must/ produce a NUMBER. Used as a fallback when the
 -- typechecker's 'InfoMap' is missing or imprecise for a given node.
@@ -1983,17 +1956,114 @@ isNumberExprShape = \case
     _             -> False
   _ -> False
 
--- | Test whether an expression's L4 type is @STRING@. Used to dispatch
--- @EQUALS@ on strings through @__l4_str_eq@ (content equality) instead of
--- the legacy 'arith.cmpf' on the pointer bit-pattern (which only happened to
--- agree for string-pool-interned-equal literals — see jl4-core's
--- 'BinOpEquals' on @ValString@).
-isStringExpr :: Expr Resolved -> LowerM Bool
-isStringExpr e = do
+-- | The comparison-relevant class of an operand's L4 type. Drives the
+-- 'lowerCmp' / 'dispatchEqualsByType' dispatch:
+--
+--   * 'CmpNumber' — a rational-pool /handle/. Ordered and equality
+--     comparisons MUST go through @__l4_rat_cmp@; the raw f64 is a pool
+--     index, so 'arith.cmpf' on it compares handle bit-patterns.
+--   * 'CmpString' — a string-pool /pointer/. Equality MUST go through
+--     @__l4_str_eq@ (content equality); the raw f64 is a pointer, so
+--     'arith.cmpf' compares addresses, not contents.
+--   * 'CmpOther' — a value whose raw f64 /is/ its comparison key:
+--     BOOLEAN (0.0\/1.0), enum tag (small int), DATE\/TIME serial. For
+--     these the legacy 'arith.cmpf' on the f64 is correct.
+data CmpClass = CmpNumber | CmpString | CmpOther
+  deriving (Eq)
+
+-- | Resolve an operand's 'CmpClass' as reliably as possible. Combines, in
+-- order of confidence:
+--
+--   1. the typechecker's 'InfoMap' (exact-range match via 'typeOfExpr');
+--   2. the recorded source-level type of a bare @Var@ reference
+--      ('bindingL4Types' — populated for GIVEN params and WHERE\/LET
+--      locals), which covers the very common case where the 'InfoMap'
+--      has no exact-range entry for a leaf @Var@; and
+--   3. structural shape inference ('structuralClass') for literals and
+--      builtins whose result type is fixed by their shape.
+--
+-- Returns 'Nothing' only when the type genuinely cannot be determined by
+-- any of these — the residual case 'lowerCmp' refuses to compile rather
+-- than emit an unsound 'arith.cmpf' on a possible handle\/pointer.
+classifyOperand :: Expr Resolved -> LowerM (Maybe CmpClass)
+classifyOperand e = do
   mt <- typeOfExpr e
-  pure $ case mt of
-    Just t -> isStringType t
-    Nothing -> False
+  -- IMPORTANT: the 'InfoMap' we read is *not* run through the final
+  -- substitution (unlike the LSP path), so 'typeOfExpr' frequently
+  -- returns @Just (InfVar …)@ — an un-resolved inference variable — for
+  -- leaf @Var@s. An 'InfVar' carries no usable class, so we must NOT let
+  -- it short-circuit the 'bindingL4Types' / structural fallbacks (doing
+  -- so was the original STRING-equality bug: the @Just InfVar@ was read
+  -- as "not a string" and fell through to a raw 'arith.cmpf' on the
+  -- string pointer). 'classifyL4Type' returns 'Nothing' for any
+  -- non-concrete type, so only a fully-resolved @TyApp@ head is trusted
+  -- here; everything else falls through.
+  case mt >>= classifyL4Type of
+    Just cls -> pure (Just cls)
+    Nothing  -> case e of
+      -- A bare @Var@ reference (App with no args): the 'InfoMap' often
+      -- lacks an exact-range entry — or carries only an 'InfVar' — for
+      -- the leaf, but 'bindingL4Types' records the param's\/local's
+      -- resolved source type.
+      App _ n [] -> do
+        let name = resolvedName n
+        mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
+        case mL4Ty >>= classifyL4Type of
+          Just cls -> pure (Just cls)
+          Nothing  -> pure (structuralClass e)
+      _ -> pure (structuralClass e)
+
+-- | Classify a resolved L4 type into a 'CmpClass'. NUMBER and STRING are
+-- the handle\/pointer ABIs that need a runtime call. Returns 'Nothing'
+-- for any /non-concrete/ type — an inference variable ('InfVar'), a
+-- function type, a @Forall@, or the kind @Type@ — so the caller falls
+-- through to a more reliable source rather than mis-reading an
+-- un-substituted 'InfVar' as @CmpOther@.
+classifyL4Type :: Type' Resolved -> Maybe CmpClass
+classifyL4Type t
+  | isNumberType t = Just CmpNumber
+  | isStringType t = Just CmpString
+  | isConcreteType t = Just CmpOther
+  | otherwise      = Nothing
+
+-- | A type is "concrete" for comparison purposes when it is a fully
+-- applied type constructor (a @TyApp@ with a resolved head) — i.e. a
+-- BOOLEAN, an enum, a DATE\/TIME, a record, etc. whose raw f64 /is/ its
+-- comparison key. Inference variables and arrow\/forall types are not
+-- concrete and must not be trusted as @CmpOther@.
+isConcreteType :: Type' Resolved -> Bool
+isConcreteType TyApp{} = True
+isConcreteType _       = False
+
+-- | Structural inference, used only when neither the 'InfoMap' nor
+-- 'bindingL4Types' resolved the operand. Conservative: returns 'Just'
+-- only when the shape /must/ produce a NUMBER or STRING. Never claims
+-- 'CmpOther' — an unrecognised shape stays 'Nothing' so the caller can
+-- fail loud rather than guess.
+structuralClass :: Expr Resolved -> Maybe CmpClass
+structuralClass e
+  | isNumberExprShape e = Just CmpNumber
+  | otherwise = case e of
+      Lit _ (StringLit _ _) -> Just CmpString
+      Concat{}              -> Just CmpString
+      AsString{}            -> Just CmpString
+      App _ n _ -> case resolvedName n of
+        "__l4_str_concat" -> Just CmpString
+        "__l4_to_string"  -> Just CmpString
+        _                 -> Nothing
+      _ -> Nothing
+
+-- | Combine the two operands' resolved 'CmpClass'es into the comparison's
+-- class. A concrete NUMBER\/STRING on /either/ side fixes the comparison
+-- (the two operands must share a type to have type-checked), so a known
+-- side rescues an unresolved one. 'Nothing' (both unresolved) is the only
+-- case the caller must refuse.
+combineCmpClass :: Maybe CmpClass -> Maybe CmpClass -> Maybe CmpClass
+combineCmpClass a b
+  | Just CmpNumber `elem` [a, b] = Just CmpNumber
+  | Just CmpString `elem` [a, b] = Just CmpString
+  | Just CmpOther  `elem` [a, b] = Just CmpOther
+  | otherwise                    = Nothing
 
 isNumberType :: Type' Resolved -> Bool
 isNumberType t = case t of
@@ -2008,24 +2078,40 @@ isStringType t = case t of
 nameMatches :: Resolved -> [Text] -> Bool
 nameMatches r names = resolvedName r `elem` names
 
--- | Lower a comparison. Dispatches on the operand's L4 type:
+-- | Lower a comparison. Dispatches on the operand's resolved 'CmpClass'
+-- ('classifyOperand' + 'combineCmpClass'):
 --
 --   * NUMBER → @__l4_rat_cmp@ returning -1.0\/0.0\/1.0 (f64-ABI); compare
 --     against 0.0 with @arith.cmpf@ to get the @i1@ truth value with the
---     same predicate the source used.
+--     same predicate the source used. Works for both ordered and equality
+--     comparisons.
 --   * STRING ==\/!= → @__l4_str_eq@ returning 0.0\/1.0 (f64-ABI); compare
 --     against 1.0 (or 0.0, for !=) to get @i1@.
---   * Everything else (BOOLEAN, enum tag, DATE\/TIME serial, pointers) →
---     legacy @arith.cmpf@ on the raw f64 bit-pattern (same as before).
+--   * STRING ordered (\<, \<=, \>, \>=) → /fail loud/. There is no
+--     string-ordering runtime builtin (only @__l4_str_eq@), and the raw
+--     f64 is a string-pool /pointer/, so an 'arith.cmpf' would order
+--     addresses, not contents — unsound. Refuse the export instead.
+--   * 'CmpOther' (BOOLEAN, enum tag, DATE\/TIME serial) → legacy
+--     @arith.cmpf@ on the raw f64, which /is/ the correct comparison key
+--     for these.
+--   * Unresolvable (neither side's type could be determined) → /fail
+--     loud/. The raw f64 might be a rational handle or a string pointer;
+--     an 'arith.cmpf' on it would compare handle\/pointer bit-patterns and
+--     "almost always" yield the wrong boolean. A refused compile is
+--     acceptable; a silent wrong boolean on a legal\/financial rule is
+--     not.
 --
 -- The native @i1@ result is then lifted to the uniform-ABI f64 truth value
 -- (0.0 = false, 1.0 = true) via 'boxBoolI1'.
 lowerCmp :: CmpfPredicate -> Expr Resolved -> Expr Resolved -> LowerM Value
 lowerCmp pred_ lhs rhs = do
-  numLhs <- isNumberExpr lhs
-  numRhs <- isNumberExpr rhs
-  if numLhs || numRhs
-    then do
+  clsLhs <- classifyOperand lhs
+  clsRhs <- classifyOperand rhs
+  case combineCmpClass clsLhs clsRhs of
+    Just CmpNumber -> do
+      -- A NUMBER is a rational-pool handle: never compare the handles
+      -- directly. @__l4_rat_cmp@ returns -1.0\/0.0\/1.0; re-applying the
+      -- source predicate against 0.0 recovers the intended truth value.
       lhsVal <- lowerExpr lhs l4NumberType
       rhsVal <- lowerExpr rhs l4NumberType
       cmpF <- emitVal $ \vid -> funcCall [vid] "__l4_rat_cmp"
@@ -2033,40 +2119,40 @@ lowerCmp pred_ lhs rhs = do
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       i1Val <- emitVal $ \vid -> arithCmpf vid pred_ cmpF zero
       boxBoolI1 i1Val
-    else case pred_ of
-      OEQ -> dispatchEqualsByType lhs rhs False
-      ONE -> dispatchEqualsByType lhs rhs True
-      _   -> do
-        lhsVal <- lowerExpr lhs l4NumberType
-        rhsVal <- lowerExpr rhs l4NumberType
-        i1Val <- emitVal $ \vid -> arithCmpf vid pred_ lhsVal rhsVal
-        boxBoolI1 i1Val
+    Just CmpString -> case pred_ of
+      OEQ -> lowerStringEq lhs rhs False
+      ONE -> lowerStringEq lhs rhs True
+      _   -> markUnsupported
+        "ordered comparison (<, <=, >, >=) on STRING values is not \
+        \supported by the WASM backend: there is no string-ordering \
+        \runtime builtin, and comparing the raw f64 would order \
+        \string-pool pointers, not contents"
+    Just CmpOther -> do
+      -- BOOLEAN / enum tag / DATE / TIME serial: the raw f64 is the
+      -- comparison key, so the direct arith.cmpf is correct.
+      lhsVal <- lowerExpr lhs l4NumberType
+      rhsVal <- lowerExpr rhs l4NumberType
+      i1Val <- emitVal $ \vid -> arithCmpf vid pred_ lhsVal rhsVal
+      boxBoolI1 i1Val
+    Nothing -> markUnsupported
+      "comparison on a value whose type could not be resolved; emitting a \
+      \raw arith.cmpf would be unsound on the rational-handle / \
+      \string-pointer ABI (the f64 may be a pool handle or pointer, not a \
+      \comparable numeric value)"
 
--- | EQUALS \/ NOT EQUALS dispatch when neither side is NUMBER. STRING goes
--- through @__l4_str_eq@ (content equality); everything else falls back to
--- bit-pattern equality on the raw f64 (correct for BOOLEAN\/enum\/DATE\/TIME,
--- approximate for pointer-typed values — a long-standing limitation
--- inherited from the pre-2b lowering).
-dispatchEqualsByType :: Expr Resolved -> Expr Resolved -> Bool -> LowerM Value
-dispatchEqualsByType lhs rhs invert = do
-  strLhs <- isStringExpr lhs
-  strRhs <- isStringExpr rhs
-  if strLhs || strRhs
-    then do
-      lhsVal <- lowerExpr lhs l4NumberType
-      rhsVal <- lowerExpr rhs l4NumberType
-      eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
-        [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
-      -- Compare the 0.0\/1.0 truth against 1.0 (for ==) or 0.0 (for !=).
-      cmpAgainst <- emitVal $ \vid ->
-        arithConstantFloat vid (if invert then 0.0 else 1.0)
-      i1Val <- emitVal $ \vid -> arithCmpf vid OEQ eqF cmpAgainst
-      boxBoolI1 i1Val
-    else do
-      lhsVal <- lowerExpr lhs l4NumberType
-      rhsVal <- lowerExpr rhs l4NumberType
-      i1Val <- emitVal $ \vid -> arithCmpf vid (if invert then ONE else OEQ) lhsVal rhsVal
-      boxBoolI1 i1Val
+-- | Lower STRING equality (==) or inequality (!=) through @__l4_str_eq@
+-- (content equality). The runtime returns 0.0\/1.0; we compare that
+-- against 1.0 (for ==) or 0.0 (for !=) to get the @i1@ truth value.
+lowerStringEq :: Expr Resolved -> Expr Resolved -> Bool -> LowerM Value
+lowerStringEq lhs rhs invert = do
+  lhsVal <- lowerExpr lhs l4NumberType
+  rhsVal <- lowerExpr rhs l4NumberType
+  eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
+    [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
+  cmpAgainst <- emitVal $ \vid ->
+    arithConstantFloat vid (if invert then 0.0 else 1.0)
+  i1Val <- emitVal $ \vid -> arithCmpf vid OEQ eqF cmpAgainst
+  boxBoolI1 i1Val
 
 -- | Lower a boolean binary operation. Operands arrive as f64 (encoded
 -- as 0.0 / 1.0). We unbox each to @i1@, run the native op, then box

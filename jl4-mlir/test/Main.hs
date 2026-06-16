@@ -62,6 +62,10 @@ main = do
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
+    , test "NUMBER == (InfoMap miss) → __l4_rat_cmp" testNumberCmpInfoMapMiss
+    , test "STRING == (InfoMap miss) → __l4_str_eq"  testStringEqInfoMapMiss
+    , test "STRING ordered < → supported:false"      testStringOrderedUnsupported
+    , test "unresolvable cmp → supported:false"      testUnresolvableCmpUnsupported
     ]
   if and results
     then do
@@ -673,3 +677,138 @@ testOverloadCollisionUnsupported = do
       pure ok
   where
     unless b act = if b then pure () else act
+
+-- | Regression for the @lowerCmp@ rational-handle bug. The 'InfoMap' we
+-- read is not run through the final substitution, so 'typeOfExpr' returns
+-- @Just (InfVar …)@ for a bare NUMBER @Var@ — neither NUMBER nor STRING.
+-- The fix must NOT let that 'InfVar' short-circuit the resolution: it
+-- falls through to 'bindingL4Types', recovers the param's NUMBER type, and
+-- routes the comparison through @__l4_rat_cmp@. A NUMBER is a rational-pool
+-- /handle/, so a raw @arith.cmpf@ on it would compare handle bit-patterns
+-- and almost always yield the wrong boolean. (Equality is used here so the
+-- arithmetic-shape fallback can't rescue it — only the type resolution can.)
+testNumberCmpInfoMapMiss :: IO Bool
+testNumberCmpInfoMapMiss = do
+  let src = T.unlines
+        [ "@export Compare"
+        , "GIVEN a IS A NUMBER"
+        , "      b IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS a EQUALS b"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_rat_cmp" mlir
+            && not (bareCmpf mlir)
+      unless ok $
+        putStrLn "\n    expected __l4_rat_cmp (not a raw arith.cmpf on handles)"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Regression for the STRING half of the same bug. A STRING is a
+-- string-pool /pointer/; equality must go through @__l4_str_eq@ (content
+-- equality). Before the fix, 'typeOfExpr' returned @Just (InfVar …)@ for
+-- the STRING params and the old @isStringExpr@ (which trusted that @Just@
+-- and had no 'bindingL4Types' fallback) reported "not a string", so
+-- @a EQUALS b@ lowered to @arith.cmpf oeq@ on the two pointer
+-- bit-patterns — wrong for equal-content strings interned at different
+-- addresses. The fix recovers STRING from 'bindingL4Types' and emits
+-- @__l4_str_eq@.
+testStringEqInfoMapMiss :: IO Bool
+testStringEqInfoMapMiss = do
+  let src = T.unlines
+        [ "@export Compare"
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS a EQUALS b"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_str_eq" mlir
+            && not (bareCmpf mlir)
+      unless ok $
+        putStrLn "\n    expected __l4_str_eq (not a raw arith.cmpf on string pointers)"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Ordered comparison on STRING (@<@) has no string-ordering runtime
+-- builtin (only @__l4_str_eq@ exists), and the raw f64 is a string-pool
+-- pointer, so an @arith.cmpf@ would order addresses, not contents. The
+-- compiler must refuse: flag the export @supported:false@ rather than ship
+-- an unsound ordering.
+testStringOrderedUnsupported :: IO Bool
+testStringOrderedUnsupported = do
+  let src = T.unlines
+        [ "@export Compare"
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS a LESS THAN b"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "ordered comparison" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for ordered STRING comparison. got:\n    "
+          <> T.unpack (T.take 700 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | When neither operand's type can be resolved by any source — here the
+-- operands are the results of a STRING-returning helper whose return type
+-- the (un-substituted) 'InfoMap' leaves as an inference variable, so
+-- 'typeOfExpr', 'bindingL4Types' (the operands aren't bare params), and the
+-- structural heuristic all come up empty — the compiler must fail loud
+-- rather than emit a raw @arith.cmpf@ on values that might be pool
+-- handles or pointers. The export is flagged @supported:false@.
+testUnresolvableCmpUnsupported :: IO Bool
+testUnresolvableCmpUnsupported = do
+  let src = T.unlines
+        [ "GIVEN x IS A STRING"
+        , "GIVETH A STRING"
+        , "`echo` MEANS x"
+        , ""
+        , "@export Compare"
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS (`echo` OF a) EQUALS (`echo` OF b)"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "could not be resolved" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for the unresolvable comparison. got:\n    "
+          <> T.unpack (T.take 700 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | True when the MLIR contains a raw @arith.cmpf@ that is NOT part of a
+-- type-guaranteed comparison path (@__l4_rat_cmp@ / @__l4_str_eq@ both
+-- legitimately follow up with an @arith.cmpf@ against a constant to turn
+-- their f64 result into an @i1@). Used to assert the rational-handle /
+-- string-pointer bug is gone.
+bareCmpf :: T.Text -> Bool
+bareCmpf mlir =
+  T.isInfixOf "arith.cmpf" mlir
+    && not (T.isInfixOf "@__l4_rat_cmp" mlir)
+    && not (T.isInfixOf "@__l4_str_eq" mlir)
