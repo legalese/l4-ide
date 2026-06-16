@@ -55,6 +55,30 @@ const throws = (name, fn, pred) => {
   ok ? pass++ : fail++;
 };
 
+// Expected-to-fail (TDD): encodes a behavior we intend to implement but
+// haven't yet, documenting the target without breaking the suite. `fn`
+// returns true iff the DESIRED behavior already holds.
+//   throws / returns false → xfail (pending): logged, suite stays green
+//   returns true           → XPASS: the feature landed; promote to a real `eq`
+let xfailPending = 0;
+let xpass = 0;
+const xfail = (name, fn) => {
+  let ok = false;
+  let info = "";
+  try {
+    ok = fn() === true;
+  } catch (e) {
+    info = ` (throws ${e && e.name})`;
+  }
+  if (ok) {
+    console.log(`XPASS ${name}: now passes — promote to a real test`);
+    xpass++;
+  } else {
+    console.log(`xfail ${name}: pending${info}`);
+    xfailPending++;
+  }
+};
+
 // --- __l4_str_concat (M1b: was an identity stub) ---
 eq("concat", unbox(env.__l4_str_concat(box("foo"), box("bar"))), "foobar");
 eq("concat empty lhs", unbox(env.__l4_str_concat(box(""), box("x"))), "x");
@@ -297,5 +321,47 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   );
 }
 
-console.log(`\n${pass} passed, ${fail} failed`);
+// ---------------------------------------------------------------------------
+// TDD (expected-fail): bold deontic claims from the docs, not yet realized.
+// These encode jl4-core's prohibition semantics (EvaluateLazy/Machine.hs) and
+// go RED today because QW2 refuses MUSTNOT loudly. When correct prohibition
+// support lands they XPASS — at which point promote them to `eq` and delete
+// the "MUSTNOT refused" guard test above. Tracked in
+// specs/todo/mlir-parity-fixes.md (deontic semantics, full fix).
+// ---------------------------------------------------------------------------
+{
+  const prohibition = {
+    kind: "OBLIGATION",
+    modal: "MUSTNOT",
+    party: "driver",
+    action: "speed",
+    deadline: 14,
+  };
+  // Machine.hs:1038-1042 — the prohibited action performed before the deadline
+  // is a VIOLATION → LEST, or immediate BREACH when there is no LEST clause;
+  // never FULFILLED (the inversion QW2 currently guards against by refusing).
+  xfail(
+    "deontic: MUSTNOT + prohibited act before deadline → BREACH (not FULFILLED)",
+    () => {
+      const r = runDeontic(
+        prohibition,
+        0,
+        [{ party: "driver", action: "speed", at: 1 }],
+        {},
+        null,
+      );
+      return r !== "FULFILLED" && !(r && r.OBLIGATION);
+    },
+  );
+  // Machine.hs:983-986 — deadline passes with the prohibited action never taken:
+  // the prohibition was RESPECTED → HENCE, defaulting to FULFILLED.
+  xfail(
+    "deontic: MUSTNOT respected (no prohibited act by deadline) → FULFILLED",
+    () => runDeontic(prohibition, 0, [], {}, null) === "FULFILLED",
+  );
+}
+
+console.log(
+  `\n${pass} passed, ${fail} failed, ${xfailPending} xfail (pending), ${xpass} XPASS`,
+);
 process.exit(fail ? 1 : 0);

@@ -103,6 +103,24 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
 - ⬜ **Tests that execute wasm** — all 19 Haskell tests are `isInfixOf` string
   checks; none compiles/runs a module. (Needs the toolchain in CI.)
 
+### Tests (TDD red→green)
+
+Bold doc claims that are currently false are encoded as **expected-fail** tests
+that go red now (falsifying the "DONE" claim) and green when realized:
+
+- ✅ **`xfail` harness** in `runtime/jl4-runtime.test.mjs` — pending failures are
+  logged + tallied but don't break the suite; a passing xfail prints `XPASS`
+  (the nudge to promote it to a real `eq` assertion).
+- 🔴 **MUSTNOT → BREACH** (prohibited act before deadline) and **MUSTNOT
+  respected → FULFILLED** — encode jl4-core `Machine.hs:983/1038`; red today
+  (QW2 refuses MUSTNOT). Promote + delete the "MUSTNOT refused" guard test once
+  real prohibition lands.
+- ⬜ **(deferred to post-lowerCmp, Haskell `test/Main.hs`)** xfail for
+  `Schema.freeVarsOfExpr` vs `Lower.freeVarsOfExpr` agreement on an App-head
+  case; xfail that a PROVIDED guard survives into the extracted
+  `deonticContract`. Needs a `pending` facility added to the Haskell runner.
+  (Held back to avoid colliding with the in-flight lowerCmp agent.)
+
 ### Hygiene / scope
 - ⬜ **String-op fidelity** — code-point vs UTF-16 in length/substring/indexOf;
   `TOSTRING`/`JSON_ENCODE` formatting for small fractions & big ints; add
