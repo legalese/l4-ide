@@ -78,10 +78,18 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   extraction (Schema.hs:801-810 ignores `action.provided`), regulative
   `AND`/`OR` unsupported. Decision: port from jl4-core `Machine.hs` vs.
   refuse-and-route-to-fallback.
-- 🔄 **`lowerCmp` InfoMap-miss fallback** (Lower.hs:2002-2009) does raw
-  `arith.cmpf` on rational handle bit-patterns — "almost always wrong" per the
-  code's own comment. Make NUMBER/STRING comparison type-guaranteed.
-  (background agent — fix type dispatch; fail loud where type is unresolvable.)
+- ✅ **`lowerCmp` InfoMap-miss fallback** — DONE (commit `65c94608`). Root cause
+  was deeper than the review: `tcdInfoMap` isn't run through the typechecker's
+  final substitution, so `typeOfExpr` returns `Just (InfVar …)` (not `Nothing`)
+  and `isStringExpr` (no `bindingL4Types` fallback) let **STRING `==` on params
+  lower to a bare `arith.cmpf` on pointers** — silently wrong for equal-content
+  strings interned at different addresses. New `classifyOperand` dispatches
+  NUMBER→`__l4_rat_cmp`, STRING `==`/`!=`→`__l4_str_eq`; ordered-STRING (no
+  runtime builtin) and genuinely-unresolvable both fail loud (`supported:false`);
+  BOOLEAN/enum/DATE keep `arith.cmpf`. 4 regression tests; 26/26 pass.
+  Residual (tracked): a STRING comparison whose operands are *helper results*
+  still fails loud because `funcSigs` only stores MLIR types (f64) — recovering
+  the L4 return type needs a bundle-wide return-type map (larger change).
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
