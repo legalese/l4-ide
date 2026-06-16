@@ -1566,10 +1566,23 @@ regulative layer already descends (\S\ref{sec:regulative}). The same object
 wears several hats---event sourcing for the engineer, the event calculus for the
 logician, a \emph{trace} for the process reading of \S\ref{sec:regulative}, and,
 for the lawyer, \emph{the record}: append-only, corrections filed rather than
-expunged, interrogable as of any date. The capability L4 would need is therefore
-not mutation but its dual---letting a constitutive \code{DECIDE} \emph{query the
-regulative trace}---and we leave it to the work in progress flagged at the head
-of this appendix.
+expunged, interrogable as of any date. The capability is not mutation but its
+dual---letting a constitutive \code{DECIDE} \emph{query the regulative
+trace}---and that dual is now realised. L4 provides \code{RECORD} (append to a
+party's own ledger), \code{COMMIT}/\code{ATTEST} (append to the shared
+\emph{official} record), and \code{RECALL} (the projecting read, including
+\code{<party>'s} cross-party and \code{OFFICIAL's} official-record forms). A
+proof action's \code{HENCE} appends with \code{RECORD}, and a later \code{DECIDE}
+reads the fact back with \code{RECALL}, so the record-then-read loop is the
+deontic sequencing \mbox{\code{p HENCE RECORD HENCE q}} threaded through the
+regulative chain; the writes append and never overwrite by construction, the
+no-\code{UPDATE} discipline argued above made concrete. What remains is the
+\emph{second} temporal axis: \code{resolve} graduating from this last-write-wins
+fold into the bitemporal, supersession-aware projection \code{established(F) AS OF
+(validTime, knownAt)}, where a correction is a superseding event rather than the
+latest write, and a typed \code{EnvironmentState} schema linking each read's type
+to the fact it recorded. Those two refinements---not the query capability
+itself---are the work in progress flagged at the head of this appendix.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{l4-icail}
