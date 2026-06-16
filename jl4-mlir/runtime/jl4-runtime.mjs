@@ -1421,12 +1421,12 @@ function buildInnerEvalTraceSubtree(
   startTime,
   events,
   value,
-  residualContract,
-  residualDeadline,
+  _residualContract,
+  _residualDeadline,
   contractBodyText,
   innerResultText,
   args,
-  givenParams,
+  _givenParams,
   explicitBreach,
 ) {
   const fnNameRendered =
@@ -1508,7 +1508,7 @@ function buildFnApplicationSubtree(
   paramSchemas,
   args,
   fnNameRendered,
-  contractBodyText,
+  _contractBodyText,
 ) {
   const unwrappedArgs = paramSchemas
     .map((p) => "unwrapped_" + p.name)
@@ -1907,8 +1907,8 @@ function buildEvalTraceCallFrame(
   paramSchemas,
   contractBodyText,
   innerResultText,
-  value,
-  explicitBreach,
+  _value,
+  _explicitBreach,
 ) {
   // The "a" leaf always shows the chosen branch's body text. For
   // svc's parameterised wrapper this means the IF-resolved body
@@ -1981,7 +1981,7 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
   if (expr == null) return "";
   if (typeof expr === "string") return expr;
   if (expr.param != null) {
@@ -3506,7 +3506,7 @@ export function createRuntime(opts) {
 
   // M5 slice 4A — synthetic IF sub-tree for `__NOT__ a` ⟶
   // `IF a THEN FALSE ELSE TRUE`. Single arg, no short-circuit.
-  function synthesizeNotDesugar(frame, node, parentResultText, lookupNode) {
+  function synthesizeNotDesugar(frame, _node, parentResultText, lookupNode) {
     if (frame.children.length < 1) return [];
     const argTruth = frameTruth(frame.children[0], lookupNode);
     const aText =
@@ -3949,12 +3949,6 @@ export function createRuntime(opts) {
 // returns, with `tag = TraceResponse` whenever `reasoning` is non-empty
 // (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
-
-const EMPTY_REASONING = {
-  exampleCode: [],
-  explanation: [],
-  children: [],
-};
 
 export function isEmptyReasoning(r) {
   return (
