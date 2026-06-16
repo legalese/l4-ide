@@ -1173,9 +1173,17 @@ HENCE  `abuse of confidence is established`
 \cite{kowalski1986events}であって，その\code{HoldsAt(f,t)}はまさに\code{established(f) AS OF t}であり，規制層は
 すでにそこから派生している（\ref{sec:regulative}節）。同じ対象がいくつもの顔をもつ――技術者にはイベント
 ソーシング，論理学者には事象計算，\ref{sec:regulative}節のプロセス的読みには\emph{トレース}，そして法律家には
-\emph{訴訟記録}：追記専用で，訂正は抹消されずに提出され，任意の日付時点で参照できる。したがってL4が加えるべき
-能力は変異ではなくその双対――制定的\code{DECIDE}が規制トレースを\emph{問い合わせる}こと――であり，本付録冒頭で
-掲げた進行中の作業に委ねる。
+\emph{訴訟記録}：追記専用で，訂正は抹消されずに提出され，任意の日付時点で参照できる。その能力は変異ではなく
+その双対――制定的\code{DECIDE}が規制トレースを\emph{問い合わせる}こと――であり，その双対はいまや実現されている。
+L4は\code{RECORD}（当事者自身の台帳への追記），\code{COMMIT}/\code{ATTEST}（共有される\emph{公式}記録への追記），
+そして\code{RECALL}（射影的な読み出し。\code{<party>'s}による他当事者参照と\code{OFFICIAL's}による公式記録参照を
+含む）を提供する。証明行為の\code{HENCE}は\code{RECORD}で追記し，後続の\code{DECIDE}は\code{RECALL}でその事実を
+読み戻すので，記録してから読むこの循環は，規制連鎖を貫く逐次化\mbox{\code{p HENCE RECORD HENCE q}}にほかならない。
+これらの書き込みは構成上つねに追記であって上書きしないので，上で論じた\code{UPDATE}非使用の規律が具体化されて
+いる。残るのは\emph{第二の}時間軸である――\code{resolve}がこの最新書き込み優先の畳み込みから，訂正を最新の書き込み
+ではなく上書き的事象として扱うバイテンポラルで上書き認識的な射影\code{established(F) AS OF (validTime, knownAt)}へと
+昇格すること，そして各読み出しの型を記録した事実に結びつける型付き\code{EnvironmentState}スキーマである。これら
+二つの精緻化こそが――問い合わせ能力そのものではなく――本付録冒頭で掲げた進行中の作業である。
 
 % --- 参考文献 -------------------------------------------------------
 \bibliographystyle{plain}
