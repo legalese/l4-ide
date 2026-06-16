@@ -280,11 +280,13 @@ in wasm linear memory, but the proxy runs Node — which has `BigInt`. So:
   `jl4-mlir run` verified (`calculate-bonus → 25000`), and the parity harness is
   unchanged (gate PASS). `runtime/rational.test.mjs` now also exercises the
   imports end-to-end (`0.1+0.2 → 0.3` through `__l4_rat_*`).
-- **Slice 2b — next:** the lowering itself. `NUMBER` box kind becomes a handle;
-  route every numeric literal (→ `__l4_rat_parse` of the interned decimal),
-  arithmetic op (`arith.addf`→`__l4_rat_add`, etc.), comparison
-  (`arith.cmpf`→`__l4_rat_cmp`), and numeric builtin through the runtime; final
-  marshal renders via `ratToJSONValue`. This is the invasive multi-week core.
+- **Slice 2b — DONE:** the lowering itself is wired. `NUMBER` box kind is a
+  handle; every numeric literal (→ `__l4_rat_parse` of the interned decimal),
+  arithmetic op (`__PLUS__`/`Plus`→`__l4_rat_add`, etc., [Lower.hs:1575-1578](src/L4/MLIR/Lower.hs), [1722-1725](src/L4/MLIR/Lower.hs)),
+  comparison (→ `__l4_rat_cmp`), and numeric builtin now route through the
+  runtime; final marshal renders via `ratToJSONValue`. The old `arith.addf`/
+  `subf`/`mulf`/`divf` constructors in `Dialect/Arith.hs` have zero remaining
+  callers in `src/`. This was the invasive multi-week core.
 - **Slice 3:** input decimal→rational parsing in the request marshaler.
 - Gate each slice on the M0 harness: watch `ulp-differs` cells flip to
   `byte-identical`.
