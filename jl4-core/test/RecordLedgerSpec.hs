@@ -190,7 +190,7 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
         Left errs -> expectationFailure ("expected a clean typecheck, got: " <> show errs)
         Right r ->
           case directiveExprs r.tcdModule of
-            [ReadCell _ _cell] -> pure ()
+            [ReadCell _ _mParty _isOfficial _cell] -> pure ()
             other -> expectationFailure ("expected exactly one ReadCell directive, got: " <> show (length other))
 
     it "(1) after RECORD `x` IS 273.15, RECALL `x` evaluates to JUST 273.15 (shared ledger, via the seam)" $

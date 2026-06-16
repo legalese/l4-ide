@@ -271,6 +271,10 @@ interpMachine = \ case
     routeEvent route ev
   CurrentLedger ->
     currentOwnLedger
+  PartyLedger key ->
+    storeOwnLedger key <$> currentStore
+  OfficialLedger ->
+    (.officialLedger) <$> currentStore
   GetCurrentParty ->
     readRef (.currentParty)
   PutCurrentParty mp ->

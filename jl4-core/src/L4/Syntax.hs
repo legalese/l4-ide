@@ -250,12 +250,33 @@ data Expr n =
     -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
     -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
     -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
-  | ReadCell   Anno (Expr n)
-    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5). @RECALL <cell>@.
-    -- The cell expr is a string-keyed path (a backtick ident or string literal,
-    -- the same surface as 'Record'). It forward-evaluates the cell to a 'Path',
-    -- reads the latest 'snapshot' projection of the M0 ledger, and yields
-    -- @MAYBE a@ — @JUST v@ if the cell has been written, @NOTHING@ otherwise.
+  | ReadCell   Anno (Maybe (Expr n)) Bool (Expr n)
+    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5 / M4.5).
+    -- @RECALL [<party>'s | OFFICIAL's] <cell>@. (@OFFICIAL@ is a case-sensitive
+    -- keyword, all-caps like @RECORD@/@COMMIT@/@RECALL@; lowercase @official@
+    -- remains an ordinary identifier.)
+    --
+    -- The fields are: an optional /party-qualifier/ expression, an /isOfficial/
+    -- flag, and the /cell/ expr (a string-keyed path: a backtick ident or string
+    -- literal, the same surface as 'Record').
+    --
+    --   * @RECALL <cell>@            — @(Nothing, False)@: read the CURRENT acting
+    --     party's own ledger (the M1.5 default, unchanged).
+    --   * @RECALL <party>'s <cell>@  — @(Just party, False)@: read ANOTHER party's
+    --     OWN ledger. The party qualifier is a NAME-RESOLVED expression (the same
+    --     party value a PARTY clause uses), rendered via @partyKeyWHNF@ so the
+    --     read key matches a write key exactly.
+    --   * @RECALL OFFICIAL's <cell>@ — @(Nothing, True)@: read the shared OFFICIAL
+    --     record (the COMMIT/ATTEST target).
+    --
+    -- Parser-enforced invariant: @isOfficial == True@ implies the @Maybe@ is
+    -- 'Nothing' (an official read has no party qualifier). This mirrors 'Record'\'s
+    -- flat (cell, val, isOfficial, mHence) encoding rather than a parameterized
+    -- sum, so no extra instance derivation is needed.
+    --
+    -- It forward-evaluates the cell to a 'Path', reads the latest 'snapshot'
+    -- projection of the routed M0/M4 ledger, and yields @MAYBE a@ — @JUST v@ if
+    -- the cell has been written there, @NOTHING@ otherwise.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]

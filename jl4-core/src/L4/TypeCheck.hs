@@ -1514,14 +1514,23 @@ inferExpr' g =
         Just hence -> do
           (hence', henceT) <- inferExpr hence
           pure (Record ann cell' val' isOfficial (Just hence'), henceT)
-    ReadCell ann cell -> do
-      -- STATE-AS-LEDGER M1.5: the cell is a string-keyed path; the read is
+    ReadCell ann mParty isOfficial cell -> do
+      -- STATE-AS-LEDGER M1.5 / M4.5: the cell is a string-keyed path; the read is
       -- polymorphic in the stored value (the flat ledger is untyped at runtime),
-      -- so @RECALL <cell>@ has type @MAYBE a@ for a fresh @a@ pinned by the use
-      -- site — exactly what M3's @fromMaybe <presumption> (RECALL cell)@ consumes.
+      -- so @RECALL [<party>'s | OFFICIAL's] <cell>@ has type @MAYBE a@ for a fresh
+      -- @a@ pinned by the use site — exactly what M3's
+      -- @fromMaybe <presumption> (RECALL cell)@ consumes. The result type is the
+      -- same regardless of which ledger is read.
+      --
+      -- M4.5: an optional party qualifier is typechecked EXACTLY as a PARTY
+      -- clause's party is (a fresh party type, 'ExpectRegulativePartyContext'),
+      -- mirroring 'checkDeonton'/'inferEvent'. The OFFICIAL read has no party.
       cell' <- checkExpr ExpectRecordCellContext cell string
+      mParty' <- traverse (\p -> do
+                   partyT <- fresh (NormalName "party")
+                   checkExpr ExpectRegulativePartyContext p partyT) mParty
       a <- fresh (NormalName "cell")
-      pure (ReadCell ann cell', maybeType a)
+      pure (ReadCell ann mParty' isOfficial cell', maybeType a)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -2968,7 +2977,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
       Record ann cell val off mHence -> Record ann (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
-      ReadCell ann cell -> ReadCell ann (go False ctx cell)
+      ReadCell ann mParty off cell -> ReadCell ann (fmap (go False ctx) mParty) off (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)

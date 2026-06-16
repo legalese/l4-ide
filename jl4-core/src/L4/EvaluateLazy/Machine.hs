@@ -90,9 +90,20 @@ data Frame =
   -- step (after 'tellEvent', forward @[time, events]@ to @k@).
   | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
   | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved))
-  -- STATE-AS-LEDGER M1.5: RECALL. ReadCell1 waits for the cell to evaluate;
-  -- when it has, we read the cell back from the ledger and yield MAYBE.
-  | ReadCell1 {- -}
+  -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
+  -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
+  -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
+  -- Once the cell is in hand we branch on the qualifier:
+  --   * isOfficial          -> read the OFFICIAL ledger, finish.
+  --   * Just partyExpr       -> push 'ReadCell2' (holding the cell WHNF) and
+  --                             forward-eval the party expr; on its value we key
+  --                             via 'partyKeyWHNF' and read that party's ledger.
+  --   * Nothing (default)    -> read the CURRENT party's own ledger, finish.
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool Environment
+  -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
+  -- already-evaluated cell WHNF so 'finishRead' can complete the read against
+  -- the named party's own ledger.
+  | ReadCell2 WHNF {- -}
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -194,6 +205,8 @@ data Machine a where
   GetSafeMode :: Machine Bool  -- ^ Returns True when HTTP operations should be disabled
   TellEvent :: EventRoute -> LedgerEvent -> Machine ()  -- ^ append an event to the routed ledger (STATE-AS-LEDGER M4)
   CurrentLedger :: Machine Ledger  -- ^ read the current acting party's own ledger (STATE-AS-LEDGER M1.5, RECALL)
+  PartyLedger :: Text -> Machine Ledger  -- ^ read a NAMED party's own ledger (STATE-AS-LEDGER M4.5, cross-party RECALL)
+  OfficialLedger :: Machine Ledger  -- ^ read the shared official record (STATE-AS-LEDGER M4.5, RECALL official's)
   GetCurrentParty :: Machine (Maybe Text)  -- ^ the party whose HENCE/LEST we are inside (M4)
   PutCurrentParty :: Maybe Text -> Machine ()  -- ^ set the current acting party (M4); restored via a frame
   PokeThunk :: Reference
@@ -414,10 +427,12 @@ forwardExpr env = \ case
     -- HENCE can be forwarded in the RECORD's lexical environment.
     PushFrame (Record1 val env isOfficial mHence)
     ForwardExpr env cell
-  ReadCell _ann cell -> do
-    -- STATE-AS-LEDGER M1.5: evaluate the cell to a String path, then read it
-    -- back from the ledger snapshot and return MAYBE (JUST/NOTHING).
-    PushFrame ReadCell1
+  ReadCell _ann mParty isOfficial cell -> do
+    -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
+    -- carrying the optional party qualifier (still unevaluated), the isOfficial
+    -- flag, and the env. The 'ReadCell1' frame then routes to the right ledger
+    -- (own / cross-party / official) and reads it, yielding MAYBE (JUST/NOTHING).
+    PushFrame (ReadCell1 mParty isOfficial env)
     ForwardExpr env cell
   Concat _ann [] ->
     Backward (ValString "")
@@ -466,10 +481,31 @@ backward val = WithPoppedFrame $ \ case
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
     runRecord cellVal val isOfficial env mHence
-  Just ReadCell1 -> do
-    -- the cell has evaluated to 'val' (a String path): read the ledger and
-    -- return MAYBE — JUST the stored value, or NOTHING (M1.5).
-    runReadCell val
+  Just (ReadCell1 mParty isOfficial env) -> do
+    -- the cell has evaluated to 'val' (a String path). Route to the right
+    -- ledger and finish (M1.5 / M4.5):
+    --   * isOfficial   -> read the shared OFFICIAL record.
+    --   * Just party    -> evaluate the party qualifier (push ReadCell2 holding
+    --                      the cell), then key it and read that party's ledger.
+    --   * Nothing       -> read the CURRENT acting party's own ledger (M1.5).
+    if isOfficial
+      then do
+        ledger <- OfficialLedger
+        finishRead val ledger
+      else case mParty of
+        Just partyExpr -> do
+          PushFrame (ReadCell2 val)
+          ForwardExpr env partyExpr
+        Nothing -> do
+          ledger <- CurrentLedger
+          finishRead val ledger
+  Just (ReadCell2 cellVal) -> do
+    -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
+    -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
+    -- write, then read that party's own ledger and finish (M4.5).
+    let key = partyKeyWHNF val
+    ledger <- PartyLedger key
+    finishRead cellVal ledger
   Just (RestoreCurrentParty mOriginal) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -1600,20 +1636,26 @@ runRecord cellVal val isOfficial env mHence = do
     Nothing    -> Backward val            -- M1: terminal / expression use
     Just hence -> ForwardExpr env hence   -- M5: become the deontic continuation
 
--- | STATE-AS-LEDGER M1.5: perform a RECALL (cell read).
+-- | STATE-AS-LEDGER M1.5 / M4.5: finish a RECALL (cell read) against a given
+-- ledger.
 --
 -- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
 -- lower it to a single-segment 'Path' (mirroring 'runRecord') and read the
--- latest projection of the ledger via 'readCell' (D2: a fold over the append
--- log, last-write-wins). The result is @MAYBE a@: @JUST v@ when the cell has
--- been written (the stored 'WHNF' is allocated into a fresh reference, exactly
--- as the @ENV@/date-parse builtins do for their JUST values), or @NOTHING@ when
--- the cell has never been assigned (e.g. a read before any RECORD, or a read in
+-- latest projection of the supplied @ledger@ via 'readCell' (D2: a fold over
+-- the append log, last-write-wins). The @ledger@ is chosen by the caller — the
+-- current party's own ledger (M1.5, the default), a named party's own ledger
+-- (M4.5 cross-party), or the shared official record (M4.5 @official's@) — so
+-- this helper is the single shared completion for all three RECALL forms.
+--
+-- The result is @MAYBE a@: @JUST v@ when the cell has been written in that
+-- ledger (the stored 'WHNF' is allocated into a fresh reference, exactly as the
+-- @ENV@/date-parse builtins do for their JUST values), or @NOTHING@ when the
+-- cell has never been assigned there (e.g. a read before any RECORD, a read of a
+-- party that recorded nothing, an official read before any COMMIT, or a read in
 -- a fresh per-directive ledger — 'withFreshLedger' isolation).
-runReadCell :: WHNF -> Machine Config
-runReadCell cellVal = do
+finishRead :: WHNF -> Ledger -> Machine Config
+finishRead cellVal ledger = do
   cell <- expectString cellVal
-  ledger <- CurrentLedger
   case readCell [cell] ledger of
     Just storedVal -> do
       valueRef <- AllocateValue storedVal

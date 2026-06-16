@@ -1724,16 +1724,44 @@ recordOrCommitExpr = do
       <*> annoHole (indentedExpr current)
       <*> optionalWithHole (hence (mkPos 1))
 
--- | @RECALL <cell>@ — STATE-AS-LEDGER M1.5. Reads a cell back from the ledger,
--- yielding @MAYBE a@. The cell uses the SAME 'cellExpr' surface as
--- RECORD/COMMIT/ATTEST (a backtick ident or a string literal), so a read and a
--- write name a cell the same way.
+-- | @RECALL [<party>'s | OFFICIAL's] <cell>@ — STATE-AS-LEDGER M1.5 + M4.5.
+-- Reads a cell back from a ledger, yielding @MAYBE a@. The cell uses the SAME
+-- 'cellExpr' surface as RECORD/COMMIT/ATTEST (a backtick ident or a string
+-- literal), so a read and a write name a cell the same way.
+--
+-- After @RECALL@ we parse an OPTIONAL qualifier (M4.5), then the cell:
+--
+--   * @OFFICIAL's@      => @(Nothing, True)@  — read the shared OFFICIAL record.
+--   * @<party>'s@       => @(Just party, False)@ — read another party's OWN ledger.
+--     The party is a minimal name atom (NOT a full expression), wrapped as a
+--     @Var@ ('App' with no args), so it is name-resolved exactly like a PARTY.
+--   * (no qualifier)    => @(Nothing, False)@ — read the CURRENT party's own ledger.
+--
+-- Disambiguation: @OFFICIAL@ is a reserved, case-sensitive keyword (@TKOfficial@),
+-- tried first.
+-- The party branch uses @try (name <* TGenitive)@ so that, absent a following
+-- @'s@, it backtracks and the token is parsed as the cell instead (a backtick
+-- 'cellExpr' name and a backtick party 'name' otherwise overlap). 'cellExpr'
+-- being restrictive (backtick/string) keeps it from colliding with the cell.
 recallExpr :: Parser (Expr Name)
 recallExpr =
   attachAnno $
-    ReadCell emptyAnno
+    (\(mParty, isOfficial) cell -> ReadCell emptyAnno mParty isOfficial cell)
       <$  annoLexeme (spacedKeyword_ TKRecall)
+      <*> recallQualifier
       <*> annoHole cellExpr
+
+-- | The optional party/official qualifier of a @RECALL@ (M4.5). Produces the
+-- @(Maybe partyExpr, isOfficial)@ pair feeding 'ReadCell'. The parsed pieces
+-- contribute to the surrounding annotation via 'annoLexeme'/'annoHole'.
+recallQualifier :: AnnoParser (Maybe (Expr Name), Bool)
+recallQualifier =
+      tryParser ((Nothing, True) <$  annoLexeme (spacedKeyword_ TKOfficial)
+                                 <*  annoLexeme (spacedToken_ (TIdentifiers TGenitive)))
+  <|> ((\p -> (Just p, False)) <$> annoHole (try (App emptyAnno <$> name <*> pure [] <* genitive)))
+  <|> pure (Nothing, False)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
 
 -- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
 -- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a
