@@ -146,6 +146,20 @@ data LowerState = LowerState
     -- set is potentially mutually recursive — eager evaluation would
     -- loop, so 'lowerLocalDecl' lambda-lifts it instead.
   , pendingDecide :: !(Set.Set Text)
+    -- | Mangled symbols already claimed by an emitted @func.func@ body,
+    -- keyed by @(sanitizedName, arity)@ — the exact tuple
+    -- 'dedupAndSynthExterns' mangles to a single WASM symbol
+    -- (@name__$arity@). L4 allows ad-hoc overloading, so two genuinely
+    -- different top-level definitions can share a name AND an arity
+    -- (e.g. @daydate@'s four arity-1 @Date@ overloads, distinguished
+    -- only by their parameter *type*). The dedup post-pass keeps just
+    -- the FIRST body per mangled symbol and silently drops the rest, so
+    -- calls that meant a later overload would dispatch to the wrong
+    -- body. We can't disambiguate by type at the f64 ABI, so when a
+    -- second body collides on this key we 'markUnsupported' both the
+    -- prior and the current definition (keyed by their shared
+    -- 'Schema.wasmSymbol') — fail loud instead of silently wrong.
+  , emittedBodies :: !(Map (Text, Int) ())
   }
 
 type LowerM a = State LowerState a
@@ -176,6 +190,7 @@ initState info = LowerState
   , openTraceNode = Nothing
   , funcParams = Map.empty
   , pendingDecide = Set.empty
+  , emittedBodies = Map.empty
   }
 
 -- | Look up the ground-truth type for an expression using the typechecker's
@@ -1084,6 +1099,30 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
           region
 
     modify' $ \s -> s { functions = funcOp : s.functions }
+
+  -- Same-arity overload collision: 'dedupAndSynthExterns' mangles a
+  -- function symbol to @name__$arity@ when (and only when) the name is
+  -- used at more than one arity, then keeps just the FIRST body per
+  -- mangled symbol. If a *second* genuinely-different top-level body
+  -- shares this name AND arity (ad-hoc overloads distinguished only by
+  -- parameter type — e.g. @daydate@'s four arity-1 @Date@ overloads),
+  -- the dedup silently drops it, so a call meaning the later overload
+  -- dispatches to the wrong body. We can't disambiguate by type across
+  -- the f64 ABI, so fail loud: flag the export @supported: false@
+  -- (keyed by 'Schema.wasmSymbol', which equals @funcName@) and let the
+  -- proxy route it to a fallback evaluator. This runs *outside* the
+  -- @withScope@ body block so 'markUnsupported' still attributes to
+  -- @currentFunction@ (= @Just funcName@).
+  let bodyArity = length params
+  seenBefore <- gets (Map.member (funcName, bodyArity) . (.emittedBodies))
+  modify' $ \s -> s
+    { emittedBodies = Map.insert (funcName, bodyArity) () s.emittedBodies }
+  when seenBefore $ do
+    _ <- markUnsupported $
+      "ad-hoc overload collision: multiple definitions of " <> funcName
+        <> " at arity " <> Text.pack (show bodyArity)
+        <> " share one WASM symbol and cannot be disambiguated by the WASM backend"
+    pure ()
 
   -- M5 slice 2C — emit `<funcName>$trace`, a structurally identical clone
   -- with per-subexpression trace instrumentation. Each traceable
@@ -2106,12 +2145,16 @@ lowerConsider scrutinee branches _expectedTy = do
 -- instead, so the value is safe to consume as a NUMBER. The cost is one
 -- @__l4_rat_parse \"0\/1\"@ per branch-exhausted CONSIDER, which is
 -- unreachable in well-typed L4 anyway.
+--
+-- Only a *bare* @OTHERWISE@ branch is executed unconditionally. A
+-- guarded @WHEN p@ branch — even the LAST one — is always tested via
+-- 'testPatternTy' (its else arm is the branch-exhausted fallthrough).
+-- An earlier version short-circuited a trailing single @WHEN@ branch
+-- as an unconditional fallthrough, which skipped its guard entirely
+-- and could match values the pattern rejects.
 lowerBranches :: Value -> [Branch Resolved] -> LowerM Value
 lowerBranches _ [] = emitNumberLiteral 0
 lowerBranches _scrutVal [MkBranch _ (Otherwise _) body] =
-  lowerExpr body l4NumberType
-lowerBranches scrutVal [MkBranch _ (When _ pat) body] = withScope $ do
-  bindPatternTy scrutVal l4NumberType l4NumberType pat
   lowerExpr body l4NumberType
 lowerBranches scrutVal (MkBranch _ branchLhs body : rest) = do
   case branchLhs of
@@ -2144,8 +2187,11 @@ lowerBranches scrutVal (MkBranch _ branchLhs body : rest) = do
 --   * PatApp con args       — enum-with-data constructor: match the tag.
 --                             Args bind to slots starting at 1 (slot 0 = tag).
 --   * PatLit (Numeric n)    — match if scrutinee == n.
---   * PatLit (String _)     — deferred (needs __l4_str_eq call).
+--   * PatLit (String s)     — match if @__l4_str_eq scrut s == 1.0@.
 --   * PatVar _              — always matches, binds the scrutinee as-is.
+--   * PatExpr _             — markUnsupported (the WASM backend can't
+--                             evaluate an arbitrary computed-expression
+--                             pattern as a guard).
 
 testPatternTy :: Value -> MLIRType -> Pattern Resolved -> LowerM Value
 testPatternTy = go
@@ -2166,7 +2212,7 @@ testPatternTy = go
           env <- gets (.typeEnv)
           case lookupEnumTag name env of
             Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> trueI1
+            Nothing  -> unsupportedMatch (unresolvedEnumReason name)
     go scrutF64 _ (PatApp _ con [_]) = do
       let name = resolvedName con
       case name of
@@ -2177,12 +2223,13 @@ testPatternTy = go
           env <- gets (.typeEnv)
           case lookupEnumTag name env of
             Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> trueI1
+            Nothing  -> unsupportedMatch (unresolvedEnumReason name)
     go scrutF64 _ (PatApp _ con _) = do
+      let name = resolvedName con
       env <- gets (.typeEnv)
-      case lookupEnumTag (resolvedName con) env of
+      case lookupEnumTag name env of
         Just tag -> enumTagCmpF64 scrutF64 tag
-        Nothing  -> trueI1
+        Nothing  -> unsupportedMatch (unresolvedEnumReason name)
     go scrutF64 _ (PatLit _ (NumericLit _ r)) = do
       -- The scrutinee is a NUMBER handle; compare for equality via
       -- @__l4_rat_cmp@ against the literal's handle.
@@ -2191,13 +2238,49 @@ testPatternTy = go
         [scrutF64, lit] [l4NumberType, l4NumberType] [l4NumberType]
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       emitVal $ \vid -> arithCmpf vid OEQ cmpF zero
-    go _ _ (PatLit _ (StringLit _ _)) = trueI1
+    go scrutF64 _ (PatLit _ (StringLit _ s)) = do
+      -- The scrutinee is a STRING handle (boxed @!llvm.ptr@). Intern the
+      -- literal, box its address the same way 'lowerLit' does, then ask
+      -- the runtime for content equality via @__l4_str_eq@ (the same
+      -- idiom 'dispatchEqualsByType' uses for @EQUALS@ on strings). The
+      -- call returns 1.0 for equal / 0.0 for unequal; match iff == 1.0.
+      globalName <- internString s
+      ptr <- emitVal $ \vid -> mkOp [vid] "llvm.mlir.addressof" []
+        [NamedAttribute "global_name" (FlatSymbolRefAttr globalName)]
+        [PointerType] []
+      litF64 <- ptrToF64 ptr
+      eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
+        [scrutF64, litF64] [l4NumberType, l4NumberType] [l4NumberType]
+      one <- emitVal $ \vid -> arithConstantFloat vid 1.0
+      emitVal $ \vid -> arithCmpf vid OEQ eqF one
     go scrutF64 _ (PatCons _ _ _) = do
       -- List is non-null: scrutinee != 0.0
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       emitVal $ \vid -> arithCmpf vid ONE scrutF64 zero
-    go _ _ (PatExpr _ _) = trueI1
+    go _ _ (PatExpr _ _) =
+      unsupportedMatch
+        "CONSIDER with a computed-expression pattern is not supported by the WASM backend"
 
+    -- | Reason string for a constructor tag that the lowering can't
+    -- resolve to a concrete enum index. Such a pattern used to always
+    -- match (returning @trueI1@), which silently mis-evaluated the
+    -- CONSIDER; now we flag the enclosing function unsupported instead.
+    unresolvedEnumReason name =
+      "CONSIDER pattern constructor " <> name
+        <> " could not be resolved to an enum tag by the WASM backend"
+
+
+-- | Record an unsupported-pattern diagnostic against the enclosing
+-- function (via 'markUnsupported'), then return a FALSE @i1@ so the
+-- synthesised @scf.if@ stays well-typed (its condition must be @i1@,
+-- not the @f64@ 0.0 'markUnsupported' yields). Fail-closed: the branch
+-- never matches, and the export is flagged @supported: false@ so the
+-- proxy routes the call to a fallback evaluator rather than trusting a
+-- WASM module that can't evaluate this pattern.
+unsupportedMatch :: Text -> LowerM Value
+unsupportedMatch reason = do
+  _ <- markUnsupported reason
+  falseI1
 
 -- | Compare an f64-scrutinee against an enum tag (as f64).
 enumTagCmpF64 :: Value -> Integer -> LowerM Value
@@ -2207,6 +2290,9 @@ enumTagCmpF64 scrutF64 tag = do
 
 trueI1 :: LowerM Value
 trueI1 = emitVal $ \vid -> arithConstantBool vid True
+
+falseI1 :: LowerM Value
+falseI1 = emitVal $ \vid -> arithConstantBool vid False
 
 -- | Bind pattern variables under the uniform f64 ABI. The scrutinee and
 -- all bound values are f64 — enum-tag / maybe / list destructuring is

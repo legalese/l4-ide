@@ -59,6 +59,9 @@ main = do
     , test "fnValue node + enter_fn/exit_fn"   testTraceFnValueAndContext
     , test "NOT-range disambiguation"          testTraceNotRangeDisambiguation
     , test "returnType enriched from EntityInfo" testReturnTypeEnrichedFromEntityInfo
+    , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
+    , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
+    , test "overload collision → supported:false" testOverloadCollisionUnsupported
     ]
   if and results
     then do
@@ -567,6 +570,106 @@ testSchemaUsesImportedDeclares = do
             && T.isInfixOf "\"propertyOrder\"" json
       unless ok $
         putStrLn $ "\n    schema missing imported fields. got:\n    " <> T.unpack json
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | A CONSIDER on a STRING with string-literal WHEN patterns must
+-- compile each branch test to a @__l4_str_eq@ runtime call (content
+-- equality), not an unconditional always-match. Regression test: the
+-- @PatLit String@ case used to return @trueI1@, so the first WHEN
+-- branch always matched regardless of the scrutinee. Mirrors the
+-- @jl4/examples/ok/consider-primitives.l4@ @`classify string`@ fixture
+-- but inlined so no IMPORT is needed.
+testStringPatternStrEq :: IO Bool
+testStringPatternStrEq = do
+  let src = T.unlines
+        [ "@export Classify a string"
+        , "GIVEN s IS A STRING"
+        , "GIVETH A NUMBER"
+        , "`classify string` MEANS"
+        , "  CONSIDER s"
+        , "    WHEN \"a\" THEN 1"
+        , "    WHEN \"b\" THEN 2"
+        , "    OTHERWISE 0"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_str_eq" mlir
+      unless ok $
+        putStrLn "\n    expected a __l4_str_eq call for the string-literal patterns"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | A CONSIDER whose WHEN guard is a computed expression (@EXACTLY
+-- <expr>@, parsed to 'PatExpr') cannot be evaluated as a guard by the
+-- WASM backend. It used to always-match (return @trueI1@) and ship as
+-- @supported:true@; now the enclosing function must be flagged
+-- @supported:false@ so the proxy routes it to a fallback evaluator.
+testPatExprUnsupported :: IO Bool
+testPatExprUnsupported = do
+  let src = T.unlines
+        [ "@export Compute"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`compute` MEANS"
+        , "  CONSIDER n"
+        , "    WHEN EXACTLY 3 THEN 6"
+        , "    OTHERWISE 0"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "computed-expression pattern" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for the EXACTLY pattern. got:\n    "
+          <> T.unpack (T.take 600 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Two genuinely-different top-level definitions that share a name AND
+-- an arity (ad-hoc overloads distinguished only by parameter type — the
+-- real case is @daydate@'s four arity-1 @Date@ overloads) mangle to one
+-- WASM symbol. The dedup post-pass silently keeps only the FIRST body;
+-- we now detect the collision during lowering and flag the export
+-- @supported:false@ instead of silently dispatching to the wrong body.
+-- A third definition at a DIFFERENT arity forces name mangling on, so
+-- the arity-1 pair actually collides on @blend__$1@.
+testOverloadCollisionUnsupported :: IO Bool
+testOverloadCollisionUnsupported = do
+  let src = T.unlines
+        [ "@export Blend"
+        , "GIVEN x IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`blend` MEANS x PLUS 1"
+        , ""
+        , "GIVEN s IS A STRING"
+        , "GIVETH A NUMBER"
+        , "`blend` MEANS 2"
+        , ""
+        , "GIVEN x IS A NUMBER"
+        , "      y IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`blend` MEANS x PLUS y"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "overload collision" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for the colliding overload. got:\n    "
+          <> T.unpack (T.take 700 json)
       pure ok
   where
     unless b act = if b then pure () else act
