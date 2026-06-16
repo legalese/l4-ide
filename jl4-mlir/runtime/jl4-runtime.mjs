@@ -528,6 +528,18 @@ export function runDeontic(contract, startTime, events, args, meta) {
 // "a OF b, c" result line ("PARTY buyer MUST pay …" for a sale
 // contract after the seller delivered).
 function runDeonticInternal(contract, startTime, events, args, meta) {
+  // A null/undefined contract must never reach the walk below: the
+  // 'while (current)' loop would be skipped and the trailing
+  // 'if (!current) return FULFILLED' would silently report a satisfied
+  // obligation for a function that has no contract at all. Both the
+  // value path ('invokeDeontic') and the trace path
+  // ('invokeFunctionWithReasoning') guard this before calling in, but
+  // we re-check here so the exported 'runDeontic' is safe in isolation.
+  if (contract == null) {
+    throw new DeonticInputError(
+      "deontic function has no compiled contract metadata",
+    );
+  }
   const t0 = Number(startTime);
   const sortedEvents = (events || [])
     .slice()
@@ -546,6 +558,24 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
       continue;
     }
     if (current.kind !== "OBLIGATION") break;
+
+    // Refuse prohibition (MUSTNOT / SHANT) loudly rather than compute
+    // an inverted answer. The matched-event branch below treats any
+    // performed action as fulfillment ('current = current.hence …'),
+    // but jl4-core flips a MUSTNOT to LEST/BREACH when the prohibited
+    // action IS performed before the deadline
+    // (EvaluateLazy/Machine.hs:1037-1051). Schema.hs's 'modalToText'
+    // emits exactly "MUST" | "MAY" | "MUSTNOT", so this only fires for
+    // genuine prohibition nodes — the MUST/MAY sale/seatbelt/breach
+    // fixtures never reach it. We deliberately do NOT attempt correct
+    // prohibition semantics here.
+    if (current.modal === "MUSTNOT") {
+      throw new DeonticInputError(
+        "unsupported deontic modal MUSTNOT (prohibition): the JS " +
+          "runtime would compute an inverted result; refusing rather " +
+          "than returning a silently wrong answer",
+      );
+    }
 
     const deadlineLit =
       current.deadline == null ? null : Number(current.deadline);
@@ -3094,6 +3124,15 @@ export function createRuntime(opts) {
     // trace-mode column shows 'trace-differs' until the
     // 'decodeArgs'/'CONSIDER InputArgs' wrapper lands).
     if (meta.isDeontic) {
+      // A deontic function with no compiled contract must NOT fall
+      // through to 'runDeonticInternal(null, …)', which would walk a
+      // null tree and silently return FULFILLED. Guard the trace path
+      // exactly like the value path ('invokeDeontic').
+      if (!meta.deonticContract) {
+        throw new DeonticInputError(
+          "deontic function has no compiled contract metadata",
+        );
+      }
       const startTime = args.startTime;
       const events = args.events;
       if (startTime === undefined || startTime === null) {

@@ -12,6 +12,8 @@ import {
   makeTracePool,
   MemoryLimitError,
   DEFAULT_MAX_HEAP_BYTES,
+  DeonticInputError,
+  runDeontic,
 } from "./jl4-runtime.mjs";
 
 const rt = createRuntime();
@@ -29,6 +31,26 @@ const eq = (name, got, want) => {
   const ok = got === want;
   console.log(
     `${ok ? "ok  " : "FAIL"} ${name}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`,
+  );
+  ok ? pass++ : fail++;
+};
+
+// Assert that 'fn' throws, optionally matching a predicate on the error.
+// Prints ok/FAIL like 'eq' so it slots into the same pass/fail tally.
+const throws = (name, fn, pred) => {
+  let threw = false;
+  let err = null;
+  try {
+    fn();
+  } catch (e) {
+    threw = true;
+    err = e;
+  }
+  const ok = threw && (pred ? pred(err) : true);
+  console.log(
+    `${ok ? "ok  " : "FAIL"} ${name}: ${
+      threw ? `threw ${err && err.name}: ${err && err.message}` : "did NOT throw"
+    }`,
   );
   ok ? pass++ : fail++;
 };
@@ -174,6 +196,106 @@ eq("concat then eq", env.__l4_str_eq(c, box("ab")), 1);
 // Default cap is 64 MiB — published as a public constant so the HTTP
 // wrapper and tests stay in sync without hard-coding the number.
 eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
+
+// --- Deontic: null/absent contract must FAIL LOUD, never FULFILLED ----
+// Regression for the silent-wrong-answer bug: a deontic function whose
+// 'deonticContract' is null/undefined was returning FULFILLED on the
+// trace path (runDeonticInternal walked a null tree). It must throw on
+// BOTH the value path (invokeFunction → invokeDeontic) and the trace
+// path (invokeFunctionWithReasoning), plus via the exported runDeontic.
+{
+  const rt3 = createRuntime();
+  rt3.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+  // Deontic dispatch skips the wasm body, so a stub instance is fine.
+  const stubInstance = { exports: {} };
+  // A well-formed deontic request (startTime + events present) so the
+  // ONLY thing that can go wrong is the missing contract — proving the
+  // null-contract guard fires rather than the startTime/events guards.
+  const goodArgs = { startTime: 0, events: [] };
+  const isDeonticErr = (e) => e instanceof DeonticInputError;
+
+  // null contract
+  const metaNull = {
+    isDeontic: true,
+    deonticContract: null,
+    parameters: { properties: {} },
+    paramOrder: [],
+  };
+  throws(
+    "deontic: null contract throws on VALUE path",
+    () => rt3.invokeFunction(stubInstance, metaNull, goodArgs),
+    isDeonticErr,
+  );
+  throws(
+    "deontic: null contract throws on TRACE path",
+    () => rt3.invokeFunctionWithReasoning(stubInstance, metaNull, goodArgs),
+    isDeonticErr,
+  );
+
+  // absent contract (key entirely missing — undefined)
+  const metaAbsent = {
+    isDeontic: true,
+    parameters: { properties: {} },
+    paramOrder: [],
+  };
+  throws(
+    "deontic: absent contract throws on VALUE path",
+    () => rt3.invokeFunction(stubInstance, metaAbsent, goodArgs),
+    isDeonticErr,
+  );
+  throws(
+    "deontic: absent contract throws on TRACE path",
+    () => rt3.invokeFunctionWithReasoning(stubInstance, metaAbsent, goodArgs),
+    isDeonticErr,
+  );
+
+  // Exported runDeontic in isolation also refuses a null contract.
+  throws(
+    "deontic: runDeontic(null, …) throws (no silent FULFILLED)",
+    () => runDeontic(null, 0, [], {}, null),
+    isDeonticErr,
+  );
+
+  // Sanity: a well-formed MUST contract with no events still produces a
+  // residual OBLIGATION (proving the guards above didn't over-fire and
+  // that the normal MUST path is unaffected).
+  const mustContract = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "buyer",
+    action: "pay",
+    deadline: 14,
+  };
+  const mustResult = runDeontic(mustContract, 0, [], {}, null);
+  eq(
+    "deontic: MUST contract with no events is a residual OBLIGATION",
+    !!(mustResult && mustResult.OBLIGATION),
+    true,
+  );
+
+  // Task 2: a reached MUSTNOT (prohibition) node must be REFUSED loudly
+  // rather than computing the inverted FULFILLED. MUST/MAY fixtures
+  // never carry this modal, so they remain unaffected.
+  const mustNotContract = {
+    kind: "OBLIGATION",
+    modal: "MUSTNOT",
+    party: "driver",
+    action: "speed",
+    deadline: 14,
+  };
+  throws(
+    "deontic: MUSTNOT (prohibition) is refused, not inverted",
+    () =>
+      runDeontic(
+        mustNotContract,
+        0,
+        [{ party: "driver", action: "speed", at: 1 }],
+        {},
+        null,
+      ),
+    (e) => e instanceof DeonticInputError && /MUSTNOT/.test(e.message),
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
