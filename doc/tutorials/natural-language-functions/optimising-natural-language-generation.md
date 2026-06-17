@@ -305,7 +305,7 @@ the body on the next line:
 ```l4
 GIVEN x IS A NUMBER, y IS A NUMBER
 GIVETH A NUMBER
-`the greater of` x y @nlg the greater of %x% and %y%
+`the greater of` x y     @nlg the greater of %x% and %y%
   MEANS IF x >= y THEN x ELSE y
 ```
 
@@ -319,9 +319,9 @@ with:
 
 So the rule above renders as _"The greater of means the greater of x and y"_ in
 its own definition, and a call `` `the greater of` `start date` `end date` ``
-renders as _"the greater of the start date and the end date"_.
+renders as _"the greater of start date and end date"_.
 
-### It replaces the implementation
+### nlg annotations replace the implementation
 
 A function with an `@nlg` renders **as its sentence**, not as its body. This is
 what makes recursive library functions readable — for example `filter` ships
