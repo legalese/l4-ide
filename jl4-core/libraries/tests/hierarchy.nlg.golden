@@ -4,6 +4,7 @@
 `render outline` with `default scheme` and `amended`
 `render outline` with `default scheme` and `amended bumping`
 `render outline` with `default scheme` and `renumbered`
+`render outline` with `body scheme` and `definitions`
 `depth` with `item` with solo is equal to 1
 `count nodes` with `sample` is equal to 6
 `depth` with `sample` is equal to 3
@@ -17,3 +18,4 @@
 `render outline` with `default scheme` and `amended` is equal to list of Clauses, 1	Payment, 2b	Late payment and 2	Delivery
 `render outline` with `default scheme` and `amended bumping` is equal to list of Clauses, 1	Payment, 2b	Late payment and 3	Delivery
 `render outline` with `default scheme` and `renumbered` is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
+`render outline` with `body scheme` and `definitions` is equal to list of Definitions, a	Affiliate, b	Business Day, c	Confidential Information, d	Effective Date, e	Intellectual Property and f	Territory

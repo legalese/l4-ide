@@ -322,6 +322,19 @@ GIVETH A LIST OF STRING
 
 #EVAL `render outline` `default scheme` `renumbered`   -- "1 …", "2 …", "7 …", "8 …"
 
+-- Wide fan-out: `item` carries up to 4 children positionally; for more, pass
+-- them as an explicit LIST (which may equally hold labeled / restartAt nodes).
+`definitions` MEANS
+  item "Definitions" (LIST
+    item "Affiliate" ,
+    item "Business Day" ,
+    item "Confidential Information" ,
+    item "Effective Date" ,
+    item "Intellectual Property" ,
+    item "Territory")
+
+#EVAL `render outline` `body scheme` `definitions`   -- a … f
+
 -- structure + markers
 #ASSERT depth (item "solo") EQUALS 1
 #ASSERT `count nodes` `sample` EQUALS 6
@@ -338,3 +351,4 @@ GIVETH A LIST OF STRING
 #ASSERT `render outline` `default scheme` `amended` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "2\tDelivery")
 #ASSERT `render outline` `default scheme` `amended bumping` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "3\tDelivery")
 #ASSERT `render outline` `default scheme` `renumbered` EQUALS (LIST "Recitals", "1\tRecital one", "2\tRecital two", "7\tRecital seven", "8\tRecital eight")
+#ASSERT `render outline` `body scheme` `definitions` EQUALS (LIST "Definitions", "a\tAffiliate", "b\tBusiness Day", "c\tConfidential Information", "d\tEffective Date", "e\tIntellectual Property", "f\tTerritory")
