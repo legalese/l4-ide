@@ -95,16 +95,31 @@ DECIDE `as at an` `application date` `the applicant` `is eligible for` `the prog
 
 In a conventional programming language, this would be a function taking three arguments: `eligibility(applicant, programme, date)`.
 
-In L4, it is also a function taking three arguments, but the arguments are intermingled across the function name for the sake of readability.
+In L4, it is also a function taking three arguments, but the arguments are intermingled across the function name for improved readability.
 
 ### End helper names in a preposition
 
-A function whose name ends in a preposition (`of`, `for`, `to`, `between`, …)
-gets its arguments joined naturally, without a stray "with":
+When a function name does not end in a preposition, the renderer joins it to its
+arguments with "with". That can read naturally for past-participle names:
+
+```l4
+`augmented` x y MEANS x + y
+-- call site renders as: "augmented with base benefit and supplement"
+```
+
+But it becomes awkward when the name is a noun phrase:
+
+```l4
+`the later` x y MEANS IF x >= y THEN x ELSE y
+-- call site renders as: "the later with start date and end date"  ← awkward
+```
+
+Ending the name in a preposition (`of`, `for`, `to`, `between`, …) eliminates
+the inserted "with" and lets the arguments slot in naturally:
 
 ```l4
 `the later of` x y MEANS IF x >= y THEN x ELSE y
--- "the later of the start date and the end date"
+-- call site renders as: "the later of start date and end date"  ← natural
 ```
 
 ### Let control flow stay structured
