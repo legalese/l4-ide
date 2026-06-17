@@ -43,7 +43,7 @@ mpt MEANS ...
 ```
 
 > [!NOTE]
-> Beginner programmers are routinely and pointedly reminded to use the first form whenever they reach for the latter.
+> Beginner programmers are routinely and pointedly reminded to use the first form whenever they reach for the latter. In the heat of the moment, short forms make sense; but six months later, they don't.
 
 ### Name parameters as nouns, not letters
 
@@ -62,22 +62,34 @@ GIVEN p IS A Person
 
 Sometimes existing legal writing will deliberately adopt this form: "A person (A) discriminates against another (B) if ..." (Equality Act 2010, s.13). In that situation the renderer will aim to obey the "legislative variable" style.
 
-If a parameter has a record type, the renderer promotes the type name into a noun phrase: ``GIVEN claim IS A `Payment Claim` `` renders as "the payment claim". This works cleanly only when one parameter has that type — two `Payment Claim` parameters would collide on the same phrase.
+> [!NOTE]
+> If a parameter has a record type, the renderer promotes the type name into a noun phrase: ``GIVEN claim IS A `Payment Claim` `` renders as "the payment claim". This works cleanly only when one parameter has that type — two `Payment Claim` parameters would collide on the same phrase.
 
 ### Name record fields readably
 
-Projections render as `X's field`, so field names carry straight into the prose:
+Attribute accessors render as ``X's `fieldname` ``, so field names carry straight into the prose.
 
 ```l4
-DECLARE `Property Details` HAS
-    `market value`         IS A NUMBER
-    `monthly property tax` IS A NUMBER
--- "the property's market value", "the property's monthly property tax"
+DECLARE Region IS ONE OF central, suburban, rural
+
+DECLARE `Property` HAS
+     `market value`       IS A NUMBER
+     `school district`    IS A Region
 ```
 
----
+A piece of code could refer as follows:
 
-## Lever 2 — Shape the code so it reads in order
+``` l4
+GIVEN residence IS A `Property`
+DECIDE `monthly property tax` IS residence's `market value` TIMES `school district tax`
+  WHERE `school district tax` MEANS
+          CONSIDER residence's `school district`
+            WHEN  central  THEN 6%
+            ^     suburban THEN 4%
+            ^     rural    THEN 2%
+```
+
+## Lever 2 — Shape the code so it reads naturally
 
 ### Use mixfix so calls read as sentences
 
@@ -85,17 +97,36 @@ Put the words and the argument holes where they belong in the sentence. (See the
 [mixfix tutorial](natural-language-functions.md) for the full mechanics.)
 
 ```l4
-GIVEN `the applicant` IS A Person
+DECLARE Person HAS
+  name IS A STRING
+  age  IS A NUMBER
+
+DECLARE Programme HAS title IS A STRING
+
+GIVEN `application date` IS A DATE
+      `the applicant` IS A Person
       `the programme` IS A Programme
-      `application date` IS A DATE
 GIVETH A BOOLEAN
-DECIDE `as at an` `application date` `the applicant` `is eligible for` `the programme` IF ...
-  
+`as at` `application date` `the applicant` `is eligible for` `the programme` MEANS
+  `the applicant`'s age >= 65
 ```
 
-In a conventional programming language, this would be a function taking three arguments: `eligibility(applicant, programme, date)`.
+In a conventional programming language, this would be a function taking three arguments: `eligibility(date, applicant, programme)`.
 
 In L4, it is also a function taking three arguments, but the arguments are intermingled across the function name for improved readability.
+
+The function would be called thusly:
+``` l4
+#EVAL `as at` (January 1 2010) `Alice Apple` `is eligible for` `retirement benefits`
+```
+
+And the natural language would generate like:
+
+```
+As at application date the applicant is eligible for the programme holds if the person's age is at least 65.
+
+Alice's eligibility means as at January 1 2010 Alice Apple is eligible for retirement benefits.
+```
 
 ### End helper names in a preposition
 
@@ -103,8 +134,14 @@ When a function name does not end in a preposition, the renderer joins it to its
 arguments with "with". That can read naturally for past-participle names:
 
 ```l4
-`augmented` x y MEANS x + y
--- call site renders as: "augmented with base benefit and supplement"
+DECLARE `Base Benefit` HAS amount IS A NUMBER
+DECLARE Supplement HAS amount IS A NUMBER
+
+GIVEN x IS A `Base Benefit`
+      y IS A Supplement
+GIVETH A NUMBER
+`augmented` x y MEANS x's amount + y's amount
+-- call site renders as: "augmented with standard pension and cost of living allowance"
 ```
 
 But it becomes awkward when the name is a noun phrase:
