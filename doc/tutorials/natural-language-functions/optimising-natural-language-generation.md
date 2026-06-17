@@ -94,14 +94,11 @@ DECIDE `property tax` IS residence's `market value` TIMES `school district tax`
 
 This renders as follows:
 
-• Property tax equals:
-&nbsp;&nbsp;&nbsp;&nbsp;the property's market value × school district tax
-&nbsp;&nbsp;&nbsp;&nbsp;where:
-&nbsp;&nbsp;&nbsp;&nbsp;- School district tax is determined by:
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;depending on the property's school district:
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- if it is central: 6%
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- if it is suburban: 4%
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- if it is rural: 2%
+- Property tax equals the property's market value × school district tax, where:
+  - School district tax is determined by the property's school district:
+    - if it is central: 6%
+    - if it is suburban: 4%
+    - if it is rural: 2%
 
 ## Lever 2 — Shape the code so it reads naturally
 
