@@ -141,7 +141,14 @@ GIVEN x IS A `Base Benefit`
       y IS A Supplement
 GIVETH A NUMBER
 `augmented` x y MEANS x's amount + y's amount
--- call site renders as: "augmented with standard pension and cost of living allowance"
+-- definition renders as: "Augmented equals the base benefit's amount + the supplement's amount."
+
+`standard pension`          MEANS `Base Benefit` WITH amount IS 1000
+`cost of living allowance`  MEANS Supplement     WITH amount IS 200
+
+DECIDE `total benefit` IS
+  `augmented` `standard pension` `cost of living allowance`
+-- call site renders as: "Total benefit means augmented with standard pension and cost of living allowance."
 ```
 
 But it becomes awkward when the name is a noun phrase:
