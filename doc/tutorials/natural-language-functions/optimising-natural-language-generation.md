@@ -24,7 +24,7 @@ the result further.
 
 ---
 
-## Lever 1 — Names do most of the work
+## Lever 1 — Choose Names Wisely
 
 > *"Names reflect true understanding of a thing, and when you truly understand a thing you have power over it."*
 >
@@ -35,19 +35,18 @@ the single highest-leverage thing you can do.
 
 ### Name rules as the phrase you want to read
 
-A backticked identifier can contain spaces, so name a rule as the noun phrase or
-clause it represents:
+A backticked identifier can contain spaces. So you can spell out a noun phrase or clause:
 
 ```l4
--- Renders: "Monthly property tax means ..."
+-- Descriptive: "Monthly property tax means ..."
 `monthly property tax` MEANS ...
 
--- Renders: "Mpt means ..."
+-- Cryptic: "Mpt means ..."
 mpt MEANS ...
 ```
 
 > [!NOTE]
-> Beginner programmers are routinely and pointedly reminded to use the first form whenever they reach for the latter. In the heat of the moment, short forms make sense; but six months later, they don't.
+> Beginner programmers are routinely and pointedly reminded to use the first form whenever they reach for the latter. In the heat of the moment, short forms make sense; six months later, they don't.
 
 ### Name parameters as nouns, not letters
 
@@ -55,16 +54,16 @@ Parameters appear in the rendered prose and in every `@nlg` slot. Name them the
 way they should read:
 
 ```l4
--- Renders: "... the buyer ... the seller ..."
-GIVEN `the buyer` IS A Person
+-- Descriptive: "... the buyer ... the seller ..."
+GIVEN `the buyer`  IS A Person
       `the seller` IS A Person
 
--- Renders: "... p ... q ..."
+-- Cryptic: "... p ... q ..."
 GIVEN p IS A Person
       q IS A Person
 ```
 
-Sometimes existing legal writing will deliberately adopt this form: "A person (A) discriminates against another (B) if ..." (Equality Act 2010, s.13). In that situation the renderer will aim to obey the "legislative variable" style.
+To be fair: sometimes existing legal writing will deliberately adopt this "variable" form: "A person (A) discriminates against another (B) if ..." (Equality Act 2010, s.13). In that situation the renderer will aim to obey the "legislative variable" style.
 
 > [!NOTE]
 > If a parameter has a record type, the renderer promotes the type name into a noun phrase: ``GIVEN claim IS A `Payment Claim` `` renders as "the payment claim". This works cleanly only when one parameter has that type — two `Payment Claim` parameters would collide on the same phrase.
@@ -85,12 +84,25 @@ A piece of code could refer as follows:
 
 ``` l4
 GIVEN residence IS A `Property`
-DECIDE `monthly property tax` IS residence's `market value` TIMES `school district tax`
+DECIDE `property tax` IS residence's `market value` TIMES `school district tax`
   WHERE `school district tax` MEANS
           CONSIDER residence's `school district`
             WHEN  central  THEN 6%
             ^     suburban THEN 4%
             ^     rural    THEN 2%
+```
+
+This renders as follows:
+
+```
+• Property tax equals:
+    the property's market value × school district tax
+    where:
+    - School district tax is determined by:
+        depending on the property's school district:
+        - if it is central: 6%
+        - if it is suburban: 4%
+        - if it is rural: 2%
 ```
 
 ## Lever 2 — Shape the code so it reads naturally
