@@ -123,7 +123,7 @@ The function would be called thusly:
 And the natural language would generate like:
 
 ```
-As at application date the applicant is eligible for the programme holds if the person's age is at least 65.
+As at application date the applicant is eligible for the programme if the person's age is at least 65.
 
 Alice's eligibility means as at January 1 2010 Alice Apple is eligible for retirement benefits.
 ```
