@@ -231,11 +231,11 @@ renderHtml cfg doc =
     CTable cols rows -> esc conn <> ":" <> tableHtml cols rows
     CWhere inner defs -> bodyHtml conn inner <> whereHtml defs
 
-  introAll conn = if conn == "holds if"
-    then "holds if all of the following are true:"
+  introAll conn = if conn == "if"
+    then "if all of the following are true:"
     else esc conn <> " all of the following are true:"
-  introAny conn = if conn == "holds if"
-    then "holds if any of the following is true:"
+  introAny conn = if conn == "if"
+    then "if any of the following is true:"
     else esc conn <> " any of the following is true:"
 
   clauseHtml = \case

@@ -664,7 +664,7 @@ unitRendering u = case u.uDecl of
     -- implementation — so e.g. @filter@ reads "the items of list for which f
     -- holds", not its recursive @CONSIDER@ body.
     | Just nlg <- decideNlg d ->
-        ( if returnsBoolean tysig then "holds if" else "means"
+        ( if returnsBoolean tysig then "if" else "means"
         , CLeaf (renderNlgWith Map.empty nlg) )
     -- Otherwise rewrite the body up front (mixfix/maths/dates/numbers/params ->
     -- Inert leaves) so formula mode survives arithmetic that contains a mixfix
@@ -780,7 +780,7 @@ spaceCamel = Text.pack . go . Text.unpack
 
 connectorFor :: TypeSig Resolved -> Expr Resolved -> Text
 connectorFor tysig body
-  | returnsBoolean tysig = "holds if"
+  | returnsBoolean tysig = "if"
   | otherwise = case carameliseNode body of
       Consider{} -> "is determined by"
       _          -> "means"
