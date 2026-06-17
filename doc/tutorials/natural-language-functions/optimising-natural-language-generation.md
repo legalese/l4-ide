@@ -28,7 +28,7 @@ the result further.
 
 > *"Names reflect true understanding of a thing, and when you truly understand a thing you have power over it."*
 >
-> — Ursula K. Le Guin, *A Wizard of Earthsea*
+> — Patrick Rothfuss, *The Wise Man's Fear*
 
 The renderer prints identifiers and parameter names **verbatim**. Good names are
 the single highest-leverage thing you can do.
