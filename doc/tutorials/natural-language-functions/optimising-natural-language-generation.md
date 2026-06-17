@@ -285,14 +285,14 @@ The argument names appear, but the word order is dictated by the function name. 
 GIVEN x IS A `Base Benefit`
       y IS A Supplement
 GIVETH A NUMBER
-`augmented` x y   @nlg %y% augmented with %x%
+`augmented` x y   @nlg %y% based on %x%
   MEANS x's amount + y's amount
 ```
 
-Now the definition renders as _"Augmented means y augmented with x"_, and the call site renders as:
+Now the definition renders as _"Augmented means y based on x"_, and the call site renders as:
 
 ```
-Total benefit means cost of living allowance augmented with standard pension.
+Total benefit means cost of living allowance based on standard pension.
 ```
 
 The arguments slot into exactly the positions you chose.
