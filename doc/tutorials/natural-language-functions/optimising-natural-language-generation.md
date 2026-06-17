@@ -151,6 +151,8 @@ DECIDE `total benefit` IS
 -- call site renders as: "Total benefit means augmented with standard pension and cost of living allowance."
 ```
 
+The call site surfaces the argument names, but the word order is still driven by the function name. In Lever 3 we will return to this example and use `@nlg` to rearrange the words so the sentence reads more naturally.
+
 But it becomes awkward when the name is a noun phrase:
 
 ```l4
@@ -247,6 +249,32 @@ heading rather than a generic one.
 When structure and naming aren't enough — a recursive helper, domain jargon, or
 a formula you'd rather state in words — attach an `@nlg` annotation. It is the
 authoritative natural-language form of that definition.
+
+### Revisiting `augmented`
+
+Recall from Lever 2 that the call site rendered as:
+
+```
+Total benefit means augmented with standard pension and cost of living allowance.
+```
+
+The argument names appear, but the word order is dictated by the function name. Adding an `@nlg` annotation with `%param%` slots lets you rearrange freely:
+
+```l4
+GIVEN x IS A `Base Benefit`
+      y IS A Supplement
+GIVETH A NUMBER
+`augmented` x y @nlg %x% augmented with %y%
+  MEANS x's amount + y's amount
+```
+
+Now the definition renders as _"Augmented means x augmented with y"_, and the call site renders as:
+
+```
+Total benefit means standard pension augmented with cost of living allowance.
+```
+
+The arguments slot into exactly the positions you chose.
 
 ### Where it goes: end of the line
 
