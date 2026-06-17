@@ -436,10 +436,16 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in test deontic-sale deontic-seatbelt deontic-breach; do
+          for f in test datetime-probe deontic-sale deontic-seatbelt deontic-breach; do
             p="jl4-mlir/test/fixtures/$f.l4"
             if [ ! -s "$p" ]; then echo "MISSING/EMPTY fixture: $p" >&2; fail=1; fi
           done
+          # datetime-probe.cases.json guards the DATE-arithmetic ABI fix
+          # (date - date, date + n); without it those collapse to skip and the
+          # fix could silently regress.
+          if [ ! -s "jl4-mlir/test/fixtures/datetime-probe.cases.json" ]; then
+            echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/datetime-probe.cases.json" >&2; fail=1
+          fi
           # Each deontic fixture MUST keep a non-empty curated cases.json, else
           # every deontic fn silently degrades to skip-no-cases at harness time.
           for f in deontic-sale deontic-seatbelt deontic-breach; do
@@ -537,6 +543,7 @@ jobs:
           node jl4-mlir/scripts/parity-harness.mjs \
             --out jl4-mlir/parity-report \
             jl4-mlir/test/fixtures/test.l4 \
+            jl4-mlir/test/fixtures/datetime-probe.l4 \
             jl4-mlir/test/fixtures/deontic-sale.l4 \
             jl4-mlir/test/fixtures/deontic-seatbelt.l4 \
             jl4-mlir/test/fixtures/deontic-breach.l4

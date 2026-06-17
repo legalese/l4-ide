@@ -1915,13 +1915,69 @@ emitRatBinop fn a b =
   emitVal $ \vid -> funcCall [vid] fn [a, b]
     [l4NumberType, l4NumberType] [l4NumberType]
 
--- | Lower a binary arithmetic op on NUMBER. Both subexpressions are NUMBERs,
--- so they resolve to rational handles, and the result is also a handle.
+-- | The DATE\/TIME serial kind of an arithmetic operand, if any.
+data SerialKind = SKDate | SKTime
+
+-- | Resolve whether an operand is DATE- or TIME-typed, reusing the same
+-- evidence ladder as 'classifyOperand': the typechecker's 'InfoMap'
+-- ('typeOfExpr'), then the recorded source type of a bare @Var@
+-- ('bindingL4Types'). Returns 'Nothing' for NUMBER (the overwhelmingly common
+-- operand) and anything that isn't a date\/time — those need no bridging.
+operandDateTimeKind :: Expr Resolved -> LowerM (Maybe SerialKind)
+operandDateTimeKind e = do
+  mt <- typeOfExpr e
+  case mt >>= serialKind of
+    Just k  -> pure (Just k)
+    Nothing -> case e of
+      App _ n [] -> do
+        mL4 <- gets (Map.lookup (resolvedName n) . (.bindingL4Types))
+        pure (mL4 >>= serialKind)
+      _ -> pure Nothing
+  where
+    serialKind t
+      | isDateType t = Just SKDate
+      | isTimeType t = Just SKTime
+      | otherwise    = Nothing
+
+-- | serial (raw f64) → rational handle, via the runtime's own bridge
+-- (@__l4_date_serial@ / @__l4_time_serial@ each do @ratFromInt(Number(d))@).
+serialToHandle :: SerialKind -> Value -> LowerM Value
+serialToHandle k v = emitVal $ \vid ->
+  funcCall [vid] (serialBuiltin k) [v] [l4NumberType] [l4NumberType]
+  where serialBuiltin SKDate = "__l4_date_serial"
+        serialBuiltin SKTime = "__l4_time_serial"
+
+-- | rational handle → serial (raw f64), the inverse bridge
+-- (@__l4_date_from_serial@ / @__l4_time_from_serial@).
+handleToSerial :: SerialKind -> Value -> LowerM Value
+handleToSerial k v = emitVal $ \vid ->
+  funcCall [vid] (fromSerialBuiltin k) [v] [l4NumberType] [l4NumberType]
+  where fromSerialBuiltin SKDate = "__l4_date_from_serial"
+        fromSerialBuiltin SKTime = "__l4_time_from_serial"
+
+boxIfSerial :: Maybe SerialKind -> Value -> LowerM Value
+boxIfSerial Nothing  v = pure v
+boxIfSerial (Just k) v = serialToHandle k v
+
+-- | Lower @PLUS@\/@MINUS@\/@TIMES@\/@DIVIDE@\/@MODULO@ through the exact-rational
+-- runtime. DATE\/TIME operands arrive as raw f64 serials but @__l4_rat_*@
+-- expects rational-pool handles, so any dated operand is boxed serial→handle
+-- first (otherwise the rat op @ratUnbox@es the serial as a bogus pool index →
+-- the @reading 'num' of undefined@ crash). The result of an /additive/ op with
+-- exactly one dated operand is itself a DATE\/TIME (@date + n@, @date - n@), so
+-- it is unboxed handle→serial; @date - date@ (both dated) is a day-count and
+-- stays a NUMBER handle; non-additive ops never yield a date.
 lowerRatBinop :: Text -> Expr Resolved -> Expr Resolved -> LowerM Value
 lowerRatBinop fn lhs rhs = do
-  lhsVal <- lowerExpr lhs l4NumberType
-  rhsVal <- lowerExpr rhs l4NumberType
-  emitRatBinop fn lhsVal rhsVal
+  lhsK <- operandDateTimeKind lhs
+  rhsK <- operandDateTimeKind rhs
+  lhsVal <- lowerExpr lhs l4NumberType >>= boxIfSerial lhsK
+  rhsVal <- lowerExpr rhs l4NumberType >>= boxIfSerial rhsK
+  result <- emitRatBinop fn lhsVal rhsVal
+  case (fn `elem` ["__l4_rat_add", "__l4_rat_sub"], lhsK, rhsK) of
+    (True, Just k,  Nothing) -> handleToSerial k result
+    (True, Nothing, Just k)  -> handleToSerial k result
+    _                        -> pure result
 
 -- | Lower a literal.
 lowerLit :: Lit -> MLIRType -> LowerM Value
@@ -2073,6 +2129,26 @@ isNumberType t = case t of
 isStringType :: Type' Resolved -> Bool
 isStringType t = case t of
   TyApp _ n _ -> nameMatches n ["STRING", "string"]
+  _ -> False
+
+-- | DATE\/TIME are NUMBER-compatible in jl4-core (a date /is/ its day-serial,
+-- a time /is/ its second-serial — see @libraries/daydate.l4@, which does
+-- @DATE PLUS NUMBER@ etc. directly). But in this backend a DATE\/TIME value
+-- flows as a /raw f64 serial/ (the date intrinsics — @__l4_date_serial@,
+-- @make-date@, weekday — all read\/write the bare serial), whereas the generic
+-- rational ops @__l4_rat_*@ operate on rational-pool /handles/. So a DATE\/TIME
+-- operand of @MINUS@\/@PLUS@\/… must be boxed serial→handle before the op (and
+-- a DATE\/TIME /result/ unboxed handle→serial after). 'lowerRatBinop' does this
+-- bridging; these predicates and 'operandDateTimeKind' detect when to.
+-- Case-insensitive, mirroring the schema emitter's @Text.toLower@ name match.
+isDateType :: Type' Resolved -> Bool
+isDateType t = case t of
+  TyApp _ n _ -> Text.toLower (resolvedName n) == "date"
+  _ -> False
+
+isTimeType :: Type' Resolved -> Bool
+isTimeType t = case t of
+  TyApp _ n _ -> Text.toLower (resolvedName n) == "time"
   _ -> False
 
 nameMatches :: Resolved -> [Text] -> Bool

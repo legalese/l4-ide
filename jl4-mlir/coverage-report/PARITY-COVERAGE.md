@@ -21,20 +21,24 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 
 | Outcome               | Cells | Meaning                                                        |
 | --------------------- | ----: | -------------------------------------------------------------- |
-| `byte-identical`      |   124 | WASM response == jl4-service, byte-for-byte (across 33 files)  |
+| `byte-identical`      |   130 | WASM response == jl4-service, byte-for-byte (across 34 files)  |
 | `differs`             |     2 | **silent wrong answer** — `desc::factorial` (see below)        |
-| `wasm-error`          |     9 | **WASM crash, svc OK** — DATE-param arithmetic (see below)     |
+| `wasm-error`          |     3 | **WASM crash, svc OK** — `is-a-weekday` overload collision     |
 | `refused-unsupported` |     2 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     1 | deontic fn (`ceo-performance-award`); needs event `cases.json` |
 
-**124 of 126 real comparisons (98.4%) are byte-identical.** "Real comparisons"
+**130 of 132 real comparisons (98.5%) are byte-identical.** "Real comparisons"
 counts only cells where both backends produced a value (`byte-identical` +
-`differs`); the 9 `wasm-error` cells are a separate failure mode (WASM threw,
+`differs`); the 3 `wasm-error` cells are a separate failure mode (WASM threw,
 jl4-service answered) and the 2 `refused`/1 `skip` are correct/untested-not-failed.
 
-The curated cases nearly doubled real branch coverage (76 → 124) over the first
-pass — and in doing so surfaced a **second** bug class beyond the `factorial`
-finding.
+The DATE-arithmetic crashes (Finding 2) are now **fixed** — `days-between` and
+`shift-date` are byte-identical, lifting the wasm-error count from 9 to 3; the
+residual 3 are `is-a-weekday`, a _separate_ overload-collision bug (below).
+
+The curated cases nearly doubled real branch coverage (76 → 130) — and in doing
+so surfaced a **second** bug class beyond the `factorial` finding (the
+DATE-arithmetic crash, now fixed).
 
 ## Finding 1: untyped scalar param → silent wrong answers 🔴
 
@@ -61,32 +65,41 @@ _bare-head positional param_ style (`DECIDE foo x IS` with no `GIVEN`), the lone
 example in the corpus. The follow-up hunt confirmed the rest of the value core is
 solid (see "Curated cases" below).
 
-## Finding 2: DATE-typed parameter in arithmetic → WASM crash 🔴
+## Finding 2: DATE-typed operand in arithmetic → WASM crash ✅ FIXED
 
-Functions that take a `DATE` parameter and feed it to `MINUS`/`PLUS`/comparison
-crash on the WASM backend while jl4-service answers correctly:
+Functions that fed a `DATE` value to `MINUS`/`PLUS` crashed the WASM backend
+(`TypeError: Cannot read properties of undefined (reading 'num')`) while
+jl4-service answered correctly:
 
-| function (`datetime-probe.l4`) | args                        | jl4-service | WASM      |
-| ------------------------------ | --------------------------- | ----------: | --------- |
-| `days-between`                 | `2024-01-01` → `2024-12-31` |       `365` | **crash** |
-| `shift-date`                   | `2024-01-01` + 30           |  `2024-...` | **crash** |
-| `is-a-weekday`                 | `2024-01-01`                |      `TRUE` | **crash** |
+| function (`datetime-probe.l4`) | args                        | jl4-service | WASM (before) | WASM (after) |
+| ------------------------------ | --------------------------- | ----------: | ------------: | -----------: |
+| `days-between`                 | `2024-01-01` → `2024-12-31` |       `365` |         crash |     ✅ `365` |
+| `shift-date`                   | `2024-01-01` + 30           |  `2024-...` |         crash |  ✅ `2024-…` |
 
-The crash is `TypeError: Cannot read properties of undefined (reading 'num')`.
-Root cause is an **ABI split**: DATE values are raw f64 day-serials throughout
-the date intrinsics and `marshalArg` hands a date param over as that raw serial,
-but `Lower.hs` lowers `MINUS`/`PLUS` on _any_ operands (including dates) to the
+Root cause was an **ABI split**: DATE values are raw f64 day-serials throughout
+the date intrinsics, and `marshalArg` hands a date param over as that raw serial,
+but `Lower.hs` lowered `MINUS`/`PLUS` on _any_ operands (including dates) to the
 generic _rational_ ops (`__l4_rat_sub`), which `ratUnbox` their args
-(`ratPool.get(serial)` → `undefined` → `.num`). All three functions ship
-`supported: true`.
+(`ratPool.get(serial)` → `undefined` → `.num`). **Previously masked** as harmless
+`both-error`: the auto-generated input for a date-string param is the literal
+`"x"`, which jl4-service _also_ rejects, so both sides errored — valid ISO dates
+unmasked it (same trivial-input masking as `factorial`).
 
-**Previously masked** as harmless `both-error`: the auto-generated input for a
-date-string param is the literal `"x"`, which jl4-service _also_ rejects
-("expected a DATE but got x"), so both sides errored and looked consistent. Valid
-ISO dates unmask it — the same trivial-input masking as `factorial`. Tracked in
-the spec; regression cases in `jl4-mlir/test/fixtures/datetime-probe.cases.json`
-(date _construction_ — `make-date`/`make-datetime`/`make-time` — is byte-identical;
-the three DATE-_input_ functions are `wasm-error` until fixed).
+**Fix** (`Lower.hs` `lowerRatBinop`): box DATE/TIME operands serial→handle
+(`__l4_date_serial`) before the rational op, and unbox the result handle→serial
+for additive ops that yield a date (`date + n`); `date − date` is a day-count
+and stays a NUMBER. Comparison was already correct (DATE → `arith.cmpf` on the
+raw serial). Verified byte-identical; full corpus 124 → 130 byte-identical, no
+regressions. `datetime-probe` is now in the **CI Tier-2 corpus** to guard it.
+
+**Residual (separate bug):** `is-a-weekday` still crashes (the 3 remaining
+`wasm-error` cells). Isolation probes show `(DATE_SERIAL d) MOD 7` and
+`(Day d) MOD 7` are byte-identical, but `` `Weekday of` d `` crashes — daydate's
+`Weekday of` has same-arity `NUMBER`/`DATE` overloads that **collide** in
+jl4-mlir, so the wrong body runs on a raw-serial date. That is the
+same-arity-overload-collision issue (see `MLIR-REVIEW.md`), not the date ABI;
+tracked in the spec. It auto-generates to a harmless `both-error` and so isn't in
+`datetime-probe.cases.json` / doesn't gate.
 
 ## Curated cases added (`cases.json`)
 
@@ -107,6 +120,10 @@ NUMBER`, nested records. Mirrors the file's own `#ASSERT`ed fixtures
   share the same f64 transcendental path + number formatting) and unicode
   `STRINGLENGTH` (`"héllo"`, `"日本語"`), `REPLACE`, `TOUPPER`, `CONTAINS`,
   `IS INTEGER`.
+- `jl4-mlir/test/fixtures/datetime-probe.l4` — date construction (`make-date`/
+  `make-datetime`/`make-time`) and, after the Finding 2 fix, date arithmetic
+  (`days-between`, `shift-date`) are byte-identical. _Now in the CI Tier-2 corpus
+  — guards the date-ABI fix._ (`is-a-weekday` excluded: separate overload bug.)
 - `jl4/examples/ok/assume-as-given.l4` + `jl4/examples/implicit-assume-test.l4` —
   **18/18 byte-identical** at threshold-crossing inputs. Confirms `ASSUME` and
   _implicit_-`ASSUME` params bind correctly (schema-typed `number`/`boolean`,
