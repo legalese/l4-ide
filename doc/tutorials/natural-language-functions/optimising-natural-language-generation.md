@@ -1,4 +1,4 @@
-# Optimising for Natural Language Document Generation with `@nlg`
+# Optimising for Natural Language Document Generation
 
 L4 can render your rules back into formatted English prose — in the VS Code
 **Render** tab, or with `l4 render`. The renderer is **deterministic**: it walks
@@ -25,6 +25,10 @@ the result further.
 ---
 
 ## Lever 1 — Names do most of the work
+
+> *"Names reflect true understanding of a thing, and when you truly understand a thing you have power over it."*
+>
+> — Ursula K. Le Guin, *A Wizard of Earthsea*
 
 The renderer prints identifiers and parameter names **verbatim**. Good names are
 the single highest-leverage thing you can do.
