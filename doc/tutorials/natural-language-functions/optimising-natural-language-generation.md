@@ -100,6 +100,8 @@ This renders as follows:
     - if it is suburban: 4%
     - if it is rural: 2%
 
+---
+
 ## Lever 2 — Shape the code so it reads naturally
 
 ### Use mixfix so calls read as sentences
@@ -262,9 +264,12 @@ heading rather than a generic one.
 
 ## Lever 3 — `@nlg`: author the exact sentence
 
-When structure and naming aren't enough — a recursive helper, domain jargon, or
-a formula you'd rather state in words — attach an `@nlg` annotation. It is the
-authoritative natural-language form of that definition.
+When structure and naming aren't enough — a recursive helper, domain
+jargon, or a formula you'd rather state in words — attach an `@nlg`
+annotation.
+
+This gives you full control over the authoritative natural-language
+form of that definition.
 
 ### Revisiting `augmented`
 
@@ -280,14 +285,14 @@ The argument names appear, but the word order is dictated by the function name. 
 GIVEN x IS A `Base Benefit`
       y IS A Supplement
 GIVETH A NUMBER
-`augmented` x y @nlg %x% augmented with %y%
+`augmented` x y   @nlg %y% augmented with %x%
   MEANS x's amount + y's amount
 ```
 
-Now the definition renders as _"Augmented means x augmented with y"_, and the call site renders as:
+Now the definition renders as _"Augmented means y augmented with x"_, and the call site renders as:
 
 ```
-Total benefit means standard pension augmented with cost of living allowance.
+Total benefit means cost of living allowance augmented with standard pension.
 ```
 
 The arguments slot into exactly the positions you chose.
