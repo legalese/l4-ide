@@ -474,19 +474,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl gnupg lsb-release software-properties-common ca-certificates zip
           curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh && chmod +x llvm.sh
-          sudo ./llvm.sh 19
-          sudo apt-get install -y mlir-19-tools libmlir-19-dev lld-19 llvm-19
-          # apt.llvm.org packaging puts some binaries in /usr/bin/<tool>-19 and
-          # others only under /usr/lib/llvm-19/bin/<tool>. Probe both so a
+          # LLVM 22 matches the proven dev toolchain: jl4-mlir's README and
+          # FEATURE-PARITY-PLAN document the pass pipeline running unmodified on
+          # Homebrew llvm@22, and the parity harness was confirmed 20/20
+          # byte-identical end-to-end locally on LLVM 22.1.7. Matching the major
+          # version minimises MLIR textual-IR / pass-name drift risk.
+          sudo ./llvm.sh 22
+          sudo apt-get install -y mlir-22-tools libmlir-22-dev lld-22 llvm-22
+          # apt.llvm.org packaging puts some binaries in /usr/bin/<tool>-22 and
+          # others only under /usr/lib/llvm-22/bin/<tool>. Probe both so a
           # packaging-path change fails LOUD (set -e on a missing tool) rather
           # than silently degrading to an all-compile-fail run.
           set -e
           link() {
             local tool="$1" dst="$2"
-            for cand in "/usr/bin/$tool-19" "/usr/lib/llvm-19/bin/$tool" "/usr/bin/$tool"; do
+            for cand in "/usr/bin/$tool-22" "/usr/lib/llvm-22/bin/$tool" "/usr/bin/$tool"; do
               if [ -x "$cand" ]; then sudo ln -sf "$cand" "$dst"; return 0; fi
             done
-            echo "ERROR: could not locate $tool for LLVM 19 (checked /usr/bin/$tool-19, /usr/lib/llvm-19/bin/$tool, /usr/bin/$tool)" >&2
+            echo "ERROR: could not locate $tool for LLVM 22 (checked /usr/bin/$tool-22, /usr/lib/llvm-22/bin/$tool, /usr/bin/$tool)" >&2
             return 1
           }
           link mlir-opt       /usr/local/bin/mlir-opt

@@ -21,6 +21,7 @@ suites pass (jl4-runtime 40, rational 138, wasm-backend 6). 8 files changed,
 absent; tests assert on emitted MLIR text / schema flags / JS runtime functions.)
 
 ### QW1 — Fail-loud the silent wrong-answer paths in lowering ✅
+
 Files: `Lower.hs`, `ABI.hs` (comment), `test/Main.hs`.
 
 - ✅ **String-literal CONSIDER patterns** (Lower.hs:2246-2258) — now emit a real
@@ -36,7 +37,7 @@ Files: `Lower.hs`, `ABI.hs` (comment), `test/Main.hs`.
 - ✅ **Same-arity overload collisions** — detected during lowering via a new
   `emittedBodies` LowerState field (`lowerDecide` ~1101-1126); a genuine
   collision flags the export `supported:false`. (Note: the `daydate.l4`
-  four-`Date@1` repro is masked as a *dependency* import by
+  four-`Date@1` repro is masked as a _dependency_ import by
   `registerDependencyModule`'s dedup, so the regression test uses three
   same-name overloads in the main module.)
 - ✅ **ABI.hs doc comment** (ABI.hs:30) — corrected to the rational-pool-handle
@@ -45,6 +46,7 @@ Files: `Lower.hs`, `ABI.hs` (comment), `test/Main.hs`.
   `testOverloadCollisionUnsupported`.
 
 ### QW2 — Stop the silent deontic FULFILLED on the trace path ✅
+
 Files: `runtime/jl4-runtime.mjs`, `runtime/jl4-runtime.test.mjs`.
 
 - ✅ **Null-contract guard** — added on the trace path
@@ -59,6 +61,7 @@ Files: `runtime/jl4-runtime.mjs`, `runtime/jl4-runtime.test.mjs`.
 - ✅ node regression test (+7 assertions; 33 → 40).
 
 ### QW3 — Reconcile stale / contradictory documentation ✅
+
 Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
 
 - ✅ README "Known gaps": strings de-stubbed (real `__l4_str_*` impls listed,
@@ -73,6 +76,7 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
 ## Substantive items (tracked, not auto-fixed — need our hands / a decision)
 
 ### Correctness
+
 - ⏸ **Deontic semantics, full fix** — MUSTNOT/prohibition (correct, not just
   refuse), `DO`≡`MUST` collapse, **PROVIDED guards silently dropped** at
   extraction (Schema.hs:801-810 ignores `action.provided`), regulative
@@ -87,7 +91,7 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   NUMBER→`__l4_rat_cmp`, STRING `==`/`!=`→`__l4_str_eq`; ordered-STRING (no
   runtime builtin) and genuinely-unresolvable both fail loud (`supported:false`);
   BOOLEAN/enum/DATE keep `arith.cmpf`. 4 regression tests; 26/26 pass.
-  Residual (tracked): a STRING comparison whose operands are *helper results*
+  Residual (tracked): a STRING comparison whose operands are _helper results_
   still fails loud because `funcSigs` only stores MLIR types (f64) — recovering
   the L4 return type needs a bundle-wide return-type map (larger change).
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
@@ -100,6 +104,7 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   non-filtered helper trips it.
 
 ### Verification (the meta-fix)
+
 - ✅ **Differential parity in CI — gate hardened + wired** (adversarial workflow
   `ci-parity-gate`: survey → design → implement → 4-lens red-team (13 findings,
   6 blocker/major) → harden). Landed:
@@ -114,7 +119,7 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
     print `PARITY OK`. Red-team hardening: non-finite `comparisonsRun` (NaN/Inf)
     can't disable the guard; `minComparisons` is clamped to a floor of 1; the
     harness counter is cross-checked against the tally and the gate fails on the
-    smaller — *a harness bug can only make the gate stricter, never looser.*
+    smaller — _a harness bug can only make the gate stricter, never looser._
   - **`scripts/parity-harness.mjs`** — imports the pure module (inline copies
     deleted); broken default corpus (`../jl4-auth-proxy/validation/test.l4`) →
     in-repo 4-fixture manifest; **fail-loud `fs.existsSync` precheck** (missing
@@ -134,14 +139,21 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
     `jl4-mlir-parity-full` (LLVM/MLIR 19 + GHC 9.10.2, runs the harness on the
     explicit corpus, appends `parity.txt` to the step summary, uploads
     `parity-report` via `upload-artifact@v4`).
-  - **NOT end-to-end verified here**: no LLVM toolchain (`mlir-opt`/`mlir-translate`/
-    `llc`/`wasm-ld`) and no live jl4-service locally, so **Tier 2 ships
-    `continue-on-error: true`** (advisory) until it's proven green in CI a few
-    times — *then flip to `false` to make it required*. Residuals: on-disk
-    fixtures have no required *compile* coverage (Main.hs builds equivalent L4
-    inline, never reads the files); `allowCompileFail`/`allowDeployFail` stay
-    aggregate-opaque (harness must subtract reviewed ids before building the
-    tally); LLVM-19 apt package names unconfirmed on the runner.
+  - **End-to-end verified locally** (LLVM 22.1.7 — Homebrew `llvm` + `lld` —
+    against a live jl4-service): `parity-harness.mjs` on the 4-fixture corpus →
+    **20/20 byte-identical, `PARITY OK`, exit 0** (zero `differs`/`wasm-error`;
+    trace=full sub-matrix is the known M5-slice-1 backlog, non-gating). The
+    hardened verdict prints/exits correctly and the zero-comparison guard does
+    not false-trip. The CI Tier-2 job is pinned to **LLVM 22** to match this
+    proven toolchain (README + FEATURE-PARITY-PLAN both endorse 22). It still
+    ships **`continue-on-error: true`** (advisory) until it's green on the
+    _ubuntu_ runner a few times — the apt package resolution
+    (`mlir-22-tools` etc.) and the ubuntu LLVM-22 IR surface are the only
+    remaining unknowns — _then flip to `false` to make it required_. Residuals:
+    on-disk fixtures have no required _compile_ coverage in the Haskell suite
+    (Main.hs builds equivalent L4 inline, never reads the files);
+    `allowCompileFail`/`allowDeployFail` stay aggregate-opaque (harness must
+    subtract reviewed ids before building the tally).
 - ⬜ **Flip Tier 2 to required** (`continue-on-error: false`) once the toolchain
   job is green a few times; add a `Main.hs` case that reads each fixture `.l4`
   from disk (with prelude-import/VFS wiring) so the corpus has required compile
@@ -171,6 +183,7 @@ that go red now (falsifying the "DONE" claim) and green when realized:
   (Held back to avoid colliding with the in-flight lowerCmp agent.)
 
 ### Hygiene / scope
+
 - ⬜ **String-op fidelity** — code-point vs UTF-16 in length/substring/indexOf;
   `TOSTRING`/`JSON_ENCODE` formatting for small fractions & big ints; add
   missing `SPLIT`.

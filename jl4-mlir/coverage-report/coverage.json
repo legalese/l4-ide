@@ -1,11 +1,11 @@
 {
-  "totalFiles": 438,
+  "totalFiles": 432,
   "buckets": {
-    "clean": 35,
-    "no-exports": 349,
-    "has-unsupported": 2,
+    "clean": 36,
+    "no-exports": 342,
     "typecheck-fail": 51,
-    "lower-fail": 1
+    "lower-fail": 1,
+    "has-unsupported": 2
   },
   "typecheckErrorClasses": {
     "parse-error": 22,
@@ -14,12 +14,19 @@
     "ambiguous": 2
   },
   "unsupportedReasonHistogram": {
-    "REGULATIVE (deontic) construct not supported by the WASM backend": 2
+    "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend": 1,
+    "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend": 1,
+    "CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend": 1
   },
   "unsupportedFunctionsByReason": {
-    "REGULATIVE (deontic) construct not supported by the WASM backend": [
-      "jl4/examples/legal/ceo-performance-award.l4::Eligible-Service-Requirement",
-      "ts-apps/jl4-web/src/generated/ceo-performance-award.l4::Eligible-Service-Requirement"
+    "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend": [
+      "jl4/examples/ok/mixfix-garden-path.l4::tax-on"
+    ],
+    "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend": [
+      "jl4/experiments/thailand-cosmetics/orchestrator.l4::evaluateClaim"
+    ],
+    "CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend": [
+      "jl4/experiments/thailand-cosmetics/orchestrator.l4::evaluateClaim"
     ]
   },
   "perFile": [
@@ -519,6 +526,21 @@
       "functions": 6
     },
     {
+      "file": "jl4-mlir/test/fixtures/deontic-breach.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
+      "file": "jl4-mlir/test/fixtures/deontic-sale.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
+      "file": "jl4-mlir/test/fixtures/deontic-seatbelt.l4",
+      "outcome": "clean",
+      "functions": 1
+    },
+    {
       "file": "jl4-mlir/test/fixtures/intrinsics-probe.l4",
       "outcome": "clean",
       "functions": 7
@@ -580,11 +602,8 @@
     },
     {
       "file": "jl4/examples/legal/ceo-performance-award.l4",
-      "outcome": "has-unsupported",
-      "functions": 1,
-      "unsupported": {
-        "Eligible-Service-Requirement": "REGULATIVE (deontic) construct not supported by the WASM backend"
-      }
+      "outcome": "clean",
+      "functions": 1
     },
     {
       "file": "jl4/examples/legal/directive-showcase.l4",
@@ -673,7 +692,9 @@
       "file": "jl4/examples/not-ok/empty.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/export-after-giveth.l4",
@@ -704,67 +725,89 @@
       "file": "jl4/examples/not-ok/tc/computed-fields-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-long-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-override.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-self-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/computed-fields-type-mismatch.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/datetime-type-errors.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/error-directive-ambiguity.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/error-unify-test.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/mixfix-wrong-keyword.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/overloaded-ambiguous.l4",
       "outcome": "typecheck-fail",
       "errorClass": "ambiguous",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/parse-error1.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting %, ELSE, or space token"]
+      "error": [
+        "    expecting %, ELSE, or space token"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/parse-error2.l4",
@@ -786,43 +829,57 @@
       "file": "jl4/examples/not-ok/tc/parse-error4.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting AKA, IF, IS, OF, identifier, or space token"]
+      "error": [
+        "    expecting AKA, IF, IS, OF, identifier, or space token"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/percent.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/postfix-in-let-block.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/scombinator-fragment.l4",
       "outcome": "lower-fail",
       "errorClass": "other",
-      "error": ["    incorrect indentation (got 1, should be greater than 3)"]
+      "error": [
+        "    incorrect indentation (got 1, should be greater than 3)"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/sing.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/tdnr-ambiguous.l4",
       "outcome": "typecheck-fail",
       "errorClass": "ambiguous",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/not-ok/tc/time-type-errors.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/examples/ok/actus-library-test.l4",
@@ -1326,8 +1383,11 @@
     },
     {
       "file": "jl4/examples/ok/mixfix-garden-path.l4",
-      "outcome": "clean",
-      "functions": 1
+      "outcome": "has-unsupported",
+      "functions": 1,
+      "unsupported": {
+        "tax-on": "ad-hoc overload collision: multiple definitions of tax_on at arity 3 share one WASM symbol and cannot be disambiguated by the WASM backend"
+      }
     },
     {
       "file": "jl4/examples/ok/mixfix-multiline.l4",
@@ -1663,7 +1723,9 @@
       "file": "jl4/experiments/Singapore-Data-Protection-Act.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/actors.l4",
@@ -1679,7 +1741,9 @@
       "file": "jl4/experiments/britishcitizen.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting operator char"]
+      "error": [
+        "    expecting operator char"
+      ]
     },
     {
       "file": "jl4/experiments/britishcitizen2.l4",
@@ -1755,7 +1819,9 @@
       "file": "jl4/experiments/computed-fields-cycle.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/computed-fields-external-of.l4",
@@ -1781,7 +1847,9 @@
       "file": "jl4/experiments/computed-fields-override.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/computed-fields-where-let.l4",
@@ -1797,19 +1865,25 @@
       "file": "jl4/experiments/deontic-may.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting AKA, MEANS, or space token"]
+      "error": [
+        "    expecting AKA, MEANS, or space token"
+      ]
     },
     {
       "file": "jl4/experiments/dogs.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/environmental-quality-review-act-7.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/fetch-uuid.l4",
@@ -1854,7 +1928,9 @@
       "file": "jl4/experiments/jerseyCharities2-tests.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/jerseyCharities2.l4",
@@ -1898,7 +1974,9 @@
       "file": "jl4/experiments/json-roundtrip.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/json-test-minimal.l4",
@@ -1919,13 +1997,17 @@
       "file": "jl4/experiments/macma2.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/macma3.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/misleadingPriceLists.l4",
@@ -2005,7 +2087,9 @@
       "file": "jl4/experiments/purchase.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting operator char"]
+      "error": [
+        "    expecting operator char"
+      ]
     },
     {
       "file": "jl4/experiments/query-planner-tests/01-simple-and.l4",
@@ -2081,7 +2165,9 @@
       "file": "jl4/experiments/regulative-powers.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting AKA, MEANS, identifier, or space token"]
+      "error": [
+        "    expecting AKA, MEANS, identifier, or space token"
+      ]
     },
     {
       "file": "jl4/experiments/restaurant1.l4",
@@ -2095,7 +2181,9 @@
       "file": "jl4/experiments/restaurant2.l4",
       "outcome": "typecheck-fail",
       "errorClass": "parse-error",
-      "error": ["    expecting %, ;, LEST, WHERE, end of input, or space token"]
+      "error": [
+        "    expecting %, ;, LEST, WHERE, end of input, or space token"
+      ]
     },
     {
       "file": "jl4/experiments/safe-post-new.l4",
@@ -2106,7 +2194,9 @@
       "file": "jl4/experiments/safe-post-tests.l4",
       "outcome": "typecheck-fail",
       "errorClass": "type-mismatch",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/safe-post.l4",
@@ -2135,19 +2225,25 @@
       "file": "jl4/experiments/test-anthropic-api-response.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/test-json-roundtrip-nested.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/test-jsondecode-nested.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     },
     {
       "file": "jl4/experiments/test-nested-jsonencode.l4",
@@ -2171,8 +2267,11 @@
     },
     {
       "file": "jl4/experiments/thailand-cosmetics/orchestrator.l4",
-      "outcome": "clean",
-      "functions": 1
+      "outcome": "has-unsupported",
+      "functions": 1,
+      "unsupported": {
+        "evaluateClaim": "CONSIDER pattern constructor RIGHT could not be resolved to an enum tag by the WASM backend; CONSIDER pattern constructor LEFT could not be resolved to an enum tag by the WASM backend"
+      }
     },
     {
       "file": "jl4/experiments/thailand-cosmetics/prelude.l4",
@@ -2249,55 +2348,9 @@
       "file": "jl4/tests-cli/fixtures/typecheck-error.l4",
       "outcome": "typecheck-fail",
       "errorClass": "other",
-      "error": ["  Typecheck completed with errors"]
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/anti-social.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/british-citizen-act.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/ceo-performance-award.l4",
-      "outcome": "has-unsupported",
-      "functions": 1,
-      "unsupported": {
-        "Eligible-Service-Requirement": "REGULATIVE (deontic) construct not supported by the WASM backend"
-      }
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/directive-showcase.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/empty.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/imaginary-alcohol-act.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/ny-environmental-7.3.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/jl4-web/src/generated/promissory-note.l4",
-      "outcome": "no-exports",
-      "functions": 0
-    },
-    {
-      "file": "ts-apps/vscode/static/skills/writing-l4-rules/assets/example-parking.l4",
-      "outcome": "clean",
-      "functions": 1
+      "error": [
+        "  Typecheck completed with errors"
+      ]
     }
   ]
 }
