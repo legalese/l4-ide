@@ -124,7 +124,7 @@ GIVETH A BOOLEAN
 
 In a conventional programming language, this would be a function taking three arguments: `eligibility(date, applicant, programme)`.
 
-In L4, it is also a function taking three arguments, but the arguments are intermingled across the function name for improved readability.
+In L4, it is also a function taking three arguments, but the arguments are interspersed together with the function name for improved readability.
 
 The function would be called thusly:
 ``` l4
@@ -135,22 +135,19 @@ And the natural language would generate like:
 
 ```
 As at application date the applicant is eligible for the programme if the person's age is at least 65.
-
-Alice's eligibility means as at January 1 2010 Alice Apple is eligible for retirement benefits.
 ```
 
 ### End helper names in a preposition
 
-When a function name does not end in a preposition, the renderer joins it to its
-arguments with "with". That can read naturally for past-participle names:
+When a function name does not end in a preposition, the renderer joins it with its
+arguments -- using the word "with". That can read naturally for past-participle names:
 
 ```l4
 DECLARE `Base Benefit` HAS amount IS A NUMBER
-DECLARE Supplement HAS amount IS A NUMBER
+DECLARE Supplement     ^   ^      ^  ^ ^
 
 GIVEN x IS A `Base Benefit`
       y IS A Supplement
-GIVETH A NUMBER
 `augmented` x y MEANS x's amount + y's amount
 -- definition renders as: "Augmented equals the base benefit's amount + the supplement's amount."
 
@@ -164,19 +161,22 @@ DECIDE `total benefit` IS
 
 The call site surfaces the argument names, but the word order is still driven by the function name. In Lever 3 we will return to this example and use `@nlg` to rearrange the words so the sentence reads more naturally.
 
-But it becomes awkward when the name is a noun phrase:
+The "with" convention becomes awkward when the name is a noun phrase:
 
 ```l4
 `the later` x y MEANS IF x >= y THEN x ELSE y
--- call site renders as: "the later with start date and end date"  ← awkward
+-- by default, the call site renders as: "the later with start date and end date". Awkward.
 ```
 
-Ending the name in a preposition (`of`, `for`, `to`, `between`, …) eliminates
-the inserted "with" and lets the arguments slot in naturally:
+The solution: end the name in a preposition (`of`, `for`, `to`,
+`between`, …).
+
+That preposition eliminates the "with" and lets the arguments
+slot in naturally:
 
 ```l4
 `the later of` x y MEANS IF x >= y THEN x ELSE y
--- call site renders as: "the later of start date and end date"  ← natural
+-- call site renders as: "the later of start date and end date". Natural.
 ```
 
 ### Let control flow stay structured
@@ -209,6 +209,8 @@ wrapping it in prose helpers:
 (`base rent` PLUS `service charge`) TIMES `months` PLUS `deposit`
 -- "(base rent + service charge) × months + deposit"
 ```
+
+Beyond three terms, you will get "sum" and "product".
 
 ### Group rules into titled sections
 
@@ -252,6 +254,9 @@ definitions and rules are grouped into automatic **Definitions** and
 the parts the way a reader of the contract or statute would expect. Imported
 modules that carry their own section titles keep them, rendering under their own
 heading rather than a generic one.
+
+> [!NOTE]
+> Section symbols are used for more than rendering text. Identifiers are organized into lexical scope under the section hierarchy. See [Section Markers (§)](../../reference/syntax/README.md#section-markers-) in the syntax reference.
 
 ---
 
