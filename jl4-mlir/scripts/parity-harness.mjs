@@ -35,6 +35,14 @@ import {
   aesonStringify,
   wrapEvaluationEnvelope,
 } from "../runtime/jl4-runtime.mjs";
+// Pure gate semantics live in a side-effect-free module so they can be
+// unit-tested under bare node (scripts/parity-gate.test.mjs is the
+// verification anchor). canonical/extractValue/ulpEqual were moved verbatim
+// from this file; classifyOutcome is the faithful trace=none ladder;
+// gateVerdict is the hardened replacement for the old inline parityFails.
+// (canonical/ulpEqual are used internally by classifyOutcome and so are no
+// longer referenced directly here — only extractValue still is, for logging.)
+import { extractValue, classifyOutcome, gateVerdict } from "./parity-gate.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -53,12 +61,30 @@ if (files.length === 0) {
   // Default fixture set: the 12-fn M0/M5 corpus + the M6 deontic
   // fixtures (simple cascade + record-typed parties + explicit
   // BREACH BY/BECAUSE).
+  // The in-repo fixture set (corpusManifest). The old default pointed at
+  // ../jl4-auth-proxy/validation/test.l4, which is NOT checked out in this
+  // worktree — a broken path that used to manifest as compile-fail and (under
+  // the old verdict) still printed PARITY OK. The identical fixture lives at
+  // jl4-mlir/test/fixtures/test.l4, so we point there.
   files.push(
-    path.join(REPO_ROOT, "..", "jl4-auth-proxy", "validation", "test.l4"),
+    path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "test.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-sale.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-seatbelt.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-breach.l4"),
   );
+}
+
+// Fail LOUD if any input path is missing rather than silently dropping it to
+// compile-fail (or worse, never noticing). The old broken default
+// (../jl4-auth-proxy/validation/test.l4) is exactly this failure mode; a
+// missing file is a corpus error, not a parity result.
+const missingInputs = files.filter((f) => !fs.existsSync(f));
+if (missingInputs.length) {
+  console.error(
+    `parity-harness: ${missingInputs.length} input file(s) not found:\n` +
+      missingInputs.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(2);
 }
 
 const cabalBin = (name) =>
@@ -96,36 +122,8 @@ function genArgs(parameters) {
   return args;
 }
 
-// ---- canonical JSON (sorted keys) for value comparison --------------------
-function canonical(x) {
-  if (Array.isArray(x)) return "[" + x.map(canonical).join(",") + "]";
-  if (x && typeof x === "object")
-    return (
-      "{" +
-      Object.keys(x)
-        .sort()
-        .map((k) => JSON.stringify(k) + ":" + canonical(x[k]))
-        .join(",") +
-      "}"
-    );
-  return JSON.stringify(x);
-}
-const extractValue = (body) => {
-  try {
-    return JSON.parse(body)?.contents?.result?.value;
-  } catch {
-    return undefined;
-  }
-};
-// Are two values numerically equal to within a few ULP? This isolates the
-// known f64-vs-exact-rational drift (M4) from genuine logic divergence so the
-// harness can gate on the latter without being permanently red on the former.
-function ulpEqual(a, b) {
-  if (typeof a !== "number" || typeof b !== "number") return false;
-  if (a === b) return true;
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
-}
+// canonical / extractValue / ulpEqual now live in ./parity-gate.mjs (imported
+// above) so the gate's classification logic is unit-testable under bare node.
 
 // ---- jl4-service lifecycle ------------------------------------------------
 const store = fs.mkdtempSync(path.join(os.tmpdir(), "parity-store-"));
@@ -206,6 +204,36 @@ async function serviceEval(id, fn, args, traceMode, deonticExtras) {
 const results = [];
 const tally = {};
 const traceTally = {};
+// Running count of cells where BOTH backends produced a comparable value
+// (the four real-comparison outcomes). Passed to gateVerdict, which also
+// recomputes it from the tally and cross-checks (belt-and-suspenders).
+let comparisonsRun = 0;
+const REAL_COMPARISON_OUTCOMES = new Set([
+  "byte-identical",
+  "value-equal",
+  "ulp-differs",
+  "differs",
+]);
+// ---- PARTIAL-CORPUS-COLLAPSE GUARD (per-file, keyed on curated cases) ------
+// The aggregate gateVerdict floor (minComparisons against realComparisons)
+// cannot see WHICH file produced a comparison. test.l4 alone keeps the
+// aggregate well above 1, so the entire deontic half of the corpus could
+// silently evaporate (a deontic body regressing to supported:false ->
+// refused-unsupported, or a *.cases.json key drifting from the apiName ->
+// skip-no-cases, or a sidecar renamed/dropped) while the gate still reports
+// PARITY OK with ZERO deontic comparisons.
+//
+// gateVerdict is intentionally aggregate-only (it takes the tally, not the
+// per-file results). The harness, by contrast, has full per-file knowledge,
+// so it asserts here that EVERY curated `(file, fn)` declared in a loaded
+// *.cases.json actually produced at least one real comparison. A curated
+// fixture that collapses entirely is a corpus regression and fails the gate
+// loud, independent of the aggregate floor.
+//
+// `expectedCuratedCells` is populated as cases.json sidecars are loaded;
+// `realComparisonCells` records every (id, fn) that yielded a real comparison.
+const expectedCuratedCells = new Map(); // "id::fn" -> { id, fn }
+const realComparisonCells = new Set(); // "id::fn"
 const bump = (k) => (tally[k] = (tally[k] || 0) + 1);
 const bumpTrace = (k) => (traceTally[k] = (traceTally[k] || 0) + 1);
 
@@ -264,8 +292,17 @@ try {
     // optional curated cases
     let curated = {};
     const casesFile = src.replace(/\.l4$/, ".cases.json");
-    if (fs.existsSync(casesFile))
+    if (fs.existsSync(casesFile)) {
       curated = JSON.parse(fs.readFileSync(casesFile, "utf8"));
+      // Every fn with curated cases is EXPECTED to produce real comparisons;
+      // record it so the partial-corpus-collapse guard can detect a fixture
+      // whose deontic body or cases.json key silently stopped contributing.
+      for (const fnName of Object.keys(curated)) {
+        const cases = curated[fnName];
+        if (Array.isArray(cases) && cases.length > 0)
+          expectedCuratedCells.set(`${id}::${fnName}`, { id, fn: fnName });
+      }
+    }
 
     // 4. per function
     for (const [fnName, fe] of Object.entries(schema.functions)) {
@@ -334,22 +371,27 @@ try {
           wasmErr = String(e.message || e);
         }
 
-        let outcome;
-        const svcOk = svcR.status >= 200 && svcR.status < 300;
-        if (wasmErr && !svcOk) outcome = "both-error";
-        else if (wasmErr) outcome = "wasm-error";
-        else if (!svcOk) outcome = "service-error";
-        else if (svcR.body === wasmBody) outcome = "byte-identical";
-        else if (
-          canonical(extractValue(svcR.body)) ===
-          canonical(extractValue(wasmBody))
-        )
-          outcome = "value-equal";
-        else if (ulpEqual(extractValue(svcR.body), extractValue(wasmBody)))
-          outcome = "ulp-differs";
-        else outcome = "differs";
+        // The trace=none classifier now lives in ./parity-gate.mjs
+        // (classifyOutcome), byte-for-byte the same if/else ladder that used
+        // to be inline here. Same inputs, same outcome.
+        const outcome = classifyOutcome({
+          svcStatus: svcR.status,
+          svcBody: svcR.body,
+          wasmBody,
+          wasmErr,
+        });
 
         bump(outcome);
+        // Accumulate the harness's own running count of real comparisons
+        // (cells where BOTH backends produced a comparable value). gateVerdict
+        // recomputes this from the tally and cross-checks it.
+        if (REAL_COMPARISON_OUTCOMES.has(outcome)) {
+          comparisonsRun++;
+          // Record (file, fn) for the partial-corpus-collapse guard: a curated
+          // cell that never reaches here (because it was refused/skipped) marks
+          // its fixture as collapsed below.
+          realComparisonCells.add(`${id}::${fnName}`);
+        }
         const mark =
           {
             "byte-identical": "✓",
@@ -422,10 +464,45 @@ try {
 }
 
 // ---- report ---------------------------------------------------------------
+// The verdict is now the SINGLE source of truth in ./parity-gate.mjs
+// (gateVerdict). It gates on genuine logic divergence (differs / wasm-error,
+// preserved) PLUS the previously-silent false negatives — service-error,
+// compile-fail, deploy-fail — and the zero-comparison guard (a vacuous run
+// must never report PARITY OK). ulp-differs remains the tracked, known
+// f64-vs-rational gap (M4) and does NOT gate.
+const verdict = gateVerdict(tally, { comparisonsRun });
+
+// ---- PARTIAL-CORPUS-COLLAPSE GUARD -----------------------------------------
+// Every curated (file, fn) declared in a *.cases.json must have produced at
+// least one real comparison. A curated cell that never did (entire fixture
+// refused/skipped/compile-failed) is a corpus regression the aggregate floor
+// cannot see, so fail the gate loud here. This is the per-file teeth the
+// deontic half of the corpus needs (test.l4 alone keeps the aggregate above 1).
+const collapsedCells = [];
+for (const [key, cell] of expectedCuratedCells) {
+  if (!realComparisonCells.has(key))
+    collapsedCells.push(`${cell.id}::${cell.fn}`);
+}
+if (collapsedCells.length) {
+  verdict.pass = false;
+  if (!verdict.failures.includes("corpus-collapse"))
+    verdict.failures.push("corpus-collapse");
+  verdict.collapsedCells = collapsedCells;
+  const note = `curated cells produced ZERO real comparisons (corpus collapse): ${collapsedCells.join(", ")}`;
+  // Normalize the gateVerdict reason to a FAIL prefix, then append the note.
+  verdict.reason = verdict.reason.startsWith("PARITY OK")
+    ? "PARITY FAIL: " + verdict.reason.slice("PARITY OK: ".length) + "; " + note
+    : verdict.reason + "; " + note;
+  console.error(
+    `parity-harness: ${collapsedCells.length} curated cell(s) collapsed to zero comparisons:\n` +
+      collapsedCells.map((c) => `  - ${c}`).join("\n"),
+  );
+}
+
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(
   path.join(outDir, "parity.json"),
-  JSON.stringify({ tally, traceTally, results }, null, 2),
+  JSON.stringify({ tally, traceTally, verdict, results }, null, 2),
 );
 
 const order = [
@@ -443,10 +520,10 @@ const order = [
 let txt = "M0 differential parity matrix (jl4-service vs WASM)\n\n";
 for (const k of order)
   if (tally[k]) txt += `  ${String(tally[k]).padStart(4)}  ${k}\n`;
-// Gate fails only on genuine logic divergence; ulp-differs is the tracked,
-// known f64-vs-rational gap (M4), not a regression.
-const parityFails = (tally["differs"] || 0) + (tally["wasm-error"] || 0);
-txt += `\n${parityFails === 0 ? "PARITY OK" + (tally["ulp-differs"] || 0 ? " (" + tally["ulp-differs"] + " known ULP drift, M4)" : "") : "PARITY MISMATCHES: " + parityFails}\n`;
+txt += `\n${verdict.reason}\n`;
+if (verdict.failures.length)
+  txt += `failures: ${verdict.failures.join(", ")}\n`;
+txt += `realComparisons: ${verdict.realComparisons}  (parityFails: ${verdict.parityFails})\n`;
 
 // M5 slice 1: trace-mode sub-matrix. Currently every cell is expected to
 // be `trace-differs` — the synthetic Reasoning the runtime emits is a
@@ -469,4 +546,4 @@ if (traceTotal > 0) {
 fs.writeFileSync(path.join(outDir, "parity.txt"), txt);
 console.log("\n" + txt);
 console.log(`Report: ${path.join(outDir, "parity.txt")} / parity.json`);
-process.exit(parityFails > 0 ? 1 : 0);
+process.exit(verdict.pass ? 0 : 1);

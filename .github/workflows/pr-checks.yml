@@ -30,6 +30,7 @@ jobs:
       haskell: ${{ steps.filter.outputs.haskell }}
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
+      mlir: ${{ steps.filter.outputs.mlir }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -66,6 +67,12 @@ jobs:
             docs:
               - 'doc/**'
               - 'specs/**'
+            mlir:
+              - 'jl4-mlir/**'
+              # Re-trigger the mlir jobs when the jobs themselves change (e.g.
+              # tuning these steps, or flipping jl4-mlir-parity-full's
+              # continue-on-error) so a workflow-only PR can self-validate.
+              - '.github/workflows/pr-checks.yml'
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
@@ -394,6 +401,154 @@ jobs:
           echo "- **GHC WASM:** ${{ env.GHC_WASM_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Binary Size:** ${WASM_SIZE_MB} MB" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** All tests passed" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # TIER 1 — cheap, ALWAYS-ON pure parity-gate unit test (REQUIRED)
+  # No LLVM, no GHC, no service, no npm. Guards gate semantics every PR.
+  # ============================================
+  jl4-mlir-parity-gate-unit:
+    name: jl4-mlir Parity Gate (pure unit)
+    needs: changes
+    if: needs.changes.outputs.mlir == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      - name: Pure parity-gate classify + verdict semantics
+        run: node jl4-mlir/scripts/parity-gate.test.mjs
+      - name: Other jl4-mlir pure node tests (untested in CI today)
+        run: |
+          set -e
+          for f in jl4-mlir/runtime/*.test.mjs jl4-mlir/scripts/*.test.mjs; do
+            case "$f" in */parity-gate.test.mjs) continue;; esac
+            echo "== $f =="; node "$f"
+          done
+      # Corpus-collapse backstop (ALWAYS enforced, no toolchain). The heavy
+      # differential harness (Tier 2) is continue-on-error until the LLVM/MLIR
+      # + GHC toolchain is proven green, so it does not yet block a PR. This
+      # cheap check catches the corpus-collapse modes that don't need the
+      # toolchain — a fixture deleted/emptied, or a deontic *.cases.json
+      # renamed/dropped/emptied — so the degenerate-vacuous window can't
+      # silently persist while Tier 2 is advisory.
+      - name: Corpus fixtures exist and are non-empty
+        run: |
+          set -e
+          fail=0
+          for f in test deontic-sale deontic-seatbelt deontic-breach; do
+            p="jl4-mlir/test/fixtures/$f.l4"
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY fixture: $p" >&2; fail=1; fi
+          done
+          # Each deontic fixture MUST keep a non-empty curated cases.json, else
+          # every deontic fn silently degrades to skip-no-cases at harness time.
+          for f in deontic-sale deontic-seatbelt deontic-breach; do
+            p="jl4-mlir/test/fixtures/$f.cases.json"
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY cases sidecar: $p" >&2; fail=1; continue; fi
+            node -e "const c=require('./$p'); const n=Object.values(c).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0); if(n<1){console.error('cases sidecar has zero cases: $p');process.exit(1);} console.log('$p: '+n+' curated cases');"
+          done
+          if [ "$fail" != "0" ]; then echo 'corpus-collapse: fixture/sidecar check failed' >&2; exit 1; fi
+
+  # ============================================
+  # TIER 2 — heavy full differential parity harness (BEST-EFFORT first)
+  # Compiles to wasm via LLVM/MLIR, spawns jl4-service, diffs both.
+  # continue-on-error until toolchain + IR compat proven green; then flip to false.
+  # ============================================
+  jl4-mlir-parity-full:
+    name: jl4-mlir Full Parity Harness
+    needs: [changes, jl4-mlir-parity-gate-unit]
+    if: needs.changes.outputs.mlir == 'true'
+    runs-on: ubuntu-24.04
+    continue-on-error: true # flip to false once stable to make required
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+      JL4_LIBRARY_PATH: ${{ github.workspace }}/jl4-core/libraries
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      # --- LLVM/MLIR toolchain (version-pinned; symlinked to unsuffixed names) ---
+      - name: Install LLVM/MLIR + wasm-ld + zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg lsb-release software-properties-common ca-certificates zip
+          curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh && chmod +x llvm.sh
+          sudo ./llvm.sh 19
+          sudo apt-get install -y mlir-19-tools libmlir-19-dev lld-19 llvm-19
+          # apt.llvm.org packaging puts some binaries in /usr/bin/<tool>-19 and
+          # others only under /usr/lib/llvm-19/bin/<tool>. Probe both so a
+          # packaging-path change fails LOUD (set -e on a missing tool) rather
+          # than silently degrading to an all-compile-fail run.
+          set -e
+          link() {
+            local tool="$1" dst="$2"
+            for cand in "/usr/bin/$tool-19" "/usr/lib/llvm-19/bin/$tool" "/usr/bin/$tool"; do
+              if [ -x "$cand" ]; then sudo ln -sf "$cand" "$dst"; return 0; fi
+            done
+            echo "ERROR: could not locate $tool for LLVM 19 (checked /usr/bin/$tool-19, /usr/lib/llvm-19/bin/$tool, /usr/bin/$tool)" >&2
+            return 1
+          }
+          link mlir-opt       /usr/local/bin/mlir-opt
+          link mlir-translate /usr/local/bin/mlir-translate
+          link llc            /usr/local/bin/llc
+          link wasm-ld        /usr/local/bin/wasm-ld
+          mlir-opt --version && mlir-translate --version && llc --version && wasm-ld --version
+      # --- GHC / cabal (mirror the haskell job's system deps) ---
+      - name: Install Haskell system deps
+        run: |
+          sudo apt-get install -y build-essential libffi-dev libffi8 libgmp-dev libgmp10 \
+            libncurses-dev pkg-config zlib1g-dev liblzma-dev xz-utils
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: "9.10.2"
+          cabal-version: "latest"
+          cabal-update: true
+      - name: Update git submodules
+        run: git submodule update --init
+      - name: Restore cabal store cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ hashFiles('**/*.cabal','cabal.project') }}
+          restore-keys: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-
+      - name: Restore dist-newstyle cache
+        uses: actions/cache/restore@v5
+        with:
+          path: dist-newstyle
+          key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-${{ hashFiles('**/*.hs','**/*.cabal') }}
+          restore-keys: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
+      - name: Build native jl4-mlir + jl4-service
+        run: |
+          cabal update
+          cabal build jl4-mlir jl4-service
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      # --- run the harness with EXPLICIT in-repo corpus (default list is broken) ---
+      - name: Run differential parity harness
+        run: |
+          node jl4-mlir/scripts/parity-harness.mjs \
+            --out jl4-mlir/parity-report \
+            jl4-mlir/test/fixtures/test.l4 \
+            jl4-mlir/test/fixtures/deontic-sale.l4 \
+            jl4-mlir/test/fixtures/deontic-seatbelt.l4 \
+            jl4-mlir/test/fixtures/deontic-breach.l4
+      - name: Append parity matrix to job summary
+        if: always()
+        run: |
+          if [ -f jl4-mlir/parity-report/parity.txt ]; then
+            { echo '## jl4-mlir Parity Matrix'; echo '```'; cat jl4-mlir/parity-report/parity.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jl4-mlir-parity-report
+          path: jl4-mlir/parity-report/
+          if-no-files-found: warn
+          retention-days: 14
 
   # ============================================
   # Nix Flake Check

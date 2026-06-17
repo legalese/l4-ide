@@ -100,16 +100,57 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   non-filtered helper trips it.
 
 ### Verification (the meta-fix)
-- ⬜ **Differential parity in CI** — `parity-harness.mjs` isn't in CI, needs the
-  LLVM toolchain + a live jl4-service, leaves no committed artifact, has a
-  broken default fixture path in-worktree, and gates only on
-  `differs`+`wasm-error` (compile-fail / deploy-fail / `value-equal` all pass).
-  Harden the gate; commit an artifact; wire to CI.
+- ✅ **Differential parity in CI — gate hardened + wired** (adversarial workflow
+  `ci-parity-gate`: survey → design → implement → 4-lens red-team (13 findings,
+  6 blocker/major) → harden). Landed:
+  - **`scripts/parity-gate.mjs`** (NEW, pure / side-effect-free) — `canonical`,
+    `extractValue`, `ulpEqual` moved verbatim; `classifyOutcome` is a faithful
+    extraction of the old inline `:337-350` ladder (no behaviour change); the
+    hardened `gateVerdict(tally, {comparisonsRun, …})` is now the single source
+    of truth. Fails on `differs`/`wasm-error` (preserved) **plus** the
+    previously-silent `service-error`/`compile-fail`/`deploy-fail`, **plus** a
+    **zero-comparison guard** so a vacuous run (empty/broken corpus, all
+    refused/skip/both-error, every file dropped to compile/deploy-fail) can never
+    print `PARITY OK`. Red-team hardening: non-finite `comparisonsRun` (NaN/Inf)
+    can't disable the guard; `minComparisons` is clamped to a floor of 1; the
+    harness counter is cross-checked against the tally and the gate fails on the
+    smaller — *a harness bug can only make the gate stricter, never looser.*
+  - **`scripts/parity-harness.mjs`** — imports the pure module (inline copies
+    deleted); broken default corpus (`../jl4-auth-proxy/validation/test.l4`) →
+    in-repo 4-fixture manifest; **fail-loud `fs.existsSync` precheck** (missing
+    input `exit(2)`, not a silent compile-fail); per-file **partial-corpus-collapse
+    guard** (a curated `*.cases.json` cell that yields zero real comparisons fails
+    with `corpus-collapse` — the per-file teeth `gateVerdict`'s aggregate floor
+    lacks); writes `verdict` into `parity.json`/`parity.txt`; `exit(verdict.pass?0:1)`.
+  - **`scripts/parity-gate.test.mjs`** (NEW, bare-node, no toolchain) — **93/93
+    pass** (independently re-run). Covers all 7 `classifyOutcome` outcomes +
+    boundaries, the moved helpers, the M4 ulp-must-not-gate invariant, and every
+    false-negative trap incl. the NaN/Inf and `minComparisons`-floor regression
+    locks. **This is the sole machine-verified anchor** in this environment.
+  - **`.github/workflows/pr-checks.yml`** — `mlir: jl4-mlir/**` (+ the workflow
+    file itself) added to the `changes` filter; **Tier 1** `jl4-mlir-parity-gate-unit`
+    (always-on, pure node: runs the gate test, the other jl4-mlir `*.test.mjs`,
+    and a corpus-fixtures-exist-and-non-empty check); **Tier 2**
+    `jl4-mlir-parity-full` (LLVM/MLIR 19 + GHC 9.10.2, runs the harness on the
+    explicit corpus, appends `parity.txt` to the step summary, uploads
+    `parity-report` via `upload-artifact@v4`).
+  - **NOT end-to-end verified here**: no LLVM toolchain (`mlir-opt`/`mlir-translate`/
+    `llc`/`wasm-ld`) and no live jl4-service locally, so **Tier 2 ships
+    `continue-on-error: true`** (advisory) until it's proven green in CI a few
+    times — *then flip to `false` to make it required*. Residuals: on-disk
+    fixtures have no required *compile* coverage (Main.hs builds equivalent L4
+    inline, never reads the files); `allowCompileFail`/`allowDeployFail` stay
+    aggregate-opaque (harness must subtract reviewed ids before building the
+    tally); LLVM-19 apt package names unconfirmed on the runner.
+- ⬜ **Flip Tier 2 to required** (`continue-on-error: false`) once the toolchain
+  job is green a few times; add a `Main.hs` case that reads each fixture `.l4`
+  from disk (with prelude-import/VFS wiring) so the corpus has required compile
+  coverage.
 - ⬜ **Expand the corpus** beyond the 12-fn fixture at single trivial inputs:
   non-degenerate `.cases.json` hitting TRUE branches, the ~35 clean exportable
   files, property/fuzz tests for the deontic state machine vs. jl4-core.
 - ⬜ **Tests that execute wasm** — all 19 Haskell tests are `isInfixOf` string
-  checks; none compiles/runs a module. (Needs the toolchain in CI.)
+  checks; none compiles/runs a module. (Needs the toolchain in CI — Tier 2.)
 
 ### Tests (TDD red→green)
 
