@@ -322,8 +322,19 @@ GIVETH A LIST OF STRING
 
 #EVAL `render outline` `default scheme` `renumbered`   -- "1 …", "2 …", "7 …", "8 …"
 
+-- structure + markers
 #ASSERT depth (item "solo") EQUALS 1
+#ASSERT `count nodes` `sample` EQUALS 6
+#ASSERT depth `sample` EQUALS 3
 #ASSERT `marker for` UpperAlpha 3 EQUALS "C"
+#ASSERT `marker for` LowerAlpha 1 EQUALS "a"
 #ASSERT `marker for` LowerRoman 4 EQUALS "iv"
 #ASSERT `marker for` Decimal 2 EQUALS "2"
 #ASSERT `roman` 2024 EQUALS "MMXXIV"
+#ASSERT `roman` 49 EQUALS "XLIX"
+
+-- end-to-end rendering: the three numbering modes
+#ASSERT `render outline` `body scheme` `sample` EQUALS (LIST "Tenant's covenants", "a\tpay the Rent when due", "b\tkeep the interior in good repair", "b.i\tfair wear and tear excepted", "b.ii\tdamage by insured risks excepted", "c\tnot assign or sublet without the Landlord's consent")
+#ASSERT `render outline` `default scheme` `amended` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "2\tDelivery")
+#ASSERT `render outline` `default scheme` `amended bumping` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "3\tDelivery")
+#ASSERT `render outline` `default scheme` `renumbered` EQUALS (LIST "Recitals", "1\tRecital one", "2\tRecital two", "7\tRecital seven", "8\tRecital eight")
