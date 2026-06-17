@@ -97,6 +97,15 @@ const MLIR_BIN = cabalBin("jl4-mlir");
 const SERVICE_BIN = cabalBin("jl4-service");
 
 // ---- schema-driven argument generation ------------------------------------
+// Sentinel: this parameter shape can't be auto-synthesized (unknown type, or an
+// object with no declared properties — e.g. an untyped param the schema emitter
+// defaulted to {"type":"object"} with no shape). We must NOT send `null` for it:
+// jl4-service correctly 422s on a null where a value is required, which the
+// harness would then misread as a `service-error` divergence. Instead the
+// function is skipped (skip-no-cases) and a curated *.cases.json must supply
+// real inputs — exactly the deontic treatment.
+const UNSYNTH = Symbol("unsynthesizable");
+
 // Build a deterministic sample value for one parameter schema node.
 function genValue(p) {
   const t = p.type;
@@ -106,19 +115,33 @@ function genValue(p) {
     if (Array.isArray(p.enum) && p.enum.length) return p.enum[0];
     return "x";
   }
-  if (t === "array") return p.items ? [genValue(p.items)] : [];
+  if (t === "array") {
+    if (!p.items) return [];
+    const e = genValue(p.items);
+    return e === UNSYNTH ? UNSYNTH : [e];
+  }
   if (t === "object" && p.properties) {
     const o = {};
-    for (const [k, v] of Object.entries(p.properties)) o[k] = genValue(v);
+    for (const [k, v] of Object.entries(p.properties)) {
+      const vv = genValue(v);
+      if (vv === UNSYNTH) return UNSYNTH;
+      o[k] = vv;
+    }
     return o;
   }
-  return null;
+  return UNSYNTH;
 }
 
+// Returns the generated args bag, or null if ANY parameter can't be synthesized
+// (caller treats null like a deontic function: skip-no-cases, needs cases.json).
 function genArgs(parameters) {
   const props = parameters?.properties || {};
   const args = {};
-  for (const [k, v] of Object.entries(props)) args[k] = genValue(v);
+  for (const [k, v] of Object.entries(props)) {
+    const vv = genValue(v);
+    if (vv === UNSYNTH) return null;
+    args[k] = vv;
+  }
   return args;
 }
 
@@ -325,13 +348,18 @@ try {
       // and for a regular function is just the args bag
       //   { foo: 1, ... }.
       // The harness detects the deontic shape by looking at 'isDeontic'
-      // on the schema. genArgs can't synthesize meaningful events, so
-      // deontic functions without curated cases are skipped (logged).
+      // on the schema. genArgs can't synthesize meaningful events (deontic) or
+      // un-typed/shapeless params (genArgs returns null), so such functions
+      // without curated cases are skipped (logged) rather than fed bad input.
+      const generated = fe.isDeontic ? null : genArgs(fe.parameters);
       const rawCases =
-        curated[fnName] || (fe.isDeontic ? null : [genArgs(fe.parameters)]);
+        curated[fnName] || (generated == null ? null : [generated]);
       if (rawCases == null) {
+        const why = fe.isDeontic
+          ? "deontic, needs events"
+          : "un-synthesizable params";
         console.log(
-          `  skip-no-cases  ${id}::${fnName}  (deontic, needs cases.json)`,
+          `  skip-no-cases  ${id}::${fnName}  (${why}, needs cases.json)`,
         );
         results.push({
           file: id,

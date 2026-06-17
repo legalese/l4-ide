@@ -94,6 +94,20 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   Residual (tracked): a STRING comparison whose operands are _helper results_
   still fails loud because `funcSigs` only stores MLIR types (f64) — recovering
   the L4 return type needs a bundle-wide return-type map (larger change).
+- 🔴 **Untyped scalar param → silent wrong answers** (found by differential
+  parity with curated `cases.json`, not the compile-sweep). `desc.l4`'s
+  `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers NUMBER, but the
+  jl4-mlir **schema emitter defaults the param to `{"type":"object"}`** and the
+  scalar is never bound as a number — so the WASM backend returns **`1` for all
+  inputs** (`factorial(5)` → WASM `1` vs jl4-service `120`; `factorial(6)` → `1`
+  vs `720`). **Silent**: the function is flagged `supported: true` (it is one of
+  the 36 "clean" files), so it does NOT route to fallback. base-case inputs
+  (`x=0`,`x=1`) coincidentally return `1` and hid it; the trivial/`null`
+  generated input hid it entirely. Fix spans schema type-inference (propagate
+  the inferred NUMBER instead of defaulting to object) and/or marshaling of
+  object-typed scalars. Regression case lives in `jl4/examples/ok/desc.cases.json`
+  (xfail-style: currently `differs`, flips to byte-identical when fixed). Until
+  then, the WASM path silently mis-evaluates any untyped scalar param.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
