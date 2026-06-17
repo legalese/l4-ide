@@ -1,0 +1,340 @@
+IMPORT prelude
+
+§ `Hierarchy`
+
+-- A library for hierarchical (nested) lists — the kind of structure you get
+-- with legal paragraphs that nest 1.A.i.a, where each item may itself contain a
+-- sub-list of items, to arbitrary depth.
+--
+-- A flat `LIST OF STRING` cannot represent this: it has no notion of a child
+-- list hanging off an item. The minimal datatype that can is a *rose tree* — a
+-- node carrying a value together with an ordered list of sub-trees (its
+-- children). This is the same shape as Haskell's `Data.Tree` (`Tree a = Node a
+-- [Tree a]`).
+--
+-- We do NOT store the bullet labels ("1", "A", "i", "a") in the tree. Those are
+-- derived by the renderer from each node's depth and its position among its
+-- siblings (see `Numbering` below). The author just writes the text and the
+-- nesting; an `Outline` is "basically a rose tree of strings". For the cases
+-- where legal drafting departs from the regular sequence (e.g. an inserted
+-- "2b"), a node may pin an explicit label that overrides the auto-number.
+
+§§ `The core recursive datatype`
+
+-- A rose tree: a node carries a `value` and an ordered list of `children`,
+-- each of which is itself a rose tree of the same element type. A "leaf" is
+-- simply a node whose `children` list is EMPTY — no separate constructor
+-- needed. The recursion lives in the `children` field.
+DECLARE RoseTree OF a
+  HAS
+    value    IS AN a
+    children IS A LIST OF RoseTree OF a
+
+§§ `Generic operations on rose trees`
+
+-- Total number of nodes (this node plus every descendant).
+GIVEN  a IS A TYPE
+       t IS A RoseTree OF a
+GIVETH A NUMBER
+`count nodes` t MEANS
+  1 + sum (map (GIVEN c YIELD `count nodes` c) (t's children))
+
+-- How deeply the tree nests; a single leaf has depth 1.
+GIVEN  a IS A TYPE
+       t IS A RoseTree OF a
+GIVETH A NUMBER
+depth t MEANS
+  CONSIDER t's children
+    WHEN EMPTY THEN 1
+    OTHERWISE  1 + maximum (map (GIVEN c YIELD depth c) (t's children))
+
+-- All values in pre-order (this node first, then each child's subtree in turn).
+GIVEN  a IS A TYPE
+       t IS A RoseTree OF a
+GIVETH A LIST OF a
+flatten t MEANS
+  (t's value) FOLLOWED BY concat (map (GIVEN c YIELD flatten c) (t's children))
+
+-- Map a function over every value, preserving the shape of the tree.
+GIVEN  a IS A TYPE
+       b IS A TYPE
+       f IS A FUNCTION FROM a TO b
+       t IS A RoseTree OF a
+GIVETH A RoseTree OF b
+`map tree` f t MEANS
+  RoseTree OF f (t's value), map (GIVEN c YIELD `map tree` f c) (t's children)
+
+§ `Outlines`
+
+-- How a node's marker is determined, and what it does to the running counter
+-- that numbers its siblings (the "carry"):
+--   Auto     — the ordinary case: take the next counter value, advance the carry
+--   Pinned   — pin an explicit marker; `advances` says whether it still consumes
+--              a counting slot (TRUE bumps the siblings after it, FALSE slots in
+--              without disturbing them)
+--   Restart  — resume auto-numbering, but reset the carry to `at` first
+DECLARE Numbering IS ONE OF
+    Auto
+    Pinned HAS marker   IS A STRING
+               advances IS A BOOLEAN
+    Restart HAS at IS A NUMBER
+
+-- The content carried at each node of an outline: the paragraph `text` and its
+-- `numbering` directive.
+DECLARE Item
+  HAS
+    text      IS A STRING
+    numbering IS A Numbering
+
+-- An outline is a rose tree of items. A whole document is a single root outline
+-- whose children are its top-level entries — so the caller never needs a
+-- top-level LIST.
+DECLARE Outline IS RoseTree OF Item
+
+§§ `Natural-reading constructors`
+
+-- `item` is the constructor: it wraps the text in an (auto-numbered) Item, and
+-- is overloaded on arity — Prolog-style `item/1`, `item/2`, `item/3`, … — so
+-- sub-items nest as positional arguments and the caller never writes a LIST:
+--
+--   item "keep the interior in good repair"
+--     (item "fair wear and tear excepted")
+--     (item "damage by insured risks excepted")
+--
+-- L4's type-directed resolution picks the right definition from the number and
+-- types of the arguments.
+GIVEN  txt IS A STRING
+GIVETH AN Outline
+item txt MEANS RoseTree OF (Item OF txt, Auto), EMPTY
+
+GIVEN  txt IS A STRING
+       c1  IS AN Outline
+GIVETH AN Outline
+item txt c1 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1)
+
+GIVEN  txt IS A STRING
+       c1  IS AN Outline
+       c2  IS AN Outline
+GIVETH AN Outline
+item txt c1 c2 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2)
+
+GIVEN  txt IS A STRING
+       c1  IS AN Outline
+       c2  IS AN Outline
+       c3  IS AN Outline
+GIVETH AN Outline
+item txt c1 c2 c3 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2, c3)
+
+GIVEN  txt IS A STRING
+       c1  IS AN Outline
+       c2  IS AN Outline
+       c3  IS AN Outline
+       c4  IS AN Outline
+GIVETH AN Outline
+item txt c1 c2 c3 c4 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2, c3, c4)
+
+-- Wide fan-out: pass the sub-items as an explicit list.
+GIVEN  txt  IS A STRING
+       kids IS A LIST OF Outline
+GIVETH AN Outline
+item txt kids MEANS RoseTree OF (Item OF txt, Auto), kids
+
+-- The explicit-marker exceptions, for the irregular numbering legal drafting
+-- sometimes demands. Marker first, then text: `labeled "2b" "Late payment"`.
+--   labeled — slots in WITHOUT disturbing its siblings' numbering (no bump):
+--             [item, labeled "2b", item]  renders  1, 2b, 2
+--   numbered — pins the marker AND consumes a counting slot (bump):
+--             [item, numbered "2b", item]  renders  1, 2b, 3
+GIVEN  lbl IS A STRING
+       txt IS A STRING
+GIVETH AN Outline
+labeled lbl txt MEANS RoseTree OF (Item OF txt, (Pinned OF lbl, FALSE)), EMPTY
+
+GIVEN  lbl IS A STRING
+       txt IS A STRING
+GIVETH AN Outline
+numbered lbl txt MEANS RoseTree OF (Item OF txt, (Pinned OF lbl, TRUE)), EMPTY
+
+-- `restartAt` resumes auto-numbering from a chosen value — the list-style
+-- "start at N" property. Number first: `restartAt 7 "Item seven"`.
+GIVEN  n   IS A NUMBER
+       txt IS A STRING
+GIVETH AN Outline
+restartAt n txt MEANS RoseTree OF (Item OF txt, (Restart OF n)), EMPTY
+
+§ `Numbering`
+
+-- The marker style used at a given depth. The renderer turns a sibling position
+-- (1, 2, 3, ...) into a marker according to the style in force at that depth.
+DECLARE NumberStyle IS ONE OF
+    Decimal      -- 1, 2, 3, ...
+    UpperAlpha   -- A, B, C, ...
+    LowerAlpha   -- a, b, c, ...
+    UpperRoman   -- I, II, III, ...
+    LowerRoman   -- i, ii, iii, ...
+    Bulleted     -- •
+
+-- The conventional legal cascade: 1 / A / i / a, repeating Decimal for any
+-- depth beyond the fourth.
+`default scheme` MEANS LIST Decimal, UpperAlpha, LowerRoman, LowerAlpha
+
+-- The 1-based position `n` rendered in the upper-case alphabet (1 -> "A").
+-- (Single letter only; positions beyond 26 are out of scope here.)
+GIVEN  n IS A NUMBER
+GIVETH A STRING
+`alpha` n MEANS SUBSTRING "ABCDEFGHIJKLMNOPQRSTUVWXYZ" (n - 1) 1
+
+-- The number `n` as an upper-case Roman numeral, by the standard subtractive
+-- method (1 -> "I", 4 -> "IV", 9 -> "IX", ...): emit the largest numeral that
+-- fits, subtract, and recurse. `BRANCH` gives us a flat multi-way conditional,
+-- so the guards stack vertically instead of forcing an indented ELSE-IF cascade.
+GIVEN  n IS A NUMBER
+GIVETH A STRING
+`roman` n MEANS
+  BRANCH IF n AT LEAST 1000 THEN APPEND "M"  `roman` (n - 1000)
+         IF n AT LEAST 900  THEN APPEND "CM" `roman` (n - 900)
+         IF n AT LEAST 500  THEN APPEND "D"  `roman` (n - 500)
+         IF n AT LEAST 400  THEN APPEND "CD" `roman` (n - 400)
+         IF n AT LEAST 100  THEN APPEND "C"  `roman` (n - 100)
+         IF n AT LEAST 90   THEN APPEND "XC" `roman` (n - 90)
+         IF n AT LEAST 50   THEN APPEND "L"  `roman` (n - 50)
+         IF n AT LEAST 40   THEN APPEND "XL" `roman` (n - 40)
+         IF n AT LEAST 10   THEN APPEND "X"  `roman` (n - 10)
+         IF n AT LEAST 9    THEN APPEND "IX" `roman` (n - 9)
+         IF n AT LEAST 5    THEN APPEND "V"  `roman` (n - 5)
+         IF n AT LEAST 4    THEN APPEND "IV" `roman` (n - 4)
+         IF n AT LEAST 1    THEN APPEND "I"  `roman` (n - 1)
+         OTHERWISE ""
+
+-- Render sibling position `n` in the given style.
+GIVEN  style IS A NumberStyle
+       n     IS A NUMBER
+GIVETH A STRING
+`marker for` style n MEANS
+  CONSIDER style
+    WHEN Decimal    THEN TOSTRING n
+    WHEN UpperAlpha THEN `alpha` n
+    WHEN LowerAlpha THEN TOLOWER (`alpha` n)
+    WHEN UpperRoman THEN `roman` n
+    WHEN LowerRoman THEN TOLOWER (`roman` n)
+    WHEN Bulleted   THEN "\8226"
+
+-- The style in force at depth `d` (0 = top level); falls back to Decimal once
+-- the scheme runs out of levels.
+GIVEN  scheme IS A LIST OF NumberStyle
+       d      IS A NUMBER
+GIVETH A NumberStyle
+`style at` scheme d MEANS
+  CONSIDER scheme
+    WHEN EMPTY            THEN Decimal
+    WHEN s FOLLOWED BY ss THEN IF d AT MOST 0 THEN s ELSE `style at` ss (d - 1)
+
+§ `Rendering`
+
+-- Render a document as numbered lines, one per node, each of the form
+-- "<dotted path><TAB><text>" — e.g. "1.A.i.a\tAgreement means this contract."
+-- The `root` is the document container: its text becomes an unnumbered heading,
+-- and its children are the top-level entries (numbered from depth 0). Children
+-- inherit the current node's dotted path as their prefix, which is what produces
+-- the 1.A.i.a nesting. A node's own marker comes from its `numbering` directive.
+GIVEN  scheme IS A LIST OF NumberStyle
+       root   IS AN Outline
+GIVETH A LIST OF STRING
+`render outline` scheme root MEANS
+  (root's value's text) FOLLOWED BY forest "" 0 (root's children)
+  WHERE
+    -- a list of siblings, numbered 1, 2, 3, ... by position
+    forest prefix lvl kids MEANS go prefix lvl 1 kids
+    go prefix lvl idx siblings MEANS
+      CONSIDER siblings
+        WHEN EMPTY            THEN EMPTY
+        WHEN k FOLLOWED BY ks THEN
+          append (node prefix lvl idx k) (go prefix lvl (bump k idx) ks)
+    -- the carry: how each sibling hands the running counter to the next one
+    bump k idx MEANS CONSIDER k's value's numbering
+                       WHEN Auto                  THEN idx + 1
+                       WHEN Pinned marker advances THEN IF advances THEN idx + 1 ELSE idx
+                       WHEN Restart at            THEN at + 1
+    -- one node: its own line, then its children one level deeper
+    node prefix lvl idx t MEANS
+      (APPEND (here APPEND "\t") (t's value's text))
+        FOLLOWED BY forest here (lvl + 1) (t's children)
+      WHERE
+        here   MEANS IF prefix EQUALS "" THEN marker ELSE APPEND (prefix APPEND ".") marker
+        marker MEANS CONSIDER t's value's numbering
+                       WHEN Auto                  THEN `marker for` (`style at` scheme lvl) idx
+                       WHEN Pinned m advances     THEN m
+                       WHEN Restart at            THEN `marker for` (`style at` scheme lvl) at
+
+§ `Worked example`
+
+-- A whole document as one bracket-free expression: the root is the clause
+-- heading, its children are the numbered entries. Here, the Tenant's covenants:
+--
+--   Tenant's covenants
+--   a   pay the Rent when due
+--   b   keep the interior in good repair
+--       i   fair wear and tear excepted
+--       ii  damage by insured risks excepted
+--   c   not assign or sublet without the Landlord's consent
+`sample` MEANS
+  item "Tenant's covenants"
+    (item "pay the Rent when due")
+    (item "keep the interior in good repair"
+      (item "fair wear and tear excepted")
+      (item "damage by insured risks excepted"))
+    (item "not assign or sublet without the Landlord's consent")
+
+-- Inside a body paragraph the enumeration runs lettered, then roman — the clause
+-- number itself sits on the § heading, not here.
+`body scheme` MEANS LIST LowerAlpha, LowerRoman, UpperAlpha
+
+#EVAL `count nodes` `sample`               -- 6 (heading + 5 entries)
+#EVAL depth `sample`                       -- 3
+#EVAL `render outline` `body scheme` `sample`
+
+-- The "2b" exception, no-bump: `labeled` slots the pinned marker in without
+-- disturbing its neighbours, so Delivery keeps "2".
+`amended` MEANS
+  item "Clauses"
+    (item "Payment")
+    (labeled "2b" "Late payment")
+    (item "Delivery")
+
+#EVAL `render outline` `default scheme` `amended`   -- "1 Payment", "2b Late payment", "2 Delivery"
+
+-- The bump variant: `numbered` consumes a slot, so Delivery moves to "3".
+`amended bumping` MEANS
+  item "Clauses"
+    (item "Payment")
+    (numbered "2b" "Late payment")
+    (item "Delivery")
+
+#EVAL `render outline` `default scheme` `amended bumping`   -- "1 …", "2b …", "3 …"
+
+-- restart-at: the counter resumes from 7.
+`renumbered` MEANS
+  item "Recitals"
+    (item "Recital one")
+    (item "Recital two")
+    (restartAt 7 "Recital seven")
+    (item "Recital eight")
+
+#EVAL `render outline` `default scheme` `renumbered`   -- "1 …", "2 …", "7 …", "8 …"
+
+-- structure + markers
+#ASSERT depth (item "solo") EQUALS 1
+#ASSERT `count nodes` `sample` EQUALS 6
+#ASSERT depth `sample` EQUALS 3
+#ASSERT `marker for` UpperAlpha 3 EQUALS "C"
+#ASSERT `marker for` LowerAlpha 1 EQUALS "a"
+#ASSERT `marker for` LowerRoman 4 EQUALS "iv"
+#ASSERT `marker for` Decimal 2 EQUALS "2"
+#ASSERT `roman` 2024 EQUALS "MMXXIV"
+#ASSERT `roman` 49 EQUALS "XLIX"
+
+-- end-to-end rendering: the three numbering modes
+#ASSERT `render outline` `body scheme` `sample` EQUALS (LIST "Tenant's covenants", "a\tpay the Rent when due", "b\tkeep the interior in good repair", "b.i\tfair wear and tear excepted", "b.ii\tdamage by insured risks excepted", "c\tnot assign or sublet without the Landlord's consent")
+#ASSERT `render outline` `default scheme` `amended` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "2\tDelivery")
+#ASSERT `render outline` `default scheme` `amended bumping` EQUALS (LIST "Clauses", "1\tPayment", "2b\tLate payment", "3\tDelivery")
+#ASSERT `render outline` `default scheme` `renumbered` EQUALS (LIST "Recitals", "1\tRecital one", "2\tRecital two", "7\tRecital seven", "8\tRecital eight")

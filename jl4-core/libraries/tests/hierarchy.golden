@@ -1,0 +1,41 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+hierarchy.l4:292:1-29:
+  6
+hierarchy.l4:293:1-21:
+  3
+hierarchy.l4:294:1-46:
+  LIST "Tenant's covenants", "a	pay the Rent when due", "b	keep the interior in good repair", "b.i	fair wear and tear excepted", "b.ii	damage by insured risks excepted", "c	not assign or sublet without the Landlord's consent"
+hierarchy.l4:304:1-50:
+  LIST "Clauses", "1	Payment", "2b	Late payment", "2	Delivery"
+hierarchy.l4:313:1-58:
+  LIST "Clauses", "1	Payment", "2b	Late payment", "3	Delivery"
+hierarchy.l4:323:1-53:
+  LIST "Recitals", "1	Recital one", "2	Recital two", "7	Recital seven", "8	Recital eight"
+hierarchy.l4:326:1-37:
+  assertion satisfied
+hierarchy.l4:327:1-40:
+  assertion satisfied
+hierarchy.l4:328:1-32:
+  assertion satisfied
+hierarchy.l4:329:1-45:
+  assertion satisfied
+hierarchy.l4:330:1-45:
+  assertion satisfied
+hierarchy.l4:331:1-46:
+  assertion satisfied
+hierarchy.l4:332:1-42:
+  assertion satisfied
+hierarchy.l4:333:1-37:
+  assertion satisfied
+hierarchy.l4:334:1-33:
+  assertion satisfied
+hierarchy.l4:337:1-286:
+  assertion satisfied
+hierarchy.l4:338:1-125:
+  assertion satisfied
+hierarchy.l4:339:1-133:
+  assertion satisfied
+hierarchy.l4:340:1-156:
+  assertion satisfied
