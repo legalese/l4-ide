@@ -108,6 +108,43 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   object-typed scalars. Regression case lives in `jl4/examples/ok/desc.cases.json`
   (xfail-style: currently `differs`, flips to byte-identical when fixed). Until
   then, the WASM path silently mis-evaluates any untyped scalar param.
+  - **Scope (measured 2026-06-17):** this is **narrow**, not the tip of an
+    iceberg. A follow-up hunt added branch-crossing `cases.json` for the rest of
+    the exportable corpus and the value core held up everywhere: `test.l4`
+    **30/30** byte-identical (tax brackets, loan amortisation, ticket pricing,
+    enums, `MAYBE`, recursion); `intrinsics-probe` **25/25** including the
+    _irrational_ `SQRT 2`/`LN 2`/`LN 0.5` and unicode `STRINGLENGTH`;
+    `assume-as-given` + `implicit-assume-test` **18/18** (ASSUME / implicit-ASSUME
+    params bind correctly — schema-typed `number`/`boolean`, not `object`). So
+    `factorial` is specifically the **bare-head positional param** path
+    (`DECIDE foo x IS` with no `GIVEN`), the lone instance of that style in the
+    corpus.
+- 🔴 **DATE-typed parameter in arithmetic/comparison → WASM crash** (found by the
+  same differential hunt, 2026-06-17). Functions that take a `DATE`/`TIME`
+  parameter and feed it to `MINUS`/`PLUS`/`<`/`>` crash on the WASM backend with
+  `TypeError: Cannot read properties of undefined (reading 'num')`, while
+  jl4-service answers correctly. Confirmed on `datetime-probe.l4`'s
+  `days-between` (svc `365`, WASM crash), `shift-date`, and `is-a-weekday` —
+  all three ship `supported: true`. **Root cause is an ABI split, not a
+  marshaling typo.** DATE values are **raw f64 day-serials** throughout the date
+  intrinsics (`__l4_date_serial`/`_day`/`_month` all do `Number(d)`; `make-date`
+  returns a raw serial; runtime comment at `jl4-runtime.mjs:2262`) and `marshalArg`
+  correctly hands a date param over as that raw serial (`:2417` → `parseDateStr`).
+  But `Lower.hs:1615`/`:1762` lower `MINUS`/`PLUS` on **any** operands —
+  including dates — to the generic **rational** ops `__l4_rat_sub`/`__l4_rat_add`,
+  which `ratUnbox` their args (`ratPool.get(serial)` → `undefined` → `.num`). The
+  marshaler and the arithmetic lowering disagree on whether a DATE is a raw serial
+  or a rational-pool handle. **Previously masked** as harmless `both-error`: the
+  auto-generated input for a `{format:date,type:string}` param is the literal
+  `"x"`, which jl4-service _also_ rejects ("expected a DATE but got x"), so both
+  sides errored and looked consistent — valid ISO dates unmask it. Fix is a
+  lowering decision (lower date-operand `MINUS`/`PLUS`/cmp via a raw-f64 path, or
+  box dates as rationals at op boundaries and unbox for the intrinsics — a
+  coherent DATE-ABI choice), **not** a one-line marshaler change (boxing the
+  input would break `__l4_date_*`, which need the raw serial). Regression cases in
+  `jl4-mlir/test/fixtures/datetime-probe.cases.json` (xfail-style: `make-date`/
+  `make-datetime`/`make-time` are byte-identical; the three DATE-input functions
+  are `wasm-error` until fixed). Not in the CI default corpus, so it doesn't gate.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
