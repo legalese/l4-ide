@@ -86,9 +86,10 @@ DECLARE Item
     text      IS A STRING
     numbering IS A Numbering
 
--- An outline is a rose tree of items; a document is a forest of outlines.
-DECLARE Outline  IS RoseTree OF Item
-DECLARE Document IS LIST OF Outline
+-- An outline is a rose tree of items. A whole document is a single root outline
+-- whose children are its top-level entries — so the caller never needs a
+-- top-level LIST.
+DECLARE Outline IS RoseTree OF Item
 
 §§ `Natural-reading constructors`
 
@@ -230,15 +231,17 @@ GIVETH A NumberStyle
 
 § `Rendering`
 
--- Render a whole document as numbered lines, one per node, each of the form
+-- Render a document as numbered lines, one per node, each of the form
 -- "<dotted path><TAB><text>" — e.g. "1.A.i.a\tAgreement means this contract."
--- Children inherit the current node's dotted path as their prefix, which is
--- what produces the 1.A.i.a nesting. A node's own marker is its pinned `label`
--- if present, otherwise the auto-number for its depth and sibling position.
+-- The `root` is the document container: its text becomes an unnumbered heading,
+-- and its children are the top-level entries (numbered from depth 0). Children
+-- inherit the current node's dotted path as their prefix, which is what produces
+-- the 1.A.i.a nesting. A node's own marker comes from its `numbering` directive.
 GIVEN  scheme IS A LIST OF NumberStyle
-       doc    IS A Document
+       root   IS AN Outline
 GIVETH A LIST OF STRING
-`render outline` scheme doc MEANS forest "" 0 doc
+`render outline` scheme root MEANS
+  (root's value's text) FOLLOWED BY forest "" 0 (root's children)
   WHERE
     -- a list of siblings, numbered 1, 2, 3, ... by position
     forest prefix lvl kids MEANS go prefix lvl 1 kids
@@ -265,53 +268,57 @@ GIVETH A LIST OF STRING
 
 § `Worked example`
 
--- Headings are carried by the § section markers; the rose tree handles the
--- enumerated list *inside* a body paragraph. Here, the Tenant's covenants as
--- they might be set out within a single clause:
+-- A whole document as one bracket-free expression: the root is the clause
+-- heading, its children are the numbered entries. Here, the Tenant's covenants:
 --
+--   Tenant's covenants
 --   a   pay the Rent when due
 --   b   keep the interior in good repair
 --       i   fair wear and tear excepted
 --       ii  damage by insured risks excepted
 --   c   not assign or sublet without the Landlord's consent
-`sample` MEANS LIST
-  item "pay the Rent when due" ,
-  item "keep the interior in good repair"
-    (item "fair wear and tear excepted")
-    (item "damage by insured risks excepted") ,
-  item "not assign or sublet without the Landlord's consent"
+`sample` MEANS
+  item "Tenant's covenants"
+    (item "pay the Rent when due")
+    (item "keep the interior in good repair"
+      (item "fair wear and tear excepted")
+      (item "damage by insured risks excepted"))
+    (item "not assign or sublet without the Landlord's consent")
 
 -- Inside a body paragraph the enumeration runs lettered, then roman — the clause
 -- number itself sits on the § heading, not here.
 `body scheme` MEANS LIST LowerAlpha, LowerRoman, UpperAlpha
 
-#EVAL map `count nodes` `sample`           -- nodes under each item: 1, 3, 1
-#EVAL map depth `sample`                   -- nesting depth of each item: 1, 2, 1
+#EVAL `count nodes` `sample`               -- 6 (heading + 5 entries)
+#EVAL depth `sample`                       -- 3
 #EVAL `render outline` `body scheme` `sample`
 
 -- The "2b" exception, no-bump: `labeled` slots the pinned marker in without
 -- disturbing its neighbours, so Delivery keeps "2".
-`amended` MEANS LIST
-  item "Payment" ,
-  labeled "2b" "Late payment" ,
-  item "Delivery"
+`amended` MEANS
+  item "Clauses"
+    (item "Payment")
+    (labeled "2b" "Late payment")
+    (item "Delivery")
 
 #EVAL `render outline` `default scheme` `amended`   -- "1 Payment", "2b Late payment", "2 Delivery"
 
 -- The bump variant: `numbered` consumes a slot, so Delivery moves to "3".
-`amended bumping` MEANS LIST
-  item "Payment" ,
-  numbered "2b" "Late payment" ,
-  item "Delivery"
+`amended bumping` MEANS
+  item "Clauses"
+    (item "Payment")
+    (numbered "2b" "Late payment")
+    (item "Delivery")
 
 #EVAL `render outline` `default scheme` `amended bumping`   -- "1 …", "2b …", "3 …"
 
 -- restart-at: the counter resumes from 7.
-`renumbered` MEANS LIST
-  item "Recital one" ,
-  item "Recital two" ,
-  restartAt 7 "Recital seven" ,
-  item "Recital eight"
+`renumbered` MEANS
+  item "Recitals"
+    (item "Recital one")
+    (item "Recital two")
+    (restartAt 7 "Recital seven")
+    (item "Recital eight")
 
 #EVAL `render outline` `default scheme` `renumbered`   -- "1 …", "2 …", "7 …", "8 …"
 
