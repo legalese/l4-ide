@@ -1,0 +1,33 @@
+-- Offside-hyphen bullet lists desugar to the same node as a LIST literal.
+--
+--   - a
+--   - b
+-- is LIST a, b
+--
+-- A bullet is a '-' at the offside (start) of a line, followed by a space
+-- and a body on the same line. Items align at a common column.
+
+DECIDE xs IS
+  - 1
+  - 2
+  - 3
+#EVAL xs                         -- LIST 1, 2, 3
+
+DECIDE single IS
+  - 42
+#EVAL single                     -- LIST 42
+
+DECIDE negItems IS
+  - -5
+  - 7
+#EVAL negItems                   -- LIST -5, 7  (a fused negative literal is a fine item)
+
+DECIDE exprItems IS
+  - 1 + 2
+  - 3 * 4
+#EVAL exprItems                  -- LIST 3, 12  (each item is a full expression)
+
+DECIDE strItems IS
+  - "alpha"
+  - "beta"
+#EVAL strItems                   -- LIST "alpha", "beta"

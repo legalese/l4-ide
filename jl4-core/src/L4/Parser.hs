@@ -1745,6 +1745,7 @@ baseExpr' =
   <|> try namedApp -- This is not nice
   <|> app
   <|> lit
+  <|> try bulletBlock   -- offside '-' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
   <|> paren expr
@@ -1846,6 +1847,52 @@ listItemThreshold tk = do
     pure $ if firstItemLine == keywordLine
              then keywordCol
              else mkPos (max 1 (unPos firstItemCol - 1))
+
+-- | Lookahead guard: are we positioned at an offside @-@ bullet marker?
+-- A bullet is a @-@ ('TMinus') followed by at least one space and then a
+-- body token on the SAME line. Consumes nothing.
+--
+-- This never collides with existing syntax: line comments lex as comment
+-- tokens (never 'TMinus'); a negative literal @-5@ fuses into a single
+-- @TIntLit@ in the lexer; binary subtraction @a - b@ is parsed as an
+-- operator continuation /after/ a left operand, never at the head of an
+-- expression; and a bare head @-@ is otherwise a parse error, so bullets
+-- claim unused territory.
+bulletAhead :: Parser ()
+bulletAhead = void $ lookAhead $ do
+  dashLine <- currentLine
+  _        <- plainToken (TOperators TMinus)
+  sp       <- spaces
+  bodyLine <- currentLine
+  guard (not (null sp) && bodyLine == dashLine)
+
+-- | A block of offside @-@ bullets aligned at a common column, desugaring to
+-- the same 'List' node as a @LIST@ literal:
+--
+-- >   - a
+-- >   - b
+--
+-- is @LIST a, b@.
+bulletBlock :: Parser (Expr Name)
+bulletBlock = do
+  bulletAhead
+  blockCol <- Lexer.indentLevel
+  attachAnno $
+    List emptyAnno
+      <$> annoHole (someLinesPos blockCol bulletItem)
+
+-- | A single bullet: a line-leading @-@ marker, then a full expression as the
+-- body. The body threshold is the dash column, so 'indentedExpr' admits the
+-- same-line body and any deeper continuation. The @-@ marker token is
+-- prepended to the item's annotation (mirroring how 'lsepBy' folds a
+-- separator into an item) so that exact-printing round-trips the bullet
+-- syntax rather than dropping the dashes.
+bulletItem :: Pos -> Parser (Expr Name)
+bulletItem dashCol = do
+  bulletAhead
+  dash <- spacedToken_ (TOperators TMinus)
+  e    <- indentedExpr dashCol
+  pure $ setAnno (fixAnnoSrcRange $ mkSimpleEpaAnno (lexToEpa dash) <> getAnno e) e
 
 intLit :: Parser Lit
 intLit =

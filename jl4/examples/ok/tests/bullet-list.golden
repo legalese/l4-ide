@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+bullet-list.l4:14:1-9:
+  LIST 1, 2, 3
+bullet-list.l4:18:1-13:
+  LIST 42
+bullet-list.l4:23:1-15:
+  LIST -5, 7
+bullet-list.l4:28:1-16:
+  LIST 3, 12
+bullet-list.l4:33:1-15:
+  LIST "alpha", "beta"
