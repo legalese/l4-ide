@@ -136,6 +136,12 @@ expr ::=
   | "CONSIDER" expr branches           -- elimination for general datatypes
   | expr "WHERE" localdecls            -- local declarations
   | "LIST" expr{,}*                    -- literal lists
+  | ("•" expr)+                        -- bullet lists: a "•" marker at the line
+                                       --   offside (+ space + same-line body) per
+                                       --   element, aligned in a column; desugars
+                                       --   to a literal LIST. "•" has no arithmetic
+                                       --   meaning, so unlike "-" it is also valid
+                                       --   in argument position.
   | "NOT" expr                         -- negation [should probably be predefined, not built-in]
   | ...                                -- numeric literals (at least integers)
   | ...                                -- string literals (in double quotes)

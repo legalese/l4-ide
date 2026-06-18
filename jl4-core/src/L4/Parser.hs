@@ -1745,8 +1745,7 @@ baseExpr' =
   <|> try namedApp -- This is not nice
   <|> app
   <|> lit
-  <|> try (bulletBlock dashMarker)   -- offside '-' bullet list (expr position only)
-  <|> try (bulletBlock dotMarker)    -- offside '•' bullet list
+  <|> try bulletBlock   -- offside '•' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
   <|> paren expr
@@ -1859,17 +1858,21 @@ listItemThreshold tk = do
 -- operator continuation /after/ a left operand, never at the head of an
 -- expression; and a bare head @-@ is otherwise a parse error, so bullets
 -- claim unused territory.
--- | The two accepted bullet markers. @-@ is typeable but, being also binary
--- subtraction, is confined to expression position; @•@ has no arithmetic
--- meaning, so it is unambiguous everywhere — including as a function argument.
-dashMarker, dotMarker :: TokenType
-dashMarker = TOperators TMinus
-dotMarker  = TSymbols TBullet
+-- | The bullet marker. @•@ (U+2022) has no arithmetic meaning, so it is
+-- unambiguous everywhere — including as a function argument, which is what lets
+-- bullet children nest under a constructor. (An earlier @-@ marker was dropped:
+-- @-@ doubles as binary subtraction, so an indented @- x@ collides with a
+-- wrapped subtraction continuation and could not be used in argument position.
+-- Rather than ship two markers with different reach, @•@ is the only bullet.)
+bulletMarker :: TokenType
+bulletMarker = TSymbols TBullet
 
-bulletAhead :: TokenType -> Parser ()
-bulletAhead marker = void $ lookAhead $ do
+-- | Lookahead guard: are we at an offside @•@ bullet marker — a @•@ followed
+-- by at least one space and a body token on the SAME line? Consumes nothing.
+bulletAhead :: Parser ()
+bulletAhead = void $ lookAhead $ do
   markLine <- currentLine
-  _        <- plainToken marker
+  _        <- plainToken bulletMarker
   sp       <- spaces
   bodyLine <- currentLine
   guard (not (null sp) && bodyLine == markLine)
@@ -1881,13 +1884,13 @@ bulletAhead marker = void $ lookAhead $ do
 -- >   - b
 --
 -- is @LIST a, b@.
-bulletBlock :: TokenType -> Parser (Expr Name)
-bulletBlock marker = do
-  bulletAhead marker
+bulletBlock :: Parser (Expr Name)
+bulletBlock = do
+  bulletAhead
   blockCol <- Lexer.indentLevel
   attachAnno $
     List emptyAnno
-      <$> annoHole (someLinesPos blockCol (bulletItem marker))
+      <$> annoHole (someLinesPos blockCol bulletItem)
 
 -- | A single bullet: a line-leading @-@ marker, then a full expression as the
 -- body. The body threshold is the dash column, so 'indentedExpr' admits the
@@ -1895,10 +1898,10 @@ bulletBlock marker = do
 -- prepended to the item's annotation (mirroring how 'lsepBy' folds a
 -- separator into an item) so that exact-printing round-trips the bullet
 -- syntax rather than dropping the dashes.
-bulletItem :: TokenType -> Pos -> Parser (Expr Name)
-bulletItem marker markCol = do
-  bulletAhead marker
-  mark <- spacedToken_ marker
+bulletItem :: Pos -> Parser (Expr Name)
+bulletItem markCol = do
+  bulletAhead
+  mark <- spacedToken_ bulletMarker
   e    <- indentedExpr markCol
   pure $ setAnno (fixAnnoSrcRange $ mkSimpleEpaAnno (lexToEpa mark) <> getAnno e) e
 
@@ -1971,10 +1974,8 @@ parseAppArgs current fname = go True
     parseOne allowBreak = do
       when allowBreak $ guardMixfixKeyword funcLine
       -- '•' is collision-free, so a '•' bullet block may be a function
-      -- argument (feeding e.g. an arity-overloaded list constructor); '-'
-      -- is NOT admitted here, as an indented '- x' collides with a wrapped
-      -- subtraction continuation.
-      indented (try (bulletBlock dotMarker) <|> atomicExpr') current
+      -- argument (feeding e.g. an arity-overloaded list constructor).
+      indented (try bulletBlock <|> atomicExpr') current
 
 guardMixfixKeyword :: Maybe Int -> Parser ()
 guardMixfixKeyword Nothing = pure ()

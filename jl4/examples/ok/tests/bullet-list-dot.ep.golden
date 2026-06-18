@@ -20,6 +20,16 @@ DECIDE strs IS
   • "beta"
 #EVAL strs                        -- LIST "alpha", "beta"
 
+DECIDE negItems IS
+  • -5
+  • 7
+#EVAL negItems                    -- LIST -5, 7  (a fused negative literal is a fine item)
+
+DECIDE exprItems IS
+  • 1 + 2
+  • 3 * 4
+#EVAL exprItems                   -- LIST 3, 12  (each item is a full expression)
+
 -- '•' children nest under `item` to arbitrary depth — no LIST, no parens.
 -- (Grandchildren indent past the parent item's text, which the "• " prefix
 -- shifts to the right.)
