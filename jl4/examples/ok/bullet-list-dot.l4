@@ -1,0 +1,33 @@
+-- The '•' bullet marker.
+--
+-- Like '-', a '•' at the offside of a line opens a list element and the block
+-- desugars to a LIST. Unlike '-', '•' has no arithmetic meaning, so it is also
+-- allowed in ARGUMENT position — letting bullet children nest under a
+-- constructor with no LIST literal and no parentheses, to arbitrary depth.
+
+IMPORT prelude
+IMPORT hierarchy
+
+-- Generic: '•' is just a list literal (any element type), exactly like '-'.
+DECIDE xs IS
+  • 1
+  • 2
+  • 3
+#EVAL xs                          -- LIST 1, 2, 3
+
+DECIDE strs IS
+  • "alpha"
+  • "beta"
+#EVAL strs                        -- LIST "alpha", "beta"
+
+-- '•' children nest under `item` to arbitrary depth — no LIST, no parens.
+-- (Grandchildren indent past the parent item's text, which the "• " prefix
+-- shifts to the right.)
+`nested` MEANS
+  item "Parent"
+    • item "a"
+    • item "Sub"
+        • item "b"
+        • item "c"
+    • item "d"
+#EVAL `render outline` `body scheme` `nested`       -- Parent / a / b Sub / b.i b / b.ii c / c d

@@ -95,6 +95,7 @@ data TSymbols
   | TNlgOpen
   | TNlgClose
   | TParagraph
+  | TBullet      -- • offside bullet-list marker
   | TPOpen
   | TPClose
   | TCOpen
@@ -123,6 +124,7 @@ symbols = Map.fromList
   , ("[" , TNlgOpen)
   , ("]" , TNlgClose)
   , ("§" , TParagraph)
+  , ("•" , TBullet)
   , ("," , TComma)
   , (";" , TSemicolon)
   , ("." , TDot)

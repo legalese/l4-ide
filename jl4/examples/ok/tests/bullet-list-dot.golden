@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+bullet-list-dot.l4:16:1-9:
+  LIST 1, 2, 3
+bullet-list-dot.l4:21:1-11:
+  LIST "alpha", "beta"
+bullet-list-dot.l4:33:1-46:
+  LIST "Parent", "a	a", "b	Sub", "b.i	b", "b.ii	c", "c	d"
