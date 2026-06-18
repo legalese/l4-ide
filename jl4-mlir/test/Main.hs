@@ -62,6 +62,7 @@ main = do
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
+    , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
     , test "NUMBER == (InfoMap miss) → __l4_rat_cmp" testNumberCmpInfoMapMiss
     , test "STRING == (InfoMap miss) → __l4_str_eq"  testStringEqInfoMapMiss
     , test "STRING ordered < → supported:false"      testStringOrderedUnsupported
@@ -677,6 +678,43 @@ testOverloadCollisionUnsupported = do
       pure ok
   where
     unless b act = if b then pure () else act
+
+-- | Two NON-exported helpers sharing a name AND arity but differing in argument
+-- type (NUMBER vs STRING) must lower to DISTINCT WASM symbols so each call site
+-- dispatches to the right body — the same-arity-overload fix. (Contrast
+-- 'testOverloadCollisionUnsupported', where the colliding overload is @export'd
+-- and so stays API-ambiguous → supported:false.) Without the fix both bodies
+-- collapse to one @blend@ symbol and the dedup drops one.
+testOverloadSameArityDispatch :: IO Bool
+testOverloadSameArityDispatch = do
+  let src = T.unlines
+        [ "GIVEN x IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`blend` MEANS x PLUS 1"
+        , ""
+        , "GIVEN s IS A STRING"
+        , "GIVETH A NUMBER"
+        , "`blend` MEANS 2"
+        , ""
+        , "@export Use both overloads"
+        , "GIVEN n IS A NUMBER"
+        , "      t IS A STRING"
+        , "GIVETH A NUMBER"
+        , "`use both` MEANS (`blend` n) PLUS (`blend` t)"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck/lower failed: " <> show errs
+      pure False
+    Right mlir -> do
+      -- Both overload bodies must survive, under distinct disambiguated symbols.
+      let ok = T.isInfixOf "blend__ov0" mlir && T.isInfixOf "blend__ov1" mlir
+      unless' ok $
+        putStrLn $ "\n    expected distinct blend__ov0/blend__ov1 symbols. got:\n    "
+          <> T.unpack (T.take 700 mlir)
+      pure ok
+  where
+    unless' b act = if b then pure () else act
 
 -- | Regression for the @lowerCmp@ rational-handle bug. The 'InfoMap' we
 -- read is not run through the final substitution, so 'typeOfExpr' returns

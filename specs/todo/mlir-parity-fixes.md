@@ -94,6 +94,39 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   Residual (tracked): a STRING comparison whose operands are _helper results_
   still fails loud because `funcSigs` only stores MLIR types (f64) — recovering
   the L4 return type needs a bundle-wide return-type map (larger change).
+- ✅ **Same-arity overload collision → wrong-overload dispatch** — DONE. The
+  arity-only mangle (`dedupAndSynthExterns`) gave two overloads sharing a name
+  AND arity but differing in argument type (e.g. `daydate`'s `Weekday of`/`Day`
+  on NUMBER vs DATE) the **same** WASM symbol, so one body won the dedup and both
+  call sites bound to it — nondeterministic mis-dispatch (it's why `is-a-weekday`
+  crashed: `Weekday of d` hit the NUMBER body `days MOD 7` on a raw-serial date).
+  **Fix** (`Lower.hs`): the typechecker already gives each overload a distinct
+  `getUnique`, and a reference shares its definition's unique, so
+  `computeOverloadSymbols` precomputes a per-group-indexed symbol (`name__ovN`)
+  for every same-arity overload set and `symbolFor` applies it consistently at
+  the definition, every call site, and the dep-dedup/`funcSigs` keys. Groups with
+  an `@export` member are left alone (an exported same-arity collision is
+  API-ambiguous → still `markUnsupported`, preserving the existing test). Verified:
+  `Weekday of`/`Day`/`days-between`/`shift-date` now byte-identical; Haskell
+  26/26 (the exported-collision test still flags `supported:false`); full corpus
+  130 byte-identical / 2 differs (factorial), **no regressions**, the
+  `is-a-weekday` crash class eliminated.
+  - **Residual: `is-a-weekday` is now `differs`, not `wasm-error`.** With dispatch
+    fixed, `is weekend` reaches `w EQUALS Saturday` where `w MEANS Weekday of d`
+    — a comparison of a **helper-result** NUMBER, the exact case the `lowerCmp`
+    residual above can't classify. As a top-level export it correctly _refuses_
+    (`supported:false`); but here it's inside the **helper** `is weekend`, and a
+    helper's unsupported diagnostic does **not** propagate to its exported caller
+    (`applyDiagnostics` only downgrades functions in `bundleExports`), so
+    `is a weekday` stays `supported:true` and runs the unsound `arith.cmpf` →
+    **silent wrong answer** for weekend dates. Two pre-existing gaps, both
+    independent of overloads: (1) helper-result return-type recovery (the
+    bundle-wide return-type map above), and (2) **diagnostic propagation through
+    the call graph** — an exported function that transitively calls an
+    unsupported helper must itself become `supported:false` (fail-loud). Until
+    (1)/(2) land, `is-a-weekday` is excluded from `datetime-probe.cases.json`
+    (auto-generates to a harmless `both-error`) so it doesn't ship a silent-wrong
+    in any gated path.
 - 🔴 **Untyped scalar param → silent wrong answers** (found by differential
   parity with curated `cases.json`, not the compile-sweep). `desc.l4`'s
   `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers NUMBER, but the

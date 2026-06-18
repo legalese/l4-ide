@@ -38,6 +38,7 @@ import L4.Syntax
   , NamedExpr(..), InertContext(..), OptionallyNamedType(..)
   , Info(..)
   , rawName, rawNameToText, getActual
+  , Unique, getUnique
   )
 import L4.Annotation (HasSrcRange, emptyAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
@@ -160,6 +161,19 @@ data LowerState = LowerState
     -- prior and the current definition (keyed by their shared
     -- 'Schema.wasmSymbol') — fail loud instead of silently wrong.
   , emittedBodies :: !(Map (Text, Int) ())
+    -- Disambiguated WASM symbols for same-arity overload sets. The
+    -- arity-only mangle ('dedupAndSynthExterns') cannot separate two
+    -- overloads with the SAME name AND arity but different argument types
+    -- (e.g. @daydate@'s @Weekday of@ on NUMBER vs DATE), so they'd collapse
+    -- to one symbol and dispatch to whichever body won the dedup. The
+    -- typechecker already gives each overload a distinct 'getUnique', so we
+    -- map that unique to a per-group-indexed symbol (@name__ovN@) and use it
+    -- at BOTH the definition and every call site (which carries the same
+    -- unique — name resolution links a 'Ref' to its 'Def's unique). Computed
+    -- once by 'computeOverloadSymbols'; only populated for groups with no
+    -- @\@export@ member (an exported same-arity collision is API-ambiguous
+    -- and stays 'markUnsupported'). Names absent here use their plain symbol.
+  , overloadSymbols :: !(Map Unique Text)
   }
 
 type LowerM a = State LowerState a
@@ -191,6 +205,7 @@ initState info = LowerState
   , funcParams = Map.empty
   , pendingDecide = Set.empty
   , emittedBodies = Map.empty
+  , overloadSymbols = Map.empty
   }
 
 -- | Look up the ground-truth type for an expression using the typechecker's
@@ -475,7 +490,10 @@ lowerProgramWithDiagnostics
 lowerProgramWithDiagnostics info mainMod deps =
   let mainNames = collectLocalNames mainMod
       exportArgs = collectExportAssumeArgs mainMod
-      initial = (initState info) { exportAssumeArgs = exportArgs }
+      initial = (initState info)
+        { exportAssumeArgs = exportArgs
+        , overloadSymbols  = computeOverloadSymbols (mainMod : deps)
+        }
       finalState = execState (do
         forM_ deps (registerDependencyModule mainNames)
         lowerModuleDecls mainMod
@@ -502,6 +520,61 @@ collectExportAssumeArgs mod' = Map.fromList
     Decide _ d | Export.isExportedDecide d -> [d]
     Section _ s -> goSection s
     _ -> []
+
+-- | Every DECIDE in a module, descending into nested sections.
+allModuleDecides :: Module Resolved -> [Decide Resolved]
+allModuleDecides (MkModule _ _ sect) = goSection sect
+  where
+    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goDecl (Decide _ d)  = [d]
+    goDecl (Section _ s) = goSection s
+    goDecl _             = []
+
+-- | Compute the disambiguated WASM symbol for every same-arity overload that
+-- needs one. Two DECIDEs sharing a sanitized name AND arity (but differing in
+-- argument type — which the f64 ABI erases) would collapse to one symbol under
+-- the arity-only mangle; here we give each a distinct @name__ovN@ keyed on its
+-- 'getUnique'. Call sites carry the same unique (a 'Ref' shares its 'Def's
+-- unique), so definition and call agree. Groups that contain an @\@export@
+-- member are left out: an exported same-arity collision is ambiguous at the
+-- JSON API and stays 'markUnsupported' (routed to fallback), and skipping them
+-- also avoids desyncing 'Schema.wasmSymbol' for exports. See 'overloadSymbols'.
+computeOverloadSymbols :: [Module Resolved] -> Map Unique Text
+computeOverloadSymbols mods =
+  let decides = concatMap allModuleDecides mods
+      entries =
+        [ ((sanitizeName (resolvedName h), arity), (getUnique h, Export.isExportedDecide d))
+        | d@(MkDecide _ _ af _) <- decides
+        , let h = appFormHead' af
+              arity = length (appFormParams af)
+        ]
+      byKey = Map.fromListWith (flip (++)) [ (k, [v]) | (k, v) <- entries ]
+  in Map.fromList
+       [ (u, base <> "__ov" <> Text.pack (show idx))
+       | ((base, _arity), members) <- Map.toList byKey
+       , let distinct = dedupByUnique members
+       , length distinct > 1          -- a genuine same-arity overload set
+       , not (any snd distinct)        -- and none of them is @export'd
+       , (idx, (u, _)) <- zip [(0 :: Int) ..] distinct
+       ]
+  where
+    -- Distinct by unique, first occurrence wins, source order preserved.
+    dedupByUnique = go Set.empty
+      where
+        go _ [] = []
+        go seen ((u, ex) : rest)
+          | Set.member u seen = go seen rest
+          | otherwise         = (u, ex) : go (Set.insert u seen) rest
+
+-- | The WASM symbol for a resolved function reference\/definition: the
+-- per-overload disambiguated name when it belongs to a same-arity overload
+-- set ('overloadSymbols'), otherwise the plain sanitized name. Use this
+-- everywhere a function symbol is derived from a 'Resolved' so a definition
+-- and its call sites agree.
+symbolFor :: Resolved -> LowerM Text
+symbolFor r = do
+  ov <- gets (.overloadSymbols)
+  pure (Map.findWithDefault (sanitizeName (resolvedName r)) (getUnique r) ov)
 
 -- | Final pass run by 'L4.MLIR.Pipeline' once all operations — including
 -- runtime builtins — have been assembled. It handles three consumers
@@ -715,7 +788,7 @@ registerDependencyModule skipLocal (MkModule _ _ section) = go section
     -- break the module for unrelated calls.
     processDepDecide :: Decide Resolved -> LowerM ()
     processDepDecide decide@(MkDecide _ typeSig appForm _) = do
-      let name = sanitizeName (resolvedName (appFormHead' appForm))
+      name <- symbolFor (appFormHead' appForm)
       skip <- shouldSkip name
       unless skip $
         if sigHasFunctionParam typeSig
@@ -725,8 +798,8 @@ registerDependencyModule skipLocal (MkModule _ _ section) = go section
     registerExternDecide :: Decide Resolved -> LowerM ()
     registerExternDecide (MkDecide _ typeSig appForm _body) = do
       env <- gets (.typeEnv)
-      let name = sanitizeName (resolvedName (appFormHead' appForm))
-          (argTypes, sigRetType) = sigToTypesEnv env typeSig
+      name <- symbolFor (appFormHead' appForm)
+      let (argTypes, sigRetType) = sigToTypesEnv env typeSig
           retType = if hasGiveth typeSig then sigRetType else l4NumberType
           argListElems = listElementsFromSig env typeSig
           declOp = mkExternFunc name argTypes retType
@@ -802,8 +875,8 @@ registerTypeDecl _ = pure ()
 registerFuncSig :: TopDecl Resolved -> LowerM ()
 registerFuncSig (Decide _ (MkDecide _ typeSig appForm body)) = do
   env <- gets (.typeEnv)
-  let name = sanitizeName (resolvedName (appFormHead' appForm))
-      (argTypes, sigRetType) = sigToTypesEnv env typeSig
+  name <- symbolFor (appFormHead' appForm)
+  let (argTypes, sigRetType) = sigToTypesEnv env typeSig
       argListElems = listElementsFromSig env typeSig
   -- Exported DECIDEs that reference module-level ASSUMEs get those ASSUMEs
   -- appended as extra arguments in the ABI.
@@ -992,8 +1065,8 @@ _emitTracePopArgPaths =
 lowerDecide :: Decide Resolved -> LowerM ()
 lowerDecide (MkDecide _ typeSig appForm body) = do
   env <- gets (.typeEnv)
-  let funcName = sanitizeName (resolvedName (appFormHead' appForm))
-      givenParams = appFormParams appForm
+  funcName <- symbolFor (appFormHead' appForm)
+  let givenParams = appFormParams appForm
       (givenArgTypes, sigRetType) = sigToTypesEnv env typeSig
       listElemTys = listElementsFromSig env typeSig
       -- M5 slice 2B: kind byte we'll pass to `__l4_trace_exit` in the
@@ -1511,7 +1584,7 @@ lowerExprCases expr expectedTy = case expr of
   -- Variable reference
   App _ n [] -> do
     let name = resolvedName n
-        funcN = sanitizeName name
+    funcN <- symbolFor n
     mVal <- lookupVar name
     case mVal of
       Just val -> pure val
@@ -1576,7 +1649,7 @@ lowerExprCases expr expectedTy = case expr of
   -- Function application
   App _ n args -> do
     let rawName_ = resolvedName n
-        funcN = sanitizeName rawName_
+    funcN <- symbolFor n
     env <- gets (.typeEnv)
     -- Closure conversion for @WHERE@ / @LET IN@ helpers: when the
     -- callee was lambda-lifted with captured outer-scope variables,
