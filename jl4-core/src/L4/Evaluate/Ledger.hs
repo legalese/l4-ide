@@ -24,6 +24,7 @@ module L4.Evaluate.Ledger
   , emptyLedger
   , snapshot
   , readCell
+  , readCellAll
     -- * Per-party store (M4)
   , LedgerStore (..)
   , emptyStore
@@ -93,6 +94,23 @@ snapshot =
 -- cell has never been assigned.
 readCell :: Path -> Ledger -> Maybe WHNF
 readCell p = Map.lookup p . snapshot
+
+-- | STATE-AS-LEDGER approach B: read /every/ value ever assigned to a single
+-- cell, oldest-first, as a list (empty if the cell has never been assigned).
+--
+-- This is the collect-all dual of 'readCell'. Where 'readCell' collapses the
+-- append log to last-write-wins (the latest 'Assign' for the 'Path'),
+-- 'readCellAll' exposes the full accumulation the append-only log already
+-- retains: it filters every 'Assign' to this 'Path' and keeps them ALL. No
+-- write-side change is needed — each write is already its own event — so this
+-- is a pure read-time projection over the same 'Ledger'.
+--
+-- Order: append/evaluation order ('toList' on a 'DList' yields oldest-first).
+-- This equals @AT@ order ONLY for literal-AT @#TRACE@ events (those are stably
+-- sorted by 'sortByStablePinned'/'eventAtKey' at build time); runtime-AT events
+-- such as @WAIT UNTIL@ stay pinned in authored order.
+readCellAll :: Path -> Ledger -> [WHNF]
+readCellAll p l = [ v | Assign c v _ <- toList l, c == p ]
 
 -----------------------------------------------------------------------------
 -- M4: per-party store + a shared official record (R1)

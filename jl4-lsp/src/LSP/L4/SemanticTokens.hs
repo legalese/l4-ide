@@ -203,6 +203,9 @@ instance ToSemTokens Context PosToken DeonticModal where
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens Context PosToken InertContext where
   toSemTokens _ = pure []
+-- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
+instance ToSemTokens Context PosToken RecallMode where
+  toSemTokens _ = pure []
 instance ToSemTokens Context PosToken (RAction Name) where
 instance ToSemTokens Context PosToken (LocalDecl Name) where
 instance ToSemTokens Context PosToken (Assume Name) where
@@ -309,6 +312,9 @@ instance ToSemTokens () PosToken DeonticModal where
   toSemTokens _ = pure []
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens () PosToken InertContext where
+  toSemTokens _ = pure []
+-- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
+instance ToSemTokens () PosToken RecallMode where
   toSemTokens _ = pure []
 instance ToSemTokens () PosToken (RAction Resolved) where
 instance ToSemTokens () PosToken (Event Resolved) where

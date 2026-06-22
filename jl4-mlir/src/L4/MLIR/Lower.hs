@@ -2583,7 +2583,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Env _ a -> go bound a
       Post _ a b c -> Set.unions [go bound a, go bound b, go bound c]
       Record _ mParty cell val _ mHence -> Set.unions ([go bound cell, go bound val] <> maybe [] (\p -> [go bound p]) mParty <> maybe [] (\k -> [go bound k]) mHence)
-      ReadCell _ mParty _ cell -> Set.unions ([go bound cell] <> maybe [] (\p -> [go bound p]) mParty)
+      ReadCell _ mParty _ _ cell -> Set.unions ([go bound cell] <> maybe [] (\p -> [go bound p]) mParty)
       Breach _ ma mb -> Set.unions (maybe Set.empty (go bound) ma : [maybe Set.empty (go bound) mb])
 
     stepLocal (bnd, frees) (LocalDecide _ (MkDecide _ _ af bdy)) =

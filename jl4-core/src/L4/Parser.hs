@@ -1769,10 +1769,22 @@ recordRecipient =
 recallExpr :: Parser (Expr Name)
 recallExpr =
   attachAnno $
-    (\(mParty, isOfficial) cell -> ReadCell emptyAnno mParty isOfficial cell)
+    (\mode (mParty, isOfficial) cell -> ReadCell emptyAnno mParty isOfficial mode cell)
       <$  annoLexeme (spacedKeyword_ TKRecall)
+      <*> recallMode
       <*> recallQualifier
       <*> annoHole cellExpr
+
+-- | The optional @ALL@ collect-all marker of a @RECALL@ (STATE-AS-LEDGER
+-- approach B). @RECALL ALL …@ folds every assignment to the cell into a list;
+-- a bare @RECALL …@ stays last-write-wins. Reuses the existing 'TKAll' token
+-- (the same keyword used by @FOR ALL@): there is no clash because @ALL@ here is
+-- only reachable after a leading @RECALL@ in expression position, while @FOR
+-- ALL@ requires a preceding @FOR@ in type position.
+recallMode :: AnnoParser RecallMode
+recallMode =
+      (RecallAll <$ annoLexeme (spacedKeyword_ TKAll))
+  <|> pure RecallLast
 
 -- | The optional party/official qualifier of a @RECALL@ (M4.5). Produces the
 -- @(Maybe partyExpr, isOfficial)@ pair feeding 'ReadCell'. The parsed pieces
