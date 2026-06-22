@@ -131,9 +131,13 @@ anonymousParty :: Text
 anonymousParty = ""
 
 -- | M4: how a ledger write is routed. 'RouteOwn' appends to the acting party's
--- own ledger (a @RECORD@); 'RouteOfficial' appends to the shared official
--- record (a @COMMIT@/@ATTEST@).
-data EventRoute = RouteOwn | RouteOfficial
+-- own ledger (a bare @RECORD@); 'RouteOfficial' appends to the shared official
+-- record (a @COMMIT@/@ATTEST@); 'RouteNotify' (NOTIFY v1) appends to a NAMED
+-- /recipient/ party's own ledger — the acting party performs the write but it
+-- lands in @ownLedgers[recipientKey]@, the exact map @RECALL <party>'s@ reads.
+-- The 'Text' is the recipient key, computed via the SAME @partyKeyWHNF@ that a
+-- cross-party @RECALL@ uses, so write-key ≡ read-key by construction.
+data EventRoute = RouteOwn | RouteOfficial | RouteNotify !Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 

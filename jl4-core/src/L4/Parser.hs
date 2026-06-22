@@ -1714,15 +1714,32 @@ recordOrCommitExpr :: Parser (Expr Name)
 recordOrCommitExpr = do
   current <- Lexer.indentLevel
   attachAnno $
-    (\isOfficial cell val mHence -> Record emptyAnno cell val isOfficial mHence)
+    (\isOfficial mParty cell val mHence -> Record emptyAnno mParty cell val isOfficial mHence)
       <$> ( (False <$ annoLexeme (spacedKeyword_ TKRecord))
         <|> (True  <$ annoLexeme (spacedKeyword_ TKCommit))
         <|> (True  <$ annoLexeme (spacedKeyword_ TKAttest))
           )
+      <*> recordRecipient
       <*> annoHole cellExpr
       <*  annoLexeme (spacedKeyword_ TKIs)
       <*> annoHole (indentedExpr current)
       <*> optionalWithHole (hence (mkPos 1))
+
+-- | The optional NOTIFY-v1 /recipient/ qualifier of a @RECORD@ — the symmetric
+-- WRITE to 'recallQualifier'\'s cross-party READ. @RECORD q's <cell> IS <v>@
+-- writes into party @q@'s OWN ledger. We reuse the EXACT party atom that
+-- 'recallQualifier' uses (a bare 'name' wrapped as a @Var@ / @App … []@ so it is
+-- name-resolved as a PARTY, with @try (… <* genitive)@ so that — absent a
+-- following @'s@ — it backtracks and the token falls through to 'cellExpr'). No
+-- new keyword. @COMMIT@/@ATTEST@ accept the same surface but the recipient is
+-- vacuous there (the official record has no recipient) — by convention a
+-- recipient is only written on @RECORD@.
+recordRecipient :: AnnoParser (Maybe (Expr Name))
+recordRecipient =
+      (Just <$> annoHole (try (App emptyAnno <$> name <*> pure [] <* genitive)))
+  <|> pure Nothing
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
 
 -- | @RECALL [<party>'s | OFFICIAL's] <cell>@ — STATE-AS-LEDGER M1.5 + M4.5.
 -- Reads a cell back from a ledger, yielding @MAYBE a@. The cell uses the SAME
