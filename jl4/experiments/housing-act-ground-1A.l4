@@ -1,0 +1,375 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1A (Renters' Rights Act 2025)`
+
+-- Ground 1A, inserted into Schedule 2 to the Housing Act 1988 by the
+-- Renters' Rights Act 2025 (c. 26), Sch. 1 para. 3. It is one of the MANDATORY
+-- grounds in Part I of Schedule 2: where it is made out, the court MUST order
+-- possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(d) -> predicates carrying the verbatim
+--     statute inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome               -> a regulative/deontic clause guarded
+--     by the conjunction of conditions (a)-(d).
+--
+-- Statutory text encoded ("The following conditions are met—", a CONJUNCTION):
+--   (a) the landlord who is seeking possession intends to sell a freehold or
+--       leasehold interest in the dwelling-house, or to grant a lease of the
+--       dwelling-house for a term certain of more than 21 years which is not
+--       terminable before the end of that term by notice given by or to the
+--       landlord;
+--   (b) the assured tenancy did not come into being by virtue of Schedule 1 to
+--       the Rent Act 1977 or section 4 of the Rent (Agriculture) Act 1976;
+--   (c) either—
+--         (i)  the current tenancy began at least 1 year before the relevant
+--              date, or
+--         (ii) at the relevant date a notice under a compulsory-acquisition
+--              power has been given, the landlord intends to sell ("sell"
+--              includes transfer) the landlord's interest in the dwelling-house
+--              to the acquiring authority, and the acquiring authority intends
+--              to acquire the landlord's interest;
+--   (d) the landlord is not—
+--         (i)   a non-profit registered provider of social housing,
+--         (ii)  a body registered as a social landlord under section 1 of the
+--               Housing Act 1996,
+--         (iii) a body registered as a social landlord under section 20(1) of
+--               the Housing (Scotland) Act 2010,
+--         (iv)  a housing trust, within the meaning of the Housing Associations
+--               Act 1985, which is a charity, or
+--         (v)   where the dwelling-house is social housing within the meaning of
+--               Part 2 of the Housing and Regeneration Act 2008, a profit-making
+--               registered provider of social housing.
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The landlord's intended disposal, as TYPED DATA (not reflection). Ground 1A
+-- limb (a) admits two shapes of disposal: selling a freehold/leasehold interest,
+-- or granting a "long lease". Whether a granted lease counts as a "long lease"
+-- for this ground is a STRUCTURAL PROPERTY of the intended instrument's data:
+-- "a term certain of more than 21 years which is not terminable before the end
+-- of that term by notice given by or to the landlord". A fuller treatment could
+-- introspect an actual imported L4 lease construct (its term, its break-notice
+-- clauses) rather than these summary fields; that is deferred.
+DECLARE Disposal IS ONE OF
+    `sell a freehold or leasehold interest`
+    `grant a long lease`
+        HAS `term certain in years`           IS A NUMBER
+            `terminable before end by notice`  IS A BOOLEAN
+
+-- The operative atoms of conditions (b), (c) and (d), gathered on the claim,
+-- alongside the intended disposal (a) and the two dates the (c)(i) limb needs.
+DECLARE Ground1AClaim HAS
+  `intended disposal`                                                 IS A Disposal
+  -- (b)
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS A BOOLEAN
+  -- (c)(i)
+  `tenancy began`                                                     IS A DATE
+  `relevant date`                                                     IS A DATE
+  -- (c)(ii)
+  `compulsory-acquisition notice has been given`                      IS A BOOLEAN
+  `landlord intends to sell interest to the acquiring authority`      IS A BOOLEAN
+  `acquiring authority intends to acquire the interest`               IS A BOOLEAN
+  -- (d) — provider-type flags; the landlord qualifies only if NONE is ticked
+  `landlord is a non-profit registered provider of social housing`    IS A BOOLEAN  -- (d)(i)
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS A BOOLEAN  -- (d)(ii)
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS A BOOLEAN  -- (d)(iii)
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS A BOOLEAN  -- (d)(iv)
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS A BOOLEAN  -- (d)(v)
+
+§§ `Condition (a) — the disposal-intention gateway`
+
+-- A "grant a long lease" qualifies for this ground iff its term certain exceeds
+-- 21 years AND it is not terminable before the end of that term by notice. This
+-- is the structural "long lease" test on the intended-instrument DATA.
+GIVEN disposal IS A Disposal
+GIVETH A BOOLEAN
+`is a qualifying long lease` disposal MEANS
+    CONSIDER disposal
+    WHEN `sell a freehold or leasehold interest` THEN FALSE
+    WHEN `grant a long lease` `term certain in years` `terminable before end by notice` THEN
+            "a term certain of more than 21 years"
+        ... `term certain in years` GREATER THAN 21
+        AND "which is not terminable before the end of that term by notice given by or to the landlord"
+        ... NOT `terminable before end by notice`
+
+GIVEN disposal IS A Disposal
+GIVETH A BOOLEAN
+`is a sale of a freehold or leasehold interest` disposal MEANS
+    CONSIDER disposal
+    WHEN `sell a freehold or leasehold interest` THEN TRUE
+    WHEN `grant a long lease` `term certain in years` `terminable before end by notice` THEN FALSE
+
+-- (a) sell a freehold/leasehold interest, OR grant a qualifying long lease.
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`condition (a) — disposal intention` claim MEANS
+        "(a) the landlord who is seeking possession intends to"
+    ...     "sell a freehold or leasehold interest in the dwelling-house"
+        ..  `is a sale of a freehold or leasehold interest` (claim's `intended disposal`)
+        ..  "or to grant a lease of the dwelling-house for a term certain of more than 21 years which is not terminable before the end of that term by notice given by or to the landlord"
+        ..  `is a qualifying long lease` (claim's `intended disposal`)
+
+§§ `Condition (b) — not a Rent Act 1977 / Rent (Agriculture) Act 1976 tenancy`
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`condition (b) — not a Rent Act tenancy` claim MEANS
+        "(b) the assured tenancy did not come into being by virtue of Schedule 1 to the Rent Act 1977 or section 4 of the Rent (Agriculture) Act 1976"
+    ... NOT claim's `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`
+
+§§ `Condition (c)(i) — the 1-year condition (inclusive day-counting)`
+
+-- "The current tenancy began at least 1 year before the relevant date", counting
+-- BOTH endpoints. Reused in shape from the amended-2025 Ground 1 file: measure
+-- the inclusive elapsed span and compare against a one-year window derived from
+-- the actual dates (leap-year-correct).
+GIVEN claim IS A Ground1AClaim
+GIVETH A NUMBER
+`inclusive days from tenancy start to relevant date` claim MEANS
+    (Day (claim's `relevant date`) MINUS Day (claim's `tenancy began`)) PLUS 1
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A NUMBER
+`inclusive days in one year from tenancy start` claim MEANS
+    (Day (`one year after tenancy start` claim) MINUS Day (claim's `tenancy began`)) PLUS 1
+    WHERE
+        GIVEN c IS A Ground1AClaim
+        GIVETH A DATE
+        `one year after tenancy start` c MEANS
+            Date (DATE_DAY   (c's `tenancy began`))
+                 (DATE_MONTH (c's `tenancy began`))
+                 (DATE_YEAR  (c's `tenancy began`) PLUS 1)
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`current tenancy began at least 1 year before the relevant date` claim MEANS
+        "(i) the current tenancy began at least 1 year before the relevant date"
+    ... "(both the day when the current tenancy began and the relevant date must be included in the calculation)"
+    ... `inclusive days from tenancy start to relevant date` claim
+            AT LEAST `inclusive days in one year from tenancy start` claim
+
+§§ `Condition (c)(ii) — the compulsory-acquisition limb`
+
+-- Note: for this limb "sell" includes transfer.
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`compulsory-acquisition limb` claim MEANS
+        "(ii) at the relevant date a compulsory-acquisition notice has been given,"
+    ... claim's `compulsory-acquisition notice has been given`
+    AND "the landlord intends to sell (which includes transfer) the landlord's interest to the acquiring authority,"
+    ... claim's `landlord intends to sell interest to the acquiring authority`
+    AND "and the acquiring authority intends to acquire the landlord's interest"
+    ... claim's `acquiring authority intends to acquire the interest`
+
+§§ `Condition (c) — either (i) or (ii)`
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`condition (c) — 1-year or compulsory acquisition` claim MEANS
+        "(c) either—"
+    ..  `current tenancy began at least 1 year before the relevant date` claim
+    ..  `compulsory-acquisition limb` claim
+
+§§ `Condition (d) — the landlord is NOT a social-housing provider type`
+
+-- (d) is satisfied iff the landlord is NONE of the listed provider types.
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`landlord is an excluded provider type` claim MEANS
+        "(i) a non-profit registered provider of social housing,"
+    ..  claim's `landlord is a non-profit registered provider of social housing`
+    ..  "(ii) a body registered as a social landlord under section 1 of the Housing Act 1996,"
+    ..  claim's `landlord is registered as a social landlord under s.1 Housing Act 1996`
+    ..  "(iii) a body registered as a social landlord under section 20(1) of the Housing (Scotland) Act 2010,"
+    ..  claim's `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`
+    ..  "(iv) a housing trust, within the meaning of the Housing Associations Act 1985, which is a charity, or"
+    ..  claim's `landlord is a housing trust (Housing Associations Act 1985) which is a charity`
+    ..  "(v) where the dwelling-house is social housing within the meaning of Part 2 of the Housing and Regeneration Act 2008, a profit-making registered provider of social housing."
+    ..  claim's `dwelling-house is social housing and landlord is a profit-making registered provider`
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`condition (d) — landlord is not an excluded provider` claim MEANS
+        "(d) the landlord is not—"
+    ... NOT `landlord is an excluded provider type` claim
+
+§§ `Ground 1A made out — conditions (a) AND (b) AND (c) AND (d)`
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A BOOLEAN
+`Ground 1A made out` claim MEANS
+        "The following conditions are met—"
+    ... `condition (a) — disposal intention` claim
+    AND `condition (b) — not a Rent Act tenancy` claim
+    AND `condition (c) — 1-year or compulsory acquisition` claim
+    AND `condition (d) — landlord is not an excluded provider` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground1AClaim
+GIVETH A DEONTIC Actor Action
+`ground 1A possession order` claim MEANS
+    IF   `Ground 1A made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates (reused shape from the amended-2025 Ground 1 file)`
+
+`relevant date 2025`          MEANS January 1 2025
+`tenancy began exactly 1yr`   MEANS January 1 2024   -- exactly 1 year before -> satisfied
+`tenancy began 1 day short`   MEANS January 2 2024   -- one day short -> not satisfied
+`tenancy began well over 1yr` MEANS June 1 2023
+
+§§ `Disposals`
+
+`disposal — sell` MEANS `sell a freehold or leasehold interest`
+
+`disposal — long lease 99yr` MEANS `grant a long lease` WITH
+  `term certain in years`          IS 99
+  `terminable before end by notice` IS FALSE
+
+`disposal — lease exactly 21yr` MEANS `grant a long lease` WITH
+  `term certain in years`          IS 21       -- "more than 21" fails at exactly 21
+  `terminable before end by notice` IS FALSE
+
+`disposal — long lease but terminable` MEANS `grant a long lease` WITH
+  `term certain in years`          IS 99
+  `terminable before end by notice` IS TRUE     -- break notice defeats the long-lease test
+
+-- The long-lease boundary: >21 and not terminable qualifies; 21 exactly fails;
+-- terminable-by-notice fails even at 99 years.
+#ASSERT     `is a qualifying long lease` `disposal — long lease 99yr`
+#ASSERT NOT `is a qualifying long lease` `disposal — lease exactly 21yr`
+#ASSERT NOT `is a qualifying long lease` `disposal — long lease but terminable`
+#ASSERT NOT `is a qualifying long lease` `disposal — sell`
+
+§§ `Ground made out — via (c)(i), the 1-year limb`
+
+`claim all-met via (c)(i)` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `tenancy began`                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS FALSE
+  `landlord intends to sell interest to the acquiring authority`      IS FALSE
+  `acquiring authority intends to acquire the interest`               IS FALSE
+  `landlord is a non-profit registered provider of social housing`    IS FALSE
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT `condition (a) — disposal intention`            `claim all-met via (c)(i)`
+#ASSERT `condition (b) — not a Rent Act tenancy`        `claim all-met via (c)(i)`
+#ASSERT `condition (c) — 1-year or compulsory acquisition` `claim all-met via (c)(i)`
+#ASSERT `condition (d) — landlord is not an excluded provider` `claim all-met via (c)(i)`
+#ASSERT `Ground 1A made out`                            `claim all-met via (c)(i)`
+
+§§ `Ground made out — via (c)(ii), the compulsory-acquisition limb`
+
+-- Tenancy is only 1 day short of a year, but the compulsory-acquisition limb
+-- carries condition (c).
+`claim all-met via (c)(ii)` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — long lease 99yr`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `tenancy began`                                                     IS `tenancy began 1 day short`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS TRUE
+  `landlord intends to sell interest to the acquiring authority`      IS TRUE
+  `acquiring authority intends to acquire the interest`               IS TRUE
+  `landlord is a non-profit registered provider of social housing`    IS FALSE
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT NOT `current tenancy began at least 1 year before the relevant date` `claim all-met via (c)(ii)`
+#ASSERT `compulsory-acquisition limb`                   `claim all-met via (c)(ii)`
+#ASSERT `condition (c) — 1-year or compulsory acquisition` `claim all-met via (c)(ii)`
+#ASSERT `Ground 1A made out`                            `claim all-met via (c)(ii)`
+
+§§ `Condition (a) knocked out — disposal does not qualify`
+
+-- A long lease that is terminable by notice: limb (a) fails, ground not made out.
+`claim — (a) fails` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — long lease but terminable`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `tenancy began`                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS FALSE
+  `landlord intends to sell interest to the acquiring authority`      IS FALSE
+  `acquiring authority intends to acquire the interest`               IS FALSE
+  `landlord is a non-profit registered provider of social housing`    IS FALSE
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT NOT `condition (a) — disposal intention` `claim — (a) fails`
+#ASSERT NOT `Ground 1A made out`                 `claim — (a) fails`
+
+§§ `Condition (b) knocked out — tenancy arose under the Rent Acts`
+
+`claim — (b) fails` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS TRUE
+  `tenancy began`                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS FALSE
+  `landlord intends to sell interest to the acquiring authority`      IS FALSE
+  `acquiring authority intends to acquire the interest`               IS FALSE
+  `landlord is a non-profit registered provider of social housing`    IS FALSE
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT NOT `condition (b) — not a Rent Act tenancy` `claim — (b) fails`
+#ASSERT NOT `Ground 1A made out`                     `claim — (b) fails`
+
+§§ `Condition (c) knocked out — neither limb (tenancy too short, no acquisition)`
+
+`claim — (c) fails` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `tenancy began`                                                     IS `tenancy began 1 day short`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS FALSE
+  `landlord intends to sell interest to the acquiring authority`      IS FALSE
+  `acquiring authority intends to acquire the interest`               IS FALSE
+  `landlord is a non-profit registered provider of social housing`    IS FALSE
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT NOT `condition (c) — 1-year or compulsory acquisition` `claim — (c) fails`
+#ASSERT NOT `Ground 1A made out`                               `claim — (c) fails`
+
+§§ `Condition (d) knocked out — landlord is an excluded provider`
+
+`claim — (d) fails` MEANS Ground1AClaim WITH
+  `intended disposal`                                                 IS `disposal — sell`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `tenancy began`                                                     IS `tenancy began well over 1yr`
+  `relevant date`                                                     IS `relevant date 2025`
+  `compulsory-acquisition notice has been given`                      IS FALSE
+  `landlord intends to sell interest to the acquiring authority`      IS FALSE
+  `acquiring authority intends to acquire the interest`               IS FALSE
+  `landlord is a non-profit registered provider of social housing`    IS TRUE   -- (d)(i) ticked
+  `landlord is registered as a social landlord under s.1 Housing Act 1996`         IS FALSE
+  `landlord is registered as a social landlord under s.20(1) Housing (Scotland) Act 2010`  IS FALSE
+  `landlord is a housing trust (Housing Associations Act 1985) which is a charity`  IS FALSE
+  `dwelling-house is social housing and landlord is a profit-making registered provider`  IS FALSE
+
+#ASSERT `landlord is an excluded provider type`                  `claim — (d) fails`
+#ASSERT NOT `condition (d) — landlord is not an excluded provider` `claim — (d) fails`
+#ASSERT NOT `Ground 1A made out`                                 `claim — (d) fails`
