@@ -1714,12 +1714,16 @@ recordOrCommitExpr :: Parser (Expr Name)
 recordOrCommitExpr = do
   current <- Lexer.indentLevel
   attachAnno $
-    (\isOfficial mParty cell val mHence -> Record emptyAnno mParty cell val isOfficial mHence)
-      <$> ( (False <$ annoLexeme (spacedKeyword_ TKRecord))
-        <|> (True  <$ annoLexeme (spacedKeyword_ TKCommit))
-        <|> (True  <$ annoLexeme (spacedKeyword_ TKAttest))
+    (\(isOfficial, mParty) cell val mHence -> Record emptyAnno mParty cell val isOfficial mHence)
+      -- Only RECORD takes the optional <party>'s recipient (the symmetric WRITE to
+      -- RECALL <party>'s). COMMIT/ATTEST write the OFFICIAL record, which has no
+      -- recipient, so they carry no qualifier — this makes the Record invariant
+      -- (isOfficial ==> mParty == Nothing) genuinely parser-enforced, mirroring
+      -- recallQualifier's OFFICIAL-vs-<party>'s split.
+      <$> ( ((\mParty -> (False, mParty)) <$> (annoLexeme (spacedKeyword_ TKRecord) *> recordRecipient))
+        <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKCommit))
+        <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKAttest))
           )
-      <*> recordRecipient
       <*> annoHole cellExpr
       <*  annoLexeme (spacedKeyword_ TKIs)
       <*> annoHole (indentedExpr current)
@@ -1731,9 +1735,11 @@ recordOrCommitExpr = do
 -- 'recallQualifier' uses (a bare 'name' wrapped as a @Var@ / @App … []@ so it is
 -- name-resolved as a PARTY, with @try (… <* genitive)@ so that — absent a
 -- following @'s@ — it backtracks and the token falls through to 'cellExpr'). No
--- new keyword. @COMMIT@/@ATTEST@ accept the same surface but the recipient is
--- vacuous there (the official record has no recipient) — by convention a
--- recipient is only written on @RECORD@.
+-- new keyword. Only @RECORD@ takes this qualifier (see 'recordOrCommitExpr');
+-- @COMMIT@/@ATTEST@ write the official record, which has no recipient, so they
+-- reject a @<party>'s@ qualifier at parse time. That makes the 'Record' invariant
+-- @isOfficial ==> mParty == Nothing@ genuinely parser-enforced (mirroring
+-- 'recallQualifier'\'s @OFFICIAL's@-vs-@<party>'s@ split).
 recordRecipient :: AnnoParser (Maybe (Expr Name))
 recordRecipient =
       (Just <$> annoHole (try (App emptyAnno <$> name <*> pure [] <* genitive)))
