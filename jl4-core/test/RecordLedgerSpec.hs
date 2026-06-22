@@ -33,6 +33,7 @@
 module RecordLedgerSpec (spec) where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
@@ -59,6 +60,7 @@ import L4.EvaluateLazy
   , currentStore
   , evalExprForLedger
   , execEvalModuleWithEnv
+  , prettyEvalDirectiveResult
   , resolveEvalConfig
   , runEvalAction
   )
@@ -108,6 +110,11 @@ isNothingWHNF _                     = False
 isNothingNF :: NF -> Bool
 isNothingNF (MkNF (ValConstructor r [])) = getUnique r == TypeCheck.nothingUnique
 isNothingNF _                            = False
+
+-- | Is this fully-forced NF a @ValBreached@ (i.e. a deontic BREACH)?
+isBreachedNF :: NF -> Bool
+isBreachedNF (MkNF (ValBreached _)) = True
+isBreachedNF _                      = False
 
 spec :: Spec
 spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5 read)" $ do
@@ -249,6 +256,53 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
                 Reduction (Right nfVal) ->
                   isNothingNF nfVal `shouldBe` True
                 other -> expectationFailure ("read directive: expected NOTHING, got " <> show other)
+            _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
+
+  describe "CAF ISOLATION: a nullary def containing RECALL re-evaluates per directive" $ do
+    -- The DECISIVE REPRO for the shared-CAF bug. 'reader' is a NULLARY top-level
+    -- definition whose body performs an effectful RECALL. Because top-level defs
+    -- are stored as shared Reference IORefs that the lazy evaluator memoizes in
+    -- place on first force, a naive driver forces 'reader' ONCE (when directive 1
+    -- evaluates 'recordThenRead', which writes `x` then chains into 'reader' and
+    -- gets FULFILLED) and then SHARES that WHNF with directive 2's bare
+    -- '#EVAL reader'. That is wrong: directive 2 runs against a FRESH (empty)
+    -- ledger (withFreshLedger), so its RECALL `x` is NOTHING and the CONSIDER must
+    -- route to BREACH. The fix (fresh evaluation heap per directive) re-thunks the
+    -- top-level defs before each directive so the CAF re-evaluates against that
+    -- directive's own ledger. This guards against regressing to a shared forced CAF.
+    let cafSrc = Text.unlines
+          [ "IMPORT prelude"
+          , "DECLARE Actor IS ONE OF P"
+          , "DECLARE Action IS ONE OF act"
+          , "GIVETH A DEONTIC Actor Action"
+          , "reader MEANS"
+          , "    CONSIDER RECALL `x`"
+          , "    WHEN JUST v  THEN FULFILLED"
+          , "    WHEN NOTHING THEN BREACH"
+          , "GIVETH A DEONTIC Actor Action"
+          , "recordThenRead MEANS RECORD `x` IS TRUE HENCE reader"
+          , "#EVAL recordThenRead"   -- forces the 'reader' CAF (x present) => FULFILLED
+          , "#EVAL reader"           -- fresh ledger, x absent => must be BREACH (NOT a cached FULFILLED)
+          ]
+
+    it "(4) the 2nd '#EVAL reader' BREACHES (fresh ledger), not a cached FULFILLED from the 1st directive" $
+      case checkWithImports vfs cafSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r -> do
+          (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+          case results of
+            [firstRes, secondRes] -> do
+              -- directive 1 (recordThenRead): writes `x`, reads it back, FULFILLED.
+              case firstRes.result of
+                Reduction (Right nf) -> do
+                  isBreachedNF nf `shouldBe` False
+                  prettyEvalDirectiveResult firstRes `shouldSatisfy` Text.isInfixOf "FULFILLED"
+                other -> expectationFailure ("first directive: expected FULFILLED, got " <> show other)
+              -- directive 2 (bare reader): isolated fresh ledger => RECALL is
+              -- NOTHING => BREACH. The bug returned a cached FULFILLED here.
+              case secondRes.result of
+                Reduction (Right nf) -> isBreachedNF nf `shouldBe` True
+                other -> expectationFailure ("second directive: expected a BREACH (ValBreached), got " <> show other)
             _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
   where
     provenances ledger = [ p | Assign _ _ p <- foldr (:) [] ledger ]

@@ -495,11 +495,56 @@ evalExprForLedger expr = runConfig (ForwardMachine emptyEnvironment expr)
 evalModuleAndDirectives :: Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectives env m = do
   ienv <- initialEnvironment
-  (env', directives) <- evalModule (env <> ienv) m
-  results <- traverse nfDirective directives
+  let baseEnv = env <> ienv
+  -- First pass: get env' (the module's exported bindings) and the directive
+  -- count/order for the return value.
+  (env', directives0) <- evalModule baseEnv m
+  -- STATE-AS-LEDGER CAF ISOLATION: re-thunk the top-level heap per directive so a
+  -- nullary top-level definition that is forced (and memoized in its shared
+  -- Reference IORef) in directive N is Unevaluated again in directive N+1. This is
+  -- the heap analog of 'withFreshLedger': each directive evaluates the top-level
+  -- defs against fresh References, so an effectful read (RECALL) inside a CAF is
+  -- re-run against that directive's own (isolated) ledger instead of returning a
+  -- value cached from whichever directive forced it first. See 'forEachDirectiveFreshHeap'.
+  results <- forEachDirectiveFreshHeap (\_ -> pure ()) baseEnv m (length directives0)
   -- NOTE: We are only returning the new definitions of this module, not any imports.
   -- Depending on future export semantics, this may have to change.
   pure (env', results)
+
+-- | Run every directive of a module against its OWN freshly-allocated top-level
+-- heap. We re-run 'evalModule' once per directive: each pass re-'preAllocate's a
+-- fresh set of top-level References (all 'Unevaluated') and re-writes the body
+-- thunks into them, then we normal-form just the i-th directive from THAT pass.
+--
+-- Why this is correct and minimal:
+--   * Top-level definitions are stored as shared 'Reference' IORefs that the lazy
+--     evaluator overwrites in place to 'WHNF' on first force (standard
+--     lazy-sharing memoization). That memoization is unsound for a nullary def
+--     whose body performs an effectful read ('RECALL'), because its WHNF is not a
+--     pure function of the source — it depends on the per-directive ledger that
+--     'withFreshLedger' (correctly) resets. Re-thunking discards the stale WHNF.
+--   * 'evalModule' forces nothing (it only allocates References and writes
+--     thunks), so re-running it per directive is side-effect-free except for heap
+--     allocation and supply/address bumps; pure CAFs simply recompute (cheap).
+--   * 'nfDirective' still wraps each evaluation in 'withFreshLedger', so ledger
+--     isolation is unchanged.
+--
+-- The @prepare@ hook lets a caller (the JSON entry point) write extra bindings
+-- (ASSUME'd variables) into each fresh pass's combined environment before the
+-- directive is evaluated.
+forEachDirectiveFreshHeap
+  :: (Environment -> Eval ())     -- ^ per-pass preparation over the fresh combined env (e.g. JSON writes)
+  -> Environment                  -- ^ base env (imports <> initial environment), allocated once
+  -> Module Resolved
+  -> Int                          -- ^ number of directives (from the first pass)
+  -> Eval [EvalDirectiveResult]
+forEachDirectiveFreshHeap prepare baseEnv m n =
+  for [0 .. n - 1] $ \i -> do
+    (moduleEnv, dirs) <- evalModule baseEnv m  -- fresh preAllocate => fresh IORefs => Unevaluated CAFs
+    prepare (moduleEnv <> baseEnv)
+    case drop i dirs of
+      (d : _) -> nfDirective d
+      []      -> error "forEachDirectiveFreshHeap: directive index out of range (evalModule produced fewer directives than the first pass)"
 
 -- | Evaluate module with JSON input bindings for batch processing.
 -- JSON keys are matched to ASSUME'd L4 variables by name.
@@ -508,12 +553,14 @@ evalModuleAndDirectives env m = do
 evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectivesWithJSON json env m = do
   ienv <- initialEnvironment
-  (moduleEnv, dirs) <- evalModule (env <> ienv) m
-  -- Now write JSON values into the pre-allocated References
-  -- The combined environment includes both the initial env and the moduleEnv
-  let combinedEnv = moduleEnv <> env <> ienv
-  writeJSONToReferences json combinedEnv
-  results <- traverse nfDirective dirs
+  let baseEnv = env <> ienv
+  -- First pass: get moduleEnv (exports) and the directive count for the return value.
+  (moduleEnv, dirs0) <- evalModule baseEnv m
+  -- Same CAF-isolation rebuild as 'evalModuleAndDirectives', but the per-pass
+  -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
+  -- combined environment — otherwise the freshly re-thunked References would lack
+  -- the JSON-provided values.
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
