@@ -501,10 +501,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       val' <- addNlg val
       mHence' <- traverse addNlg mHence
       pure $ Record ann mParty' cell' val' isOfficial mHence'
-    ReadCell ann mParty isOfficial cell -> do
+    ReadCell ann mParty isOfficial mode cell -> do
       mParty' <- traverse addNlg mParty
       cell' <- addNlg cell
-      pure $ ReadCell ann mParty' isOfficial cell'
+      pure $ ReadCell ann mParty' isOfficial mode cell'
     Concat ann es -> do
       es' <- traverse addNlg es
       pure $ Concat ann es'

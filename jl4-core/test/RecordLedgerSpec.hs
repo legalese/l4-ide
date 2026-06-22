@@ -41,6 +41,7 @@ import L4.Syntax
   ( Directive (..)
   , Expr (..)
   , Module (..)
+  , RecallMode (..)
   , Resolved
   , Section (..)
   , TopDecl (..)
@@ -50,6 +51,7 @@ import L4.Evaluate.Ledger
   ( LedgerEvent (..)
   , LedgerStore (..)
   , Provenance (..)
+  , readCellAll
   , snapshot
   )
 import L4.Evaluate.ValueLazy (NF (..), Value (..), WHNF)
@@ -102,6 +104,12 @@ showVal = show
 isJustWHNF :: WHNF -> Bool
 isJustWHNF (ValConstructor r [_]) = getUnique r == TypeCheck.justUnique
 isJustWHNF _                      = False
+
+-- | Is this WHNF the empty list (@ValNil@)? @RECALL ALL@ on a never-written
+-- cell yields @[]@ (NOT @NOTHING@) — the deliberate difference from plain RECALL.
+isNilWHNF :: WHNF -> Bool
+isNilWHNF ValNil = True
+isNilWHNF _      = False
 
 -- | Is this WHNF a @NOTHING@ (the prelude MAYBE constructor)?
 isNothingWHNF :: WHNF -> Bool
@@ -199,7 +207,7 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
         Left errs -> expectationFailure ("expected a clean typecheck, got: " <> show errs)
         Right r ->
           case directiveExprs r.tcdModule of
-            [ReadCell _ _mParty _isOfficial _cell] -> pure ()
+            [ReadCell _ _mParty _isOfficial _mode _cell] -> pure ()
             other -> expectationFailure ("expected exactly one ReadCell directive, got: " <> show (length other))
 
     it "(1) after RECORD `x` IS 273.15, RECALL `x` evaluates to JUST 273.15 (shared ledger, via the seam)" $
@@ -386,6 +394,197 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
                       map provSource (provenances recipientLedger) `shouldBe` ["NOTIFY"]
                     _ -> expectationFailure "expected exactly one non-empty own ledger (the recipient's)"
             other -> expectationFailure ("expected write + three reads, got " <> show (length other) <> " directives")
+
+  describe "RECALL ALL (approach B): collect-all read folds the WHOLE per-cell history into a LIST" $ do
+    -- Approach B exposes the accumulation the append-only ledger ALREADY retains.
+    -- Plain RECALL is last-write-wins (MAYBE a); RECALL ALL collects EVERY Assign
+    -- to the cell into a LIST OF a, oldest->newest. No write-side change: each
+    -- write is already its own event. These tests are LOAD-BEARING — they pin the
+    -- grammar, the LIST (not MAYBE) typing, oldest->newest order, the empty-list
+    -- (not NOTHING) behaviour, and — critically — that the RecallMode reaches BOTH
+    -- evaluator frames (ReadCell1 for own/official, ReadCell2 for cross-party).
+
+    it "(B0) RECALL ALL `c` parses to a ReadCell with RecallAll mode and type-checks as LIST OF a (not MAYBE a)" $
+      case checkWithImports vfs "IMPORT prelude\n#EVAL RECALL ALL `c`\n" of
+        Left errs -> expectationFailure ("expected a clean typecheck, got: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [ReadCell _ _mParty _isOfficial mode _cell] -> mode `shouldBe` RecallAll
+            other -> expectationFailure ("expected one RECALL ALL ReadCell, got: " <> show (length other))
+
+    it "(B1) a bare RECALL (no ALL) still parses to RecallLast — RECALL ALL is opt-in, plain RECALL is unchanged" $
+      case checkWithImports vfs "IMPORT prelude\n#EVAL RECALL `c`\n" of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [ReadCell _ _mParty _isOfficial mode _cell] -> mode `shouldBe` RecallLast
+            other -> expectationFailure ("expected one plain RECALL ReadCell, got: " <> show (length other))
+
+    -- NOTE on the harness: 'checkWithImports (vfsFromList [])' provides BUILT-IN
+    -- bindings (LIST, RECORD/RECALL, arithmetic) but NOT the prelude.l4 runtime
+    -- definitions (sum/count/fromMaybe-from-prelude). So these tests assert
+    -- approach B WITHOUT prelude helpers: the writes go through the real
+    -- evaluator (a LIST of RECORDs forces every write, left-to-right), and the
+    -- collect-all behaviour is asserted via the 'readCellAll' PROJECTION over the
+    -- captured ledger/store — i.e. the exact fold the runtime 'RECALL ALL' uses,
+    -- read off the very ledger the evaluator wrote. The end-to-end runtime value
+    -- of 'RECALL ALL' (a real ValCons/ValNil list) is covered by B0/B5 and the
+    -- jl4/experiments/recall-all.l4 demo (run under the real prelude).
+
+    it "(B2) OWN ledger, multi-write (ReadCell1 path): readCellAll folds ALL three writes oldest->newest; plain readCell is unchanged (JUST the last)" $
+      -- Three writes as SEPARATE forced exprs sharing one ledger (the seam), then
+      -- read the ledger back. readCellAll over the captured ledger is the
+      -- collect-all projection; plain readCell (snapshot) is still last-write-wins.
+      let writeSrc = Text.unlines
+            [ "#EVAL RECORD `n` IS 10"
+            , "#EVAL RECORD `n` IS 20"
+            , "#EVAL RECORD `n` IS 30"
+            ]
+      in case checkWithImports vfs writeSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [w1, w2, w3] -> do
+              res <- runEvalAction cfg $ do
+                _ <- evalExprForLedger w1
+                _ <- evalExprForLedger w2
+                _ <- evalExprForLedger w3
+                currentLedger
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right ledger -> do
+                  -- COLLECT-ALL: every write, oldest->newest.
+                  map showVal (readCellAll ["n"] ledger)
+                    `shouldBe` map (showVal . ValNumber) [10, 20, 30]
+                  -- LAST-WRITE-WINS is unchanged: plain readCell sees only 30.
+                  fmap showVal (Map.lookup ["n"] (snapshot ledger))
+                    `shouldBe` Just (showVal (ValNumber 30))
+            other -> expectationFailure ("expected three writes, got " <> show (length other))
+
+    it "(B3) CROSS-PARTY, multi-write (ReadCell2 path — the silent-fallback trap): readCellAll over Bob's OWN ledger folds [1,2,3]; a never-written party (Alice) folds []" $
+      -- THIS guards the design's highest-risk gap: the cross-party branch pushes
+      -- ReadCell2 BEFORE finishRead, so a missing mode thread would SILENTLY fall
+      -- back to last-write-wins with NO type error. We write `c` THREE times into
+      -- Bob's own ledger (recipient-qualified RECORD), then assert the collect-all
+      -- projection over Bob's ledger is the FULL [1,2,3] (a fallback would expose
+      -- only the last). Alice's ledger, never written, folds to [].
+      let crossSrc = Text.unlines
+            [ "DECLARE Person IS ONE OF Alice, Bob"
+            , "#EVAL RECORD Bob's `c` IS 1"
+            , "#EVAL RECORD Bob's `c` IS 2"
+            , "#EVAL RECORD Bob's `c` IS 3"
+            ]
+      in case checkWithImports vfs crossSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [w1, w2, w3] -> do
+              res <- runEvalAction cfg $ do
+                menv <- moduleEnvForLedger emptyEnvironment r.tcdModule
+                _    <- evalExprForLedgerWithEnv menv w1
+                _    <- evalExprForLedgerWithEnv menv w2
+                _    <- evalExprForLedgerWithEnv menv w3
+                currentStore
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right store -> do
+                  let bobLedger   = Map.findWithDefault mempty "Bob"   store.ownLedgers
+                      aliceLedger = Map.findWithDefault mempty "Alice" store.ownLedgers
+                  -- COLLECT-ALL across a DIFFERENT party's ledger: all three, in order.
+                  map showVal (readCellAll ["c"] bobLedger)
+                    `shouldBe` map (showVal . ValNumber) [1, 2, 3]
+                  -- last-write-wins on Bob's ledger is still the last value only.
+                  fmap showVal (Map.lookup ["c"] (snapshot bobLedger))
+                    `shouldBe` Just (showVal (ValNumber 3))
+                  -- a party that received no write folds to [].
+                  readCellAll ["c"] aliceLedger `shouldSatisfy` null
+            other -> expectationFailure ("expected three writes, got " <> show (length other))
+
+    it "(B3b) CROSS-PARTY RECALL ALL evaluates end-to-end to a real list (ValCons), NOT a last-write-wins JUST — the ReadCell2 thread is live" $
+      -- The runtime complement to B3: evaluate `RECALL ALL Bob's c` THROUGH the
+      -- ReadCell2 cross-party frame and assert the value is a list head (ValCons),
+      -- which a last-write-wins fallback (a ValConstructor JUST) could never be.
+      let crossSrc = Text.unlines
+            [ "DECLARE Person IS ONE OF Alice, Bob"
+            , "#EVAL RECORD Bob's `c` IS 1"
+            , "#EVAL RECORD Bob's `c` IS 2"
+            , "#EVAL RECALL ALL Bob's `c`"
+            ]
+      in case checkWithImports vfs crossSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [w1, w2, readAllExpr] -> do
+              res <- runEvalAction cfg $ do
+                menv <- moduleEnvForLedger emptyEnvironment r.tcdModule
+                _    <- evalExprForLedgerWithEnv menv w1
+                _    <- evalExprForLedgerWithEnv menv w2
+                evalExprForLedgerWithEnv menv readAllExpr   -- RECALL ALL Bob's `c`
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right readWHNF -> do
+                  -- a NON-EMPTY list (ValCons), not NOTHING and not a JUST.
+                  isNilWHNF readWHNF     `shouldBe` False
+                  isNothingWHNF readWHNF `shouldBe` False
+                  case readWHNF of
+                    ValCons _ _ -> pure ()
+                    other -> expectationFailure ("expected a ValCons list head (cross-party RECALL ALL), got " <> show other)
+            other -> expectationFailure ("expected 2 writes + 1 read, got " <> show (length other))
+
+    it "(B4) OFFICIAL ledger, multi-write: readCellAll over the official record folds every COMMIT [5,7,9] oldest->newest" $
+      let officialSrc = Text.unlines
+            [ "#EVAL COMMIT `c` IS 5"
+            , "#EVAL COMMIT `c` IS 7"
+            , "#EVAL COMMIT `c` IS 9"
+            ]
+      in case checkWithImports vfs officialSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [w1, w2, w3] -> do
+              res <- runEvalAction cfg $ do
+                _ <- evalExprForLedger w1
+                _ <- evalExprForLedger w2
+                _ <- evalExprForLedger w3
+                currentStore
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right store ->
+                  map showVal (readCellAll ["c"] store.officialLedger)
+                    `shouldBe` map (showVal . ValNumber) [5, 7, 9]
+            other -> expectationFailure ("expected three COMMITs, got " <> show (length other))
+
+    it "(B5) EMPTY case: RECALL ALL on a never-written cell evaluates to [] (ValNil), NOT NOTHING" $
+      case checkWithImports vfs "#EVAL RECALL ALL `never`\n" of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [readExpr] -> do
+              res <- runEvalAction cfg (evalExprForLedger readExpr)
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right readWHNF -> do
+                  isNilWHNF readWHNF     `shouldBe` True   -- it IS the empty list
+                  isNothingWHNF readWHNF `shouldBe` False  -- and it is NOT NOTHING
+            other -> expectationFailure ("expected one RECALL ALL directive, got " <> show (length other))
+
+    it "(B6) NO KEYWORD CLASH: reusing the existing TKAll token leaves `FOR ALL` (forall types) and lowercase `all` (an ordinary identifier) parsing exactly as before" $
+      -- 'RECALL ALL' reuses the SAME TKAll token as 'FOR ALL'. There is no clash:
+      -- 'FOR ALL' needs a preceding TKFor in type position; 'RECALL ALL' needs a
+      -- preceding TKRecall in expression position; and case-sensitivity keeps the
+      -- lowercase identifier `all` distinct from the all-caps keyword. This module
+      -- exercises all three in one file; it must type-check cleanly.
+      let clashSrc = Text.unlines
+            [ "ASSUME polymap IS"
+            , "  FOR ALL a AND b"           -- forall type still parses (TKFor TKAll)
+            , "  A FUNCTION FROM a TO b"
+            , "GIVEN all IS A NUMBER"        -- lowercase `all` is an ordinary param name
+            , "GIVETH A NUMBER"
+            , "DECIDE twice all IS all TIMES 2"
+            ]
+      in case checkWithImports vfs clashSrc of
+        Left errs -> expectationFailure ("expected FOR ALL + identifier `all` to still type-check, got: " <> show errs)
+        Right _   -> pure ()
 
   where
     provenances ledger = [ p | Assign _ _ p <- foldr (:) [] ledger ]

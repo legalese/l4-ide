@@ -433,8 +433,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
         <+> printWithLayout cell <+> "IS" <+> printWithLayout val
         <> maybe mempty (\k -> " HENCE" <+> printWithLayout k) mHence
-    ReadCell _ mParty isOfficial cell ->
+    ReadCell _ mParty isOfficial mode cell ->
       "RECALL"
+        <> (case mode of RecallAll -> " ALL"; RecallLast -> mempty)
         <> (if isOfficial then " OFFICIAL'S" else mempty)
         <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
         <+> printWithLayout cell

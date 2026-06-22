@@ -1521,13 +1521,17 @@ inferExpr' g =
         Just hence -> do
           (hence', henceT) <- inferExpr hence
           pure (Record ann mParty' cell' val' isOfficial (Just hence'), henceT)
-    ReadCell ann mParty isOfficial cell -> do
+    ReadCell ann mParty isOfficial mode cell -> do
       -- STATE-AS-LEDGER M1.5 / M4.5: the cell is a string-keyed path; the read is
       -- polymorphic in the stored value (the flat ledger is untyped at runtime),
       -- so @RECALL [<party>'s | OFFICIAL's] <cell>@ has type @MAYBE a@ for a fresh
       -- @a@ pinned by the use site — exactly what M3's
-      -- @fromMaybe <presumption> (RECALL cell)@ consumes. The result type is the
-      -- same regardless of which ledger is read.
+      -- @fromMaybe <presumption> (RECALL cell)@ consumes.
+      --
+      -- Approach B ('RecallAll', @RECALL ALL …@): the collect-all read folds
+      -- EVERY assignment to the cell, so its result type is @LIST OF a@ instead
+      -- of @MAYBE a@ (same fresh @a@). The result type is otherwise the same
+      -- regardless of which ledger (own/party/official) is read.
       --
       -- M4.5: an optional party qualifier is typechecked EXACTLY as a PARTY
       -- clause's party is (a fresh party type, 'ExpectRegulativePartyContext'),
@@ -1537,7 +1541,10 @@ inferExpr' g =
                    partyT <- fresh (NormalName "party")
                    checkExpr ExpectRegulativePartyContext p partyT) mParty
       a <- fresh (NormalName "cell")
-      pure (ReadCell ann mParty' isOfficial cell', maybeType a)
+      let resultT = case mode of
+            RecallLast -> maybeType a
+            RecallAll  -> list a
+      pure (ReadCell ann mParty' isOfficial mode cell', resultT)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -2984,7 +2991,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
       Record ann mParty cell val off mHence -> Record ann (fmap (go False ctx) mParty) (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
-      ReadCell ann mParty off cell -> ReadCell ann (fmap (go False ctx) mParty) off (go False ctx cell)
+      ReadCell ann mParty off mode cell -> ReadCell ann (fmap (go False ctx) mParty) off mode (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)

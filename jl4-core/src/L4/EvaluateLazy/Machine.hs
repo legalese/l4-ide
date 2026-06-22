@@ -81,6 +81,7 @@ import L4.Evaluate.Ledger
   , Provenance (..)
   , anonymousParty
   , readCell
+  , readCellAll
   , storeAppendOfficial
   , storeAppendOwn
   , storeOwnLedger
@@ -138,11 +139,16 @@ data Frame =
   --                             forward-eval the party expr; on its value we key
   --                             via 'partyKeyWHNF' and read that party's ledger.
   --   * Nothing (default)    -> read the CURRENT party's own ledger, finish.
-  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool Environment
+  -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
+  -- through to 'finishRead' so the read folds the chosen ledger into either a
+  -- MAYBE (last) or a LIST (all).
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
   -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
-  -- already-evaluated cell WHNF so 'finishRead' can complete the read against
-  -- the named party's own ledger.
-  | ReadCell2 WHNF {- -}
+  -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
+  -- the read against the named party's own ledger. The mode MUST be threaded here
+  -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
+  -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
+  | ReadCell2 WHNF RecallMode {- -}
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -657,12 +663,13 @@ forwardExpr env = \ case
       Nothing -> do
         pushFrame (Record1 val env isOfficial mHence Nothing)
         continueExpr env cell
-  ReadCell _ann mParty isOfficial cell -> do
+  ReadCell _ann mParty isOfficial mode cell -> do
     -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
     -- carrying the optional party qualifier (still unevaluated), the isOfficial
-    -- flag, and the env. The 'ReadCell1' frame then routes to the right ledger
-    -- (own / cross-party / official) and reads it, yielding MAYBE (JUST/NOTHING).
-    pushFrame (ReadCell1 mParty isOfficial env)
+    -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
+    -- routes to the right ledger (own / cross-party / official) and reads it,
+    -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
+    pushFrame (ReadCell1 mParty isOfficial mode env)
     continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
@@ -721,31 +728,32 @@ backward val = withPoppedFrame $ \ case
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
     runRecord cellVal val isOfficial env mHence mRecipientKey
-  Just (ReadCell1 mParty isOfficial env) -> do
+  Just (ReadCell1 mParty isOfficial mode env) -> do
     -- the cell has evaluated to 'val' (a String path). Route to the right
-    -- ledger and finish (M1.5 / M4.5):
+    -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
     --   * isOfficial   -> read the shared OFFICIAL record.
     --   * Just party    -> evaluate the party qualifier (push ReadCell2 holding
-    --                      the cell), then key it and read that party's ledger.
+    --                      the cell AND the mode), then key it and read that
+    --                      party's ledger.
     --   * Nothing       -> read the CURRENT acting party's own ledger (M1.5).
     if isOfficial
       then do
         ledger <- officialLedgerEval
-        finishRead val ledger
+        finishRead mode val ledger
       else case mParty of
         Just partyExpr -> do
-          pushFrame (ReadCell2 val)
+          pushFrame (ReadCell2 val mode)
           continueExpr env partyExpr
         Nothing -> do
           ledger <- currentLedgerEval
-          finishRead val ledger
-  Just (ReadCell2 cellVal) -> do
+          finishRead mode val ledger
+  Just (ReadCell2 cellVal mode) -> do
     -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
     -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
-    -- write, then read that party's own ledger and finish (M4.5).
+    -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
-    finishRead cellVal ledger
+    finishRead mode cellVal ledger
   Just (RestoreCurrentParty mOriginal) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -1452,27 +1460,46 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
     Nothing    -> continueBackward val          -- M1: terminal / expression use
     Just hence -> continueExpr env hence        -- M5: become the deontic continuation
 
--- | STATE-AS-LEDGER M1.5 / M4.5: finish a RECALL (cell read) against a given
--- ledger.
+-- | STATE-AS-LEDGER M1.5 / M4.5 (+ approach B): finish a RECALL (cell read)
+-- against a given ledger, in the requested 'RecallMode'.
 --
 -- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
--- lower it to a single-segment 'Path' (mirroring 'runRecord') and read the
--- latest projection of the supplied @ledger@ via 'readCell' (D2: a fold over
--- the append log, last-write-wins). The @ledger@ is chosen by the caller — the
--- current party's own ledger (M1.5, the default), a named party's own ledger
--- (M4.5 cross-party), or the shared official record (M4.5 @official's@).
+-- lower it to a single-segment 'Path' (mirroring 'runRecord'). The @ledger@ is
+-- chosen by the caller — the current party's own ledger (M1.5, the default), a
+-- named party's own ledger (M4.5 cross-party), or the shared official record
+-- (M4.5 @official's@).
 --
--- The result is @MAYBE a@: @JUST v@ when the cell has been written in that
--- ledger, or @NOTHING@ when the cell has never been assigned there.
-finishRead :: WHNF -> Ledger -> Machine Config
-finishRead cellVal ledger = do
+--   * 'RecallLast' (@RECALL …@): read the LATEST projection via 'readCell'
+--     (D2: a fold over the append log, last-write-wins). Result @MAYBE a@:
+--     @JUST v@ when the cell has been written there, @NOTHING@ otherwise.
+--   * 'RecallAll' (@RECALL ALL …@, approach B): fold EVERY 'Assign' to the
+--     cell into a @LIST OF a@ via 'readCellAll' (oldest->newest, append order),
+--     building it right-to-left as 'ValCons'/'ValNil'. Result @[]@ (ValNil)
+--     when the cell has never been written there — NOT @NOTHING@.
+finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
+finishRead mode cellVal ledger = do
   cell <- expectString cellVal
-  case readCell [cell] ledger of
-    Just storedVal -> do
-      valueRef <- allocateValue storedVal
-      continueBackward (ValConstructor TypeCheck.justRef [valueRef])
-    Nothing ->
-      continueBackward (ValConstructor TypeCheck.nothingRef [])
+  case mode of
+    RecallLast ->
+      case readCell [cell] ledger of
+        Just storedVal -> do
+          valueRef <- allocateValue storedVal
+          continueBackward (ValConstructor TypeCheck.justRef [valueRef])
+        Nothing ->
+          continueBackward (ValConstructor TypeCheck.nothingRef [])
+    RecallAll -> do
+      -- oldest->newest list of every assignment to this cell. Build the spine
+      -- right-to-left as ValCons cells terminating in ValNil (ValueLazy list
+      -- representation): the resulting WHNF has the oldest value at the head.
+      let storedVals = readCellAll [cell] ledger
+      listVal <- foldrM
+        (\v tailWHNF -> do
+            headRef <- allocateValue v
+            tailRef <- allocateValue tailWHNF
+            pure (ValCons headRef tailRef))
+        ValNil
+        storedVals
+      continueBackward listVal
 
 matchGivens :: GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
 matchGivens (MkGivenSig _ann otns) f es = do
