@@ -2753,7 +2753,47 @@ contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> 
 contractToEvalDirective contract t evs = do
   pure $ App emptyAnno TypeCheck.evalContractRef [contract, t, evListExpr]
   where
-  evListExpr = List emptyAnno $ map eventExpr evs
+  -- A trace is a SET of timestamped facts that must be processed in time order.
+  -- STABLE-sort the authored #TRACE/EVALTRACE WITH event list by AT (nondecreasing),
+  -- preserving authored order for equal timestamps. This is the single point where the
+  -- event stream is built and handed to residuation, so it uniformly governs all
+  -- RAND/ROR strands. A stable sort of an already-monotonic trace is the identity, and
+  -- we do NOT touch the deadline/blame logic: sorting makes its "earlier events already
+  -- seen" assumption hold.
+  --
+  -- We only reorder genuine literal-AT 'Event' nodes relative to one another. Entries
+  -- whose AT is not a literal at parse time (e.g. @`WAIT UNTIL` 100@, which is a runtime
+  -- @Number -> Event@ application, or an already-desugared event) carry no extractable
+  -- key and stay PINNED in their authored positions -- 'sortByStablePinned' never moves
+  -- an unkeyed element. This is why we use a comparison that only orders when both keys
+  -- are present, rather than a plain @sortOn@ (which would float unkeyed entries to one
+  -- end and scramble positional markers like WAIT UNTIL).
+  evListExpr = List emptyAnno $ map eventExpr (sortByStablePinned eventAtKey evs)
+
+-- | Sort key for an authored event: the literal AT timestamp as a 'Rational'.
+-- Non-literal or already-desugared events yield 'Nothing'.
+eventAtKey :: Expr Resolved -> Maybe Rational
+eventAtKey (Event _ann (MkEvent _ _ _ (Lit _ (NumericLit _ r)) _)) = Just r
+eventAtKey _ = Nothing
+
+-- | A stable sort by a partial key that leaves every element whose key is 'Nothing'
+-- pinned at its original index. Keyed elements ('Just') are stably sorted by their key
+-- among themselves and then poured back into the non-pinned slots in that sorted order;
+-- equal keys preserve authored order. Unkeyed elements (e.g. @`WAIT UNTIL` 100@, whose
+-- AT is not a parse-time literal) never move, so positional markers are preserved.
+-- For an all-keyed, already-monotonic list this is the identity.
+sortByStablePinned :: Ord k => (a -> Maybe k) -> [a] -> [a]
+sortByStablePinned key xs =
+  let keyed  = [ (k, x) | x <- xs, Just k <- [key x] ]
+      sorted = map snd (sortOn fst keyed)   -- stable sort of just the keyed elements
+  in  refill sorted xs
+  where
+    refill _      []       = []
+    refill sorted (x : rest) = case key x of
+      Nothing -> x : refill sorted rest                       -- pinned slot
+      Just _  -> case sorted of
+        (s : ss) -> s : refill ss rest
+        []       -> x : refill [] rest                        -- unreachable
 
 eventExpr :: Expr Resolved -> Expr Resolved
 eventExpr (Event _ann ev) = desugarEvent ev
