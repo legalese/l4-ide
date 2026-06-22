@@ -1,0 +1,306 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (amended 2024)`
+
+-- This file encodes the AMENDED 2024 version of Ground 1, as substituted by the
+-- Renters' Rights Act 2024.  It is a DIFFERENT test from the original 1988
+-- Ground 1 (which lives in housing-act-ground-1-limbs.l4):
+--   * there is NO notice requirement;
+--   * there is NO reversion-for-value carve-out;
+--   * instead there is a 1-year minimum-tenancy condition, and an EXPANDED
+--     family list of qualifying occupiers.
+--
+-- HYBRID encoding (matching the established house style):
+--   * constitutive conditions  -> predicates (GIVEN ... GIVETH A BOOLEAN ... MEANS ...)
+--     carrying the verbatim statute inline as inert prose;
+--   * the mandatory outcome     -> a regulative/deontic clause guarded by the
+--     constitutive condition.
+--
+-- Statutory text encoded (Ground 1, amended 2024):
+--
+--   The current tenancy began at least 1 year before the relevant date and the
+--   landlord who is seeking possession requires the dwelling-house as the only
+--   or principal home of any of the following—
+--   (a) the landlord;
+--   (b) the landlord's spouse or civil partner or a person with whom the
+--       landlord lives as if they were married or in a civil partnership;
+--   (c) the landlord's— (i) parent; (ii) grandparent; (iii) sibling;
+--       (iv) child; (v) grandchild;
+--   (d) a child or grandchild of a person mentioned in paragraph (b).
+--   In the case of joint landlords seeking possession, references to "the
+--   landlord" in this ground are to be read as references to at least one of
+--   those joint landlords.
+--   When calculating whether the current tenancy began at least 1 year before
+--   the relevant date, both— (a) the day when the current tenancy began, and
+--   (b) the relevant date,— must be included in the calculation.
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The qualifying relationships, capturing list items (a)-(d) of the amended
+-- ground.  An occupier qualifies if they stand in ONE of these relationships to
+-- (one of) the landlord(s):
+--   * Landlord                      -> (a) the landlord
+--   * PartnerOrCohabitant           -> (b) spouse / civil partner / cohabitant
+--   * Parent, Grandparent, Sibling,
+--     Child, Grandchild             -> (c)(i)-(v) the landlord's family
+--   * ChildOrGrandchildOfPartner    -> (d) a child or grandchild of a (b) person
+DECLARE Relationship IS ONE OF
+  Landlord
+  PartnerOrCohabitant
+  Parent
+  Grandparent
+  Sibling
+  Child
+  Grandchild
+  ChildOrGrandchildOfPartner
+
+-- A Person is a landlord-side party.  Each landlord points (in the claim) at a
+-- proposed occupier and the relationship that occupier bears to that landlord,
+-- together with whether the landlord requires the dwelling-house as that
+-- occupier's only or principal home.
+DECLARE Person HAS
+  name                                                  IS A STRING
+  `relationship of proposed occupier to this landlord`  IS A Relationship
+  `requires dwelling-house as that occupier's only or principal home`  IS A BOOLEAN
+
+-- A Claim bundles the facts the court reasons over.
+--   * `landlords`     — the landlord(s) seeking possession.  "the landlord" in
+--     this ground reads as "at least one of those joint landlords".
+--   * `tenancy began` — the day the current tenancy began (a DATE).
+--   * `relevant date` — the relevant date (a DATE).
+DECLARE Claim HAS
+  `landlords`         IS A LIST OF Person
+  `tenancy began`     IS A DATE
+  `relevant date`     IS A DATE
+
+§§ `The qualifying-occupier requirement — list items (a)-(d)`
+
+-- A relationship qualifies iff it is one of the enumerated family relationships.
+-- (Every constructor of Relationship is, by construction, a qualifying item of
+-- the (a)-(d) list, so this is total — but we spell the disjunction out inertly
+-- so the statute's list rides alongside the logic.)
+GIVEN r IS A Relationship
+GIVETH A BOOLEAN
+`is a qualifying relationship` r MEANS
+        "(a) the landlord;"                                                              ... r EQUALS Landlord
+    ..  "(b) the landlord's spouse or civil partner or a person with whom the landlord lives as if they were married or in a civil partnership;"
+                                                                                         ... r EQUALS PartnerOrCohabitant
+    ..  "(c) the landlord's— (i) parent;"                                                ... r EQUALS Parent
+    ..  "(ii) grandparent;"                                                              ... r EQUALS Grandparent
+    ..  "(iii) sibling;"                                                                 ... r EQUALS Sibling
+    ..  "(iv) child;"                                                                    ... r EQUALS Child
+    ..  "(v) grandchild;"                                                                ... r EQUALS Grandchild
+    ..  "(d) a child or grandchild of a person mentioned in paragraph (b)."             ... r EQUALS ChildOrGrandchildOfPartner
+
+-- A single landlord supplies the requirement iff they require the dwelling-house
+-- as the only or principal home of an occupier who stands in a qualifying
+-- relationship to them.
+GIVEN l IS A Person
+GIVETH A BOOLEAN
+`this landlord requires it as a qualifying occupier's home` l MEANS
+        l's `requires dwelling-house as that occupier's only or principal home`
+    AND `is a qualifying relationship` (l's `relationship of proposed occupier to this landlord`)
+
+-- The occupier requirement, ranging over the joint landlords: "the landlord who
+-- is seeking possession requires the dwelling-house as the only or principal
+-- home of any of the [qualifying occupiers]", with "the landlord" read (per the
+-- joint-landlords rule) as "at least one of those joint landlords".
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`qualifying-occupier requirement` claim MEANS
+        "the landlord who is seeking possession requires the dwelling-house as the only or principal home of any of the following"
+    ... "(in the case of joint landlords seeking possession, references to the landlord are to at least one of those joint landlords)"
+    ... any (GIVEN l YIELD `this landlord requires it as a qualifying occupier's home` l)
+            (claim's `landlords`)
+
+§§ `The 1-year condition — inclusive day-counting`
+
+-- "The current tenancy began at least 1 year before the relevant date", with the
+-- statutory gloss that BOTH the tenancy-start day AND the relevant date are
+-- counted ("both ... must be included in the calculation").
+--
+-- DAY-COUNTING ASSUMPTION.  We measure the span INCLUSIVELY: the number of days
+-- in the closed interval [tenancyBegan, relevantDate], counting both endpoints,
+-- is  (Day relevantDate − Day tenancyBegan) + 1.  We compare that against the
+-- length of a one-calendar-year window measured the SAME inclusive way: the days
+-- in the closed interval [tenancyBegan, tenancyBegan + 1 calendar year], i.e.
+-- (Day (tenancyBegan + 1 year) − Day tenancyBegan) + 1.  Deriving the threshold
+-- from the actual dates (rather than a fixed 365/365.2425) makes the boundary
+-- leap-year-correct.  Boundary behaviour, with both endpoints included:
+--   * tenancy began EXACTLY 1 year before the relevant date  -> satisfied;
+--   * tenancy began one day short of 1 year before           -> NOT satisfied.
+
+-- The relevant date moved back by one calendar year (same day & month).  The
+-- tenancy "began at least 1 year before the relevant date" exactly when it began
+-- on or before this date.
+GIVEN claim IS A Claim
+GIVETH A DATE
+`one year before the relevant date` claim MEANS
+    Date (DATE_DAY   (claim's `relevant date`))
+         (DATE_MONTH (claim's `relevant date`))
+         (DATE_YEAR  (claim's `relevant date`) MINUS 1)
+
+-- Inclusive span actually elapsed, in days, both endpoints counted.
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`inclusive days from tenancy start to relevant date` claim MEANS
+    (Day (claim's `relevant date`) MINUS Day (claim's `tenancy began`)) PLUS 1
+
+-- Inclusive length of a one-year window starting at the tenancy-start day, both
+-- endpoints counted; this is the threshold the elapsed span must reach.
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`inclusive days in one year from tenancy start` claim MEANS
+    (Day (`one year after tenancy start` claim) MINUS Day (claim's `tenancy began`)) PLUS 1
+    WHERE
+        GIVEN c IS A Claim
+        GIVETH A DATE
+        `one year after tenancy start` c MEANS
+            Date (DATE_DAY   (c's `tenancy began`))
+                 (DATE_MONTH (c's `tenancy began`))
+                 (DATE_YEAR  (c's `tenancy began`) PLUS 1)
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`current tenancy began at least 1 year before the relevant date` claim MEANS
+        "The current tenancy began at least 1 year before the relevant date"
+    ... "(both the day when the current tenancy began and the relevant date must be included in the calculation)"
+    ... `inclusive days from tenancy start to relevant date` claim
+            AT LEAST `inclusive days in one year from tenancy start` claim
+
+§§ `Ground 1 (amended 2024) made out — 1-year condition AND occupier requirement`
+
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`Ground 1 (amended 2024) made out` claim MEANS
+        `current tenancy began at least 1 year before the relevant date` claim
+    AND `qualifying-occupier requirement` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+-- Part I grounds are MANDATORY: if Ground 1 (amended 2024) is made out the court
+-- MUST order possession.  Guard the deontic outcome by the constitutive
+-- condition; if the ground is not made out, there is (on this ground) nothing
+-- the court must do.
+GIVEN claim IS A Claim
+GIVETH A DEONTIC Actor Action
+`ground 1 (amended 2024) possession order` claim MEANS
+    IF   `Ground 1 (amended 2024) made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Helper: a landlord requiring the home for an occupier of a given relationship`
+
+-- Build a landlord who DOES require the dwelling-house as the only or principal
+-- home of an occupier standing in relationship `r`.
+GIVEN r IS A Relationship
+GIVETH A Person
+`requiring landlord for` r MEANS Person WITH
+  name                                                  IS "L"
+  `relationship of proposed occupier to this landlord`  IS r
+  `requires dwelling-house as that occupier's only or principal home`  IS TRUE
+
+-- A landlord who requires nothing of anyone (no requirement asserted).
+`non-requiring landlord` MEANS Person WITH
+  name                                                  IS "N"
+  `relationship of proposed occupier to this landlord`  IS Landlord
+  `requires dwelling-house as that occupier's only or principal home`  IS FALSE
+
+§§ `Dates used in the tenancy-length tests`
+
+-- Relevant date fixed at 1 January 2025.
+`relevant date 2025`         MEANS January 1 2025
+
+-- Tenancy began EXACTLY 1 year before (1 January 2024): inclusive span reaches
+-- the inclusive one-year window -> 1-year condition satisfied.
+`tenancy began exactly 1yr`  MEANS January 1 2024
+
+-- Tenancy began ONE DAY SHORT of 1 year before (2 January 2024): one day too
+-- late -> 1-year condition NOT satisfied.
+`tenancy began 1 day short`  MEANS January 2 2024
+
+-- Tenancy began comfortably more than 1 year before (1 June 2023).
+`tenancy began well over 1yr` MEANS June 1 2023
+
+§§ `Each family relationship qualifies in turn`
+
+-- For each enumerated relationship, a single landlord requiring the home for an
+-- occupier of that relationship, with a tenancy of well over a year, makes the
+-- ground out.
+GIVEN r IS A Relationship
+GIVETH A Claim
+`claim for relationship` r MEANS Claim WITH
+  `landlords`       IS LIST (`requiring landlord for` r)
+  `tenancy began`   IS `tenancy began well over 1yr`
+  `relevant date`   IS `relevant date 2025`
+
+#ASSERT `is a qualifying relationship` Landlord
+#ASSERT `is a qualifying relationship` PartnerOrCohabitant
+#ASSERT `is a qualifying relationship` Parent
+#ASSERT `is a qualifying relationship` Grandparent
+#ASSERT `is a qualifying relationship` Sibling
+#ASSERT `is a qualifying relationship` Child
+#ASSERT `is a qualifying relationship` Grandchild
+#ASSERT `is a qualifying relationship` ChildOrGrandchildOfPartner
+
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Landlord)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` PartnerOrCohabitant)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Parent)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Grandparent)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Sibling)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Child)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` Grandchild)
+#ASSERT `Ground 1 (amended 2024) made out` (`claim for relationship` ChildOrGrandchildOfPartner)
+
+§§ `Not a qualifying occupier — landlord requires nothing`
+
+-- The landlord does not require the dwelling-house as anyone's home: the
+-- occupier requirement fails, so (despite a long tenancy) the ground is not made
+-- out.
+`claim no requirement` MEANS Claim WITH
+  `landlords`       IS LIST `non-requiring landlord`
+  `tenancy began`   IS `tenancy began well over 1yr`
+  `relevant date`   IS `relevant date 2025`
+
+#ASSERT NOT `qualifying-occupier requirement`        `claim no requirement`
+#ASSERT NOT `Ground 1 (amended 2024) made out`       `claim no requirement`
+
+§§ `The 1-year condition at its boundary (inclusive counting)`
+
+-- Tenancy began EXACTLY 1 year before the relevant date: satisfied.
+`claim exactly 1yr` MEANS Claim WITH
+  `landlords`       IS LIST (`requiring landlord for` Landlord)
+  `tenancy began`   IS `tenancy began exactly 1yr`
+  `relevant date`   IS `relevant date 2025`
+
+#ASSERT     `current tenancy began at least 1 year before the relevant date` `claim exactly 1yr`
+#ASSERT     `Ground 1 (amended 2024) made out`                               `claim exactly 1yr`
+
+-- Tenancy began ONE DAY SHORT of 1 year before the relevant date: not
+-- satisfied, so (despite a qualifying occupier) the ground is not made out.
+`claim 1 day short` MEANS Claim WITH
+  `landlords`       IS LIST (`requiring landlord for` Landlord)
+  `tenancy began`   IS `tenancy began 1 day short`
+  `relevant date`   IS `relevant date 2025`
+
+#ASSERT NOT `current tenancy began at least 1 year before the relevant date` `claim 1 day short`
+#ASSERT NOT `Ground 1 (amended 2024) made out`                               `claim 1 day short`
+
+§§ `Joint landlords — "at least one of them"`
+
+-- Two landlords; only one requires the home for a qualifying occupier.  The
+-- occupier requirement is satisfied because at least one of them does.
+`claim joint one qualifies` MEANS Claim WITH
+  `landlords`       IS LIST `non-requiring landlord`, (`requiring landlord for` Sibling)
+  `tenancy began`   IS `tenancy began well over 1yr`
+  `relevant date`   IS `relevant date 2025`
+
+#ASSERT `qualifying-occupier requirement`        `claim joint one qualifies`
+#ASSERT `Ground 1 (amended 2024) made out`       `claim joint one qualifies`

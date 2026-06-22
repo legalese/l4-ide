@@ -1,8 +1,11 @@
 IMPORT prelude
 
-§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1, limbs (a) and (b)`
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (original 1988), limbs (a) and (b)`
 
--- This file encodes the BOTTOM HALF of Ground 1: the "home condition", i.e.
+-- This file encodes the BOTTOM HALF of Ground 1 (the ORIGINAL 1988 version, as
+-- amended by the Civil Partnership Act 2004 — NOT the Renters' Rights Act 2024
+-- replacement, which lives in housing-act-ground-1-amended-2024.l4): the "home
+-- condition", i.e.
 -- the disjunction of limb (a) (prior occupation) and limb (b) (present
 -- requirement), which is the constitutive core that the notice requirement
 -- sits on top of.  The TOP half of Ground 1 — the notice / just-and-equitable
@@ -24,7 +27,7 @@ IMPORT prelude
 --       only or principal home; or
 --   (b) the landlord who is seeking possession or, in the case of joint
 --       landlords seeking possession, at least one of them requires the
---       dwelling-house as his, or his spouse's or civil partner's, only or
+--       dwelling-house as [F2 his, his spouse's or his civil partner's] only or
 --       principal home and neither the landlord (or, in the case of joint
 --       landlords, any one of them) nor any other person who, as landlord,
 --       derived title under the landlord who gave the notice mentioned in
@@ -75,8 +78,8 @@ GIVETH A BOOLEAN
 §§ `Limb (b) — present requirement`
 
 -- (b) the landlord ... or, in the case of joint landlords ..., at least one of
---     them requires the dwelling-house as his, or his spouse's or civil
---     partner's, only or principal home
+--     them requires the dwelling-house as his, his spouse's or his civil
+--     partner's only or principal home
 -- AND neither the landlord (or any one of joint landlords) nor any other
 --     person who, as landlord, derived title under the landlord who gave the
 --     notice acquired the reversion on the tenancy for money or money's worth.
@@ -86,19 +89,20 @@ GIVEN claim IS A Claim
 GIVETH A BOOLEAN
 `requires as only or principal home` claim MEANS
         "the landlord who is seeking possession or, in the case of joint landlords seeking possession, at least one of them"
-    ... "requires the dwelling-house as his, or his spouse's or civil partner's, only or principal home"
+    ... "requires the dwelling-house as his, his spouse's or his civil partner's only or principal home"
     ... any (GIVEN l YIELD l's `requires as own or spouse or civil partner home`)
             (claim's `landlords`)
 
--- Money atom of (b): the reversion-for-value check ranges over BOTH the
--- landlords AND the successors in title.  TRUE if ANY of them acquired the
--- reversion for money or money's worth.
+-- Money atom of (b), stated in the POSITIVE: the reversion-for-value check
+-- ranges over BOTH the landlords AND the successors in title.  TRUE if ANY of
+-- them acquired the reversion for money or money's worth.  The statute's own
+-- NEGATIVE framing ("neither ... nor ... acquired ...") is carried at the
+-- negation site below, where the negation actually is, so the verbatim "neither
+-- ... nor ..." prose sits next to the NOT.
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
 `reversion acquired for value` claim MEANS
-        "neither the landlord (or, in the case of joint landlords, any one of them)"
-    ..  "nor any other person who, as landlord, derived title under the landlord who gave the notice mentioned in Ground 1 above"
-    ..  "acquired the reversion on the tenancy for money or money's worth"
+        "any of them acquired the reversion on the tenancy for money or money's worth"
     ..  ( any (GIVEN p YIELD p's `acquired reversion for money or money's worth`)
               (claim's `landlords`)
        OR any (GIVEN p YIELD p's `acquired reversion for money or money's worth`)
@@ -108,7 +112,10 @@ GIVEN claim IS A Claim
 GIVETH A BOOLEAN
 `limb (b) present requirement` claim MEANS
         `requires as only or principal home` claim
-    AND NOT `reversion acquired for value` claim
+    AND     "neither the landlord (or, in the case of joint landlords, any one of them)"
+        ... "nor any other person who, as landlord, derived title under the landlord who gave the notice mentioned in Ground 1 above"
+        ... "acquired the reversion on the tenancy for money or money's worth"
+        ... NOT `reversion acquired for value` claim
 
 §§ `The home condition — limb (a) OR limb (b)`
 
@@ -119,15 +126,15 @@ GIVETH A BOOLEAN
         `limb (a) prior occupation`   claim
     ..  `limb (b) present requirement` claim
 
-§§ `Ground 1 made out — notice gateway AND home condition`
+§§ `Ground 1 (original 1988) made out — notice gateway AND home condition`
 
--- The full Ground 1 = the notice gateway (modelled as a plain BOOLEAN here)
--- AND the home condition.  (Per spec the just-and-equitable dispensation lives
--- with the notice modelling on another branch; here `notice was given` is the
--- whole gateway.)
+-- The full Ground 1 (original 1988) = the notice gateway (modelled as a plain
+-- BOOLEAN here) AND the home condition.  (Per spec the just-and-equitable
+-- dispensation lives with the notice modelling on another branch; here
+-- `notice was given` is the whole gateway.)
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
-`Ground 1 made out` claim MEANS
+`Ground 1 (original 1988) made out` claim MEANS
         claim's `notice was given`
     AND `landlord-home condition` claim
 
@@ -141,7 +148,7 @@ DECLARE Action IS ONE OF `order possession`
 GIVEN claim IS A Claim
 GIVETH A DEONTIC Actor Action
 `ground 1 possession order` claim MEANS
-    IF   `Ground 1 made out` claim
+    IF   `Ground 1 (original 1988) made out` claim
     THEN PARTY Court MUST `order possession` WITHIN 30
     ELSE FULFILLED
 
@@ -195,7 +202,7 @@ GIVETH A DEONTIC Actor Action
 #ASSERT     `limb (a) prior occupation`   `claim (a)-true`
 #ASSERT NOT `limb (b) present requirement` `claim (a)-true`
 #ASSERT     `landlord-home condition`     `claim (a)-true`
-#ASSERT     `Ground 1 made out`           `claim (a)-true`
+#ASSERT     `Ground 1 (original 1988) made out`           `claim (a)-true`
 
 §§ `Claim (b)-true — present requirement, no purchase for value`
 
@@ -209,7 +216,7 @@ GIVETH A DEONTIC Actor Action
 #ASSERT NOT `reversion acquired for value` `claim (b)-true`
 #ASSERT     `limb (b) present requirement` `claim (b)-true`
 #ASSERT     `landlord-home condition`      `claim (b)-true`
-#ASSERT     `Ground 1 made out`            `claim (b)-true`
+#ASSERT     `Ground 1 (original 1988) made out`            `claim (b)-true`
 
 §§ `Claim (b)-fails — required, but reversion bought for value`
 
@@ -225,7 +232,7 @@ GIVETH A DEONTIC Actor Action
 #ASSERT     `reversion acquired for value`  `claim (b)-fails-by-purchase`
 #ASSERT NOT `limb (b) present requirement`  `claim (b)-fails-by-purchase`
 #ASSERT NOT `landlord-home condition`       `claim (b)-fails-by-purchase`
-#ASSERT NOT `Ground 1 made out`             `claim (b)-fails-by-purchase`
+#ASSERT NOT `Ground 1 (original 1988) made out`             `claim (b)-fails-by-purchase`
 
 -- Same defeat, but via a LANDLORD who bought for value (no successors).
 `claim (b)-fails-by-landlord-purchase` MEANS Claim WITH
@@ -247,7 +254,7 @@ GIVETH A DEONTIC Actor Action
 #ASSERT NOT `limb (a) prior occupation`    `claim neither-limb`
 #ASSERT NOT `limb (b) present requirement` `claim neither-limb`
 #ASSERT NOT `landlord-home condition`      `claim neither-limb`
-#ASSERT NOT `Ground 1 made out`            `claim neither-limb`
+#ASSERT NOT `Ground 1 (original 1988) made out`            `claim neither-limb`
 
 §§ `Joint landlords — "at least one of them"`
 
@@ -260,7 +267,7 @@ GIVETH A DEONTIC Actor Action
 
 #ASSERT `limb (a) prior occupation`  `claim joint-one-occupied`
 #ASSERT `landlord-home condition`    `claim joint-one-occupied`
-#ASSERT `Ground 1 made out`          `claim joint-one-occupied`
+#ASSERT `Ground 1 (original 1988) made out`          `claim joint-one-occupied`
 
 §§ `Notice gateway — home condition met but no notice`
 
@@ -272,4 +279,4 @@ GIVETH A DEONTIC Actor Action
   `notice was given`    IS FALSE
 
 #ASSERT     `landlord-home condition` `claim no-notice`
-#ASSERT NOT `Ground 1 made out`       `claim no-notice`
+#ASSERT NOT `Ground 1 (original 1988) made out`       `claim no-notice`
