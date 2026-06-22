@@ -1,0 +1,239 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 2ZB (Renters' Rights Act 2025)`
+
+-- Ground 2ZB, inserted into Schedule 2 to the Housing Act 1988 by the
+-- Renters' Rights Act 2025 (c. 26). It is one of the MANDATORY grounds in Part I
+-- of Schedule 2: where it is made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a regulative/deontic clause guarded by the
+--     conjunction (chapeau AND (a OR b)).
+--
+-- Statutory text encoded ("The landlord ... holds the interest ... under a
+-- superior tenancy which is a fixed term tenancy of a term certain of more than
+-- 21 years and—", i.e. a CHAPEAU conjoined with a DISJUNCTION of (a) and (b)):
+--   The landlord who is seeking possession holds the interest in the
+--   dwelling-house under a superior tenancy which is a fixed term tenancy of a
+--   term certain of more than 21 years and—
+--   (a) the fixed term will expire (if the tenancy does not come to an end
+--       earlier) within the period of 12 months beginning with the relevant date,
+--       or
+--   (b) if the superior tenancy has continued following the expiry of the fixed
+--       term, any party to the superior tenancy has served a valid notice to
+--       terminate that tenancy as a result of which the superior tenancy will end
+--       within the period of 12 months beginning with the relevant date.
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms. The chapeau turns on the superior tenancy being a fixed
+-- term of a term certain (a structural property of the tenancy data) whose term
+-- certain exceeds 21 years (a NUMBER field, tested `> 21`, mirroring the long-
+-- lease test in the Ground 1A/1B files; note there is NO "terminable by notice"
+-- element here). Limbs (a) and (b) both test a 12-month window beginning with the
+-- relevant date; (b) is additionally gated on the tenancy having continued past
+-- the fixed term and a valid termination notice having been served.
+DECLARE Ground2ZBClaim HAS
+  -- chapeau
+  `landlord holds the interest under a superior tenancy`        IS A BOOLEAN
+  `superior tenancy is a fixed term tenancy of a term certain`  IS A BOOLEAN
+  `term certain in years`                                      IS A NUMBER
+  `relevant date`                                              IS A DATE
+  -- (a) — the date the fixed term will expire
+  `fixed term expiry date`                                     IS A DATE
+  -- (b)
+  `superior tenancy has continued following expiry of the fixed term`  IS A BOOLEAN
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS A BOOLEAN
+  `superior tenancy end date under the notice`                 IS A DATE
+
+§§ `Shared helper — the 12-month window beginning with the relevant date`
+
+-- "within the period of 12 months beginning with the relevant date", counting
+-- inclusively from the relevant date. Reused in shape from the amended-2025
+-- Ground 1 file's 1-year window (leap-year-correct).
+GIVEN `end date`      IS A DATE
+      `relevant date` IS A DATE
+GIVETH A BOOLEAN
+`falls within 12 months beginning with the relevant date` MEANS
+        (Day `end date` MINUS Day `relevant date`) PLUS 1
+    AT MOST
+        (Day `twelve months after relevant date` MINUS Day `relevant date`) PLUS 1
+    WHERE
+        `twelve months after relevant date` MEANS
+            Date (DATE_DAY   `relevant date`)
+                 (DATE_MONTH `relevant date`)
+                 (DATE_YEAR  `relevant date` PLUS 1)
+
+§§ `The chapeau — a superior fixed term of a term certain of more than 21 years`
+
+-- The structural "more than 21 years" test on the term certain. Unlike the long-
+-- lease test in Grounds 1A/1B, there is NO "terminable before the end by notice"
+-- element here.
+GIVEN claim IS A Ground2ZBClaim
+GIVETH A BOOLEAN
+`superior tenancy is a long fixed term` claim MEANS
+        "holds the interest in the dwelling-house under a superior tenancy which is a fixed term tenancy of a term certain"
+    ... claim's `landlord holds the interest under a superior tenancy`
+    AND claim's `superior tenancy is a fixed term tenancy of a term certain`
+    AND "of more than 21 years"
+    ... claim's `term certain in years` GREATER THAN 21
+
+§§ `Limb (a) — the fixed term will expire within 12 months`
+
+GIVEN claim IS A Ground2ZBClaim
+GIVETH A BOOLEAN
+`limb (a) — fixed term expires within 12 months` claim MEANS
+        "(a) the fixed term will expire (if the tenancy does not come to an end earlier) within the period of 12 months beginning with the relevant date"
+    ... `falls within 12 months beginning with the relevant date`
+            (claim's `fixed term expiry date`)
+            (claim's `relevant date`)
+
+§§ `Limb (b) — continued tenancy, valid notice ending it within 12 months`
+
+GIVEN claim IS A Ground2ZBClaim
+GIVETH A BOOLEAN
+`limb (b) — continued tenancy terminated by notice within 12 months` claim MEANS
+        "(b) if the superior tenancy has continued following the expiry of the fixed term,"
+    ... claim's `superior tenancy has continued following expiry of the fixed term`
+    AND "any party to the superior tenancy has served a valid notice to terminate that tenancy"
+    ... claim's `a party to the superior tenancy has served a valid notice to terminate it`
+    AND "as a result of which the superior tenancy will end within the period of 12 months beginning with the relevant date"
+    ... `falls within 12 months beginning with the relevant date`
+            (claim's `superior tenancy end date under the notice`)
+            (claim's `relevant date`)
+
+§§ `Ground 2ZB made out — chapeau AND (a OR b)`
+
+GIVEN claim IS A Ground2ZBClaim
+GIVETH A BOOLEAN
+`Ground 2ZB made out` claim MEANS
+        "The landlord who is seeking possession holds the interest in the dwelling-house under a superior tenancy which is a fixed term tenancy of a term certain of more than 21 years and—"
+    ... `superior tenancy is a long fixed term` claim
+    AND     `limb (a) — fixed term expires within 12 months` claim
+        ..  `limb (b) — continued tenancy terminated by notice within 12 months` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground2ZBClaim
+GIVETH A DEONTIC Actor Action
+`ground 2ZB possession order` claim MEANS
+    IF   `Ground 2ZB made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the 12-month window beginning with the relevant date`
+
+`relevant date 2025`         MEANS January 1 2025
+`ends within 12 months`     MEANS December 1 2025   -- inside [Jan 1 2025, Jan 1 2026]
+`ends exactly at 12 months` MEANS January 1 2026    -- the last day of the window -> satisfied
+`ends just after 12 months` MEANS January 2 2026    -- one day past the window -> not satisfied
+
+§§ `Ground made out — via (a), the fixed-term-expiry limb`
+
+`claim all-met via (a)` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `term certain in years`                                      IS 99
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends within 12 months`
+  `superior tenancy has continued following expiry of the fixed term`  IS FALSE
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS FALSE
+  `superior tenancy end date under the notice`                 IS `ends just after 12 months`
+
+#ASSERT `superior tenancy is a long fixed term`               `claim all-met via (a)`
+#ASSERT `limb (a) — fixed term expires within 12 months`      `claim all-met via (a)`
+#ASSERT `Ground 2ZB made out`                                 `claim all-met via (a)`
+
+§§ `Ground made out — via (b), the continued-tenancy-notice limb`
+
+-- The fixed term itself expired long ago (well outside the window), but the
+-- tenancy continued and has now been terminated by a valid notice ending it
+-- within the window. Limb (b) carries the disjunction.
+`claim all-met via (b)` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `term certain in years`                                      IS 30
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends just after 12 months`   -- (a) would fail
+  `superior tenancy has continued following expiry of the fixed term`  IS TRUE
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS TRUE
+  `superior tenancy end date under the notice`                 IS `ends exactly at 12 months`
+
+#ASSERT NOT `limb (a) — fixed term expires within 12 months`                       `claim all-met via (b)`
+#ASSERT `limb (b) — continued tenancy terminated by notice within 12 months`       `claim all-met via (b)`
+#ASSERT `Ground 2ZB made out`                                                      `claim all-met via (b)`
+
+§§ `Chapeau knocked out — term certain is exactly 21 years (not "more than")`
+
+`claim — chapeau fails (21yr)` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `term certain in years`                                      IS 21    -- "more than 21" fails at exactly 21
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends within 12 months`
+  `superior tenancy has continued following expiry of the fixed term`  IS FALSE
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS FALSE
+  `superior tenancy end date under the notice`                 IS `ends just after 12 months`
+
+#ASSERT NOT `superior tenancy is a long fixed term` `claim — chapeau fails (21yr)`
+#ASSERT NOT `Ground 2ZB made out`                   `claim — chapeau fails (21yr)`
+
+§§ `Chapeau knocked out — not a fixed term of a term certain`
+
+`claim — chapeau fails (not fixed term)` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE   -- periodic, say
+  `term certain in years`                                      IS 99
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends within 12 months`
+  `superior tenancy has continued following expiry of the fixed term`  IS FALSE
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS FALSE
+  `superior tenancy end date under the notice`                 IS `ends just after 12 months`
+
+#ASSERT NOT `superior tenancy is a long fixed term` `claim — chapeau fails (not fixed term)`
+#ASSERT NOT `Ground 2ZB made out`                   `claim — chapeau fails (not fixed term)`
+
+§§ `Both limbs knocked out — neither (a) nor (b)`
+
+-- A long fixed term, but the fixed term expires after the window, and the tenancy
+-- has not continued / no notice served: neither (a) nor (b) holds.
+`claim — (a) and (b) fail` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `term certain in years`                                      IS 99
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends just after 12 months`   -- (a) fails
+  `superior tenancy has continued following expiry of the fixed term`  IS FALSE              -- (b) fails
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS FALSE
+  `superior tenancy end date under the notice`                 IS `ends within 12 months`
+
+#ASSERT     `superior tenancy is a long fixed term`                              `claim — (a) and (b) fail`
+#ASSERT NOT `limb (a) — fixed term expires within 12 months`                     `claim — (a) and (b) fail`
+#ASSERT NOT `limb (b) — continued tenancy terminated by notice within 12 months` `claim — (a) and (b) fail`
+#ASSERT NOT `Ground 2ZB made out`                                                `claim — (a) and (b) fail`
+
+§§ `Limb (b) knocked out — continued but no valid notice served`
+
+-- The tenancy has continued past the fixed term, and a notice's end date would
+-- fall within the window, but NO valid notice has actually been served.
+`claim — (b) fails (no notice)` MEANS Ground2ZBClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `term certain in years`                                      IS 30
+  `relevant date`                                              IS `relevant date 2025`
+  `fixed term expiry date`                                     IS `ends just after 12 months`   -- (a) fails
+  `superior tenancy has continued following expiry of the fixed term`  IS TRUE
+  `a party to the superior tenancy has served a valid notice to terminate it`  IS FALSE
+  `superior tenancy end date under the notice`                 IS `ends within 12 months`
+
+#ASSERT NOT `limb (b) — continued tenancy terminated by notice within 12 months` `claim — (b) fails (no notice)`
+#ASSERT NOT `Ground 2ZB made out`                                                `claim — (b) fails (no notice)`

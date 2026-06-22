@@ -1,0 +1,290 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 2ZA (Renters' Rights Act 2025)`
+
+-- Ground 2ZA, inserted into Schedule 2 to the Housing Act 1988 by the
+-- Renters' Rights Act 2025 (c. 26). It is one of the MANDATORY grounds in Part I
+-- of Schedule 2: where it is made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(b) -> predicates carrying the verbatim
+--     statute inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome               -> a regulative/deontic clause guarded
+--     by the conjunction of conditions (a) AND (b).
+--
+-- Statutory text encoded ("The landlord who is seeking possession—", a
+-- CONJUNCTION of (a) and (b)):
+--   (a) holds the interest in the dwelling-house under a superior tenancy where—
+--         (i)  the superior landlord has given a valid notice to terminate that
+--              tenancy as a result of which the superior tenancy will end within
+--              the period of 12 months beginning with the relevant date, or
+--         (ii) the superior tenancy is a fixed term tenancy of a term certain
+--              which will expire (if the tenancy does not come to an end earlier)
+--              within the period of 12 months beginning with the relevant date,
+--              and
+--   (b) is, or, in the case of joint landlords seeking possession, at least one
+--       of them is—
+--         (i)   a private registered provider of social housing,
+--         (ii)  a tenant of the superior landlord under a tenancy of an
+--               agricultural holding within the meaning of the Agricultural
+--               Holdings Act 1986 which is a tenancy to which that Act applies, or
+--               a farm business tenancy within the meaning of the Agricultural
+--               Tenancies Act 1995,
+--         (iii) a person who held the dwelling-house for the purpose of making it
+--               available for occupation as supported accommodation, or
+--         (iv)  a company of which a local authority owns at least 50% of the
+--               issued share capital.
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The recurring "qualifying landlord types" list (shared with Ground 2ZC's
+-- (a)-(d) list). Modelled as independent boolean flags an input layer can simply
+-- CHECKBOX: the party qualifies iff AT LEAST ONE flag is ticked. "the landlord"
+-- reads, per the joint-landlords rule in (b), as "at least one of the joint
+-- landlords".
+DECLARE QualifyingLandlordType HAS
+  `is a private registered provider of social housing`                         IS A BOOLEAN  -- (i)
+  `is a tenant under an agricultural holding or farm business tenancy`         IS A BOOLEAN  -- (ii)
+  `held the dwelling-house for use as supported accommodation`                 IS A BOOLEAN  -- (iii)
+  `is a company of which a local authority owns at least 50% of share capital` IS A BOOLEAN  -- (iv)
+
+-- The operative atoms of conditions (a) and (b), gathered on the claim. Limb (a)
+-- turns on two facts (valid notice given; superior tenancy is a fixed term of a
+-- term certain) plus the date the superior tenancy ends/expires, which must fall
+-- within the 12-month window beginning with the relevant date.
+DECLARE Ground2ZAClaim HAS
+  `landlord holds the interest under a superior tenancy`        IS A BOOLEAN  -- (a) chapeau
+  -- (a)(i)
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS A BOOLEAN
+  -- (a)(ii)
+  `superior tenancy is a fixed term tenancy of a term certain`  IS A BOOLEAN
+  -- the end/expiry date the 12-month window is tested against, plus the window start
+  `superior tenancy end date`                                  IS A DATE
+  `relevant date`                                              IS A DATE
+  -- (b)
+  `landlord type`                                              IS A QualifyingLandlordType
+
+§§ `Shared helper — the 12-month window beginning with the relevant date`
+
+-- "within the period of 12 months beginning with the relevant date", counting
+-- inclusively from the relevant date. Reused in shape from the amended-2025
+-- Ground 1 file's 1-year window: measure the inclusive elapsed span and compare
+-- against a 12-month window derived from the actual dates (leap-year-correct).
+GIVEN `end date`      IS A DATE
+      `relevant date` IS A DATE
+GIVETH A BOOLEAN
+`falls within 12 months beginning with the relevant date` MEANS
+        (Day `end date` MINUS Day `relevant date`) PLUS 1
+    AT MOST
+        (Day `twelve months after relevant date` MINUS Day `relevant date`) PLUS 1
+    WHERE
+        `twelve months after relevant date` MEANS
+            Date (DATE_DAY   `relevant date`)
+                 (DATE_MONTH `relevant date`)
+                 (DATE_YEAR  `relevant date` PLUS 1)
+
+§§ `Shared helper — the qualifying landlord types list (i)-(iv)`
+
+-- The party qualifies iff it is AT LEAST ONE of the listed types. Shared in shape
+-- with Ground 2ZC's (a)-(d) list.
+GIVEN `landlord type` IS A QualifyingLandlordType
+GIVETH A BOOLEAN
+`is one of the qualifying landlord types` MEANS
+        "(i) a private registered provider of social housing,"
+    ..  `landlord type`'s `is a private registered provider of social housing`
+    ..  "(ii) a tenant of the superior landlord under a tenancy of an agricultural holding within the meaning of the Agricultural Holdings Act 1986 which is a tenancy to which that Act applies, or a farm business tenancy within the meaning of the Agricultural Tenancies Act 1995,"
+    ..  `landlord type`'s `is a tenant under an agricultural holding or farm business tenancy`
+    ..  "(iii) a person who held the dwelling-house for the purpose of making it available for occupation as supported accommodation, or"
+    ..  `landlord type`'s `held the dwelling-house for use as supported accommodation`
+    ..  "(iv) a company of which a local authority owns at least 50% of the issued share capital."
+    ..  `landlord type`'s `is a company of which a local authority owns at least 50% of share capital`
+
+§§ `Condition (a) — superior-tenancy gateway, ending within 12 months`
+
+-- (a) holds the interest under a superior tenancy where EITHER (i) valid notice
+--     has been given ending the superior tenancy within 12 months of the relevant
+--     date, OR (ii) the superior tenancy is a fixed term of a term certain that
+--     will expire within that same window. Both arms share the 12-month window.
+GIVEN claim IS A Ground2ZAClaim
+GIVETH A BOOLEAN
+`condition (a) — superior tenancy ending within 12 months` claim MEANS
+        "(a) holds the interest in the dwelling-house under a superior tenancy where—"
+    ... claim's `landlord holds the interest under a superior tenancy`
+    AND     "(i) the superior landlord has given a valid notice to terminate that tenancy as a result of which the superior tenancy will end within the period of 12 months beginning with the relevant date,"
+        ...     claim's `superior landlord has given a valid notice to terminate the superior tenancy`
+            AND `superior tenancy ends within 12 months` claim
+        ..  "or"
+        ..      "(ii) the superior tenancy is a fixed term tenancy of a term certain which will expire (if the tenancy does not come to an end earlier) within the period of 12 months beginning with the relevant date"
+            AND     claim's `superior tenancy is a fixed term tenancy of a term certain`
+                AND `superior tenancy ends within 12 months` claim
+    WHERE
+        GIVEN c IS A Ground2ZAClaim
+        GIVETH A BOOLEAN
+        `superior tenancy ends within 12 months` c MEANS
+            `falls within 12 months beginning with the relevant date`
+                (c's `superior tenancy end date`)
+                (c's `relevant date`)
+
+§§ `Condition (b) — landlord is one of the qualifying types`
+
+GIVEN claim IS A Ground2ZAClaim
+GIVETH A BOOLEAN
+`condition (b) — landlord is a qualifying type` claim MEANS
+        "(b) is, or, in the case of joint landlords seeking possession, at least one of them is—"
+    ... `is one of the qualifying landlord types` (claim's `landlord type`)
+
+§§ `Ground 2ZA made out — conditions (a) AND (b)`
+
+GIVEN claim IS A Ground2ZAClaim
+GIVETH A BOOLEAN
+`Ground 2ZA made out` claim MEANS
+        "The landlord who is seeking possession—"
+    ... `condition (a) — superior tenancy ending within 12 months` claim
+    AND `condition (b) — landlord is a qualifying type` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground2ZAClaim
+GIVETH A DEONTIC Actor Action
+`ground 2ZA possession order` claim MEANS
+    IF   `Ground 2ZA made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the 12-month window beginning with the relevant date`
+
+`relevant date 2025`              MEANS January 1 2025
+`ends within 12 months`          MEANS December 1 2025   -- inside [Jan 1 2025, Jan 1 2026]
+`ends exactly at 12 months`      MEANS January 1 2026    -- the last day of the window -> satisfied
+`ends just after 12 months`      MEANS January 2 2026    -- one day past the window -> not satisfied
+
+§§ `Qualifying landlord types — one checkbox ticked each (and one "none")`
+
+`type — private registered provider` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS TRUE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`type — agricultural tenant` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS TRUE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`type — supported accommodation holder` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS TRUE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`type — LA-owned company` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS TRUE
+
+`type — none of the list` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+-- The (i)-(iv) list bites: each listed type qualifies; "none" does not.
+#ASSERT     `is one of the qualifying landlord types` `type — private registered provider`
+#ASSERT     `is one of the qualifying landlord types` `type — agricultural tenant`
+#ASSERT     `is one of the qualifying landlord types` `type — supported accommodation holder`
+#ASSERT     `is one of the qualifying landlord types` `type — LA-owned company`
+#ASSERT NOT `is one of the qualifying landlord types` `type — none of the list`
+
+§§ `Ground made out — via (a)(i), the valid-notice arm`
+
+`claim all-met via (a)(i)` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
+  `superior tenancy end date`                                  IS `ends within 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — private registered provider`
+
+#ASSERT `condition (a) — superior tenancy ending within 12 months` `claim all-met via (a)(i)`
+#ASSERT `condition (b) — landlord is a qualifying type`            `claim all-met via (a)(i)`
+#ASSERT `Ground 2ZA made out`                                     `claim all-met via (a)(i)`
+
+§§ `Ground made out — via (a)(ii), the fixed-term-expiry arm`
+
+`claim all-met via (a)(ii)` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS FALSE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `superior tenancy end date`                                  IS `ends exactly at 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — LA-owned company`
+
+#ASSERT `condition (a) — superior tenancy ending within 12 months` `claim all-met via (a)(ii)`
+#ASSERT `condition (b) — landlord is a qualifying type`            `claim all-met via (a)(ii)`
+#ASSERT `Ground 2ZA made out`                                     `claim all-met via (a)(ii)`
+
+§§ `Condition (a) knocked out — superior tenancy ends just after the 12-month window`
+
+-- Valid notice was given, but the superior tenancy ends one day past the window.
+`claim — (a) fails (window)` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
+  `superior tenancy end date`                                  IS `ends just after 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — private registered provider`
+
+#ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (window)`
+#ASSERT NOT `Ground 2ZA made out`                                      `claim — (a) fails (window)`
+
+§§ `Condition (a) knocked out — neither notice nor fixed-term-expiry`
+
+-- Within the window, but no valid notice given and not a fixed term of a term
+-- certain: neither arm of (a) fires.
+`claim — (a) fails (neither arm)` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS FALSE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
+  `superior tenancy end date`                                  IS `ends within 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — private registered provider`
+
+#ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (neither arm)`
+#ASSERT NOT `Ground 2ZA made out`                                      `claim — (a) fails (neither arm)`
+
+§§ `Condition (a) knocked out — landlord does not hold under a superior tenancy`
+
+-- The chapeau of (a) fails: the landlord does not hold the interest under a
+-- superior tenancy at all.
+`claim — (a) fails (no superior tenancy)` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS FALSE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
+  `superior tenancy end date`                                  IS `ends within 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — private registered provider`
+
+#ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (no superior tenancy)`
+#ASSERT NOT `Ground 2ZA made out`                                      `claim — (a) fails (no superior tenancy)`
+
+§§ `Condition (b) knocked out — landlord is none of the qualifying types`
+
+`claim — (b) fails` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
+  `superior tenancy end date`                                  IS `ends within 12 months`
+  `relevant date`                                              IS `relevant date 2025`
+  `landlord type`                                              IS `type — none of the list`
+
+#ASSERT NOT `condition (b) — landlord is a qualifying type` `claim — (b) fails`
+#ASSERT NOT `Ground 2ZA made out`                           `claim — (b) fails`
