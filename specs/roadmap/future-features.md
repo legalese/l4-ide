@@ -14,7 +14,7 @@ Set-theoretic syntax for UNION and INTERSECT. Sometimes set-and means logical-or
 
 WHEN should not be needed at each line in a CONSIDER.
 
-**Homoiconic introspection of imported constructs.** Motivated by Housing Act 1988 Sch. 2 Ground 1A(a) — "a lease granted for a term certain of more than 21 years and not terminable before the end of that term by notice" — which asks us to *introspect another L4 instrument* rather than evaluate one. When sketching Ground 1A I reached for three things that, on reflection, are **cleverly functional, not homoiconic**:
+**Homoiconic introspection of imported constructs.** Motivated by Housing Act 1988 Sch. 2 Ground 1A(a) — "a lease granted for a term certain of more than 21 years and not terminable before the end of that term by notice" — which asks us to *introspect another L4 instrument* rather than evaluate one (the L4 sketch: [`housing-act-ground-1A.l4`](../../jl4/experiments/housing-act-ground-1A.l4)). When sketching Ground 1A I reached for three things that, on reflection, are **cleverly functional, not homoiconic**:
 
 - *model-as-data* — re-describe the salient features as a typed `Disposal` record (`termYears`, `terminable`) and read its fields. But that inspects a hand-authored re-description, not the construct itself.
 - *behavioural* — run the construct through `#TRACE` and watch whether a "terminate by notice" event reduces it. This is black-box property-over-trace (the letter-vs-spirit check), i.e. *execution*, not reflection.

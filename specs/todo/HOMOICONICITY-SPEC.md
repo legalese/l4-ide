@@ -68,6 +68,18 @@ The `regulative.md` document identifies this need under "Homoiconicity, Introspe
 
 This is exactly the pattern: a rule that refers to other rules as data, inspects their properties (deadlines), and modifies them (extends). The legal text treats rules as first-class objects.
 
+### A Real-World Motivating Example: Housing Act 1988 Sch. 2 Ground 1A(a)
+
+The Renters' Rights Act 2025 inserts Ground 1A into the Housing Act 1988 — a mandatory ground for possession where the landlord intends to sell. Limb (a) is satisfied where the landlord intends to grant:
+
+> "a lease granted for a term certain of more than 21 years which is not terminable before the end of that term by notice given by or to the tenant"
+
+This is a statute that asks us to **introspect another legal instrument**: to look _inside_ an intended lease and test a structural property of it ("a term certain of more than 21 years") together with a behavioural one ("not terminable before the end of that term by notice"). In a homoiconic setting where leases are L4 values, that is a query over the imported construct's own structure — the same shape as the Commissioner deadline-extension pattern above, but driven by real legislation.
+
+The L4 sketch — [`housing-act-ground-1A.l4`](../../jl4/experiments/housing-act-ground-1A.l4) — does **not** yet do this homoiconically. It models the salient features as typed DATA (a `Disposal` ADT carrying `term certain in years` and `terminable before end by notice`) and reads those fields. That is honest and useful, but it is _cleverly functional, not homoiconic_: it inspects a hand-authored re-description, not the lease construct itself. Two other near-term stand-ins are equally non-reflective — running the construct through `#TRACE` to observe whether a "terminate by notice" event reduces it (black-box property-over-trace, i.e. execution), and querying the lowered MLIR Schema (reflection over a derived, lossy projection).
+
+Genuine homoiconic introspection here is exactly **R10** (Rule Graph Introspection) below: a reified `Syntax` value for the imported lease, a `QUOTE` that preserves its _source_ structure (precisely what MLIR lowering discards), an `EVAL`/unquote inverse, and binding hygiene so "is _this_ lease terminable by notice" resolves names in the lease's own vocabulary. Caveat: L4's surface (mixfix, layout, inert prose) is not a uniform s-expression, so even with QUOTE/EVAL this is Template-Haskell-style staged reflection over a reified AST, not Lisp-strict code≡data. A short write-up lives in the [roadmap](../roadmap/future-features.md).
+
 ### Jurisprudential Foundations: Higher-Order Legal Relations
 
 The need for higher-order operations in legal formalization has deep roots in analytical jurisprudence. Several legal theorists have developed formal frameworks for understanding how legal powers operate at multiple levels:
@@ -275,7 +287,7 @@ Common legal formulations:
 
 ### R10: Rule Graph Introspection (Stretch Goal)
 
-**This requirement is optional for initial implementation but represents the full vision of homoiconicity.**
+**This requirement is optional for initial implementation but represents the full vision of homoiconicity.** A concrete real-world driver is Housing Act 1988 Sch. 2 Ground 1A(a) — see [_A Real-World Motivating Example_](#a-real-world-motivating-example-housing-act-1988-sch-2-ground-1aa) in Motivation, and the [`housing-act-ground-1A.l4`](../../jl4/experiments/housing-act-ground-1A.l4) sketch whose typed-`Disposal` approach is the cleverly-functional stand-in this requirement would replace.
 
 Beyond treating obligations as runtime values, full homoiconicity would allow introspection and manipulation of the _regulative rule graph itself_ - the HENCE/LEST state machine structure:
 
