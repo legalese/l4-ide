@@ -1,0 +1,90 @@
+IMPORT prelude
+
+§ `Schedule 2 as an aspect woven onto a vanilla lease`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+DECLARE Action IS ONE OF payRent, giveNotice, apply, dispense, orderPossession
+
+-- ====================================================================
+-- BASE PROGRAM: the vanilla operational lease (the happy path).
+-- Knows nothing about possession or notice — just the usual blather.
+-- ====================================================================
+
+GIVEN monthsLeft IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`rent spine` monthsLeft MEANS
+    IF   monthsLeft GREATER THAN 0
+    THEN PARTY Tenant MUST payRent WITHIN 30 HENCE `rent spine` (monthsLeft MINUS 1)
+    ELSE FULFILLED
+
+GIVETH A DEONTIC Actor Action
+`vanilla lease` MEANS `rent spine` 2     -- (+ utilities, deposit-return, ... ; no possession, no notice)
+
+-- ====================================================================
+-- ASPECT: Schedule 2 grounds for possession (the unhappy path),
+-- a cross-cutting concern loadable onto ANY lease.
+-- ====================================================================
+
+-- the notice wrapper — giving notice IS the ledger write (records iff performed; soft)
+GIVEN onwards IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`giving the Ground 1 notice, then` onwards MEANS
+    PARTY Landlord MUST giveNotice WITHIN 30
+    HENCE RECORD `noticeGiven` IS TRUE HENCE onwards
+    LEST  onwards
+
+-- (1) the notice, factored to a SINGLE LINE:
+GIVETH A DEONTIC Actor Action
+`gives the Ground 1 notice` MEANS `giving the Ground 1 notice, then` FULFILLED
+
+-- (2) the court-action codepath, a SEPARATE THREAD that reads the trace:
+GIVETH A DEONTIC Actor Action
+`court decision` MEANS
+    CONSIDER RECALL `noticeGiven`
+    WHEN JUST x  THEN IF   x THEN PARTY Court MUST orderPossession WITHIN 30
+                            ELSE PARTY Court MAY dispense WITHIN 30 HENCE PARTY Court MUST orderPossession WITHIN 30
+    WHEN NOTHING THEN PARTY Court MAY dispense WITHIN 30 HENCE PARTY Court MUST orderPossession WITHIN 30
+
+GIVETH A DEONTIC Actor Action
+`possession proceedings` MEANS
+    PARTY Landlord MAY apply WITHIN 3650 HENCE `court decision`
+
+-- ====================================================================
+-- WEAVING: load Schedule 2 onto the vanilla lease with RAND.
+-- ====================================================================
+
+-- full overlay: notice aspect (one line) RAND court thread
+GIVETH A DEONTIC Actor Action
+`under Schedule 2` MEANS
+    ( `gives the Ground 1 notice` )
+    RAND
+    ( `possession proceedings` )
+
+GIVETH A DEONTIC Actor Action
+`lease, loaded with Schedule 2` MEANS `vanilla lease` RAND `under Schedule 2`
+
+-- a lease with NO notice aspect at all — still fits Schedule 2 (court goes discretionary)
+GIVETH A DEONTIC Actor Action
+`lease, Schedule 2 but no notice aspect` MEANS `vanilla lease` RAND `possession proceedings`
+
+§ `Traces — the same vanilla lease under three compositions`
+
+-- (i) vanilla lease ALONE: happy path, no Schedule 2.  => FULFILLED
+#TRACE `vanilla lease` AT 0 WITH
+    PARTY Tenant DOES payRent AT 30
+    PARTY Tenant DOES payRent AT 60
+
+-- (ii) loaded with Schedule 2; landlord gives notice + applies => Court MUST (mandatory).
+--      Events are listed out of AT order on purpose; the engine sorts by AT.
+#TRACE `lease, loaded with Schedule 2` AT 0 WITH
+    PARTY Tenant   DOES payRent AT 30
+    PARTY Tenant   DOES payRent AT 60
+    PARTY Landlord DOES giveNotice AT 10
+    PARTY Landlord DOES apply AT 400
+
+-- (iii) a lease with NO notice woven in at all, yet still under Schedule 2
+--       => Court MAY dispense (discretionary).  "a lease without any notice still fits."
+#TRACE `lease, Schedule 2 but no notice aspect` AT 0 WITH
+    PARTY Tenant   DOES payRent AT 30
+    PARTY Tenant   DOES payRent AT 60
+    PARTY Landlord DOES apply AT 400
