@@ -74,3 +74,86 @@ GIVETH A DEONTIC Party Action
 #TRACE `two-notice lease` AT 0 WITH
     PARTY Landlord DOES `serve notice` AT 5
     PARTY Landlord DOES `serve notice` AT 15
+
+§ `"At least three red or yellow notices" — colour in the STRING`
+
+-- Cheapest modelling: the colour is a word in the notice string, detected with a
+-- prefix/substring test. CAVEAT: substring matching is brittle — STARTSWITH "RED"
+-- also fires on "REDACTED", and there is no word-boundary check. For anything
+-- court-facing prefer the typed colour below.
+GIVEN s IS A STRING
+GIVETH A BOOLEAN
+`is red or yellow (string)` s MEANS
+        STARTSWITH s "RED"
+    OR  STARTSWITH s "YELLOW"
+
+-- The filter on a literal list: 3 of the 4 notices are red or yellow.
+`sample notice strings` MEANS LIST "RED rent arrears", "YELLOW noise", "GREEN reminder", "RED final warning"
+#ASSERT count (filter `is red or yellow (string)` `sample notice strings`) AT LEAST 3
+
+-- And over the accumulated ledger, in a deontic #TRACE: the landlord serves three
+-- colour-coded notices; the court's duty is guarded by "at least three red or yellow
+-- notices served" — count + filter over RECALL ALL of the tenant's history.
+GIVETH A DEONTIC Party Action
+`three strikes (string)` MEANS
+    PARTY Landlord MUST `serve notice` WITHIN 10
+    HENCE RECORD Tenant's `coloured` IS "RED rent arrears"
+    HENCE PARTY Landlord MUST `serve notice` WITHIN 20
+          HENCE RECORD Tenant's `coloured` IS "YELLOW noise complaint"
+          HENCE PARTY Landlord MUST `serve notice` WITHIN 30
+                HENCE RECORD Tenant's `coloured` IS "RED final warning"
+                HENCE IF   count (filter `is red or yellow (string)` (RECALL ALL Tenant's `coloured`)) AT LEAST 3
+                      THEN PARTY Court MUST `order possession` WITHIN 30
+                      ELSE FULFILLED
+
+#TRACE `three strikes (string)` AT 0 WITH
+    PARTY Landlord DOES `serve notice` AT 5
+    PARTY Landlord DOES `serve notice` AT 10
+    PARTY Landlord DOES `serve notice` AT 15
+-- 3 red/yellow notices on record -> residual: PARTY Court MUST `order possession`
+
+§ `"At least three red or yellow notices" — colour in the NOTICE TYPE`
+
+-- Robust modelling: the colour is a typed field, tested with EQUALS — no string
+-- fragility, and a notice can only be a colour the type allows.
+DECLARE Colour          IS ONE OF Red, Yellow, Green
+DECLARE ColouredNotice  HAS body IS A STRING, colour IS A Colour
+
+GIVEN n IS A ColouredNotice
+GIVETH A BOOLEAN
+`is red or yellow (notice)` n MEANS
+        n's colour EQUALS Red
+    OR  n's colour EQUALS Yellow
+
+-- Three named coloured notices (record construction puts each field on its own line).
+`a red notice` MEANS ColouredNotice WITH
+    body   IS "rent arrears"
+    colour IS Red
+`a yellow notice` MEANS ColouredNotice WITH
+    body   IS "noise complaint"
+    colour IS Yellow
+`a green notice` MEANS ColouredNotice WITH
+    body   IS "reminder"
+    colour IS Green
+
+-- The filter on a literal list of them: 2 of the 3 are red or yellow.
+#ASSERT count (filter `is red or yellow (notice)` (LIST `a red notice`, `a yellow notice`, `a green notice`)) EQUALS 2
+
+-- Same "at least three red or yellow" guard, over a ledger of TYPED notices.
+GIVETH A DEONTIC Party Action
+`three strikes (typed)` MEANS
+    PARTY Landlord MUST `serve notice` WITHIN 10
+    HENCE RECORD Tenant's `typed` IS `a red notice`
+    HENCE PARTY Landlord MUST `serve notice` WITHIN 20
+          HENCE RECORD Tenant's `typed` IS `a yellow notice`
+          HENCE PARTY Landlord MUST `serve notice` WITHIN 30
+                HENCE RECORD Tenant's `typed` IS `a red notice`
+                HENCE IF   count (filter `is red or yellow (notice)` (RECALL ALL Tenant's `typed`)) AT LEAST 3
+                      THEN PARTY Court MUST `order possession` WITHIN 30
+                      ELSE FULFILLED
+
+#TRACE `three strikes (typed)` AT 0 WITH
+    PARTY Landlord DOES `serve notice` AT 5
+    PARTY Landlord DOES `serve notice` AT 10
+    PARTY Landlord DOES `serve notice` AT 15
+-- 3 red/yellow typed notices on record -> residual: PARTY Court MUST `order possession`
