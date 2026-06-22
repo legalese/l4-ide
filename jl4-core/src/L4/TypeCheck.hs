@@ -1490,7 +1490,7 @@ inferExpr' g =
       e2' <- checkExpr ExpectPostHeadersContext e2 string
       e3' <- checkExpr ExpectPostBodyContext e3 string
       pure (Post ann e1' e2' e3', string)
-    Record ann cell val isOfficial mHence -> do
+    Record ann mParty cell val isOfficial mHence -> do
       -- STATE-AS-LEDGER M1: the cell is a string-keyed path; the value may be of
       -- any type. Without a HENCE (M1, expression position) the whole
       -- RECORD/COMMIT/ATTEST expression has the *value's* type.
@@ -1508,12 +1508,19 @@ inferExpr' g =
       -- timing worry completely) would need a separate well-formedness pass and is
       -- deferred — see STATE-AS-LEDGER-SPEC Appendix B.5(1).
       cell' <- checkExpr ExpectRecordCellContext cell string
+      -- NOTIFY v1: an optional recipient qualifier is typechecked EXACTLY as a
+      -- cross-party RECALL's party is (a fresh party type,
+      -- 'ExpectRegulativePartyContext'), so a NOTIFY recipient and a RECALL party
+      -- are the same kind of value. The recipient does not change the result type.
+      mParty' <- traverse (\p -> do
+                   partyT <- fresh (NormalName "party")
+                   checkExpr ExpectRegulativePartyContext p partyT) mParty
       (val', valT) <- inferExpr val
       case mHence of
-        Nothing -> pure (Record ann cell' val' isOfficial Nothing, valT)
+        Nothing -> pure (Record ann mParty' cell' val' isOfficial Nothing, valT)
         Just hence -> do
           (hence', henceT) <- inferExpr hence
-          pure (Record ann cell' val' isOfficial (Just hence'), henceT)
+          pure (Record ann mParty' cell' val' isOfficial (Just hence'), henceT)
     ReadCell ann mParty isOfficial cell -> do
       -- STATE-AS-LEDGER M1.5 / M4.5: the cell is a string-keyed path; the read is
       -- polymorphic in the stored value (the flat ledger is untyped at runtime),
@@ -2976,7 +2983,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Fetch ann e -> Fetch ann (go False ctx e)
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
-      Record ann cell val off mHence -> Record ann (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
+      Record ann mParty cell val off mHence -> Record ann (fmap (go False ctx) mParty) (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
       ReadCell ann mParty off cell -> ReadCell ann (fmap (go False ctx) mParty) off (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)

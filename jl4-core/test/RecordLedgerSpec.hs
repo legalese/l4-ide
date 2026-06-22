@@ -59,6 +59,8 @@ import L4.EvaluateLazy
   , currentLedger
   , currentStore
   , evalExprForLedger
+  , evalExprForLedgerWithEnv
+  , moduleEnvForLedger
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
@@ -89,7 +91,7 @@ directiveExprs (MkModule _ _ sec) = goSection sec
 -- | The single 'Record' node we expect from a one-directive module.
 theRecord :: Module Resolved -> Maybe (Expr Resolved, Expr Resolved, Bool)
 theRecord m = case directiveExprs m of
-  [Record _ cell val isOfficial _mHence] -> Just (cell, val, isOfficial)
+  [Record _ _mParty cell val isOfficial _mHence] -> Just (cell, val, isOfficial)
   _                                       -> Nothing
 
 -- 'WHNF'/'NF' have no 'Eq' (they carry IORef thunks), so we compare via Show.
@@ -304,6 +306,87 @@ spec = describe "STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (M1 write) + RECALL (M1.5
                 Reduction (Right nf) -> isBreachedNF nf `shouldBe` True
                 other -> expectationFailure ("second directive: expected a BREACH (ValBreached), got " <> show other)
             _ -> expectationFailure ("expected exactly two directive results, got " <> show (length results))
+
+  describe "NOTIFY v1: recipient-qualified RECORD (cross-party WRITE, symmetric to cross-party RECALL)" $ do
+    -- The IRREDUCIBLE CORE of NOTIFY: @RECORD q's <cell> IS v@ — the symmetric
+    -- WRITE to @RECALL q's <cell>@. The acting party performs the write, but the
+    -- value lands in the RECIPIENT's own ledger, keyed by the SAME 'partyKeyWHNF'
+    -- that a cross-party RECALL reads — so write-key ≡ read-key BY CONSTRUCTION.
+    --
+    -- Module: two parties; a recipient-qualified write into Bob's ledger, then
+    -- three reads collected as directive exprs and SEQUENCED IN ONE
+    -- 'runEvalAction' (one EvalState / one ledger, so no 'withFreshLedger' wipes
+    -- between them — the M4.5 cross-party-read seam, reused here for the write).
+    let notifySrc = Text.unlines
+          [ "IMPORT prelude"
+          , "DECLARE Person IS ONE OF Alice, Bob"
+          , "#EVAL RECORD Bob's `k` IS TRUE"   -- WRITE into Bob's own ledger (NOTIFY)
+          , "#EVAL RECALL Bob's `k`"           -- recipient read: must be JUST TRUE
+          , "#EVAL RECALL Alice's `k`"         -- another party: must be NOTHING (isolation)
+          , "#EVAL RECALL `k`"                 -- bare/own read (acting party): must be NOTHING
+          ]
+
+    it "(N1) RECORD Bob's `k` IS TRUE parses to a Record node carrying a recipient qualifier (mParty = Just _)" $
+      case checkWithImports vfs notifySrc of
+        Left errs -> expectationFailure ("expected a clean typecheck, got: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            (Record _ mParty _cell _val isOfficial _mHence : _) -> do
+              -- the recipient qualifier is present, and it is an OWN write (a
+              -- NOTIFY is RECORD, not COMMIT) — so isOfficial is False.
+              case mParty of
+                Just _  -> pure ()
+                Nothing -> expectationFailure "expected a recipient qualifier (mParty = Just _) on the NOTIFY RECORD"
+              isOfficial `shouldBe` False
+            other -> expectationFailure ("expected a recipient-qualified Record first, got " <> show (length other) <> " directives")
+
+    it "(N2) read-key ≡ write-key: RECALL Bob's `k` sees JUST; RECALL Alice's `k` and bare RECALL `k` see NOTHING; only Bob's own ledger got the write" $
+      case checkWithImports vfs notifySrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r ->
+          case directiveExprs r.tcdModule of
+            [writeExpr, readBobExpr, readAliceExpr, readBareExpr] -> do
+              -- All FOUR directives run in ONE runEvalAction => one EvalState =>
+              -- one ledger. The cross-party reads MUST see (or not see) the prior
+              -- recipient-qualified write through the SHARED store. We evaluate
+              -- against the MODULE env (so the `Bob`/`Alice` party constructors in
+              -- the recipient/qualifier positions resolve) but WITHOUT
+              -- withFreshLedger between directives (the shared-ledger seam).
+              res <- runEvalAction cfg $ do
+                menv     <- moduleEnvForLedger emptyEnvironment r.tcdModule
+                _        <- evalExprForLedgerWithEnv menv writeExpr      -- RECORD Bob's `k` IS TRUE
+                readBob  <- evalExprForLedgerWithEnv menv readBobExpr    -- RECALL Bob's `k`
+                readAli  <- evalExprForLedgerWithEnv menv readAliceExpr  -- RECALL Alice's `k`
+                readBare <- evalExprForLedgerWithEnv menv readBareExpr   -- RECALL `k`
+                store    <- currentStore
+                pure (readBob, readAli, readBare, store)
+              case res of
+                Left e -> expectationFailure ("unexpected Eval exception: " <> show e)
+                Right (readBob, readAli, readBare, store) -> do
+                  -- (i) the RECIPIENT read sees the write: JUST TRUE.
+                  isJustWHNF readBob   `shouldBe` True
+                  -- (ii) a DIFFERENT party's own ledger is isolated: NOTHING.
+                  isNothingWHNF readAli `shouldBe` True
+                  -- (iii) the ACTING party's bare/own read does NOT see it: the
+                  -- write went to Bob's ledger, not the acting party's. NOTHING.
+                  isNothingWHNF readBare `shouldBe` True
+                  -- (iv) STRUCTURAL: exactly ONE own ledger received the write,
+                  -- and it is keyed by the recipient (Bob) — NOT the anonymous
+                  -- acting party "" and NOT Alice. The write's provenance records
+                  -- the acting party (anonymous "") and source = NOTIFY, proving
+                  -- the acting party performed it while it landed in Bob's inbox.
+                  let nonEmpty = [ (key, l) | (key, l) <- Map.toList store.ownLedgers
+                                            , not (null (foldr (:) [] l)) ]
+                  length nonEmpty `shouldBe` 1
+                  -- the single recipient key must NOT be the anonymous acting key.
+                  map fst nonEmpty `shouldNotBe` [""]
+                  -- and the routed write carries source = NOTIFY in its provenance.
+                  case nonEmpty of
+                    [(_recipientKey, recipientLedger)] ->
+                      map provSource (provenances recipientLedger) `shouldBe` ["NOTIFY"]
+                    _ -> expectationFailure "expected exactly one non-empty own ledger (the recipient's)"
+            other -> expectationFailure ("expected write + three reads, got " <> show (length other) <> " directives")
+
   where
     provenances ledger = [ p | Assign _ _ p <- foldr (:) [] ledger ]
     provSource p = p.source

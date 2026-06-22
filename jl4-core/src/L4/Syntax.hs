@@ -237,13 +237,26 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
-  | Record     Anno (Expr n) (Expr n) Bool (Maybe (Expr n))
-    -- ^ append to the ledger (STATE-AS-LEDGER M1). Cell expr, value expr, an
-    -- isOfficial flag, and an optional @HENCE@ continuation (M5).
+  | Record     Anno (Maybe (Expr n)) (Expr n) (Expr n) Bool (Maybe (Expr n))
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). An optional /recipient/
+    -- party-qualifier, a cell expr, a value expr, an isOfficial flag, and an
+    -- optional @HENCE@ continuation (M5).
     --
-    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger),
-    -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). The flag is stored
-    -- faithfully so M4 can split own/official.
+    -- The leading 'Maybe (Expr n)' is the NOTIFY-v1 /recipient/ qualifier: the
+    -- symmetric WRITE to 'ReadCell'\'s cross-party READ. @Nothing@ is the M1 own
+    -- write (@RECORD <cell> IS <v>@ lands in the acting party's OWN ledger);
+    -- @Just q@ is the recipient-qualified write (@RECORD q's <cell> IS <v>@), in
+    -- which the acting party performs the write but the value lands in @q@'s own
+    -- ledger, keyed via the SAME 'partyKeyWHNF' that @RECALL q's <cell>@ reads
+    -- from — so a NOTIFY write and a recipient's read match by construction.
+    -- Parser-enforced invariant: @isOfficial == True@ (@COMMIT@/@ATTEST@) implies
+    -- the recipient 'Maybe' is 'Nothing' (an official write has no recipient),
+    -- mirroring 'ReadCell'\'s @isOfficial ⟹ no party@ invariant.
+    --
+    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger,
+    -- or a recipient's own ledger when qualified), 'True' = @COMMIT@/@ATTEST@
+    -- (the shared official record). The flag is stored faithfully so M4 can split
+    -- own/official.
     --
     -- The final 'Maybe (Expr n)' is the M5 @HENCE@ continuation: 'Nothing' is the
     -- M1 expression-position form (@RECORD <cell> IS <v>@ evaluates to @v@);

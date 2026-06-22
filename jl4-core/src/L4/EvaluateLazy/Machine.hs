@@ -111,15 +111,24 @@ data Frame =
   | Post1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | Post2 WHNF {- -} (Expr Resolved) Environment
   | Post3 WHNF WHNF {- -}
-  -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST. Record1 waits for the cell to
-  -- evaluate (holds the still-unevaluated value expr, its env, isOfficial, and
-  -- the optional M5 HENCE continuation); Record2 waits for the value (holds the
-  -- evaluated cell WHNF, isOfficial, the HENCE, and the env to evaluate it in).
-  -- The 'Maybe (Expr Resolved)' is the M5 HENCE: 'Nothing' is M1 expression use
-  -- (the write returns its value); @Just k@ makes the write an event-free deontic
-  -- step (after 'tellEvent', forward @[time, events]@ to @k@).
-  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
-  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved))
+  -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (+ NOTIFY-v1 recipient). When a
+  -- @RECORD q's <cell> IS <v>@ carries a recipient qualifier, we evaluate the
+  -- recipient FIRST (mirroring 'ReadCell2'): 'Record0' holds the still-unevaluated
+  -- cell + value exprs, the env, isOfficial, and the M5 HENCE while the recipient
+  -- party expr evaluates; on its WHNF we key via 'partyKeyWHNF' and thread that
+  -- recipient key through the rest of the write.
+  --
+  -- 'Record1' waits for the cell to evaluate (holds the still-unevaluated value
+  -- expr, its env, isOfficial, the M5 HENCE, and the resolved recipient key —
+  -- 'Nothing' for a bare own write, @Just rk@ for a NOTIFY write); 'Record2'
+  -- waits for the value (holds the evaluated cell WHNF, isOfficial, the HENCE,
+  -- the env, and the recipient key). The 'Maybe (Expr Resolved)' is the M5 HENCE:
+  -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
+  -- the write an event-free deontic step (after 'tellEvent', forward
+  -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
   -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
   -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
   -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
@@ -380,6 +389,12 @@ tellEventRouted route ev = do
     RouteOwn -> do
       party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
       liftIO (modifyIORef' store (storeAppendOwn party ev))
+    -- NOTIFY v1: the acting party performs the write, but the event lands in the
+    -- NAMED recipient's own ledger (keyed by 'partyKeyWHNF', the same key a
+    -- cross-party @RECALL@ reads). 'storeAppendOwn' already takes a 'Text' key —
+    -- we simply pass the recipient key instead of the acting party.
+    RouteNotify recipientKey ->
+      liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
 
 -- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
 currentLedgerEval :: Eval Ledger
@@ -623,14 +638,25 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
-  Record _ann cell val isOfficial mHence -> do
-    -- STATE-AS-LEDGER M1: evaluate the cell to a String path, then the value to
-    -- WHNF, append an Assign event to the ledger. M5: if a HENCE continuation is
-    -- present, forward [time, events] to it (event-free deontic step); otherwise
-    -- return the written value (M1 expression use). The 'env' is carried so the
-    -- HENCE can be forwarded in the RECORD's lexical environment.
-    pushFrame (Record1 val env isOfficial mHence)
-    continueExpr env cell
+  Record _ann mParty cell val isOfficial mHence -> do
+    -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
+    -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
+    -- continuation is present, forward [time, events] to it (event-free deontic
+    -- step); otherwise return the written value (M1 expression use). The 'env' is
+    -- carried so the HENCE can be forwarded in the RECORD's lexical environment.
+    --
+    -- NOTIFY v1: if a recipient qualifier is present (@RECORD q's <cell> IS v@),
+    -- evaluate the RECIPIENT first (push 'Record0', mirroring 'ReadCell2'); on its
+    -- WHNF we key it via 'partyKeyWHNF' and route the write to that recipient's
+    -- own ledger. A bare @RECORD@ (no qualifier) carries 'Nothing' and routes to
+    -- the acting party's own ledger exactly as before.
+    case mParty of
+      Just partyExpr -> do
+        pushFrame (Record0 cell val env isOfficial mHence)
+        continueExpr env partyExpr
+      Nothing -> do
+        pushFrame (Record1 val env isOfficial mHence Nothing)
+        continueExpr env cell
   ReadCell _ann mParty isOfficial cell -> do
     -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
     -- carrying the optional party qualifier (still unevaluated), the isOfficial
@@ -675,16 +701,26 @@ backward val = withPoppedFrame $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
-  Just (Record1 valExpr env isOfficial mHence) -> do
+  Just (Record0 cell valExpr env isOfficial mHence) -> do
+    -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
+    -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
+    -- write-key matches the recipient's read-key by construction. Carry that key
+    -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
+    -- cell exactly as a bare RECORD does.
+    let recipientKey = partyKeyWHNF val
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    continueExpr env cell
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
     -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
-    -- the env and the M5 HENCE so 'runRecord' can forward to the continuation.
-    pushFrame (Record2 val isOfficial env mHence)
+    -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
+    -- route the write and forward to the continuation.
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
     continueExpr env valExpr
-  Just (Record2 cellVal isOfficial env mHence) -> do
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
-    runRecord cellVal val isOfficial env mHence
+    runRecord cellVal val isOfficial env mHence mRecipientKey
   Just (ReadCell1 mParty isOfficial env) -> do
     -- the cell has evaluated to 'val' (a String path). Route to the right
     -- ledger and finish (M1.5 / M4.5):
@@ -1389,8 +1425,8 @@ partyKeyWHNF = \ case
 --     'continueWithFollowup' already pushed is still on the stack, so once
 --     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
 --     @[time, events]@ — the next step scrutinizes the SAME event stream.
-runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Machine Config
-runRecord cellVal val isOfficial env mHence = do
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey = do
   cell <- expectString cellVal
   -- M2 provenance enrichment: stamp the write with the directive's evaluation
   -- time ('getEvalTime', the same clock the deontic state machine and
@@ -1399,10 +1435,18 @@ runRecord cellVal val isOfficial env mHence = do
   mParty  <- getCurrentParty
   let prov = MkProvenance
         { party    = fromMaybe "" mParty
-        , source   = if isOfficial then "COMMIT" else "RECORD"
+        , source   = if isOfficial then "COMMIT"
+                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
         , position = Just (formatUTCTimeIso evalNow)
         }
-      route = if isOfficial then RouteOfficial else RouteOwn
+      -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
+      -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes
+      -- to the acting party's own ledger ('RouteOwn'); COMMIT/ATTEST stays
+      -- official. The recipient key was computed via 'partyKeyWHNF' (Record0), the
+      -- same key a cross-party RECALL reads — so write-key ≡ read-key.
+      route = if isOfficial
+              then RouteOfficial
+              else maybe RouteOwn RouteNotify mRecipientKey
   tellEventRouted route (Assign [cell] val prov)
   case mHence of
     Nothing    -> continueBackward val          -- M1: terminal / expression use

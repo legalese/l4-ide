@@ -26,6 +26,8 @@ module L4.EvaluateLazy
 , currentStore
 , runEvalAction
 , evalExprForLedger
+, evalExprForLedgerWithEnv
+, moduleEnvForLedger
 )
 where
 
@@ -488,6 +490,32 @@ runEvalAction evalConfig action = do
 -- Not part of the stable public API; exposed for the test suite only.
 evalExprForLedger :: Expr Resolved -> Eval WHNF
 evalExprForLedger expr = runConfig (ForwardMachine emptyEnvironment expr)
+
+-- | As 'evalExprForLedger', but evaluate the expression against a SUPPLIED
+-- environment (so a directive expr that references a top-level binding — e.g. a
+-- party constructor named in a NOTIFY @RECORD q's …@ recipient — resolves at
+-- runtime). The companion 'moduleEnvForLedger' builds such an environment from a
+-- module. Like 'evalExprForLedger', this does NOT wrap the evaluation in
+-- 'withFreshLedger', so a sequence of these in ONE 'runEvalAction' shares one
+-- ledger — the seam a cross-party WRITE/READ test needs.
+--
+-- Not part of the stable public API; exposed for the test suite only.
+evalExprForLedgerWithEnv :: Environment -> Expr Resolved -> Eval WHNF
+evalExprForLedgerWithEnv env expr = runConfig (ForwardMachine env expr)
+
+-- | Build the runtime environment a module's directives evaluate against (the
+-- module's top-level bindings combined with the initial/prelude environment),
+-- WITHOUT running any directive. Used with 'evalExprForLedgerWithEnv' so a test
+-- can sequence several directive exprs against one shared ledger while still
+-- resolving top-level references (constructors, defs).
+--
+-- Not part of the stable public API; exposed for the test suite only.
+moduleEnvForLedger :: Environment -> Module Resolved -> Eval Environment
+moduleEnvForLedger env m = do
+  ienv <- initialEnvironment
+  let baseEnv = env <> ienv
+  (moduleEnv, _directives) <- evalModule baseEnv m
+  pure (moduleEnv <> baseEnv)
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,
