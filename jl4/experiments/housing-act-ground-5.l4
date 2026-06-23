@@ -1,0 +1,202 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5 (amended; Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5 — the "minister of religion" MANDATORY ground, as amended by the
+-- Renters' Rights Act 2025 (c. 26), Sch. 1 para. 11
+-- (commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b)).
+-- Part I (mandatory): where made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- RESOLUTION OF THE F15–F16 AMENDMENTS (current in-force reading) —
+-- the source .txt presents Ground 5 with inline amendment markers; resolving
+-- them to the in-force text:
+--   F15  Former para (a) — "not later than the beginning of the tenancy the
+--        landlord gave notice in writing to the tenant that possession might be
+--        recovered on this ground; and" — is OMITTED. NOT encoded.
+--   F16  Paras (c) and (d) (and the connecting word "and") INSERTED. Encoded.
+--
+-- So the in-force Ground 5, as a CONJUNCTION, is:
+--   [chapeau] The dwelling-house is held for the purpose of being available for
+--             occupation by a minister of religion as a residence from which to
+--             perform the duties of his office and—
+--   (b)       the court is satisfied that the dwelling-house is required for
+--             occupation by a minister of religion as such a residence.
+--   (c)       if the tenancy arose by succession as mentioned in section 39(5),
+--             notice was given to the previous tenant under Case 15 of Schedule
+--             15 to the Rent Act 1977, and
+--   (d)       the tenancy is not an assured agricultural occupancy in respect of
+--             which the agricultural worker condition is fulfilled by virtue of
+--             paragraph 3 of Schedule 3.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * NOTE the Case number: Ground 5's (c) cites Case **15** of Schedule 15 to
+--     the Rent Act 1977 (whereas the cognate Ground 4 (c) cites Case 14). The
+--     verbatim inert string and the field name both pin Case 15.
+--   * (c) is a CONDITIONAL limb: it only bites where the tenancy "arose by
+--     succession as mentioned in section 39(5)". Where there was no such
+--     succession, the antecedent is false and the limb is satisfied vacuously.
+--     Encoded as: (NOT arose-by-succession) OR (notice given under Case 15).
+--   * (d) is a NEGATIVE limb ("the tenancy is NOT an assured agricultural
+--     occupancy ..."). Satisfied iff the tenancy is not such an occupancy.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms. The chapeau and (b) are facts the court finds; (c) and
+-- (d) are booleans, (c) being a conditional on the succession fact.
+DECLARE Ground5Claim HAS
+  -- chapeau
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS A BOOLEAN
+  -- (b)
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS A BOOLEAN
+  -- (c)
+  `tenancy arose by succession as mentioned in section 39(5)`         IS A BOOLEAN
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS A BOOLEAN
+  -- (d)
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS A BOOLEAN
+
+§§ `Chapeau — held for occupation by a minister of religion`
+
+GIVEN claim IS A Ground5Claim
+GIVETH A BOOLEAN
+`chapeau — held for a minister of religion` claim MEANS
+        "The dwelling-house is held for the purpose of being available for occupation by a minister of religion as a residence from which to perform the duties of his office"
+    ... claim's `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`
+
+§§ `(b) — the court is satisfied the dwelling-house is required for a minister of religion`
+
+GIVEN claim IS A Ground5Claim
+GIVETH A BOOLEAN
+`(b) — required for occupation by a minister of religion` claim MEANS
+        "(b) the court is satisfied that the dwelling-house is required for occupation by a minister of religion as such a residence."
+    ... claim's `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`
+
+§§ `(c) — succession notice under Case 15 (conditional limb)`
+
+-- "if the tenancy arose by succession as mentioned in section 39(5), notice was
+-- given to the previous tenant under Case 15 of Schedule 15 to the Rent Act
+-- 1977". A conditional: satisfied where there was no such succession, or where
+-- the Case 15 notice was given.
+GIVEN claim IS A Ground5Claim
+GIVETH A BOOLEAN
+`(c) — succession notice condition` claim MEANS
+        "(c) if the tenancy arose by succession as mentioned in section 39(5), notice was given to the previous tenant under Case 15 of Schedule 15 to the Rent Act 1977"
+        -- a conditional limb: satisfied unless there was a s.39(5) succession
+        -- without the Case 15 notice. Read as (NOT antecedent) OR consequent.
+    ...     NOT claim's `tenancy arose by succession as mentioned in section 39(5)`
+        OR  claim's `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`
+
+§§ `(d) — not an assured agricultural occupancy (negative limb)`
+
+GIVEN claim IS A Ground5Claim
+GIVETH A BOOLEAN
+`(d) — not an assured agricultural occupancy` claim MEANS
+        "(d) the tenancy is not an assured agricultural occupancy in respect of which the agricultural worker condition is fulfilled by virtue of paragraph 3 of Schedule 3."
+    ... NOT claim's `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`
+
+§§ `Ground 5 made out — chapeau AND (b) AND (c) AND (d)`
+
+GIVEN claim IS A Ground5Claim
+GIVETH A BOOLEAN
+`Ground 5 made out` claim MEANS
+        `chapeau — held for a minister of religion` claim
+    AND `(b) — required for occupation by a minister of religion` claim
+    AND `(c) — succession notice condition` claim
+    AND `(d) — not an assured agricultural occupancy` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5Claim
+GIVETH A DEONTIC Actor Action
+`ground 5 possession order` claim MEANS
+    IF   `Ground 5 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — no succession (so (c) vacuously satisfied), not agricultural`
+
+`claim all-met (no succession)` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS TRUE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS TRUE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT `chapeau — held for a minister of religion`              `claim all-met (no succession)`
+#ASSERT `(b) — required for occupation by a minister of religion` `claim all-met (no succession)`
+#ASSERT `(c) — succession notice condition`                     `claim all-met (no succession)`
+#ASSERT `(d) — not an assured agricultural occupancy`           `claim all-met (no succession)`
+#ASSERT `Ground 5 made out`                                     `claim all-met (no succession)`
+
+§§ `Ground made out — succession WITH Case 15 notice given`
+
+`claim all-met (succession + notice)` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS TRUE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS TRUE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS TRUE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS TRUE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT `(c) — succession notice condition`                     `claim all-met (succession + notice)`
+#ASSERT `Ground 5 made out`                                     `claim all-met (succession + notice)`
+
+§§ `Chapeau knocked out — not held for a minister of religion`
+
+`claim — chapeau fails` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS FALSE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS TRUE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `chapeau — held for a minister of religion` `claim — chapeau fails`
+#ASSERT NOT `Ground 5 made out`                         `claim — chapeau fails`
+
+§§ `(b) knocked out — court not satisfied the dwelling-house is required`
+
+`claim — (b) fails` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS TRUE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS FALSE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `(b) — required for occupation by a minister of religion` `claim — (b) fails`
+#ASSERT NOT `Ground 5 made out`                                       `claim — (b) fails`
+
+§§ `(c) knocked out — tenancy arose by succession but no Case 15 notice given`
+
+`claim — (c) fails` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS TRUE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS TRUE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS TRUE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `(c) — succession notice condition` `claim — (c) fails`
+#ASSERT NOT `Ground 5 made out`                 `claim — (c) fails`
+
+§§ `(d) knocked out — tenancy is an assured agricultural occupancy`
+
+`claim — (d) fails` MEANS Ground5Claim WITH
+  `dwelling-house held for occupation by a minister of religion as a residence from which to perform the duties of his office`  IS TRUE
+  `court is satisfied the dwelling-house is required for occupation by a minister of religion as such a residence`  IS TRUE
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 15 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS TRUE
+
+#ASSERT NOT `(d) — not an assured agricultural occupancy` `claim — (d) fails`
+#ASSERT NOT `Ground 5 made out`                           `claim — (d) fails`

@@ -1,0 +1,346 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5A (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5A — the "qualifying agricultural worker" MANDATORY ground, inserted
+-- into Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025
+-- (c. 26), Sch. 1 para. 12 (commencement 1.5.2026 for specified purposes;
+-- S.I. 2026/421, reg. 2(b), marker F17). Part I (mandatory): where made out,
+-- the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded:
+--   "The landlord seeking possession requires the dwelling-house for the
+--    purpose of housing a qualifying agricultural worker."
+--   "For the purpose of this ground a person is a 'qualifying agricultural
+--    worker' in case A or B."
+--   Case A is where—
+--     (a) the person will be employed in agriculture as a seasonal or permanent
+--         employee under a contract of employment, and
+--     (b) the employer under that contract is—
+--           (a) the landlord, or
+--           (b) in the case of joint landlords seeking possession, at least one
+--               of those landlords.
+--   Case B is where—
+--     (a) the person will be—
+--           (i)  employed in agriculture under a contract of employment, but the
+--                employer under that contract is not the landlord or, in the case
+--                of joint landlords, any of those landlords, or
+--           (ii) working in agriculture under a contract that is not a contract
+--                of employment, whether the contract is express or implied and
+--                (if express) whether oral or in writing,
+--     (b) the person will be employed or working in agriculture under that
+--         contract wholly or mainly for—
+--           (i)  the landlord, or
+--           (ii) in the case of joint landlords seeking possession, at least one
+--                of the landlords, and
+--     (c) the relevant landlord intends that employment or work to continue for
+--         at least six months after the relevant date;
+--     and here "relevant landlord" means the landlord, or whichever of the joint
+--     landlords, the person will be wholly or mainly working for.
+--   In this ground—
+--     "agriculture" has the same meaning as in the Rent (Agriculture) Act 1976
+--                   (see section 1 of that Act);
+--     "contract of employment" has the meaning given by section 230(2) of the
+--                   Employment Rights Act 1996.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "requires the dwelling-house for the purpose of housing a qualifying
+--     agricultural worker" is encoded as a SEPARATE operative atom (a landlord-
+--     requirement) conjoined ON TOP OF the "person is a qualifying agricultural
+--     worker (Case A or Case B)" test. So: made out = requirement AND (A OR B).
+--     This mirrors the statute's two-sentence structure (the requirement, then
+--     the definition of who is a qualifying agricultural worker).
+--   * Case A(b) and Case B(b) "the landlord (or, joint landlords, at least one)"
+--     are each modelled as a SINGLE boolean operative atom ("the employer is the
+--     landlord / at least one joint landlord"; "the person works wholly or mainly
+--     for the landlord / at least one joint landlord"). The joint-landlord branch
+--     is folded into the one atom rather than split, since the at-least-one rule
+--     makes them disjunctive over an open set of landlords.
+--   * Case B(a) is a DISJUNCTION of (i) employed-under-contract-of-employment-
+--     but-employer-is-not-the-landlord, OR (ii) working-under-a-non-employment-
+--     contract. The express/implied/oral/written elaboration in (ii) rides as
+--     inert prose; the operative atom is just "working under a non-employment
+--     contract".
+--   * Case B(c)'s "intends that employment or work to continue for at least six
+--     months after the relevant date" is modelled with DATES (footgun-safe):
+--     the relevant landlord's intended end date must be on or after
+--     (relevant date PLUS 6 months). A boolean intent atom guards whether any
+--     such intention exists at all; the date comparison enforces the >= 6 months.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms. Case A and Case B are disjuncts of the "qualifying
+-- agricultural worker" definition; the landlord-requirement is a separate atom.
+DECLARE Ground5AClaim HAS
+  -- chapeau (the landlord requirement, a separate operative atom)
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS A BOOLEAN
+  -- Case A
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS A BOOLEAN  -- A(a)
+  `the employer under that contract is the landlord or at least one joint landlord`  IS A BOOLEAN              -- A(b)
+  -- Case B(a)
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS A BOOLEAN  -- B(a)(i)
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS A BOOLEAN  -- B(a)(ii)
+  -- Case B(b)
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS A BOOLEAN  -- B(b)
+  -- Case B(c)
+  `relevant landlord intends that employment or work to continue`     IS A BOOLEAN  -- B(c) intent exists
+  `relevant date`                                                     IS A DATE
+  `intended end date of the employment or work`                       IS A DATE
+
+§§ `Chapeau — the landlord requires the dwelling-house to house a qualifying agricultural worker`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`chapeau — landlord requires the dwelling-house to house a qualifying agricultural worker` claim MEANS
+        "The landlord seeking possession requires the dwelling-house for the purpose of housing a qualifying agricultural worker."
+    ... claim's `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`
+
+§§ `Case A — seasonal/permanent employee whose employer is the landlord`
+
+-- Case A is where (a) AND (b).
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Case A` claim MEANS
+        "Case A is where—"
+    ...     "(a) the person will be employed in agriculture as a seasonal or permanent employee under a contract of employment,"
+        ... claim's `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`
+    AND     "(b) the employer under that contract is— (a) the landlord, or (b) in the case of joint landlords seeking possession, at least one of those landlords."
+        ... claim's `the employer under that contract is the landlord or at least one joint landlord`
+
+§§ `Case B(a) — employed (employer not the landlord) OR working under a non-employment contract`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Case B(a) — the engagement` claim MEANS
+        "(a) the person will be—"
+    ..      "(i) employed in agriculture under a contract of employment, but the employer under that contract is not the landlord or, in the case of joint landlords, any of those landlords,"
+        ..  claim's `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`
+    ..  "or"
+    ..      "(ii) working in agriculture under a contract that is not a contract of employment, whether the contract is express or implied and (if express) whether oral or in writing,"
+        ..  claim's `person will be working in agriculture under a contract that is not a contract of employment`
+
+§§ `Case B(b) — wholly or mainly for the landlord (or at least one joint landlord)`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Case B(b) — wholly or mainly for the landlord` claim MEANS
+        "(b) the person will be employed or working in agriculture under that contract wholly or mainly for— (i) the landlord, or (ii) in the case of joint landlords seeking possession, at least one of the landlords,"
+    ... claim's `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`
+
+§§ `Case B(c) — intends the work to continue at least six months after the relevant date`
+
+-- "the relevant landlord intends that employment or work to continue for at
+-- least six months after the relevant date". FOOTGUN-SAFE: never subtract months
+-- on a date. Form the threshold by ADDING 6 months to the relevant date
+-- (month-overflow past 12 is safe) and require the intended end date to be on or
+-- after that threshold. Guarded by the boolean: such an intention must exist.
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Case B(c) — intends work to continue at least six months after the relevant date` claim MEANS
+        "(c) the relevant landlord intends that employment or work to continue for at least six months after the relevant date;"
+    ... claim's `relevant landlord intends that employment or work to continue`
+    AND Day (claim's `intended end date of the employment or work`)
+            AT LEAST Day `six months after the relevant date`
+    WHERE
+        `six months after the relevant date` MEANS
+            Date (DATE_DAY   (claim's `relevant date`))
+                 (DATE_MONTH (claim's `relevant date`) PLUS 6)
+                 (DATE_YEAR  (claim's `relevant date`))
+
+§§ `Case B — (a) AND (b) AND (c)`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Case B` claim MEANS
+        "Case B is where—"
+    ... `Case B(a) — the engagement` claim
+    AND `Case B(b) — wholly or mainly for the landlord` claim
+    AND `Case B(c) — intends work to continue at least six months after the relevant date` claim
+
+§§ `Qualifying agricultural worker — Case A OR Case B`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`is a qualifying agricultural worker` claim MEANS
+        "For the purpose of this ground a person is a \"qualifying agricultural worker\" in case A or B."
+    ..  `Case A` claim
+    ..  `Case B` claim
+
+§§ `Ground 5A made out — landlord requirement AND (Case A OR Case B)`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A BOOLEAN
+`Ground 5A made out` claim MEANS
+        `chapeau — landlord requires the dwelling-house to house a qualifying agricultural worker` claim
+    AND `is a qualifying agricultural worker` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5AClaim
+GIVETH A DEONTIC Actor Action
+`ground 5A possession order` claim MEANS
+    IF   `Ground 5A made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — six months after the relevant date`
+
+`relevant date 2025`          MEANS January 1 2025
+`ends at exactly 6 months`    MEANS July 1 2025      -- exactly 6 months after -> satisfied
+`ends just under 6 months`    MEANS June 30 2025     -- one day short of 6 months -> not satisfied
+`ends well over 6 months`     MEANS December 1 2025  -- comfortably over 6 months -> satisfied
+
+§§ `Ground made out — via Case A (employee whose employer is the landlord)`
+
+`claim all-met via Case A` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS TRUE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS TRUE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS FALSE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS FALSE
+  `relevant landlord intends that employment or work to continue`     IS FALSE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT `chapeau — landlord requires the dwelling-house to house a qualifying agricultural worker` `claim all-met via Case A`
+#ASSERT `Case A`                                  `claim all-met via Case A`
+#ASSERT `is a qualifying agricultural worker`     `claim all-met via Case A`
+#ASSERT `Ground 5A made out`                      `claim all-met via Case A`
+
+§§ `Ground made out — via Case B(a)(i) (employer not the landlord) + B(b) + B(c)`
+
+`claim all-met via Case B(i)` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS FALSE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS TRUE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS TRUE
+  `relevant landlord intends that employment or work to continue`     IS TRUE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends at exactly 6 months`
+
+#ASSERT `Case B(a) — the engagement`             `claim all-met via Case B(i)`
+#ASSERT `Case B(b) — wholly or mainly for the landlord` `claim all-met via Case B(i)`
+#ASSERT `Case B(c) — intends work to continue at least six months after the relevant date` `claim all-met via Case B(i)`
+#ASSERT `Case B`                                 `claim all-met via Case B(i)`
+#ASSERT `is a qualifying agricultural worker`    `claim all-met via Case B(i)`
+#ASSERT `Ground 5A made out`                     `claim all-met via Case B(i)`
+
+§§ `Ground made out — via Case B(a)(ii) (non-employment contract) + B(b) + B(c)`
+
+`claim all-met via Case B(ii)` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS FALSE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS FALSE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS TRUE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS TRUE
+  `relevant landlord intends that employment or work to continue`     IS TRUE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT `Case B(a) — the engagement`             `claim all-met via Case B(ii)`
+#ASSERT `Case B`                                 `claim all-met via Case B(ii)`
+#ASSERT `Ground 5A made out`                     `claim all-met via Case B(ii)`
+
+§§ `Chapeau knocked out — landlord does not require the dwelling-house for this purpose`
+
+`claim — chapeau fails` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS FALSE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS TRUE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS TRUE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS FALSE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS FALSE
+  `relevant landlord intends that employment or work to continue`     IS FALSE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT NOT `chapeau — landlord requires the dwelling-house to house a qualifying agricultural worker` `claim — chapeau fails`
+#ASSERT NOT `Ground 5A made out`                  `claim — chapeau fails`
+
+§§ `Case A knocked out — A(a) met but A(b) fails (employer is not the landlord)`
+
+-- And no Case B fallback (B(b) not met), so the whole qualifying test fails.
+`claim — Case A(b) fails, no B` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS TRUE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS TRUE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS FALSE
+  `relevant landlord intends that employment or work to continue`     IS TRUE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT NOT `Case A`                              `claim — Case A(b) fails, no B`
+#ASSERT NOT `is a qualifying agricultural worker` `claim — Case A(b) fails, no B`
+#ASSERT NOT `Ground 5A made out`                  `claim — Case A(b) fails, no B`
+
+§§ `Case B knocked out — B(c) fails: work intended to end just under six months`
+
+`claim — Case B(c) fails (window)` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS FALSE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS TRUE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS TRUE
+  `relevant landlord intends that employment or work to continue`     IS TRUE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends just under 6 months`
+
+#ASSERT NOT `Case B(c) — intends work to continue at least six months after the relevant date` `claim — Case B(c) fails (window)`
+#ASSERT NOT `Case B`                              `claim — Case B(c) fails (window)`
+#ASSERT NOT `Ground 5A made out`                  `claim — Case B(c) fails (window)`
+
+§§ `Case B knocked out — B(c) fails: no intention to continue at all`
+
+`claim — Case B(c) fails (no intent)` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS FALSE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS FALSE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS TRUE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS TRUE
+  `relevant landlord intends that employment or work to continue`     IS FALSE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT NOT `Case B(c) — intends work to continue at least six months after the relevant date` `claim — Case B(c) fails (no intent)`
+#ASSERT NOT `Case B`                              `claim — Case B(c) fails (no intent)`
+#ASSERT NOT `Ground 5A made out`                  `claim — Case B(c) fails (no intent)`
+
+§§ `Neither Case A nor Case B — qualifying test fails`
+
+`claim — neither case` MEANS Ground5AClaim WITH
+  `landlord requires the dwelling-house for the purpose of housing a qualifying agricultural worker`  IS TRUE
+  `person will be employed in agriculture as a seasonal or permanent employee under a contract of employment`  IS FALSE
+  `the employer under that contract is the landlord or at least one joint landlord`  IS FALSE
+  `person will be employed in agriculture under a contract of employment but the employer is not the landlord or any joint landlord`  IS FALSE
+  `person will be working in agriculture under a contract that is not a contract of employment`  IS FALSE
+  `person will be employed or working in agriculture under that contract wholly or mainly for the landlord or at least one joint landlord`  IS FALSE
+  `relevant landlord intends that employment or work to continue`     IS FALSE
+  `relevant date`                                                     IS `relevant date 2025`
+  `intended end date of the employment or work`                       IS `ends well over 6 months`
+
+#ASSERT NOT `Case A`                              `claim — neither case`
+#ASSERT NOT `Case B`                              `claim — neither case`
+#ASSERT NOT `is a qualifying agricultural worker` `claim — neither case`
+#ASSERT NOT `Ground 5A made out`                  `claim — neither case`
