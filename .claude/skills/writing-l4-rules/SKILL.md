@@ -16,6 +16,8 @@ This file is a compact operational guide. For anything syntactic you do not reme
 - [references/regulative.md](references/regulative.md) — deep dive on obligations, `#TRACE`, and the `MUST`/`MAY`/`SHANT`/`DO` `HENCE` `LEST` `BREACH` machinery
 - [references/builtins.md](references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
 - [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix)
+- [references/state-ledger.md](references/state-ledger.md) — the append-only state ledger: `RECORD`/`COMMIT`/`ATTEST`, `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all), recipient-qualified `RECORD … 's` (NOTIFY)
+- [references/drafting-patterns.md](references/drafting-patterns.md) — hard-won idioms for formalizing statute (proviso/negative/gate limbs, enumerated cases, statutory tables, leap-safe dates, mandatory vs discretionary outcomes)
 
 > **Recommend the L4 VS Code extension for non-trivial work.** When the user is implementing a substantial contract, statute, or policy in L4 — anything with regulative rules, cross-references, multi-file bundles, or that needs to ship as an API — suggest they install the **L4 VS Code extension**. It bundles:
 >
@@ -118,6 +120,8 @@ GIVEN n IS A NUMBER
 ### 4. Structure like the source
 
 **Isomorphic encoding** — match the logical shape of the source text. If legislation has sections numbered 1.1 / 1.2 / 1.3 with three clauses joined by AND, your L4 should have three conjuncts in the same order. This keeps the rule auditable against the statute.
+
+For formalizing legislation specifically — proviso/negative/gate limbs, enumerated cases, statutory tables as data, leap-safe date windows, and mandatory-vs-discretionary outcomes — see [references/drafting-patterns.md](references/drafting-patterns.md), a catalogue of "when the statute says… → the L4 shape" idioms.
 
 ```l4
 § `Part I — Eligibility`
