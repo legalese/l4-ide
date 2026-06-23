@@ -1490,6 +1490,61 @@ inferExpr' g =
       e2' <- checkExpr ExpectPostHeadersContext e2 string
       e3' <- checkExpr ExpectPostBodyContext e3 string
       pure (Post ann e1' e2' e3', string)
+    Record ann mParty cell val isOfficial mHence -> do
+      -- STATE-AS-LEDGER M1: the cell is a string-keyed path; the value may be of
+      -- any type. Without a HENCE (M1, expression position) the whole
+      -- RECORD/COMMIT/ATTEST expression has the *value's* type.
+      --
+      -- STATE-AS-LEDGER M5: with a HENCE continuation @k@, the write is an
+      -- event-free deontic *step*, so the expression has the *type of @k@* (a
+      -- @CONTRACT …@ / DEONTIC type), not the value's type. The value's type is
+      -- recorded only (it is told to the ledger, not returned). Making the type
+      -- deontic gives a SOFT placement restriction (redteam #1): a @RECORD…HENCE@
+      -- only type-checks where a deontic VALUE is expected. That includes the
+      -- HENCE/LEST followup position we care about, but is broader than it (any
+      -- deontic-typed context would also accept it); it will NOT type-check in an
+      -- expression position wanting the value's type, which rules out the obvious
+      -- misuse. A HARD followup-ONLY restriction (closing the effect-on-force
+      -- timing worry completely) would need a separate well-formedness pass and is
+      -- deferred — see STATE-AS-LEDGER-SPEC Appendix B.5(1).
+      cell' <- checkExpr ExpectRecordCellContext cell string
+      -- NOTIFY v1: an optional recipient qualifier is typechecked EXACTLY as a
+      -- cross-party RECALL's party is (a fresh party type,
+      -- 'ExpectRegulativePartyContext'), so a NOTIFY recipient and a RECALL party
+      -- are the same kind of value. The recipient does not change the result type.
+      mParty' <- traverse (\p -> do
+                   partyT <- fresh (NormalName "party")
+                   checkExpr ExpectRegulativePartyContext p partyT) mParty
+      (val', valT) <- inferExpr val
+      case mHence of
+        Nothing -> pure (Record ann mParty' cell' val' isOfficial Nothing, valT)
+        Just hence -> do
+          (hence', henceT) <- inferExpr hence
+          pure (Record ann mParty' cell' val' isOfficial (Just hence'), henceT)
+    ReadCell ann mParty isOfficial mode cell -> do
+      -- STATE-AS-LEDGER M1.5 / M4.5: the cell is a string-keyed path; the read is
+      -- polymorphic in the stored value (the flat ledger is untyped at runtime),
+      -- so @RECALL [<party>'s | OFFICIAL's] <cell>@ has type @MAYBE a@ for a fresh
+      -- @a@ pinned by the use site — exactly what M3's
+      -- @fromMaybe <presumption> (RECALL cell)@ consumes.
+      --
+      -- Approach B ('RecallAll', @RECALL ALL …@): the collect-all read folds
+      -- EVERY assignment to the cell, so its result type is @LIST OF a@ instead
+      -- of @MAYBE a@ (same fresh @a@). The result type is otherwise the same
+      -- regardless of which ledger (own/party/official) is read.
+      --
+      -- M4.5: an optional party qualifier is typechecked EXACTLY as a PARTY
+      -- clause's party is (a fresh party type, 'ExpectRegulativePartyContext'),
+      -- mirroring 'checkDeonton'/'inferEvent'. The OFFICIAL read has no party.
+      cell' <- checkExpr ExpectRecordCellContext cell string
+      mParty' <- traverse (\p -> do
+                   partyT <- fresh (NormalName "party")
+                   checkExpr ExpectRegulativePartyContext p partyT) mParty
+      a <- fresh (NormalName "cell")
+      let resultT = case mode of
+            RecallLast -> maybeType a
+            RecallAll  -> list a
+      pure (ReadCell ann mParty' isOfficial mode cell', resultT)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -2935,6 +2990,8 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Fetch ann e -> Fetch ann (go False ctx e)
       Env ann e -> Env ann (go False ctx e)
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
+      Record ann mParty cell val off mHence -> Record ann (fmap (go False ctx) mParty) (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
+      ReadCell ann mParty off mode cell -> ReadCell ann (fmap (go False ctx) mParty) off mode (go False ctx cell)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
@@ -3434,6 +3491,8 @@ prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
+prettyTypeMismatch ExpectRecordCellContext expected given =
+  standardTypeMismatch [ "The cell of a RECORD/COMMIT/ATTEST is expected to be of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text

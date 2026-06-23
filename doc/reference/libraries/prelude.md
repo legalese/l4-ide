@@ -69,6 +69,45 @@ The prelude can be imported into every L4 program with `IMPORT prelude` and prov
 - `catMaybes` - Extract all JUST values
 - `asum` / `firstJust` - First successful Maybe
 - `maybeToList` / `listToMaybe` - Convert between Maybe and List
+- `holds` - Negation-as-failure grounding for `MAYBE BOOLEAN`: `NOTHING` defaults to `FALSE` (closed-world)
+- `naf` - Negation as failure: succeeds when a proposition is not provably true
+- `presumed` - Open-world dual of `holds`: `NOTHING` defaults to `TRUE` ("not forbidden ⇒ permitted")
+
+#### Negation as Failure (`MAYBE BOOLEAN`)
+
+A `MAYBE BOOLEAN` distinguishes three epistemic states, which lets L4 express
+negation as failure in the style of Prolog without any special operator:
+
+| Value        | Reading                                 |
+| ------------ | --------------------------------------- |
+| `JUST TRUE`  | proven true                             |
+| `JUST FALSE` | proven false                            |
+| `NOTHING`    | no proof either way (the open question) |
+
+The closed-world assumption -- "absence of proof is failure" -- is exactly
+`fromMaybe FALSE`, which the prelude names `holds`. Its complement is `naf`, and
+its open-world dual (defaulting the open question the other way) is `presumed`:
+
+| Combinator   | Definition          | `JUST TRUE` | `JUST FALSE` | `NOTHING` |
+| ------------ | ------------------- | ----------- | ------------ | --------- |
+| `holds p`    | `fromMaybe FALSE p` | `TRUE`      | `FALSE`      | `FALSE`   |
+| `naf p`      | `NOT (holds p)`     | `FALSE`     | `TRUE`       | `TRUE`    |
+| `presumed p` | `fromMaybe TRUE p`  | `TRUE`      | `FALSE`      | `TRUE`    |
+
+`naf` succeeds on everything not provably true -- both the refuted (`JUST FALSE`)
+and the unknown (`NOTHING`) cases -- mirroring Prolog's `\+`. Choosing the default
+is the closed-world / open-world switch: `holds` reads silence as failure (an
+obligation left undischarged), while `presumed` reads silence as permission.
+
+```l4
+#EVAL holds NOTHING       -- FALSE  (no proof => fails, closed-world)
+#EVAL naf NOTHING         -- TRUE   (unprovable => negation succeeds)
+#EVAL presumed NOTHING    -- TRUE   (no prohibition => permitted, open-world)
+```
+
+For a runnable worked example -- including an optional Kleene three-valued lift
+(`kand` / `kor` / `knot`) that propagates "unknown" through the connectives -- see
+[negation-as-failure.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure.l4).
 
 #### Either Functions
 

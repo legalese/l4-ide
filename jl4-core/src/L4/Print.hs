@@ -428,6 +428,17 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "ENV" <+> printWithLayout e
     Post _ e1 e2 e3 ->
       "POST" <+> printWithLayout e1 <+> printWithLayout e2 <+> printWithLayout e3
+    Record _ mParty cell val isOfficial mHence ->
+      (if isOfficial then "COMMIT" else "RECORD")
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <+> printWithLayout cell <+> "IS" <+> printWithLayout val
+        <> maybe mempty (\k -> " HENCE" <+> printWithLayout k) mHence
+    ReadCell _ mParty isOfficial mode cell ->
+      "RECALL"
+        <> (case mode of RecallAll -> " ALL"; RecallLast -> mempty)
+        <> (if isOfficial then " OFFICIAL'S" else mempty)
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <+> printWithLayout cell
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AsString _ e ->

@@ -1437,6 +1437,8 @@ baseExpr' =
   <|> fetchExpr
   <|> envExpr
   <|> postExpr
+  <|> recordOrCommitExpr
+  <|> recallExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -1689,6 +1691,182 @@ postExpr = do
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
+
+-- | @RECORD <cell> IS <expr>@ (own ledger) and
+-- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1,
+-- with an optional trailing @HENCE <expr>@ continuation (M5).
+-- Both lower to the same 'Record' node; the keyword choice sets the
+-- @isOfficial@ flag ('False' for @RECORD@, 'True' for @COMMIT@/@ATTEST@).
+--
+-- M5: the value is parsed with 'indentedExpr current', which STOPS at the
+-- reserved @HENCE@ keyword (the deontic-followup parser relies on the same
+-- property) and may not dedent past the RECORD, so the value never swallows
+-- @HENCE k@. When a @HENCE@ follows, it is parsed into the 'Record' node's
+-- optional continuation, making the write an event-free deontic step.
+--
+-- The HENCE *continuation* is parsed at the lenient block threshold @mkPos 1@
+-- (exactly as top-level 'expr' is), NOT at @current@: in the idiomatic flat
+-- chain the chained @HENCE@ sits to the LEFT of @RECORD@ (aligned with the
+-- enclosing obligation's @HENCE@s), so anchoring to the RECORD's own column
+-- would wrongly reject it. @mkPos 1@ still halts cleanly at the next col-1 token
+-- (e.g. a following @#TRACE@ or top-level declaration).
+-- NOTE on exactprint hole-ordering: the generic ToConcreteNodes traversal
+-- (L4.Annotation) renders ONE holeFit per 'Record' constructor field, in
+-- field-declaration order — mParty, cell, val, isOfficial, mHence
+-- (Syntax.hs ~240) — and 'flattenConcreteNodes' pops one holeFit per
+-- 'AnnoHole' in this node's surface-ordered anno payload. Correct round-trip
+-- therefore REQUIRES exactly one 'annoHole' per field, emitted in
+-- field-declaration order. 'isOfficial :: Bool' renders to an empty surface
+-- (Syntax.hs ~817) but STILL consumes a holeFit slot, so it gets a placeholder
+-- 'annoHole (pure …)'. Keyword tokens (RECORD/COMMIT/ATTEST, IS) are
+-- 'AnnoCsn' and do NOT consume holeFits, so they may be interleaved freely to
+-- match the surface order. If anyone reorders the 'Record' fields in Syntax.hs,
+-- the hole order below MUST move in lockstep (the ledger ep.goldens guard this).
+recordOrCommitExpr :: Parser (Expr Name)
+recordOrCommitExpr = do
+  current <- Lexer.indentLevel
+  attachAnno $ do
+    -- mParty hole (field 1). Only RECORD takes the optional <party>'s recipient
+    -- (the symmetric WRITE to RECALL <party>'s). COMMIT/ATTEST write the OFFICIAL
+    -- record, which has no recipient: their mParty placeholder hole is forced to
+    -- 'Nothing' WITHOUT calling recordRecipient, so the Record invariant
+    -- (isOfficial ==> mParty == Nothing) stays genuinely parser-enforced,
+    -- mirroring recallOfficialKw's OFFICIAL-vs-<party>'s split.
+    (isOfficial, mParty) <-
+          ((\mp -> (False, mp)) <$> (annoLexeme (spacedKeyword_ TKRecord) *> recordRecipient))
+      <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKCommit) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
+      <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKAttest) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
+    cell  <- annoHole cellExpr                                -- cell hole (field 2)
+    _     <- annoLexeme (spacedKeyword_ TKIs)
+    val   <- annoHole (indentedExpr current)                  -- val hole (field 3)
+    _     <- annoHole (pure isOfficial)                       -- isOfficial placeholder hole (field 4)
+    mHence <- optionalWithHole (hence (mkPos 1))  -- mHence hole (field 5)
+    pure (Record emptyAnno mParty cell val isOfficial mHence)
+
+-- | The optional NOTIFY-v1 /recipient/ qualifier of a @RECORD@ — the symmetric
+-- WRITE to 'recallPartyAtom'\'s cross-party READ. @RECORD q's <cell> IS <v>@
+-- writes into party @q@'s OWN ledger. We reuse the EXACT party atom ('partyAtom',
+-- a bare 'name' wrapped as a @Var@ / @App … []@ so it is name-resolved as a
+-- PARTY), with @try (… <* lookAhead genitive)@ so that — absent a following @'s@
+-- — it backtracks and the token falls through to 'cellExpr'. No new keyword.
+-- Only @RECORD@ takes this qualifier (see 'recordOrCommitExpr'); @COMMIT@/@ATTEST@
+-- write the official record, which has no recipient, so they reject a
+-- @<party>'s@ qualifier at parse time. That makes the 'Record' invariant
+-- @isOfficial ==> mParty == Nothing@ genuinely parser-enforced (mirroring
+-- 'recallOfficialKw'\'s @OFFICIAL's@-vs-@<party>'s@ split).
+-- The fallthrough (absent recipient) must STILL emit exactly one (empty)
+-- mParty hole so the unqualified RECORD slots its mParty field correctly under
+-- the generic exactprint traversal (same fix shape as 'optionalWithHole').
+recordRecipient :: AnnoParser (Maybe (Expr Name))
+recordRecipient =
+      (Just <$> (annoHole (try (partyAtom <* lookAhead genitive))
+                  <* annoLexeme genitive))
+  <|> annoHole (pure Nothing)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
+
+-- | A bare party reference (a @Var@ / @App … []@) used by the @<party>'s@
+-- qualifier of RECORD and RECALL. Built via 'attachAnno' so the name token is
+-- captured into the 'App' node's OWN anno (a hole) — WITHOUT this the App
+-- renders empty and exactprint drops the party on round-trip. The party is
+-- name-resolved exactly like any other reference.
+partyAtom :: Parser (Expr Name)
+partyAtom =
+  attachAnno $
+    (\fname -> App emptyAnno fname []) <$> annoHole name
+
+-- | @RECALL [<party>'s | OFFICIAL's] <cell>@ — STATE-AS-LEDGER M1.5 + M4.5.
+-- Reads a cell back from a ledger, yielding @MAYBE a@. The cell uses the SAME
+-- 'cellExpr' surface as RECORD/COMMIT/ATTEST (a backtick ident or a string
+-- literal), so a read and a write name a cell the same way.
+--
+-- After @RECALL@ we parse an OPTIONAL qualifier (M4.5), then the cell:
+--
+--   * @OFFICIAL's@      => @(Nothing, True)@  — read the shared OFFICIAL record.
+--   * @<party>'s@       => @(Just party, False)@ — read another party's OWN ledger.
+--     The party is a minimal name atom (NOT a full expression), wrapped as a
+--     @Var@ ('App' with no args), so it is name-resolved exactly like a PARTY.
+--   * (no qualifier)    => @(Nothing, False)@ — read the CURRENT party's own ledger.
+--
+-- Disambiguation: @OFFICIAL@ is a reserved, case-sensitive keyword (@TKOfficial@),
+-- tried first.
+-- The party branch uses @try (name <* TGenitive)@ so that, absent a following
+-- @'s@, it backtracks and the token is parsed as the cell instead (a backtick
+-- 'cellExpr' name and a backtick party 'name' otherwise overlap). 'cellExpr'
+-- being restrictive (backtick/string) keeps it from colliding with the cell.
+-- NOTE on exactprint hole-ordering: 'ReadCell' fields are mParty, isOfficial,
+-- mode, cell (Syntax.hs ~266); the generic traversal renders one holeFit per
+-- field in THAT order, so we must emit exactly one 'annoHole' per field in field
+-- order — even though the SURFACE order is @RECALL [ALL] [OFFICIAL's|q's] cell@.
+-- 'isOfficial :: Bool' and 'mode :: RecallMode' render to empty surface
+-- (Syntax.hs ~814/~817) but STILL consume a holeFit each, so they get
+-- placeholder holes. The ALL / OFFICIAL's / q's keyword tokens are 'AnnoCsn'
+-- (do NOT consume holeFits) and are emitted in their surface positions. We
+-- therefore emit the field holes in field order while keeping the ALL /
+-- OFFICIAL's / q's keyword tokens in their surface positions. The try/back-
+-- tracking of the OFFICIAL's-vs-q's-vs-none split and ALL-vs-none is preserved
+-- by 'recallModeKw' / 'recallPartyAtom' / 'recallOfficialKw'.
+recallExpr :: Parser (Expr Name)
+recallExpr =
+  attachAnno $ do
+    _    <- annoLexeme (spacedKeyword_ TKRecall)
+    -- SURFACE order is @RECALL [ALL] [OFFICIAL's|q's] cell@; FIELD order is
+    -- mParty, isOfficial, mode, cell. Keyword tokens (ALL, OFFICIAL, 's) are
+    -- 'AnnoCsn' and do NOT consume holeFits, so we emit ALL first (its surface
+    -- position) while keeping the four field holes in field order. The party-atom
+    -- 'q' is itself the mParty hole; its 's genitive is an adjacent token. The
+    -- 'OFFICIAL' keyword + 's render adjacent to the (empty) isOfficial hole.
+    mode <- recallModeKw                        -- emits the ALL keyword token (no hole)
+    -- mParty hole (field 1): the q's party atom, or empty when OFFICIAL's/none.
+    mParty <- recallPartyAtom
+    -- isOfficial hole (field 2): empty placeholder; the OFFICIAL's tokens render here.
+    isOff  <- recallOfficialKw
+    _    <- annoHole (pure mode)                -- mode placeholder hole (field 3)
+    cell <- annoHole cellExpr                   -- cell hole (field 4)
+    pure (ReadCell emptyAnno mParty isOff mode cell)
+
+-- | The optional @ALL@ collect-all marker — emits ONLY the ALL keyword token
+-- (no hole). Mode field hole is emitted in field order by 'recallExpr'.
+recallModeKw :: AnnoParser RecallMode
+recallModeKw =
+      (RecallAll <$ annoLexeme (spacedKeyword_ TKAll))
+  <|> pure RecallLast
+
+-- | The optional @q's@ party atom of a RECALL: emits the mParty field hole
+-- (field 1) holding the party atom, with the 's genitive as an adjacent token.
+-- Absent a following @'s@ it backtracks (the token falls through to the cell)
+-- and emits an empty mParty hole. OFFICIAL's is handled separately by
+-- 'recallOfficialKw', so this only matches a bare @<party>'s@.
+recallPartyAtom :: AnnoParser (Maybe (Expr Name))
+recallPartyAtom =
+      (Just <$> (annoHole (try (partyAtom <* lookAhead genitive))
+                  <* annoLexeme genitive))
+  <|> annoHole (pure Nothing)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
+
+-- | The optional @OFFICIAL's@ qualifier of a RECALL: emits the isOfficial field
+-- hole (field 2, empty surface) with the OFFICIAL keyword + 's genitive rendered
+-- adjacent as tokens. Tried with backtracking; @OFFICIAL@ is a reserved keyword.
+recallOfficialKw :: AnnoParser Bool
+recallOfficialKw =
+      tryParser (annoLexeme (spacedKeyword_ TKOfficial)
+                  *> annoLexeme (spacedToken_ (TIdentifiers TGenitive))
+                  *> annoHole (pure True))
+  <|> annoHole (pure False)
+
+-- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
+-- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a
+-- plain string literal, lowering BOTH to a 'StringLit'. This keeps the cell
+-- out of name resolution: it is data (a key), not a variable reference.
+cellExpr :: Parser (Expr Name)
+cellExpr =
+  attachAnno (Lit emptyAnno <$> annoHole cellLit)
+
+cellLit :: Parser Lit
+cellLit =
+      attachAnno (StringLit emptyAnno <$> annoEpa (spacedToken (#_TIdentifiers % #_TQuoted) "quoted cell name"))
+  <|> stringLit
 
 negation :: Parser (Expr Name)
 negation = do

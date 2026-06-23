@@ -1,0 +1,12 @@
+IMPORT prelude
+-- PHASE A exactprint guard: every RECALL shape must round-trip with its cell and
+-- qualifier intact. Before the ReadCell anno-ordering fix `l4 format` dropped the
+-- cell (bare `RECALL`) and merged directives. See the recallExpr field-order note
+-- in jl4-core/src/L4/Parser.hs (ReadCell fields: mParty, isOfficial, mode, cell).
+
+DECLARE Party IS ONE OF q
+
+#EVAL RECALL `a`
+#EVAL RECALL OFFICIAL's `a`
+#EVAL RECALL q's `a`
+#EVAL RECALL ALL `a`

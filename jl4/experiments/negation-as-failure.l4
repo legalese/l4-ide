@@ -1,0 +1,125 @@
+-- Negation as failure (NAF), the functional way.
+-- Companion to specs/todo/NEGATION-AS-FAILURE-SPEC.md
+--
+-- The whole idea: a proposition that may or may not have been settled is a
+-- MAYBE BOOLEAN. Negation as failure is the closed-world assumption -- the act
+-- of defaulting "unproven" to FALSE -- and that act is already `fromMaybe FALSE`.
+-- The prelude now names it `holds`, with `naf` and the open-world dual `presumed`.
+
+IMPORT prelude
+
+§ `The three epistemic states`
+
+-- A "Default Boolean" lives in one of three states:
+--   JUST TRUE   proven true
+--   JUST FALSE  proven false
+--   NOTHING     no proof either way (the open question / the default)
+DECLARE DefBool IS A MAYBE BOOLEAN
+
+-- holds, naf, presumed all come from the prelude. We only demonstrate them here.
+
+-- holds = fromMaybe FALSE : closed-world grounding (Prolog NAF / CWA)
+#EVAL holds (JUST TRUE)     -- TRUE
+#EVAL holds (JUST FALSE)    -- FALSE
+#EVAL holds NOTHING         -- FALSE
+
+-- naf = NOT . holds : succeeds on everything not provably true
+#EVAL naf (JUST TRUE)       -- FALSE
+#EVAL naf (JUST FALSE)      -- TRUE
+#EVAL naf NOTHING           -- TRUE
+
+-- presumed = fromMaybe TRUE : open-world dual ("not forbidden => permitted")
+#EVAL presumed (JUST TRUE)  -- TRUE
+#EVAL presumed (JUST FALSE) -- FALSE
+#EVAL presumed NOTHING      -- TRUE
+
+#ASSERT holds NOTHING EQUALS FALSE
+#ASSERT presumed NOTHING EQUALS TRUE
+#ASSERT naf NOTHING
+#ASSERT NOT (naf (JUST TRUE))
+
+§ `The lattice of readings: one knob, many epistemics`
+
+-- `decided` is the orthogonal axis NAF throws away: is there a verdict at all?
+-- (This is just isJust, from the prelude.) A forbidden act is *decided*;
+-- a merely non-obligatory act may be only *undecided*.
+GIVEN p IS A DefBool
+GIVETH A BOOLEAN
+decided p MEANS isJust p
+
+#ASSERT decided (JUST FALSE)
+#ASSERT NOT (decided NOTHING)
+
+§ `A worked legal example`
+
+-- Closed-world obligation: you are in breach unless filing can be proven.
+-- Silence (NOTHING) defaults to breach -- the absence of compliance is failure.
+GIVEN `filed on time` IS A DefBool
+GIVETH A BOOLEAN
+`in breach` `filed on time` MEANS naf `filed on time`
+
+-- Open-world permission: you may park unless a prohibition can be proven.
+-- Silence (NOTHING) defaults to permission -- absence of prohibition is liberty.
+GIVEN `parking prohibited here` IS A DefBool
+GIVETH A BOOLEAN
+`may park` `parking prohibited here` MEANS naf `parking prohibited here`
+
+-- Statute silent on filing => treated as breach (closed-world).
+#ASSERT `in breach` NOTHING
+-- Proof of timely filing => not in breach.
+#ASSERT NOT (`in breach` (JUST TRUE))
+-- Statute silent on parking prohibition => may park (open-world reading of the same naf).
+#ASSERT `may park` NOTHING
+-- A proven prohibition => may not park.
+#ASSERT NOT (`may park` (JUST TRUE))
+
+§ `The Kleene lift: propagating "unknown" through the connectives`
+
+-- The combinators above apply NAF at the leaves, with ordinary two-valued AND/OR
+-- above. If instead you want NOTHING ("unknown") to flow THROUGH the connectives
+-- -- the road to well-founded / stable-model semantics -- lift the operators to
+-- Kleene strong three-valued logic over MAYBE BOOLEAN, treating NOTHING as the
+-- undefined element, and ground to two-valued just once, at the top, with `holds`.
+
+GIVEN p IS A DefBool
+GIVETH A DefBool
+knot p MEANS
+  CONSIDER p
+  WHEN JUST TRUE  THEN JUST FALSE
+  WHEN JUST FALSE THEN JUST TRUE
+  WHEN NOTHING    THEN NOTHING
+
+GIVEN p IS A DefBool
+      q IS A DefBool
+GIVETH A DefBool
+p `kand` q MEANS
+  CONSIDER p
+  WHEN JUST FALSE THEN JUST FALSE          -- FALSE absorbs, even under uncertainty
+  WHEN JUST TRUE  THEN q
+  WHEN NOTHING    THEN CONSIDER q
+                       WHEN JUST FALSE THEN JUST FALSE
+                       OTHERWISE NOTHING   -- unknown AND true = unknown
+
+GIVEN p IS A DefBool
+      q IS A DefBool
+GIVETH A DefBool
+p `kor` q MEANS
+  CONSIDER p
+  WHEN JUST TRUE  THEN JUST TRUE           -- TRUE absorbs, even under uncertainty
+  WHEN JUST FALSE THEN q
+  WHEN NOTHING    THEN CONSIDER q
+                       WHEN JUST TRUE THEN JUST TRUE
+                       OTHERWISE NOTHING   -- unknown OR false = unknown
+
+#EVAL NOTHING `kand` (JUST FALSE)   -- JUST FALSE  (unknown AND false = false)
+#EVAL NOTHING `kand` (JUST TRUE)    -- NOTHING     (unknown AND true  = unknown)
+#EVAL NOTHING `kor`  (JUST TRUE)    -- JUST TRUE   (unknown OR  true  = true)
+#EVAL NOTHING `kor`  (JUST FALSE)   -- NOTHING     (unknown OR  false = unknown)
+#EVAL knot NOTHING                  -- NOTHING     (not unknown = unknown)
+
+#ASSERT (NOTHING `kand` (JUST FALSE)) EQUALS (JUST FALSE)
+#ASSERT (NOTHING `kand` (JUST TRUE)) EQUALS NOTHING
+#ASSERT (NOTHING `kor` (JUST TRUE)) EQUALS (JUST TRUE)
+#ASSERT (knot (JUST TRUE)) EQUALS (JUST FALSE)
+-- Ground the three-valued result back to a yes/no with the same `holds`:
+#ASSERT holds (NOTHING `kand` (JUST TRUE)) EQUALS FALSE

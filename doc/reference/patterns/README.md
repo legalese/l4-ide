@@ -225,6 +225,46 @@ DECIDE `is eligible` IF
 
 ---
 
+## Negation as Failure (Closed-World and Open-World Defaults)
+
+**When to use:** When a fact may be *undecided* -- modelled as `MAYBE BOOLEAN`
+(`JUST TRUE` / `JUST FALSE` / `NOTHING`) -- and you must say what the *absence* of
+proof means. Regulatory silence often means failure ("you did not prove you filed,
+so you are in breach"); a permission regime often means liberty ("nothing prohibits
+this, so it is allowed").
+
+**Canonical form:**
+
+```l4
+-- Closed-world: in breach unless timely filing is proven (NOTHING => breach)
+GIVEN `filed on time` IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`in breach` `filed on time` MEANS naf `filed on time`
+
+-- Open-world: may park unless a prohibition is proven (NOTHING => permitted)
+GIVEN `parking prohibited here` IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`may park` `parking prohibited here` MEANS naf `parking prohibited here`
+```
+
+**Notes:**
+
+- The three prelude combinators are `holds p` (≡ `fromMaybe FALSE`, closed-world
+  grounding), `naf p` (≡ `NOT (holds p)`, negation as failure), and `presumed p`
+  (≡ `fromMaybe TRUE`, the open-world dual).
+- `naf` succeeds on everything not provably true -- both the refuted (`JUST FALSE`)
+  and the unknown (`NOTHING`) cases -- mirroring Prolog's `\+`.
+- The default value *is* the closed-world / open-world knob: `FALSE` for `holds`,
+  `TRUE` for `presumed`. This is how one `MAYBE BOOLEAN` supports both "silence =
+  failure" (obligations) and "silence = permission" (deontic liberty).
+- Contrast with [UNLESS](#unless): UNLESS negates a *known* `BOOLEAN` exception
+  (`p AND NOT q`); negation-as-failure handles a *possibly-undecided* proposition.
+- See the [prelude reference](../libraries/prelude.md) for the full truth table, and
+  the runnable example (with a Kleene three-valued lift)
+  [negation-as-failure.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure.l4).
+
+---
+
 ## LET / IN (Prefix-Style Local Bindings)
 
 **When to use:** When you want to define local bindings before the expression that uses them, as an alternative to WHERE (which places bindings after).

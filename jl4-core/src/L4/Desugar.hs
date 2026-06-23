@@ -71,6 +71,8 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Fetch      ann e -> Fetch ann (carameliseExprWithContext InertCtxNone e)
   Env        ann e -> Env ann (carameliseExprWithContext InertCtxNone e)
   Post       ann e1 e2 e3 -> Post ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2) (carameliseExprWithContext InertCtxNone e3)
+  Record     ann mParty cell val isOfficial mHence -> Record ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (carameliseExprWithContext InertCtxNone cell) (carameliseExprWithContext InertCtxNone val) isOfficial (fmap (carameliseExprWithContext InertCtxNone) mHence)
+  ReadCell   ann mParty isOfficial mode cell -> ReadCell ann (fmap (carameliseExprWithContext InertCtxNone) mParty) isOfficial mode (carameliseExprWithContext InertCtxNone cell)
   Concat     ann es -> Concat ann (fmap (carameliseExprWithContext InertCtxNone) es)
   AsString   ann e -> AsString ann (carameliseExprWithContext InertCtxNone e)
   Breach     ann mParty mReason -> Breach ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (fmap (carameliseExprWithContext InertCtxNone) mReason)
@@ -352,6 +354,8 @@ rewriteFieldRefs fields self = go fields
       Fetch ann e         -> Fetch ann (go flds e)
       Env ann e           -> Env ann (go flds e)
       Post ann u h b      -> Post ann (go flds u) (go flds h) (go flds b)
+      Record ann mp c v off mh -> Record ann (fmap (go flds) mp) (go flds c) (go flds v) off (fmap (go flds) mh)
+      ReadCell ann mp off mode c -> ReadCell ann (fmap (go flds) mp) off mode (go flds c)
       Breach ann mp mr    -> Breach ann (fmap (go flds) mp) (fmap (go flds) mr)
       Event {}            -> expr  -- regulative events are complex; leave as-is
       Regulative {}       -> expr  -- regulative rules: leave as-is

@@ -103,6 +103,9 @@ Automatically imported. Provides foundational functions for lists, numbers, and 
 | `isNothing x`         | `Maybe a → Bool`            | Is Nothing?         |
 | `mapMaybe f list`     | `(a → Maybe b) → [a] → [b]` | Filter-map          |
 | `catMaybes list`      | `[Maybe a] → [a]`           | Collect Justs       |
+| `holds p`             | `Maybe Bool → Bool`         | Closed-world (NAF); `NOTHING`→`FALSE` |
+| `naf p`               | `Maybe Bool → Bool`         | Negation as failure |
+| `presumed p`          | `Maybe Bool → Bool`         | Open-world dual; `NOTHING`→`TRUE` |
 
 **Either, Pair, Utility:**
 

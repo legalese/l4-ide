@@ -1,0 +1,66 @@
+IMPORT prelude
+-- STATE-AS-LEDGER approach B: RECALL ALL (the collect-all read).
+--
+-- The append-only ledger already retains EVERY write to a cell. Plain RECALL
+-- is last-write-wins: for a cell written N times it returns only the latest,
+-- as MAYBE a. RECALL ALL exposes the accumulation instead — it folds ALL the
+-- writes to a cell into a LIST OF a, oldest->newest (empty list if never
+-- written). No write-side change: each write is already its own event.
+--
+-- Surface:
+--   RECALL ALL <cell>                : LIST OF a   (current party's own ledger)
+--   RECALL ALL <party>'s <cell>      : LIST OF a   (another party's own ledger)
+--   RECALL ALL OFFICIAL's <cell>     : LIST OF a   (the shared official record)
+--
+-- Run me:
+--   JL4_FIXED_NOW=2025-01-01T00:00:00Z l4 run jl4/experiments/recall-all.l4
+
+§ `A recipient accumulates multiple notices, read back as a list`
+-- A landlord serves three separate notices on a tenant. Each is its own RECORD
+-- into the SAME cell `notices`. Last-write-wins would hide the first two; the
+-- ledger retains all three, and RECALL ALL reads them back as a list.
+--
+-- The writes and the reads must share a directive (the per-directive ledger is
+-- reset between #EVALs), so we sequence the three writes and the RECALL ALL in
+-- one LIST whose final element is the collected history.
+#EVAL LIST (RECORD `notices` IS "rent arrears"),
+           (RECORD `notices` IS "noise complaint"),
+           (RECORD `notices` IS "final warning")
+-- evaluates to LIST "rent arrears", "noise complaint", "final warning"
+-- (the three writes, each returning the value written, in order)
+
+§ `count and contains over the collected history`
+-- We sequence the three writes and the reads in ONE directive as a LIST whose
+-- elements are all NUMBERS (so the literal type-checks): the three writes each
+-- return a numeric code, the fourth element is the count, the fifth a 1/0
+-- contains-flag. Returning the whole LIST forces every write before the reads.
+GIVEN b IS A BOOLEAN
+GIVETH A NUMBER
+boolToNum MEANS IF b THEN 1 ELSE 0
+
+#EVAL LIST (RECORD `code` IS 101),   -- "rent arrears"
+           (RECORD `code` IS 202),   -- "noise complaint"
+           (RECORD `code` IS 909),   -- "final warning"
+           (count (RECALL ALL `code`)),                       -- 3 notices in all
+           (boolToNum (elem 101 (RECALL ALL `code`))),        -- 1: code 101 WAS served...
+           (fromMaybe 0 (RECALL `code`))                      -- ...even though the LATEST (RECALL) is 909
+-- evaluates to LIST 101, 202, 909, 3, 1, 909:
+--   * 3   = count of the collect-all history (all three writes)
+--   * 1   = code 101 is in the history (elem over RECALL ALL), though...
+--   * 909 = ...the plain RECALL (last-write-wins) is only the latest code
+
+§ `RECALL ALL of a never-written cell is the empty list (not NOTHING)`
+-- The deliberate difference from plain RECALL: an unwritten cell reads back as
+-- [] (so count = 0, elem = FALSE), whereas plain RECALL would give NOTHING.
+#EVAL count (RECALL ALL `unsent`)
+#ASSERT count (RECALL ALL `unsent`) EQUALS 0
+#ASSERT NOT (elem "anything" (RECALL ALL `unsent`))
+
+§ `The collected list is in append order (oldest -> newest)`
+-- Three numeric writes; RECALL ALL preserves the order they were written in,
+-- so the sum is 1 + 2 + 3 = 6 (all three collected, not just the last).
+#EVAL LIST (RECORD `seq` IS 1),
+           (RECORD `seq` IS 2),
+           (RECORD `seq` IS 3),
+           (sum (RECALL ALL `seq`))     -- 6
+#ASSERT (LIST (RECORD `seq` IS 1), (RECORD `seq` IS 2), (RECORD `seq` IS 3), (sum (RECALL ALL `seq`))) EQUALS (LIST 1, 2, 3, 6)

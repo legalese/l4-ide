@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+record-flat.l4:9:1-22:
+  1
+  Ledger:
+    RECORD `a` IS 1   [source=RECORD, at=2025-01-31T15:45:30Z]
+record-flat.l4:10:1-22:
+  2
+  Official record:
+    COMMIT `b` IS 2   [source=COMMIT, at=2025-01-31T15:45:30Z]
+record-flat.l4:11:1-22:
+  3
+  Official record:
+    COMMIT `c` IS 3   [source=COMMIT, at=2025-01-31T15:45:30Z]
+record-flat.l4:12:1-26:
+  4
+  Ledger (q):
+    RECORD `d` IS 4   [source=NOTIFY, at=2025-01-31T15:45:30Z]

@@ -1,0 +1,172 @@
+IMPORT prelude
+
+§ `Housing Act 1988 — Schedule 2 — Ground 1 (fleshed out)`
+
+-- Ground 1 = (notice given OR court dispenses) AND (limb (a) prior occupation OR limb (b) present requirement).
+-- The NOTICE is a trace fact (RECORD/RECALL). The HOME CONDITION (a)∨(b) is a constitutive predicate over the
+-- claim's facts, wired as an IF guard on the court's duty: if the ground is not made out, the court is simply not
+-- obliged (FULFILLED), even where notice was given. Schedule 2 is woven onto a vanilla lease with RAND.
+-- (The notice's *content* — "in writing", the Ground 1 wording, "before the beginning of the tenancy" — is still a
+--  bare flag here; that is the job of the forthcoming NOTIFY primitive.)
+
+DECLARE Actor  IS ONE OF Landlord, Tenant, Court
+DECLARE Action IS ONE OF payRent, giveNotice, apply, dispense, orderPossession
+
+-- Constitutive facts about each landlord-side person, for limbs (a) and (b).
+DECLARE Person HAS
+    name                                  IS A STRING
+    `occupied as home before the tenancy` IS A BOOLEAN   -- limb (a)
+    `requires as only or principal home`  IS A BOOLEAN   -- limb (b), first conjunct
+    `acquired the reversion for value`    IS A BOOLEAN   -- limb (b), second conjunct (negated)
+
+DECLARE Claim HAS
+    landlords             IS A LIST OF Person   -- landlord(s) seeking possession; joint => "at least one of them"
+    `successors in title` IS A LIST OF Person   -- persons who derived title under the notice-giving landlord
+
+§§ `The home condition — limbs (a) and (b)`
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`occupied` p MEANS p's `occupied as home before the tenancy`
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`requires` p MEANS p's `requires as only or principal home`
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`acquired for value` p MEANS p's `acquired the reversion for value`
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+`prior occupation` c MEANS
+        "(a) at some time before the beginning of the tenancy, the landlord (or, in the case of joint landlords, at least one of them) occupied the dwelling-house as his only or principal home"
+    ... any `occupied` (c's landlords)
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+`reversion acquired for value` c MEANS
+        "the landlord (or any one of them) or any other person who, as landlord, derived title under the landlord who gave the notice acquired the reversion on the tenancy for money or money's worth"
+    ...     any `acquired for value` (c's landlords)
+        OR  any `acquired for value` (c's `successors in title`)
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+`present requirement` c MEANS
+        "(b) the landlord (or at least one of them) requires the dwelling-house as his or his spouse's only or principal home"
+    ...     any `requires` (c's landlords)
+    AND "and neither the landlord nor any successor in title acquired the reversion for money or money's worth"
+    ... NOT `reversion acquired for value` c
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+`landlord-home condition` c MEANS
+        `prior occupation` c
+    OR  `present requirement` c
+
+§§ `The Schedule 2 aspect, woven onto a vanilla lease`
+
+GIVEN monthsLeft IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`rent spine` monthsLeft MEANS
+    IF   monthsLeft GREATER THAN 0
+    THEN PARTY Tenant MUST payRent WITHIN 30 HENCE `rent spine` (monthsLeft MINUS 1)
+    ELSE FULFILLED
+
+GIVETH A DEONTIC Actor Action
+`vanilla lease` MEANS `rent spine` 2
+
+GIVEN onwards IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`giving the Ground 1 notice, then` onwards MEANS
+    PARTY Landlord MUST giveNotice WITHIN 30
+    HENCE RECORD `noticeGiven` IS TRUE HENCE onwards
+    LEST  onwards
+
+GIVETH A DEONTIC Actor Action
+`gives the Ground 1 notice` MEANS `giving the Ground 1 notice, then` FULFILLED
+
+-- The court's duty: GUARDED by the home condition (IF), then mandatory on notice / discretionary on dispensation.
+GIVEN c IS A Claim
+GIVETH A DEONTIC Actor Action
+`court decision` c MEANS
+    IF   `landlord-home condition` c
+    THEN CONSIDER RECALL `noticeGiven`
+         WHEN JUST x  THEN PARTY Court MUST orderPossession WITHIN 30
+         WHEN NOTHING THEN PARTY Court MAY dispense WITHIN 30 HENCE PARTY Court MUST orderPossession WITHIN 30
+    ELSE FULFILLED
+
+GIVEN c IS A Claim
+GIVETH A DEONTIC Actor Action
+`possession proceedings` c MEANS
+    PARTY Landlord MAY apply WITHIN 3650 HENCE `court decision` c
+
+GIVEN c IS A Claim
+GIVETH A DEONTIC Actor Action
+`under Schedule 2` c MEANS
+    ( `gives the Ground 1 notice` ) RAND ( `possession proceedings` c )
+
+GIVEN c IS A Claim
+GIVETH A DEONTIC Actor Action
+`lease, under Schedule 2` c MEANS `vanilla lease` RAND `under Schedule 2` c
+
+§§ `Sample claims`
+
+GIVETH A Person
+`Larry who lived there` MEANS Person WITH
+    name                                  IS "Larry"
+    `occupied as home before the tenancy` IS TRUE
+    `requires as only or principal home`  IS FALSE
+    `acquired the reversion for value`    IS FALSE
+
+GIVETH A Person
+`Nora who needs it` MEANS Person WITH
+    name                                  IS "Nora"
+    `occupied as home before the tenancy` IS FALSE
+    `requires as only or principal home`  IS TRUE
+    `acquired the reversion for value`    IS FALSE
+
+GIVETH A Person
+`Vic the investor` MEANS Person WITH
+    name                                  IS "Vic"
+    `occupied as home before the tenancy` IS FALSE
+    `requires as only or principal home`  IS TRUE
+    `acquired the reversion for value`    IS TRUE   -- bought the reversion for value => limb (b) fails
+
+GIVETH A Claim
+`claim a made out` MEANS Claim WITH
+    landlords             IS LIST `Larry who lived there`
+    `successors in title` IS EMPTY
+
+GIVETH A Claim
+`claim b made out` MEANS Claim WITH
+    landlords             IS LIST `Nora who needs it`
+    `successors in title` IS EMPTY
+
+GIVETH A Claim
+`claim bought for value` MEANS Claim WITH
+    landlords             IS LIST `Vic the investor`
+    `successors in title` IS EMPTY
+
+§ `Traces`
+
+-- A) limb (a) made out + notice given  =>  Court MUST order possession (mandatory)
+#TRACE `lease, under Schedule 2` `claim a made out` AT 0 WITH
+    PARTY Tenant   DOES payRent AT 30
+    PARTY Tenant   DOES payRent AT 60
+    PARTY Landlord DOES giveNotice AT 10
+    PARTY Landlord DOES apply AT 400
+
+-- B) limb (b) made out + NO notice  =>  Court MAY dispense (discretionary; "it depends")
+#TRACE `lease, under Schedule 2` `claim b made out` AT 0 WITH
+    PARTY Tenant   DOES payRent AT 30
+    PARTY Tenant   DOES payRent AT 60
+    PARTY Landlord DOES apply AT 400
+
+-- C) requires-as-home TRUE but reversion BOUGHT FOR VALUE (and never occupied) => home condition FAILS
+--    => even WITH notice, the Court is NOT obliged: FULFILLED (no possession on Ground 1)
+#TRACE `lease, under Schedule 2` `claim bought for value` AT 0 WITH
+    PARTY Tenant   DOES payRent AT 30
+    PARTY Tenant   DOES payRent AT 60
+    PARTY Landlord DOES giveNotice AT 10
+    PARTY Landlord DOES apply AT 400

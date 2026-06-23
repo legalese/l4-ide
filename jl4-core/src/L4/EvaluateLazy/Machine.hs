@@ -22,6 +22,11 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+-- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
+-- driver in 'L4.EvaluateLazy'; not part of the stable public API.
+, tellEventRouted
+, currentLedgerEval
+, readEvalRef
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -68,6 +73,19 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
+import L4.Evaluate.Ledger
+  ( EventRoute (..)
+  , Ledger
+  , LedgerEvent (..)
+  , LedgerStore (..)
+  , Provenance (..)
+  , anonymousParty
+  , readCell
+  , readCellAll
+  , storeAppendOfficial
+  , storeAppendOwn
+  , storeOwnLedger
+  )
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
@@ -94,6 +112,49 @@ data Frame =
   | Post1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | Post2 WHNF {- -} (Expr Resolved) Environment
   | Post3 WHNF WHNF {- -}
+  -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (+ NOTIFY-v1 recipient). When a
+  -- @RECORD q's <cell> IS <v>@ carries a recipient qualifier, we evaluate the
+  -- recipient FIRST (mirroring 'ReadCell2'): 'Record0' holds the still-unevaluated
+  -- cell + value exprs, the env, isOfficial, and the M5 HENCE while the recipient
+  -- party expr evaluates; on its WHNF we key via 'partyKeyWHNF' and thread that
+  -- recipient key through the rest of the write.
+  --
+  -- 'Record1' waits for the cell to evaluate (holds the still-unevaluated value
+  -- expr, its env, isOfficial, the M5 HENCE, and the resolved recipient key —
+  -- 'Nothing' for a bare own write, @Just rk@ for a NOTIFY write); 'Record2'
+  -- waits for the value (holds the evaluated cell WHNF, isOfficial, the HENCE,
+  -- the env, and the recipient key). The 'Maybe (Expr Resolved)' is the M5 HENCE:
+  -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
+  -- the write an event-free deontic step (after 'tellEvent', forward
+  -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
+  -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
+  -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
+  -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
+  -- Once the cell is in hand we branch on the qualifier:
+  --   * isOfficial          -> read the OFFICIAL ledger, finish.
+  --   * Just partyExpr       -> push 'ReadCell2' (holding the cell WHNF) and
+  --                             forward-eval the party expr; on its value we key
+  --                             via 'partyKeyWHNF' and read that party's ledger.
+  --   * Nothing (default)    -> read the CURRENT party's own ledger, finish.
+  -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
+  -- through to 'finishRead' so the read folds the chosen ledger into either a
+  -- MAYBE (last) or a LIST (all).
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
+  -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
+  -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
+  -- the read against the named party's own ledger. The mode MUST be threaded here
+  -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
+  -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
+  | ReadCell2 WHNF RecallMode {- -}
+  -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
+  -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
+  -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
+  -- mirroring the 'EvalAsOfSystemTime2' save/restore-frame idiom. Carries the
+  -- party to restore TO (the enclosing party, or Nothing at the outer level).
+  | RestoreCurrentParty (Maybe Text)
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -165,6 +226,15 @@ data EvalState =
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
+    , envLedger  :: !(IORef LedgerStore) -- append-only event store (M0 substrate, M4
+                                         -- per-party + official record); always collected
+                                         -- (non-optional, unlike evalTrace)
+    , currentParty :: !(IORef (Maybe Text))
+                                     -- ^ M4: the party whose deontic HENCE/LEST we are
+                                     -- currently inside, so a RECORD fired there routes to
+                                     -- that party's own ledger. 'Nothing' = no enclosing
+                                     -- party (a top-level RECORD), routed to the anonymous
+                                     -- own ledger. Set/restored around 'continueWithFollowup'.
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -289,6 +359,70 @@ putTemporalContext :: TemporalContext -> Eval ()
 putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
+
+-----------------------------------------------------------------------------
+-- STATE-AS-LEDGER: the ledger operations as direct 'Eval' actions.
+--
+-- These used to be 'Machine' GADT constructors (TellEvent, CurrentLedger,
+-- PartyLedger, OfficialLedger, GetCurrentParty, PutCurrentParty) dispatched by
+-- 'interpMachine'. On the direct-Eval evaluator they are plain functions that
+-- read/write the two 'EvalState' IORef fields ('envLedger', 'currentParty').
+-- They live here (not in EvaluateLazy.hs) so 'runRecord'/'finishRead'/the
+-- backward frame arms can call them without an import cycle.
+-----------------------------------------------------------------------------
+
+-- | Read an IORef-typed 'EvalState' field. (origin/main has no generic
+-- readRef/writeRef helper, so we provide small local ones.)
+readEvalRef :: (EvalState -> IORef a) -> Eval a
+readEvalRef f = asks f >>= liftIO . readIORef
+
+-- | Write an IORef-typed 'EvalState' field.
+writeEvalRef :: (EvalState -> IORef a) -> a -> Eval ()
+writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
+
+-- | Append an event to the appropriate ledger (M4 routing).
+--
+-- A @RECORD@ ('RouteOwn') lands in the /current acting party's/ own ledger
+-- (keyed by 'currentParty', defaulting to 'anonymousParty' at top level). A
+-- @COMMIT@/@ATTEST@ ('RouteOfficial') lands in the shared official record.
+-- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
+tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
+tellEventRouted route ev = do
+  store <- asks (.envLedger)
+  case route of
+    RouteOfficial ->
+      liftIO (modifyIORef' store (storeAppendOfficial ev))
+    RouteOwn -> do
+      party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
+      liftIO (modifyIORef' store (storeAppendOwn party ev))
+    -- NOTIFY v1: the acting party performs the write, but the event lands in the
+    -- NAMED recipient's own ledger (keyed by 'partyKeyWHNF', the same key a
+    -- cross-party @RECALL@ reads). 'storeAppendOwn' already takes a 'Text' key —
+    -- we simply pass the recipient key instead of the acting party.
+    RouteNotify recipientKey ->
+      liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
+
+-- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
+currentLedgerEval :: Eval Ledger
+currentLedgerEval = do
+  party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
+  storeOwnLedger party <$> readEvalRef (.envLedger)
+
+-- | Read a NAMED party's own ledger (M4.5 cross-party @RECALL@).
+partyLedgerEval :: Text -> Eval Ledger
+partyLedgerEval key = storeOwnLedger key <$> readEvalRef (.envLedger)
+
+-- | Read the shared official record (M4.5 @RECALL OFFICIAL's@).
+officialLedgerEval :: Eval Ledger
+officialLedgerEval = (.officialLedger) <$> readEvalRef (.envLedger)
+
+-- | The party whose HENCE/LEST we are currently inside (M4).
+getCurrentParty :: Eval (Maybe Text)
+getCurrentParty = readEvalRef (.currentParty)
+
+-- | Set the current acting party (M4); restored via a 'RestoreCurrentParty' frame.
+putCurrentParty :: Maybe Text -> Eval ()
+putCurrentParty = writeEvalRef (.currentParty)
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -510,6 +644,33 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
+  Record _ann mParty cell val isOfficial mHence -> do
+    -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
+    -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
+    -- continuation is present, forward [time, events] to it (event-free deontic
+    -- step); otherwise return the written value (M1 expression use). The 'env' is
+    -- carried so the HENCE can be forwarded in the RECORD's lexical environment.
+    --
+    -- NOTIFY v1: if a recipient qualifier is present (@RECORD q's <cell> IS v@),
+    -- evaluate the RECIPIENT first (push 'Record0', mirroring 'ReadCell2'); on its
+    -- WHNF we key it via 'partyKeyWHNF' and route the write to that recipient's
+    -- own ledger. A bare @RECORD@ (no qualifier) carries 'Nothing' and routes to
+    -- the acting party's own ledger exactly as before.
+    case mParty of
+      Just partyExpr -> do
+        pushFrame (Record0 cell val env isOfficial mHence)
+        continueExpr env partyExpr
+      Nothing -> do
+        pushFrame (Record1 val env isOfficial mHence Nothing)
+        continueExpr env cell
+  ReadCell _ann mParty isOfficial mode cell -> do
+    -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
+    -- carrying the optional party qualifier (still unevaluated), the isOfficial
+    -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
+    -- routes to the right ledger (own / cross-party / official) and reads it,
+    -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
+    pushFrame (ReadCell1 mParty isOfficial mode env)
+    continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
   Concat _ann (e : es) -> do
@@ -547,6 +708,57 @@ backward val = withPoppedFrame $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
+  Just (Record0 cell valExpr env isOfficial mHence) -> do
+    -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
+    -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
+    -- write-key matches the recipient's read-key by construction. Carry that key
+    -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
+    -- cell exactly as a bare RECORD does.
+    let recipientKey = partyKeyWHNF val
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    continueExpr env cell
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
+    -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
+    -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
+    -- route the write and forward to the continuation.
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
+    continueExpr env valExpr
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
+    -- both the cell ('cellVal') and the value ('val') are evaluated: append the
+    -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
+    -- continuation (forward [time, events] to it); without, return the value (M1).
+    runRecord cellVal val isOfficial env mHence mRecipientKey
+  Just (ReadCell1 mParty isOfficial mode env) -> do
+    -- the cell has evaluated to 'val' (a String path). Route to the right
+    -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
+    --   * isOfficial   -> read the shared OFFICIAL record.
+    --   * Just party    -> evaluate the party qualifier (push ReadCell2 holding
+    --                      the cell AND the mode), then key it and read that
+    --                      party's ledger.
+    --   * Nothing       -> read the CURRENT acting party's own ledger (M1.5).
+    if isOfficial
+      then do
+        ledger <- officialLedgerEval
+        finishRead mode val ledger
+      else case mParty of
+        Just partyExpr -> do
+          pushFrame (ReadCell2 val mode)
+          continueExpr env partyExpr
+        Nothing -> do
+          ledger <- currentLedgerEval
+          finishRead mode val ledger
+  Just (ReadCell2 cellVal mode) -> do
+    -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
+    -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
+    -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
+    let key = partyKeyWHNF val
+    ledger <- partyLedgerEval key
+    finishRead mode cellVal ledger
+  Just (RestoreCurrentParty mOriginal) -> do
+    -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
+    -- restore the enclosing acting party and pass the value on unchanged (M4).
+    putCurrentParty mOriginal
+    continueBackward val
   Just (BinBuiltin1 binOp r) -> do
     pushFrame (BinBuiltin2 binOp val)
     continueRef r
@@ -980,21 +1192,31 @@ backwardContractFrame val = \ case
       -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
       -- MAY: deadline passed without exercising permission = FULFILLED (or HENCE if specified)
       then case act.modal of
-        DMustNot ->
+        DMustNot -> do
           -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
-          -- Continue with HENCE (followup), which defaults to FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
-        DMay ->
-          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
+          -- Continue with HENCE (followup), which defaults to FULFILLED.
+          -- Force the obligation party first so the followup is attributed to it.
+          t <- allocateValue ev'time
+          pushCFrame (ResolveParty ResolvePartyFrame {followup, env, events, time = t})
+          maybeEvaluate env party
+        DMay -> do
+          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED.
+          -- Force the obligation party first so the followup is attributed to it.
+          t <- allocateValue ev'time
+          pushCFrame (ResolveParty ResolvePartyFrame {followup, env, events, time = t})
+          maybeEvaluate env party
         _ -> -- DMust, DDo: deadline passed = failure
           case lest of
             Nothing -> do
               -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
               partyR <- either (`allocate_` env) allocateValue party
               continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
-            Just lestFollowup -> allocateValue ev'time
-              >>= continueWithFollowup env lestFollowup events
+            Just lestFollowup -> do
+              -- Force the obligation party first so a RECORD in the LEST reparation
+              -- attributes to it, not the anonymous ledger.
+              t <- allocateValue ev'time
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = lestFollowup, env, events, time = t})
+              maybeEvaluate env party
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -1038,7 +1260,7 @@ backwardContractFrame val = \ case
           DMustNot -> case lest of
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> allocateValue time
-              >>= continueWithFollowup (env `Map.union` henceEnv) lestFollowup events
+              >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) lestFollowup events
             -- No LEST clause: immediate breach
             Nothing -> do
               -- Extract timestamp from time (which has been updated to event time)
@@ -1051,12 +1273,17 @@ backwardContractFrame val = \ case
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
           -- MUST, MAY, DO: action done = success
           _ -> allocateValue time
-            >>= continueWithFollowup (env `Map.union` henceEnv) followup events
+            >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) followup events
       ValBool False -> do
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
+  ResolveParty ResolvePartyFrame {..} ->
+    -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
+    -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
+    -- does, so a RECORD in the followup/reparation attributes to the real party.
+    continueWithFollowup (Just (partyKeyWHNF val)) env followup events time
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -1144,8 +1371,23 @@ backwardContractFrame val = \ case
 
     pushCFrame = pushFrame . ContractFrame
 
-    continueWithFollowup :: Environment -> RExpr -> Reference -> Reference -> Machine Config
-    continueWithFollowup env followup events time = do
+    -- M4 party-threading hinge: set the acting party for the DURATION of the
+    -- HENCE/LEST body, so a RECORD fired inside it routes to that party's own
+    -- ledger and stamps its provenance. Because the CEK machine is trampolined
+    -- (the followup is forced later by 'runConfig', not inline here), a plain
+    -- monadic bracket would restore the party BEFORE the followup runs. So we
+    -- use the SAME save/restore-FRAME idiom as 'EvalAsOfSystemTime': capture the
+    -- enclosing party, set the new one, and push 'RestoreCurrentParty' FIRST (so
+    -- it is processed LAST — after the followup and its App1 continuation have
+    -- fully evaluated). The party is rendered to a 'Text' key by 'partyKey…'; an
+    -- unevaluated/unkeyable party yields 'Nothing' (the RECORD then falls back to
+    -- the anonymous own ledger), and a nested obligation's own followup re-sets
+    -- and re-restores the party around its body.
+    continueWithFollowup :: Maybe Text -> Environment -> RExpr -> Reference -> Reference -> Machine Config
+    continueWithFollowup mParty env followup events time = do
+      mOriginal <- getCurrentParty
+      putCurrentParty mParty
+      pushFrame (RestoreCurrentParty mOriginal)
       pushFrame (App1 [time, events] Nothing)
       continueExpr env followup
 
@@ -1156,6 +1398,108 @@ backwardContractFrame val = \ case
 
 maybeEvaluate :: Environment -> MaybeEvaluated -> Machine Config
 maybeEvaluate env = either (continueExpr env) continueBackward
+
+-- | STATE-AS-LEDGER: render a forced party WHNF to the 'Text' key that names its
+-- own ledger. A 'ValString' is its own key; anything else falls back to its
+-- pretty layout. This is the SINGLE keying function used both by a RECORD write
+-- (via 'continueWithFollowup' / 'currentParty') and a cross-party RECALL read
+-- (via 'ReadCell2'), so read-key ≡ write-key by construction.
+partyKeyWHNF :: WHNF -> Text
+partyKeyWHNF = \ case
+  ValString t -> t
+  v           -> prettyLayout v
+
+-- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (typed nested schemas are deferred).
+-- We append an 'Assign' event to the ledger (D2 / Rung 3 — an APPEND, not a
+-- store) and return the written value so it can chain in a HENCE continuation.
+--
+-- M4: own ('RECORD') writes route to the acting party's own ledger, official
+-- ('COMMIT'/'ATTEST') writes route to the shared official record. The acting
+-- party is read from 'getCurrentParty' (set by 'continueWithFollowup' around the
+-- HENCE/LEST body) and recorded in the provenance @party@. A top-level
+-- @#EVAL RECORD@ has no enclosing party, so @party@ is "" and it routes to the
+-- anonymous own ledger.
+--
+-- M5: 'runRecord' fires the write EXACTLY ONCE per forward-eval of the 'Record'
+-- node — it is reached precisely when the 'Record2' frame is popped (once). It
+-- then branches on the optional HENCE continuation @mHence@:
+--
+--   * 'Nothing' (M1, expression position): 'continueBackward' the written value.
+--   * @Just hence@ (M5, deontic step): 'continueExpr' the continuation in the
+--     RECORD's lexical @env@. The 'App1 [time, events]' that the ENCLOSING
+--     'continueWithFollowup' already pushed is still on the stack, so once
+--     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
+--     @[time, events]@ — the next step scrutinizes the SAME event stream.
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey = do
+  cell <- expectString cellVal
+  -- M2 provenance enrichment: stamp the write with the directive's evaluation
+  -- time ('getEvalTime', the same clock the deontic state machine and
+  -- @EVAL AS OF SYSTEM TIME@ already use) and the real write kind in 'source'.
+  evalNow <- getEvalTime
+  mParty  <- getCurrentParty
+  let prov = MkProvenance
+        { party    = fromMaybe "" mParty
+        , source   = if isOfficial then "COMMIT"
+                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
+        , position = Just (formatUTCTimeIso evalNow)
+        }
+      -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
+      -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes
+      -- to the acting party's own ledger ('RouteOwn'); COMMIT/ATTEST stays
+      -- official. The recipient key was computed via 'partyKeyWHNF' (Record0), the
+      -- same key a cross-party RECALL reads — so write-key ≡ read-key.
+      route = if isOfficial
+              then RouteOfficial
+              else maybe RouteOwn RouteNotify mRecipientKey
+  tellEventRouted route (Assign [cell] val prov)
+  case mHence of
+    Nothing    -> continueBackward val          -- M1: terminal / expression use
+    Just hence -> continueExpr env hence        -- M5: become the deontic continuation
+
+-- | STATE-AS-LEDGER M1.5 / M4.5 (+ approach B): finish a RECALL (cell read)
+-- against a given ledger, in the requested 'RecallMode'.
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (mirroring 'runRecord'). The @ledger@ is
+-- chosen by the caller — the current party's own ledger (M1.5, the default), a
+-- named party's own ledger (M4.5 cross-party), or the shared official record
+-- (M4.5 @official's@).
+--
+--   * 'RecallLast' (@RECALL …@): read the LATEST projection via 'readCell'
+--     (D2: a fold over the append log, last-write-wins). Result @MAYBE a@:
+--     @JUST v@ when the cell has been written there, @NOTHING@ otherwise.
+--   * 'RecallAll' (@RECALL ALL …@, approach B): fold EVERY 'Assign' to the
+--     cell into a @LIST OF a@ via 'readCellAll' (oldest->newest, append order),
+--     building it right-to-left as 'ValCons'/'ValNil'. Result @[]@ (ValNil)
+--     when the cell has never been written there — NOT @NOTHING@.
+finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
+finishRead mode cellVal ledger = do
+  cell <- expectString cellVal
+  case mode of
+    RecallLast ->
+      case readCell [cell] ledger of
+        Just storedVal -> do
+          valueRef <- allocateValue storedVal
+          continueBackward (ValConstructor TypeCheck.justRef [valueRef])
+        Nothing ->
+          continueBackward (ValConstructor TypeCheck.nothingRef [])
+    RecallAll -> do
+      -- oldest->newest list of every assignment to this cell. Build the spine
+      -- right-to-left as ValCons cells terminating in ValNil (ValueLazy list
+      -- representation): the resulting WHNF has the oldest value at the head.
+      let storedVals = readCellAll [cell] ledger
+      listVal <- foldrM
+        (\v tailWHNF -> do
+            headRef <- allocateValue v
+            tailRef <- allocateValue tailWHNF
+            pure (ValCons headRef tailRef))
+        ValNil
+        storedVals
+      continueBackward listVal
 
 matchGivens :: GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
 matchGivens (MkGivenSig _ann otns) f es = do
@@ -2480,7 +2824,47 @@ contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> 
 contractToEvalDirective contract t evs = do
   pure $ App emptyAnno TypeCheck.evalContractRef [contract, t, evListExpr]
   where
-  evListExpr = List emptyAnno $ map eventExpr evs
+  -- A trace is a SET of timestamped facts that must be processed in time order.
+  -- STABLE-sort the authored #TRACE/EVALTRACE WITH event list by AT (nondecreasing),
+  -- preserving authored order for equal timestamps. This is the single point where the
+  -- event stream is built and handed to residuation, so it uniformly governs all
+  -- RAND/ROR strands. A stable sort of an already-monotonic trace is the identity, and
+  -- we do NOT touch the deadline/blame logic: sorting makes its "earlier events already
+  -- seen" assumption hold.
+  --
+  -- We only reorder genuine literal-AT 'Event' nodes relative to one another. Entries
+  -- whose AT is not a literal at parse time (e.g. @`WAIT UNTIL` 100@, which is a runtime
+  -- @Number -> Event@ application, or an already-desugared event) carry no extractable
+  -- key and stay PINNED in their authored positions -- 'sortByStablePinned' never moves
+  -- an unkeyed element. This is why we use a comparison that only orders when both keys
+  -- are present, rather than a plain @sortOn@ (which would float unkeyed entries to one
+  -- end and scramble positional markers like WAIT UNTIL).
+  evListExpr = List emptyAnno $ map eventExpr (sortByStablePinned eventAtKey evs)
+
+-- | Sort key for an authored event: the literal AT timestamp as a 'Rational'.
+-- Non-literal or already-desugared events yield 'Nothing'.
+eventAtKey :: Expr Resolved -> Maybe Rational
+eventAtKey (Event _ann (MkEvent _ _ _ (Lit _ (NumericLit _ r)) _)) = Just r
+eventAtKey _ = Nothing
+
+-- | A stable sort by a partial key that leaves every element whose key is 'Nothing'
+-- pinned at its original index. Keyed elements ('Just') are stably sorted by their key
+-- among themselves and then poured back into the non-pinned slots in that sorted order;
+-- equal keys preserve authored order. Unkeyed elements (e.g. @`WAIT UNTIL` 100@, whose
+-- AT is not a parse-time literal) never move, so positional markers are preserved.
+-- For an all-keyed, already-monotonic list this is the identity.
+sortByStablePinned :: Ord k => (a -> Maybe k) -> [a] -> [a]
+sortByStablePinned key xs =
+  let keyed  = [ (k, x) | x <- xs, Just k <- [key x] ]
+      sorted = map snd (sortOn fst keyed)   -- stable sort of just the keyed elements
+  in  refill sorted xs
+  where
+    refill _      []       = []
+    refill sorted (x : rest) = case key x of
+      Nothing -> x : refill sorted rest                       -- pinned slot
+      Just _  -> case sorted of
+        (s : ss) -> s : refill ss rest
+        []       -> x : refill [] rest                        -- unreachable
 
 eventExpr :: Expr Resolved -> Expr Resolved
 eventExpr (Event _ann ev) = desugarEvent ev
@@ -3158,6 +3542,13 @@ parseDatetimeText raw =
 formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
+
+-- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
+-- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
+-- only have the evaluation clock and no tz context.
+formatUTCTimeIso :: UTCTime -> Text
+formatUTCTimeIso utc =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text

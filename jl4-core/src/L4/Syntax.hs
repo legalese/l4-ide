@@ -237,6 +237,67 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
+  | Record     Anno (Maybe (Expr n)) (Expr n) (Expr n) Bool (Maybe (Expr n))
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). An optional /recipient/
+    -- party-qualifier, a cell expr, a value expr, an isOfficial flag, and an
+    -- optional @HENCE@ continuation (M5).
+    --
+    -- The leading 'Maybe (Expr n)' is the NOTIFY-v1 /recipient/ qualifier: the
+    -- symmetric WRITE to 'ReadCell'\'s cross-party READ. @Nothing@ is the M1 own
+    -- write (@RECORD <cell> IS <v>@ lands in the acting party's OWN ledger);
+    -- @Just q@ is the recipient-qualified write (@RECORD q's <cell> IS <v>@), in
+    -- which the acting party performs the write but the value lands in @q@'s own
+    -- ledger, keyed via the SAME 'partyKeyWHNF' that @RECALL q's <cell>@ reads
+    -- from — so a NOTIFY write and a recipient's read match by construction.
+    -- Parser-enforced invariant: @isOfficial == True@ (@COMMIT@/@ATTEST@) implies
+    -- the recipient 'Maybe' is 'Nothing' (an official write has no recipient),
+    -- mirroring 'ReadCell'\'s @isOfficial ⟹ no party@ invariant.
+    --
+    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger,
+    -- or a recipient's own ledger when qualified), 'True' = @COMMIT@/@ATTEST@
+    -- (the shared official record). The flag is stored faithfully so M4 can split
+    -- own/official.
+    --
+    -- The final 'Maybe (Expr n)' is the M5 @HENCE@ continuation: 'Nothing' is the
+    -- M1 expression-position form (@RECORD <cell> IS <v>@ evaluates to @v@);
+    -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
+    -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
+    -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
+  | ReadCell   Anno (Maybe (Expr n)) Bool RecallMode (Expr n)
+    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5 / M4.5).
+    -- @RECALL [ALL] [<party>'s | OFFICIAL's] <cell>@. (@OFFICIAL@ is a
+    -- case-sensitive keyword, all-caps like @RECORD@/@COMMIT@/@RECALL@; lowercase
+    -- @official@ remains an ordinary identifier.)
+    --
+    -- The fields are: an optional /party-qualifier/ expression, an /isOfficial/
+    -- flag, a 'RecallMode' (last-write-wins vs collect-all, approach B), and the
+    -- /cell/ expr (a string-keyed path: a backtick ident or string literal, the
+    -- same surface as 'Record').
+    --
+    -- The 'RecallMode' axis is orthogonal to the party/official axis: any of the
+    -- six combinations (own/party/official x last/all) is well-formed. With
+    -- 'RecallLast' the read is last-write-wins and yields @MAYBE a@; with
+    -- 'RecallAll' (@RECALL ALL …@) it folds EVERY 'Assign' to the cell into a
+    -- @LIST OF a@, oldest->newest (empty list when never written — deliberately
+    -- NOT @NOTHING@, the intended difference from plain @RECALL@'s @MAYBE a@).
+    --
+    --   * @RECALL <cell>@            — @(Nothing, False)@: read the CURRENT acting
+    --     party's own ledger (the M1.5 default, unchanged).
+    --   * @RECALL <party>'s <cell>@  — @(Just party, False)@: read ANOTHER party's
+    --     OWN ledger. The party qualifier is a NAME-RESOLVED expression (the same
+    --     party value a PARTY clause uses), rendered via @partyKeyWHNF@ so the
+    --     read key matches a write key exactly.
+    --   * @RECALL OFFICIAL's <cell>@ — @(Nothing, True)@: read the shared OFFICIAL
+    --     record (the COMMIT/ATTEST target).
+    --
+    -- Parser-enforced invariant: @isOfficial == True@ implies the @Maybe@ is
+    -- 'Nothing' (an official read has no party qualifier). This mirrors 'Record'\'s
+    -- flat (cell, val, isOfficial, mHence) encoding rather than a parameterized
+    -- sum, so no extra instance derivation is needed.
+    --
+    -- It forward-evaluates the cell to a 'Path', reads the latest 'snapshot'
+    -- projection of the routed M0/M4 ledger, and yields @MAYBE a@ — @JUST v@ if
+    -- the cell has been written there, @NOTHING@ otherwise.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
@@ -250,6 +311,16 @@ data InertContext
   = InertCtxAnd   -- ^ In AND context, evaluates to True (AND identity)
   | InertCtxOr    -- ^ In OR context, evaluates to False (OR identity)
   | InertCtxNone  -- ^ Default context, evaluates to True
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | How a @RECALL@ projects the append-only ledger (STATE-AS-LEDGER approach B).
+-- A named sum (rather than a second bare 'Bool' adjacent to @isOfficial@ in
+-- 'ReadCell') so the last-vs-all axis is distinct from the own/party/official
+-- axis and cannot be silently transposed at a deconstruction site.
+data RecallMode
+  = RecallLast  -- ^ @RECALL …@: last-write-wins, yields @MAYBE a@.
+  | RecallAll   -- ^ @RECALL ALL …@: collect every assignment, yields @LIST OF a@.
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -738,6 +809,27 @@ instance ToConcreteNodes PosToken Text where
 instance ToConcreteNodes PosToken InertContext where
   toNodes _ = pure []
 
+-- RecallMode has no concrete syntax nodes (the ALL keyword is captured in the
+-- surrounding Anno of the RECALL expression, like Record's isOfficial flag)
+instance ToConcreteNodes PosToken RecallMode where
+  toNodes _ = pure []
+
+-- The empty-surface payload fields (Bool isOfficial, RecallMode mode) still
+-- occupy one holeFit slot in the generic exactprint traversal, so the parser
+-- emits a placeholder 'annoHole' for each in field-declaration order (see
+-- recordOrCommitExpr / recallExpr). 'annoHole' needs 'HasSrcRange'; an empty
+-- field contributes no surface, so its hole-hint range is 'Nothing'.
+instance HasSrcRange RecallMode where
+  rangeOf _ = Nothing
+
+-- Bool has no concrete syntax nodes (used in Record for the isOfficial flag;
+-- the RECORD/COMMIT/ATTEST keyword is already captured in the surrounding Anno)
+instance ToConcreteNodes PosToken Bool where
+  toNodes _ = pure []
+
+instance HasSrcRange Bool where
+  rangeOf _ = Nothing
+
 instance ToConcreteNodes PosToken Name where
   toNodes (MkName ann _) =
     flattenConcreteNodes ann []
@@ -848,6 +940,7 @@ deriving anyclass instance Serialise n => Serialise (TypeDecl n)
 deriving anyclass instance Serialise n => Serialise (ConDecl n)
 deriving anyclass instance Serialise n => Serialise (Expr n)
 deriving anyclass instance Serialise InertContext
+deriving anyclass instance Serialise RecallMode
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise DeonticModal
