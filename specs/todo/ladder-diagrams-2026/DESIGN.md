@@ -554,15 +554,20 @@ its own node.)
 - **"Left of a stack" is not a special case** — express it as a conjunction:
   `inert … (stack)`. In LR a series puts the leading inert to the left for free.
   So no dedicated "left heading" placement is needed.
-- **Conjunctive (series) inerts → above the unbroken wire** (default
-  `connectiveStyle: 'above-wire'`). The wire stays *continuous* (inert = identity =
-  always conducts, so the line must not break for it) and the prose sits just above
-  it. This makes inert placement uniform: **all inert text lives above what it
+- **Conjunctive (series) inerts → an unbroken wire, prose above** — the wire stays
+  *continuous* (inert = identity = always conducts, so the line must not break for
+  it). This makes inert placement uniform: **all inert text lives above what it
   annotates** — headings above stacks, connectives above wires — one reading rule.
-  `'below-wire'` (prose below) and `'on-wire'` (text in a gap the series leaves)
-  remain as toggles; `'on-wire'` is discouraged because the gap reads like a
-  contact, which inert never is.
-- *(Open: disjunctive medial inert placement — an inert *between* OR rungs.)*
+- **Long connectives straddle the wire** (default `connectiveStyle: 'straddle-wire'`,
+  *adaptive*): prose wider than ~a box (`STRADDLE_MIN_WIDTH`) word-wraps to two
+  width-balanced lines, half above / half below, the wire threading between —
+  ~halving the horizontal footprint (which long verbatim inert prose otherwise
+  wastes) at the cost of vertical space (which a series has to spare). Short prose
+  stays a single line above, so `'straddle-wire'` is a strict superset of
+  `'above-wire'`. `'below-wire'` and `'on-wire'` remain toggles; `'on-wire'` is
+  discouraged (its gap reads like a contact, which inert never is).
+- *(Open: disjunctive medial inert placement — an inert *between* OR rungs; and
+  whether to generalize straddle to N lines for very long statutory clauses.)*
 
 **Scene IR / layout.** The `text` prim gains roles `heading` and `connective`
 (unboxed, italic, inert ink — no rect, no ports). `measureOr` extracts the leading

@@ -96,8 +96,11 @@ export type Theme = 'screen' | 'ink'
  *  'on-wire'    — text sits on the line, in a gap the series leaves (it "rides").
  *  'above-wire' — continuous wire; text sits above it (matches OR heading-above, so
  *                 all inert text lives above what it annotates — one reading rule).
- *  'below-wire' — continuous wire; text drops just below it. */
-export type ConnectiveStyle = 'on-wire' | 'above-wire' | 'below-wire'
+ *  'below-wire' — continuous wire; text drops just below it.
+ *  'straddle-wire' — long prose word-wraps across the wire (half above, half below,
+ *                 the line threading between); ~halves the horizontal footprint at
+ *                 the cost of vertical space. Single words fall back to 'above-wire'. */
+export type ConnectiveStyle = 'on-wire' | 'above-wire' | 'below-wire' | 'straddle-wire'
 
 export interface ViewSpec {
   readonly foldSet: ReadonlySet<NodeId>
@@ -115,7 +118,7 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     scale: partial.scale ?? 'full',
     orient: partial.orient ?? 'LR',
     theme: partial.theme ?? 'screen',
-    connectiveStyle: partial.connectiveStyle ?? 'above-wire',
+    connectiveStyle: partial.connectiveStyle ?? 'straddle-wire',
   }
 }
 
