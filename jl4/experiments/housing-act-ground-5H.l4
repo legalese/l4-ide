@@ -1,0 +1,425 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5H (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5H — the "eligibility conditions" MANDATORY ground, inserted into
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26),
+-- Sch. 1 para. 19 (commencement 1.5.2026 for specified purposes; S.I. 2026/421,
+-- reg. 2(b), marker F28). Part I (mandatory): where made out, the court MUST
+-- order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded (a CHAPEAU followed by a CONJUNCTION (a)-(e)):
+--   "The landlord seeking possession is a registered provider of social housing
+--    or a charity and—
+--      (a) the tenancy was granted because the tenant met one or more eligibility
+--          conditions,
+--      (b) a written tenancy agreement set out the eligibility condition (the
+--          'specified condition') or the eligibility conditions (the 'specified
+--          conditions') that the tenant met,
+--      (c) either—
+--            (i) the tenant no longer meets the specified condition or specified
+--                conditions, or
+--           (ii) the tenancy was granted in order to provide accommodation for a
+--                limited period to help the tenant transition to living
+--                independently and that period has come to an end,
+--      (d) the rent is no higher than 80% of market rent (and here 'rent' and
+--          'market rent' include any amount payable by way of service charge), and
+--      (e) the tenancy was not granted—
+--            (i) pursuant to a nomination as mentioned in section 159(2)(c) of the
+--                Housing Act 1996,
+--           (ii) as a tenancy of supported accommodation, or
+--          (iii) in pursuance of a local housing authority's duty under section 193
+--                of the Housing Act 1996."
+--
+-- CARRIED AS INERT PROSE (definitions / interpretive rules, NOT operative limbs):
+--   * the "eligibility condition" menu ((a) in/specified work for pay; (b)
+--     actively seeking such work; (c) of a particular age / within a range);
+--   * the "description of work" clarifications (employer/place/amount/duration);
+--   * "work includes self-employment / seeking work includes seeking to become
+--     self-employed";
+--   * the "no longer meets ... determined in accordance with the terms of the
+--     tenancy agreement" rule, and the "But if the terms make no provision ... and
+--     there are 2+ specified conditions and the tenant no longer meets one or more,
+--     the tenant no longer meets the specified conditions" rule;
+--   * the Secretary of State "eligibility condition regulations" power.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * Made out = (chapeau: RP-of-social-housing OR charity) AND (a) AND (b) AND
+--     (c){(i) OR (ii)} AND (d) AND (e){NOT(i) AND NOT(ii) AND NOT(iii)}.
+--   * "one or more eligibility conditions" / "the specified condition or specified
+--     conditions": the *which-conditions* enumeration is carried as the inert
+--     eligibility-condition menu; the operative content is reduced to single
+--     BOOLEAN atoms — limb (a) "the tenancy was granted because the tenant met one
+--     or more eligibility conditions", limb (b) "a written tenancy agreement set
+--     out the specified condition(s) the tenant met", and limb (c)(i) "the tenant
+--     no longer meets the specified condition or specified conditions" — each an
+--     atom answered by the facts (and, for (c)(i), per the tenancy agreement's
+--     terms / the "But if" fallback, both carried inert here). We do NOT model the
+--     menu as a list of separate operative conditions, because the ground turns on
+--     whether the agreement's *specified* condition(s) were met / no longer met,
+--     not on re-deriving eligibility from first principles.
+--   * (c) is an EITHER/OR of two limbs (i) and (ii); (ii) additionally requires the
+--     limited transition period to have "come to an end".
+--   * (d) modelled like Ground 1B's rent test: rent AT MOST 0.8 * market-rent, with
+--     both figures already service-charge-inclusive by construction.
+--   * (e) is a NEGATIVE limb — "the tenancy was not granted [via any of
+--     (i)/(ii)/(iii)]" — so the limb is satisfied iff NONE of the three routes
+--     applies: NOT(i) AND NOT(ii) AND NOT(iii).
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Ground5HClaim HAS
+  -- chapeau (disjunction)
+  `landlord is a registered provider of social housing`              IS A BOOLEAN
+  `landlord is a charity`                                            IS A BOOLEAN
+  -- (a)
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS A BOOLEAN
+  -- (b)
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS A BOOLEAN
+  -- (c)(i)
+  `the tenant no longer meets the specified condition or specified conditions`  IS A BOOLEAN
+  -- (c)(ii)
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS A BOOLEAN
+  `that limited period has come to an end`                           IS A BOOLEAN
+  -- (d) — rent test (both figures include any service charge)
+  `rent`                                                             IS A NUMBER
+  `market rent`                                                      IS A NUMBER
+  -- (e) — negative limb: the tenancy was NOT granted via any of these routes
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS A BOOLEAN
+  `tenancy was granted as a tenancy of supported accommodation`      IS A BOOLEAN
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS A BOOLEAN
+
+§§ `Chapeau — landlord is a registered provider of social housing or a charity`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`chapeau — registered provider of social housing or a charity` claim MEANS
+        "The landlord seeking possession is"
+    ..  "a registered provider of social housing"
+        ..  claim's `landlord is a registered provider of social housing`
+    ..  "or a charity"
+        ..  claim's `landlord is a charity`
+
+§§ `(a) — tenancy granted because the tenant met one or more eligibility conditions`
+
+-- The "eligibility condition" menu is carried as inert prose below; the operative
+-- content of (a) reduces to the single atom.
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(a) — granted because tenant met one or more eligibility conditions` claim MEANS
+        "(a) the tenancy was granted because the tenant met one or more eligibility conditions,"
+    ... claim's `tenancy was granted because the tenant met one or more eligibility conditions`
+
+§§ `(b) — written tenancy agreement set out the specified condition(s) the tenant met`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(b) — written agreement set out the specified condition(s)` claim MEANS
+        "(b) a written tenancy agreement set out the eligibility condition (the 'specified condition') or the eligibility conditions (the 'specified conditions') that the tenant met,"
+    ... claim's `a written tenancy agreement set out the specified condition(s) that the tenant met`
+
+§§ `(c) — either (i) no longer meets, or (ii) the limited transition period has ended`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(c)(i) — tenant no longer meets the specified condition(s)` claim MEANS
+        "(i) the tenant no longer meets the specified condition or specified conditions,"
+    ... claim's `the tenant no longer meets the specified condition or specified conditions`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(c)(ii) — limited transition period has come to an end` claim MEANS
+        "(ii) the tenancy was granted in order to provide accommodation for a limited period to help the tenant transition to living independently"
+    ... claim's `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`
+    AND "and that period has come to an end,"
+    ... claim's `that limited period has come to an end`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(c) — either (i) or (ii)` claim MEANS
+        "(c) either—"
+    ..  `(c)(i) — tenant no longer meets the specified condition(s)` claim
+    ..  `(c)(ii) — limited transition period has come to an end` claim
+
+§§ `(d) — rent is no higher than 80% of market rent`
+
+-- Like Ground 1B's rent test: rent AT MOST 0.8 * market rent. Both figures already
+-- include any amount payable by way of service charge, by construction of the data.
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(d) — rent is no higher than 80% of market rent` claim MEANS
+        "(d) the rent is no higher than 80% of market rent (and here 'rent' and 'market rent' include any amount payable by way of service charge),"
+    ... claim's `rent`
+            AT MOST (0.8 TIMES claim's `market rent`)
+
+§§ `(e) — the tenancy was NOT granted via any of the excluded routes (negative limb)`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`tenancy was granted via an excluded route` claim MEANS
+        "(i) pursuant to a nomination as mentioned in section 159(2)(c) of the Housing Act 1996,"
+    ..  claim's `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`
+    ..  "(ii) as a tenancy of supported accommodation, or"
+    ..  claim's `tenancy was granted as a tenancy of supported accommodation`
+    ..  "(iii) in pursuance of a local housing authority's duty under section 193 of the Housing Act 1996."
+    ..  claim's `tenancy was granted in pursuance of a local housing authority's s.193 duty`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`(e) — tenancy was not granted via an excluded route` claim MEANS
+        "(e) the tenancy was not granted—"
+    ... NOT `tenancy was granted via an excluded route` claim
+
+§§ `Definitions and interpretive rules (inert prose)`
+
+-- The "eligibility condition" menu — carried as inert scaffolding, not lifted to
+-- separate operative limbs (see the interpretation note in the header).
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`definition — eligibility condition` claim MEANS
+        "Each of the following is an 'eligibility condition' for the purposes of this ground—"
+    ..  "(a) the tenant is in work, or work of a description specified in the condition, for which the tenant is paid;"
+    ..  "(b) the tenant is actively seeking work, or work of a description specified in the condition, for which the tenant would be paid;"
+    ..      "(c) the tenant is—"
+        ..  "(i) of a particular age, or"
+        ..  "(ii) within a particular range of ages,"
+        ..  "specified in the condition."
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`definition — description of work` claim MEANS
+        "For the purposes of paragraph (a) or (b) of the definition of 'eligibility condition', a description of work may (in particular) be expressed by reference to—"
+    ..  "(a) work for a particular employer or description of employer or work at a particular place of work or description of place of work;"
+    ..  "(b) the amount which the tenant is paid for the work;"
+    ..  "(c) the duration or expected duration of the contract or other arrangement under which the work is done."
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`definition — work includes self-employment` claim MEANS
+        "In this ground a reference—"
+    ..  "(a) to work includes self-employment;"
+    ..  "(b) to seeking work includes seeking to become self-employed."
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`rule — no-longer-meets is determined by the tenancy agreement terms` claim MEANS
+        "The question of whether the tenant no longer meets the specified condition or specified conditions is to be determined for the purposes of this ground in accordance with the terms of the tenancy agreement."
+    ... "But if—"
+    ...     "(a) the terms of the tenancy agreement do not make any provision about that question,"
+    ...     "(b) there are two or more specified conditions, and"
+    ...     "(c) the tenant no longer meets one or more of those conditions,"
+    ...     "the tenant no longer meets the specified conditions for the purposes of this ground."
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`power — eligibility condition regulations` claim MEANS
+        "The Secretary of State may by regulations ('eligibility condition regulations') make provision (including provision amending this ground)—"
+    ..  "(a) to add, vary or remove any eligibility condition;"
+    ..  "(b) about the meaning of any eligibility condition."
+    -- "Eligibility condition regulations may make different provision for different
+    --  purposes. A statutory instrument containing eligibility condition regulations
+    --  may not be made unless a draft of the instrument has been laid before and
+    --  approved by a resolution of each House of Parliament."
+
+§§ `Ground 5H made out — chapeau AND (a) AND (b) AND (c) AND (d) AND (e)`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A BOOLEAN
+`Ground 5H made out` claim MEANS
+        `chapeau — registered provider of social housing or a charity` claim
+    AND "and—"
+    ... `(a) — granted because tenant met one or more eligibility conditions` claim
+    AND `(b) — written agreement set out the specified condition(s)` claim
+    AND `(c) — either (i) or (ii)` claim
+    AND `(d) — rent is no higher than 80% of market rent` claim
+    AND `(e) — tenancy was not granted via an excluded route` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5HClaim
+GIVETH A DEONTIC Actor Action
+`ground 5H possession order` claim MEANS
+    IF   `Ground 5H made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — chapeau (RP) and (a)-(e), via (c)(i)`
+
+`claim all-met via (c)(i)` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT `chapeau — registered provider of social housing or a charity` `claim all-met via (c)(i)`
+#ASSERT `(a) — granted because tenant met one or more eligibility conditions` `claim all-met via (c)(i)`
+#ASSERT `(b) — written agreement set out the specified condition(s)` `claim all-met via (c)(i)`
+#ASSERT `(c)(i) — tenant no longer meets the specified condition(s)` `claim all-met via (c)(i)`
+#ASSERT `(c) — either (i) or (ii)` `claim all-met via (c)(i)`
+#ASSERT `(d) — rent is no higher than 80% of market rent` `claim all-met via (c)(i)`
+#ASSERT `(e) — tenancy was not granted via an excluded route` `claim all-met via (c)(i)`
+#ASSERT `Ground 5H made out` `claim all-met via (c)(i)`
+
+§§ `Ground made out — chapeau (charity) and via (c)(ii), the transition limb`
+
+-- Tenant still meets the specified conditions, but the tenancy was a limited-period
+-- transition that has ended; and the landlord is a charity, not an RP.
+`claim all-met via (c)(ii)` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS FALSE
+  `landlord is a charity`                                            IS TRUE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS FALSE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS TRUE
+  `that limited period has come to an end`                           IS TRUE
+  `rent`                                                             IS 800
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `(c)(i) — tenant no longer meets the specified condition(s)` `claim all-met via (c)(ii)`
+#ASSERT `(c)(ii) — limited transition period has come to an end` `claim all-met via (c)(ii)`
+#ASSERT `(c) — either (i) or (ii)` `claim all-met via (c)(ii)`
+#ASSERT `chapeau — registered provider of social housing or a charity` `claim all-met via (c)(ii)`
+#ASSERT `Ground 5H made out` `claim all-met via (c)(ii)`
+
+§§ `Chapeau knocked out — landlord is neither an RP nor a charity`
+
+`claim — chapeau fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS FALSE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `chapeau — registered provider of social housing or a charity` `claim — chapeau fails`
+#ASSERT NOT `Ground 5H made out`                                          `claim — chapeau fails`
+
+§§ `(a) knocked out — tenancy not granted because the tenant met any eligibility condition`
+
+`claim — (a) fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS FALSE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `(a) — granted because tenant met one or more eligibility conditions` `claim — (a) fails`
+#ASSERT NOT `Ground 5H made out`                                                 `claim — (a) fails`
+
+§§ `(b) knocked out — no written agreement set out the specified condition(s)`
+
+`claim — (b) fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS FALSE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `(b) — written agreement set out the specified condition(s)` `claim — (b) fails`
+#ASSERT NOT `Ground 5H made out`                                        `claim — (b) fails`
+
+§§ `(c) knocked out — neither limb: tenant still meets, and no ended transition period`
+
+`claim — (c) fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS FALSE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS TRUE
+  `that limited period has come to an end`                           IS FALSE   -- period has NOT ended
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `(c)(i) — tenant no longer meets the specified condition(s)` `claim — (c) fails`
+#ASSERT NOT `(c)(ii) — limited transition period has come to an end` `claim — (c) fails`
+#ASSERT NOT `(c) — either (i) or (ii)`                              `claim — (c) fails`
+#ASSERT NOT `Ground 5H made out`                                    `claim — (c) fails`
+
+§§ `(d) knocked out — rent is more than 80% of market rent`
+
+-- 850 of 1000 market rent is 85% > 80%.
+`claim — (d) fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 850   -- 85% > 80%
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS FALSE
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT NOT `(d) — rent is no higher than 80% of market rent` `claim — (d) fails`
+#ASSERT NOT `Ground 5H made out`                              `claim — (d) fails`
+
+§§ `(e) knocked out — tenancy WAS granted via an excluded route (supported accommodation)`
+
+`claim — (e) fails` MEANS Ground5HClaim WITH
+  `landlord is a registered provider of social housing`              IS TRUE
+  `landlord is a charity`                                            IS FALSE
+  `tenancy was granted because the tenant met one or more eligibility conditions`  IS TRUE
+  `a written tenancy agreement set out the specified condition(s) that the tenant met`  IS TRUE
+  `the tenant no longer meets the specified condition or specified conditions`  IS TRUE
+  `tenancy was granted to provide accommodation for a limited period to help the tenant transition to living independently`  IS FALSE
+  `that limited period has come to an end`                           IS FALSE
+  `rent`                                                             IS 750
+  `market rent`                                                      IS 1000
+  `tenancy was granted pursuant to a nomination under s.159(2)(c) Housing Act 1996`  IS FALSE
+  `tenancy was granted as a tenancy of supported accommodation`      IS TRUE   -- (e)(ii) route applies
+  `tenancy was granted in pursuance of a local housing authority's s.193 duty`  IS FALSE
+
+#ASSERT `tenancy was granted via an excluded route`            `claim — (e) fails`
+#ASSERT NOT `(e) — tenancy was not granted via an excluded route` `claim — (e) fails`
+#ASSERT NOT `Ground 5H made out`                               `claim — (e) fails`

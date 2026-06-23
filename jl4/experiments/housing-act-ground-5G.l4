@@ -1,0 +1,191 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5G (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5G — the "homelessness duty" MANDATORY ground, inserted into Schedule 2
+-- to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 18
+-- (commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b),
+-- marker F27). Part I (mandatory): where made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded (a CHAPEAU followed by a CONJUNCTION of (a) and (b)):
+--   "The tenant's occupation of the dwelling-house was (at any time during the
+--    period of occupation) in pursuance of a local housing authority's duty to
+--    the tenant under section 193 of the Housing Act 1996 and—
+--      (a) the local housing authority has notified the landlord that the tenancy
+--          is not required for the purposes of that duty, and
+--      (b) the relevant date is no more than 12 months after the date on which the
+--          local housing authority notified the landlord as mentioned in
+--          paragraph (a)."
+--   "In this ground 'local housing authority' means a district council, a county
+--    council in England for an area for which there is no district council, a
+--    London borough council, the Common Council of the City of London or the
+--    Council of the Isles of Scilly."
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * Made out = (chapeau: occupation in pursuance of the s.193 duty) AND (a) AND
+--     (b). All three are conjuncts.
+--   * (b) "no more than 12 months after" the notification date is modelled
+--     footgun-safe: rather than subtracting 12 months from the relevant date
+--     (which would clamp), we ADD 12 months to the earlier notification date by
+--     incrementing its year by 1 (12 months == +1 year, same day & month), then
+--     require the relevant date to be AT MOST that deadline. Inclusive of the
+--     boundary day ("no more than 12 months after" -> AT MOST).
+--   * The "local housing authority" definition is carried purely as inert prose
+--     (a definition, not a separate operative limb); whether a given body is such
+--     an authority is folded into the chapeau atom and the (a) atom.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms of the chapeau, (a), and the two dates that (b) needs.
+DECLARE Ground5GClaim HAS
+  -- chapeau
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS A BOOLEAN
+  -- (a)
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS A BOOLEAN
+  -- (b) — the two dates compared
+  `date the local housing authority notified the landlord`           IS A DATE
+  `relevant date`                                                    IS A DATE
+
+§§ `Chapeau — occupation in pursuance of the s.193 duty`
+
+GIVEN claim IS A Ground5GClaim
+GIVETH A BOOLEAN
+`chapeau — occupation in pursuance of the s.193 duty` claim MEANS
+        "The tenant's occupation of the dwelling-house was (at any time during the period of occupation) in pursuance of a local housing authority's duty to the tenant under section 193 of the Housing Act 1996"
+    ... claim's `tenant's occupation was in pursuance of the local housing authority's s.193 duty`
+
+§§ `(a) — authority has notified the landlord the tenancy is not required`
+
+GIVEN claim IS A Ground5GClaim
+GIVETH A BOOLEAN
+`(a) — authority notified the landlord the tenancy is not required` claim MEANS
+        "(a) the local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty,"
+    ... claim's `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`
+
+§§ `(b) — relevant date no more than 12 months after the notification`
+
+-- Footgun-safe: ADD 12 months (== +1 year, same day & month) to the EARLIER
+-- notification date to get the deadline; never subtract from the relevant date.
+GIVEN claim IS A Ground5GClaim
+GIVETH A DATE
+`12 months after the notification date` claim MEANS
+    Date (DATE_DAY   (claim's `date the local housing authority notified the landlord`))
+         (DATE_MONTH (claim's `date the local housing authority notified the landlord`))
+         (DATE_YEAR  (claim's `date the local housing authority notified the landlord`) PLUS 1)
+
+GIVEN claim IS A Ground5GClaim
+GIVETH A BOOLEAN
+`(b) — relevant date no more than 12 months after the notification` claim MEANS
+        "(b) the relevant date is no more than 12 months after the date on which the local housing authority notified the landlord as mentioned in paragraph (a)."
+    ... claim's `relevant date`
+            AT MOST `12 months after the notification date` claim
+
+§§ `Definition — "local housing authority" (inert prose)`
+
+-- Carried as inert scaffolding: a definition, not a separate operative limb.
+GIVEN claim IS A Ground5GClaim
+GIVETH A BOOLEAN
+`definition — local housing authority` claim MEANS
+        "In this ground 'local housing authority' means—"
+    ..  "a district council,"
+    ..  "a county council in England for an area for which there is no district council,"
+    ..  "a London borough council,"
+    ..  "the Common Council of the City of London or"
+    ..  "the Council of the Isles of Scilly."
+
+§§ `Ground 5G made out — chapeau AND (a) AND (b)`
+
+GIVEN claim IS A Ground5GClaim
+GIVETH A BOOLEAN
+`Ground 5G made out` claim MEANS
+        `chapeau — occupation in pursuance of the s.193 duty` claim
+    AND "and—"
+    ... `(a) — authority notified the landlord the tenancy is not required` claim
+    AND `(b) — relevant date no more than 12 months after the notification` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5GClaim
+GIVETH A DEONTIC Actor Action
+`ground 5G possession order` claim MEANS
+    IF   `Ground 5G made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates`
+
+`notified 2024-06-01`     MEANS June 1 2024
+`relevant within 12mo`    MEANS January 1 2025   -- well within 12 months of notification
+`relevant exactly 12mo`   MEANS June 1 2025      -- exactly 12 months after -> still "no more than"
+`relevant 1 day over`     MEANS June 2 2025      -- one day past the 12-month deadline
+
+§§ `Ground made out — chapeau, (a), and (b) all met`
+
+`claim all-met` MEANS Ground5GClaim WITH
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS TRUE
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS TRUE
+  `date the local housing authority notified the landlord`           IS `notified 2024-06-01`
+  `relevant date`                                                    IS `relevant within 12mo`
+
+#ASSERT `chapeau — occupation in pursuance of the s.193 duty`              `claim all-met`
+#ASSERT `(a) — authority notified the landlord the tenancy is not required` `claim all-met`
+#ASSERT `(b) — relevant date no more than 12 months after the notification` `claim all-met`
+#ASSERT `Ground 5G made out`                                              `claim all-met`
+
+§§ `(b) boundary — relevant date exactly 12 months after notification (still made out)`
+
+`claim — exactly 12 months` MEANS Ground5GClaim WITH
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS TRUE
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS TRUE
+  `date the local housing authority notified the landlord`           IS `notified 2024-06-01`
+  `relevant date`                                                    IS `relevant exactly 12mo`
+
+#ASSERT `(b) — relevant date no more than 12 months after the notification` `claim — exactly 12 months`
+#ASSERT `Ground 5G made out`                                              `claim — exactly 12 months`
+
+§§ `Chapeau knocked out — occupation was not in pursuance of the s.193 duty`
+
+`claim — chapeau fails` MEANS Ground5GClaim WITH
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS FALSE
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS TRUE
+  `date the local housing authority notified the landlord`           IS `notified 2024-06-01`
+  `relevant date`                                                    IS `relevant within 12mo`
+
+#ASSERT NOT `chapeau — occupation in pursuance of the s.193 duty` `claim — chapeau fails`
+#ASSERT NOT `Ground 5G made out`                                 `claim — chapeau fails`
+
+§§ `(a) knocked out — authority has not notified the landlord`
+
+`claim — (a) fails` MEANS Ground5GClaim WITH
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS TRUE
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS FALSE
+  `date the local housing authority notified the landlord`           IS `notified 2024-06-01`
+  `relevant date`                                                    IS `relevant within 12mo`
+
+#ASSERT NOT `(a) — authority notified the landlord the tenancy is not required` `claim — (a) fails`
+#ASSERT NOT `Ground 5G made out`                                              `claim — (a) fails`
+
+§§ `(b) knocked out — relevant date more than 12 months after notification`
+
+`claim — (b) fails` MEANS Ground5GClaim WITH
+  `tenant's occupation was in pursuance of the local housing authority's s.193 duty`  IS TRUE
+  `local housing authority has notified the landlord that the tenancy is not required for the purposes of that duty`  IS TRUE
+  `date the local housing authority notified the landlord`           IS `notified 2024-06-01`
+  `relevant date`                                                    IS `relevant 1 day over`
+
+#ASSERT NOT `(b) — relevant date no more than 12 months after the notification` `claim — (b) fails`
+#ASSERT NOT `Ground 5G made out`                                              `claim — (b) fails`
