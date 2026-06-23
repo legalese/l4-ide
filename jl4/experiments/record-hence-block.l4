@@ -1,0 +1,110 @@
+IMPORT prelude
+-- Layout "block" sugar for RECORD/COMMIT/ATTEST continuations.
+--
+-- An aligned same-column sibling after `RECORD <cell> IS <val>` is parsed as the
+-- Record node's continuation (its mHence slot), yielding the IDENTICAL AST to the
+-- explicit flat HENCE chain. This file proves the equivalence by residuating the
+-- block and flat forms with #TRACE and observing identical results. See the
+-- accept/reject matrix in jl4/examples/ok/ledger/ for the golden-pinned cases.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Act IS ONE OF
+  serve
+  pay
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- R1: HENCE-block == flat HENCE chain
+-- ─────────────────────────────────────────────────────────────────────────────
+
+flatChain MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+  HENCE RECORD `b` IS FALSE
+  HENCE PARTY P MUST serve WITHIN 20
+
+henceBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+        RECORD `b` IS FALSE
+        PARTY P MUST serve WITHIN 20
+
+-- Both residuate identically after P serves at t=5: the two RECORDs fire as
+-- event-free deontic steps and we land on the second obligation.
+#TRACE flatChain  AT 0 WITH PARTY P DOES serve AT 5
+#TRACE henceBlock AT 0 WITH PARTY P DOES serve AT 5
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- R2: LEST-block == flat LEST chain (sugar is on Record, not the entry keyword)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+flatLest MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  LEST RECORD `a` IS TRUE
+  HENCE RECORD `b` IS FALSE
+  HENCE BREACH BY P BECAUSE "missed"
+
+lestBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  LEST RECORD `a` IS TRUE
+       RECORD `b` IS FALSE
+       BREACH BY P BECAUSE "missed"
+
+-- P fails to serve before t=10: the LEST branch fires, runs the two RECORDs, then
+-- BREACHes. Identical residuation for flat and block.
+#TRACE flatLest AT 0 WITH PARTY P DOES serve AT 20
+#TRACE lestBlock AT 0 WITH PARTY P DOES serve AT 20
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- R3: COMMIT/ATTEST sequence in a block (same Record node, isOfficial=True)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+flatCommit MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE COMMIT `a` IS TRUE
+  HENCE ATTEST `b` IS FALSE
+  HENCE PARTY P MUST serve WITHIN 20
+
+commitBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE COMMIT `a` IS TRUE
+        ATTEST `b` IS FALSE
+        PARTY P MUST serve WITHIN 20
+
+#TRACE flatCommit  AT 0 WITH PARTY P DOES serve AT 5
+#TRACE commitBlock AT 0 WITH PARTY P DOES serve AT 5
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- R4: terminal RAND/ROR — block ends at the first non-RECORD provision, which may
+-- itself be a RAND expression
+-- ─────────────────────────────────────────────────────────────────────────────
+
+flatRand MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+  HENCE (PARTY P MUST serve WITHIN 20
+         RAND PARTY Q MUST pay WITHIN 5)
+
+randBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+        (PARTY P MUST serve WITHIN 20
+         RAND PARTY Q MUST pay WITHIN 5)
+
+#TRACE flatRand AT 0 WITH PARTY P DOES serve AT 5
+#TRACE randBlock AT 0 WITH PARTY P DOES serve AT 5
