@@ -76,9 +76,11 @@ Print (target D) forces the choice. SVG is resolution-independent vector, native
 Every prior iteration bound layout to the browser (`node.measured.width`, React Flow measured nodes). That is *exactly* why none can render headless for print. We invert it:
 
 ```
-LayoutCore :  IRExpr  ×  TextMetrics  ×  Config   →   Geometry tree (BBE)
-              (topology)  (injected)     (orientation,    (absolute x/y/w/h,
-                                          scale, margins)   ports, connector paths)
+LayoutCore :  IRExpr  ×  TextMetrics  ×  ViewSpec   →   Scene IR
+              (topology)  (injected)     (fold set,        (flat & resolved:
+                                          eval, scale,      absolute coords, ports,
+                                          orient, page?)    connector paths, tagged
+                                                            primitives, pre-broken text)
 ```
 
 `TextMetrics` is **injected** as a strategy:
@@ -88,6 +90,8 @@ LayoutCore :  IRExpr  ×  TextMetrics  ×  Config   →   Geometry tree (BBE)
 
 Because the geometry tree is computed analytically (sizes from intrinsic element size + margins, never from reflow), the same core feeds every renderer. This is the "write once, render everywhere" payoff, and it is what box-model.pdf's algebra was designed to enable.
 
+The BBE tree (§5) is the core's *internal* layout mechanism; what it *emits* is a **Scene IR** (§4.2) — a flat, resolved, tagged drawing model that both renderers consume without re-deriving geometry. The single config both web and print accept is the **ViewSpec** (§4.3). These two contracts are what keep the renderer overlays thin (§4.1).
+
 ### 3.3 Where the core lives: TypeScript
 
 All four consumers are JS-reachable (browsers + Node for headless print). A single TS core feeds all renderers; no divergence between a Haskell print path and a TS web path. Haskell remains topology-only and emits `IRExpr` JSON over the existing LSP/WASM channels.
@@ -96,38 +100,114 @@ All four consumers are JS-reachable (browsers + Node for headless print). A sing
 
 ## 4. Architecture overview
 
+One shared base with two thin, *additive* renderer overlays — the **90 / 10 / 10**
+split. The overlays sum past 100% on purpose: they *add* behaviour to a base that
+never forks (§4.1).
+
 ```
-            ┌─────────────────────────────────────────────────────────┐
-  Haskell   │  L4.Viz.Ladder  →  VizExpr.IRExpr   (topology only)      │
-            └───────────────────────────┬─────────────────────────────┘
-                                         │  JSON (LSP / WASM)   ← UNCHANGED boundary
-            ┌────────────────────────────▼────────────────────────────┐
-            │  @repo/ladder-core  (pure TS, no DOM)                    │
-            │    • IRExpr → BBE tree  (align-then-stack, §5)           │
-            │    • TextMetrics interface (injected)                   │
-            │    • Config: orientation (LR/TB), scale (Full/Small/Tiny)│
-            │    • outputs: Geometry tree — absolute coords, ports,   │
-            │      connector paths, leaf circuit states (T/F/U)       │
-            └───────┬───────────────────────────────────┬─────────────┘
-                    │                                   │
-       ┌────────────▼───────────┐          ┌────────────▼────────────────┐
-       │ SVG renderer (shared)  │          │ Headless print sink (Node)  │
-       │  geometry → <svg> AST  │          │  geometry → SVG file → PDF  │
-       └───────┬────────────────┘          │  A3/A2/A1, Tufte styling    │
-               │                            └─────────────────────────────┘
-   ┌───────────▼──────────────┐
-   │ Interactive wrapper      │   ← Svelte component: events on SVG,
-   │ (jl4-web, VS Code)       │     pan/zoom via viewBox, eval panel,
-   └──────────────────────────┘     context menus, inline-expr toggle
-   ┌──────────────────────────┐
-   │ Standalone widget        │   ← same SVG renderer, minimal chrome
-   └──────────────────────────┘
+              ┌────────────────────────────────────────────────────────┐
+  Haskell     │  L4.Viz.Ladder → VizExpr.IRExpr   (topology only)       │
+              └────────────────────────────┬───────────────────────────┘
+                                JSON (LSP/WASM)  ← UNCHANGED boundary
+  ViewSpec ──────────────┐                 │
+  {foldSet, eval(s),     │   ┌─────────────▼───────────────────────────┐
+   scale, orient, page?} └──▶│  @repo/ladder-core    (pure TS, no DOM)  │  ~75%
+                             │    IRExpr → BBE tree (align-then-stack)  │
+  TextMetrics ──────────────▶│    → SCENE IR  (flat, resolved, tagged)  │
+  (injected; font-parity)    └────────────────────┬────────────────────┘
+                                                   │  Scene IR — the contract
+                             ┌─────────────────────▼───────────────────┐
+                             │  @repo/ladder-svg   (shared SVG emit)    │  ~15%
+                             │  Scene IR → <rect>/<path>/<text><tspan>  │
+                             │  DOM-node sink (browser) │ string (Node) │
+                             └────────┬────────────────────────┬────────┘
+                                      │                        │
+                   ┌──────────────────▼──────┐   ┌─────────────▼──────────────┐
+                   │  web overlay        ~10% │   │  print overlay        ~10% │
+                   │  events, fold carets,    │   │  page A3/A2…, ink theme,   │
+                   │  hover, FLIP transitions │   │  bake ViewSpec, tile,      │
+                   │  opt. foreignObject text │   │  SVG string → PDF          │
+                   │  viewBox pan/zoom        │   │  (resvg / headless Chrome) │
+                   └──────────┬───────────────┘   └────────────────────────────┘
+          ┌──────────────────┼──────────────────┐
+       jl4-web        VS Code webview      standalone widget
 ```
 
-Three packages (names provisional, §12):
-- **`ladder-core`** — pure layout + geometry. No DOM, no Svelte.
-- **`ladder-svg`** — geometry → SVG (DOM nodes in-browser; string for headless).
-- **`ladder-svelte`** (or fold into existing `l4-ladder-visualizer`) — interactive chrome for IDE targets.
+Packages (names provisional, §12):
+- **`ladder-core`** — IRExpr → BBE → Scene IR. Pure; no DOM, no Svelte. (~75%)
+- **`ladder-svg`** — Scene IR → SVG primitives; DOM-node sink (browser) + string sink (headless). Shared by both overlays. (~15%)
+- **`ladder-web`** (or fold into `l4-ladder-visualizer`) — Svelte interactive overlay. (~10%)
+- **`ladder-print`** — Node CLI: ViewSpec → SVG string → PDF, A3+. (~10%)
+
+### 4.1 Why it sums to 110% — the factoring discipline
+
+The two renderer overlays are not *slices* of a pie that must total 100; they are
+**additive** behaviour on a base that never branches. `ladder-core` and the shared
+SVG emit (~90%) are byte-identical for every target. Each overlay then *adds* a
+little — events/animation for web, page-setup/PDF for print. Summing past 100% is
+the signature of clean layering; if the overlays summed to *exactly* 100% it would
+mean the core had been forked per target. The two contracts below (Scene IR,
+ViewSpec) are what hold the line.
+
+### 4.2 Scene IR — the core → renderer contract
+
+The core does **not** hand renderers a BBE tree; it hands a flat, resolved drawing
+model. Every primitive carries absolute coordinates **and** semantic tags, so the
+web overlay can attach behaviour and the print overlay can restyle — neither
+re-derives geometry:
+
+```ts
+type ScenePrim =
+  | { kind: 'box';   id: NodeId; atomId?: AtomId; rect: Rect;
+      role: 'leaf' | 'group' | 'placeholder';
+      state: 'live' | 'inert' | 'dead' | 'eliminable';
+      folded?: boolean; label?: TextRef }
+  | { kind: 'wire';  from: Port; to: Port; path: PathSeg[];
+      role: 'rail' | 'rung' | 'stub'; state: ScenePrim['state'] }
+  | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
+  | { kind: 'text';  id: NodeId; lines: TextLine[]; bbox: Rect;  // pre-broken
+      anchor: 'start' | 'middle'; style: TextStyleRef }
+type Scene = { size: Size; prims: ScenePrim[]; viewSpec: ViewSpec }
+```
+
+Key points: coordinates are absolute (no nesting to resolve at paint time);
+**text is already line-broken** by the core via `TextMetrics`; `id` is positional
+(fold state, animation tracking — and the `eliminable` key, §15.2), `atomId` keys
+leaf *values*. The Scene IR is the seam that keeps both overlays ~10%.
+
+### 4.3 ViewSpec — the shared "what to draw"
+
+Interactivity is dynamic on web; print needs a *frozen* configuration. One
+serializable record is the input to the core for **both**:
+
+```ts
+type ViewSpec = {
+  foldSet:   Set<NodeId>                 // which interior nodes are collapsed
+  eval:      Record<AtomId, UBoolValue>  // leaf assignment(s); [] = no eval
+  overlay?:  ViewSpec[]                   // multi-panel diff (e.g. two readings)
+  scale:     'full' | 'small' | 'tiny'
+  orient:    'LR' | 'TB'
+  page?:     { size: 'A4'|'A3'|'A2'|'A1'; tile?: boolean }  // print only
+  theme:     'screen' | 'ink'
+}
+```
+
+Payoff: the live web view's state *is* a ViewSpec — serialize it and hand it to
+the print path to **"print exactly what I'm looking at,"** including the two-panel
+s 415 diff (`overlay`, §15.3). Print stops being an afterthought; it is "render
+this ViewSpec to paper."
+
+### 4.4 Text: `foreignObject` is enhancement-only; font parity
+
+To keep print first-class, the **canonical** text path is SVG `<text>/<tspan>` —
+the core pre-breaks lines (§4.2) so screen and paper lay text identically.
+`foreignObject` (HTML text: wrapping, a11y, rich inline markup) is a **web-only
+progressive enhancement layered over** the tspan path — never the *only* way text
+renders, or print breaks. Corollary: **font parity** — the injected `TextMetrics`
+must be backed by the *same* font file in browser (`measureText`) and Node
+(`fontkit`), or line breaks diverge between screen and page. One font asset, two
+agreeing metric providers. Colour→ink is a `theme` parameter in the SVG-emit step,
+not a second layout.
 
 ---
 
@@ -312,12 +392,12 @@ IRExpr (fixture or live export)
 
 ```
 ts-shared/
-  ladder-core/        # pure layout; no DOM; the BBE algebra + geometry types
-  ladder-svg/         # geometry → SVG (DOM sink + string sink)
-  l4-ladder-visualizer/   # existing pkg, slimmed to the interactive Svelte wrapper
-                          # (re-exports the new core/svg; drops Dagre/SvelteFlow layout)
+  ladder-core/        # pure: IRExpr → BBE → Scene IR (§4.2); no DOM; ViewSpec (§4.3)
+  ladder-svg/         # Scene IR → SVG primitives (DOM sink + string sink)
+  l4-ladder-visualizer/   # existing pkg, slimmed to the web interactive overlay
+                          # (re-exports core/svg; drops Dagre/SvelteFlow layout)
 tools/
-  ladder-print/       # Node CLI: IRExpr fixture → A3+ SVG/PDF
+  ladder-print/       # Node CLI: (IRExpr, ViewSpec) → A3+ SVG/PDF
 ```
 
 (Alternative: keep everything inside `l4-ladder-visualizer` as internal modules and only split packages once stable. Decide in §13.)
@@ -338,7 +418,7 @@ tools/
 
 ## 14. Phased plan (proposed, post-approval)
 
-- **P0 — Prototype the kernel.** Standalone page (target C) rendering hand-fed AND/OR trees through `ladder-core` → `ladder-svg`. Nail centering, ports, connectors, LR/TB. No LSP, no IDE. *Validates the headline fix visually.*
+- **P0 — Prototype the kernel.** Standalone page (target C) rendering hand-fed AND/OR trees through `ladder-core` → `ladder-svg`, driven by a `ViewSpec`. Nail centering, ports, connectors, LR/TB. **Build folding (§16) and print-a-ViewSpec in from day one** — folding stresses re-layout/re-centering on every toggle (the best proof of the centering thesis), and a `ViewSpec`→SVG-string path makes the print seam real immediately. No LSP, no IDE. *Validates the headline fix visually.*
 - **P1 — Ladder semantics.** TRUE/FALSE/UNKNOWN circuit states; Full/Small/Tiny scales; minimap.
 - **P2 — Wire to live data.** Decode real `RenderAsLadderInfo` from the LSP; render real statutes/contracts.
 - **P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`; restore interactivity (toggle/eval/inline) on the SVG; ship to jl4-web + VS Code.
@@ -377,6 +457,40 @@ Worked SVG + generator (hand-rolled, pre-`ladder-core`): `~/src/legalese/sandbox
 ### 15.4 A real fixture for P0 / P2
 
 s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — **now vendored in this branch** (cherry-picked from `poh-yuan-nie` `21b62316`, so the patch is identical and will merge to `unstable` without conflict). Canonical home stays the *Poh Yuan Nie* work; if it diverges, reconcile on `unstable`. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` (in `~/src/legalese/sandbox/mengwong/layman/`) is exactly the upstream minimiser that would emit the `eliminable` map.
+
+---
+
+## 16. Folding & progressive disclosure
+
+Collapsing an interior `And`/`Or` (or any subtree) into a placeholder, and
+expanding it back, is a first-class interaction — and the single best stress test
+of the layout core, so P0 builds it in.
+
+- **A fold is a core *input*, not a renderer trick.** A collapsed node lives in
+  `ViewSpec.foldSet` (§4.3); the core treats it as a leaf-shaped placeholder and
+  re-runs align-then-stack, so everything re-centers with no renderer special-casing.
+  That folding "just works" is itself evidence the BBE architecture is right.
+- **The placeholder keeps the verdict.** A folded subtree still carries its
+  evaluation state — fold the *detail*, keep the *answer*: a collapsed satisfied OR
+  renders live ("▸ ANY OF 4 ✓"); collapsed-unknown stays grey; collapsed-eliminable
+  shows the ghost (§15). Scene IR marks it `role: 'placeholder'` with the rolled-up
+  `state`.
+- **Identity across fold/unfold** uses the keys we already have: positional `id`
+  tracks structure (fold state + animation), `atomId` keys leaf values. FLIP
+  animation is clean because the core yields exact pre/post rects — collapsing
+  children scale/fade into the placeholder deterministically.
+- **Eliminable ↔ fold are partners.** Surplusage = collapse-by-default: a dead
+  subtree folds to a ghosted "otiose — collapsed" placeholder; expand to inspect.
+- **Explainability payoff.** Fold to the top-level verdict, then expand only the
+  branch that *did the work* (the live path). "Why TRUE? → expand the satisfied
+  OR." Auto-expand-the-deciding-path is a headline feature.
+- **Heuristics & persistence.** Auto-fold beyond depth N for large statutes;
+  "focus mode" folds siblings; the Tiny minimap (§7) stays fully expanded while the
+  main view folds. Fold state persists per node-path across re-eval and sessions.
+
+The s 415 fixture exercises it: fold the whole second limb to its verdict, then
+expand just the deception gateway to watch the concealment rung go live (court's
+reading) or ghost-and-fold (applicants').
 
 ---
 
