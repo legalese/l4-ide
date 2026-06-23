@@ -14,7 +14,7 @@ We have been through three iterations of the AND/OR ("ladder logic") visualizer:
 | # | Stack | Layout method | Centers? |
 |---|---|---|---|
 | 1. Haskell `ladder-diagram` (`insert-ladder-diagram` branch) | Svelte + npm `ladder-diagram`, fed `RuleNode`/`AndOr` JSON | the library's relay-circuit renderer | n/a — dead IR |
-| 2. **layman** (`~/src/smucclaw/sandbox/mengwong/layman`) | Next.js + React Flow | hand-rolled **two-pass recursive**: lay children naively → measure bbox → `pos = (bbox − child)/2` on the cross-axis | ✅ intrinsic |
+| 2. **layman** (`~/src/legalese/sandbox/mengwong/layman`) | Next.js + React Flow | hand-rolled **two-pass recursive**: lay children naively → measure bbox → `pos = (bbox − child)/2` on the cross-axis | ✅ intrinsic |
 | 3. **current** (`ts-shared/l4-ladder-visualizer`) | SvelteFlow (xyflow) + **Dagre** | general DAG layout; OR-branches sandwiched with invisible source/sink "bundling" nodes | ❌ right-aligns |
 
 **Root cause of the right-alignment infelicity (iteration 3):** Dagre is a general layered-graph drawer with no notion of "center this AND/OR nest under its parent." Nesting is faked with invisible bundling nodes. On top of that, `displayers/flow/layout.ts` converts Dagre's center-anchor to SvelteFlow's top-left anchor by subtracting `w/2, h/2` for normal nodes **but skips that shift for bundling nodes** — so group containers sit half a box off from their contents. The code comment already concedes "the anchor positions for the grouping nodes were indeed not being set correctly."
@@ -350,7 +350,7 @@ tools/
 
 **Motivation.** A worked example — Penal Code s 415, *Poh Yuan Nie v PP* [2022] SGCA 74 — produces a ladder in which one rung is provably *otiose*: under a given reading/fact-context it can **never carry current**. That is the legal doctrine of **surplusage** and the CS notion of **dead code / a don't-care variable** — the same thing. The §6 leaf model (true / false / unknown) cannot express it, yet it is the single most legible thing a ladder can show a lawyer.
 
-### 6a. A fourth leaf state: ELIMINABLE (don't-care)
+### 15.1 A fourth leaf state: ELIMINABLE (don't-care)
 
 Orthogonal to T/F/U:
 
@@ -363,20 +363,20 @@ Orthogonal to T/F/U:
 
 `eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
 
-### Source of the flag (both respect the pure-core boundary, §3.2)
+### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
-- **Annotated** — `ladder-core` takes a per-`atomId` `eliminable: boolean` map computed upstream by a minimiser (Quine–McCluskey / Espresso / a BDD don't-care pass — cf. `BOOLEAN-MINIMIZATION-SPEC`, issue #638). Just more injected data, like `TextMetrics`.
+- **Annotated** — `ladder-core` takes an `eliminable` map **keyed by node `id`** (positional, *not* `atomId`: a repeated atom can be live in one rung and otiose in another, and interior `And`/`Or` rungs carry no `atomId`), computed upstream by a minimiser / don't-care prover (Quine–McCluskey / Espresso / a BDD don't-care pass / the Z3 region proof below — cf. the planned boolean-minimization spec, GH issue #638). Just more injected data, like `TextMetrics`. (Leaf **values** stay keyed by `atomId` — toggling a leaf sets it everywhere; only **eliminability** is positional.)
 - **Intrinsic** — for small trees, compute it in-core from topology + a partial assignment (cofactor equality per leaf). O(leaves × cases); fine at Small/Tiny.
 
-### Minimisation / diff overlay (extends §13.7's "annotated print mode")
+### 15.3 Minimisation / diff overlay (extends §13.7's "annotated print mode")
 
 Render one geometry tree under two contexts (two interpretations, two fact-assignments, or before/after a minimisation pass) and mark which rungs changed state — especially which went **eliminable**. The headline artifact: two stacked panels of one circuit, the disputed rung live in one and ghosted in the other. The visual proof of a surplusage argument — and a strong poster (target D).
 
 Worked SVG + generator (hand-rolled, pre-`ladder-core`): `~/src/legalese/sandbox/mengwong/layman/cheating-415-ladder.{svg,py}`.
 
-### A real fixture for P0 / P2
+### 15.4 A real fixture for P0 / P2
 
-s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `cheating-415-poh-yuan-nie.l4` (+ its Z3 surplusage proof `cheating-415-surplusage.z3.py`, which is exactly the upstream minimiser that would emit the `eliminable` map).
+s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — currently in the sibling **`poh-yuan-nie`** worktree (`~/src/legalese/l4wt/poh-yuan-nie/`), not yet in this branch or `unstable`; bring it in (or land it on `unstable`) when wiring P2. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` is exactly the upstream minimiser that would emit the `eliminable` map.
 
 ---
 
@@ -384,6 +384,6 @@ s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-d
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.
 - `tmp/ladder logic and or tree visualization.pdf` (2023-05-21) — ladder-logic metaphor, `Either (Maybe Bool) (Maybe Bool)` default model, Leaf/Not/All/Any combinators, T/F/U leaf rendering, group sub-ordering. Primary spec for §6.
-- `~/src/smucclaw/sandbox/mengwong/layman` — iteration 2; proven two-pass centering recursion.
+- `~/src/legalese/sandbox/mengwong/layman` — iteration 2; proven two-pass centering recursion.
 - `ts-shared/l4-ladder-visualizer` — iteration 3; the code being refreshed.
 - `jl4-core/src/L4/Viz/{Ladder,VizExpr}.hs` — the topology IR boundary we keep.
