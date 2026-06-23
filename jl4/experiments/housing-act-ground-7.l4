@@ -1,0 +1,339 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 7 (devolution on death; amended, Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 7 — the "devolution on death" MANDATORY ground, as amended by the
+-- Renters' Rights Act 2025 (c. 26), Sch. 1 para. 23 (commencement 1.5.2026 for
+-- specified purposes; S.I. 2026/421, reg. 2(b)). Part I (mandatory): where made
+-- out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- RESOLUTION OF THE F41–F47 AMENDMENTS (current in-force reading) —
+-- the source .txt presents Ground 7 with inline amendment markers; resolving
+-- them to the in-force text at 1.5.2026:
+--   F41  Words substituted by RRA 2025, Sch. 1 para. 23(a). The PDF shows two
+--        overlapping F41 spans (the old "The tenancy has devolved on a person
+--        (the 'new tenant')" is replaced). The in-force core chapeau reads:
+--        "The tenancy is a periodic tenancy (including a statutory periodic
+--         tenancy), or a fixed term tenancy of a dwelling-house in England, which
+--         has devolved on a person (the 'new tenant') under the will or intestacy
+--         of the former tenant and the proceedings for the recovery of possession
+--         are begun not later than twelve months after the death of the former
+--         tenant or, if the court so directs, after the date on which, in the
+--         opinion of the court, the landlord (or, in the case of joint landlords,
+--         any one of them) became aware of the former tenant's death."
+--   F42  "or a fixed term tenancy of a dwelling-house in England," inserted
+--        (Localism Act 2011, in force) -> kept (it is part of the in-force core).
+--   F43  The PROVISO inserted by RRA 2025, Sch. 1 para. 23(b) -> ENCODED as an
+--        implication (see below).
+--   F44/F45  Localism Act 2011 tweaks to the "acceptance of rent" rule -> carried
+--        as inert interpretive prose.
+--   F46  The final "premium-lease" exclusion was OMITTED by RRA 2025, Sch. 1
+--        para. 23(c) as of 1.5.2026 -> NOT encoded (per the task spec).
+--   F47  Localism Act 2011 insertion inside that now-omitted exclusion -> moot;
+--        NOT encoded.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The PROVISO (F43) is modelled as an IMPLICATION. The ground's order "may not
+--     be made" where the new tenant occupied as their only/principal home
+--     immediately before the death UNLESS (a) prior devolution, or (b) special
+--     tenancy. So the proviso is SATISFIED iff:
+--         (NOT occupying-as-only/principal-home-immediately-before-death)
+--      OR (a) the tenancy has previously devolved on the former tenant, or
+--      OR (b) the tenancy is a special tenancy immediately before the death.
+--   * "special tenancy" (a)-(e): a 5-way OR of independent boolean flags. Limb (e)
+--     ("meets the conditions in paragraphs (a), (b), (d) and (e) in the first
+--     paragraph of Ground 5H") is reduced to a single atom — the cross-reference
+--     into Ground 5H is carried as inert prose, the operative content answered by
+--     a fact, rather than re-deriving Ground 5H here.
+--   * The "acceptance of rent does not create a new tenancy unless ..." rule is an
+--     interpretive rule, not an operative limb of the made-out test; carried as
+--     inert prose.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- "special tenancy" limbs (a)-(e): independent boolean flags. The tenancy is a
+-- "special tenancy" iff AT LEAST ONE is ticked.
+DECLARE SpecialTenancy HAS
+  `tenancy of social housing (Part 2 HRA 2008) where landlord is a private RP of social housing`  IS A BOOLEAN  -- (a)
+  `tenancy entered into pursuant to a rent-to-buy agreement (as in Ground 1B) where landlord is a private RP`  IS A BOOLEAN  -- (b)
+  `tenancy of supported accommodation (para 12 of Schedule 2)`        IS A BOOLEAN  -- (c)
+  `tenancy where former tenant's occupation is in pursuance of a LHA's s.193 HA1996 duty`  IS A BOOLEAN  -- (d)
+  `tenancy which meets the conditions in paras (a),(b),(d),(e) of the first paragraph of Ground 5H`  IS A BOOLEAN  -- (e)
+
+-- The operative atoms of Ground 7, gathered on the claim. The core turns on the
+-- tenancy shape (periodic, or an England fixed term), the devolution-on-death
+-- fact, and the proceedings-begun date measured against the twelve-month window;
+-- the proviso turns on the only/principal-home fact plus its (a)/(b) escape
+-- routes; (b)'s escape route carries the "special tenancy" record.
+DECLARE Ground7Claim HAS
+  -- core chapeau — tenancy shape (a periodic tenancy .. OR an England fixed term)
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS A BOOLEAN
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS A BOOLEAN
+  -- core — devolution on death
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS A BOOLEAN
+  -- core — the twelve-month proceedings window
+  `date of the former tenant's death (or court-directed awareness date)`  IS A DATE
+  `date proceedings for recovery of possession were begun`           IS A DATE
+  -- proviso (F43)
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS A BOOLEAN
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS A BOOLEAN  -- (a)
+  `special tenancy`                                                   IS A SpecialTenancy           -- (b)
+
+§§ `Core — chapeau: a qualifying tenancy shape, devolved on death, proceedings begun in time`
+
+-- Tenancy shape: a periodic tenancy (including a statutory periodic tenancy), OR
+-- a fixed term tenancy of a dwelling-house in England.
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`tenancy is of a qualifying shape` claim MEANS
+        "The tenancy is a periodic tenancy (including a statutory periodic tenancy),"
+    ..  claim's `tenancy is a periodic tenancy (including a statutory periodic tenancy)`
+    ..  "or a fixed term tenancy of a dwelling-house in England,"
+    ..  claim's `tenancy is a fixed term tenancy of a dwelling-house in England`
+
+-- "the proceedings for the recovery of possession are begun not later than twelve
+-- months after the death of the former tenant or, if the court so directs, after
+-- the date on which the landlord became aware of the former tenant's death". The
+-- operative date the window runs from is captured in one field (the death date,
+-- or — where the court so directs — the awareness date). FOOTGUN-SAFE: never
+-- subtract months on a date; form the window's far end by ADDING 12 months to the
+-- start date (here the year+1, same day/month).
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`proceedings begun not later than twelve months after the death` claim MEANS
+        "the proceedings for the recovery of possession are begun not later than twelve months after the death of the former tenant or, if the court so directs, after the date on which, in the opinion of the court, the landlord (or, in the case of joint landlords, any one of them) became aware of the former tenant's death"
+    ... Day (claim's `date proceedings for recovery of possession were begun`)
+            AT MOST Day `twelve months after the death`
+    WHERE
+        `twelve months after the death` MEANS
+            Date (DATE_DAY   (claim's `date of the former tenant's death (or court-directed awareness date)`))
+                 (DATE_MONTH (claim's `date of the former tenant's death (or court-directed awareness date)`))
+                 (DATE_YEAR  (claim's `date of the former tenant's death (or court-directed awareness date)`) PLUS 1)
+
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`core — devolution on death, proceedings begun in time` claim MEANS
+        `tenancy is of a qualifying shape` claim
+    AND "which has devolved on a person (the 'new tenant') under the will or intestacy of the former tenant"
+    ... claim's `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`
+    AND `proceedings begun not later than twelve months after the death` claim
+
+§§ `"special tenancy" — limbs (a)-(e)`
+
+GIVEN st IS A SpecialTenancy
+GIVETH A BOOLEAN
+`is a special tenancy` st MEANS
+        "In this Ground 'special tenancy' means—"
+    ..  "(a) a tenancy of social housing (within the meaning given by Part 2 of the Housing and Regeneration Act 2008) where the landlord is a private registered provider of social housing;"
+    ..  st's `tenancy of social housing (Part 2 HRA 2008) where landlord is a private RP of social housing`
+    ..  "(b) a tenancy entered into pursuant to a rent-to-buy agreement (which has the same meaning as in Ground 1B) where the landlord is a private registered provider of social housing;"
+    ..  st's `tenancy entered into pursuant to a rent-to-buy agreement (as in Ground 1B) where landlord is a private RP`
+    ..  "(c) a tenancy of supported accommodation, within the meaning given by paragraph 12 of Schedule 2;"
+    ..  st's `tenancy of supported accommodation (para 12 of Schedule 2)`
+    ..  "(d) a tenancy where the former tenant's occupation of the dwelling-house is in pursuance of a local housing authority's duty to the tenant under section 193 of the Housing Act 1996 (and here 'local housing authority' has the same meaning as in Ground 5G);"
+    ..  st's `tenancy where former tenant's occupation is in pursuance of a LHA's s.193 HA1996 duty`
+    ..  "(e) a tenancy which meets the conditions in paragraphs (a), (b), (d) and (e) in the first paragraph of Ground 5H."
+    ..  st's `tenancy which meets the conditions in paras (a),(b),(d),(e) of the first paragraph of Ground 5H`
+
+§§ `Proviso (F43) — modelled as an IMPLICATION`
+
+-- "But, if the new tenant is occupying the dwelling-house as the new tenant's only
+-- or principal home immediately before the death of the former tenant, an order
+-- for possession on this Ground may not be made unless—
+--   (a) the tenancy has previously devolved on the former tenant under a will or
+--       intestacy (whenever that devolution occurred), or
+--   (b) the tenancy is a special tenancy immediately before the death of the
+--       former tenant."
+--
+-- As an implication: the proviso is SATISFIED iff the antecedent fails (the new
+-- tenant was NOT occupying as their only/principal home immediately before the
+-- death) OR one of the escape routes (a)/(b) holds.
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`proviso satisfied` claim MEANS
+        "But, if the new tenant is occupying the dwelling-house as the new tenant's only or principal home immediately before the death of the former tenant, an order for possession on this Ground may not be made unless—"
+        -- implication: (NOT antecedent) OR (a) OR (b)
+    ..  NOT claim's `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`
+    ..  "(a) the tenancy has previously devolved on the former tenant under a will or intestacy (whenever that devolution occurred), or"
+    ..  claim's `tenancy has previously devolved on the former tenant under a will or intestacy`
+    ..  "(b) the tenancy is a special tenancy immediately before the death of the former tenant."
+    ..  `is a special tenancy` (claim's `special tenancy`)
+
+§§ `Interpretive rule (inert prose) — acceptance of rent does not create a new tenancy`
+
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`rule — acceptance of rent does not create a new tenancy` claim MEANS
+        "For the purposes of this ground, the acceptance by the landlord of rent from a new tenant after the death of the former tenant shall not be regarded as creating a new tenancy, unless the landlord agrees in writing to a change (as compared with the tenancy before the death) in the amount of the rent, the period or length of term of the tenancy, the premises which are let or any other term of the tenancy."
+    ... TRUE   -- inert interpretive rule; carried as prose, not an operative limb
+
+§§ `Ground 7 made out — core AND proviso`
+
+GIVEN claim IS A Ground7Claim
+GIVETH A BOOLEAN
+`Ground 7 made out` claim MEANS
+        `core — devolution on death, proceedings begun in time` claim
+    AND `proviso satisfied` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground7Claim
+GIVETH A DEONTIC Actor Action
+`ground 7 possession order` claim MEANS
+    IF   `Ground 7 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the twelve-month proceedings window`
+
+`death 2025`                     MEANS March 1 2025
+`proceedings within window`      MEANS September 1 2025   -- inside [death, death + 12m]
+`proceedings exactly 12m later`  MEANS March 1 2026       -- the last day of the window -> satisfied
+`proceedings just after window`  MEANS March 2 2026       -- one day past the window -> not satisfied
+
+§§ `Special tenancies — one limb each, plus a "none"`
+
+`special — none` MEANS SpecialTenancy WITH
+  `tenancy of social housing (Part 2 HRA 2008) where landlord is a private RP of social housing`  IS FALSE
+  `tenancy entered into pursuant to a rent-to-buy agreement (as in Ground 1B) where landlord is a private RP`  IS FALSE
+  `tenancy of supported accommodation (para 12 of Schedule 2)`        IS FALSE
+  `tenancy where former tenant's occupation is in pursuance of a LHA's s.193 HA1996 duty`  IS FALSE
+  `tenancy which meets the conditions in paras (a),(b),(d),(e) of the first paragraph of Ground 5H`  IS FALSE
+
+`special — supported accommodation (c)` MEANS SpecialTenancy WITH
+  `tenancy of social housing (Part 2 HRA 2008) where landlord is a private RP of social housing`  IS FALSE
+  `tenancy entered into pursuant to a rent-to-buy agreement (as in Ground 1B) where landlord is a private RP`  IS FALSE
+  `tenancy of supported accommodation (para 12 of Schedule 2)`        IS TRUE
+  `tenancy where former tenant's occupation is in pursuance of a LHA's s.193 HA1996 duty`  IS FALSE
+  `tenancy which meets the conditions in paras (a),(b),(d),(e) of the first paragraph of Ground 5H`  IS FALSE
+
+-- Each special-tenancy limb bites; "none" does not.
+#ASSERT NOT `is a special tenancy` `special — none`
+#ASSERT     `is a special tenancy` `special — supported accommodation (c)`
+
+§§ `Ground made out — new tenant did NOT occupy as only/principal home (proviso vacuously satisfied)`
+
+-- The antecedent of the proviso fails, so the proviso is satisfied regardless of
+-- the (a)/(b) escape routes. Core all met.
+`claim all-met (not occupying as principal home)` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS TRUE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings within window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS FALSE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT `tenancy is of a qualifying shape`                          `claim all-met (not occupying as principal home)`
+#ASSERT `core — devolution on death, proceedings begun in time`     `claim all-met (not occupying as principal home)`
+#ASSERT `proviso satisfied`                                         `claim all-met (not occupying as principal home)`
+#ASSERT `Ground 7 made out`                                         `claim all-met (not occupying as principal home)`
+
+§§ `Ground made out — occupying as principal home BUT a special tenancy (proviso escape (b)); England fixed term; proceedings exactly 12m later`
+
+`claim all-met (principal home + special tenancy)` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS FALSE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS TRUE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings exactly 12m later`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS TRUE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — supported accommodation (c)`
+
+#ASSERT `proviso satisfied`                                         `claim all-met (principal home + special tenancy)`
+#ASSERT `Ground 7 made out`                                         `claim all-met (principal home + special tenancy)`
+
+§§ `Ground made out — occupying as principal home BUT prior devolution (proviso escape (a))`
+
+`claim all-met (principal home + prior devolution)` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS TRUE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings within window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS TRUE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS TRUE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT `proviso satisfied`                                         `claim all-met (principal home + prior devolution)`
+#ASSERT `Ground 7 made out`                                         `claim all-met (principal home + prior devolution)`
+
+§§ `Core knocked out — tenancy is neither periodic nor an England fixed term`
+
+`claim — shape fails` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS FALSE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings within window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS FALSE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT NOT `tenancy is of a qualifying shape`  `claim — shape fails`
+#ASSERT NOT `Ground 7 made out`                 `claim — shape fails`
+
+§§ `Core knocked out — no devolution under will or intestacy`
+
+`claim — no devolution` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS TRUE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS FALSE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings within window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS FALSE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT NOT `core — devolution on death, proceedings begun in time` `claim — no devolution`
+#ASSERT NOT `Ground 7 made out`                                     `claim — no devolution`
+
+§§ `Core knocked out — proceedings begun just after the twelve-month window`
+
+`claim — out of window` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS TRUE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings just after window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS FALSE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT NOT `proceedings begun not later than twelve months after the death` `claim — out of window`
+#ASSERT NOT `Ground 7 made out`                                             `claim — out of window`
+
+§§ `Proviso knocked out — occupying as principal home, and NEITHER escape route (a) nor (b)`
+
+-- The proviso bites: an order may not be made. New tenant occupies as their
+-- only/principal home immediately before the death, but there was no prior
+-- devolution and the tenancy is not a special tenancy.
+`claim — proviso fails` MEANS Ground7Claim WITH
+  `tenancy is a periodic tenancy (including a statutory periodic tenancy)`  IS TRUE
+  `tenancy is a fixed term tenancy of a dwelling-house in England`    IS FALSE
+  `tenancy has devolved on the new tenant under the will or intestacy of the former tenant`  IS TRUE
+  `date of the former tenant's death (or court-directed awareness date)`  IS `death 2025`
+  `date proceedings for recovery of possession were begun`           IS `proceedings within window`
+  `new tenant is occupying the dwelling-house as their only or principal home immediately before the death of the former tenant`  IS TRUE
+  `tenancy has previously devolved on the former tenant under a will or intestacy`  IS FALSE
+  `special tenancy`                                                   IS `special — none`
+
+#ASSERT     `core — devolution on death, proceedings begun in time` `claim — proviso fails`
+#ASSERT NOT `proviso satisfied`                                     `claim — proviso fails`
+#ASSERT NOT `Ground 7 made out`                                     `claim — proviso fails`
