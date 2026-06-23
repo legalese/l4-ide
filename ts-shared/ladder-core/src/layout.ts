@@ -102,9 +102,16 @@ const C_GAP = 8 // clearance between the wire and the nearest edge of connective
 const C_ASCENT = FONT * 0.78
 const C_DESCENT = FONT * 0.22
 const STRADDLE_MIN_WIDTH = 160 // only wrap connectives wider than this (~a box width)
+const STRADDLE_GAP = 3 // tighter than C_GAP: the two straddle lines hug the wire
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
- *  can't split -> single line. */
+ *  can't split -> single line.
+ *
+ *  FUTURE: generalize to N balanced lines straddling the wire (≈ N/2 above, N/2
+ *  below) so we can set an entire paragraph's worth of verbatim inert prose in a
+ *  compact block — e.g. balanceNLines(text, tm, targetWidth). Two lines is enough
+ *  for now; the wire would thread the middle line (or the gap between the two
+ *  central lines for even N). */
 function balanceTwoLines(text: string, tm: TextMetrics): string[] {
   const words = text.split(/\s+/).filter(Boolean)
   if (words.length < 2) return [text]
@@ -133,7 +140,7 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
     const lines = singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm) : [text]
     if (lines.length === 2) {
       const w = Math.max(tm.width(lines[0], FONT), tm.width(lines[1], FONT)) + 2 * INERT_PAD
-      const h = 2 * lineH + 2 * PAD_Y
+      const h = 2 * lineH + 2 * STRADDLE_GAP // tight: the two lines hug the wire
       return {
         w,
         h,
@@ -142,8 +149,8 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
           const cy = oy + h / 2
           const mid = ox + w / 2
           out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
-          out.push({ kind: 'text', at: { x: mid, y: cy - C_GAP - C_DESCENT }, text: lines[0], anchor: 'middle', state: 'inert', tag: 'connective' })
-          out.push({ kind: 'text', at: { x: mid, y: cy + C_GAP + C_ASCENT }, text: lines[1], anchor: 'middle', state: 'inert', tag: 'connective' })
+          out.push({ kind: 'text', at: { x: mid, y: cy - STRADDLE_GAP - C_DESCENT }, text: lines[0], anchor: 'middle', state: 'inert', tag: 'connective' })
+          out.push({ kind: 'text', at: { x: mid, y: cy + STRADDLE_GAP + C_ASCENT }, text: lines[1], anchor: 'middle', state: 'inert', tag: 'connective' })
           return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
         },
       }
