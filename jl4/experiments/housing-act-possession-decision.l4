@@ -1,0 +1,365 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — section 7 + Schedule 2 — the court's overall possession decision`
+
+-- ===========================================================================
+-- PROOF-OF-CONCEPT — a single TOP-LEVEL ENTRY POINT that aggregates the
+-- (separately-encoded) Schedule 2 grounds into the court's overall decision on
+-- whether to order possession. THIS IS A DESIGN PoC, NOT a re-encoding of the
+-- grounds: each of the 37 grounds already lives in its own self-contained file
+-- (housing-act-ground-1.l4, …-8.l4, …-9.l4, …) with its own Claim type and its
+-- own `Ground N made out` predicate.
+--
+-- In the REAL version, the booleans on the `CaseFile` record below would be
+-- COMPUTED by importing each per-ground file and calling its
+-- `Ground N made out` predicate on that ground's own pleaded facts, e.g.
+--      `ground 8 made out` cf  :=  `Ground 8 made out` cf's `ground 8 claim`
+-- Here, to keep the PoC self-contained and to focus on the AGGREGATION design,
+-- we represent each pleaded ground's outcome directly as a BOOLEAN on a
+-- composite CaseFile. (L4 has no cross-file IMPORT of sibling experiments wired
+-- up for this folder, and each ground's Claim type differs, so inlining the
+-- per-ground outcomes as booleans is the honest PoC boundary.)
+--
+-- WHAT THIS FILE DEMONSTRATES — TWO FORMS SIDE BY SIDE:
+--
+--   FORM A  — the COURT's decision as a TWO-TIER guarded deontic (recommended).
+--             s.7(3): the court MUST order possession if ANY Part I (mandatory)
+--             ground is established. s.7(4): the court MAY order possession (and
+--             only if it considers it reasonable) if ANY Part II (discretionary)
+--             ground is established. The two tiers must NOT collapse into a flat
+--             OR — a flat `MUST IF (g1 OR … OR g14)` would wrongly make the
+--             discretionary grounds mandatory. Form A keeps the modality split.
+--
+--   FORM B  — the LANDLORD's ELECTION as ROR (the genuine regulative choice).
+--             The grounds are not alternatives the COURT chooses between (they
+--             are facts → a guarded disjunction, Form A). But the LANDLORD
+--             genuinely ELECTS which ground(s) to plead — that IS a choice, and
+--             ROR ("any one fulfils") is the right operator for it, yielding a
+--             residuation trace.
+--
+-- STATUTORY FRAMING (Housing Act 1988, s.7 — "Orders for possession"), carried
+-- as inert prose at the decision sites:
+--   s.7(3) "If the court is satisfied that any of the grounds in Part I of
+--           Schedule 2 to this Act is established then … the court SHALL make an
+--           order for possession."                              (-> Court MUST)
+--   s.7(4) "If the court is satisfied that any of the grounds in Part II of
+--           Schedule 2 to this Act is established, then … the court MAY make an
+--           order for possession if it considers it REASONABLE to do so."
+--                                                               (-> Court MAY, gated)
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Action IS ONE OF
+  `order possession`
+  `seek possession`
+
+-- The composite case file. Each boolean is the OUTCOME of one pleaded ground —
+-- in the real version, the result of that ground's own `Ground N made out`
+-- predicate run on that ground's own pleaded facts (see header). A REPRESENTATIVE
+-- handful is used, spanning both tiers of Schedule 2.
+DECLARE CaseFile HAS
+  -- Part I — MANDATORY grounds (Court MUST, if any established): s.7(3)
+  `ground 1 made out`                      IS A BOOLEAN   -- landlord's former / intended home
+  `ground 6 made out`                      IS A BOOLEAN   -- demolition / reconstruction (redevelopment)
+  `ground 8 made out`                      IS A BOOLEAN   -- serious rent arrears
+  -- Part II — DISCRETIONARY grounds (Court MAY, if any established + reasonable): s.7(4)
+  `ground 10 made out`                     IS A BOOLEAN   -- some rent arrears
+  `ground 14 made out`                     IS A BOOLEAN   -- nuisance / annoyance
+  -- the s.7(4) reasonableness gate that Part II requires
+  `it is reasonable to make the order`     IS A BOOLEAN
+
+§ `FORM A — the court's decision as a TWO-TIER guarded deontic`
+
+§§ `Tier aggregators — "any Part I ground" / "any Part II ground"`
+
+-- "any of the grounds in Part I of Schedule 2 … is established" (s.7(3)).
+-- An OR over the three representative Part I booleans. Carrying the operative
+-- atoms; the inert prose names the limb each disjunct stands for.
+GIVEN cf IS A CaseFile
+GIVETH A BOOLEAN
+`any Part I ground made out` cf MEANS
+        "Ground 1 (landlord's home)"
+    ..  cf's `ground 1 made out`
+    ..  "Ground 6 (redevelopment)"
+    ..  cf's `ground 6 made out`
+    ..  "Ground 8 (serious rent arrears)"
+    ..  cf's `ground 8 made out`
+
+-- "any of the grounds in Part II of Schedule 2 … is established" (s.7(4)).
+-- An OR over the two representative Part II booleans.
+GIVEN cf IS A CaseFile
+GIVETH A BOOLEAN
+`any Part II ground made out` cf MEANS
+        "Ground 10 (some rent arrears)"
+    ..  cf's `ground 10 made out`
+    ..  "Ground 14 (nuisance / annoyance)"
+    ..  cf's `ground 14 made out`
+
+§§ `The two-tier guarded deontic — the court's overall decision`
+
+-- THE CRITICAL STRUCTURE. Two tiers, NOT a flat OR:
+--   * Part I established  -> Court MUST order possession      (mandatory; s.7(3))
+--   * else Part II established AND reasonable
+--                         -> Court MAY  order possession      (discretionary; s.7(4))
+--   * else                -> FULFILLED (no order; the decision is discharged)
+-- The Part I tier is tested FIRST: if a mandatory ground is made out, the duty is
+-- a MUST regardless of reasonableness; only when no Part I ground stands does the
+-- discretionary MAY (gated on reasonableness) come into play. A flat
+-- `MUST IF (g1 OR … OR g14)` would wrongly elevate the discretionary grounds to
+-- mandatory and would also drop the s.7(4) reasonableness gate.
+GIVEN cf IS A CaseFile
+GIVETH A DEONTIC Actor Action
+`court possession decision` cf MEANS
+    IF   `any Part I ground made out` cf                              -- s.7(3): a mandatory ground
+    THEN PARTY Court
+         MUST `order possession`
+         WITHIN 30
+    ELSE IF   (    `any Part II ground made out` cf                    -- s.7(4): a discretionary ground
+               AND cf's `it is reasonable to make the order`)          --        AND reasonable to order
+         THEN PARTY Court
+              MAY `order possession`
+              WITHIN 30
+         ELSE FULFILLED                                                -- no ground stands: no order
+
+§§ `Provenance — the satisfied-grounds list`
+
+-- WHY a decision was reached: the labels of the grounds whose boolean is TRUE,
+-- so the court can say "possession ordered on Grounds 1 and 8". Built by walking
+-- a fixed (label, flag) list and keeping the labels whose flag holds (mapMaybe:
+-- emit JUST label when the flag is TRUE, NOTHING otherwise). Each entry is a
+-- PAIR OF a STRING label and its made-out BOOLEAN.
+GIVEN cf IS A CaseFile
+GIVETH A LIST OF PAIR STRING BOOLEAN
+`pleaded grounds` cf MEANS
+  LIST (PAIR "Ground 1"  (cf's `ground 1 made out`))
+     , (PAIR "Ground 6"  (cf's `ground 6 made out`))
+     , (PAIR "Ground 8"  (cf's `ground 8 made out`))
+     , (PAIR "Ground 10" (cf's `ground 10 made out`))
+     , (PAIR "Ground 14" (cf's `ground 14 made out`))
+
+GIVEN cf IS A CaseFile
+GIVETH A LIST OF STRING
+`satisfied grounds` cf MEANS
+  mapMaybe `label if satisfied` (`pleaded grounds` cf)
+  WHERE
+    `label if satisfied` pg MEANS
+      IF pg's snd THEN JUST (pg's fst) ELSE NOTHING
+
+§ `FORM B — the landlord's election as ROR (the genuine regulative choice)`
+
+-- WHY ROR FITS THE LANDLORD, NOT THE COURT.
+-- The court does NOT pick among grounds: which grounds are established is a
+-- question of FACT, and the court's decision is a guarded disjunction over those
+-- facts (Form A). But the LANDLORD genuinely ELECTS which ground(s) to PLEAD —
+-- pleading Ground 8 vs Ground 10 vs Ground 14 is a real, free choice the landlord
+-- makes. That choice is exactly what ROR ("any one branch fulfils") models, and
+-- running it under #TRACE yields a residuation showing which branch the landlord
+-- took and the court duty it triggers.
+--
+-- THE ELSE-FULFILLED TRAP. A per-ground contract shaped
+--     IF `ground N made out` THEN PARTY Court MUST … ELSE FULFILLED
+-- is POISON under ROR. ROR("any one fulfils") treats a FULFILLED branch as
+-- success — so a branch whose ground is NOT made out (the ELSE FULFILLED arm)
+-- would make the whole choice fire TRIVIALLY, "succeeding" by electing a ground
+-- that does not exist. The election would resolve to FULFILLED without any court
+-- duty, which is nonsense.
+--
+-- THE FIX. Make only ACTUALLY-AVAILABLE grounds participate in the ROR. We build
+-- the branch list by FILTERING to the grounds whose made-out boolean holds, and
+-- each surviving branch is an UNGUARDED court duty (no ELSE FULFILLED short-
+-- circuit). The landlord's permission to seek possession then HENCEs into the
+-- ROR over those live branches, so the residual is the court's duty for the
+-- elected ground — never a trivial FULFILLED.
+
+§§ `One live branch per available ground — the court's duty, unguarded`
+
+-- For a ground that IS available, the branch is simply the court's duty under
+-- that ground. No ELSE arm: this contract is only ever CONSTRUCTED for a ground
+-- that is actually made out (see `available ground duties` below), so it cannot
+-- short-circuit to FULFILLED.
+GIVEN groundLabel IS A STRING
+GIVETH A DEONTIC Actor Action
+`court duty for ground` groundLabel MEANS
+    PARTY Court
+    MUST `order possession`
+    WITHIN 30
+
+-- The court duties for ONLY the grounds the landlord actually has available —
+-- i.e. the satisfied grounds. Each becomes one live ROR branch.
+GIVEN cf IS A CaseFile
+GIVETH A LIST OF DEONTIC Actor Action
+`available ground duties` cf MEANS
+  map `court duty for ground` (`satisfied grounds` cf)
+
+-- Fold the live branches together with ROR — but NOT with a FULFILLED seed.
+-- A `foldr ROR FULFILLED` would re-introduce the trap from the other direction:
+-- `dutyA ROR (dutyB ROR FULFILLED)` collapses to FULFILLED immediately, because
+-- the innermost FULFILLED already satisfies ROR("any one fulfils") — the election
+-- would "succeed" trivially before the landlord even elects. So we ROR the
+-- branches with NO terminal FULFILLED: a one-branch list is that branch itself; a
+-- many-branch list is head ROR (the rest). The empty case (no ground available)
+-- is the ONLY place FULFILLED appears — and that is correct: with nothing to
+-- elect, there is nothing to pursue, so the election is vacuously discharged.
+GIVEN branches IS A LIST OF DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`ror together` branches MEANS
+  CONSIDER branches
+  WHEN EMPTY                 THEN FULFILLED       -- no available ground: nothing to elect
+  WHEN d FOLLOWED BY EMPTY   THEN d               -- exactly one: that single duty, no FULFILLED tail
+  WHEN d FOLLOWED BY rest    THEN d ROR `ror together` rest
+
+GIVEN cf IS A CaseFile
+GIVETH A DEONTIC Actor Action
+`election among available grounds` cf MEANS
+  `ror together` (`available ground duties` cf)
+
+-- The landlord's regulative choice: the landlord MAY seek possession, and on
+-- doing so the contract continues into the ROR election among the grounds the
+-- landlord actually has available. The landlord then "elects" a ground by the
+-- court performing the possession order on that branch.
+GIVEN cf IS A CaseFile
+GIVETH A DEONTIC Actor Action
+`landlord election` cf MEANS
+    PARTY Landlord
+    MAY `seek possession`
+    WITHIN 30
+    HENCE `election among available grounds` cf
+
+§ `Tests`
+
+§§ `Representative case files`
+
+-- CASE 1 — a Part I ground (Ground 8, serious arrears) AND a Part II ground
+-- (Ground 10, some arrears) are both established; reasonable to order.
+-- Part I controls: the court's duty is MUST.
+`case — Part I (G8) and Part II (G10)` MEANS CaseFile WITH
+  `ground 1 made out`                   IS FALSE
+  `ground 6 made out`                   IS FALSE
+  `ground 8 made out`                   IS TRUE
+  `ground 10 made out`                  IS TRUE
+  `ground 14 made out`                  IS FALSE
+  `it is reasonable to make the order`  IS TRUE
+
+-- CASE 2 — ONLY a Part II ground (Ground 14, nuisance) is established, and it IS
+-- reasonable to order. No Part I ground: the court's outcome is a discretionary MAY.
+`case — only Part II (G14), reasonable` MEANS CaseFile WITH
+  `ground 1 made out`                   IS FALSE
+  `ground 6 made out`                   IS FALSE
+  `ground 8 made out`                   IS FALSE
+  `ground 10 made out`                  IS FALSE
+  `ground 14 made out`                  IS TRUE
+  `it is reasonable to make the order`  IS TRUE
+
+-- CASE 3 — ONLY a Part II ground (Ground 14) is established, but it is NOT
+-- reasonable to order. The s.7(4) gate is shut: no order. Form A -> FULFILLED.
+`case — only Part II (G14), NOT reasonable` MEANS CaseFile WITH
+  `ground 1 made out`                   IS FALSE
+  `ground 6 made out`                   IS FALSE
+  `ground 8 made out`                   IS FALSE
+  `ground 10 made out`                  IS FALSE
+  `ground 14 made out`                  IS TRUE
+  `it is reasonable to make the order`  IS FALSE
+
+-- CASE 4 — nothing is made out at all. No order. Form A -> FULFILLED.
+`case — nothing made out` MEANS CaseFile WITH
+  `ground 1 made out`                   IS FALSE
+  `ground 6 made out`                   IS FALSE
+  `ground 8 made out`                   IS FALSE
+  `ground 10 made out`                  IS FALSE
+  `ground 14 made out`                  IS FALSE
+  `it is reasonable to make the order`  IS FALSE
+
+-- CASE 5 — two Part I grounds (Ground 1, landlord's home; Ground 8, arrears) are
+-- established. Used to show the satisfied-grounds list with multiple labels.
+`case — Part I G1 and G8` MEANS CaseFile WITH
+  `ground 1 made out`                   IS TRUE
+  `ground 6 made out`                   IS FALSE
+  `ground 8 made out`                   IS TRUE
+  `ground 10 made out`                  IS FALSE
+  `ground 14 made out`                  IS FALSE
+  `it is reasonable to make the order`  IS TRUE
+
+§§ `#ASSERT — the tier disjunctions`
+
+#ASSERT     `any Part I ground made out`  `case — Part I (G8) and Part II (G10)`
+#ASSERT     `any Part II ground made out` `case — Part I (G8) and Part II (G10)`
+
+#ASSERT NOT `any Part I ground made out`  `case — only Part II (G14), reasonable`
+#ASSERT     `any Part II ground made out` `case — only Part II (G14), reasonable`
+
+#ASSERT NOT `any Part I ground made out`  `case — nothing made out`
+#ASSERT NOT `any Part II ground made out` `case — nothing made out`
+
+#ASSERT     `any Part I ground made out`  `case — Part I G1 and G8`
+#ASSERT NOT `any Part II ground made out` `case — Part I G1 and G8`
+
+§§ `#ASSERT — the satisfied-grounds provenance list`
+
+-- Part I G8 + Part II G10 established -> labels "Ground 8" and "Ground 10".
+#ASSERT (`satisfied grounds` `case — Part I (G8) and Part II (G10)`) EQUALS (LIST "Ground 8", "Ground 10")
+
+-- Two Part I grounds established -> "Ground 1" and "Ground 8" (statute order).
+#ASSERT (`satisfied grounds` `case — Part I G1 and G8`) EQUALS (LIST "Ground 1", "Ground 8")
+
+-- Only Ground 14 established -> a single-label list.
+#ASSERT (`satisfied grounds` `case — only Part II (G14), reasonable`) EQUALS (LIST "Ground 14")
+
+-- Nothing established -> empty list.
+#ASSERT (`satisfied grounds` `case — nothing made out`) EQUALS EMPTY
+
+§§ `#TRACE — FORM A, the two-tier guarded deontic in three states`
+
+-- (A DEONTIC value cannot be EQUALS-compared in #ASSERT, so the decision is
+-- exercised via #TRACE, as the per-ground files do.)
+
+-- STATE 1a — a Part I ground (G8) is made out, court has NOT yet acted. The
+-- residual is the bare MANDATORY duty "PARTY Court MUST order possession" — the
+-- modality is MUST (mandatory; s.7(3)), visible because the empty event stream
+-- leaves the duty standing.
+#TRACE `court possession decision` `case — Part I (G8) and Part II (G10)` AT 0 WITH
+
+-- STATE 1b — same Part I ground, and here the court PERFORMS the duty: the MUST is
+-- discharged -> FULFILLED.
+#TRACE `court possession decision` `case — Part I (G8) and Part II (G10)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- STATE 2 — only a Part II ground (G14) + reasonable. The residual is the
+-- DISCRETIONARY permission "PARTY Court MAY order possession". Shown here with the
+-- court NOT ordering: MAY's omission defaults to FULFILLED — no breach (the
+-- hallmark of a discretionary ground), in contrast to the Part I MUST.
+#TRACE `court possession decision` `case — only Part II (G14), reasonable` AT 0 WITH
+
+-- STATE 3 — only a Part II ground but NOT reasonable: the decision is FULFILLED
+-- from the outset (no order). The empty event stream leaves it FULFILLED.
+#TRACE `court possession decision` `case — only Part II (G14), NOT reasonable` AT 0 WITH
+
+-- STATE 4 — nothing made out: likewise FULFILLED (no order).
+#TRACE `court possession decision` `case — nothing made out` AT 0 WITH
+
+§§ `#TRACE — FORM B, the landlord's ROR election resolving to the court's duty`
+
+-- The landlord elects among the grounds actually available. In CASE 1 the
+-- satisfied grounds are G8 and G10, so the ROR offers the court duty for either.
+-- The landlord seeks possession; the court then orders possession on the elected
+-- branch. The residual resolves THROUGH the elected ground to the court's duty —
+-- and, because only AVAILABLE grounds are branches, the ROR never short-circuits
+-- to a trivial FULFILLED (the ELSE-FULFILLED trap is avoided).
+#TRACE `landlord election` `case — Part I (G8) and Part II (G10)` AT 0 WITH
+    PARTY Landlord DOES `seek possession`  AT 5
+    PARTY Court    DOES `order possession` AT 15
+
+-- The landlord seeks possession but the court has not yet ordered: the residual
+-- is the standing ROR choice over the available grounds' court duties — i.e. the
+-- election remains LIVE, awaiting the court's order on whichever ground.
+#TRACE `landlord election` `case — Part I (G8) and Part II (G10)` AT 0 WITH
+    PARTY Landlord DOES `seek possession` AT 5
+
+-- CONTRAST with Form A: Form A is a SINGLE guarded deontic — the modality (MUST
+-- vs MAY) is fixed by the FACTS (which tier is established), and there is no
+-- choosing. Form B is a genuine CHOICE — the residual carries the open ROR until
+-- the landlord/court collapse it onto one ground, and the trace records WHICH
+-- ground was elected.
