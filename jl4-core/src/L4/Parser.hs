@@ -1740,7 +1740,7 @@ recordOrCommitExpr = do
     _     <- annoLexeme (spacedKeyword_ TKIs)
     val   <- annoHole (indentedExpr current)                  -- val hole (field 3)
     _     <- annoHole (pure isOfficial)                       -- isOfficial placeholder hole (field 4)
-    mHence <- optionalWithHole (hence (mkPos 1))  -- mHence hole (field 5)
+    mHence <- optionalWithHole (hence (mkPos 1) <|> implicitSeq current)  -- mHence hole (field 5)
     pure (Record emptyAnno mParty cell val isOfficial mHence)
 
 -- | The optional NOTIFY-v1 /recipient/ qualifier of a @RECORD@ — the symmetric
@@ -1986,6 +1986,50 @@ hence current =
 lest :: Pos -> AnnoParser (Expr Name)
 lest current =
   annoLexeme (spacedKeyword_ TKLest) *> annoHole (indentedExpr current)
+
+-- | The /block/ (layout) sugar for a RECORD/COMMIT/ATTEST continuation: a second
+-- way into the 'Record' node's @mHence@ slot besides the explicit @HENCE@
+-- keyword. When the line immediately following @RECORD <cell> IS <val>@ begins
+-- EXACTLY at the RECORD's own column (@current@), that aligned same-column
+-- sibling is parsed as the continuation provision — yielding the IDENTICAL
+-- right-nested AST as if an explicit @HENCE@ had separated them:
+--
+-- @
+--   HENCE RECORD "a" IS "x"        ===   HENCE RECORD "a" IS "x"
+--         RECORD "b" IS "y"              HENCE RECORD "b" IS "y"
+--         PARTY p MUST serve            HENCE PARTY p MUST serve
+-- @
+--
+-- This is anchored ONLY on the 'Record' continuation slot (see
+-- 'recordOrCommitExpr'), reached identically whether the first RECORD arrived
+-- via @HENCE RECORD@ or @LEST RECORD@. @hence@ is tried FIRST, so the explicit
+-- flat chain and flat/block mixing are unchanged. The continuation parser body
+-- is the SAME as 'indentedExpr' EXCEPT the leading guard demands EQ-@current@
+-- (the sibling must start EXACTLY at the RECORD column) rather than GT-@current@.
+--
+-- Crucially the OPERATOR/where continuations inside the body keep the standard
+-- GT-@current@ discipline (via 'expressionCont'/'whereExpr'), so a RAND/ROR
+-- operand sitting on an aligned next line (col == @current@) does NOT attach —
+-- it dedents to @current@, not GT — which is exactly the block-boundary the spec
+-- (R4) requires. The terminal non-RECORD provision (PARTY…MUST…, BREACH BY…, a
+-- RAND/ROR expr) is parsed by the LAST sibling's value/continuation path through
+-- the SAME @current@ and the SAME operator machinery the flat HENCE chain uses,
+-- so it lowers to the identical AST.
+--
+-- 'withIndent EQ' fails WITHOUT consuming on a column mismatch (it is a peek at
+-- the indent level), so when no aligned sibling follows, the surrounding
+-- 'optionalWithHole' cleanly falls through to its @Nothing@ arm (empty
+-- continuation). A column-aligned sibling whose body is then malformed is a
+-- genuine hard parse error (acceptable — the input is malformed).
+implicitSeq :: Pos -> AnnoParser (Expr Name)
+implicitSeq current =
+  annoHole $
+    withIndent EQ current $ \ _ -> do
+      l   <- currentLine
+      e   <- mixfixChainExpr
+      efs <- many (expressionCont current)
+      mw  <- optional (whereExpr current)
+      pure ((maybe id id mw) (combine End l e efs))
 
 consider :: Parser (Expr Name)
 consider = do

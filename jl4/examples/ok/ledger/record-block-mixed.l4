@@ -1,0 +1,16 @@
+IMPORT prelude
+-- R5: flat HENCE and block siblings mix harmlessly. Explicit HENCE wins a->b
+-- (hence is tried first); b then opens a block for c and the terminal obligation.
+-- AST is identical to a fully-flat four-step HENCE chain.
+
+DECLARE Person IS ONE OF P
+DECLARE Act IS ONE OF serve
+
+mixedChain MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+  HENCE RECORD `b` IS FALSE
+        RECORD `c` IS TRUE
+        PARTY P MUST serve WITHIN 20

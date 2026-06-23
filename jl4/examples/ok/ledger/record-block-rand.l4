@@ -1,0 +1,17 @@
+IMPORT prelude
+-- R4: the block terminates at the first non-RECORD provision, which here is itself
+-- a RAND expression. The terminal provision is parsed by the same operator
+-- machinery the flat HENCE chain uses, so it lowers to the identical AST.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Act IS ONE OF
+  serve
+  pay
+
+randBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+        (PARTY P MUST serve WITHIN 20
+         RAND PARTY Q MUST pay WITHIN 5)

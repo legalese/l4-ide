@@ -1,0 +1,17 @@
+IMPORT prelude
+-- R7 exactprint round-trip of the BLOCK form: an aligned same-column RECORD
+-- sibling stands in for an explicit HENCE. The ep.golden must reproduce this
+-- layout verbatim with NO inserted HENCE keyword (implicitSeq captures the
+-- continuation via a bare annoHole). Parses to the IDENTICAL AST as the flat
+-- chain in record-hence-flat.l4.
+
+DECLARE Person IS ONE OF P
+DECLARE Act IS ONE OF serve
+
+henceBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  HENCE RECORD `a` IS TRUE
+        RECORD `b` IS FALSE
+        PARTY P MUST serve WITHIN 20
