@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 7B (no right to rent / immigration status)`
@@ -62,7 +63,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The person named in the Secretary of State's notice, with the operative atoms
 -- the disqualification test turns on.
@@ -162,7 +163,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground7BClaim
 GIVETH A DEONTIC Actor Action

@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 4 (amended; Renters' Rights Act 2025)`
@@ -51,7 +52,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The operative atoms. The chapeau's "term not exceeding twelve months" is
 -- tested against the fixed term's length in months. The paragraph-8 condition
@@ -144,7 +145,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground4Claim
 GIVETH A DEONTIC Actor Action

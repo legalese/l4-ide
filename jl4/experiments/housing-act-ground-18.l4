@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part II — Ground 18 (supported accommodation: refusal to co-operate with support services) [NEW — RRA 2025]`
@@ -47,7 +48,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 DECLARE Ground18Claim HAS
   -- LIMB 1 — the supported-accommodation gateway
@@ -81,7 +82,7 @@ GIVETH A BOOLEAN
 
 §§ `The discretionary outcome — Court MAY order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground18Claim
 GIVETH A DEONTIC Actor Action

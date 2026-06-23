@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part II — Ground 9 (suitable alternative accommodation)`
@@ -82,7 +83,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The operative atoms of Ground 9 and its Part III definition, gathered on the
 -- claim. Many are "in the opinion of the court" appraisals lifted as booleans.
@@ -184,7 +185,7 @@ GIVETH A BOOLEAN
 
 §§ `The discretionary outcome — Court MAY order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 -- Part II is DISCRETIONARY: where the ground is made out the court MAY order
 -- possession. MAY defaults so that omission (the court declining) is FULFILLED —

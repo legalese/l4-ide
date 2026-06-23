@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 6A (Renters' Rights Act 2025)`
@@ -59,7 +60,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The operative atoms of conditions (a)-(d), gathered on the claim.
 DECLARE Ground6AClaim HAS
@@ -188,7 +189,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground6AClaim
 GIVETH A DEONTIC Actor Action

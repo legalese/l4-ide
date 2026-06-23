@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part II — Ground 12 (breach of obligation)`
@@ -37,7 +38,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 DECLARE Ground12Claim HAS
   -- the single operative atom (already scoped to non-rent obligations)
@@ -60,7 +61,7 @@ GIVETH A BOOLEAN
 
 §§ `The discretionary outcome — Court MAY order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground12Claim
 GIVETH A DEONTIC Actor Action

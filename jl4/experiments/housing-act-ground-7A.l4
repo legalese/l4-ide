@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 7A (anti-social behaviour)`
@@ -78,7 +79,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 DECLARE Ground7AClaim HAS
   -- The appeal proviso (shared across all five Conditions)
@@ -224,7 +225,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground7AClaim
 GIVETH A DEONTIC Actor Action

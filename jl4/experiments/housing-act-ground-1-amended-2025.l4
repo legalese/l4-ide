@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (amended; Renters' Rights Act 2025)`
@@ -31,7 +32,7 @@ IMPORT daydate
 
 §§ `Domain model — the relationship as a relation ON THE OCCUPIER`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The prospective occupier (resident). The relationship the occupier bears to the
 -- landlord is modelled as a RELATION ON THE OCCUPIER: a set of independent boolean
@@ -123,7 +124,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Claim
 GIVETH A DEONTIC Actor Action

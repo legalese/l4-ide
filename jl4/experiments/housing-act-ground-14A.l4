@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 IMPORT daydate
 
 § `Housing Act 1988 — Schedule 2 — Part II — Ground 14A (domestic violence, social landlords)`
@@ -66,7 +67,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The operative atoms of the chapeau and limbs (a)-(d), gathered on the claim.
 DECLARE Ground14AClaim HAS
@@ -146,7 +147,7 @@ GIVETH A BOOLEAN
 
 -- Part II ground: where made out the court MAY order possession (and only if it
 -- is also satisfied it is reasonable to do so — s.7(4)). MAY, not MUST.
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground14AClaim
 GIVETH A DEONTIC Actor Action

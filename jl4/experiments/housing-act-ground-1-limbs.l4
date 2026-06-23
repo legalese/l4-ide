@@ -1,4 +1,5 @@
 IMPORT prelude
+IMPORT `housing-act-common`
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (original 1988), limbs (a) and (b)`
 
@@ -36,7 +37,7 @@ IMPORT prelude
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- A Person here is a landlord-side party.  The booleans capture the operative
 -- atoms the statute turns on, per person:
@@ -140,7 +141,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 -- Part I grounds are MANDATORY: if Ground 1 is made out the court MUST order
 -- possession.  Guard the deontic outcome by the constitutive condition; if the

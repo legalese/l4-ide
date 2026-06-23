@@ -1,5 +1,6 @@
 IMPORT prelude
 IMPORT daydate
+IMPORT `housing-act-common`
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 8 (rent arrears; amended, Renters' Rights Act 2025)`
 
@@ -61,7 +62,7 @@ IMPORT daydate
 
 §§ `Domain model`
 
-DECLARE Actor IS ONE OF Landlord, Tenant, Court
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
 
 -- The rent period. The in-force ground sets thresholds only for weekly/fortnightly
 -- and monthly periods. `Other` stands for any period the in-force ground no longer
@@ -166,7 +167,7 @@ GIVETH A BOOLEAN
 
 §§ `The mandatory outcome — Court MUST order possession`
 
-DECLARE Action IS ONE OF `order possession`
+-- Action (`order possession`) is imported from `housing-act-common`.
 
 GIVEN claim IS A Ground8Claim
 GIVETH A DEONTIC Actor Action
