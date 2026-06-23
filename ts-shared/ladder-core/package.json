@@ -14,7 +14,8 @@
     "clean": "git clean -fdx dist || echo 'git not available'",
     "build": "npm run clean && tsc",
     "check": "tsc --noEmit",
-    "demo": "tsx demo/s415.ts"
+    "demo": "tsx demo/s415.ts",
+    "standalone": "bash standalone/build.sh"
   },
   "packageManager": "npm@11.0.0",
   "engines": {

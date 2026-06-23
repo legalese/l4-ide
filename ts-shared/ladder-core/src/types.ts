@@ -154,6 +154,9 @@ export type ScenePrim =
       state: State
       tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective'
       size?: number
+      /** node id this text belongs to (heading -> its group; label -> its box) —
+       *  used by renderers for click targets and FLIP matching. */
+      id?: NodeId
     }
 
 export interface Scene {

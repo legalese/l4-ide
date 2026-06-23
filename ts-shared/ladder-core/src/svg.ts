@@ -36,17 +36,19 @@ function prim(p: ScenePrim, pal: Palette): string {
   switch (p.kind) {
     case 'box': {
       const { x, y, w, h } = p.rect
+      const foldable = p.role === 'placeholder'
+      const a = ` data-fnid="${p.id}"${foldable ? ` data-fold="${p.id}"` : ''} class="lad-box${foldable ? ' lad-foldable' : ''}"`
       if (p.state === 'eliminable')
-        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="#f6f7f8" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`
+        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="#f6f7f8" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`
       const fill = p.role === 'placeholder' ? '#eef1f6' : '#ffffff'
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"/>`
+      return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"/>`
     }
     case 'wire': {
       const d = p.path.map((pt) => `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ')
       const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
       const col = p.role === 'rail' ? pal.rail : strokeFor(p.state, pal)
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
-      return `<polyline points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
+      return `<polyline class="lad-wire" points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
     }
     case 'glyph':
       if (p.role === 'open-contact')
@@ -62,7 +64,9 @@ function prim(p: ScenePrim, pal: Palette): string {
       const italic = inert ? ' font-style="italic"' : ''
       const weight = p.tag === 'title' ? ' font-weight="700"' : ''
       const fill = p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
-      return `<text x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`
+      const foldable = p.tag === 'heading' && p.id != null
+      const a = `${p.id != null ? ` data-fnid="${p.id}"` : ''}${foldable ? ` data-fold="${p.id}" class="lad-foldable"` : ''}`
+      return `<text${a} x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`
     }
   }
 }

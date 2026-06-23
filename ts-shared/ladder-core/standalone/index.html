@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L4 Ladder — s 415 (interactive)</title>
+    <style>
+      body { font-family: Georgia, 'Times New Roman', serif; margin: 0; color: #222; background: #fff; }
+      header { padding: 20px 28px 8px; }
+      header h1 { font-size: 19px; margin: 0; font-weight: 700; }
+      header p { font-size: 13px; color: #666; margin: 5px 0 0; max-width: 70ch; }
+      .controls { display: flex; gap: 26px; align-items: center; flex-wrap: wrap;
+        padding: 11px 28px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;
+        font-size: 13px; color: #444; }
+      .controls fieldset { border: none; padding: 0; margin: 0; display: flex; gap: 9px; align-items: center; }
+      .controls label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+      .grp { font-style: italic; color: #999; letter-spacing: .02em; }
+      select { font-family: inherit; font-size: 13px; padding: 2px 4px; }
+      #ladder { padding: 26px 28px; overflow-x: auto; }
+      #ladder svg { display: block; }
+      .hint { padding: 0 28px 22px; font-size: 12px; color: #999; font-style: italic; max-width: 80ch; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Penal Code s 415, second limb — interactive ladder</h1>
+      <p>
+        Boxed atoms carry current; unboxed italic prose is inert scaffolding. Click a heading
+        (or a folded box) to fold / expand — everything re-centres live.
+      </p>
+    </header>
+    <div class="controls">
+      <fieldset>
+        <span class="grp">reading</span>
+        <label><input type="radio" name="reading" value="court" checked /> court</label>
+        <label><input type="radio" name="reading" value="applicants" /> applicants</label>
+      </fieldset>
+      <fieldset>
+        <span class="grp">connective</span>
+        <select id="connective">
+          <option value="straddle-wire" selected>straddle-wire</option>
+          <option value="above-wire">above-wire</option>
+          <option value="below-wire">below-wire</option>
+          <option value="on-wire">on-wire</option>
+        </select>
+      </fieldset>
+      <fieldset>
+        <span class="grp">fold</span>
+        <label><input type="checkbox" id="fold-deception" /> deception</label>
+        <label><input type="checkbox" id="fold-harm" /> harm</label>
+      </fieldset>
+    </div>
+    <div id="ladder"></div>
+    <div class="hint">
+      Switch to the applicants’ reading to ghost the “dishonest concealment” rung — surplusage /
+      dead code, drawn. Folding collapses a group to its verdict (the heading becomes the label).
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

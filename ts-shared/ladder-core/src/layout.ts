@@ -85,7 +85,7 @@ function leafBox(
     state,
     emit(ox, oy, out) {
       out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state })
-      out.push({ kind: 'text', at: { x: ox + w / 2, y: oy + h / 2 }, text: label, anchor: 'middle', state })
+      out.push({ kind: 'text', at: { x: ox + w / 2, y: oy + h / 2 }, text: label, anchor: 'middle', state, id })
       if (state === 'eliminable')
         out.push({ kind: 'text', at: { x: ox + w / 2, y: oy - 9 }, text: 'otiose — always open', anchor: 'middle', state, tag: 'otiose', size: 11 })
       const cy = oy + h / 2
@@ -311,7 +311,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         out.push({ kind: 'wire', path: [{ x: leftBusX, y: rungCenters[0] }, { x: leftBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
         out.push({ kind: 'wire', path: [{ x: rightBusX, y: rungCenters[0] }, { x: rightBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
       }
-      if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5 })
+      if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5, id: e.id })
       return { inPort: { x: leftBusX, y: top + stackH / 2 }, outPort: { x: rightBusX, y: top + stackH / 2 } }
     },
   }
