@@ -1,0 +1,318 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 7B (no right to rent / immigration status)`
+
+-- ===========================================================================
+-- GROUND 7B — the "disqualified by immigration status" MANDATORY ground,
+-- inserted into Schedule 2 to the Housing Act 1988 by the Immigration Act 2016
+-- (c. 19), s. 41(2) (in force 1.12.2016; marker F50). Part I (mandatory): where
+-- made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("Both of the following conditions are met in relation
+-- to a dwelling-house in England.", a CONJUNCTION of a gateway with Conditions
+-- 1 and 2):
+--   Gateway      — the dwelling-house is in England.
+--   Condition 1  — the Secretary of State has given a written notice to the
+--                  landlord (or, for joint landlords, one or more of them)
+--                  identifying (a) the tenant(s), or (b) one or more other
+--                  persons aged 18 or over occupying the dwelling-house, as
+--                  disqualified by their immigration status from occupying the
+--                  dwelling-house under the tenancy.
+--   Condition 2  — the person(s) named in the notice (a) fall within (a) or (b)
+--                  of Condition 1, AND (b) are disqualified as a result of their
+--                  immigration status from occupying the dwelling-house under the
+--                  tenancy.
+--
+-- The "disqualified as a result of their immigration status" test (defined for
+-- the purposes of this ground) is a CONJUNCTION:
+--   P is disqualified if— (a) P is not a relevant national, AND (b) P does not
+--   have a right to rent in relation to the dwelling-house.
+-- and "P does not have a right to rent ... if—" is a DISJUNCTION:
+--   (a) P requires leave to enter or remain in the UK but does not have it, OR
+--   (b) P's leave is subject to a condition preventing P from occupying the
+--       dwelling-house;
+-- subject to an override: P is treated as HAVING a right to rent if the
+-- Secretary of State has granted P permission (for the purposes of this ground)
+-- to occupy a dwelling-house under an assured tenancy.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "Both of the following conditions are met" is a CONJUNCTION (Condition 1
+--     AND Condition 2), additionally gated on the "in England" requirement.
+--   * The disqualification test is modelled compositionally as a reusable
+--     predicate over a `NamedPerson` (the person named in the notice), so the
+--     "P is disqualified", "no right to rent", and "relevant national" / SoS-
+--     permission overrides are encoded once and applied to the named person.
+--     Condition 2(b) is exactly this test applied to the named person.
+--   * Condition 1's notice already asserts the named person is disqualified; the
+--     ground deliberately re-tests disqualification at Condition 2(b) (the
+--     court's own determination), so the model keeps them as separate atoms —
+--     Condition 1 records that the SoS *identified/asserted* the person as
+--     disqualified; Condition 2(b) recomputes disqualification on the facts.
+--   * "relevant national" (British citizen / Irish citizen / a person with leave
+--     granted under residence-scheme immigration rules; the lettered (b),(c)
+--     limbs are omitted in force) is folded into the single `P is a relevant
+--     national` atom, its constituent prose carried inline.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The person named in the Secretary of State's notice, with the operative atoms
+-- the disqualification test turns on.
+DECLARE NamedPerson HAS
+  `P is a relevant national`                                                   IS A BOOLEAN
+  `P requires leave to enter or remain in the United Kingdom but does not have it`  IS A BOOLEAN
+  `P's leave to enter or remain is subject to a condition preventing P from occupying the dwelling-house`  IS A BOOLEAN
+  `the Secretary of State has granted P permission (for the purposes of this ground) to occupy a dwelling-house under an assured tenancy`  IS A BOOLEAN
+
+DECLARE Ground7BClaim HAS
+  -- gateway
+  `the dwelling-house is in England`                                           IS A BOOLEAN
+  -- Condition 1
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS A BOOLEAN
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS A BOOLEAN
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS A BOOLEAN
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS A BOOLEAN
+  -- Condition 2(a) — the named person falls within (a) or (b) of Condition 1
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS A BOOLEAN
+  -- Condition 2(b) — re-tested disqualification, computed on the named person
+  `the person named in the notice`                                            IS A NamedPerson
+
+§§ `The "right to rent" test — a disjunction, with the SoS-permission override`
+
+-- "P does not have a right to rent in relation to the dwelling-house if—
+--    (a) P requires leave to enter or remain in the United Kingdom but does not
+--        have it, or
+--    (b) P's leave to enter or remain in the United Kingdom is subject to a
+--        condition preventing P from occupying the dwelling-house.
+--  But P is to be treated as having a right to rent in relation to a dwelling-
+--  house if the Secretary of State has granted P permission for the purposes of
+--  this ground to occupy a dwelling-house under an assured tenancy."
+GIVEN person IS A NamedPerson
+GIVETH A BOOLEAN
+`P does not have a right to rent in relation to the dwelling-house` person MEANS
+        "P does not have a right to rent in relation to the dwelling-house if—"
+    ... (       "(a) P requires leave to enter or remain in the United Kingdom but does not have it, or"
+            ..  person's `P requires leave to enter or remain in the United Kingdom but does not have it`
+            ..  "(b) P's leave to enter or remain in the United Kingdom is subject to a condition preventing P from occupying the dwelling-house."
+            ..  person's `P's leave to enter or remain is subject to a condition preventing P from occupying the dwelling-house`)
+    AND "But P is to be treated as having a right to rent in relation to a dwelling-house if the Secretary of State has granted P permission for the purposes of this ground to occupy a dwelling-house under an assured tenancy."
+    ... NOT person's `the Secretary of State has granted P permission (for the purposes of this ground) to occupy a dwelling-house under an assured tenancy`
+
+§§ `The disqualification test — not a relevant national AND no right to rent`
+
+-- "For the purposes of this ground a person (“P”) is disqualified as a result of
+--  their immigration status from occupying the dwelling-house under the tenancy
+--  if— (a) P is not a relevant national, and (b) P does not have a right to rent
+--  in relation to the dwelling-house."
+-- "relevant national" means— (a) a British citizen, (aa) an Irish citizen, or
+-- (ab) a person who is not an Irish citizen and who has leave to enter or remain
+-- in the UK granted by virtue of residence scheme immigration rules (s.17 EU
+-- (Withdrawal Agreement) Act 2020).
+GIVEN person IS A NamedPerson
+GIVETH A BOOLEAN
+`P is disqualified as a result of their immigration status` person MEANS
+        "(a) P is not a relevant national,"
+    ...     "“relevant national” means— (a) a British citizen, (aa) an Irish citizen, or (ab) a person who is not an Irish citizen and who has leave to enter or remain in the United Kingdom granted by virtue of residence scheme immigration rules within the meaning given by section 17 of the European Union (Withdrawal Agreement) Act 2020"
+        ... NOT person's `P is a relevant national`
+    AND "and (b) P does not have a right to rent in relation to the dwelling-house."
+    ... `P does not have a right to rent in relation to the dwelling-house` person
+
+§§ `Condition 1 — the Secretary of State's notice`
+
+GIVEN claim IS A Ground7BClaim
+GIVETH A BOOLEAN
+`Condition 1` claim MEANS
+        "Condition 1 is that the Secretary of State has given a notice in writing to the landlord or, in the case of joint landlords, one or more of them which identifies—"
+    ... claim's `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`
+    AND     "(a) the tenant or, in the case of joint tenants, one or more of them, or"
+        ..  claim's `(1)(a) the notice identifies the tenant or one or more joint tenants`
+        ..  "(b) one or more other persons aged 18 or over who are occupying the dwelling-house,"
+        ..  claim's `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`
+    AND "as a person or persons disqualified as a result of their immigration status from occupying the dwelling-house under the tenancy."
+    ... claim's `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`
+
+§§ `Condition 2 — the named person falls within Condition 1 and is in fact disqualified`
+
+GIVEN claim IS A Ground7BClaim
+GIVETH A BOOLEAN
+`Condition 2` claim MEANS
+        "Condition 2 is that the person or persons named in the notice—"
+    ... "(a) fall within paragraph (a) or (b) of condition 1, and"
+    ... claim's `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`
+    AND "(b) are disqualified as a result of their immigration status from occupying the dwelling-house under the tenancy."
+    ... `P is disqualified as a result of their immigration status` (claim's `the person named in the notice`)
+
+§§ `Ground 7B made out — in England AND Condition 1 AND Condition 2`
+
+GIVEN claim IS A Ground7BClaim
+GIVETH A BOOLEAN
+`Ground 7B made out` claim MEANS
+        "Both of the following conditions are met in relation to a dwelling-house in England."
+    ... claim's `the dwelling-house is in England`
+    AND `Condition 1` claim
+    AND `Condition 2` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground7BClaim
+GIVETH A DEONTIC Actor Action
+`ground 7B possession order` claim MEANS
+    IF   `Ground 7B made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground7BClaim value (house style; L4 has
+-- no record-update). The named-person sub-record is built from named helpers.
+-- ---------------------------------------------------------------------------
+
+§§ `Named persons`
+
+-- A non-national who needs leave but lacks it, with no SoS permission ->
+-- disqualified.
+`person — overstayer, no leave` MEANS NamedPerson WITH
+  `P is a relevant national`                                                   IS FALSE
+  `P requires leave to enter or remain in the United Kingdom but does not have it`  IS TRUE
+  `P's leave to enter or remain is subject to a condition preventing P from occupying the dwelling-house`  IS FALSE
+  `the Secretary of State has granted P permission (for the purposes of this ground) to occupy a dwelling-house under an assured tenancy`  IS FALSE
+
+-- A British citizen -> a relevant national -> NOT disqualified, whatever else.
+`person — British citizen` MEANS NamedPerson WITH
+  `P is a relevant national`                                                   IS TRUE
+  `P requires leave to enter or remain in the United Kingdom but does not have it`  IS TRUE
+  `P's leave to enter or remain is subject to a condition preventing P from occupying the dwelling-house`  IS TRUE
+  `the Secretary of State has granted P permission (for the purposes of this ground) to occupy a dwelling-house under an assured tenancy`  IS FALSE
+
+-- A non-national with no right to rent on the face of it, BUT the SoS granted
+-- permission for the purposes of this ground -> treated as having a right to
+-- rent -> NOT disqualified.
+`person — SoS permission override` MEANS NamedPerson WITH
+  `P is a relevant national`                                                   IS FALSE
+  `P requires leave to enter or remain in the United Kingdom but does not have it`  IS TRUE
+  `P's leave to enter or remain is subject to a condition preventing P from occupying the dwelling-house`  IS FALSE
+  `the Secretary of State has granted P permission (for the purposes of this ground) to occupy a dwelling-house under an assured tenancy`  IS TRUE
+
+#ASSERT     `P is disqualified as a result of their immigration status` `person — overstayer, no leave`
+#ASSERT NOT `P is disqualified as a result of their immigration status` `person — British citizen`
+#ASSERT NOT `P is disqualified as a result of their immigration status` `person — SoS permission override`
+
+§§ `Base — nothing met -> NOT made out`
+
+`base — nothing met` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS FALSE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS FALSE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS FALSE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS FALSE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS FALSE
+  `the person named in the notice`                                            IS `person — British citizen`
+
+#ASSERT NOT `Ground 7B made out` `base — nothing met`
+
+§§ `Ground made out — notice identifies the tenant, who is in fact disqualified`
+
+`claim made out` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS TRUE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS TRUE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — overstayer, no leave`
+
+#ASSERT `Condition 1`        `claim made out`
+#ASSERT `Condition 2`        `claim made out`
+#ASSERT `Ground 7B made out` `claim made out`
+
+§§ `Ground made out — notice identifies an adult occupier (the (1)(b) limb)`
+
+`claim made out via (1)(b)` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS TRUE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS FALSE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS TRUE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — overstayer, no leave`
+
+#ASSERT `Condition 1`        `claim made out via (1)(b)`
+#ASSERT `Ground 7B made out` `claim made out via (1)(b)`
+
+§§ `Gateway knocked out — all else met but the dwelling-house is NOT in England`
+
+`claim — not in England` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS FALSE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS TRUE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — overstayer, no leave`
+
+#ASSERT NOT `Ground 7B made out` `claim — not in England`
+
+§§ `Condition 1 knocked out — notice given but identifies neither a tenant nor an adult occupier`
+
+`claim — notice identifies no one` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS TRUE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS FALSE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — overstayer, no leave`
+
+#ASSERT NOT `Condition 1`        `claim — notice identifies no one`
+#ASSERT NOT `Ground 7B made out` `claim — notice identifies no one`
+
+§§ `Condition 2 knocked out — named person is a British citizen, so not in fact disqualified`
+
+-- Notice and Condition 1 all in order, but the court's own re-test (Condition
+-- 2(b)) finds the named person is a relevant national -> not disqualified.
+`claim — named person not disqualified` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS TRUE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS TRUE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — British citizen`
+
+#ASSERT     `Condition 1`        `claim — named person not disqualified`
+#ASSERT NOT `Condition 2`        `claim — named person not disqualified`
+#ASSERT NOT `Ground 7B made out` `claim — named person not disqualified`
+
+§§ `Condition 2 knocked out — SoS-permission override means the named person has a right to rent`
+
+`claim — SoS permission override` MEANS Ground7BClaim WITH
+  `the dwelling-house is in England`                                           IS TRUE
+  `(1) the Secretary of State has given a written notice to the landlord (or one or more joint landlords)`  IS TRUE
+  `(1)(a) the notice identifies the tenant or one or more joint tenants`        IS TRUE
+  `(1)(b) the notice identifies one or more other persons aged 18 or over occupying the dwelling-house`  IS FALSE
+  `(1) the notice identifies that person or those persons as disqualified by their immigration status from occupying the dwelling-house under the tenancy`  IS TRUE
+  `(2)(a) the person named in the notice falls within paragraph (a) or (b) of Condition 1`  IS TRUE
+  `the person named in the notice`                                            IS `person — SoS permission override`
+
+#ASSERT NOT `Condition 2`        `claim — SoS permission override`
+#ASSERT NOT `Ground 7B made out` `claim — SoS permission override`
+
+§§ `The mandatory possession order fires when the ground is made out`
+
+#TRACE `ground 7B possession order` `claim made out` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+#TRACE `ground 7B possession order` `base — nothing met` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10

@@ -1,0 +1,594 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 7A (anti-social behaviour)`
+
+-- ===========================================================================
+-- GROUND 7A — the "anti-social behaviour" MANDATORY ground, inserted into
+-- Schedule 2 to the Housing Act 1988 by the Anti-social Behaviour, Crime and
+-- Policing Act 2014 (c. 12), s. 97(1) (in force 20.10.2014 for E.,
+-- 21.10.2014 for W.; marker F48). Part I (mandatory): where made out, the court
+-- MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("Any of the following conditions is met.", a
+-- DISJUNCTION over Conditions 1-5, each with its own sub-structure):
+--   Condition 1 — (a) tenant/resident/visitor convicted of a serious offence,
+--                 and (b) the serious offence was committed (i) in/in the
+--                 locality of the dwelling-house, (ii) elsewhere against a person
+--                 with a right to reside/occupy housing in the locality, or
+--                 (iii) elsewhere against the landlord or a housing-management
+--                 employee, related to those functions.
+--   Condition 2 — a court found in relevant proceedings a breach of an
+--                 injunction under s.1 of the 2014 Act (other than a positive-
+--                 requirement provision), and (a) the breach occurred in/in the
+--                 locality, or (b) it occurred elsewhere and the provision was
+--                 intended to prevent (i) nuisance/annoyance conduct to a person
+--                 with a right to reside/occupy housing in the locality, or
+--                 (ii) such conduct to the landlord/housing-management employee.
+--   Condition 3 — tenant/resident/visitor convicted under s.30 of the 2014 Act
+--                 or s.339 of the Sentencing Code (breach of a criminal
+--                 behaviour order), and the offence involved (a) a breach in/in
+--                 the locality, or (b) a breach elsewhere of a provision intended
+--                 to prevent (i) harassment/alarm/distress behaviour to a person
+--                 with a right to reside/occupy housing in the locality, or
+--                 (ii) such behaviour to the landlord/housing-management employee.
+--   Condition 4 — (a) the dwelling-house is or has been subject to a closure
+--                 order under s.80 of the 2014 Act, and (b) access has been
+--                 prohibited for a continuous period of more than 48 hours.
+--   Condition 5 — (a) tenant/resident/visitor convicted of an offence under
+--                 (i) s.80(4) or (ii) s.82(8) of the Environmental Protection
+--                 Act 1990 (statutory-nuisance abatement breaches), and (b) the
+--                 nuisance concerned was noise emitted from the dwelling-house
+--                 which was a statutory nuisance under s.79(1)(g) of that Act.
+--
+-- THE APPEAL PROVISO (cross-cutting, applies to EVERY Condition):
+--   "Condition 1, 2, 3, 4 or 5 is not met if—
+--      (a) there is an appeal against the conviction, finding or order concerned
+--          which has not been finally determined, abandoned or withdrawn, or
+--      (b) the final determination of the appeal results in the conviction,
+--          finding or order being overturned."
+--   Modelled as a single shared knock-out conjoined onto each Condition: a
+--   Condition is made out iff its own limbs hold AND the appeal proviso does NOT
+--   defeat it.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "Any of the following conditions is met" is a DISJUNCTION over Conditions
+--     1-5; made out = Condition 1 OR ... OR Condition 5.
+--   * The actor phrase "the tenant, or a person residing in or visiting the
+--     dwelling-house" recurs across Conditions 1, 2, 3 and 5; it is folded into
+--     each Condition's lead conviction/breach atom rather than lifted as a
+--     separate predicate, since the statute pins the conviction/finding to that
+--     class of person.
+--   * Defined terms ("relevant proceedings", "serious offence") are carried as
+--     inert prose at the foot; the operative effect of "serious offence" is
+--     folded into Condition 1's conviction atom (`convicted of a serious
+--     offence`), so the Sch. 2A-listing / not-summary-only / committed-after-
+--     commencement qualifications are presumed assessed when that atom is set.
+--   * Condition 5's (a) is itself a disjunction over (i) s.80(4) and (ii) s.82(8)
+--     convictions, conjoined with (b) the noise-nuisance qualifier.
+--   * The 48-hour "continuous period" in Condition 4(b) is modelled as a single
+--     operative boolean (the prohibition exceeded 48 continuous hours), not as
+--     date arithmetic, since the source supplies no anchor timestamps.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Ground7AClaim HAS
+  -- The appeal proviso (shared across all five Conditions)
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS A BOOLEAN
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS A BOOLEAN
+
+  -- Condition 1
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS A BOOLEAN
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS A BOOLEAN
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS A BOOLEAN
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS A BOOLEAN
+
+  -- Condition 2
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS A BOOLEAN
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS A BOOLEAN
+  `(2)(b) the breach occurred elsewhere`                                        IS A BOOLEAN
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS A BOOLEAN
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS A BOOLEAN
+
+  -- Condition 3
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS A BOOLEAN
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS A BOOLEAN
+  `(3)(b) a breach that occurred elsewhere`                                     IS A BOOLEAN
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS A BOOLEAN
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS A BOOLEAN
+
+  -- Condition 4
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS A BOOLEAN
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS A BOOLEAN
+
+  -- Condition 5
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS A BOOLEAN
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS A BOOLEAN
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS A BOOLEAN
+
+§§ `The appeal proviso — a shared knock-out across all five Conditions`
+
+-- "Condition 1, 2, 3, 4 or 5 is not met if—
+--    (a) there is an appeal against the conviction, finding or order concerned
+--        which has not been finally determined, abandoned or withdrawn, or
+--    (b) the final determination of the appeal results in the conviction,
+--        finding or order being overturned."
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`the appeal proviso defeats the condition` claim MEANS
+        "Condition 1, 2, 3, 4 or 5 is not met if—"
+    ..  "(a) there is an appeal against the conviction, finding or order concerned which has not been finally determined, abandoned or withdrawn,"
+    ..  claim's `there is an unresolved appeal against the conviction, finding or order concerned`
+    ..  "or (b) the final determination of the appeal results in the conviction, finding or order being overturned."
+    ..  claim's `the final determination of the appeal results in the conviction, finding or order being overturned`
+
+§§ `Condition 1 — conviction of a serious offence with the required nexus`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Condition 1` claim MEANS
+        "Condition 1 is that—"
+    ... "(a) the tenant, or a person residing in or visiting the dwelling-house, has been convicted of a serious offence,"
+    ... claim's `(1)(a) tenant/resident/visitor convicted of a serious offence`
+    AND "and (b) the serious offence—"
+    ...     "(i) was committed (wholly or partly) in, or in the locality of, the dwelling-house,"
+        ..  claim's `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`
+        ..  "(ii) was committed elsewhere against a person with a right (of whatever description) to reside in, or occupy housing accommodation in the locality of, the dwelling-house, or"
+        ..  claim's `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`
+        ..  "(iii) was committed elsewhere against the landlord of the dwelling-house, or a person employed (whether or not by the landlord) in connection with the exercise of the landlord's housing management functions, and directly or indirectly related to or affected those functions."
+        ..  claim's `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`
+    AND NOT `the appeal proviso defeats the condition` claim
+
+§§ `Condition 2 — court-found breach of a s.1 injunction with the required nexus`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Condition 2` claim MEANS
+        "Condition 2 is that a court has found in relevant proceedings that the tenant, or a person residing in or visiting the dwelling-house, has breached a provision of an injunction under section 1 of the Anti-social Behaviour, Crime and Policing Act 2014, other than a provision requiring a person to participate in a particular activity,"
+    ... claim's `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`
+    AND "and—"
+    AND     "(a) the breach occurred in, or in the locality of, the dwelling-house, or"
+        ..  claim's `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`
+        ..      "(b) the breach occurred elsewhere and the provision breached was a provision intended to prevent—"
+            ...     claim's `(2)(b) the breach occurred elsewhere`
+                AND     "(i) conduct that is capable of causing nuisance or annoyance to a person with a right (of whatever description) to reside in, or occupy housing accommodation in the locality of, the dwelling-house, or"
+                    ..  claim's `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`
+                    ..  "(ii) conduct that is capable of causing nuisance or annoyance to the landlord of the dwelling-house, or a person employed (whether or not by the landlord) in connection with the exercise of the landlord's housing management functions, and that is directly or indirectly related to or affects those functions."
+                    ..  claim's `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`
+    AND NOT `the appeal proviso defeats the condition` claim
+
+§§ `Condition 3 — conviction for breach of a criminal behaviour order with the required nexus`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Condition 3` claim MEANS
+        "Condition 3 is that the tenant, or a person residing in or visiting the dwelling-house, has been convicted of an offence under section 30 of the Anti-social Behaviour, Crime and Policing Act 2014 or section 339 of the Sentencing Code consisting of a breach of a provision of a criminal behaviour order prohibiting a person from doing anything described in the order,"
+    ... claim's `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`
+    AND "and the offence involved—"
+    AND     "(a) a breach that occurred in, or in the locality of, the dwelling-house, or"
+        ..  claim's `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`
+        ..      "(b) a breach that occurred elsewhere of a provision intended to prevent—"
+            ...     claim's `(3)(b) a breach that occurred elsewhere`
+                AND     "(i) behaviour that causes or is likely to cause harassment, alarm or distress to a person with a right (of whatever description) to reside in, or occupy housing accommodation in the locality of, the dwelling-house, or"
+                    ..  claim's `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`
+                    ..  "(ii) behaviour that causes or is likely to cause harassment, alarm or distress to the landlord of the dwelling-house, or a person employed (whether or not by the landlord) in connection with the exercise of the landlord's housing management functions, and that is directly or indirectly related to or affects those functions."
+                    ..  claim's `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`
+    AND NOT `the appeal proviso defeats the condition` claim
+
+§§ `Condition 4 — closure order and >48h continuous prohibition of access`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Condition 4` claim MEANS
+        "Condition 4 is that—"
+    ... "(a) the dwelling-house is or has been subject to a closure order under section 80 of the Anti-social Behaviour, Crime and Policing Act 2014,"
+    ... claim's `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`
+    AND "and (b) access to the dwelling-house has been prohibited (under the closure order or under a closure notice issued under section 76 of that Act) for a continuous period of more than 48 hours."
+    ... claim's `(4)(b) access has been prohibited for a continuous period of more than 48 hours`
+    AND NOT `the appeal proviso defeats the condition` claim
+
+§§ `Condition 5 — statutory-nuisance abatement conviction concerning dwelling-house noise`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Condition 5` claim MEANS
+        "Condition 5 is that—"
+    ...     "(a) the tenant, or a person residing in or visiting the dwelling-house, has been convicted of an offence under—"
+        ...     "(i) section 80(4) of the Environmental Protection Act 1990 (breach of abatement notice in relation to statutory nuisance), or"
+            ..  claim's `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`
+            ..  "(ii) section 82(8) of that Act (breach of court order to abate statutory nuisance etc.),"
+            ..  claim's `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`
+    AND "and (b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance for the purposes of Part 3 of that Act by virtue of section 79(1)(g) of that Act (noise emitted from premises so as to be prejudicial to health or a nuisance)."
+    ... claim's `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`
+    AND NOT `the appeal proviso defeats the condition` claim
+
+§§ `Ground 7A made out — any of Conditions 1-5 is met`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A BOOLEAN
+`Ground 7A made out` claim MEANS
+        "Any of the following conditions is met."
+    ..  `Condition 1` claim
+    ..  `Condition 2` claim
+    ..  `Condition 3` claim
+    ..  `Condition 4` claim
+    ..  `Condition 5` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground7AClaim
+GIVETH A DEONTIC Actor Action
+`ground 7A possession order` claim MEANS
+    IF   `Ground 7A made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground7AClaim value (house style; L4 has
+-- no record-update). The base sets every atom FALSE (and the appeal-proviso
+-- atoms FALSE, so no condition is defeated); each positive scenario lights one
+-- Condition; targeted negatives probe sub-structure and the appeal proviso.
+-- ---------------------------------------------------------------------------
+
+§§ `Base — no condition met -> NOT made out`
+
+`base — nothing met` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Ground 7A made out` `base — nothing met`
+
+§§ `Condition 1 made out — serious-offence conviction committed in the locality`
+
+`claim via Condition 1` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS TRUE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS TRUE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT `Condition 1`        `claim via Condition 1`
+#ASSERT `Ground 7A made out` `claim via Condition 1`
+
+§§ `Condition 1 knocked out — conviction but NO required nexus (none of (b)(i)-(iii))`
+
+`claim Condition 1 — no nexus` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS TRUE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 1`        `claim Condition 1 — no nexus`
+#ASSERT NOT `Ground 7A made out` `claim Condition 1 — no nexus`
+
+§§ `Condition 1 made out via (b)(iii) but DEFEATED by an unresolved appeal`
+
+-- Same facts as a winning Condition 1 (nexus via (b)(iii)) but with an
+-- unresolved appeal: the shared appeal proviso knocks the condition out.
+`claim Condition 1 — appeal pending` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS TRUE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS TRUE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS TRUE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 1`        `claim Condition 1 — appeal pending`
+#ASSERT NOT `Ground 7A made out` `claim Condition 1 — appeal pending`
+
+§§ `Condition 2 made out — s.1 injunction breach, the elsewhere/(b)(ii) limb`
+
+`claim via Condition 2` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS TRUE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS TRUE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS TRUE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT `Condition 2`        `claim via Condition 2`
+#ASSERT `Ground 7A made out` `claim via Condition 2`
+
+§§ `Condition 2 knocked out — breach occurred elsewhere but provision prevented neither (b)(i) nor (b)(ii) conduct`
+
+`claim Condition 2 — elsewhere, no preventive purpose` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS TRUE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS TRUE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 2`        `claim Condition 2 — elsewhere, no preventive purpose`
+#ASSERT NOT `Ground 7A made out` `claim Condition 2 — elsewhere, no preventive purpose`
+
+§§ `Condition 3 made out — criminal-behaviour-order breach in the locality`
+
+`claim via Condition 3` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS TRUE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS TRUE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT `Condition 3`        `claim via Condition 3`
+#ASSERT `Ground 7A made out` `claim via Condition 3`
+
+§§ `Condition 4 made out — closure order and >48h continuous prohibition`
+
+`claim via Condition 4` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS TRUE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS TRUE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT `Condition 4`        `claim via Condition 4`
+#ASSERT `Ground 7A made out` `claim via Condition 4`
+
+§§ `Condition 4 knocked out — closure order but prohibition NOT exceeding 48h`
+
+`claim Condition 4 — under 48h` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS TRUE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 4`        `claim Condition 4 — under 48h`
+#ASSERT NOT `Ground 7A made out` `claim Condition 4 — under 48h`
+
+§§ `Condition 5 made out — s.82(8) conviction concerning dwelling-house noise nuisance`
+
+`claim via Condition 5` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS TRUE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS TRUE
+
+#ASSERT `Condition 5`        `claim via Condition 5`
+#ASSERT `Ground 7A made out` `claim via Condition 5`
+
+§§ `Condition 5 knocked out — qualifying conviction but the nuisance was NOT the s.79(1)(g) dwelling-house noise`
+
+`claim Condition 5 — wrong nuisance` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS FALSE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS FALSE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS FALSE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS TRUE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 5`        `claim Condition 5 — wrong nuisance`
+#ASSERT NOT `Ground 7A made out` `claim Condition 5 — wrong nuisance`
+
+§§ `Appeal overturned — even a fully made-out Condition 3 is defeated`
+
+-- Condition 3 made out on the merits (CBO breach in the locality) but the final
+-- determination of the appeal overturned the conviction: proviso limb (b) bites.
+`claim Condition 3 — overturned on appeal` MEANS Ground7AClaim WITH
+  `there is an unresolved appeal against the conviction, finding or order concerned`  IS FALSE
+  `the final determination of the appeal results in the conviction, finding or order being overturned`  IS TRUE
+  `(1)(a) tenant/resident/visitor convicted of a serious offence`               IS FALSE
+  `(1)(b)(i) serious offence committed in, or in the locality of, the dwelling-house`  IS FALSE
+  `(1)(b)(ii) serious offence committed elsewhere against a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(1)(b)(iii) serious offence committed elsewhere against the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(2) court found in relevant proceedings a breach of an injunction under s.1 of the 2014 Act (other than a positive-requirement provision)`  IS FALSE
+  `(2)(a) the breach occurred in, or in the locality of, the dwelling-house`    IS FALSE
+  `(2)(b) the breach occurred elsewhere`                                        IS FALSE
+  `(2)(b)(i) provision intended to prevent nuisance/annoyance conduct to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(2)(b)(ii) provision intended to prevent nuisance/annoyance conduct to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(3) tenant/resident/visitor convicted under s.30 of the 2014 Act or s.339 of the Sentencing Code (breach of a criminal behaviour order)`  IS TRUE
+  `(3)(a) a breach that occurred in, or in the locality of, the dwelling-house`  IS TRUE
+  `(3)(b) a breach that occurred elsewhere`                                     IS FALSE
+  `(3)(b)(i) provision intended to prevent harassment/alarm/distress behaviour to a person with a right to reside/occupy housing in the locality`  IS FALSE
+  `(3)(b)(ii) provision intended to prevent harassment/alarm/distress behaviour to the landlord or a housing-management employee related to those functions`  IS FALSE
+  `(4)(a) the dwelling-house is or has been subject to a closure order under s.80 of the 2014 Act`  IS FALSE
+  `(4)(b) access has been prohibited for a continuous period of more than 48 hours`  IS FALSE
+  `(5)(a)(i) convicted of an offence under s.80(4) of the Environmental Protection Act 1990 (breach of abatement notice)`  IS FALSE
+  `(5)(a)(ii) convicted of an offence under s.82(8) of that Act (breach of court order to abate statutory nuisance etc.)`  IS FALSE
+  `(5)(b) the nuisance concerned was noise emitted from the dwelling-house which was a statutory nuisance under s.79(1)(g)`  IS FALSE
+
+#ASSERT NOT `Condition 3`        `claim Condition 3 — overturned on appeal`
+#ASSERT NOT `Ground 7A made out` `claim Condition 3 — overturned on appeal`
+
+§§ `The mandatory possession order fires when the ground is made out`
+
+-- When the ground is made out the residual obligation is the Court's duty to
+-- order possession; performing it within the window discharges (FULFILLED).
+#TRACE `ground 7A possession order` `claim via Condition 1` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- When the ground is not made out the contract is immediately FULFILLED.
+#TRACE `ground 7A possession order` `base — nothing met` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
