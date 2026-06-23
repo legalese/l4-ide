@@ -1,0 +1,16 @@
+IMPORT prelude
+-- R2: the block sugar is on the Record continuation slot, so entry via LEST works
+-- exactly as via HENCE. Parses to lest = Just (Record a (Just (Record b (Just
+-- (Breach ...))))), identical to the flat LEST RECORD a HENCE RECORD b HENCE
+-- BREACH chain.
+
+DECLARE Person IS ONE OF P
+DECLARE Act IS ONE OF serve
+
+lestBlock MEANS
+  PARTY P
+  MUST serve
+  WITHIN 10
+  LEST RECORD `a` IS TRUE
+       RECORD `b` IS FALSE
+       BREACH BY P BECAUSE "missed"
