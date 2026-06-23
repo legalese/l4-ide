@@ -1,0 +1,1221 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 6 (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 6 — the "redevelopment" MANDATORY ground, AS SUBSTITUTED into
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26),
+-- s. 145(1)(8), Sch. 1 para. 20 (commencement 1.5.2026 for specified purposes;
+-- S.I. 2026/421, reg. 2(b); textual-amendment marker F29). Part I (mandatory):
+-- where it is made out, the court MUST order possession.
+--
+-- This is the most structurally complex ground in Schedule 2: it has a TABLE
+-- (three rows pairing landlord-type / tenancy-type / permitted redeveloper),
+-- three top-level condition-sets, and the additional RSL condition splits into
+-- Case A / Case B / Case C.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the TABLE                   -> typed DATA (a TableRow per row), matched
+--     against the claim's row + column-match booleans;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- TOP-LEVEL STRUCTURE ("These conditions are met—", a CONJUNCTION):
+--   (a) the general redevelopment conditions (in every case);
+--   (b) the landlord's acquisition condition, but only in a case where
+--       section 7(5ZA) applies in relation to the tenancy;
+--   (c) the additional RSL condition, but only in a case where the landlord
+--       seeking possession is—
+--           (i)  a relevant social landlord, and
+--           (ii) the person who intends to carry out the work mentioned in this
+--                ground.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer (see also the README at
+-- the end of the run report):
+--
+--   [I1] The two "but only in a case where ..." conditions, (b) and (c), are
+--        modelled as IMPLICATIONS. A condition that bites "only in a case where
+--        G" is, logically, "(NOT G) OR condition": where the gating case G does
+--        NOT apply, the condition is vacuously satisfied; where it DOES apply,
+--        the condition must actually be met. So:
+--          (b) -> (NOT s.7(5ZA) applies) OR (landlord's acquisition condition)
+--          (c) -> (NOT [landlord is BOTH an RSL AND the intended redeveloper])
+--                  OR (additional RSL condition)
+--        The gate for (c) is itself a CONJUNCTION of (c)(i) and (c)(ii).
+--
+--   [I2] The TABLE is modelled as DATA. Each row is a TableRow carrying a
+--        first-column landlord-type, a second-column tenancy-type, and the SET
+--        of permitted third-column redeveloper-types. The general condition
+--        (a)/(b)/(c) reads: "there exists a row of the table such that the
+--        landlord matches column 1, the tenancy matches column 2, and the
+--        intended redeveloper is one of column 3 (and that redeveloper intends
+--        (i) or (ii))." The claim carries WHICH row is being relied on, plus a
+--        boolean for each column match (col-1 landlord match, col-2 tenancy
+--        match, col-3 redeveloper-is-permitted) and the redeveloper's intent;
+--        row-consistency (the asserted redeveloper is actually a member of the
+--        relied-on row's column 3) is checked structurally against the data.
+--
+--   [I3] (d) "the intended work cannot reasonably be carried out without the
+--        tenant giving up possession because—" is a 4-WAY DISJUNCTION over the
+--        reasons (i)-(iv): any one reason suffices, conjoined with the chapeau.
+--
+--   [I4] (e) is an EITHER/OR: (i) the assured tenancy began at least 6 months
+--        before the relevant date, OR (ii) a compulsory-acquisition notice was
+--        given where (A) the acquiring authority became the landlord seeking
+--        possession AND (B) the dwelling-house was transferred to that landlord
+--        within the 12 months ending with the relevant date. This mirrors
+--        Ground 1A's (c) either/or shape, with the 6-month / 12-month windows
+--        computed leap-year-correctly from the actual dates (never by month
+--        subtraction, which clamps).
+--
+--   [I5] Case A / Case B / Case C of the additional RSL condition are a
+--        DISJUNCTION (the condition is met "in case A, case B or case C"). The
+--        accommodation-quality predicates ("adequate security of tenure",
+--        "affordable", "appropriate location", "overcrowded") and the
+--        "commonhold"/"relevant social landlord" definitions are carried as
+--        inert prose; their operative content is folded into the lifted atoms.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The redeveloper-types that can appear in the third column of the table. These
+-- are the persons who may be the one "intending to redevelop". Modelled as an
+-- enum so a TableRow can carry a LIST of the permitted ones, and the claim can
+-- name which one is actually relied on.
+DECLARE RedeveloperType IS ONE OF
+    `the landlord who is seeking possession`
+    `a superior landlord`
+    `the commonhold association`
+
+-- The first-column landlord-types and second-column tenancy-types are carried
+-- as enums too, so each TableRow pairs a concrete column-1 / column-2 pair with
+-- its permitted column-3 set, and the data can be inspected.
+DECLARE LandlordColumnType IS ONE OF
+    `col1 a relevant social landlord`
+    `col1 the unit-holder of a commonhold unit`
+    `col1 any landlord other than an RSL or a commonhold unit-holder`
+
+DECLARE TenancyColumnType IS ONE OF
+    `col2 any tenancy`
+    `col2 a tenancy of a dwelling-house in or comprising the commonhold unit`
+
+-- A row of the TABLE: column 1 (landlord), column 2 (tenancy), column 3 (the
+-- set of permitted redevelopers).
+DECLARE TableRow HAS
+    `first column — landlord seeking possession`  IS A LandlordColumnType
+    `second column — tenancy`                      IS A TenancyColumnType
+    `third column — landlords intending to redevelop`  IS A LIST OF RedeveloperType
+
+-- The operative atoms of the whole ground, gathered on the claim.
+DECLARE Ground6Claim HAS
+  -- ---- general redevelopment conditions (a)/(b)/(c): the TABLE match ----
+  -- which row of the table is being relied on
+  `relied-on table row`                                        IS A TableRow
+  -- (a) the landlord seeking possession matches column 1 of that row
+  `landlord matches first column of the relied-on row`         IS A BOOLEAN
+  -- (b) the tenancy matches column 2 of that row
+  `tenancy matches second column of the relied-on row`         IS A BOOLEAN
+  -- (c) the redeveloper actually relied on (must be in column 3 of that row)
+  `intended redeveloper`                                       IS A RedeveloperType
+  -- (c)(i)/(ii) the redeveloper's intention
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS A BOOLEAN
+  `redeveloper intends to carry out substantial works`         IS A BOOLEAN
+
+  -- ---- (d) the intended work needs vacant possession, for reasons (i)-(iv) ----
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS A BOOLEAN
+  `(d)(ii) no such variation is practicable`                                    IS A BOOLEAN
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS A BOOLEAN
+  `(d)(iv) such a tenancy is not practicable`                                   IS A BOOLEAN
+
+  -- ---- (e) the 6-month / compulsory-acquisition limb ----
+  `tenancy began`                                              IS A DATE
+  `relevant date`                                              IS A DATE
+  -- (e)(ii)
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS A BOOLEAN
+  `acquiring authority was the person who became the landlord seeking possession`  IS A BOOLEAN
+  `date the dwelling-house was transferred to that landlord`    IS A DATE
+
+  -- ---- (f) not a Rent Act 1977 / Rent (Agriculture) Act 1976 tenancy ----
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS A BOOLEAN
+
+  -- ---- gate for (b): does s.7(5ZA) apply to the tenancy? ----
+  `section 7(5ZA) applies in relation to the tenancy`          IS A BOOLEAN
+
+  -- ---- gate for (c): is the landlord BOTH an RSL AND the intended redeveloper? ----
+  `landlord seeking possession is a relevant social landlord`  IS A BOOLEAN  -- (c)(i)
+  `landlord seeking possession is the person who intends to carry out the work`  IS A BOOLEAN  -- (c)(ii)
+
+  -- ---- landlord's acquisition condition ----
+  `landlord acquired their interest before the grant of the tenancy`           IS A BOOLEAN  -- (a)
+  `that interest was in existence at the time of the grant`                     IS A BOOLEAN  -- (b) head
+  `that interest has since been acquired for money or money's worth`            IS A BOOLEAN  -- (b) tail
+
+  -- ---- additional RSL condition: Case A / Case B / Case C ----
+  -- Case A — permanent alternative accommodation
+  `(A) alternative accommodation is or will be available for the tenant`        IS A BOOLEAN
+  `(A) let as a separate dwelling with adequate security of tenure`            IS A BOOLEAN
+  `(A) affordable`                                                              IS A BOOLEAN
+  `(A) in an appropriate location`                                             IS A BOOLEAN
+  `(A) not overcrowded`                                                         IS A BOOLEAN
+  -- Case B — temporary alternative accommodation pending Case-A accommodation
+  `(B) alternative accommodation is or will be available for the tenant`        IS A BOOLEAN
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS A BOOLEAN
+  `(B) affordable`                                                              IS A BOOLEAN
+  `(B) in an appropriate location`                                             IS A BOOLEAN
+  `(B) not overcrowded`                                                         IS A BOOLEAN
+  -- Case C — written-statement-of-intention case
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS A BOOLEAN
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS A BOOLEAN
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS A BOOLEAN
+
+§§ `The TABLE as data — the three rows`
+
+-- Row 1: an RSL landlord, any tenancy; redeveloper may be the landlord seeking
+-- possession or a superior landlord.
+`table row 1` MEANS TableRow WITH
+  `first column — landlord seeking possession`      IS `col1 a relevant social landlord`
+  `second column — tenancy`                          IS `col2 any tenancy`
+  `third column — landlords intending to redevelop`  IS
+      LIST `the landlord who is seeking possession`,
+           `a superior landlord`
+
+-- Row 2: a commonhold unit-holder, a tenancy of a dwelling-house in/comprising
+-- the commonhold unit; redeveloper may be the landlord seeking possession or
+-- the commonhold association.
+`table row 2` MEANS TableRow WITH
+  `first column — landlord seeking possession`      IS `col1 the unit-holder of a commonhold unit`
+  `second column — tenancy`                          IS `col2 a tenancy of a dwelling-house in or comprising the commonhold unit`
+  `third column — landlords intending to redevelop`  IS
+      LIST `the landlord who is seeking possession`,
+           `the commonhold association`
+
+-- Row 3: any other landlord, any tenancy; redeveloper must be the landlord
+-- seeking possession.
+`table row 3` MEANS TableRow WITH
+  `first column — landlord seeking possession`      IS `col1 any landlord other than an RSL or a commonhold unit-holder`
+  `second column — tenancy`                          IS `col2 any tenancy`
+  `third column — landlords intending to redevelop`  IS
+      LIST `the landlord who is seeking possession`
+
+§§ `TABLE helper — is the intended redeveloper permitted by the relied-on row?`
+
+-- "a person mentioned in the third column of that row": the intended
+-- redeveloper must be a member of the relied-on row's column-3 set. Checked
+-- structurally against the data (the LIST carried on the row).
+GIVEN `row`          IS A TableRow
+      `redeveloper`  IS A RedeveloperType
+GIVETH A BOOLEAN
+`redeveloper is in the third column of the row` MEANS
+    any (`equals the redeveloper`) (`row`'s `third column — landlords intending to redevelop`)
+    WHERE
+        GIVEN x IS A RedeveloperType
+        GIVETH A BOOLEAN
+        `equals the redeveloper` x MEANS x EQUALS `redeveloper`
+
+§§ `General redevelopment conditions — (a) landlord in col 1, (b) tenancy in col 2, (c) redeveloper in col 3 intends (i)/(ii)`
+
+-- (a) "the landlord seeking possession is mentioned in the first column in a row
+--     of the table"; (b) "the tenancy is mentioned in the second column of that
+--     row"; (c) "a person mentioned in the third column of that row intends to
+--     (i) demolish/reconstruct ... or (ii) carry out substantial works".
+-- The claim carries the relied-on row, the col-1 and col-2 match booleans, the
+-- named intended redeveloper (checked for membership in col 3) and the
+-- redeveloper's intent.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`general (a)(b)(c) — table match and redevelopment intent` claim MEANS
+        "(a) the landlord seeking possession is mentioned in the first column in a row of the table in this ground;"
+    ... claim's `landlord matches first column of the relied-on row`
+    AND "(b) the tenancy is mentioned in the second column of that row;"
+    ... claim's `tenancy matches second column of the relied-on row`
+    AND "(c) a person mentioned in the third column of that row intends to—"
+    ...     `redeveloper is in the third column of the row`
+                (claim's `relied-on table row`)
+                (claim's `intended redeveloper`)
+        AND     "(i) demolish or reconstruct the whole or a substantial part of the dwelling-house, or"
+            ..      claim's `redeveloper intends to demolish or reconstruct whole or substantial part`
+            ..  "(ii) carry out substantial works on the dwelling-house or any part of it, or any building of which it forms part;"
+            ..      claim's `redeveloper intends to carry out substantial works`
+
+§§ `General redevelopment conditions — (d) the work needs vacant possession (reasons (i)-(iv))`
+
+-- (d) chapeau + a 4-WAY DISJUNCTION over reasons (i)-(iv): any one reason
+-- suffices to show the work cannot reasonably be carried out without the tenant
+-- giving up possession.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`general (d) — work needs vacant possession` claim MEANS
+        "(d) the intended work cannot reasonably be carried out without the tenant giving up possession of the dwelling-house because—"
+    ..  "(i) the tenant is not willing to agree to such a variation of the terms of the tenancy as would give such access and other facilities as would permit the intended work to be carried out,"
+    ..      claim's `(d)(i) tenant not willing to agree a variation giving access for the work`
+    ..  "(ii) the nature of the intended work is such that no such variation is practicable,"
+    ..      claim's `(d)(ii) no such variation is practicable`
+    ..  "(iii) the tenant is not willing to accept an assured tenancy of such part only of the dwelling-house (in this sub-paragraph referred to as the reduced part) as would leave in the possession of the landlord so much of the dwelling-house as would be reasonable to enable the intended work to be carried out and, where appropriate, as would give such access and other facilities over the reduced part as would permit the intended work to be carried out, or"
+    ..      claim's `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`
+    ..  "(iv) the nature of the intended work is such that such a tenancy is not practicable;"
+    ..      claim's `(d)(iv) such a tenancy is not practicable`
+
+§§ `General redevelopment conditions — (e) the 6-month / compulsory-acquisition limb`
+
+-- (e)(i) "the assured tenancy began at least 6 months before the relevant
+-- date". Six months computed from the actual tenancy-start date (never by month
+-- subtraction): the tenancy must have begun on or before the date 6 months
+-- before the relevant date. We derive "6 months after the tenancy start" by
+-- adding to the EARLIER date, then test inclusive elapsed span.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`(e)(i) tenancy began at least 6 months before the relevant date` claim MEANS
+        "(i) the assured tenancy began at least 6 months before the relevant date,"
+    ... (Day (claim's `relevant date`) MINUS Day (claim's `tenancy began`)) PLUS 1
+            AT LEAST
+        (Day `six months after tenancy start` MINUS Day (claim's `tenancy began`)) PLUS 1
+    WHERE
+        -- 6 months after the tenancy start, leap-safe: add 6 to the month, and
+        -- carry into the year if it overflows past December (month > 12).
+        `six months after tenancy start` MEANS
+            IF DATE_MONTH (claim's `tenancy began`) PLUS 6 GREATER THAN 12
+            THEN Date (DATE_DAY   (claim's `tenancy began`))
+                      (DATE_MONTH (claim's `tenancy began`) PLUS 6 MINUS 12)
+                      (DATE_YEAR  (claim's `tenancy began`) PLUS 1)
+            ELSE Date (DATE_DAY   (claim's `tenancy began`))
+                      (DATE_MONTH (claim's `tenancy began`) PLUS 6)
+                      (DATE_YEAR  (claim's `tenancy began`))
+
+-- (e)(ii) the compulsory-acquisition limb: notice given, (A) the acquiring
+-- authority became the landlord seeking possession, and (B) the dwelling-house
+-- was transferred to that landlord within the 12 months ENDING WITH the relevant
+-- date — i.e. the transfer fell in [relevant date − 12 months, relevant date].
+-- We derive the window start "12 months before the relevant date" by adding 12
+-- to the EARLIER (transfer) framing is awkward; instead derive it leap-safe from
+-- the relevant date using a year-1 / month-carry, then test the transfer date is
+-- on or after that window-start and on or before the relevant date.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`(e)(ii) compulsory-acquisition limb` claim MEANS
+        "(ii) notice of a compulsory acquisition was given in respect of the dwelling-house where—"
+    ... claim's `compulsory-acquisition notice was given in respect of the dwelling-house`
+    AND "(A) the acquiring authority was the person who became the landlord who is seeking possession, and"
+    ... claim's `acquiring authority was the person who became the landlord seeking possession`
+    AND "(B) the dwelling-house was transferred to that landlord within the period of 12 months ending with the relevant date;"
+    ...     Day (claim's `date the dwelling-house was transferred to that landlord`)
+                AT LEAST Day `twelve months before the relevant date`
+        AND Day (claim's `date the dwelling-house was transferred to that landlord`)
+                AT MOST Day (claim's `relevant date`)
+    WHERE
+        -- 12 months before the relevant date = same day/month, year minus 1.
+        `twelve months before the relevant date` MEANS
+            Date (DATE_DAY   (claim's `relevant date`))
+                 (DATE_MONTH (claim's `relevant date`))
+                 (DATE_YEAR  (claim's `relevant date`) MINUS 1)
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`general (e) — 6 months or compulsory acquisition` claim MEANS
+        "(e) either —"
+    ..  `(e)(i) tenancy began at least 6 months before the relevant date` claim
+    ..  `(e)(ii) compulsory-acquisition limb` claim
+
+§§ `General redevelopment conditions — (f) not a Rent Act 1977 / Rent (Agriculture) Act 1976 tenancy`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`general (f) — not a Rent Act tenancy` claim MEANS
+        "(f) the assured tenancy on which the dwelling-house is let did not come into being by virtue of any provision of Schedule 1 to the Rent Act 1977, as amended by Part 1 of Schedule 4 to this Act or, as the case may be, section 4 of the Rent (Agriculture) Act 1976, as amended by Part 2 of that Schedule."
+    ... NOT claim's `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`
+
+§§ `General redevelopment conditions — (a) AND (b) AND (c) AND (d) AND (e) AND (f)`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`general redevelopment conditions` claim MEANS
+        "The general redevelopment conditions are met if—"
+    ... `general (a)(b)(c) — table match and redevelopment intent` claim
+    AND `general (d) — work needs vacant possession` claim
+    AND `general (e) — 6 months or compulsory acquisition` claim
+    AND `general (f) — not a Rent Act tenancy` claim
+
+§§ `Landlord's acquisition condition — (a) acquired before grant, OR (b) in existence at grant and not since acquired for value`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`landlord's acquisition condition` claim MEANS
+        "The landlord's acquisition condition is met if—"
+    ..  "(a) the landlord seeking possession acquired their interest in the dwelling-house before the grant of the tenancy, or"
+    ..      claim's `landlord acquired their interest before the grant of the tenancy`
+    ..  "(b) that interest was in existence at the time of that grant and neither that landlord (or, in the case of joint landlords, any of them) nor any other person who, alone or jointly with others, has acquired that interest since that time acquired it for money or money's worth."
+    ..      (   claim's `that interest was in existence at the time of the grant`
+            AND NOT claim's `that interest has since been acquired for money or money's worth`)
+
+§§ `Additional RSL condition — Case A`
+
+-- Case A: permanent alternative accommodation available (now or when the order
+-- takes effect) meeting the four quality conditions.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`additional RSL — Case A` claim MEANS
+        "Case A: a case where alternative accommodation that meets the following conditions is available for the tenant or will be available for the tenant when the order for possession takes effect—"
+    ... claim's `(A) alternative accommodation is or will be available for the tenant`
+    AND "(a) it is let as a separate dwelling with adequate security of tenure;"
+    ... claim's `(A) let as a separate dwelling with adequate security of tenure`
+    AND "(b) it is affordable;"
+    ... claim's `(A) affordable`
+    AND "(c) it is in an appropriate location;"
+    ... claim's `(A) in an appropriate location`
+    AND "(d) it is not overcrowded."
+    ... claim's `(A) not overcrowded`
+
+§§ `Additional RSL condition — Case B`
+
+-- Case B: like Case A, but the accommodation is provided TEMPORARILY until
+-- Case-A accommodation becomes available.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`additional RSL — Case B` claim MEANS
+        "Case B: a case where alternative accommodation that meets the following conditions is available for the tenant or will be available for the tenant when the order for possession takes effect—"
+    ... claim's `(B) alternative accommodation is or will be available for the tenant`
+    AND "(a) it is being provided temporarily until other alternative accommodation becomes available which will meet the conditions in case A;"
+    ... claim's `(B) provided temporarily until Case-A accommodation becomes available`
+    AND "(b) it is affordable;"
+    ... claim's `(B) affordable`
+    AND "(c) it is in an appropriate location;"
+    ... claim's `(B) in an appropriate location`
+    AND "(d) it is not overcrowded."
+    ... claim's `(B) not overcrowded`
+
+§§ `Additional RSL condition — Case C`
+
+-- Case C: the written-statement-of-intention case.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`additional RSL — Case C` claim MEANS
+        "Case C: a case where—"
+    ... "(a) the tenancy of the dwelling-house was not granted pursuant to a nomination as mentioned in section 159(2)(c) of the Housing Act 1996,"
+    ... claim's `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`
+    AND "(b) when the tenancy was granted, the landlord intended to (i) demolish or reconstruct the whole or a substantial part of the dwelling-house, or (ii) carry out substantial works on the dwelling-house or any part of it, or any building of which it forms part, within a specific period, and"
+    ... claim's `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`
+    AND "(c) the relevant social landlord gave the tenant, before the tenancy was entered into, a written statement of the landlord's wish to be able to recover possession on the basis of that intention to carry out that work within that period (and that period must be included in the statement)."
+    ... claim's `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`
+
+§§ `Additional RSL condition — met in Case A, Case B or Case C`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`additional RSL condition` claim MEANS
+        "The additional RSL condition is met in case A, case B or case C."
+    ..  `additional RSL — Case A` claim
+    ..  `additional RSL — Case B` claim
+    ..  `additional RSL — Case C` claim
+
+§§ `Gate for (b): does section 7(5ZA) apply to the tenancy?`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`section 7(5ZA) case applies` claim MEANS
+    claim's `section 7(5ZA) applies in relation to the tenancy`
+
+§§ `Gate for (c): is the landlord BOTH an RSL AND the intended redeveloper?`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`additional-RSL case applies` claim MEANS
+        "the landlord seeking possession is—"
+    ... "(i) a relevant social landlord, and"
+    ... claim's `landlord seeking possession is a relevant social landlord`
+    AND "(ii) the person who intends to carry out the work mentioned in this ground."
+    ... claim's `landlord seeking possession is the person who intends to carry out the work`
+
+§§ `Top-level (b): landlord's acquisition condition, but only where s.7(5ZA) applies  [I1 implication]`
+
+-- "only in a case where section 7(5ZA) applies in relation to the tenancy":
+-- (NOT the case applies) OR the condition. Vacuously satisfied where the gating
+-- case does not apply.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`(b) landlord's acquisition condition, only where s.7(5ZA) applies` claim MEANS
+        "(b) the landlord's acquisition condition, but only in a case where section 7(5ZA) applies in relation to the tenancy;"
+    ..  NOT `section 7(5ZA) case applies` claim
+    ..  `landlord's acquisition condition` claim
+
+§§ `Top-level (c): additional RSL condition, but only where the landlord is an RSL and the redeveloper  [I1 implication]`
+
+-- "only in a case where the landlord seeking possession is (i) a relevant social
+-- landlord, and (ii) the person who intends to carry out the work":
+-- (NOT the case applies) OR the condition. Vacuously satisfied where the gating
+-- case does not apply.
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`(c) additional RSL condition, only where landlord is RSL and redeveloper` claim MEANS
+        "(c) the additional RSL condition, but only in a case where the landlord seeking possession is— (i) a relevant social landlord, and (ii) the person who intends to carry out the work mentioned in this ground."
+    ..  NOT `additional-RSL case applies` claim
+    ..  `additional RSL condition` claim
+
+§§ `Ground 6 made out — (a) general conditions AND (b) gated acquisition AND (c) gated RSL`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A BOOLEAN
+`Ground 6 made out` claim MEANS
+        "These conditions are met—"
+    ... "(a) the general redevelopment conditions (in every case);"
+    ... `general redevelopment conditions` claim
+    AND `(b) landlord's acquisition condition, only where s.7(5ZA) applies` claim
+    AND `(c) additional RSL condition, only where landlord is RSL and redeveloper` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground6Claim
+GIVETH A DEONTIC Actor Action
+`ground 6 possession order` claim MEANS
+    IF   `Ground 6 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the 6-month and 12-month windows`
+
+`relevant date 2025`              MEANS January 1 2025
+-- (e)(i): tenancy began at least 6 months before Jan 1 2025
+`tenancy began exactly 6mo`       MEANS July 1 2024       -- exactly 6 months before -> satisfied
+`tenancy began 1 day short of 6mo`  MEANS July 2 2024     -- one day short of 6 months -> not satisfied
+`tenancy began well over 6mo`     MEANS January 1 2023    -- comfortably over -> satisfied
+-- (e)(ii): transfer within the 12 months ending with the relevant date
+`transferred within 12mo`         MEANS June 1 2024       -- inside [Jan 1 2024, Jan 1 2025] -> satisfied
+`transferred on window start`     MEANS January 1 2024    -- exactly 12 months before -> satisfied (inclusive)
+`transferred before window`       MEANS December 31 2023  -- one day before the window -> not satisfied
+`transferred after relevant date`   MEANS January 2 2025  -- after the relevant date -> not satisfied
+
+§§ `A note on the fully-spelled test convention`
+
+-- L4 has no record-update, so each scenario is a FULLY-SPELLED Ground6Claim.
+-- The base scenario below sets a Row-3 (ordinary-landlord) redevelopment that
+-- is made out with NEITHER gating case applying (so (b) and (c) are vacuously
+-- satisfied). Later scenarios flip exactly the atoms each test exercises.
+
+§§ `Base — Row 3 ordinary landlord, made out, no gating case applies`
+
+`base — row 3, no gates` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `general (a)(b)(c) — table match and redevelopment intent` `base — row 3, no gates`
+#ASSERT `general (d) — work needs vacant possession`               `base — row 3, no gates`
+#ASSERT `general (e) — 6 months or compulsory acquisition`         `base — row 3, no gates`
+#ASSERT `general (f) — not a Rent Act tenancy`                     `base — row 3, no gates`
+#ASSERT `general redevelopment conditions`                         `base — row 3, no gates`
+-- both gates closed -> (b) and (c) vacuously satisfied
+#ASSERT NOT `section 7(5ZA) case applies`                          `base — row 3, no gates`
+#ASSERT NOT `additional-RSL case applies`                          `base — row 3, no gates`
+#ASSERT `(b) landlord's acquisition condition, only where s.7(5ZA) applies`  `base — row 3, no gates`
+#ASSERT `(c) additional RSL condition, only where landlord is RSL and redeveloper`  `base — row 3, no gates`
+#ASSERT `Ground 6 made out`                                        `base — row 3, no gates`
+
+§§ `(c)(i)/(ii) table membership — redeveloper not in the relied-on row's column 3`
+
+-- Row 3's column 3 is ONLY {the landlord seeking possession}. Naming a superior
+-- landlord as the redeveloper is NOT a member -> general (a)(b)(c) fails.
+`row 3 — superior landlord not permitted` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `a superior landlord`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `redeveloper is in the third column of the row` `table row 3` `a superior landlord`
+#ASSERT NOT `general (a)(b)(c) — table match and redevelopment intent` `row 3 — superior landlord not permitted`
+#ASSERT NOT `Ground 6 made out`                                        `row 3 — superior landlord not permitted`
+
+§§ `Row 1 — RSL landlord, superior landlord as the redeveloper (permitted), via the substantial-works intent`
+
+-- Row 1 column 3 = {landlord seeking possession, a superior landlord}. A
+-- superior landlord IS permitted here. This RSL landlord is NOT the redeveloper
+-- (so the additional-RSL gate stays closed and (c) is vacuous).
+`row 1 — superior landlord redeveloper` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 1`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `a superior landlord`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS FALSE
+  `redeveloper intends to carry out substantial works`         IS TRUE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS FALSE
+  `(d)(ii) no such variation is practicable`                                    IS TRUE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began exactly 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS TRUE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `redeveloper is in the third column of the row` `table row 1` `a superior landlord`
+#ASSERT `general (a)(b)(c) — table match and redevelopment intent` `row 1 — superior landlord redeveloper`
+-- RSL but not the redeveloper -> additional-RSL gate closed -> (c) vacuous
+#ASSERT NOT `additional-RSL case applies`                          `row 1 — superior landlord redeveloper`
+#ASSERT `Ground 6 made out`                                        `row 1 — superior landlord redeveloper`
+
+§§ `Row 2 — commonhold unit-holder, commonhold association as the redeveloper (permitted)`
+
+`row 2 — commonhold association redeveloper` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 2`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the commonhold association`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS FALSE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS TRUE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `redeveloper is in the third column of the row` `table row 2` `the commonhold association`
+#ASSERT NOT `redeveloper is in the third column of the row` `table row 2` `a superior landlord`
+#ASSERT `general (a)(b)(c) — table match and redevelopment intent` `row 2 — commonhold association redeveloper`
+#ASSERT `Ground 6 made out`                                        `row 2 — commonhold association redeveloper`
+
+§§ `(c) intent missing — redeveloper intends NEITHER (i) nor (ii) -> general (a)(b)(c) fails`
+
+`row 3 — no redevelopment intent` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS FALSE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `general (a)(b)(c) — table match and redevelopment intent` `row 3 — no redevelopment intent`
+#ASSERT NOT `Ground 6 made out`                                        `row 3 — no redevelopment intent`
+
+§§ `(d) knocked out — none of the four reasons (i)-(iv) holds`
+
+`row 3 — (d) fails` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS FALSE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `general (d) — work needs vacant possession` `row 3 — (d) fails`
+#ASSERT NOT `Ground 6 made out`                          `row 3 — (d) fails`
+
+§§ `(e) knocked out — tenancy 1 day short of 6 months and no compulsory acquisition`
+
+`row 3 — (e) fails (too short)` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began 1 day short of 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `(e)(i) tenancy began at least 6 months before the relevant date` `row 3 — (e) fails (too short)`
+#ASSERT NOT `general (e) — 6 months or compulsory acquisition`                `row 3 — (e) fails (too short)`
+#ASSERT NOT `Ground 6 made out`                                               `row 3 — (e) fails (too short)`
+
+§§ `(e)(ii) made out — short tenancy carried by the compulsory-acquisition limb`
+
+-- Tenancy is only 1 day short of 6 months, but a compulsory-acquisition notice
+-- was given, the acquiring authority became the landlord, and the transfer fell
+-- on the window-start date (exactly 12 months before the relevant date).
+`row 3 — (e) via compulsory acquisition` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began 1 day short of 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS TRUE
+  `acquiring authority was the person who became the landlord seeking possession`  IS TRUE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred on window start`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `(e)(i) tenancy began at least 6 months before the relevant date` `row 3 — (e) via compulsory acquisition`
+#ASSERT `(e)(ii) compulsory-acquisition limb`                  `row 3 — (e) via compulsory acquisition`
+#ASSERT `general (e) — 6 months or compulsory acquisition`     `row 3 — (e) via compulsory acquisition`
+#ASSERT `Ground 6 made out`                                    `row 3 — (e) via compulsory acquisition`
+
+§§ `(e)(ii) knocked out — transfer one day before the 12-month window`
+
+`row 3 — (e)(ii) transfer too early` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began 1 day short of 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS TRUE
+  `acquiring authority was the person who became the landlord seeking possession`  IS TRUE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred before window`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `(e)(ii) compulsory-acquisition limb`             `row 3 — (e)(ii) transfer too early`
+#ASSERT NOT `general (e) — 6 months or compulsory acquisition`  `row 3 — (e)(ii) transfer too early`
+#ASSERT NOT `Ground 6 made out`                                `row 3 — (e)(ii) transfer too early`
+
+§§ `(f) knocked out — tenancy arose under the Rent Acts`
+
+`row 3 — (f) fails` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS TRUE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT NOT `general (f) — not a Rent Act tenancy` `row 3 — (f) fails`
+#ASSERT NOT `Ground 6 made out`                    `row 3 — (f) fails`
+
+§§ `(b) gate OPEN — s.7(5ZA) applies, acquisition condition met (via (a))`
+
+-- s.7(5ZA) applies -> the landlord's acquisition condition is no longer vacuous
+-- and must actually be met. Here it is, via limb (a) (acquired before the grant).
+`row 3 — s7(5ZA), acquisition met` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS TRUE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS TRUE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `section 7(5ZA) case applies`                          `row 3 — s7(5ZA), acquisition met`
+#ASSERT `landlord's acquisition condition`                     `row 3 — s7(5ZA), acquisition met`
+#ASSERT `(b) landlord's acquisition condition, only where s.7(5ZA) applies`  `row 3 — s7(5ZA), acquisition met`
+#ASSERT `Ground 6 made out`                                    `row 3 — s7(5ZA), acquisition met`
+
+§§ `(b) gate OPEN — s.7(5ZA) applies but acquisition condition FAILS -> ground not made out`
+
+-- s.7(5ZA) applies, but the landlord did NOT acquire before the grant, and
+-- though the interest was in existence at the grant it HAS since been acquired
+-- for money's worth -> limb (b) of the acquisition condition fails too -> the
+-- gated condition bites and the ground is not made out.
+`row 3 — s7(5ZA), acquisition fails` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 3`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS TRUE
+  `landlord seeking possession is a relevant social landlord`  IS FALSE
+  `landlord seeking possession is the person who intends to carry out the work`  IS FALSE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS TRUE
+  `that interest has since been acquired for money or money's worth`            IS TRUE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `section 7(5ZA) case applies`                          `row 3 — s7(5ZA), acquisition fails`
+#ASSERT NOT `landlord's acquisition condition`                 `row 3 — s7(5ZA), acquisition fails`
+#ASSERT NOT `(b) landlord's acquisition condition, only where s.7(5ZA) applies`  `row 3 — s7(5ZA), acquisition fails`
+#ASSERT NOT `Ground 6 made out`                                `row 3 — s7(5ZA), acquisition fails`
+
+§§ `(c) gate OPEN — RSL landlord who is the redeveloper, additional RSL condition met (via Case A)`
+
+-- Row 1 RSL landlord who IS the redeveloper -> the additional-RSL gate is open
+-- and the additional RSL condition must actually be met. Here it is, via Case A
+-- (permanent alternative accommodation satisfying the four quality conditions).
+`row 1 — RSL redeveloper, Case A` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 1`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS TRUE
+  `landlord seeking possession is the person who intends to carry out the work`  IS TRUE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS TRUE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS TRUE
+  `(A) affordable`                                                              IS TRUE
+  `(A) in an appropriate location`                                             IS TRUE
+  `(A) not overcrowded`                                                         IS TRUE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `additional-RSL case applies`                          `row 1 — RSL redeveloper, Case A`
+#ASSERT `additional RSL — Case A`                              `row 1 — RSL redeveloper, Case A`
+#ASSERT `additional RSL condition`                             `row 1 — RSL redeveloper, Case A`
+#ASSERT `(c) additional RSL condition, only where landlord is RSL and redeveloper`  `row 1 — RSL redeveloper, Case A`
+#ASSERT `Ground 6 made out`                                    `row 1 — RSL redeveloper, Case A`
+
+§§ `(c) gate OPEN — additional RSL condition met via Case B (temporary accommodation)`
+
+`row 1 — RSL redeveloper, Case B` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 1`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS TRUE
+  `landlord seeking possession is the person who intends to carry out the work`  IS TRUE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS TRUE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS TRUE
+  `(B) affordable`                                                              IS TRUE
+  `(B) in an appropriate location`                                             IS TRUE
+  `(B) not overcrowded`                                                         IS TRUE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `additional RSL — Case B`                              `row 1 — RSL redeveloper, Case B`
+#ASSERT `additional RSL condition`                             `row 1 — RSL redeveloper, Case B`
+#ASSERT `Ground 6 made out`                                    `row 1 — RSL redeveloper, Case B`
+
+§§ `(c) gate OPEN — additional RSL condition met via Case C (written statement of intention)`
+
+`row 1 — RSL redeveloper, Case C` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 1`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS TRUE
+  `landlord seeking possession is the person who intends to carry out the work`  IS TRUE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS TRUE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS TRUE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS TRUE
+
+#ASSERT `additional RSL — Case C`                              `row 1 — RSL redeveloper, Case C`
+#ASSERT `additional RSL condition`                             `row 1 — RSL redeveloper, Case C`
+#ASSERT `Ground 6 made out`                                    `row 1 — RSL redeveloper, Case C`
+
+§§ `(c) gate OPEN — RSL redeveloper but NONE of Case A/B/C -> ground not made out`
+
+-- Row 1 RSL landlord who IS the redeveloper, so the additional-RSL gate is open,
+-- but none of Cases A/B/C is satisfied -> the gated condition bites and the
+-- ground is not made out, even though the general conditions are all met.
+`row 1 — RSL redeveloper, no Case` MEANS Ground6Claim WITH
+  `relied-on table row`                                        IS `table row 1`
+  `landlord matches first column of the relied-on row`         IS TRUE
+  `tenancy matches second column of the relied-on row`         IS TRUE
+  `intended redeveloper`                                       IS `the landlord who is seeking possession`
+  `redeveloper intends to demolish or reconstruct whole or substantial part`  IS TRUE
+  `redeveloper intends to carry out substantial works`         IS FALSE
+  `(d)(i) tenant not willing to agree a variation giving access for the work`   IS TRUE
+  `(d)(ii) no such variation is practicable`                                    IS FALSE
+  `(d)(iii) tenant not willing to accept an assured tenancy of the reduced part`  IS FALSE
+  `(d)(iv) such a tenancy is not practicable`                                   IS FALSE
+  `tenancy began`                                              IS `tenancy began well over 6mo`
+  `relevant date`                                              IS `relevant date 2025`
+  `compulsory-acquisition notice was given in respect of the dwelling-house`    IS FALSE
+  `acquiring authority was the person who became the landlord seeking possession`  IS FALSE
+  `date the dwelling-house was transferred to that landlord`    IS `transferred within 12mo`
+  `tenancy arose under Sch.1 Rent Act 1977 or s.4 Rent (Agriculture) Act 1976`  IS FALSE
+  `section 7(5ZA) applies in relation to the tenancy`          IS FALSE
+  `landlord seeking possession is a relevant social landlord`  IS TRUE
+  `landlord seeking possession is the person who intends to carry out the work`  IS TRUE
+  `landlord acquired their interest before the grant of the tenancy`           IS FALSE
+  `that interest was in existence at the time of the grant`                     IS FALSE
+  `that interest has since been acquired for money or money's worth`            IS FALSE
+  `(A) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(A) let as a separate dwelling with adequate security of tenure`            IS FALSE
+  `(A) affordable`                                                              IS FALSE
+  `(A) in an appropriate location`                                             IS FALSE
+  `(A) not overcrowded`                                                         IS FALSE
+  `(B) alternative accommodation is or will be available for the tenant`        IS FALSE
+  `(B) provided temporarily until Case-A accommodation becomes available`      IS FALSE
+  `(B) affordable`                                                              IS FALSE
+  `(B) in an appropriate location`                                             IS FALSE
+  `(B) not overcrowded`                                                         IS FALSE
+  `(C) tenancy not granted pursuant to a s.159(2)(c) Housing Act 1996 nomination`  IS FALSE
+  `(C) when granted, landlord intended to demolish/reconstruct/substantial-works within a specific period`  IS FALSE
+  `(C) the RSL gave the tenant, before the tenancy, a written statement of that intention (period included)`  IS FALSE
+
+#ASSERT `additional-RSL case applies`                          `row 1 — RSL redeveloper, no Case`
+#ASSERT NOT `additional RSL condition`                         `row 1 — RSL redeveloper, no Case`
+#ASSERT NOT `(c) additional RSL condition, only where landlord is RSL and redeveloper`  `row 1 — RSL redeveloper, no Case`
+#ASSERT `general redevelopment conditions`                     `row 1 — RSL redeveloper, no Case`
+#ASSERT NOT `Ground 6 made out`                                `row 1 — RSL redeveloper, no Case`
