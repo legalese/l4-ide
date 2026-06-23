@@ -1,0 +1,146 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 15 (deterioration of furniture)`
+
+-- ===========================================================================
+-- GROUND 15 — the "deterioration of furniture owing to ill-treatment" ground. It
+-- is one of the DISCRETIONARY grounds in Part II of Schedule 2 to the Housing Act
+-- 1988 ("GROUNDS ON WHICH COURT MAY ORDER POSSESSION"): where it is made out, the
+-- court MAY order possession (it is not bound to).
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause using MAY (not MUST).
+--
+-- Statutory text encoded:
+--   "The condition of any furniture provided for use under the tenancy has, in
+--    the opinion of the court, deteriorated owing to ill-treatment by the tenant
+--    or any other person residing in the dwelling-house and, in the case of
+--    ill-treatment by a person lodging with the tenant or by a sub-tenant of his,
+--    the tenant has not taken such steps as he ought reasonably to have taken for
+--    the removal of the lodger or sub-tenant."
+--
+-- STRUCTURE: a top-level CONJUNCTION of two limbs joined by the statute's "and"
+-- — the SAME SHAPE as Ground 13, but for furniture rather than the dwelling-house
+-- and with "ill-treatment" in place of "waste, neglect or default":
+--   LIMB 1 — furniture has, in the opinion of the court, deteriorated owing to
+--            ill-treatment by the tenant OR any other person residing in the
+--            dwelling-house; and
+--   LIMB 2 — the lodger/sub-tenant REMOVAL PROVISO: "in the case of" ill-treatment
+--            by a person lodging with the tenant or a sub-tenant of his, the tenant
+--            has not taken reasonable removal steps.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The lodger/sub-tenant proviso (LIMB 2) is modelled as an IMPLICATION, per
+--     the statute's "in the case of ..." conditional: IF the responsible actor is
+--     a lodger/sub-tenant THEN the tenant must have failed to take reasonable
+--     removal steps. Where the actor is NOT a lodger/sub-tenant, the proviso is
+--     vacuously satisfied. Encoded as `(NOT actor-is-lodger-or-subtenant) OR
+--     (tenant failed to remove)`, the material-implication reading of "if P then Q".
+--   * "in the opinion of the court" is a STANDARD-OF-PROOF qualifier on the
+--     deterioration finding, not an independent condition; it is carried as inert
+--     prose and folded into the deterioration atom (the court's opinion IS the
+--     fact-finding that the atom records).
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Ground15Claim HAS
+  -- LIMB 1
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS A BOOLEAN
+  -- LIMB 2 — the lodger/sub-tenant proviso
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS A BOOLEAN
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS A BOOLEAN
+
+§§ `Limb 1 — furniture deteriorated, in the opinion of the court, owing to ill-treatment`
+
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`furniture deteriorated owing to ill-treatment` claim MEANS
+        "The condition of any furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house"
+    ... claim's `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`
+
+§§ `Limb 2 — the lodger/sub-tenant removal proviso (an implication)`
+
+-- "and, in the case of ill-treatment by a person lodging with the tenant or by a
+-- sub-tenant of his, the tenant has not taken such steps as he ought reasonably
+-- to have taken for the removal of the lodger or sub-tenant." Read as: IF the
+-- responsible actor is a lodger/sub-tenant THEN the tenant failed to take
+-- reasonable removal steps. Encoded as the material implication (NOT P) OR Q, so
+-- it is vacuously TRUE when the actor is not a lodger/sub-tenant.
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`lodger or sub-tenant removal proviso` claim MEANS
+        "and, in the case of ill-treatment by a person lodging with the tenant or by a sub-tenant of his,"
+    ..  NOT claim's `the responsible actor is a person lodging with the tenant or a sub-tenant of his`
+    ..  "the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant."
+    ..  claim's `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`
+
+§§ `Ground 15 made out — deterioration AND the removal proviso`
+
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`Ground 15 made out` claim MEANS
+        `furniture deteriorated owing to ill-treatment` claim
+    AND `lodger or sub-tenant removal proviso` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground15Claim
+GIVETH A DEONTIC Actor Action
+`ground 15 possession order` claim MEANS
+    IF   `Ground 15 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Made out — ill-treatment by the tenant personally (proviso vacuously satisfied)`
+
+-- The tenant is not a lodger/sub-tenant, so the removal proviso is vacuously TRUE.
+`claim — tenant's own ill-treatment` MEANS Ground15Claim WITH
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS FALSE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT `furniture deteriorated owing to ill-treatment` `claim — tenant's own ill-treatment`
+#ASSERT `lodger or sub-tenant removal proviso`           `claim — tenant's own ill-treatment`
+#ASSERT `Ground 15 made out`                             `claim — tenant's own ill-treatment`
+
+§§ `Made out — ill-treatment by a sub-tenant AND the tenant failed to remove him`
+
+`claim — sub-tenant, not removed` MEANS Ground15Claim WITH
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS TRUE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS TRUE
+
+#ASSERT `furniture deteriorated owing to ill-treatment` `claim — sub-tenant, not removed`
+#ASSERT `lodger or sub-tenant removal proviso`           `claim — sub-tenant, not removed`
+#ASSERT `Ground 15 made out`                             `claim — sub-tenant, not removed`
+
+§§ `Not made out — ill-treatment by a sub-tenant BUT the tenant DID take reasonable removal steps`
+
+`claim — sub-tenant, but removed` MEANS Ground15Claim WITH
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS TRUE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT `furniture deteriorated owing to ill-treatment` `claim — sub-tenant, but removed`
+#ASSERT NOT `lodger or sub-tenant removal proviso`       `claim — sub-tenant, but removed`
+#ASSERT NOT `Ground 15 made out`                         `claim — sub-tenant, but removed`
+
+§§ `Not made out — no deterioration of furniture at all`
+
+`claim — no deterioration` MEANS Ground15Claim WITH
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS FALSE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS FALSE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT NOT `furniture deteriorated owing to ill-treatment` `claim — no deterioration`
+#ASSERT NOT `Ground 15 made out`                            `claim — no deterioration`

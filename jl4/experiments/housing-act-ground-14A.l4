@@ -1,0 +1,267 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 14A (domestic violence, social landlords)`
+
+-- ===========================================================================
+-- GROUND 14A — the "domestic violence" DISCRETIONARY ground in Part II of
+-- Schedule 2 to the Housing Act 1988, inserted (28.2.1997) by the Housing Act
+-- 1996 (c. 52), s. 149; S.I. 1997/225 (markers F63/F64). The couple-description
+-- chapeau was amended by the Civil Partnership Act 2004 (F65/F67), by the Civil
+-- Partnership (Opposite-sex Couples) Regulations 2019 (F66 omitting the old
+-- "husband and wife" wording, F68 inserting "a married couple or"); limb (b)'s
+-- provider list was expanded by the Housing and Regeneration Act 2008
+-- (Consequential Provisions) Order 2010 (F69/F70); and trailing words in the
+-- definitions were omitted by the Charities (Pre-consolidation Amendments)
+-- Order 2011 (F71). The in-force reading resolves F63-F71.
+--
+-- PART II IS DISCRETIONARY: where the ground is made out the court MAY (not
+-- MUST) order possession — it must also be satisfied it is reasonable to do so
+-- (Housing Act 1988 s.7(4)). The reasonableness discretion is carried as inert
+-- prose; the operative outcome is `PARTY Court MAY \`order possession\``.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause (MAY).
+--
+-- Statutory text encoded — the STATUTE'S OWN labelling is a CHAPEAU followed by
+-- a CONJUNCTION over (a)/(b)/(c)/(d):
+--   CHAPEAU: the dwelling-house was occupied (whether alone or with others) by
+--     a married couple, a couple who are civil partners of each other, or a
+--     couple living together as if they were a married couple or civil partners,
+--   and—
+--     (a) one or both of the partners is a tenant of the dwelling-house,
+--     (b) the landlord seeking possession is a non-profit registered provider
+--         of social housing, a registered social landlord or a charitable
+--         housing trust, or (where the dwelling-house is social housing within
+--         Part 2 of the Housing and Regeneration Act 2008) a profit-making
+--         registered provider of social housing,
+--     (c) one partner has left the dwelling-house because of violence or threats
+--         of violence by the other towards—
+--           (i)  that partner, or
+--           (ii) a member of the family of that partner who was residing with
+--                that partner immediately before the partner left, and
+--     (d) the court is satisfied that the partner who has left is unlikely to
+--         return.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The task brief labelled the conditions (a)-(e); the SOURCE labels them as
+--     an unlabelled CHAPEAU plus (a)-(d). This encoding follows the source. The
+--     mapping is: brief(a)=source chapeau (couple occupation); brief(b)=source
+--     (a) (a partner is a tenant); brief(c)=source (b) (social landlord);
+--     brief(d)=source (c) (violence, with (i)/(ii)); brief(e)=source (d)
+--     (unlikely to return).
+--   * Made out = CHAPEAU AND (a) AND (b) AND (c){(i) OR (ii)} AND (d).
+--   * The couple-description chapeau is a DISJUNCTION over the three couple
+--     forms; lifted as one operative atom (a qualifying couple occupied the
+--     dwelling-house), with the three forms carried as inert prose.
+--   * Limb (b) is a DISJUNCTION over the four landlord/provider types; the
+--     landlord qualifies if ANY one applies, lifted as one operative atom with
+--     the enumeration carried as inert prose.
+--   * The defined terms ("registered social landlord", "member of the family"
+--     per Part I Housing Act 1996; "charitable housing trust" per the Housing
+--     Associations Act 1985) are carried as inert prose.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms of the chapeau and limbs (a)-(d), gathered on the claim.
+DECLARE Ground14AClaim HAS
+  -- chapeau (brief's (a))
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS A BOOLEAN
+  -- (a)  (brief's (b))
+  `one or both of the partners is a tenant of the dwelling-house`  IS A BOOLEAN
+  -- (b)  (brief's (c))
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS A BOOLEAN
+  -- (c)  (brief's (d))
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS A BOOLEAN
+  `the violence or threats were towards that partner`  IS A BOOLEAN                                            -- (c)(i)
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS A BOOLEAN  -- (c)(ii)
+  -- (d)  (brief's (e))
+  `the court is satisfied that the partner who has left is unlikely to return`  IS A BOOLEAN
+
+§§ `Chapeau — occupation by a qualifying couple`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`chapeau — qualifying couple occupied the dwelling-house` claim MEANS
+        "The dwelling-house was occupied (whether alone or with others) by a married couple, a couple who are civil partners of each other or a couple living together as if they were a married couple or civil partners,"
+    ... claim's `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`
+
+§§ `(a) — a partner is a tenant of the dwelling-house`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`(a) — a partner is a tenant` claim MEANS
+        "(a) one or both of the partners is a tenant of the dwelling-house,"
+    ... claim's `one or both of the partners is a tenant of the dwelling-house`
+
+§§ `(b) — the landlord is a social landlord / qualifying provider`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`(b) — landlord is a qualifying social landlord` claim MEANS
+        "(b) the landlord who is seeking possession is a non-profit registered provider of social housing, a registered social landlord or a charitable housing trust or, where the dwelling-house is social housing within the meaning of Part 2 of the Housing and Regeneration Act 2008, a profit-making registered provider of social housing,"
+    ... claim's `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`
+
+§§ `(c) — a partner has left because of violence or threats of violence`
+
+-- (c) is a CONJUNCTION: a partner left because of violence/threats by the other,
+-- AND that violence/threats was directed at (i) that partner OR (ii) a family
+-- member residing with them immediately before they left.
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`(c) — a partner left because of violence or threats` claim MEANS
+        "(c) one partner has left the dwelling-house because of violence or threats of violence by the other towards—"
+    ... claim's `one partner has left the dwelling-house because of violence or threats of violence by the other`
+    AND     "(i) that partner, or"
+        ..  claim's `the violence or threats were towards that partner`
+        ..  "(ii) a member of the family of that partner who was residing with that partner immediately before the partner left,"
+        ..  claim's `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`
+
+§§ `(d) — the court is satisfied the departed partner is unlikely to return`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`(d) — the departed partner is unlikely to return` claim MEANS
+        "(d) the court is satisfied that the partner who has left is unlikely to return."
+    ... claim's `the court is satisfied that the partner who has left is unlikely to return`
+
+§§ `Ground 14A made out — chapeau AND (a) AND (b) AND (c) AND (d)`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A BOOLEAN
+`Ground 14A made out` claim MEANS
+        `chapeau — qualifying couple occupied the dwelling-house` claim
+    AND "and—"
+    AND `(a) — a partner is a tenant` claim
+    AND `(b) — landlord is a qualifying social landlord` claim
+    AND `(c) — a partner left because of violence or threats` claim
+    AND `(d) — the departed partner is unlikely to return` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Part II ground: where made out the court MAY order possession (and only if it
+-- is also satisfied it is reasonable to do so — s.7(4)). MAY, not MUST.
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground14AClaim
+GIVETH A DEONTIC Actor Action
+`ground 14A possession order` claim MEANS
+    IF   `Ground 14A made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground14AClaim value (the house style;
+-- L4 has no record-update). The all-false base fails; an all-met scenario sets
+-- the chapeau, (a), (b), (c)(i), (d); targeted negatives drop each conjunct.
+-- ---------------------------------------------------------------------------
+
+§§ `All-false base — nothing met -> NOT made out`
+
+`base — all false` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS FALSE
+  `one or both of the partners is a tenant of the dwelling-house`  IS FALSE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS FALSE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS FALSE
+  `the violence or threats were towards that partner`  IS FALSE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS FALSE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS FALSE
+
+#ASSERT NOT `Ground 14A made out` `base — all false`
+
+§§ `Made out — all conditions met, violence towards the partner ((c)(i))`
+
+`claim all-met via (c)(i)` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS TRUE
+  `one or both of the partners is a tenant of the dwelling-house`  IS TRUE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS TRUE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS TRUE
+  `the violence or threats were towards that partner`  IS TRUE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS FALSE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS TRUE
+
+#ASSERT `chapeau — qualifying couple occupied the dwelling-house` `claim all-met via (c)(i)`
+#ASSERT `(a) — a partner is a tenant`                            `claim all-met via (c)(i)`
+#ASSERT `(b) — landlord is a qualifying social landlord`         `claim all-met via (c)(i)`
+#ASSERT `(c) — a partner left because of violence or threats`    `claim all-met via (c)(i)`
+#ASSERT `(d) — the departed partner is unlikely to return`       `claim all-met via (c)(i)`
+#ASSERT `Ground 14A made out`                                    `claim all-met via (c)(i)`
+
+§§ `Made out — violence towards a resident family member ((c)(ii))`
+
+`claim all-met via (c)(ii)` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS TRUE
+  `one or both of the partners is a tenant of the dwelling-house`  IS TRUE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS TRUE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS TRUE
+  `the violence or threats were towards that partner`  IS FALSE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS TRUE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS TRUE
+
+#ASSERT `(c) — a partner left because of violence or threats` `claim all-met via (c)(ii)`
+#ASSERT `Ground 14A made out`                                 `claim all-met via (c)(ii)`
+
+§§ `(c) knocked out — a partner left, but the violence was directed at NEITHER (i) nor (ii)`
+
+`claim — (c) no target` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS TRUE
+  `one or both of the partners is a tenant of the dwelling-house`  IS TRUE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS TRUE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS TRUE
+  `the violence or threats were towards that partner`  IS FALSE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS FALSE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS TRUE
+
+#ASSERT NOT `(c) — a partner left because of violence or threats` `claim — (c) no target`
+#ASSERT NOT `Ground 14A made out`                                 `claim — (c) no target`
+
+§§ `(b) knocked out — landlord is NOT a qualifying social landlord`
+
+`claim — (b) fails` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS TRUE
+  `one or both of the partners is a tenant of the dwelling-house`  IS TRUE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS FALSE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS TRUE
+  `the violence or threats were towards that partner`  IS TRUE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS FALSE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS TRUE
+
+#ASSERT NOT `(b) — landlord is a qualifying social landlord` `claim — (b) fails`
+#ASSERT NOT `Ground 14A made out`                            `claim — (b) fails`
+
+§§ `(d) knocked out — court NOT satisfied the departed partner is unlikely to return`
+
+`claim — (d) fails` MEANS Ground14AClaim WITH
+  `the dwelling-house was occupied by a married couple, civil partners, or a couple living together as if a married couple or civil partners`  IS TRUE
+  `one or both of the partners is a tenant of the dwelling-house`  IS TRUE
+  `the landlord seeking possession is a non-profit RP of social housing, a registered social landlord, a charitable housing trust, or a profit-making RP of social housing of social-housing stock`  IS TRUE
+  `one partner has left the dwelling-house because of violence or threats of violence by the other`  IS TRUE
+  `the violence or threats were towards that partner`  IS TRUE
+  `the violence or threats were towards a member of the family of that partner residing with them immediately before the partner left`  IS FALSE
+  `the court is satisfied that the partner who has left is unlikely to return`  IS FALSE
+
+#ASSERT NOT `(d) — the departed partner is unlikely to return` `claim — (d) fails`
+#ASSERT NOT `Ground 14A made out`                              `claim — (d) fails`
+
+§§ `The discretionary possession order — Court MAY (performing it discharges)`
+
+-- When made out the residual is the Court's PERMISSION to order possession;
+-- exercising it within the window discharges (FULFILLED).
+#TRACE `ground 14A possession order` `claim all-met via (c)(i)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- MAY is benign: not exercising the permission is not a breach.
+#TRACE `ground 14A possession order` `claim all-met via (c)(i)` AT 0 WITH
+    PARTY Tenant DOES `order possession` AT 99
+
+-- Not made out -> immediately FULFILLED.
+#TRACE `ground 14A possession order` `base — all false` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10

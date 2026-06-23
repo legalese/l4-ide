@@ -1,0 +1,125 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 18 (supported accommodation: refusal to co-operate with support services) [NEW — RRA 2025]`
+
+-- ===========================================================================
+-- GROUND 18 — a BRAND-NEW DISCRETIONARY ground, inserted into Schedule 2 to the
+-- Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), s. 145(1)(8),
+-- Sch. 1 para. 17(2) (with ss. 138, 146(1), Sch. 6 paras. 1, 3, 4, 16, 17);
+-- in force 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b); marker F74.
+-- It sits at the end of Part II of Schedule 2, immediately before Part III.
+-- Part II grounds are DISCRETIONARY ("GROUNDS ON WHICH COURT MAY ORDER
+-- POSSESSION"): where it is made out, the court MAY order possession (it is not
+-- bound to).
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause using MAY (not MUST).
+--
+-- FULL STATUTORY TEXT (Ground 18, verbatim, in force on 1.5.2026):
+--   "The tenancy is of supported accommodation and the tenant has unreasonably
+--    refused to co-operate with the person providing support services with regard
+--    to those services."
+--
+-- STRUCTURE (NEW — flagged for the human reviewer): a short top-level CONJUNCTION
+-- of exactly two limbs joined by the statute's "and":
+--   LIMB 1 — the tenancy is of SUPPORTED ACCOMMODATION (a gateway/threshold fact:
+--            this ground only bites on supported-accommodation tenancies); and
+--   LIMB 2 — the tenant has UNREASONABLY REFUSED TO CO-OPERATE with the person
+--            providing support services, with regard to those services.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "unreasonably" qualifies the refusal in LIMB 2 (a reasonableness standard on
+--     the tenant's non-co-operation). It is folded into LIMB 2's single operative
+--     atom rather than lifted as a separate condition: a merely reasonable refusal
+--     to co-operate would NOT satisfy the atom.
+--   * "with regard to those services" ties the refused co-operation back to the
+--     support services that the "person providing support services" provides under
+--     LIMB 1's supported-accommodation arrangement; carried inline and folded into
+--     the LIMB 2 atom (no separate nexus atom is lifted).
+--   * "supported accommodation" is the statutory gateway. The Act defines it
+--     elsewhere (for assured-tenancy purposes, by the RRA 2025 scheme); here it is
+--     a single threshold atom, with the definition treated as out of scope for this
+--     file (a downstream use could substitute an imported definition predicate).
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Ground18Claim HAS
+  -- LIMB 1 — the supported-accommodation gateway
+  `the tenancy is of supported accommodation`  IS A BOOLEAN
+  -- LIMB 2 — unreasonable refusal to co-operate with the support-services provider
+  `the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services`  IS A BOOLEAN
+
+§§ `Limb 1 — the tenancy is of supported accommodation`
+
+GIVEN claim IS A Ground18Claim
+GIVETH A BOOLEAN
+`tenancy is of supported accommodation` claim MEANS
+        "The tenancy is of supported accommodation"
+    ... claim's `the tenancy is of supported accommodation`
+
+§§ `Limb 2 — the tenant has unreasonably refused to co-operate with support services`
+
+GIVEN claim IS A Ground18Claim
+GIVETH A BOOLEAN
+`tenant unreasonably refused to co-operate with support services` claim MEANS
+        "and the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services."
+    ... claim's `the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services`
+
+§§ `Ground 18 made out — supported accommodation AND unreasonable refusal to co-operate`
+
+GIVEN claim IS A Ground18Claim
+GIVETH A BOOLEAN
+`Ground 18 made out` claim MEANS
+        `tenancy is of supported accommodation` claim
+    AND `tenant unreasonably refused to co-operate with support services` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground18Claim
+GIVETH A DEONTIC Actor Action
+`ground 18 possession order` claim MEANS
+    IF   `Ground 18 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Made out — supported accommodation AND unreasonable refusal to co-operate`
+
+`claim — both limbs` MEANS Ground18Claim WITH
+  `the tenancy is of supported accommodation`  IS TRUE
+  `the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services`  IS TRUE
+
+#ASSERT `tenancy is of supported accommodation`                          `claim — both limbs`
+#ASSERT `tenant unreasonably refused to co-operate with support services` `claim — both limbs`
+#ASSERT `Ground 18 made out`                                             `claim — both limbs`
+
+§§ `Not made out — not supported accommodation (limb 1 fails)`
+
+-- The refusal occurs, but the tenancy is not of supported accommodation, so the
+-- gateway is not crossed.
+`claim — not supported accommodation` MEANS Ground18Claim WITH
+  `the tenancy is of supported accommodation`  IS FALSE
+  `the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services`  IS TRUE
+
+#ASSERT NOT `tenancy is of supported accommodation` `claim — not supported accommodation`
+#ASSERT NOT `Ground 18 made out`                     `claim — not supported accommodation`
+
+§§ `Not made out — supported accommodation but no unreasonable refusal (limb 2 fails)`
+
+-- The gateway is crossed, but there has been no unreasonable refusal to co-operate
+-- (e.g. the tenant co-operated, or any refusal was reasonable).
+`claim — co-operative tenant` MEANS Ground18Claim WITH
+  `the tenancy is of supported accommodation`  IS TRUE
+  `the tenant has unreasonably refused to co-operate with the person providing support services with regard to those services`  IS FALSE
+
+#ASSERT NOT `tenant unreasonably refused to co-operate with support services` `claim — co-operative tenant`
+#ASSERT NOT `Ground 18 made out`                                             `claim — co-operative tenant`
