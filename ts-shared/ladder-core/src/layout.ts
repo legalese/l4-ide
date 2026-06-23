@@ -94,10 +94,10 @@ function leafBox(
 }
 
 /** Inert text rendered UNBOXED, with left/right ports at its vertical center so a
- *  series wire connects through it — the text then "rides the wire" (DESIGN §17).
- *  The series only draws wire BETWEEN children, so the inert's own span is a clear
- *  gap with the text sitting on the line. */
-function inertInline(text: string, tm: TextMetrics): Measured {
+ *  series wire connects through it (DESIGN §17). Two styles:
+ *  - 'on-wire':    the series leaves the inert's span as a gap; text sits on the line.
+ *  - 'below-wire': the inert draws a continuous wire across its span; text drops below. */
+function inertInline(text: string, tm: TextMetrics, style: 'on-wire' | 'below-wire'): Measured {
   const w = tm.width(text, FONT) + 2 * INERT_PAD
   const h = tm.lineHeight(FONT) + 2 * PAD_Y
   return {
@@ -106,7 +106,12 @@ function inertInline(text: string, tm: TextMetrics): Measured {
     state: 'inert',
     emit(ox, oy, out) {
       const cy = oy + h / 2
-      out.push({ kind: 'text', at: { x: ox + w / 2, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
+      if (style === 'below-wire') {
+        out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
+        out.push({ kind: 'text', at: { x: ox + w / 2, y: cy + h / 2 + 1 }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
+      } else {
+        out.push({ kind: 'text', at: { x: ox + w / 2, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
+      }
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
     },
   }
@@ -115,7 +120,7 @@ function inertInline(text: string, tm: TextMetrics): Measured {
 function measure(e: IRExpr, ctx: Ctx): Measured {
   const { vs, tm } = ctx
 
-  if (e.$type === 'InertE') return inertInline(e.text, tm)
+  if (e.$type === 'InertE') return inertInline(e.text, tm, vs.connectiveStyle)
 
   if (e.$type === 'Not') {
     const inner = measure(e.negand, ctx)

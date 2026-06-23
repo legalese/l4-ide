@@ -71,6 +71,7 @@ applicantStates.set(concealment.id, 'eliminable') // the otiose rung
 
 const tm = estimateMetrics
 const sceneCourt = layout(fn, defaultViewSpec({ states: courtStates }), tm)
+const sceneCourtBelow = layout(fn, defaultViewSpec({ states: courtStates, connectiveStyle: 'below-wire' }), tm)
 const sceneAppl = layout(fn, defaultViewSpec({ states: applicantStates }), tm)
 // fold the deception group -> its leading inert becomes the placeholder label
 const sceneFolded = layout(
@@ -114,6 +115,8 @@ const write = (name: string, scene: Scene) => {
 }
 
 write('s415-court.svg', sceneCourt)
+write('s415-court-onwire.svg', sceneCourt)
+write('s415-court-belowwire.svg', sceneCourtBelow)
 write('s415-applicants.svg', sceneAppl)
 write('s415-diff.svg', diff(sceneCourt, sceneAppl))
 write('s415-folded.svg', sceneFolded)
