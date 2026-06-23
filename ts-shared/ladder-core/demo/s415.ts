@@ -20,6 +20,7 @@ import type {
   FunDecl,
   IRExpr,
   Leaf,
+  Inert,
   And,
   Or,
   State,
@@ -31,27 +32,35 @@ import type {
 let counter = 0
 const nid = () => ++counter
 const leaf = (label: string): Leaf => ({ $type: 'UBoolVar', id: nid(), label, atomId: label })
-const and = (args: IRExpr[], label?: string): And => ({ $type: 'And', id: nid(), args, label })
-const or = (args: IRExpr[], label?: string): Or => ({ $type: 'Or', id: nid(), args, label })
+const inert = (text: string, context: 'InertAnd' | 'InertOr'): Inert => ({ $type: 'InertE', id: nid(), text, context })
+const and = (args: IRExpr[]): And => ({ $type: 'And', id: nid(), args })
+const or = (args: IRExpr[]): Or => ({ $type: 'Or', id: nid(), args })
 
-// ---- build the tree, keeping references we want to key states/folds by ----
+// ---- build the tree in inert style: operative atoms boxed, prose inert/unboxed ----
 const byDeceiving = leaf('by deceiving')
 const concealment = leaf('dishonest concealment')
-const deception = or([byDeceiving, concealment], 'there is a deception (Expl. 1)')
+// leading inert => HEADING above the OR stack
+const deception = or([inert('there is a deception (Expl. 1)', 'InertOr'), byDeceiving, concealment])
 const intentionally = leaf('intentionally')
 const causesHarm = leaf('causes harm')
-const harm = or(
-  [leaf('body'), leaf('mind'), leaf('reputation'), leaf('property')],
-  'harm to…'
-)
-const second = and([deception, intentionally, causesHarm, harm])
+const harm = or([leaf('body'), leaf('mind'), leaf('reputation'), leaf('property')])
+// inert nodes in the series ride the wire; "to any person in" lands to the LEFT of
+// the harm stack (the `text … (stack)` pattern) — no heading needed on `harm`.
+const second = and([
+  deception,
+  intentionally,
+  inert('induces an act or omission that', 'InertAnd'),
+  causesHarm,
+  inert('to any person in', 'InertAnd'),
+  harm,
+])
 const fn: FunDecl = { id: nid(), name: 'is said to cheat (second limb)', params: [], body: second }
 
 // ---- collect every leaf id so we can mark them all live ----
 function leafIds(e: IRExpr, acc: NodeId[] = []): NodeId[] {
   if (e.$type === 'And' || e.$type === 'Or') e.args.forEach((a) => leafIds(a, acc))
   else if (e.$type === 'Not') leafIds(e.negand, acc)
-  else acc.push(e.id)
+  else if (e.$type !== 'InertE') acc.push(e.id) // inert carries no value/state
   return acc
 }
 const allLive = new Map<NodeId, State>(leafIds(second).map((id) => [id, 'live']))
@@ -63,9 +72,10 @@ applicantStates.set(concealment.id, 'eliminable') // the otiose rung
 const tm = estimateMetrics
 const sceneCourt = layout(fn, defaultViewSpec({ states: courtStates }), tm)
 const sceneAppl = layout(fn, defaultViewSpec({ states: applicantStates }), tm)
+// fold the deception group -> its leading inert becomes the placeholder label
 const sceneFolded = layout(
   fn,
-  defaultViewSpec({ states: courtStates, foldSet: new Set([harm.id]) }),
+  defaultViewSpec({ states: courtStates, foldSet: new Set([deception.id]) }),
   tm
 )
 

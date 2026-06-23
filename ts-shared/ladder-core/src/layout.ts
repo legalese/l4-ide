@@ -6,7 +6,9 @@
  * to the re-margining — `pos = (boundingExtent - childExtent) / 2` — so no general
  * graph engine ever fights us (the headline fix; DESIGN §0, §5.3).
  *
- * P0 is LR-only; TB is a later transpose. Text is single-line (no pre-breaking yet).
+ * Inert (grammatical scaffolding) renders UNBOXED (DESIGN §17): a leading inert in
+ * an OR becomes a HEADING above the stack; an inert in a series RIDES THE WIRE (and
+ * a leading one lands to the left of the stack for free). P0 is LR-only.
  */
 import type {
   IRExpr,
@@ -18,6 +20,8 @@ import type {
   Pt,
   State,
   NodeId,
+  And,
+  Or,
 } from './types.js'
 
 const PAD_X = 14
@@ -25,16 +29,15 @@ const PAD_Y = 10
 const GAP_SERIES = 44 // horizontal gap between AND siblings
 const GAP_PARALLEL = 26 // vertical gap between OR siblings
 const BUS_PAD = 26 // gap between an OR's bus and its child boxes
+const INERT_PAD = 12 // horizontal breathing room around inline inert text
 const LEAD = 40 // power-lead length at the far left/right
-const MARGIN = 60
+const MARGIN = 70
 const FONT = 14
 
-/** A measured BBE: intrinsic size + an emit that places it at an absolute origin
- *  and returns its in/out ports (DESIGN §5.7). This is the BBE algebra in code. */
 interface Measured {
   w: number
   h: number
-  state: State // own state (leaf state, or 'inert' for a group/placeholder)
+  state: State // own state (leaf state, or 'inert' for a group/placeholder/inert)
   emit(ox: number, oy: number, out: ScenePrim[]): { inPort: Pt; outPort: Pt }
 }
 
@@ -44,13 +47,25 @@ interface Ctx {
 }
 
 const stateOf = (vs: ViewSpec, id: NodeId): State => vs.states.get(id) ?? 'inert'
+const isOperative = (e: IRExpr): boolean => e.$type !== 'InertE'
 
-/** Label shown when a subtree is folded. Precedence: explicit IR label (if the
- *  IR carries one) -> synthesized "ALL/ANY of n". The explicit branch is the
- *  answer to "does the IR need a way to label a subtree?" — see DESIGN §16. */
-function foldLabel(e: Extract<IRExpr, { $type: 'And' | 'Or' }>): string {
-  if (e.label) return `▸ ${e.label}`
-  const n = e.args.length
+/** Leading run of inert text = the group's Pre / heading. */
+function leadingInert(args: readonly IRExpr[]): string | undefined {
+  const lead: string[] = []
+  for (const a of args) {
+    if (a.$type === 'InertE') lead.push(a.text)
+    else break
+  }
+  return lead.length ? lead.join(' ') : undefined
+}
+
+/** Fold placeholder label: explicit IR label -> leading inert (the Pre) ->
+ *  synthesized. The explicit/Pre branches answer "does the IR need a way to label
+ *  a subtree?" (DESIGN §16.1). */
+function foldLabel(e: And | Or): string {
+  const explicit = e.label ?? leadingInert(e.args)
+  if (explicit) return `▸ ${explicit}`
+  const n = e.args.filter(isOperative).length
   return e.$type === 'And' ? `▸ ALL of ${n}` : `▸ ANY of ${n}`
 }
 
@@ -69,24 +84,29 @@ function leafBox(
     state,
     emit(ox, oy, out) {
       out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state })
-      out.push({
-        kind: 'text',
-        at: { x: ox + w / 2, y: oy + h / 2 },
-        text: label,
-        anchor: 'middle',
-        state,
-      })
+      out.push({ kind: 'text', at: { x: ox + w / 2, y: oy + h / 2 }, text: label, anchor: 'middle', state })
       if (state === 'eliminable')
-        out.push({
-          kind: 'text',
-          at: { x: ox + w / 2, y: oy - 9 },
-          text: 'otiose — always open',
-          anchor: 'middle',
-          state,
-          tag: 'otiose',
-          size: 11,
-        })
+        out.push({ kind: 'text', at: { x: ox + w / 2, y: oy - 9 }, text: 'otiose — always open', anchor: 'middle', state, tag: 'otiose', size: 11 })
       const cy = oy + h / 2
+      return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
+    },
+  }
+}
+
+/** Inert text rendered UNBOXED, with left/right ports at its vertical center so a
+ *  series wire connects through it — the text then "rides the wire" (DESIGN §17).
+ *  The series only draws wire BETWEEN children, so the inert's own span is a clear
+ *  gap with the text sitting on the line. */
+function inertInline(text: string, tm: TextMetrics): Measured {
+  const w = tm.width(text, FONT) + 2 * INERT_PAD
+  const h = tm.lineHeight(FONT) + 2 * PAD_Y
+  return {
+    w,
+    h,
+    state: 'inert',
+    emit(ox, oy, out) {
+      const cy = oy + h / 2
+      out.push({ kind: 'text', at: { x: ox + w / 2, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
     },
   }
@@ -95,21 +115,15 @@ function leafBox(
 function measure(e: IRExpr, ctx: Ctx): Measured {
   const { vs, tm } = ctx
 
+  if (e.$type === 'InertE') return inertInline(e.text, tm)
+
   if (e.$type === 'Not') {
-    // P0: render the negand and prefix a ¬ marker on its in-port. (No Not in the
-    // s415 second-limb fixture; kept minimal.)
     const inner = measure(e.negand, ctx)
     return {
       ...inner,
       emit(ox, oy, out) {
         const p = inner.emit(ox, oy, out)
-        out.push({
-          kind: 'text',
-          at: { x: p.inPort.x - 6, y: p.inPort.y - 8 },
-          text: '¬',
-          anchor: 'middle',
-          state: inner.state,
-        })
+        out.push({ kind: 'text', at: { x: p.inPort.x - 6, y: p.inPort.y - 8 }, text: '¬', anchor: 'middle', state: inner.state })
         return p
       },
     }
@@ -119,46 +133,56 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     return leafBox(e.id, e.label, stateOf(vs, e.id), 'leaf', tm)
   }
 
-  // Folded AND/OR collapses to a placeholder leaf that KEEPS its rolled-up state.
   if (vs.foldSet.has(e.id)) {
     return leafBox(e.id, foldLabel(e), rollup(e, vs), 'placeholder', tm)
   }
 
+  return e.$type === 'And' ? measureAnd(e, ctx) : measureOr(e, ctx)
+}
+
+/** AND: series, children centered vertically. Inert children render inline and
+ *  ride the wire; a leading inert thus sits to the LEFT of the next element. */
+function measureAnd(e: And, ctx: Ctx): Measured {
   const kids = e.args.map((a) => measure(a, ctx))
-
-  if (e.$type === 'And') {
-    // series: lay left->right, center each child vertically (the centering).
-    const h = Math.max(...kids.map((k) => k.h))
-    const w = kids.reduce((s, k) => s + k.w, 0) + GAP_SERIES * (kids.length - 1)
-    return {
-      w,
-      h,
-      state: 'inert',
-      emit(ox, oy, out) {
-        let x = ox
-        const ports = kids.map((k) => {
-          const cy = oy + (h - k.h) / 2 // <-- centered on the cross axis
-          const p = k.emit(x, cy, out)
-          x += k.w + GAP_SERIES
-          return p
-        })
-        for (let i = 0; i < ports.length - 1; i++)
-          out.push({
-            kind: 'wire',
-            path: [ports[i].outPort, ports[i + 1].inPort],
-            role: 'rung',
-            state: 'inert',
-          })
-        return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
-      },
-    }
+  const h = Math.max(...kids.map((k) => k.h))
+  const w = kids.reduce((s, k) => s + k.w, 0) + GAP_SERIES * (kids.length - 1)
+  return {
+    w,
+    h,
+    state: 'inert',
+    emit(ox, oy, out) {
+      let x = ox
+      const ports = kids.map((k) => {
+        const cy = oy + (h - k.h) / 2 // <-- centered on the cross axis
+        const p = k.emit(x, cy, out)
+        x += k.w + GAP_SERIES
+        return p
+      })
+      for (let i = 0; i < ports.length - 1; i++)
+        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert' })
+      return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
+    },
   }
+}
 
-  // OR: parallel rungs stacked vertically, each centered horizontally, joined by
-  // a left and right bus (DESIGN §5.5, §5.7).
-  const colW = Math.max(...kids.map((k) => k.w))
+/** OR: parallel rungs stacked vertically, each centered horizontally, joined by a
+ *  left and right bus. A leading inert run becomes a HEADING above the stack; the
+ *  band is mirrored top+bottom so the stack stays centered and the rail stays
+ *  straight (a poor-man's protrude band, DESIGN §5.6). */
+function measureOr(e: Or, ctx: Ctx): Measured {
+  const { tm } = ctx
+  const head = leadingInert(e.args)
+  // drop the leading inert run; keep the remaining items in order
+  let start = 0
+  while (start < e.args.length && e.args[start].$type === 'InertE') start++
+  const items = e.args.slice(start).map((it) => ({ inert: it.$type === 'InertE', m: measure(it, ctx) }))
+
+  const colW = Math.max(...items.map((i) => i.m.w))
   const totalW = colW + 2 * BUS_PAD
-  const h = kids.reduce((s, k) => s + k.h, 0) + GAP_PARALLEL * (kids.length - 1)
+  const stackH = items.reduce((s, i) => s + i.m.h, 0) + GAP_PARALLEL * (items.length - 1)
+  const band = head ? tm.lineHeight(FONT) + 12 : 0
+  const h = stackH + 2 * band
+
   return {
     w: totalW,
     h,
@@ -166,41 +190,44 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     emit(ox, oy, out) {
       const leftBusX = ox
       const rightBusX = ox + totalW
-      let y = oy
-      const centers: number[] = []
-      for (const k of kids) {
-        const cx = ox + BUS_PAD + (colW - k.w) / 2 // <-- centered horizontally
-        const p = k.emit(cx, y, out)
+      const top = oy + band
+      let y = top
+      const rungCenters: number[] = []
+      for (const { inert, m } of items) {
+        const cx = ox + BUS_PAD + (colW - m.w) / 2 // <-- centered horizontally
+        const p = m.emit(cx, y, out)
         const cy = p.inPort.y
-        centers.push(cy)
-        const broken = k.state === 'eliminable' || k.state === 'dead'
-        if (broken) {
-          // split the left stub with an open-contact break: no current passes.
-          const mid = (leftBusX + p.inPort.x) / 2
-          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, { x: mid - 7, y: cy }], role: 'stub', state: k.state })
-          out.push({ kind: 'glyph', at: { x: mid, y: cy }, role: 'open-contact' })
-          out.push({ kind: 'wire', path: [{ x: mid + 7, y: cy }, { x: p.inPort.x, y: cy }], role: 'stub', state: k.state })
-        } else {
-          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, p.inPort], role: 'stub', state: k.state })
+        if (!inert) {
+          const broken = m.state === 'eliminable' || m.state === 'dead'
+          if (broken) {
+            const mid = (leftBusX + p.inPort.x) / 2
+            out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, { x: mid - 7, y: cy }], role: 'stub', state: m.state })
+            out.push({ kind: 'glyph', at: { x: mid, y: cy }, role: 'open-contact' })
+            out.push({ kind: 'wire', path: [{ x: mid + 7, y: cy }, { x: p.inPort.x, y: cy }], role: 'stub', state: m.state })
+          } else {
+            out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, p.inPort], role: 'stub', state: m.state })
+          }
+          out.push({ kind: 'wire', path: [p.outPort, { x: rightBusX, y: p.outPort.y }], role: 'stub', state: m.state })
+          rungCenters.push(cy)
         }
-        out.push({ kind: 'wire', path: [p.outPort, { x: rightBusX, y: p.outPort.y }], role: 'stub', state: k.state })
-        y += k.h + GAP_PARALLEL
+        y += m.h + GAP_PARALLEL
       }
-      out.push({ kind: 'wire', path: [{ x: leftBusX, y: centers[0] }, { x: leftBusX, y: centers[centers.length - 1] }], role: 'rail', state: 'inert' })
-      out.push({ kind: 'wire', path: [{ x: rightBusX, y: centers[0] }, { x: rightBusX, y: centers[centers.length - 1] }], role: 'rail', state: 'inert' })
-      return { inPort: { x: leftBusX, y: oy + h / 2 }, outPort: { x: rightBusX, y: oy + h / 2 } }
+      if (rungCenters.length) {
+        out.push({ kind: 'wire', path: [{ x: leftBusX, y: rungCenters[0] }, { x: leftBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
+        out.push({ kind: 'wire', path: [{ x: rightBusX, y: rungCenters[0] }, { x: rightBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
+      }
+      if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5 })
+      return { inPort: { x: leftBusX, y: top + stackH / 2 }, outPort: { x: rightBusX, y: top + stackH / 2 } }
     },
   }
 }
 
-/** Rolled-up state of a folded subtree (P0 heuristic; real eval is P1). */
-function rollup(e: Extract<IRExpr, { $type: 'And' | 'Or' }>, vs: ViewSpec): State {
-  const kid = e.args.map((a) => ('id' in a ? stateOf(vs, a.id) : 'inert'))
+function rollup(e: And | Or, vs: ViewSpec): State {
+  const kid = e.args.filter(isOperative).map((a) => ('id' in a ? stateOf(vs, a.id) : 'inert'))
   if (kid.some((s) => s === 'eliminable')) return 'eliminable'
   return 'inert'
 }
 
-/** Top-level: lay out the body, add power leads + terminals, return a Scene. */
 export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
   const prims: ScenePrim[] = []
   const m = measure(fn.body, { vs, tm })

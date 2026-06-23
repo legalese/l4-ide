@@ -57,8 +57,9 @@ function prim(p: ScenePrim, pal: Palette): string {
       return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`
     case 'text': {
       const size = p.size ?? 14
-      const dy = p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' ? 0 : 5 // vertical-center body text
-      const italic = p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' ? ' font-style="italic"' : ''
+      const inert = p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' || p.tag === 'connective'
+      const dy = inert ? 0 : 5 // vertical-center body text
+      const italic = inert ? ' font-style="italic"' : ''
       const weight = p.tag === 'title' ? ' font-weight="700"' : ''
       const fill = p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
       return `<text x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`

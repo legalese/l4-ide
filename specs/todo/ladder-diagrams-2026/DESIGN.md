@@ -519,6 +519,64 @@ durable step — tracked in §13.
 
 ---
 
+## 17. Unboxed elements (inert content) — PrePost generalized
+
+**The unification.** Four things we treated separately are one primitive:
+
+| surface form | was |
+|---|---|
+| "all of:" / "any of the following" group heading | PrePost `Pre` on a group |
+| "either … or …" connective between rungs | inert string between atoms |
+| inert-style verbatim prose ("as such an officer or employee,") | `InertE` node, context-identity |
+| the decoration the box model wanted to "park" | §5.6 protrude band |
+
+All four are **inert text**: the identity of their context (TRUE under AND, FALSE
+under OR), so they carry **no current**. A thing that carries no current must not
+be a **box** (boxes are operative atoms that open/close the circuit) — it renders
+**unboxed**. That is the whole idea.
+
+**PrePost is subsumed into positional `InertE`.** Inert style already places
+headings and connectives by *position in the args list*, so we don't carry a
+separate PrePost field on the wire IR; "PrePost" survives only as vocabulary:
+
+- **leading** inert run → the group's `Pre` (heading)
+- **medial** inert (between operative siblings) → a connective
+- **trailing** inert → `Post`
+
+The current IR already has `InertE` (with `InertAnd`/`InertOr` context); we were
+about to *box* it, which was the bug. (`Leaf` no longer includes `InertE`; it is
+its own node.)
+
+**Placement (locked, except as noted).**
+
+- **OR heading → above the stack.** Seated in a protrude band (§5.6); P0 mirrors
+  the band top+bottom so the stack stays centered and the rail stays straight.
+- **"Left of a stack" is not a special case** — express it as a conjunction:
+  `inert … (stack)`. In LR a series puts the leading inert to the left for free.
+  So no dedicated "left heading" placement is needed.
+- **Conjunctive (series) inerts ride the wire** — *provisional, pending visual
+  review.* The series draws wire only *between* children, so an inert child's own
+  span is a clear gap with the text sitting on the line.
+- *(Open: disjunctive medial inert placement; tightening the gap around
+  wire-riding connectives — they currently read a touch spread out.)*
+
+**Scene IR / layout.** The `text` prim gains roles `heading` and `connective`
+(unboxed, italic, inert ink — no rect, no ports). `measureOr` extracts the leading
+inert run as the heading; `measureAnd` measures inert children inline (`inertInline`
+gives them left/right ports so the wire connects through). Folding prefers the
+explicit label, then the leading inert (the Pre), then synthesizes — so folding the
+deception group yields "▸ there is a deception (Expl. 1)".
+
+**The payoff — the diagram *becomes* the statute.** Boxed = operative predicates;
+unboxed = verbatim inert prose. Read together, the rung reads as the section:
+*"there is a deception (Expl. 1)" [by deceiving / dishonest concealment] →
+intentionally → induces an act or omission that → causes harm → to any person in →
+[body / mind / reputation / property]*. The visual form of inert style; the
+isomorphism (source ↔ logic ↔ picture) made legible at once. **Proven in P0** —
+`demo/s415.ts`, `demo/out/s415-court.svg`.
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.

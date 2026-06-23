@@ -17,11 +17,27 @@ export type NodeId = number
 /** Mirror of viz-expr's UBoolValue. */
 export type UBoolValue = 'TrueV' | 'FalseV' | 'UnknownV'
 
+/** Operative atom — carries current; renders as a BOX. */
 export interface Leaf {
-  readonly $type: 'UBoolVar' | 'App' | 'TrueE' | 'FalseE' | 'InertE'
+  readonly $type: 'UBoolVar' | 'App' | 'TrueE' | 'FalseE'
   readonly id: NodeId
   readonly label: string
   readonly atomId?: string
+}
+
+/**
+ * Inert (grammatical scaffolding) — the identity of its context (TRUE under AND,
+ * FALSE under OR), so it carries NO current and renders UNBOXED (DESIGN §17).
+ * This is the one primitive behind PrePost headings, "any of the following",
+ * "… or …" connectives, and inert-style verbatim prose. Position decides render:
+ * leading inert in an OR -> heading above the stack; inert in a series -> rides
+ * the wire (and a leading one lands to the left of the stack for free).
+ */
+export interface Inert {
+  readonly $type: 'InertE'
+  readonly id: NodeId
+  readonly text: string
+  readonly context: 'InertAnd' | 'InertOr'
 }
 
 /**
@@ -51,7 +67,7 @@ export interface Not {
   readonly negand: IRExpr
 }
 
-export type IRExpr = Leaf | And | Or | Not
+export type IRExpr = Leaf | Inert | And | Or | Not
 
 export interface FunDecl {
   readonly id: NodeId
@@ -123,7 +139,7 @@ export type ScenePrim =
       text: string
       anchor: 'start' | 'middle'
       state: State
-      tag?: 'otiose' | 'title' | 'note' | 'heading'
+      tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective'
       size?: number
     }
 
