@@ -39,11 +39,12 @@ const or = (args: IRExpr[]): Or => ({ $type: 'Or', id: nid(), args })
 // ---- build the tree in inert style: operative atoms boxed, prose inert/unboxed ----
 const byDeceiving = leaf('by deceiving')
 const concealment = leaf('dishonest concealment')
-// leading inert => HEADING above the OR stack
-const deception = or([inert('there is a deception (Expl. 1)', 'InertOr'), byDeceiving, concealment])
+// leading inert => HEADING above the OR stack; medial inert ("or") => sits in the
+// gap between the two rungs (disjunctive medial placement)
+const deception = or([inert('there is a deception (Expl. 1)', 'InertOr'), byDeceiving, inert('or', 'InertOr'), concealment])
 const intentionally = leaf('intentionally')
 const causesHarm = leaf('causes harm')
-const harm = or([leaf('body'), leaf('mind'), leaf('reputation'), leaf('property')])
+const harm = or([leaf('body'), leaf('mind'), leaf('reputation'), inert('or', 'InertOr'), leaf('property')])
 // inert nodes in the series ride the wire; "to any person in" lands to the LEFT of
 // the harm stack (the `text … (stack)` pattern) — no heading needed on `harm`.
 const second = and([

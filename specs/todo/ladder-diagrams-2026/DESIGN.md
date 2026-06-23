@@ -566,8 +566,12 @@ its own node.)
   stays a single line above, so `'straddle-wire'` is a strict superset of
   `'above-wire'`. `'below-wire'` and `'on-wire'` remain toggles; `'on-wire'` is
   discouraged (its gap reads like a contact, which inert never is).
-- *(Open: disjunctive medial inert placement — an inert *between* OR rungs; and
-  whether to generalize straddle to N lines for very long statutory clauses.)*
+- **Disjunctive medial inert → centered in the inter-rung gap.** An inert *between*
+  two OR rungs (e.g. "or") sits unboxed, centered in the gap between the boxes,
+  connected to nothing (it carries no current). The gap widens only if the text
+  needs the room (`max(GAP_PARALLEL, lineHeight + 8)`) — minimal margin.
+- *(Open: N-line straddle for very long statutory clauses; trailing inert as a
+  `Post` below a group.)*
 
 **Scene IR / layout.** The `text` prim gains roles `heading` and `connective`
 (unboxed, italic, inert ink — no rect, no ports). `measureOr` extracts the leading

@@ -236,19 +236,40 @@ function measureAnd(e: And, ctx: Ctx): Measured {
 /** OR: parallel rungs stacked vertically, each centered horizontally, joined by a
  *  left and right bus. A leading inert run becomes a HEADING above the stack; the
  *  band is mirrored top+bottom so the stack stays centered and the rail stays
- *  straight (a poor-man's protrude band, DESIGN §5.6). */
+ *  straight (a poor-man's protrude band, DESIGN §5.6).
+ *
+ *  A DISJUNCTIVE MEDIAL inert (an inert BETWEEN two rungs, e.g. "or") just sits
+ *  unboxed, centered in the gap between the boxes — the gap only widens if the text
+ *  needs the room (DESIGN §17). Not connected to the buses; it carries no current. */
 function measureOr(e: Or, ctx: Ctx): Measured {
   const { tm } = ctx
+  const lineH = tm.lineHeight(FONT)
   const head = leadingInert(e.args)
-  // drop the leading inert run; keep the remaining items in order
+  // drop the leading inert run (the heading); fold the remaining inerts into the
+  // gaps between the operative rungs they sit between.
   let start = 0
   while (start < e.args.length && e.args[start].$type === 'InertE') start++
-  const items = e.args.slice(start).map((it) => ({ inert: it.$type === 'InertE', m: measure(it, ctx) }))
 
-  const colW = Math.max(...items.map((i) => i.m.w))
+  const rungs: Measured[] = []
+  const gapLabel: (string | null)[] = [] // gapLabel[k] = inert between rung k and k+1
+  let pending: string[] = []
+  for (const it of e.args.slice(start)) {
+    if (it.$type === 'InertE') {
+      pending.push(it.text)
+    } else {
+      if (rungs.length >= 1) gapLabel.push(pending.length ? pending.join(' ') : null)
+      pending = []
+      rungs.push(measure(it, ctx))
+    }
+  }
+  // (a trailing `pending` after the last rung would be a Post; dropped for now)
+
+  const labelW = (k: number) => (gapLabel[k] ? tm.width(gapLabel[k] as string, FONT) + 2 * INERT_PAD : 0)
+  const gapH = (k: number) => (gapLabel[k] ? Math.max(GAP_PARALLEL, lineH + 8) : GAP_PARALLEL)
+  const colW = Math.max(0, ...rungs.map((m) => m.w), ...gapLabel.map((_, k) => labelW(k)))
   const totalW = colW + 2 * BUS_PAD
-  const stackH = items.reduce((s, i) => s + i.m.h, 0) + GAP_PARALLEL * (items.length - 1)
-  const band = head ? tm.lineHeight(FONT) + 12 : 0
+  const stackH = rungs.reduce((s, m) => s + m.h, 0) + gapLabel.reduce((s, _, k) => s + gapH(k), 0)
+  const band = head ? lineH + 12 : 0
   const h = stackH + 2 * band
 
   return {
@@ -261,25 +282,30 @@ function measureOr(e: Or, ctx: Ctx): Measured {
       const top = oy + band
       let y = top
       const rungCenters: number[] = []
-      for (const { inert, m } of items) {
+      rungs.forEach((m, i) => {
+        if (i > 0) {
+          const k = i - 1
+          const gh = gapH(k)
+          if (gapLabel[k])
+            out.push({ kind: 'text', at: { x: ox + totalW / 2, y: y + gh / 2 + 4 }, text: gapLabel[k] as string, anchor: 'middle', state: 'inert', tag: 'connective' })
+          y += gh
+        }
         const cx = ox + BUS_PAD + (colW - m.w) / 2 // <-- centered horizontally
         const p = m.emit(cx, y, out)
         const cy = p.inPort.y
-        if (!inert) {
-          const broken = m.state === 'eliminable' || m.state === 'dead'
-          if (broken) {
-            const mid = (leftBusX + p.inPort.x) / 2
-            out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, { x: mid - 7, y: cy }], role: 'stub', state: m.state })
-            out.push({ kind: 'glyph', at: { x: mid, y: cy }, role: 'open-contact' })
-            out.push({ kind: 'wire', path: [{ x: mid + 7, y: cy }, { x: p.inPort.x, y: cy }], role: 'stub', state: m.state })
-          } else {
-            out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, p.inPort], role: 'stub', state: m.state })
-          }
-          out.push({ kind: 'wire', path: [p.outPort, { x: rightBusX, y: p.outPort.y }], role: 'stub', state: m.state })
-          rungCenters.push(cy)
+        const broken = m.state === 'eliminable' || m.state === 'dead'
+        if (broken) {
+          const mid = (leftBusX + p.inPort.x) / 2
+          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, { x: mid - 7, y: cy }], role: 'stub', state: m.state })
+          out.push({ kind: 'glyph', at: { x: mid, y: cy }, role: 'open-contact' })
+          out.push({ kind: 'wire', path: [{ x: mid + 7, y: cy }, { x: p.inPort.x, y: cy }], role: 'stub', state: m.state })
+        } else {
+          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, p.inPort], role: 'stub', state: m.state })
         }
-        y += m.h + GAP_PARALLEL
-      }
+        out.push({ kind: 'wire', path: [p.outPort, { x: rightBusX, y: p.outPort.y }], role: 'stub', state: m.state })
+        rungCenters.push(cy)
+        y += m.h
+      })
       if (rungCenters.length) {
         out.push({ kind: 'wire', path: [{ x: leftBusX, y: rungCenters[0] }, { x: leftBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
         out.push({ kind: 'wire', path: [{ x: rightBusX, y: rungCenters[0] }, { x: rightBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
