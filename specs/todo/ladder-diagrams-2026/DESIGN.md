@@ -554,11 +554,15 @@ its own node.)
 - **"Left of a stack" is not a special case** — express it as a conjunction:
   `inert … (stack)`. In LR a series puts the leading inert to the left for free.
   So no dedicated "left heading" placement is needed.
-- **Conjunctive (series) inerts ride the wire** — *provisional, pending visual
-  review.* The series draws wire only *between* children, so an inert child's own
-  span is a clear gap with the text sitting on the line.
-- *(Open: disjunctive medial inert placement; tightening the gap around
-  wire-riding connectives — they currently read a touch spread out.)*
+- **Conjunctive (series) inerts → above the unbroken wire** (default
+  `connectiveStyle: 'above-wire'`). The wire stays *continuous* (inert = identity =
+  always conducts, so the line must not break for it) and the prose sits just above
+  it. This makes inert placement uniform: **all inert text lives above what it
+  annotates** — headings above stacks, connectives above wires — one reading rule.
+  `'below-wire'` (prose below) and `'on-wire'` (text in a gap the series leaves)
+  remain as toggles; `'on-wire'` is discouraged because the gap reads like a
+  contact, which inert never is.
+- *(Open: disjunctive medial inert placement — an inert *between* OR rungs.)*
 
 **Scene IR / layout.** The `text` prim gains roles `heading` and `connective`
 (unboxed, italic, inert ink — no rect, no ports). `measureOr` extracts the leading

@@ -91,10 +91,13 @@ export type Theme = 'screen' | 'ink'
  * be live in one rung and otiose in another; DESIGN §15.2). Leaf *values* would be
  * keyed by atomId; only structural facts (fold, eliminability) are positional.
  */
-/** How a conjunctive (series) inert connective relates to the wire (DESIGN §17):
+/** How a conjunctive (series) inert connective relates to the wire (DESIGN §17).
+ *  Both 'above'/'below' keep the line UNBROKEN (inert = identity = always conducts):
  *  'on-wire'    — text sits on the line, in a gap the series leaves (it "rides").
- *  'below-wire' — wire runs continuous through the span; text drops just below it. */
-export type ConnectiveStyle = 'on-wire' | 'below-wire'
+ *  'above-wire' — continuous wire; text sits above it (matches OR heading-above, so
+ *                 all inert text lives above what it annotates — one reading rule).
+ *  'below-wire' — continuous wire; text drops just below it. */
+export type ConnectiveStyle = 'on-wire' | 'above-wire' | 'below-wire'
 
 export interface ViewSpec {
   readonly foldSet: ReadonlySet<NodeId>
@@ -112,7 +115,7 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     scale: partial.scale ?? 'full',
     orient: partial.orient ?? 'LR',
     theme: partial.theme ?? 'screen',
-    connectiveStyle: partial.connectiveStyle ?? 'on-wire',
+    connectiveStyle: partial.connectiveStyle ?? 'above-wire',
   }
 }
 

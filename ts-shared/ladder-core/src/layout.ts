@@ -22,6 +22,7 @@ import type {
   NodeId,
   And,
   Or,
+  ConnectiveStyle,
 } from './types.js'
 
 const PAD_X = 14
@@ -97,20 +98,26 @@ function leafBox(
  *  series wire connects through it (DESIGN §17). Two styles:
  *  - 'on-wire':    the series leaves the inert's span as a gap; text sits on the line.
  *  - 'below-wire': the inert draws a continuous wire across its span; text drops below. */
-function inertInline(text: string, tm: TextMetrics, style: 'on-wire' | 'below-wire'): Measured {
+function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Measured {
   const w = tm.width(text, FONT) + 2 * INERT_PAD
   const h = tm.lineHeight(FONT) + 2 * PAD_Y
+  const GAP = 8 // clearance between the wire and the nearest edge of the text
+  const ASCENT = FONT * 0.78
+  const DESCENT = FONT * 0.22
   return {
     w,
     h,
     state: 'inert',
     emit(ox, oy, out) {
       const cy = oy + h / 2
-      if (style === 'below-wire') {
-        out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
-        out.push({ kind: 'text', at: { x: ox + w / 2, y: cy + h / 2 + 1 }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
+      const mid = ox + w / 2
+      if (style === 'on-wire') {
+        out.push({ kind: 'text', at: { x: mid, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       } else {
-        out.push({ kind: 'text', at: { x: ox + w / 2, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
+        // unbroken wire through the span (inert always conducts)
+        out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
+        const baseline = style === 'above-wire' ? cy - GAP - DESCENT : cy + GAP + ASCENT
+        out.push({ kind: 'text', at: { x: mid, y: baseline }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       }
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
     },
