@@ -98,11 +98,12 @@ function leafBox(
  *  series wire connects through it (DESIGN §17). Two styles:
  *  - 'on-wire':    the series leaves the inert's span as a gap; text sits on the line.
  *  - 'below-wire': the inert draws a continuous wire across its span; text drops below. */
-const C_GAP = 8 // clearance between the wire and the nearest edge of connective text
+// clearance between the wire and the nearest edge of connective text — shared by
+// above-wire / below-wire / straddle-wire so they all hug the line identically.
+const CONNECTIVE_GAP = 3
 const C_ASCENT = FONT * 0.78
 const C_DESCENT = FONT * 0.22
 const STRADDLE_MIN_WIDTH = 160 // only wrap connectives wider than this (~a box width)
-const STRADDLE_GAP = 3 // tighter than C_GAP: the two straddle lines hug the wire
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
  *  can't split -> single line.
@@ -140,7 +141,7 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
     const lines = singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm) : [text]
     if (lines.length === 2) {
       const w = Math.max(tm.width(lines[0], FONT), tm.width(lines[1], FONT)) + 2 * INERT_PAD
-      const h = 2 * lineH + 2 * STRADDLE_GAP // tight: the two lines hug the wire
+      const h = 2 * lineH + 2 * CONNECTIVE_GAP // tight: the two lines hug the wire
       return {
         w,
         h,
@@ -149,8 +150,8 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
           const cy = oy + h / 2
           const mid = ox + w / 2
           out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
-          out.push({ kind: 'text', at: { x: mid, y: cy - STRADDLE_GAP - C_DESCENT }, text: lines[0], anchor: 'middle', state: 'inert', tag: 'connective' })
-          out.push({ kind: 'text', at: { x: mid, y: cy + STRADDLE_GAP + C_ASCENT }, text: lines[1], anchor: 'middle', state: 'inert', tag: 'connective' })
+          out.push({ kind: 'text', at: { x: mid, y: cy - CONNECTIVE_GAP - C_DESCENT }, text: lines[0], anchor: 'middle', state: 'inert', tag: 'connective' })
+          out.push({ kind: 'text', at: { x: mid, y: cy + CONNECTIVE_GAP + C_ASCENT }, text: lines[1], anchor: 'middle', state: 'inert', tag: 'connective' })
           return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
         },
       }
@@ -172,7 +173,7 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
       } else {
         // unbroken wire through the span (inert always conducts)
         out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
-        const baseline = style === 'above-wire' ? cy - C_GAP - C_DESCENT : cy + C_GAP + C_ASCENT
+        const baseline = style === 'above-wire' ? cy - CONNECTIVE_GAP - C_DESCENT : cy + CONNECTIVE_GAP + C_ASCENT
         out.push({ kind: 'text', at: { x: mid, y: baseline }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       }
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
