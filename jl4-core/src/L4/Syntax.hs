@@ -814,10 +814,21 @@ instance ToConcreteNodes PosToken InertContext where
 instance ToConcreteNodes PosToken RecallMode where
   toNodes _ = pure []
 
+-- The empty-surface payload fields (Bool isOfficial, RecallMode mode) still
+-- occupy one holeFit slot in the generic exactprint traversal, so the parser
+-- emits a placeholder 'annoHole' for each in field-declaration order (see
+-- recordOrCommitExpr / recallExpr). 'annoHole' needs 'HasSrcRange'; an empty
+-- field contributes no surface, so its hole-hint range is 'Nothing'.
+instance HasSrcRange RecallMode where
+  rangeOf _ = Nothing
+
 -- Bool has no concrete syntax nodes (used in Record for the isOfficial flag;
 -- the RECORD/COMMIT/ATTEST keyword is already captured in the surrounding Anno)
 instance ToConcreteNodes PosToken Bool where
   toNodes _ = pure []
+
+instance HasSrcRange Bool where
+  rangeOf _ = Nothing
 
 instance ToConcreteNodes PosToken Name where
   toNodes (MkName ann _) =

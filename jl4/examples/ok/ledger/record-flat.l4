@@ -1,0 +1,12 @@
+IMPORT prelude
+-- PHASE A exactprint guard: flat RECORD/COMMIT/ATTEST and a RECORD q's recipient
+-- must round-trip verbatim. Before the anno-ordering fix `l4 format` scrambled
+-- `RECORD `a` IS 1` to `RECORD IS `a` 1` (which fails to reparse). See the
+-- recordOrCommitExpr field-order note in jl4-core/src/L4/Parser.hs.
+
+DECLARE Party IS ONE OF q
+
+#EVAL RECORD `a` IS 1
+#EVAL COMMIT `b` IS 2
+#EVAL ATTEST `c` IS 3
+#EVAL RECORD q's `d` IS 4
