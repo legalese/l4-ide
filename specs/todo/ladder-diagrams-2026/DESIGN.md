@@ -409,9 +409,9 @@ tools/
 1. **Package split now vs later** — three packages up front, or one package with internal modules until the core stabilizes?
 2. **PrePost / protrude model** — finalize how label bands attach without breaking the parked-origin invariant.
 3. **Sub-ordering within groups** (§6) — implement the selectivity reorder, or preserve strict source order? Interacts with stable `atomId` and user mental model.
-4. **`IRExpr` extensions** (§11) — what, if anything, must move into Haskell vs be derived in TS.
+4. **`IRExpr` extensions** (§11) — what, if anything, must move into Haskell vs be derived in TS. **Leading candidate: a `NamedExpr` wrapper for subtree labels** (§16.1) — the wire IR currently can't name an interior node, which folding wants; `@repo/viz-expr` already stubs it out. Decide whether Haskell populates it from the inlined DECIDE/`Where` name, NLG fills it, or both.
 5. **Pan/zoom** — `viewBox` hand-roll vs `svg-pan-zoom` dependency.
-6. **SVG→PDF tool** — resvg (fast, Rust, no browser) vs headless Chrome (best CSS/font fidelity) vs Inkscape (designer-grade).
+6. **SVG→PDF tool** — resvg (fast, Rust, no browser) vs headless Chrome (best CSS/font fidelity) vs Inkscape (designer-grade). *(P0 uses `rsvg-convert` for PNG previews.)*
 7. **Interactivity in print?** — none, presumably; but confirm whether an "annotated" print mode (showing a worked T/F/U evaluation) is wanted.
 
 ---
@@ -491,6 +491,31 @@ of the layout core, so P0 builds it in.
 The s 415 fixture exercises it: fold the whole second limb to its verdict, then
 expand just the deception gateway to watch the concealment rung go live (court's
 reading) or ghost-and-fold (applicants').
+
+### 16.1 Does the IR need a way to label a subtree?
+
+A folded interior node needs a **name** to show. Three tiers, all worth supporting:
+
+- **Tier 0 — synthesize from structure.** "▸ ALL of 4" / "▸ ANY of 2". Always
+  available, no IR change, uninformative. The P0 fallback.
+- **Tier 1 — synthesize from children (NLG-lite).** Join child labels: "deceiving
+  OR concealment". Fine when shallow; degrades with depth. No IR change.
+- **Tier 2 — an explicit subtree label on the IR.** The only way to get a *legible*
+  fold like "there is a deception" or "harm to…". **The current wire IR cannot do
+  this** — `And`/`Or` carry only `id` + `args`; interior nodes are anonymous, and
+  the name is *lost* at the Haskell boundary when a named DECIDE/`Where` body is
+  inlined.
+
+Recommendation: support all three, precedence Tier 2 → 1 → 0. For Tier 2, **do not
+fatten `And`/`Or`** (keep them clean n-ary monoids); add an optional **`NamedExpr`
+wrapper** `{ name, expr }` — which `@repo/viz-expr` *already stubs out* (commented,
+`viz-expr.ts` ~L198–211, alongside `AppNamed`). Populate it on the Haskell side
+from the L4 name the subtree was inlined from, and/or via NLG (cf. the NLG
+round-trip work). The core takes a label resolver; absent name → fall to Tier 1/0.
+This also supplies the §5.6 PrePost heading text. **P0 already proves it:** the
+core honours an optional `label?` on a group, so the `harm` fold renders
+"▸ harm to…" not "▸ ANY of 4". Promoting that to the wire IR (`NamedExpr`) is the
+durable step — tracked in §13.
 
 ---
 
