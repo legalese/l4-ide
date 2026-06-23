@@ -1,0 +1,138 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5D (new; Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5D — a new MANDATORY ground inserted into Schedule 2 to the Housing
+-- Act 1988 by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 15
+-- (commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b);
+-- marker F24). Part I (mandatory): where made out, the court MUST order
+-- possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded (the in-force F24 text). The ground is a single
+-- sentence reading as a CONJUNCTION of three operative limbs:
+--   "The landlord seeking possession is a private registered provider of social
+--    housing, the tenancy agreement includes a requirement connected with the
+--    tenant's employment and the tenant no longer fulfils that requirement."
+--
+--   (a) the landlord seeking possession is a private registered provider of
+--       social housing,
+--   (b) the tenancy agreement includes a requirement connected with the
+--       tenant's employment, and
+--   (c) the tenant no longer fulfils that requirement.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The sentence is unlettered in the source; the three operative clauses are
+--     lifted as conjuncts (a), (b), (c) for testability. "that requirement" in
+--     (c) refers back to the employment-connected requirement introduced in (b).
+--   * (c) is a NEGATIVE limb ("no longer fulfils"): satisfied iff the tenant
+--     does not currently fulfil the requirement. Modelled directly as the atom
+--     `tenant no longer fulfils that requirement` (already phrased negatively in
+--     the statute), so no further NOT is applied.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+DECLARE Ground5DClaim HAS
+  -- (a)
+  `landlord seeking possession is a private registered provider of social housing`  IS A BOOLEAN
+  -- (b)
+  `tenancy agreement includes a requirement connected with the tenant's employment` IS A BOOLEAN
+  -- (c)
+  `tenant no longer fulfils that requirement`                                        IS A BOOLEAN
+
+§§ `(a) — landlord is a private registered provider of social housing`
+
+GIVEN claim IS A Ground5DClaim
+GIVETH A BOOLEAN
+`(a) — private registered provider of social housing` claim MEANS
+        "The landlord seeking possession is a private registered provider of social housing,"
+    ... claim's `landlord seeking possession is a private registered provider of social housing`
+
+§§ `(b) — tenancy agreement includes an employment-connected requirement`
+
+GIVEN claim IS A Ground5DClaim
+GIVETH A BOOLEAN
+`(b) — tenancy agreement includes an employment-connected requirement` claim MEANS
+        "the tenancy agreement includes a requirement connected with the tenant's employment"
+    ... claim's `tenancy agreement includes a requirement connected with the tenant's employment`
+
+§§ `(c) — the tenant no longer fulfils that requirement`
+
+GIVEN claim IS A Ground5DClaim
+GIVETH A BOOLEAN
+`(c) — tenant no longer fulfils that requirement` claim MEANS
+        "and the tenant no longer fulfils that requirement."
+    ... claim's `tenant no longer fulfils that requirement`
+
+§§ `Ground 5D made out — (a) AND (b) AND (c)`
+
+GIVEN claim IS A Ground5DClaim
+GIVETH A BOOLEAN
+`Ground 5D made out` claim MEANS
+        `(a) — private registered provider of social housing` claim
+    AND `(b) — tenancy agreement includes an employment-connected requirement` claim
+    AND `(c) — tenant no longer fulfils that requirement` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5DClaim
+GIVETH A DEONTIC Actor Action
+`ground 5D possession order` claim MEANS
+    IF   `Ground 5D made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — all of (a)-(c) met`
+
+`claim all-met` MEANS Ground5DClaim WITH
+  `landlord seeking possession is a private registered provider of social housing`  IS TRUE
+  `tenancy agreement includes a requirement connected with the tenant's employment` IS TRUE
+  `tenant no longer fulfils that requirement`                                        IS TRUE
+
+#ASSERT `(a) — private registered provider of social housing`              `claim all-met`
+#ASSERT `(b) — tenancy agreement includes an employment-connected requirement` `claim all-met`
+#ASSERT `(c) — tenant no longer fulfils that requirement`                   `claim all-met`
+#ASSERT `Ground 5D made out`                                               `claim all-met`
+
+§§ `(a) knocked out — landlord is not a private registered provider of social housing`
+
+`claim — (a) fails` MEANS Ground5DClaim WITH
+  `landlord seeking possession is a private registered provider of social housing`  IS FALSE
+  `tenancy agreement includes a requirement connected with the tenant's employment` IS TRUE
+  `tenant no longer fulfils that requirement`                                        IS TRUE
+
+#ASSERT NOT `(a) — private registered provider of social housing` `claim — (a) fails`
+#ASSERT NOT `Ground 5D made out`                                  `claim — (a) fails`
+
+§§ `(b) knocked out — no employment-connected requirement in the tenancy agreement`
+
+`claim — (b) fails` MEANS Ground5DClaim WITH
+  `landlord seeking possession is a private registered provider of social housing`  IS TRUE
+  `tenancy agreement includes a requirement connected with the tenant's employment` IS FALSE
+  `tenant no longer fulfils that requirement`                                        IS TRUE
+
+#ASSERT NOT `(b) — tenancy agreement includes an employment-connected requirement` `claim — (b) fails`
+#ASSERT NOT `Ground 5D made out`                                                   `claim — (b) fails`
+
+§§ `(c) knocked out — the tenant still fulfils that requirement`
+
+`claim — (c) fails` MEANS Ground5DClaim WITH
+  `landlord seeking possession is a private registered provider of social housing`  IS TRUE
+  `tenancy agreement includes a requirement connected with the tenant's employment` IS TRUE
+  `tenant no longer fulfils that requirement`                                        IS FALSE
+
+#ASSERT NOT `(c) — tenant no longer fulfils that requirement` `claim — (c) fails`
+#ASSERT NOT `Ground 5D made out`                              `claim — (c) fails`

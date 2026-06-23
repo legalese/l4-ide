@@ -1,0 +1,417 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5C (renumbered from old Ground 16; Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5C — the "employment let" MANDATORY ground. Old Ground 16 renumbered
+-- as Ground 5C and moved to after Ground 5B in Part I by the Renters' Rights Act
+-- 2025 (c. 26), Sch. 1 para. 14(1)(4) (commencement 1.5.2026 for specified
+-- purposes; S.I. 2026/421, reg. 2(b); marker F19). The substituted operative
+-- text comes in by Sch. 1 para. 14(2) (marker F20). Part I (mandatory): where
+-- made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded (the in-force F20 text):
+--   "The dwelling-house was let to the tenant in consequence of the tenant's
+--    employment—
+--      (a) by the landlord seeking possession,
+--      (b) in the case of joint landlords seeking possession, by at least one of
+--          them,
+--      (c) by a previous landlord under the tenancy, or
+--      (d) pursuant to an agreement between any of those landlords and the
+--          employer,
+--    and either—
+--      (a) the tenant has ceased to be in that employment, or
+--      (b) the tenancy was granted for the purpose of providing the tenant with
+--          accommodation during the early period of their employment, that
+--          purpose has been fulfilled and the landlord seeking possession
+--          intends to let the dwelling-house to another current or future
+--          employee of the employer."
+--
+-- So Ground 5C is, structurally, a CONJUNCTION of two paragraphs:
+--   [first  paragraph]  let in consequence of employment by ONE OF (a)-(d)   {disjunction}
+--   AND
+--   [second paragraph]  EITHER (a) ceased employment  OR  (b) early-period   {disjunction}
+--                       purpose fulfilled + landlord intends to relet
+--
+-- ===========================================================================
+-- TWO MODIFICATIONS, AND HOW THEY ARE MODELLED  (FLAGGED FOR THE REVIEWER)
+-- ===========================================================================
+--
+-- (1) HEALTH-SERVICE DEEMING (markers F21, F22) —
+--     "For the purposes of this ground, at a time when the landlord is or was
+--      the Secretary of State, employment by a health service body, as defined
+--      in section 60(7) of the National Health Service and Community Care Act
+--      1990, or by a Local Health Board, shall be regarded as employment by the
+--      Secretary of State."
+--     MODELLING CALL: this is a deeming rule that merely WIDENS who counts as
+--     the relevant employer/landlord for the first paragraph. It does not change
+--     the AND/OR shape of the ground. It is carried as inert prose, and folded
+--     into the first paragraph's "by the landlord seeking possession" reading via
+--     a boolean atom `health-service body employment deemed to be by the
+--     Secretary of State`: where the landlord is/was the Secretary of State and
+--     the employment was by a health service body or Local Health Board, that
+--     deemed-employer fact satisfies first-paragraph (a) (employment "by the
+--     landlord seeking possession"). The atom is an alternative way of meeting
+--     first-paragraph (a); it never narrows the ground.
+--
+-- (2) OFFICE-OF-CONSTABLE VARIANT (marker F23) —
+--     "This ground also applies to the letting of a dwelling-house to a tenant in
+--      consequence of the tenant's service in the office of constable, but with
+--      the following modifications.
+--        'Employment' means service in the office of constable.
+--        In the first paragraph of this ground, in paragraph (d), 'the employer'
+--        means any of the following persons—
+--          (a) the chief officer of a police force;
+--          (b) a policing body;
+--          (c) in relation to a constable's service under the direction and
+--              control of a person who is not a constable (the 'senior person')—
+--                (i) the senior person, or
+--               (ii) a person or body with the function of maintaining or securing
+--                    the maintenance of the body of which the senior person is a
+--                    member.
+--        The first paragraph of this ground has effect as if the following were
+--        substituted for the second paragraph (b)—
+--          '(b) the tenancy was granted for a particular purpose relating to the
+--               tenant's service as a constable and—
+--                 (i)  that purpose has been fulfilled, or
+--                (ii)  the tenancy is no longer required for that purpose.'"
+--     plus definitions of "chief officer of a police force" and "policing body".
+--     MODELLING CALL: a boolean `is a letting in consequence of service in the
+--     office of constable` toggles the reading. When TRUE, the second-paragraph
+--     (b) early-period-relet limb is REPLACED by the constable-specific limb
+--     (purpose fulfilled OR tenancy no longer required for that purpose); the
+--     second paragraph then reads: ceased-service OR constable-limb. The
+--     "employer"/"chief officer of a police force"/"policing body" redefinitions
+--     are carried as INERT PROSE only (they re-bind the meaning of terms used in
+--     first-paragraph (d), which here is modelled as the single operative atom
+--     `let in consequence of employment pursuant to an agreement between any of
+--     those landlords and the employer`).
+--     Tests are provided for BOTH the ordinary and the constable readings.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms.
+DECLARE Ground5CClaim HAS
+  -- first paragraph (a)-(d): the employment-let connection (a disjunction)
+  `let in consequence of employment by the landlord seeking possession`                              IS A BOOLEAN  -- (a)
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS A BOOLEAN  -- (b)
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS A BOOLEAN  -- (c)
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS A BOOLEAN  -- (d)
+  -- health-service deeming (markers F21/F22): a deemed way of meeting first-paragraph (a)
+  `health-service body employment deemed to be by the Secretary of State`                            IS A BOOLEAN
+  -- second paragraph (a): ceased to be in that employment / service
+  `tenant has ceased to be in that employment`                                                       IS A BOOLEAN
+  -- second paragraph (b) — ordinary (early-period) reading
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS A BOOLEAN
+  `that early-period purpose has been fulfilled`                                                      IS A BOOLEAN
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS A BOOLEAN
+  -- constable variant
+  `is a letting in consequence of service in the office of constable`                                IS A BOOLEAN
+  -- second paragraph (b) — substituted constable reading
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS A BOOLEAN
+  `that constable purpose has been fulfilled`                                                         IS A BOOLEAN
+  `tenancy is no longer required for that constable purpose`                                          IS A BOOLEAN
+
+§§ `First paragraph — let in consequence of employment by one of (a)-(d)`
+
+-- A DISJUNCTION over (a)-(d). The health-service deeming (F21/F22) folds into
+-- (a): a deemed "by the Secretary of State (= the landlord seeking possession)"
+-- employment is an alternative route to satisfying (a). It only ever widens.
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`first paragraph — let in consequence of employment by one of (a)-(d)` claim MEANS
+        "The dwelling-house was let to the tenant in consequence of the tenant's employment—"
+    ..      "(a) by the landlord seeking possession,"
+        ..  claim's `let in consequence of employment by the landlord seeking possession`
+        ..  "(deemed: at a time when the landlord is or was the Secretary of State, employment by a health service body (s.60(7) NHS and Community Care Act 1990) or by a Local Health Board is regarded as employment by the Secretary of State)"
+        ..  claim's `health-service body employment deemed to be by the Secretary of State`
+    ..  "(b) in the case of joint landlords seeking possession, by at least one of them,"
+    ..  claim's `let in consequence of employment by at least one of the joint landlords seeking possession`
+    ..  "(c) by a previous landlord under the tenancy, or"
+    ..  claim's `let in consequence of employment by a previous landlord under the tenancy`
+    ..  "(d) pursuant to an agreement between any of those landlords and the employer,"
+    ..  claim's `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`
+
+§§ `Second paragraph (a) — the tenant has ceased to be in that employment`
+
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`second paragraph (a) — ceased to be in that employment` claim MEANS
+        "(a) the tenant has ceased to be in that employment, or"
+    ... claim's `tenant has ceased to be in that employment`
+
+§§ `Second paragraph (b) — ordinary reading: early-period accommodation, purpose fulfilled, landlord intends to relet`
+
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`second paragraph (b) — early-period purpose fulfilled and landlord intends to relet` claim MEANS
+        "(b) the tenancy was granted for the purpose of providing the tenant with accommodation during the early period of their employment,"
+    ... claim's `tenancy granted to accommodate the tenant during the early period of their employment`
+    AND "that purpose has been fulfilled"
+    ... claim's `that early-period purpose has been fulfilled`
+    AND "and the landlord seeking possession intends to let the dwelling-house to another current or future employee of the employer."
+    ... claim's `landlord seeking possession intends to let to another current or future employee of the employer`
+
+§§ `Second paragraph (b) — constable reading: substituted limb (marker F23)`
+
+-- "The first paragraph of this ground has effect as if the following were
+-- substituted for the second paragraph (b)—
+--   '(b) the tenancy was granted for a particular purpose relating to the
+--        tenant's service as a constable and—
+--          (i)  that purpose has been fulfilled, or
+--         (ii)  the tenancy is no longer required for that purpose.'"
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`second paragraph (b) — constable purpose limb` claim MEANS
+        "(b) the tenancy was granted for a particular purpose relating to the tenant's service as a constable and—"
+    ... claim's `tenancy granted for a particular purpose relating to the tenant's service as a constable`
+    AND     "(i) that purpose has been fulfilled, or"
+        ..  claim's `that constable purpose has been fulfilled`
+        ..  "(ii) the tenancy is no longer required for that purpose."
+        ..  claim's `tenancy is no longer required for that constable purpose`
+
+§§ `Second paragraph (b) — selected reading (ordinary, or constable-substituted)`
+
+-- The constable variant REPLACES second-paragraph (b). Where the letting is in
+-- consequence of service in the office of constable, the substituted constable
+-- limb is used; otherwise the ordinary early-period-relet limb applies.
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`second paragraph (b) — selected reading` claim MEANS
+    IF   claim's `is a letting in consequence of service in the office of constable`
+    THEN `second paragraph (b) — constable purpose limb` claim
+    ELSE `second paragraph (b) — early-period purpose fulfilled and landlord intends to relet` claim
+
+§§ `Second paragraph — either (a) or (b)`
+
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`second paragraph — either (a) or (b)` claim MEANS
+        "and either—"
+    ..  `second paragraph (a) — ceased to be in that employment` claim
+    ..  `second paragraph (b) — selected reading` claim
+
+§§ `Ground 5C made out — first paragraph AND second paragraph`
+
+GIVEN claim IS A Ground5CClaim
+GIVETH A BOOLEAN
+`Ground 5C made out` claim MEANS
+        `first paragraph — let in consequence of employment by one of (a)-(d)` claim
+    AND `second paragraph — either (a) or (b)` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground5CClaim
+GIVETH A DEONTIC Actor Action
+`ground 5C possession order` claim MEANS
+    IF   `Ground 5C made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+-- A baseline "nothing ticked" claim, copied and tweaked per test. All atoms FALSE.
+`claim — blank` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS FALSE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+§§ `ORDINARY reading — ground made out via first-para (a) and second-para (a) (ceased employment)`
+
+`claim — ordinary, ceased employment` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS TRUE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS TRUE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT `first paragraph — let in consequence of employment by one of (a)-(d)` `claim — ordinary, ceased employment`
+#ASSERT `second paragraph (a) — ceased to be in that employment`               `claim — ordinary, ceased employment`
+#ASSERT `second paragraph — either (a) or (b)`                                 `claim — ordinary, ceased employment`
+#ASSERT `Ground 5C made out`                                                   `claim — ordinary, ceased employment`
+
+§§ `ORDINARY reading — ground made out via second-para (b) (early-period purpose fulfilled + intends relet)`
+
+`claim — ordinary, early-period relet` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS FALSE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS TRUE   -- first-para (c)
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE
+  `that early-period purpose has been fulfilled`                                                      IS TRUE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT `first paragraph — let in consequence of employment by one of (a)-(d)`              `claim — ordinary, early-period relet`
+#ASSERT `second paragraph (b) — early-period purpose fulfilled and landlord intends to relet` `claim — ordinary, early-period relet`
+#ASSERT `second paragraph (b) — selected reading`                                          `claim — ordinary, early-period relet`
+#ASSERT `second paragraph — either (a) or (b)`                                             `claim — ordinary, early-period relet`
+#ASSERT `Ground 5C made out`                                                               `claim — ordinary, early-period relet`
+
+§§ `HEALTH-SERVICE DEEMING — first-para (a) met only via the deemed Secretary-of-State employment`
+
+`claim — health-service deemed` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS FALSE  -- not directly
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS TRUE   -- deemed (a)
+  `tenant has ceased to be in that employment`                                                       IS TRUE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT `first paragraph — let in consequence of employment by one of (a)-(d)` `claim — health-service deemed`
+#ASSERT `Ground 5C made out`                                                   `claim — health-service deemed`
+
+§§ `CONSTABLE reading — ground made out via the substituted constable limb (purpose fulfilled)`
+
+`claim — constable, purpose fulfilled` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS TRUE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE  -- still serving
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS TRUE   -- constable reading on
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS TRUE
+  `that constable purpose has been fulfilled`                                                         IS TRUE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT `second paragraph (b) — constable purpose limb`  `claim — constable, purpose fulfilled`
+#ASSERT `second paragraph (b) — selected reading`        `claim — constable, purpose fulfilled`
+#ASSERT `second paragraph — either (a) or (b)`           `claim — constable, purpose fulfilled`
+#ASSERT `Ground 5C made out`                             `claim — constable, purpose fulfilled`
+
+§§ `CONSTABLE reading — ground made out via the substituted constable limb (tenancy no longer required)`
+
+`claim — constable, no longer required` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS TRUE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS TRUE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS TRUE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS TRUE
+
+#ASSERT `second paragraph (b) — constable purpose limb`  `claim — constable, no longer required`
+#ASSERT `Ground 5C made out`                             `claim — constable, no longer required`
+
+§§ `CONSTABLE crossover — the ORDINARY early-period limb does NOT rescue a constable letting`
+
+-- Under the constable reading the ordinary second-para (b) is REPLACED. Even if
+-- the ordinary early-period atoms were all ticked, a constable letting with no
+-- ceased-service and no satisfied constable purpose is NOT made out.
+`claim — constable but only ordinary (b) ticked` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS TRUE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE   -- ordinary (b) ticked
+  `that early-period purpose has been fulfilled`                                                      IS TRUE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
+  `is a letting in consequence of service in the office of constable`                                IS TRUE   -- but constable reading on
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT NOT `second paragraph (b) — selected reading` `claim — constable but only ordinary (b) ticked`
+#ASSERT NOT `Ground 5C made out`                      `claim — constable but only ordinary (b) ticked`
+
+§§ `First paragraph knocked out — no employment-let connection at all (none of (a)-(d), no deeming)`
+
+`claim — first paragraph fails` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS FALSE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS TRUE   -- second para met
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT NOT `first paragraph — let in consequence of employment by one of (a)-(d)` `claim — first paragraph fails`
+#ASSERT NOT `Ground 5C made out`                                                   `claim — first paragraph fails`
+
+§§ `Second paragraph knocked out — employment-let made out but neither (a) nor (b)`
+
+-- First paragraph met (employment by the landlord), but the tenant has not ceased
+-- employment and the early-period limb is not made out: ground NOT made out.
+`claim — second paragraph fails` MEANS Ground5CClaim WITH
+  `let in consequence of employment by the landlord seeking possession`                              IS TRUE
+  `let in consequence of employment by at least one of the joint landlords seeking possession`       IS FALSE
+  `let in consequence of employment by a previous landlord under the tenancy`                        IS FALSE
+  `let in consequence of employment pursuant to an agreement between any of those landlords and the employer`  IS FALSE
+  `health-service body employment deemed to be by the Secretary of State`                            IS FALSE
+  `tenant has ceased to be in that employment`                                                       IS FALSE  -- still employed
+  `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE
+  `that early-period purpose has been fulfilled`                                                      IS FALSE  -- purpose NOT fulfilled
+  `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
+  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
+  `that constable purpose has been fulfilled`                                                         IS FALSE
+  `tenancy is no longer required for that constable purpose`                                          IS FALSE
+
+#ASSERT NOT `second paragraph (b) — early-period purpose fulfilled and landlord intends to relet` `claim — second paragraph fails`
+#ASSERT NOT `second paragraph — either (a) or (b)`                                                 `claim — second paragraph fails`
+#ASSERT NOT `Ground 5C made out`                                                                   `claim — second paragraph fails`
+
+§§ `Nothing ticked — ground not made out`
+
+#ASSERT NOT `first paragraph — let in consequence of employment by one of (a)-(d)` `claim — blank`
+#ASSERT NOT `second paragraph — either (a) or (b)`                                 `claim — blank`
+#ASSERT NOT `Ground 5C made out`                                                   `claim — blank`
