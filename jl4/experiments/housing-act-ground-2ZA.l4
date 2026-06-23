@@ -1,6 +1,7 @@
 IMPORT prelude
 IMPORT `housing-act-common`
 IMPORT daydate
+IMPORT `housing-act-part-5-interpretation`   -- the `relevant date` selector (para. 12)
 
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 2ZA (Renters' Rights Act 2025)`
 
@@ -62,11 +63,43 @@ DECLARE Ground2ZAClaim HAS
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS A BOOLEAN
   -- (a)(ii)
   `superior tenancy is a fixed term tenancy of a term certain`  IS A BOOLEAN
-  -- the end/expiry date the 12-month window is tested against, plus the window start
+  -- the end/expiry date the 12-month window is tested against
   `superior tenancy end date`                                  IS A DATE
-  `relevant date`                                              IS A DATE
+  -- the window START — the "relevant date" — is no longer supplied directly; it is
+  -- DERIVED from the Part 5 selector (para. 12) over these inputs. Per para.
+  -- 12(1)(a), in Ground 2ZA the relevant date is the date of SERVICE of the s.8
+  -- notice — unless the court dispensed with notice under s.8(1)(b), when it is the
+  -- date proceedings began. The selector below answers that; the claim carries the
+  -- raw inputs, with `ground class` pinned to `Ground 2ZA` by the helper.
+  `relevant date inputs`                                       IS A RelevantDateInputs
   -- (b)
   `landlord type`                                              IS A QualifyingLandlordType
+
+§§ `The relevant date — derived from the Part 5 selector (para. 12)`
+
+-- Ground 2ZA is one of the three grounds (2ZA, 2ZB, 5F) that para. 12(1)(a) ties
+-- to the date of SERVICE of the s.8 notice — overridden, where the court dispensed
+-- with notice under s.8(1)(b), to the date proceedings began (para. 12(2)). Rather
+-- than store the answer, the claim stores the selector inputs and we DERIVE the
+-- date through the shared `relevant date` function imported from Part 5.
+
+-- Convenience constructor for the ordinary case: notice SERVED on a given date,
+-- the court NOT having dispensed with it. (For 2ZA the (b) "date specified" branch
+-- is never taken, so the specified-date input is immaterial; we pass the service
+-- date there too, and as the proceedings date, since neither is consulted.)
+GIVEN `date of service` IS A DATE
+GIVETH A RelevantDateInputs
+`2ZA notice served on` `date of service` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 2ZA`
+  `date of service of the notice under section 8`         IS `date of service`
+  `date specified in the notice under section 8`          IS `date of service`
+  `date on which proceedings for possession began`        IS `date of service`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+-- The relevant date for a 2ZA claim: the Part 5 selector applied to its inputs.
+GIVEN claim IS A Ground2ZAClaim
+GIVETH A DATE
+`the relevant date` claim MEANS `relevant date` (claim's `relevant date inputs`)
 
 §§ `Shared helper — the 12-month window beginning with the relevant date`
 
@@ -127,7 +160,7 @@ GIVETH A BOOLEAN
         `superior tenancy ends within 12 months` c MEANS
             `falls within 12 months beginning with the relevant date`
                 (c's `superior tenancy end date`)
-                (c's `relevant date`)
+                (`the relevant date` c)
 
 §§ `Condition (b) — landlord is one of the qualifying types`
 
@@ -212,7 +245,7 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
   `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
   `superior tenancy end date`                                  IS `ends within 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — private registered provider`
 
 #ASSERT `condition (a) — superior tenancy ending within 12 months` `claim all-met via (a)(i)`
@@ -226,7 +259,7 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS FALSE
   `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
   `superior tenancy end date`                                  IS `ends exactly at 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — LA-owned company`
 
 #ASSERT `condition (a) — superior tenancy ending within 12 months` `claim all-met via (a)(ii)`
@@ -241,7 +274,7 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
   `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
   `superior tenancy end date`                                  IS `ends just after 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — private registered provider`
 
 #ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (window)`
@@ -256,7 +289,7 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS FALSE
   `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
   `superior tenancy end date`                                  IS `ends within 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — private registered provider`
 
 #ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (neither arm)`
@@ -271,7 +304,7 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
   `superior tenancy is a fixed term tenancy of a term certain`  IS TRUE
   `superior tenancy end date`                                  IS `ends within 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — private registered provider`
 
 #ASSERT NOT `condition (a) — superior tenancy ending within 12 months` `claim — (a) fails (no superior tenancy)`
@@ -284,8 +317,44 @@ GIVETH A DEONTIC Actor Action
   `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
   `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
   `superior tenancy end date`                                  IS `ends within 12 months`
-  `relevant date`                                              IS `relevant date 2025`
+  `relevant date inputs`                                       IS (`2ZA notice served on` `relevant date 2025`)
   `landlord type`                                              IS `type — none of the list`
 
 #ASSERT NOT `condition (b) — landlord is a qualifying type` `claim — (b) fails`
 #ASSERT NOT `Ground 2ZA made out`                           `claim — (b) fails`
+
+§§ `Property test — the s.8(1)(b) dispensation override moves the relevant date`
+
+-- The selector, not the claim, decides the relevant date — so the s.8(1)(b)
+-- dispensation power (para. 12(2)) can change the outcome. Same superior-tenancy
+-- end date (`ends just after 12 months` = Jan 2 2026, one day past a window
+-- beginning Jan 1 2025) and same service date — but here the court DISPENSED with
+-- the s.8 notice, so the relevant date becomes the date proceedings began
+-- (Jan 2 2025). That shifts the 12-month window forward a day to
+-- [Jan 2 2025, Jan 2 2026], bringing the end date back INSIDE it. Under the old
+-- opaque-`relevant date`-field encoding this property was inexpressible.
+`proceedings began Jan 2 2025` MEANS January 2 2025
+
+`inputs — dispensed, proceedings Jan 2 2025` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 2ZA`
+  `date of service of the notice under section 8`         IS `relevant date 2025`
+  `date specified in the notice under section 8`          IS `relevant date 2025`
+  `date on which proceedings for possession began`        IS `proceedings began Jan 2 2025`
+  `the court exercised the power conferred by section 8(1)(b)`  IS TRUE
+
+`claim — dispensed flips the window` MEANS Ground2ZAClaim WITH
+  `landlord holds the interest under a superior tenancy`        IS TRUE
+  `superior landlord has given a valid notice to terminate the superior tenancy`  IS TRUE
+  `superior tenancy is a fixed term tenancy of a term certain`  IS FALSE
+  `superior tenancy end date`                                  IS `ends just after 12 months`
+  `relevant date inputs`                                       IS `inputs — dispensed, proceedings Jan 2 2025`
+  `landlord type`                                              IS `type — private registered provider`
+
+-- The derived relevant date is the proceedings date, not the service date ...
+#ASSERT (Day (`the relevant date` `claim — dispensed flips the window`)) EQUALS (Day `proceedings began Jan 2 2025`)
+-- ... and that one-day shift brings the end date back inside the window: (a) fires.
+#ASSERT     `condition (a) — superior tenancy ending within 12 months` `claim — dispensed flips the window`
+#ASSERT     `Ground 2ZA made out`                                      `claim — dispensed flips the window`
+-- Contrast: the SAME end date with notice NOT dispensed (relevant date = Jan 1
+-- 2025) stays one day outside the window — this is `claim — (a) fails (window)`.
+#ASSERT NOT `Ground 2ZA made out`                                      `claim — (a) fails (window)`
