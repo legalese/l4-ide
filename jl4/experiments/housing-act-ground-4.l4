@@ -1,0 +1,265 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 4 (amended; Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 4 — the "student let by an educational institution" MANDATORY ground,
+-- as amended by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 9
+-- (commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b)).
+-- Part I (mandatory): where made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- RESOLUTION OF THE F10–F13 AMENDMENTS (current in-force reading) —
+-- the source .txt presents Ground 4 with inline amendment markers; resolving
+-- them to the in-force text:
+--   F10  Words in the chapeau omitted -> the chapeau now reads
+--        "The tenancy is a fixed term tenancy for a term not exceeding twelve
+--         months and—" (the former "eight months" reading is gone).
+--   F11  Former para (a) — "not later than the beginning of the tenancy the
+--        landlord gave notice in writing to the tenant that possession might be
+--        recovered on this ground; and" — is OMITTED. NOT encoded.
+--   F12  Former para (b) — the paragraph-8-of-Sch-1 letting condition — becomes
+--        an UNNUMBERED paragraph. Encoded as the second conjunct (unlettered).
+--   F13  Paras (c) and (d) (and the connecting word "and") INSERTED. Encoded.
+--
+-- So the in-force Ground 4, as a CONJUNCTION, is:
+--   [chapeau] The tenancy is a fixed term tenancy for a term not exceeding
+--             twelve months and—
+--   [unnum.]  at some time within the period of twelve months ending with the
+--             beginning of the tenancy, the dwelling-house was let on a tenancy
+--             falling within paragraph 8 of Schedule 1 to this Act and—
+--   (c)       if the tenancy arose by succession as mentioned in section 39(5),
+--             notice was given to the previous tenant under Case 14 of Schedule
+--             15 to the Rent Act 1977, and
+--   (d)       the tenancy is not an assured agricultural occupancy in respect of
+--             which the agricultural worker condition is fulfilled by virtue of
+--             paragraph 3 of Schedule 3.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * (c) is a CONDITIONAL limb: it only bites where the tenancy "arose by
+--     succession as mentioned in section 39(5)". Where there was no such
+--     succession, the antecedent is false and the limb is satisfied vacuously.
+--     Encoded as: (NOT arose-by-succession) OR (notice given under Case 14).
+--   * (d) is a NEGATIVE limb ("the tenancy is NOT an assured agricultural
+--     occupancy ..."). Satisfied iff the tenancy is not such an occupancy.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms. The chapeau's "term not exceeding twelve months" is
+-- tested against the fixed term's length in months. The paragraph-8 condition
+-- turns on a fact (the dwelling-house was let on a paragraph-8 tenancy) plus the
+-- date window ("within the twelve months ending with the beginning of the
+-- tenancy"), modelled as two dates: the paragraph-8 letting date and the date
+-- the (current) tenancy began. (c) and (d) are booleans.
+DECLARE Ground4Claim HAS
+  -- chapeau
+  `fixed term length in months`                                      IS A NUMBER
+  -- unnumbered paragraph (former (b))
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS A BOOLEAN
+  `date of the paragraph 8 letting`                                   IS A DATE
+  `beginning of the tenancy`                                          IS A DATE
+  -- (c)
+  `tenancy arose by succession as mentioned in section 39(5)`         IS A BOOLEAN
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS A BOOLEAN
+  -- (d)
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS A BOOLEAN
+
+§§ `Chapeau — fixed term not exceeding twelve months`
+
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`chapeau — fixed term not exceeding twelve months` claim MEANS
+        "The tenancy is a fixed term tenancy for a term not exceeding twelve months"
+    ... claim's `fixed term length in months` AT MOST 12
+
+§§ `Unnumbered paragraph (former (b)) — paragraph-8 letting within the 12 months ending with the beginning of the tenancy`
+
+-- "within the period of twelve months ending with the beginning of the tenancy":
+-- the window is [ (beginning of tenancy) MINUS 12 months , (beginning of tenancy) ].
+-- FOOTGUN-SAFE: never subtract months on a date. Instead form the window by
+-- ADDING 12 months to the paragraph-8 letting date (month-overflow is safe) and
+-- requiring that the beginning of the tenancy is on or before that, while the
+-- letting is on or before the beginning of the tenancy. Equivalent to
+--   (beginning - 12m) <= letting <= beginning.
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`paragraph 8 letting within the 12 months ending with the beginning of the tenancy` claim MEANS
+        Day (claim's `date of the paragraph 8 letting`)
+            AT MOST Day (claim's `beginning of the tenancy`)
+    AND Day (claim's `beginning of the tenancy`)
+            AT MOST Day `twelve months after the paragraph 8 letting`
+    WHERE
+        `twelve months after the paragraph 8 letting` MEANS
+            Date (DATE_DAY   (claim's `date of the paragraph 8 letting`))
+                 (DATE_MONTH (claim's `date of the paragraph 8 letting`))
+                 (DATE_YEAR  (claim's `date of the paragraph 8 letting`) PLUS 1)
+
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`unnumbered paragraph — paragraph 8 letting condition` claim MEANS
+        "at some time within the period of twelve months ending with the beginning of the tenancy, the dwelling-house was let on a tenancy falling within paragraph 8 of Schedule 1 to this Act"
+    ... claim's `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`
+    AND `paragraph 8 letting within the 12 months ending with the beginning of the tenancy` claim
+
+§§ `(c) — succession notice under Case 14 (conditional limb)`
+
+-- "if the tenancy arose by succession as mentioned in section 39(5), notice was
+-- given to the previous tenant under Case 14 of Schedule 15 to the Rent Act
+-- 1977". A conditional: satisfied where there was no such succession, or where
+-- the Case 14 notice was given.
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`(c) — succession notice condition` claim MEANS
+        "(c) if the tenancy arose by succession as mentioned in section 39(5), notice was given to the previous tenant under Case 14 of Schedule 15 to the Rent Act 1977"
+        -- a conditional limb: satisfied unless there was a s.39(5) succession
+        -- without the Case 14 notice. Read as (NOT antecedent) OR consequent.
+    ...     NOT claim's `tenancy arose by succession as mentioned in section 39(5)`
+        OR  claim's `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`
+
+§§ `(d) — not an assured agricultural occupancy (negative limb)`
+
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`(d) — not an assured agricultural occupancy` claim MEANS
+        "(d) the tenancy is not an assured agricultural occupancy in respect of which the agricultural worker condition is fulfilled by virtue of paragraph 3 of Schedule 3."
+    ... NOT claim's `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`
+
+§§ `Ground 4 made out — chapeau AND unnumbered para AND (c) AND (d)`
+
+GIVEN claim IS A Ground4Claim
+GIVETH A BOOLEAN
+`Ground 4 made out` claim MEANS
+        `chapeau — fixed term not exceeding twelve months` claim
+    AND `unnumbered paragraph — paragraph 8 letting condition` claim
+    AND `(c) — succession notice condition` claim
+    AND `(d) — not an assured agricultural occupancy` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground4Claim
+GIVETH A DEONTIC Actor Action
+`ground 4 possession order` claim MEANS
+    IF   `Ground 4 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the 12 months ending with the beginning of the tenancy`
+
+`tenancy begins 2025`            MEANS September 1 2025
+`para8 let within window`        MEANS March 1 2025      -- inside (begins - 12m, begins]
+`para8 let exactly 12m before`   MEANS September 1 2024  -- the earliest day of the window -> satisfied
+`para8 let just before window`   MEANS August 31 2024    -- one day before the window opens -> not satisfied
+`para8 let after tenancy began`  MEANS October 1 2025    -- after the beginning of the tenancy -> not satisfied
+
+§§ `Ground made out — no succession (so (c) vacuously satisfied), not agricultural`
+
+`claim all-met (no succession)` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 9
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let within window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT `chapeau — fixed term not exceeding twelve months`               `claim all-met (no succession)`
+#ASSERT `unnumbered paragraph — paragraph 8 letting condition`           `claim all-met (no succession)`
+#ASSERT `(c) — succession notice condition`                              `claim all-met (no succession)`
+#ASSERT `(d) — not an assured agricultural occupancy`                    `claim all-met (no succession)`
+#ASSERT `Ground 4 made out`                                             `claim all-met (no succession)`
+
+§§ `Ground made out — succession WITH Case 14 notice given; paragraph-8 letting exactly 12m before`
+
+`claim all-met (succession + notice)` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 12      -- exactly 12 -> satisfied
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let exactly 12m before`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS TRUE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS TRUE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT `(c) — succession notice condition`                              `claim all-met (succession + notice)`
+#ASSERT `Ground 4 made out`                                             `claim all-met (succession + notice)`
+
+§§ `Chapeau knocked out — fixed term exceeds twelve months`
+
+`claim — chapeau fails` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 13      -- exceeds 12
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let within window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `chapeau — fixed term not exceeding twelve months` `claim — chapeau fails`
+#ASSERT NOT `Ground 4 made out`                               `claim — chapeau fails`
+
+§§ `Unnumbered paragraph knocked out — no paragraph-8 letting at all`
+
+`claim — no para8 letting` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 9
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS FALSE
+  `date of the paragraph 8 letting`                                   IS `para8 let within window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `unnumbered paragraph — paragraph 8 letting condition` `claim — no para8 letting`
+#ASSERT NOT `Ground 4 made out`                                   `claim — no para8 letting`
+
+§§ `Unnumbered paragraph knocked out — paragraph-8 letting falls outside the 12-month window`
+
+`claim — para8 out of window` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 9
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let just before window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `unnumbered paragraph — paragraph 8 letting condition` `claim — para8 out of window`
+#ASSERT NOT `Ground 4 made out`                                   `claim — para8 out of window`
+
+§§ `(c) knocked out — tenancy arose by succession but no Case 14 notice given`
+
+`claim — (c) fails` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 9
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let within window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS TRUE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS FALSE
+
+#ASSERT NOT `(c) — succession notice condition` `claim — (c) fails`
+#ASSERT NOT `Ground 4 made out`                 `claim — (c) fails`
+
+§§ `(d) knocked out — tenancy is an assured agricultural occupancy`
+
+`claim — (d) fails` MEANS Ground4Claim WITH
+  `fixed term length in months`                                      IS 9
+  `dwelling-house was let on a paragraph 8 of Sch.1 tenancy`          IS TRUE
+  `date of the paragraph 8 letting`                                   IS `para8 let within window`
+  `beginning of the tenancy`                                          IS `tenancy begins 2025`
+  `tenancy arose by succession as mentioned in section 39(5)`         IS FALSE
+  `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`  IS FALSE
+  `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`  IS TRUE
+
+#ASSERT NOT `(d) — not an assured agricultural occupancy` `claim — (d) fails`
+#ASSERT NOT `Ground 4 made out`                           `claim — (d) fails`

@@ -1,0 +1,416 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 4A (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 4A — the NEW seasonal HMO student-let MANDATORY ground, inserted into
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26),
+-- Sch. 1 para. 10 (commencement 1.5.2026 for specified purposes; S.I. 2026/421,
+-- reg. 2(b) (with reg. 6)). Provenance: Textual Amendment F14.
+-- Part I (mandatory): where made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(f) + definitions -> predicates carrying
+--     the verbatim statute inline as inert prose; only operative atoms lifted;
+--   * the mandatory outcome -> a guarded deontic clause.
+--
+-- Statutory text encoded ("The following conditions are met—", a CONJUNCTION):
+--   (a) the dwelling-house is in an HMO or is an HMO,
+--   (b) the tenant meets the student test when the tenancy is entered into,
+--   (c) the landlord or, in the case of joint landlords, at least one of them,
+--       gives the tenant, before the tenancy is entered into, a written
+--       statement of the landlord's wish to be able to recover possession on the
+--       basis that—
+--         (i)  the tenant meets the student test when the tenancy is entered
+--              into, and
+--         (ii) the landlord intends, on the next occasion on which the dwelling-
+--              house is let, to let it to a tenant who meets the student test
+--              when that new tenancy is entered into,
+--   (d) the period—
+--         (i)  beginning with the day on which the tenancy was entered into, and
+--         (ii) ending with the day on which the tenant was entitled to
+--              possession of the dwelling-house,
+--       is six months or less,
+--   (e) the relevant date falls within the period beginning with 1 June and
+--       ending with 30 September in any year, and
+--   (f) the landlord seeking possession intends, on the next occasion on which
+--       the dwelling-house is let, to let it to a tenant who meets the student
+--       test when that new tenancy is entered into.
+--
+-- Definitions encoded:
+--   * the "student test" (paras (b),(c),(f)): met when a tenancy is entered into
+--     if (a) the tenant is a full-time student at that time, or (b) at that time
+--     the landlord reasonably believes the tenant would become a full-time
+--     student during the tenancy; BUT where 2+ persons are (or would be) the
+--     tenant, the test is not met unless ALL of them meet it.
+--   * "full-time student": a person receiving education provided by means of a
+--     full-time course of a description in Sch 6 Education Reform Act 1988
+--     (England/Wales), s.38(2) Further and Higher Education (Scotland) Act 1992
+--     (Scotland), or Sch 1 Further Education (NI) Order 1997 (NI).
+--   * para 8(7) Sch 1 variant: where a tenancy becomes an assured tenancy by
+--     para 8(7), the (c) condition is met if the written statement is given
+--     within 28 days beginning with the date the tenancy becomes assured.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * (d) "six months or less" — encoded as entitled-date <= entered-date + 6
+--     months (footgun-safe: months are ADDED to the earlier date, never
+--     subtracted). The endpoints are treated as the boundary: a span landing
+--     exactly on entered + 6 months passes; one day more fails.
+--   * (e) date range INCLUSIVE of both 1 June and 30 September, year-agnostic
+--     (tested on DATE_MONTH/DATE_DAY only).
+--   * multi-person student test: encoded as ALL listed tenant-persons meeting
+--     the per-person test; a single-person tenancy is the one-element case.
+--   * "the relevant date" (e) is supplied as an input fact (its precise
+--     definition lives elsewhere in the Act); likewise "the day on which the
+--     tenant was entitled to possession" (d) is supplied as a date.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- A person who is (or would be) the tenant, for the student test. Each person
+-- carries the two operative atoms of the per-person test: whether they are a
+-- full-time student at the material time, and whether the landlord reasonably
+-- believes they would become one during the tenancy. "Full-time student" is
+-- itself a defined term (Sch 6 ERA 1988 / s.38(2) FHE(S)A 1992 / Sch 1 FE(NI)O
+-- 1997); we lift it to a single boolean atom per person, with the verbatim
+-- definition carried as inert prose in `is a full-time student`.
+DECLARE TenantPerson HAS
+  name                                                            IS A STRING
+  `is a full-time student at the material time`                   IS A BOOLEAN
+  `landlord reasonably believes would become a full-time student during the tenancy`  IS A BOOLEAN
+
+-- The operative atoms of conditions (a)-(f). The tenant is modelled as a LIST of
+-- persons (one or more); the student test quantifies over them. (c) and (f)
+-- carry the written-statement / future-letting intentions; (d) and (e) carry the
+-- dates.
+DECLARE Ground4AClaim HAS
+  -- (a)
+  `dwelling-house is in an HMO or is an HMO`                       IS A BOOLEAN
+  -- the tenant: one or more persons
+  `the tenant persons`                                            IS A LIST OF TenantPerson
+  -- (c)
+  `landlord gave the tenant a written statement before the tenancy was entered into`  IS A BOOLEAN
+  `written statement states the wish to recover on the student-test basis (i) and (ii)`  IS A BOOLEAN
+  -- (d) — the span beginning with entry and ending with entitlement to possession
+  `day the tenancy was entered into`                              IS A DATE
+  `day the tenant was entitled to possession`                     IS A DATE
+  -- (e)
+  `relevant date`                                                 IS A DATE
+  -- (f)
+  `landlord intends next letting to a tenant who meets the student test`  IS A BOOLEAN
+
+§§ `Definition — "full-time student" (per person)`
+
+-- The defined term, carried as inert prose; the operative atom is the per-person
+-- boolean flag `is a full-time student at the material time`.
+GIVEN person IS A TenantPerson
+GIVETH A BOOLEAN
+`is a full-time student` person MEANS
+        "“full-time student” means a person receiving education provided by means of a full-time course—"
+    ... "(a) of any description mentioned in Schedule 6 to the Education Reform Act 1988 provided by an institution in England or Wales;"
+    ... "(b) of any description mentioned in section 38(2) of the Further and Higher Education (Scotland) Act 1992 provided by an institution in Scotland;"
+    ... "(c) of any description mentioned in Schedule 1 to the Further Education (Northern Ireland) Order 1997 (S.I. 1997/1772 (N.I. 15)) provided by an institution in Northern Ireland."
+    ... person's `is a full-time student at the material time`
+
+§§ `Definition — the student test (per person, then quantified over all persons)`
+
+-- Per-person test: full-time student now, OR landlord reasonably believes the
+-- person would become one during the tenancy.
+GIVEN person IS A TenantPerson
+GIVETH A BOOLEAN
+`person meets the student test` person MEANS
+        "(a) the tenant is a full-time student at that time,"
+    ..  `is a full-time student` person
+    ..  "or"
+    ..  "(b) at that time, the landlord reasonably believes that the tenant would become a full-time student during the tenancy."
+    ..  person's `landlord reasonably believes would become a full-time student during the tenancy`
+
+-- The student test for the tenant: where 2+ persons are (or would be) the
+-- tenant, the test is not met unless ALL of them meet it. `all` over the list
+-- handles both the single-person and multi-person cases (empty list -> vacuously
+-- TRUE, but a real claim always has at least one person).
+GIVEN persons IS A LIST OF TenantPerson
+GIVETH A BOOLEAN
+`the tenant meets the student test` persons MEANS
+        "But, in a case where two or more persons are or would be the tenant, the tenant does not meet the student test unless all of those persons meet that test."
+    ... all `person meets the student test` persons
+
+§§ `Condition (a) — HMO`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (a) — HMO` claim MEANS
+        "(a) the dwelling-house is in an HMO or is an HMO,"
+    ... claim's `dwelling-house is in an HMO or is an HMO`
+
+§§ `Condition (b) — the tenant meets the student test on entry`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (b) — tenant meets the student test on entry` claim MEANS
+        "(b) the tenant meets the student test when the tenancy is entered into,"
+    ... `the tenant meets the student test` (claim's `the tenant persons`)
+
+§§ `Condition (c) — written statement of the landlord's wish, on the (i)/(ii) basis`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (c) — written statement on the student-test basis` claim MEANS
+        "(c) the landlord or, in the case of joint landlords, at least one of them, gives the tenant, before the tenancy is entered into, a written statement of the landlord’s wish to be able to recover possession on the basis that—"
+    ... claim's `landlord gave the tenant a written statement before the tenancy was entered into`
+    AND     "(i) the tenant meets the student test when the tenancy is entered into, and"
+        ... "(ii) the landlord intends, on the next occasion on which the dwelling-house is let, to let it to a tenant who meets the student test when that new tenancy is entered into,"
+        ... claim's `written statement states the wish to recover on the student-test basis (i) and (ii)`
+
+§§ `Condition (d) — the entry-to-entitlement span is six months or less`
+
+-- "(d) the period beginning with the day the tenancy was entered into and ending
+-- with the day the tenant was entitled to possession is six months or less."
+-- FOOTGUN-SAFE: do not subtract months. Form (entered + 6 months) by ADDING 6 to
+-- the month component (month-overflow past 12 rolls the year correctly), and
+-- require entitled-date <= that boundary (and entitled-date on/after entry).
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (d) — period is six months or less` claim MEANS
+        "(d) the period— (i) beginning with the day on which the tenancy was entered into, and (ii) ending with the day on which the tenant was entitled to possession of the dwelling-house, is six months or less,"
+    ...     Day (claim's `day the tenancy was entered into`)
+                AT MOST Day (claim's `day the tenant was entitled to possession`)
+        AND Day (claim's `day the tenant was entitled to possession`)
+                AT MOST Day `six months after entry`
+    WHERE
+        `six months after entry` MEANS
+            Date (DATE_DAY   (claim's `day the tenancy was entered into`))
+                 (DATE_MONTH (claim's `day the tenancy was entered into`) PLUS 6)
+                 (DATE_YEAR  (claim's `day the tenancy was entered into`))
+
+§§ `Condition (e) — the relevant date falls within 1 June – 30 September (any year)`
+
+-- "(e) the relevant date falls within the period beginning with 1 June and
+-- ending with 30 September in any year". Year-agnostic: compare month/day only,
+-- INCLUSIVE of both 1 June and 30 September. June (6) and July (7) and August (8)
+-- are wholly inside; September (9) is inside up to and including the 30th; any
+-- day in June qualifies from the 1st.
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (e) — relevant date is in the 1 June to 30 September window` claim MEANS
+        "(e) the relevant date falls within the period beginning with 1 June and ending with 30 September in any year,"
+    ...     `on or after 1 June`
+        AND `on or before 30 September`
+    WHERE
+        `month` MEANS DATE_MONTH (claim's `relevant date`)
+        `day`   MEANS DATE_DAY   (claim's `relevant date`)
+        -- on or after 1 June: a later month, or June from the 1st onward
+        `on or after 1 June` MEANS
+                `month` GREATER THAN 6
+            OR (`month` EQUALS 6 AND `day` AT LEAST 1)
+        -- on or before 30 September: an earlier month, or September up to the 30th
+        `on or before 30 September` MEANS
+                `month` LESS THAN 9
+            OR (`month` EQUALS 9 AND `day` AT MOST 30)
+
+§§ `Condition (f) — landlord intends to re-let to a student-test tenant`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`condition (f) — landlord intends next letting to a student-test tenant` claim MEANS
+        "(f) the landlord seeking possession intends, on the next occasion on which the dwelling-house is let, to let it to a tenant who meets the student test when that new tenancy is entered into."
+    ... claim's `landlord intends next letting to a tenant who meets the student test`
+
+§§ `Ground 4A made out — conditions (a) AND (b) AND (c) AND (d) AND (e) AND (f)`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A BOOLEAN
+`Ground 4A made out` claim MEANS
+        "The following conditions are met—"
+    ... `condition (a) — HMO` claim
+    AND `condition (b) — tenant meets the student test on entry` claim
+    AND `condition (c) — written statement on the student-test basis` claim
+    AND `condition (d) — period is six months or less` claim
+    AND `condition (e) — relevant date is in the 1 June to 30 September window` claim
+    AND `condition (f) — landlord intends next letting to a student-test tenant` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground4AClaim
+GIVETH A DEONTIC Actor Action
+`ground 4A possession order` claim MEANS
+    IF   `Ground 4A made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Tenant persons`
+
+`student now` MEANS TenantPerson WITH
+  name IS "a full-time student"
+  `is a full-time student at the material time`                   IS TRUE
+  `landlord reasonably believes would become a full-time student during the tenancy`  IS FALSE
+
+`future student (reasonable belief)` MEANS TenantPerson WITH
+  name IS "a soon-to-be student"
+  `is a full-time student at the material time`                   IS FALSE
+  `landlord reasonably believes would become a full-time student during the tenancy`  IS TRUE
+
+`non-student` MEANS TenantPerson WITH
+  name IS "not a student"
+  `is a full-time student at the material time`                   IS FALSE
+  `landlord reasonably believes would become a full-time student during the tenancy`  IS FALSE
+
+-- The per-person test bites; the full-time-student definition reads off its atom.
+#ASSERT     `person meets the student test` `student now`
+#ASSERT     `person meets the student test` `future student (reasonable belief)`
+#ASSERT NOT `person meets the student test` `non-student`
+#ASSERT     `is a full-time student`        `student now`
+#ASSERT NOT `is a full-time student`        `future student (reasonable belief)`
+
+§§ `The multi-person student test — ALL must meet it`
+
+#ASSERT     `the tenant meets the student test` (LIST `student now`)
+#ASSERT     `the tenant meets the student test` (LIST `student now`, `future student (reasonable belief)`)
+#ASSERT NOT `the tenant meets the student test` (LIST `student now`, `non-student`)
+
+§§ `Dates`
+
+`entered 1 July 2025`            MEANS July 1 2025
+`entitled within 6 months`       MEANS October 1 2025    -- 3 months later -> within 6 months
+`entitled exactly 6 months`      MEANS January 1 2026    -- entered + 6 months exactly -> satisfied
+`entitled just over 6 months`    MEANS January 2 2026    -- one day past entered + 6 months -> not satisfied
+
+`relevant date in window (1 Jun)`   MEANS June 1 2025      -- the opening day of the window -> in
+`relevant date in window (mid)`     MEANS August 15 2025   -- well inside the window -> in
+`relevant date in window (30 Sep)`  MEANS September 30 2025 -- the closing day of the window -> in
+`relevant date out (31 May)`        MEANS May 31 2025      -- one day before the window opens -> out
+`relevant date out (1 Oct)`         MEANS October 1 2025   -- one day after the window closes -> out
+
+§§ `A claim constructor — so test cases vary only the fields they care about`
+
+-- This L4 builds records only from a type name (`Ground4AClaim WITH ...`); there
+-- is no in-place record-update operator. So we expose a GIVEN-parameterised
+-- constructor; each test below supplies all fields, varying just the operative one.
+GIVEN `is HMO`               IS A BOOLEAN
+      `persons`              IS A LIST OF TenantPerson
+      `gave statement`       IS A BOOLEAN
+      `statement on basis`   IS A BOOLEAN
+      `entered`              IS A DATE
+      `entitled`             IS A DATE
+      `relevant date`        IS A DATE
+      `re-let intent`        IS A BOOLEAN
+GIVETH A Ground4AClaim
+`mk claim` MEANS Ground4AClaim WITH
+  `dwelling-house is in an HMO or is an HMO`                       IS `is HMO`
+  `the tenant persons`                                            IS `persons`
+  `landlord gave the tenant a written statement before the tenancy was entered into`  IS `gave statement`
+  `written statement states the wish to recover on the student-test basis (i) and (ii)`  IS `statement on basis`
+  `day the tenancy was entered into`                              IS `entered`
+  `day the tenant was entitled to possession`                     IS `entitled`
+  `relevant date`                                                 IS `relevant date`
+  `landlord intends next letting to a tenant who meets the student test`  IS `re-let intent`
+
+§§ `(e) date-window boundaries — year-agnostic and inclusive of both endpoints`
+
+-- Hold every other field met; vary only the relevant date.
+GIVEN `relevant date` IS A DATE
+GIVETH A Ground4AClaim
+`probe (e)` MEANS `mk claim` TRUE (LIST `student now`) TRUE TRUE
+                              `entered 1 July 2025` `entitled within 6 months`
+                              `relevant date` TRUE
+
+#ASSERT     `condition (e) — relevant date is in the 1 June to 30 September window` (`probe (e)` `relevant date in window (1 Jun)`)
+#ASSERT     `condition (e) — relevant date is in the 1 June to 30 September window` (`probe (e)` `relevant date in window (mid)`)
+#ASSERT     `condition (e) — relevant date is in the 1 June to 30 September window` (`probe (e)` `relevant date in window (30 Sep)`)
+#ASSERT NOT `condition (e) — relevant date is in the 1 June to 30 September window` (`probe (e)` `relevant date out (31 May)`)
+#ASSERT NOT `condition (e) — relevant date is in the 1 June to 30 September window` (`probe (e)` `relevant date out (1 Oct)`)
+
+§§ `(d) six-months-or-less boundary`
+
+-- Hold every other field met; vary only the entitlement date.
+GIVEN `entitled` IS A DATE
+GIVETH A Ground4AClaim
+`probe (d)` MEANS `mk claim` TRUE (LIST `student now`) TRUE TRUE
+                              `entered 1 July 2025` `entitled`
+                              `relevant date in window (mid)` TRUE
+
+#ASSERT     `condition (d) — period is six months or less` (`probe (d)` `entitled within 6 months`)
+#ASSERT     `condition (d) — period is six months or less` (`probe (d)` `entitled exactly 6 months`)
+#ASSERT NOT `condition (d) — period is six months or less` (`probe (d)` `entitled just over 6 months`)
+
+§§ `Ground made out — all six conditions met (two-person student tenancy)`
+
+`claim all-met` MEANS
+    `mk claim` TRUE (LIST `student now`, `future student (reasonable belief)`) TRUE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date in window (mid)` TRUE
+
+#ASSERT `condition (a) — HMO`                                              `claim all-met`
+#ASSERT `condition (b) — tenant meets the student test on entry`          `claim all-met`
+#ASSERT `condition (c) — written statement on the student-test basis`     `claim all-met`
+#ASSERT `condition (d) — period is six months or less`                    `claim all-met`
+#ASSERT `condition (e) — relevant date is in the 1 June to 30 September window`  `claim all-met`
+#ASSERT `condition (f) — landlord intends next letting to a student-test tenant` `claim all-met`
+#ASSERT `Ground 4A made out`                                              `claim all-met`
+
+§§ `(a) knocked out — not an HMO`
+
+`claim — (a) fails` MEANS
+    `mk claim` FALSE (LIST `student now`) TRUE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date in window (mid)` TRUE
+
+#ASSERT NOT `condition (a) — HMO` `claim — (a) fails`
+#ASSERT NOT `Ground 4A made out`  `claim — (a) fails`
+
+§§ `(b) knocked out — a tenant person is not a student (multi-person test fails)`
+
+`claim — (b) fails` MEANS
+    `mk claim` TRUE (LIST `student now`, `non-student`) TRUE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date in window (mid)` TRUE
+
+#ASSERT NOT `condition (b) — tenant meets the student test on entry` `claim — (b) fails`
+#ASSERT NOT `Ground 4A made out`                                    `claim — (b) fails`
+
+§§ `(c) knocked out — no written statement given`
+
+`claim — (c) fails` MEANS
+    `mk claim` TRUE (LIST `student now`) FALSE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date in window (mid)` TRUE
+
+#ASSERT NOT `condition (c) — written statement on the student-test basis` `claim — (c) fails`
+#ASSERT NOT `Ground 4A made out`                                          `claim — (c) fails`
+
+§§ `(d) knocked out — span exceeds six months`
+
+`claim — (d) fails` MEANS
+    `mk claim` TRUE (LIST `student now`) TRUE TRUE
+               `entered 1 July 2025` `entitled just over 6 months`
+               `relevant date in window (mid)` TRUE
+
+#ASSERT NOT `condition (d) — period is six months or less` `claim — (d) fails`
+#ASSERT NOT `Ground 4A made out`                           `claim — (d) fails`
+
+§§ `(e) knocked out — relevant date outside the seasonal window`
+
+`claim — (e) fails` MEANS
+    `mk claim` TRUE (LIST `student now`) TRUE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date out (1 Oct)` TRUE
+
+#ASSERT NOT `condition (e) — relevant date is in the 1 June to 30 September window` `claim — (e) fails`
+#ASSERT NOT `Ground 4A made out`                                                   `claim — (e) fails`
+
+§§ `(f) knocked out — landlord does not intend to re-let to a student-test tenant`
+
+`claim — (f) fails` MEANS
+    `mk claim` TRUE (LIST `student now`) TRUE TRUE
+               `entered 1 July 2025` `entitled within 6 months`
+               `relevant date in window (mid)` FALSE
+
+#ASSERT NOT `condition (f) — landlord intends next letting to a student-test tenant` `claim — (f) fails`
+#ASSERT NOT `Ground 4A made out`                                                     `claim — (f) fails`
