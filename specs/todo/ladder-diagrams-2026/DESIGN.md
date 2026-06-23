@@ -376,7 +376,7 @@ Worked SVG + generator (hand-rolled, pre-`ladder-core`): `~/src/legalese/sandbox
 
 ### 15.4 A real fixture for P0 / P2
 
-s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — currently in the sibling **`poh-yuan-nie`** worktree (`~/src/legalese/l4wt/poh-yuan-nie/`), not yet in this branch or `unstable`; bring it in (or land it on `unstable`) when wiring P2. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` is exactly the upstream minimiser that would emit the `eliminable` map.
+s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — **now vendored in this branch** (cherry-picked from `poh-yuan-nie` `21b62316`, so the patch is identical and will merge to `unstable` without conflict). Canonical home stays the *Poh Yuan Nie* work; if it diverges, reconcile on `unstable`. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` (in `~/src/legalese/sandbox/mengwong/layman/`) is exactly the upstream minimiser that would emit the `eliminable` map.
 
 ---
 
