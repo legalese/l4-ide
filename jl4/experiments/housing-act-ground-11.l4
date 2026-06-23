@@ -1,0 +1,110 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 11 (persistent delay in paying rent)`
+
+-- ===========================================================================
+-- GROUND 11 — the "persistent delay" ground. Like Ground 10 it sits in PART II
+-- of Schedule 2 — the DISCRETIONARY grounds: "GROUNDS ON WHICH COURT MAY ORDER
+-- POSSESSION". So where the ground is made out the outcome is a PERMISSION, not
+-- a duty: the court MAY order possession (and may, in its discretion, decline).
+--
+-- HYBRID encoding:
+--   * the constitutive condition -> a predicate carrying the verbatim statute
+--     inline as inert prose; only the single operative atom is lifted;
+--   * the discretionary outcome  -> a guarded deontic clause using MAY (Court MAY
+--     order possession), guarded by the operative atom.
+--
+-- Statutory text encoded (in force on 21 June 2026):
+--   "Whether or not any rent is in arrears on the date on which proceedings for
+--    possession are begun, the tenant has persistently delayed paying rent which
+--    has become lawfully due."
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * SINGLE OPERATIVE ATOM. The whole ground turns on one fact: "the tenant has
+--     persistently delayed paying rent which has become lawfully due". That is
+--     the lifted boolean.
+--   * The "whether or not any rent is in arrears on the date on which proceedings
+--     for possession are begun" clause is NOT an operative condition — it is an
+--     express disclaimer that current arrears are IRRELEVANT to this ground
+--     (a tenant who always pays, but always late, can still engage Ground 11).
+--     It is therefore carried as INERT PROSE and contributes nothing to the
+--     logic: the ground is made out on the persistent-delay atom alone,
+--     regardless of the arrears position. (Contrast Ground 10, where unpaid /
+--     in-arrears facts ARE operative.)
+--   * "rent which has become lawfully due" — the "lawfully due" qualifier rides
+--     along inside the operative atom's name; "persistently" (a course of
+--     conduct, not a single late payment) is a matter of degree left to the
+--     court's appraisal and is captured within the single atom rather than
+--     decomposed.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The single operative atom of Ground 11.
+DECLARE Ground11Claim HAS
+  `the tenant has persistently delayed paying rent which has become lawfully due`  IS A BOOLEAN
+
+§§ `Ground 11 made out — the single operative atom (arrears position irrelevant)`
+
+-- The "whether or not any rent is in arrears ..." clause is inert: it disclaims
+-- any dependence on the arrears position, so it is carried as prose and the
+-- ground is made out on the persistent-delay atom alone.
+GIVEN claim IS A Ground11Claim
+GIVETH A BOOLEAN
+`Ground 11 made out` claim MEANS
+        "Whether or not any rent is in arrears on the date on which proceedings for possession are begun,"
+    ... "the tenant has persistently delayed paying rent which has become lawfully due."
+    ... claim's `the tenant has persistently delayed paying rent which has become lawfully due`
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+-- Part II is DISCRETIONARY: where the ground is made out the court MAY order
+-- possession. MAY defaults so that omission (the court declining) is FULFILLED —
+-- no breach. Contrast the Part I grounds, where the court MUST.
+GIVEN claim IS A Ground11Claim
+GIVETH A DEONTIC Actor Action
+`ground 11 possession order` claim MEANS
+    IF   `Ground 11 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — persistent delay (no current arrears)`
+
+-- The tenant has persistently delayed paying rent. There happen to be NO current
+-- arrears (the "whether or not in arrears" clause means that is irrelevant): the
+-- ground is still made out on the persistent-delay atom alone.
+`claim all-met (persistent delay, no current arrears)` MEANS Ground11Claim WITH
+  `the tenant has persistently delayed paying rent which has become lawfully due`  IS TRUE
+
+#ASSERT `Ground 11 made out` `claim all-met (persistent delay, no current arrears)`
+
+§§ `Knocked out — no persistent delay`
+
+-- The tenant has not persistently delayed. Whatever the arrears position, the
+-- single operative atom is FALSE, so the ground is not made out.
+`claim — no persistent delay` MEANS Ground11Claim WITH
+  `the tenant has persistently delayed paying rent which has become lawfully due`  IS FALSE
+
+#ASSERT NOT `Ground 11 made out` `claim — no persistent delay`
+
+§§ `Exercising the discretionary deontic — Court MAY, declining is no breach`
+
+-- A DEONTIC value cannot be compared with EQUALS in #ASSERT, so we exercise the
+-- permission via #TRACE. With the ground made out, the residual is the standing
+-- permission "PARTY Court MAY order possession". Because MAY's omission defaults
+-- to FULFILLED, a trace in which the court never orders possession reduces to
+-- FULFILLED (no breach) — the hallmark of a DISCRETIONARY ground.
+
+-- The court exercises the permission: orders possession within the deadline.
+#TRACE `ground 11 possession order` `claim all-met (persistent delay, no current arrears)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- The court declines (never orders possession): no breach — residual FULFILLED.
+#TRACE `ground 11 possession order` `claim all-met (persistent delay, no current arrears)` AT 0 WITH

@@ -1,0 +1,320 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 9 (suitable alternative accommodation)`
+
+-- ===========================================================================
+-- GROUND 9 — the "suitable alternative accommodation" ground. It sits in PART II
+-- of Schedule 2 — the DISCRETIONARY grounds: "GROUNDS ON WHICH COURT MAY ORDER
+-- POSSESSION". So where the ground is made out the outcome is a PERMISSION, not
+-- a duty: the court MAY order possession (and may, in its discretion, decline).
+--
+-- HYBRID encoding:
+--   * the constitutive condition -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome  -> a guarded deontic clause using MAY (Court MAY
+--     order possession), guarded by the made-out predicate.
+--
+-- Statutory text encoded — the GROUND itself (Part II):
+--   "Suitable alternative accommodation is available for the tenant or will be
+--    available for him when the order for possession takes effect."
+--
+-- "suitable alternative accommodation" is then DEFINED in PART III of the
+-- Schedule (paras 1–6), which this file encodes:
+--
+--   1. For the purposes of Ground 9, a certificate of the local housing
+--      authority for the district, certifying that the authority will provide
+--      suitable alternative accommodation for the tenant by a date specified in
+--      the certificate, is CONCLUSIVE EVIDENCE that suitable alternative
+--      accommodation will be available for him by that date.
+--   2. Where no such certificate is produced to the court, accommodation is
+--      DEEMED suitable if it consists of either—
+--         (a) premises to be let as a separate dwelling such that they will then
+--             be let on an assured tenancy, other than—
+--                (i)  a tenancy in respect of which a Grounds 1-to-5 notice is
+--                     given not later than the beginning of the tenancy, or
+--                (ii) an assured shorthold tenancy, or
+--         (b) premises to be let as a separate dwelling on terms which, in the
+--             opinion of the court, afford security of tenure reasonably
+--             equivalent to that under Chapter I of Part I in the case of an
+--             assured tenancy of a kind mentioned in (a),
+--      AND, in the opinion of the court, the accommodation fulfils the relevant
+--      conditions as defined in paragraph 3.
+--   3.(1) The relevant conditions are that the accommodation is reasonably
+--         suitable to the needs of the tenant and his family as regards proximity
+--         to place of work, AND either—
+--            (a) similar as regards rental and extent to local-authority
+--                neighbourhood accommodation for persons with similar needs, or
+--            (b) reasonably suitable to the means of the tenant and to the needs
+--                of the tenant and his family as regards extent and character; AND
+--         a furniture condition (if furniture was provided under the assured
+--         tenancy, furniture is provided in the accommodation which is similar or
+--         reasonably suitable).
+--   4. Accommodation is NOT deemed suitable to the needs of the tenant and his
+--      family if their occupation of it would be that it would be an overcrowded
+--      dwelling-house for the purposes of Part X of the Housing Act 1985.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * PART III STRUCTURE. "suitable alternative accommodation is available" is
+--     modelled as: EITHER a para-1 local-housing-authority certificate is in
+--     evidence (conclusive: certificate route), OR the para-2 "deemed suitable"
+--     route is satisfied. These are alternatives (the para-2 route applies
+--     "where no such certificate ... is produced"); modelled as a disjunction so
+--     a present certificate suffices on its own, faithful to its "conclusive
+--     evidence" status.
+--   * The para-2 deemed-suitable route is: (para-2 tenancy limb (a) OR (b)) AND
+--     (para-3 relevant conditions) AND NOT (para-4 overcrowding). Paragraph 4 is
+--     an express carve-OUT of suitability ("shall NOT be deemed to be suitable
+--     ... if ... overcrowded"), so it negates the para-2 route.
+--   * "available for the tenant OR will be available ... when the order takes
+--     effect" — a present-or-future availability disjunction; both arms route
+--     through the same suitability definition. Captured as a single
+--     `suitable alternative accommodation is/ will be available` predicate over
+--     the same Part III structure, with a boolean recording which arm holds.
+--   * The Renters' Rights Act 2025 (F75) OMITTED (1.5.2026) the para-2(a) words
+--     carving out Grounds-1-to-5 / assured-shorthold tenancies. The in-force
+--     text on 21 June 2026 therefore NO LONGER contains those (i)/(ii)
+--     exclusions: para-2(a) is simply "premises to be let as a separate dwelling
+--     such that they will then be let on an assured tenancy". The omitted words
+--     are carried as INERT, struck-through prose for the audit trail but
+--     contribute nothing operative.
+-- ===========================================================================
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- The operative atoms of Ground 9 and its Part III definition, gathered on the
+-- claim. Many are "in the opinion of the court" appraisals lifted as booleans.
+DECLARE Ground9Claim HAS
+  -- the ground's availability arms
+  `suitable alternative accommodation is available for the tenant now`              IS A BOOLEAN
+  `suitable alternative accommodation will be available when the order takes effect` IS A BOOLEAN
+  -- Part III para 1 — the local housing authority certificate route
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS A BOOLEAN
+  -- Part III para 2 — the "deemed suitable" route, tenancy limbs (a)/(b)
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS A BOOLEAN
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS A BOOLEAN
+  -- Part III para 3(1) — the relevant conditions
+  `reasonably suitable as regards proximity to place of work`                       IS A BOOLEAN
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS A BOOLEAN
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS A BOOLEAN
+  `furniture condition satisfied`                                                   IS A BOOLEAN
+  -- Part III para 4 — the overcrowding carve-out
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS A BOOLEAN
+
+§§ `Part III, para 3(1) — the relevant conditions`
+
+-- "the accommodation is reasonably suitable to the needs of the tenant and his
+--  family as regards proximity to place of work, and either—
+--    (a) similar as regards rental and extent ... or
+--    (b) reasonably suitable to the means ... and ... extent and character; and
+--  that if any furniture was provided ... furniture is provided ..."
+GIVEN claim IS A Ground9Claim
+GIVETH A BOOLEAN
+`relevant conditions (para 3)` claim MEANS
+        "(1) the accommodation is reasonably suitable to the needs of the tenant and his family as regards proximity to place of work,"
+    ... claim's `reasonably suitable as regards proximity to place of work`
+    AND "and either—"
+    ... (   "(a) similar as regards rental and extent to the accommodation afforded by dwelling-houses provided in the neighbourhood by any local housing authority for persons whose needs as regards extent are, in the opinion of the court, similar to those of the tenant and of his family; or"
+        ..  claim's `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`
+        ..  "(b) reasonably suitable to the means of the tenant and to the needs of the tenant and his family as regards extent and character; and"
+        ..  claim's `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`)
+    AND "that if any furniture was provided for use under the assured tenancy in question, furniture is provided for use in the accommodation which is either similar to that so provided or is reasonably suitable to the needs of the tenant and his family."
+    ... claim's `furniture condition satisfied`
+
+§§ `Part III, para 2 — the "deemed suitable" route (no certificate produced)`
+
+-- "Where no such certificate ... is produced to the court, accommodation shall
+--  be deemed to be suitable ... if it consists of either—
+--    (a) premises which are to be let as a separate dwelling such that they will
+--        then be let on an assured tenancy, [F75 ... (i)/(ii) exclusions OMITTED
+--        1.5.2026 ...], or
+--    (b) premises to be let as a separate dwelling on terms which ... afford ...
+--        security of tenure reasonably equivalent ...,
+--  and, in the opinion of the court, the accommodation fulfils the relevant
+--  conditions as defined in paragraph 3 below."
+-- Paragraph 4 then carves overcrowded accommodation OUT of suitability.
+GIVEN claim IS A Ground9Claim
+GIVETH A BOOLEAN
+`deemed suitable under paragraph 2` claim MEANS
+        "accommodation shall be deemed to be suitable for the purposes of Ground 9 above if it consists of either—"
+    ... (   "(a) premises which are to be let as a separate dwelling such that they will then be let on an assured tenancy,"
+        ..  claim's `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`
+        ..  "or"
+        ..  "(b) premises to be let as a separate dwelling on terms which will, in the opinion of the court, afford to the tenant security of tenure reasonably equivalent to the security afforded by Chapter I of Part I of this Act in the case of an assured tenancy of a kind mentioned in sub-paragraph (a) above,"
+        ..  claim's `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`)
+    AND "and, in the opinion of the court, the accommodation fulfils the relevant conditions as defined in paragraph 3 below."
+    ... `relevant conditions (para 3)` claim
+    AND "[para 4:] Accommodation shall not be deemed to be suitable to the needs of the tenant and his family if the result of their occupation of the accommodation would be that it would be an overcrowded dwelling-house for the purposes of Part X of the Housing Act 1985."
+    ... NOT claim's `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`
+    -- F75 (RRA 2025, 1.5.2026) OMITTED the para-2(a) exclusions; carried inert for audit:
+    ... "[omitted 1.5.2026: other than— (i) a tenancy in respect of which notice is given not later than the beginning of the tenancy that possession might be recovered on any of Grounds 1 to 5 above, or (ii) an assured shorthold tenancy, within the meaning of Chapter II of Part I of this Act]"
+
+§§ `Part III — "suitable alternative accommodation" (certificate route OR deemed-suitable route)`
+
+-- Para 1's local-housing-authority certificate is "conclusive evidence" that
+-- suitable alternative accommodation will be available; the para-2 deemed-
+-- suitable route applies "where no such certificate ... is produced". Modelled
+-- as a disjunction: a certificate suffices on its own; otherwise the para-2
+-- route must be satisfied.
+GIVEN claim IS A Ground9Claim
+GIVETH A BOOLEAN
+`accommodation is suitable alternative accommodation (Part III)` claim MEANS
+        "[para 1:] a certificate of the local housing authority ... certifying that the authority will provide suitable alternative accommodation for the tenant by a date specified in the certificate, shall be conclusive evidence that suitable alternative accommodation will be available for him by that date."
+    ..  claim's `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`
+    ..  "[para 2:] Where no such certificate ... is produced to the court, accommodation shall be deemed to be suitable ..."
+    ..  `deemed suitable under paragraph 2` claim
+
+§§ `Ground 9 made out — suitable alternative accommodation is / will be available`
+
+-- "Suitable alternative accommodation is available for the tenant or will be
+--  available for him when the order for possession takes effect."
+-- The suitability definition (Part III) must hold, AND the accommodation must be
+-- available now OR available when the order takes effect.
+GIVEN claim IS A Ground9Claim
+GIVETH A BOOLEAN
+`Ground 9 made out` claim MEANS
+        "Suitable alternative accommodation"
+    ... `accommodation is suitable alternative accommodation (Part III)` claim
+    AND (   "is available for the tenant"
+        ..  claim's `suitable alternative accommodation is available for the tenant now`
+        ..  "or will be available for him when the order for possession takes effect."
+        ..  claim's `suitable alternative accommodation will be available when the order takes effect`)
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+-- Part II is DISCRETIONARY: where the ground is made out the court MAY order
+-- possession. MAY defaults so that omission (the court declining) is FULFILLED —
+-- no breach. Contrast the Part I grounds, where the court MUST.
+GIVEN claim IS A Ground9Claim
+GIVETH A DEONTIC Actor Action
+`ground 9 possession order` claim MEANS
+    IF   `Ground 9 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — para 2 deemed-suitable route, available now`
+
+-- No certificate, but the para-2 route is fully satisfied: tenancy limb (a),
+-- relevant conditions met (proximity + para 3(1)(b) + furniture), not
+-- overcrowded; and the accommodation is available now.
+`claim all-met (deemed suitable, available now)` MEANS Ground9Claim WITH
+  `suitable alternative accommodation is available for the tenant now`              IS TRUE
+  `suitable alternative accommodation will be available when the order takes effect` IS FALSE
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS FALSE
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS TRUE
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS FALSE
+  `reasonably suitable as regards proximity to place of work`                       IS TRUE
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS FALSE
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS TRUE
+  `furniture condition satisfied`                                                   IS TRUE
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS FALSE
+
+#ASSERT `relevant conditions (para 3)`                                  `claim all-met (deemed suitable, available now)`
+#ASSERT `deemed suitable under paragraph 2`                             `claim all-met (deemed suitable, available now)`
+#ASSERT `accommodation is suitable alternative accommodation (Part III)` `claim all-met (deemed suitable, available now)`
+#ASSERT `Ground 9 made out`                                            `claim all-met (deemed suitable, available now)`
+
+§§ `Ground made out — para 1 certificate route, available in future`
+
+-- A local housing authority certificate is produced (conclusive evidence): the
+-- suitability definition is satisfied by the certificate alone, regardless of the
+-- para-2 facts (here the para-2/para-3 facts are all FALSE). Accommodation will
+-- be available when the order takes effect.
+`claim all-met (certificate, available in future)` MEANS Ground9Claim WITH
+  `suitable alternative accommodation is available for the tenant now`              IS FALSE
+  `suitable alternative accommodation will be available when the order takes effect` IS TRUE
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS TRUE
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS FALSE
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS FALSE
+  `reasonably suitable as regards proximity to place of work`                       IS FALSE
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS FALSE
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS FALSE
+  `furniture condition satisfied`                                                   IS FALSE
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS FALSE
+
+#ASSERT NOT `deemed suitable under paragraph 2`                          `claim all-met (certificate, available in future)`
+#ASSERT `accommodation is suitable alternative accommodation (Part III)` `claim all-met (certificate, available in future)`
+#ASSERT `Ground 9 made out`                                            `claim all-met (certificate, available in future)`
+
+§§ `Knocked out — para 4 overcrowding carve-out defeats the deemed-suitable route`
+
+-- The para-2 tenancy limb and para-3 relevant conditions are met, but occupation
+-- would overcrowd the dwelling-house: para 4 carves it OUT of suitability. With
+-- no certificate either, the accommodation is not "suitable alternative
+-- accommodation", so the ground is not made out.
+`claim — overcrowded (para 4)` MEANS Ground9Claim WITH
+  `suitable alternative accommodation is available for the tenant now`              IS TRUE
+  `suitable alternative accommodation will be available when the order takes effect` IS FALSE
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS FALSE
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS TRUE
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS FALSE
+  `reasonably suitable as regards proximity to place of work`                       IS TRUE
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS FALSE
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS TRUE
+  `furniture condition satisfied`                                                   IS TRUE
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS TRUE
+
+#ASSERT NOT `deemed suitable under paragraph 2`                          `claim — overcrowded (para 4)`
+#ASSERT NOT `accommodation is suitable alternative accommodation (Part III)` `claim — overcrowded (para 4)`
+#ASSERT NOT `Ground 9 made out`                                        `claim — overcrowded (para 4)`
+
+§§ `Knocked out — para 3 relevant conditions fail (neither (a) nor (b))`
+
+-- Tenancy limb (a) holds and not overcrowded, but neither para-3(1)(a) nor
+-- (b) is met, so the relevant conditions fail and the para-2 route fails.
+`claim — relevant conditions fail` MEANS Ground9Claim WITH
+  `suitable alternative accommodation is available for the tenant now`              IS TRUE
+  `suitable alternative accommodation will be available when the order takes effect` IS FALSE
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS FALSE
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS TRUE
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS FALSE
+  `reasonably suitable as regards proximity to place of work`                       IS TRUE
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS FALSE
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS FALSE
+  `furniture condition satisfied`                                                   IS TRUE
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS FALSE
+
+#ASSERT NOT `relevant conditions (para 3)`      `claim — relevant conditions fail`
+#ASSERT NOT `deemed suitable under paragraph 2` `claim — relevant conditions fail`
+#ASSERT NOT `Ground 9 made out`                 `claim — relevant conditions fail`
+
+§§ `Knocked out — suitable accommodation, but neither available now nor in future`
+
+-- The accommodation IS suitable alternative accommodation (para-2 route fully
+-- met), but it is neither available now nor will be available when the order
+-- takes effect: the ground's availability requirement fails.
+`claim — suitable but unavailable` MEANS Ground9Claim WITH
+  `suitable alternative accommodation is available for the tenant now`              IS FALSE
+  `suitable alternative accommodation will be available when the order takes effect` IS FALSE
+  `a local housing authority certificate under paragraph 1 has been produced certifying availability by the specified date`  IS FALSE
+  `premises to be let as a separate dwelling on an assured tenancy (para 2(a))`     IS TRUE
+  `premises to be let as a separate dwelling affording reasonably equivalent security of tenure (para 2(b))`  IS FALSE
+  `reasonably suitable as regards proximity to place of work`                       IS TRUE
+  `similar as regards rental and extent to local-authority neighbourhood accommodation (para 3(1)(a))`  IS FALSE
+  `reasonably suitable to the means of the tenant and to the needs as regards extent and character (para 3(1)(b))`  IS TRUE
+  `furniture condition satisfied`                                                   IS TRUE
+  `occupation would result in an overcrowded dwelling-house under Part X Housing Act 1985 (para 4)`  IS FALSE
+
+#ASSERT `accommodation is suitable alternative accommodation (Part III)` `claim — suitable but unavailable`
+#ASSERT NOT `Ground 9 made out`                                        `claim — suitable but unavailable`
+
+§§ `Exercising the discretionary deontic — Court MAY, declining is no breach`
+
+-- A DEONTIC value cannot be compared with EQUALS in #ASSERT, so we exercise the
+-- permission via #TRACE. With the ground made out, the residual is the standing
+-- permission "PARTY Court MAY order possession". Because MAY's omission defaults
+-- to FULFILLED, a trace in which the court never orders possession reduces to
+-- FULFILLED (no breach) — the hallmark of a DISCRETIONARY ground.
+
+-- The court exercises the permission: orders possession within the deadline.
+#TRACE `ground 9 possession order` `claim all-met (deemed suitable, available now)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- The court declines (never orders possession): no breach — residual FULFILLED.
+#TRACE `ground 9 possession order` `claim all-met (deemed suitable, available now)` AT 0 WITH
