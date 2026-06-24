@@ -281,3 +281,135 @@ importing an SMT backend; D's singleton encoding both fails the matching case
    in the regulative reference docs.
 5. Leave rungs 3–4 unbuilt; revisit only against a concrete use case that the
    nominal rule provably cannot express.
+
+---
+
+# Addendum — Rung 3: actor-correct *free* residuation ("the ball in either court")
+
+## Why this wasn't solved by rungs 1–2 (acceptance-test scoping)
+
+The design that produced rung 2 was driven by an acceptance test that was the
+**monomorphic** incoherent contract (`DEONTIC Eater (Action Drinker)`), with free
+residuation present only as a *preserve* constraint. The **union encoding
+satisfies that constraint vacuously** (`DEONTIC Actor (Action Actor)` residuates
+*and* passes agreement `Actor ~ Actor`), so nothing forced the two goals to be
+reconciled in one contract. Rung 3 is exactly that reconciliation, and it needs
+its own acceptance test (below) — with which rung 2 visibly fails.
+
+## The tension, demonstrated (rung-2 binary)
+
+A `DEONTIC P A` value's **type is the invariant residuation must preserve**
+(subject reduction: every HENCE/LEST residual must have the contract's type).
+That forces a fork:
+
+- **Union index** `DEONTIC Actor (Action Actor)` — residuates Eater→Drinker
+  freely, but `eat`/`drink` are both `Action Actor`, so agreement is **vacuous**
+  and `PARTY ADrinker MUST eat` is *accepted*.
+- **Specific index** `DEONTIC Eater (Action Eater)` — keeps agreement's teeth,
+  but the contract type is pinned to one actor; a Drinker `LEST` fails with
+  *"HENCE … expected DEONTIC OF Eater, Action OF Eater but is here DEONTIC OF
+  Drinker, Action OF Drinker."*
+
+So under *nominal* typing, **"routes the ball between actors" and "each actor only
+does its own actions" are mutually exclusive for a single contract.** A function
+can return a union contract (multi-party, agreement off) or a polymorphic
+per-actor contract (`GIVEN who … GIVETH A DEONTIC who (Action who)` — agreement
+on, but one actor per instantiation). It cannot today return one contract that
+does both.
+
+## Rung-3 acceptance test
+
+```l4
+-- MUST type-check (ball routes Eater -> Drinker) …
+-- … AND `PARTY ADrinker MUST eat` inside such a contract MUST be rejected.
+```
+Rung 2 fails this: union-index accepts the bad clause; specific-index rejects the
+routing.
+
+## The mechanism: existential ("∃") obligations — "just GADTs"
+
+Index *both* party and action by the actor, and have each obligation
+**existentially pack a shared actor index**:
+
+```
+Obligation = ∃who. MkOb (Party who) (Action who) Deadline …
+Contract    = Tree Obligation        -- names no specific actor
+```
+
+- Each obligation is **actor-correct** (party and action share `who`).
+- The **contract type mentions no actor**, so residuals may use a *different*
+  `who` each → the ball routes freely; subject reduction holds on the existential.
+- This is "just GADTs" in the colloquial sense: a constructor that quantifies
+  `who` in its argument types and hides it in the result. **No value→type
+  promotion, no singletons, no SMT.** A clause `PARTY p MUST a` becomes sugar for
+  `MkOb p a …`, opening a fresh `who` skolem per clause.
+
+In lambda-cube terms this is the genuine step past rung 2: rung 2 added a
+constraint at HM; rung 3 adds **existential quantification** (the negative-position
+∀ that GADT/existential constructors introduce).
+
+## L4 surface sketch (TBD)
+
+```l4
+DECLARE Party  who IS ONE OF AsEater Eater | AsDrinker Drinker   -- party indexed
+DECLARE Action who HAS `verb` IS A STRING
+
+-- contract whose obligations may fall on ANY actor, each self-consistent:
+GIVETH A DEONTIC SOME who
+`pingpong` MEANS
+  PARTY (AsEater AnEater)  MUST eat   WITHIN 30   -- opens who = Eater
+  HENCE FULFILLED
+  LEST PARTY (AsDrinker ADrinker) MUST drink WITHIN 10 …   -- opens who = Drinker
+```
+The load-bearing new piece is `DEONTIC SOME who` (an existential contract type)
+plus a **fresh per-clause `who`** rather than a single contract-level parameter.
+
+## Toolchain changes (honest cost: XL — the real rung)
+
+1. **`Type'` / kinds (Syntax.hs):** add existential quantification — either a
+   general `Exists` to sit beside `Forall`, or (more contained) a built-in
+   "obligation existential" that `DEONTIC` special-cases. This is the genuine
+   type-system extension; everything else follows.
+2. **`checkDeonton` / `inferContract` (TypeCheck.hs ~1117):** allocate a fresh
+   skolem `who` per clause; check `party : Party who` and `action : Action who`
+   against it (rung-2's agreement, but on a per-clause skolem); the clause's
+   contribution to the contract type is existential in `who`.
+3. **Residual unification (`ExpectRegulativeFollowupContext`):** HENCE/LEST must
+   unify against the existential contract type, instantiating `who` *per residual*
+   — this is precisely what makes the cross-actor `LEST` (today's TEST 3 error)
+   type-check.
+4. **`inferConDecl` (TypeCheck.hs ~843):** if users declare their own indexed
+   party/obligation constructors, per-`ConDecl` result-type handling (the genuine
+   GADT feature: a constructor fixing its index).
+5. **Evaluator (EvaluateLazy.hs):** largely unaffected — `ValObligation` stores
+   party/action as runtime *values*, never types, so the existential is erased at
+   runtime (the same reason rung 2 needed no evaluator change).
+6. **Inference:** GADTs lack principal types in general, but L4 sidesteps the pain
+   because `GIVETH A DEONTIC …` makes the contract type **rigid** — every clause is
+   checked against a written signature, the condition GHC needs for GADT
+   refinement without inference blowup (see the GADT lesson in §3).
+
+## Lighter alternatives (and why they're not the static answer)
+
+- **Subtyping** (`Action Eater <: Action Actor`, covariant index) would also
+  reconcile — a union contract accepting specific actions — but L4 has **no
+  subtyping**, a large orthogonal addition.
+- **Singletons / value→type** (the party *value* determines the action type) —
+  heavier, the dependent route the LiquidHaskell/DH lessons warn against.
+- **Runtime `PROVIDED` guard on a union contract** (`DEONTIC Actor (Action
+  Actor)` + a guard that the party and action denote the same actor) — **zero
+  type-system change, available today** — gives free residuation + *dynamic*
+  actor-correctness, but it's a runtime check, not a static guarantee, and is
+  only expressible if the action value carries its actor as a field (needs
+  verification). This is the pragmatic interim while rung 3 is unbuilt.
+
+## Recommendation
+
+- **Interim (now):** runtime `PROVIDED` guard for actor-correctness on union
+  contracts; accept that routing-correctness is dynamic.
+- **Rung 3 (when a concrete case needs *static* actor-correct routing):**
+  existential obligations per the mechanism above. Scope it against the rung-3
+  acceptance test; reuse rung-2's per-clause agreement check on the fresh skolem;
+  lean on L4's rigid `GIVETH` signatures to dodge GADT inference pain. Consider
+  re-running the design workflow with the rung-3 acceptance test to pressure-test
+  this sketch before building.
