@@ -555,6 +555,91 @@ keep its teeth, presumes per-actor party types (or an actor-indexed `Party who`)
   today** — but actor-correctness is *dynamic*, and the union footgun (vacuous
   static agreement) persists until rung 3 ships.
 
+## The validated minimal mechanism (~8 lines) and build sequence
+
+The winning proposal ("Per-residual actor-open contract head") was the **only one
+of the four with zero fatal flaws** (score 6). The synthesis distilled it to a
+concrete, regression-safe patch at the residual seam.
+
+### The patch (checkDeonton, TypeCheck.hs:1125–1128)
+
+Replace the single `let rTy = contract partyT actionT` (reused for both HENCE and
+LEST) with a **per-residual** followup type:
+
+```haskell
+-- after party/action are checked and their metavars solved:
+actionT' <- applySubst actionT
+rTy <- case actionT' of
+  TyApp ann actionHead [_idx] -> do            -- arity-1, actor-indexed (rung-2's case)
+    w <- fresh                                 -- a METAVAR, not a skolem (see caveat)
+    pure (contract w (TyApp ann actionHead [w]))   -- party & action share ONE w
+  _ -> pure (contract partyT actionT)          -- arity-0 enums/unions & multi-agent
+                                               -- DEONTIC Party Action: UNCHANGED → no regression
+-- check HENCE and LEST against rTy as today; each residual is a fresh Regulative
+-- whose own checkDeonton re-runs checkPartyActionAgreement, binding its w to its
+-- party's actor type.
+```
+
+Why this passes both halves: routing type-checks because each residual gets a
+*distinct* `w`; `PARTY ADrinker MUST eat` is rejected because *within one clause*
+`w ~ Drinker` (from the party) and `w ~ Eater` (from `eat : Action Eater`) both
+fire on the same `w`, and `ensureSameRef Drinker Eater = False`.
+
+> **Caveat that sank a rival proposal — it must be a `fresh` *metavar*, not a
+> rigid skolem.** A competing design minted the per-clause actor via
+> `def + extendKnown KnownTypeVariable` (the `GIVEN who IS A TYPE` path), which
+> yields a `TyApp who []` that `ensureSameRef` unifies only with *itself*. Under
+> that, `expect (party = Eater) who` would **fail even in the good case**
+> (`Eater MUST eat`). The actor index here must be *solvable* (a metavar the
+> residual's own party fills in), not rigid. The arity-1 guard means the whole
+> legacy corpus and the multi-agent `DEONTIC Party Action` union take the
+> untouched `else` branch.
+
+### Sequenced build plan
+
+1. **Land the ~8-line seam change** above (arity-1 only; arity-0 untouched). Add an
+   OK fixture — one specific-index routing contract (`Eater MUST Eat; LEST Drinker
+   MUST Drink`) that now type-checks — and a NOT-OK fixture — that same style with a
+   residual `PARTY ADrinker MUST Eat` rejected statically. *That is the acceptance
+   test, encoded as fixtures.*
+2. **Run the golden suite;** confirm only the pre-existing unrelated excel-date
+   failures remain and all deontic/residuation/multiparty fixtures stay green (the
+   change is monomorphic metavar freshening — benign for inference, no
+   principal-types hazard).
+3. **Add the domain-phrased `prettyTypeMismatch` arm** for the residual-actor case
+   (see hazard below); treat the closed `GIVETH` annotation as the leak boundary.
+4. **Separately scoped (M, do *not* block step 1):** decide whether routed
+   contracts must be *driveable by cross-actor events*. If yes, relax the event
+   seam `eventT = event partyT actionT` (TypeCheck.hs:437) **with an event-time
+   agreement check** so `PARTY ADrinker DOES Drink` type-checks against a
+   concrete-Eater-headed routing contract yet stays actor-checked. Without it, the
+   contract routes internally but `#TRACE`/EVALTRACE on a cross-actor event is a
+   static type error.
+5. **Defer arity-2+** (`Action Object Actor`): keep rung-2's arity-1 "actor = index
+   0" restriction; a robust fix needs an explicit actor-index marker on the
+   `Action` declaration — out of rung-3 scope.
+
+### Explicitly *not* doing
+
+First-class `Exists` on `Type'` (wrong altitude: ~10 new match arms across
+Unify/Print/Export/JsonSchema/FunctionSchema/EvaluateLazy/Parser + `substituteType`/
+`applySubst`, a sound `unifyBase` existential arm with skolemise/open/escape-check
+L4 has none of, **and** it forces confronting the unfixed capture-avoiding-
+substitution-under-`Forall` TODO at `Types.hs:719`); actor-agnostic `DEONTIC SOME
+who`/0-arg head (arity error today + starves the event type); freshening *both*
+party and action (unsound); a single contract-level `GIVEN who … DEONTIC who
+(Action who)` (verified: pins the whole contract to the first clause's actor, fails
+routing); GADTs, singletons, dependent types, SMT.
+
+### Open question that needs a human call
+
+The legibility/documentation tradeoff is the one genuine design decision left: a
+concrete `DEONTIC Eater` head with relaxed seams **silently admits a `Robot`/`Drinker`
+residual** — the declared head stops documenting "who this contract is about."
+Either live with it, or bound the fresh `w` to a declared actor union (which
+partially re-introduces the union encoding rung 3 set out to retire). Decide when a
+concrete case forces it.
+
 ## Error-message hazard (carry into whichever rung is built)
 
 The CNL/proof-tool usability literature (Naproche, Lean autoformalization) is
