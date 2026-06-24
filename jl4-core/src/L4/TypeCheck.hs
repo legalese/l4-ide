@@ -1129,12 +1129,67 @@ checkDeonton ann party action due hence lest partyT actionT = do
 
 checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [CheckInfo])
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
-  (pat, bounds) <- checkPattern ExpectRegulativeActionContext action actionT
+  (pat, bounds) <- checkActionPattern action actionT
   -- NOTE: the provided clauses must evaluate to booleans
   provided <- forM mprovided \provided ->
     extendKnownMany bounds do
       checkExpr ExpectRegulativeProvidedContext provided boolean
   pure (MkAction {anno, modal, action = pat, provided}, bounds)
+
+-- | Check the action of a regulative @MUST@/@MAY@ clause against the action
+-- type declared in the contract's @DEONTIC <Party> <Action>@ signature.
+--
+-- This is 'checkPattern' specialised to 'ExpectRegulativeActionContext', with
+-- one wrinkle that matters once actions carry a type argument.
+--
+-- A bare action name is parsed as a nullary 'PatApp'. The generic pattern
+-- checker resolves it as a data constructor if it can, and otherwise treats it
+-- as a /fresh binder/ whose type is an unconstrained inference variable — which
+-- then unifies with whatever action type the contract declares. That is
+-- harmless for plain-enum actions (their names /are/ constructors, so they go
+-- through full unification), but it means a name that refers to an existing
+-- action /value/ — e.g. a parametric @Action Court@ introduced by a @MEANS@
+-- clause — is silently accepted in a contract pinned to @Action Landlord@,
+-- dropping exactly the index we want the deontic layer to enforce.
+--
+-- So when a bare name resolves to an in-scope non-constructor term, we treat it
+-- as a reference to that value — precisely as the explicit @EXACTLY@ form
+-- ('PatExpr') already does — and check its type against the contract's declared
+-- action type. The decision rule (see 'namesNonConstructorTerm'):
+--
+--   * any constructor candidate  -> constructor-pattern semantics (unchanged);
+--     this keeps plain-enum actions, and overloaded names that /also/ name a
+--     constructor, on their existing path;
+--   * else any term candidate (a @MEANS@/global @Computable@, a @GIVEN@
+--     parameter, an @ASSUME@'d term, a record selector, ...) -> reference;
+--   * no term candidate at all -> a genuine fresh binder (e.g. a wildcard
+--     action whose value a @HENCE@ clause inspects).
+--
+-- The reference branch is intentionally broader than just @MEANS@-defined
+-- actions: a bare action name that refers to /anything/ in scope denotes that
+-- value, and silently re-binding it as a fresh same-named pattern variable was
+-- exactly the footgun behind this bug. A consequence is that a name which
+-- merely collides with an unrelated in-scope term now surfaces as a type
+-- mismatch instead of quietly shadowing it — the intended trade-off.
+checkActionPattern :: Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
+checkActionPattern action actionT = case action of
+  PatApp ann n [] -> do
+    refersToValue <- namesNonConstructorTerm n
+    if refersToValue
+      then checkPattern ExpectRegulativeActionContext (PatExpr ann (Var ann n)) actionT
+      else checkPattern ExpectRegulativeActionContext action actionT
+  _ -> checkPattern ExpectRegulativeActionContext action actionT
+
+-- | Does this name resolve to at least one in-scope term, none of which is a
+-- data constructor? Used to decide whether a bare action name denotes a
+-- reference to an existing value rather than a fresh pattern binder. Any
+-- constructor candidate keeps constructor-pattern semantics (returns 'False');
+-- a name with no term candidate at all is a binder (also 'False').
+namesNonConstructorTerm :: Name -> Check Bool
+namesNonConstructorTerm n = do
+  options <- lookupRawNameInEnvironment (rawName n)
+  let termKinds = [ tk | (_, _, KnownTerm _ tk) <- options ]
+  pure (not (null termKinds) && all (/= Constructor) termKinds)
 
 buildConstructorLookup :: [DeclChecked (Declare Resolved)] -> Map Unique [Resolved]
 buildConstructorLookup = foldMap \decl ->

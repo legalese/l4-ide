@@ -166,3 +166,85 @@ black-box behaviour; **confirm in Step 0**.)
 Use the same (full, argument-recursive) unification for the regulative
 `MUST`/`MAY` action against the contract's `Action` parameter that is already used
 for function-argument checking, so R2 fails with the R3-style message.
+
+---
+
+## Outcome (implemented + verified)
+
+**Status:** done. Fix landed in `jl4-core/src/L4/TypeCheck.hs` (`checkActionPattern`
++ `namesNonConstructorTerm`, wired into `checkAction`). Suites green: jl4 golden
+887/0, jl4-core 46/0, l4-cli 20/0.
+
+### Step 0 result — the "head-only unification" hypothesis was wrong
+
+The writeup guessed the action type was compared "up to the head type constructor."
+That was **refuted** (Step 0 invited this). The general unifier (`TypeCheck/Unify.hs`
+`unifyBase`) already recurses into `TyApp` type arguments. The real bug is in
+**elaboration, not the type system**: the regulative action is a `Pattern`, and a
+bare name parses as `PatApp n []`. `inferPattern` resolves it as a *constructor* if
+it can, else falls back to `inferPatternVar` — a **fresh binder** with an
+unconstrained inference-variable type that unifies with any contract action type.
+Plain enums escaped the bug only because their names *are* constructors; a
+`MEANS`-defined action value (or any non-constructor term) was silently re-bound,
+dropping its type. No new type-system power (and certainly no dependent types) was
+needed — only correct name resolution.
+
+### The fix
+
+For a bare action `PatApp n []` whose name resolves to an in-scope **non-constructor**
+term, check it as a reference `PatExpr (Var n)` — exactly what the explicit `EXACTLY`
+form already does — so its real type is unified against the contract's declared
+action type. Constructors keep constructor-pattern semantics (enums unaffected);
+names that resolve to nothing remain fresh binders.
+
+### Definition-of-done reconciliation
+
+- **R2 now errors; R1 and R3 still error; corpus + suites green.** ✅
+- **Regression fixture:** `jl4/examples/not-ok/tc/deontic-action-type-mismatch.l4`
+  (+ goldens). ✅ Plus a positive lock-in:
+  `jl4/examples/ok/regulative-action-param-reference.l4` (see below).
+- **Message shape — corrected expectation.** The DoD asked for R2 to match *R3's*
+  shape (`expected Action OF Court … Action OF Landlord`). Verified: that bare-`Action`
+  shape is **structurally unreachable** for a regulative clause. `inferExpr`
+  (`Regulative`) infers the clause type as `contract <freshParty> <freshAction>`, so
+  the action mismatch can only surface where the whole `DEONTIC` type is unified at
+  the definition/signature boundary. So R2 lands at the **signature level, matching
+  R1's shape**: *"…must match its type signature … `DEONTIC OF Party, Action OF Court`
+  but is here of type `DEONTIC OF Party, Action OF Landlord`."* This is consistent
+  with R1 (same clause kind) and still names both action indices.
+
+### Scope is broader than "MEANS-defined actions" (deliberate)
+
+`namesNonConstructorTerm` treats a bare action name as a reference whenever it
+resolves to **any** in-scope non-constructor term — a global `MEANS`/`Computable`,
+a `GIVEN` parameter, an `ASSUME`'d term, a record selector — not only parametric
+`MEANS` actions. Two consequences, both intended:
+
+- **Parameterised actions are now correct.** `GIVEN action … MUST action` (e.g.
+  `doc/courses/.../module-a2`'s `obligation within days`) now references the `action`
+  parameter instead of shadowing it with a wildcard binder that matched *any* event.
+  The teaching file's own traces are unchanged; the corrected behaviour is pinned by
+  the new `ok` lock-in (a non-matching action leaves the obligation pending; the
+  matching one FULFILLs). This file is outside the globbed test roots, hence the pin.
+- **Accidental name collisions now surface** as a type mismatch rather than silently
+  shadowing — the same footgun class that caused this bug.
+
+Overloaded names that are *both* a constructor and a term keep **constructor
+precedence** (the constructor candidate wins; no behaviour change for enums).
+
+### Adversarial review
+
+A 5-lens adversarial workflow (logic / regression / edge / DoD / evaluator),
+verified against the built binary: **6 findings confirmed, 1 refuted, no blockers.**
+All confirmed findings are the scope/message-shape nuances recorded above; none is a
+defect or a corpus regression. Actions taken: tightened the `checkActionPattern`
+doc comment to state the real scope, added the `ok` lock-in, and wrote this section.
+
+### Not done here
+
+The housing-act sweep could not be run on this branch (the corpus lives on
+`mengwong/housing-act-ground-1`); rerun it there when merging forward. The
+action-level *"DO clause"* diagnostic was **not** pursued — it would require pushing
+the declared contract type down into `inferExpr (Regulative …)`, which also relocates
+R1's message and touches party-type checking, for a cosmetic gain over the clear
+signature-level message above.
