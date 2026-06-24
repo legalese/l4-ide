@@ -1,0 +1,33 @@
+-- ============================================================================
+-- PENDING / EXPECTED-FAIL — this file documents the NEXT rung, not a regression.
+-- ============================================================================
+--
+-- It lives in not-ok/tc/ because it *should* be rejected, but the check that
+-- would reject it does not exist yet. So today it WRONGLY type-checks, and the
+-- "parses and checks" golden test reports it as failing (the file succeeds where
+-- the not-ok bucket expects a type error). That red is intentional: it is the
+-- acceptance test for the next milestone and will turn green once that lands.
+--
+-- THE NEXT RUNG — party / action-index agreement.
+-- The action-type-check fix makes the contract's *declared action type* be
+-- enforced (a `DEONTIC P (Action Drinker)` rejects an `Action Eater` value). It
+-- does NOT yet relate the two `DEONTIC` parameters to each other: the PARTY here
+-- is an `Eater`, the action type is `Action Drinker`, and nothing forces the
+-- party's actor to match the action's actor index. That tie — "an actor may only
+-- be obligated to do its own actions" — is the dependent / GADT-indexed step.
+--
+-- WHEN DONE: this clause must be a type error (Eater party vs Drinker action),
+-- the "parses and checks" test goes green, and the nlg/schema goldens (which
+-- currently capture the wrongly-accepted output) must be regenerated.
+
+DECLARE Eater   IS ONE OF AnEater
+DECLARE Drinker IS ONE OF ADrinker
+
+DECLARE Action who HAS `verb` IS A STRING
+
+GIVETH AN Action Drinker
+Drink MEANS Action WITH `verb` IS "drink"
+
+-- An Eater party bound to a Drinker action: incoherent, but currently accepted.
+GIVETH A DEONTIC Eater (Action Drinker)
+`eater bound to drinker action` MEANS PARTY AnEater MUST Drink WITHIN 30

@@ -240,6 +240,20 @@ All confirmed findings are the scope/message-shape nuances recorded above; none 
 defect or a corpus regression. Actions taken: tightened the `checkActionPattern`
 doc comment to state the real scope, added the `ok` lock-in, and wrote this section.
 
+### Executable markers for the multi-agent / next-rung boundary
+
+- `jl4/examples/ok/regulative-multiparty-residuation.l4` (green) — a `DEONTIC
+  Party Action` contract with *union* party/action types residuates Renter →
+  Landlord → Court freely. Pins that deepening the action check did **not** narrow
+  multi-agent residuation; it only enforces an action index when one is declared.
+- `jl4/examples/not-ok/tc/pending-deontic-party-action-agreement.l4`
+  (**intentional expected-fail**) — an `Eater` party bound to a `Drinker` action
+  (`DEONTIC Eater (Action Drinker)`). It *should* be rejected but currently
+  type-checks, so the suite reports exactly **one** failure ("parses and checks":
+  `expected False, got True`). That red is the acceptance test for the next rung —
+  party/action-index agreement — and turns green when it lands (then regenerate
+  the file's nlg/schema goldens). All other examples stay green (894/895).
+
 ### Not done here
 
 The housing-act sweep could not be run on this branch (the corpus lives on
