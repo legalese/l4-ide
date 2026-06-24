@@ -286,6 +286,14 @@ importing an SMT backend; D's singleton encoding both fails the matching case
 
 # Addendum — Rung 3: actor-correct *free* residuation ("the ball in either court")
 
+> **Status: this addendum is the original hand-sketch (2026-06-24), now
+> superseded by a design-workflow run that pressure-tested it against the rung-3
+> acceptance test on the live binary. The sketch's *diagnosis* (the residual
+> pin, the union/specific fork, the GIVETH-rigidity dodge) held; its *cost
+> framing* ("XL — first-class `Exists`") and its *load-bearing piece*
+> (actor-agnostic `DEONTIC SOME who` head) did not. Read "Addendum II —
+> validated findings" at the bottom before building anything.**
+
 ## Why this wasn't solved by rungs 1–2 (acceptance-test scoping)
 
 The design that produced rung 2 was driven by an acceptance test that was the
@@ -413,3 +421,152 @@ plus a **fresh per-clause `who`** rather than a single contract-level parameter.
   lean on L4's rigid `GIVETH` signatures to dodge GADT inference pain. Consider
   re-running the design workflow with the rung-3 acceptance test to pressure-test
   this sketch before building.
+
+---
+
+# Addendum II — Rung 3 validated findings (design-workflow run #2, 2026-06-24)
+
+A 4-subsystem-map → 4-proposal → adversarial-verdict workflow was run against the
+exact rung-3 acceptance test, with every claim checked on a freshly built `l4`
+binary (patches applied, contracts driven with `#TRACE` events). The sketch above
+was confirmed where it described *today's* behaviour and corrected where it
+guessed at *cost* and *mechanism*. Net: **the static refinement is cheaper than
+the sketch claimed (S–M, not XL), but "the ball in either court" at *runtime*
+needs a second change the sketch never mentioned.**
+
+## What held (sketch was right)
+
+- **The pin is `checkDeonton`'s `let rTy = contract partyT actionT`
+  (TypeCheck.hs:1125).** All four maps reproduced it independently: HENCE (1127)
+  and LEST (1128) are both checked against this one `rTy`, whose `partyT`/`actionT`
+  are the head clause's already-solved metavars — so every residual is forced to
+  the head actor. Confirmed even with *no* `GIVETH` signature (the first
+  `PARTY AnEater` solves `partyT := Eater` and pins the rest), and confirmed to
+  re-surface inside a polymorphic helper (`expected DEONTIC OF who … but who2`),
+  proving **no pure-L4 encoding closes both halves** — the seam itself must move.
+- **The union/specific fork is real and mutually exclusive under nominal typing**
+  (re-verified on the binary): union `DEONTIC Actor (Action Actor)` routes but
+  vacuously accepts `PARTY ADrinker MUST eat` (*"Check succeeded"*); specific
+  `DEONTIC Eater (Action Eater)` rejects the cross-actor `LEST`. A
+  coproduct/tagged single `Action` enum also fails half (2) (arity-0 action ⇒
+  agreement no-op). A polymorphic `GIVEN who GIVETH A DEONTIC who (Action who)`
+  doesn't even bind `who` as a type parameter today.
+- **GADT inference pain is dodged by L4's mandatory `GIVETH`.** Every contract is
+  checked bidirectionally against a written, rigid signature — exactly the
+  condition GHC's OutsideIn(X) and OCaml's locally-abstract types need to keep
+  indexed checking out of the no-principal-types swamp. This is the single
+  biggest reason rung 3 is tractable at all.
+- **Full dependent types / SMT (the "going Liquid" route) is overkill** — the
+  per-clause obligation is one *nominal equality* (party type ~ action's actor
+  index), not a refinement predicate. The LiquidHaskell decade-long slow burn is
+  the cost of the *SMT/refinement substrate*, which this problem never invokes.
+
+## What changed (sketch was wrong, in order of importance)
+
+### 1. There are TWO actor pins, not one — and the second is the real wall.
+
+The sketch (and the cheapest proposal) relaxes only the **static residual seam**
+(`checkDeonton:1125`). A verdict applied that ~8-line patch verbatim, rebuilt, and
+showed both halves of the acceptance test pass *as a static type-check*. Then it
+**drove the contract with events** and found the fatal flaw:
+
+> The `#TRACE`/`#CONTRACT` directive types the event stream as
+> `eventT = event partyT actionT` (**TypeCheck.hs:437**) with a *single* actor
+> pinned to the declared contract type. Feeding the cross-actor event the routing
+> exists to consume — `#TRACE pingpong … WITH PARTY ADrinker DOES drink` — fails:
+> *"EVENT OF Eater, Action OF Eater but is here EVENT OF Drinker, Action OF
+> Drinker."*
+
+So the cheap patch **relocates** the single-actor pin from the residual clause to
+the event seam rather than removing it. A contract that type-checks but cannot
+ingest its own routing event is not "routing the ball" in any runtime sense — and
+event-driven residuation is the entire point of an L4 contract. **To deliver
+executable rung-3 routing you must relax *both* seams coherently** (residual *and*
+event typing), and the event-seam relaxation re-opens soundness: you must add
+**event-time party/action agreement** (reject `ADrinker DOES eat` events) or the
+event stream becomes a hole. This is the honest "real rung," and it raises the
+cost from S to **M**.
+
+### 2. Cost is S–M, not XL — no first-class `Exists`, no skolem/escape machinery.
+
+The sketch's §"Toolchain changes (honest cost: XL)" overstated the type-system
+delta. The contained refinement needs **none of**: a new `Type'` constructor, a
+`unifyBase` `Forall`/`Exists` arm, skolemisation, TcLevels, an escape check, kind
+machinery, singletons, or SMT. The reason (confirmed by all four maps and the
+lessons agent): the per-clause actor index is **consumed entirely within the
+clause** — party and action are leaves, and obligations are *never destructured
+downstream* the way a GADT scrutinee is. **No elimination site ⇒ no escape hazard
+to police.** The "existential" is therefore *operational*, not a type: a fresh
+`InfVar` opened per residual (reusing the existing `fresh` + reflexive-nominal
+unifier), solved by the residual's own party, and discarded. The XL number in the
+sketch applies only to the *first-class-`Exists`* route (general `∃` constructor +
+skolem-escape infrastructure), which the workflow judged the **wrong altitude**:
+~10 new arms across `Type'`-matching code plus genuinely-new unifier machinery
+L4 has zero of today (grep confirms no `skolem`/`rigid`/`level`/`escape` anywhere
+in TypeCheck/Types/Unify/Environment), bought for nothing this problem needs.
+
+### 3. Do NOT make the contract head actor-agnostic (`DEONTIC SOME who` / 0-arg).
+
+The sketch's load-bearing piece was an actor-erased head. The workflow rejected it
+twice over: (a) `GIVETH A DEONTIC` with no actor arg is an **arity error today**
+(*"expected 2, found 0"*, plus a confusing double-report); (b) more fundamentally
+an actor-agnostic head has **no concrete party/action to feed the event type**
+`event partyT actionT` — the same wall as finding #1, hit from the other side. The
+viable shape keeps a **concrete head** (`DEONTIC Eater (Action Eater)`) and
+relaxes the *seams*.
+
+### 4. The soundness pin: freshen the index, never the action head.
+
+The obvious one-line version — fresh *both* party and action per residual — is
+**unsound** (a verdict confirmed it accepts `Dog MUST Cat` / a `Robot` LEST). The
+correct shape pins the action **head** and freshens only its **index**, with party
+and action sharing **one** fresh actor: `rTy_resid = contract (fresh w)
+(Action (fresh w))`. Within-clause, rung-2's already-shipped
+`checkPartyActionAgreement` forces `w` to the party's actor type, preserving the
+reject-half; across residuals, distinct `w`s let the ball route.
+
+### 5. The reject-half needs per-actor party *types* (rung-2's known limitation).
+
+Half (2) of the acceptance test (`PARTY ADrinker MUST eat` rejected) survives only
+because each actor is its own `DECLARE … IS ONE OF` type, so `ADrinker : Drinker`
+and agreement `Drinker ~ Eater` bites. A **single union `Party` enum** makes the
+party type identical for everyone and agreement goes vacuous again — so rung 3, to
+keep its teeth, presumes per-actor party types (or an actor-indexed `Party who`).
+
+## Cost-corrected recommendation
+
+| Goal | Change | Cost | Soundness |
+|---|---|---|---|
+| **Static actor-correct well-formedness** (routing contract *type-checks*; bad clause rejected statically) | Relax residual seam at `checkDeonton:1125`: fresh actor index per residual, action-head pinned + index freshened (share one `w`), re-run rung-2 agreement per clause. No new `Type'`, no skolem machinery. | **S** (~8 lines, suite stays green) | Sound (only accepts programs today wrongly rejected); but the routed contract is **undriveable by cross-actor events** |
+| **Executable actor-correct routing** ("the ball in either court" *at runtime*) | The above **plus** relax the event-typing seam (`eventT = event partyT actionT`, ~TypeCheck.hs:437) with **event-time agreement** so cross-actor events type-check yet stay actor-checked. | **M** | Sound iff event-time agreement is added; re-opens soundness at the event seam |
+| **First-class existential obligations** (general `∃`, honest actor-erased head) | New `Type'` constructor + skolemise + TcLevels + escape check + ~10 match arms + Event-type rework. | **XL** | Sound but **wrong altitude** — buys generality this problem never uses; breaks event typing unless also reworked |
+
+- **Reject** the actor-agnostic `DEONTIC SOME who` head (arity + event-typing
+  collision) and **reject** the first-class-`Exists`/full-dependent/SMT routes.
+- **The legibility tradeoff is the one real design decision left:** a concrete head
+  with relaxed seams means a `DEONTIC Eater` contract silently admits a `Robot`
+  residual — the declared type stops documenting "who this contract is about." Two
+  exits: live with it, or **bound the fresh actor to a declared union** (which
+  partially re-introduces the union encoding rung 3 set out to retire). Pick when a
+  concrete case forces it.
+- **Interim, available today:** runtime `PROVIDED` guard on the union encoding
+  (`DEONTIC Actor (Action Actor)` + a guard that party and action denote the same
+  actor). It is the **only multi-actor encoding that drives events end-to-end
+  today** — but actor-correctness is *dynamic*, and the union footgun (vacuous
+  static agreement) persists until rung 3 ships.
+
+## Error-message hazard (carry into whichever rung is built)
+
+The CNL/proof-tool usability literature (Naproche, Lean autoformalization) is
+unanimous: index/type errors are the dominant comprehension barrier for
+non-experts, and the fix is a **domain-phrased message with a concrete repair
+hint**, never raw solver/type output. Rung 2 already does this ("An actor may only
+be obligated to perform its own actions"). Rung 3 must not regress it: a leaked
+unsolved actor index would otherwise surface as `who.0` / `$App_'b` /
+*"rigid type variable would escape its scope"* — pure PL jargon at the
+`ExpectRegulativeFollowupContext` seam a lawyer actually reads. The contained
+approach mostly avoids this (the fresh index is solved by the residual's own
+party), so it is **lower priority than the original sketch implied** — but a
+domain-phrased `prettyTypeMismatch` arm for an unconstrained residual actor is
+still worth adding, and the closed `GIVETH` annotation should be treated as the
+boundary past which no actor index may leak.
