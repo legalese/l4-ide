@@ -1,0 +1,25 @@
+-- Positive lock-in for rung 2 (party / action-index agreement): the matching
+-- case is ACCEPTED. Each actor is obligated only to its own actions, and the
+-- contract types pair each party with the agreeing action index.
+--
+-- The rejection case lives in not-ok/tc/deontic-party-action-agreement.l4.
+-- See specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
+
+DECLARE Eater   IS ONE OF AnEater
+DECLARE Drinker IS ONE OF ADrinker
+
+DECLARE Action who HAS `verb` IS A STRING
+
+GIVETH AN Action Eater
+Eat MEANS Action WITH `verb` IS "eat"
+
+GIVETH AN Action Drinker
+Drink MEANS Action WITH `verb` IS "drink"
+
+-- Eater obligated to an Eater action: agrees.
+GIVETH A DEONTIC Eater (Action Eater)
+`eater eats` MEANS PARTY AnEater MUST Eat WITHIN 30
+
+-- Drinker obligated to a Drinker action: agrees.
+GIVETH A DEONTIC Drinker (Action Drinker)
+`drinker drinks` MEANS PARTY ADrinker MUST Drink WITHIN 30

@@ -240,19 +240,30 @@ All confirmed findings are the scope/message-shape nuances recorded above; none 
 defect or a corpus regression. Actions taken: tightened the `checkActionPattern`
 doc comment to state the real scope, added the `ok` lock-in, and wrote this section.
 
-### Executable markers for the multi-agent / next-rung boundary
+### Rung 2 — party / action-index agreement (IMPLEMENTED)
 
-- `jl4/examples/ok/regulative-multiparty-residuation.l4` (green) — a `DEONTIC
-  Party Action` contract with *union* party/action types residuates Renter →
-  Landlord → Court freely. Pins that deepening the action check did **not** narrow
-  multi-agent residuation; it only enforces an action index when one is declared.
-- `jl4/examples/not-ok/tc/pending-deontic-party-action-agreement.l4`
-  (**intentional expected-fail**) — an `Eater` party bound to a `Drinker` action
-  (`DEONTIC Eater (Action Drinker)`). It *should* be rejected but currently
-  type-checks, so the suite reports exactly **one** failure ("parses and checks":
-  `expected False, got True`). That red is the acceptance test for the next rung —
-  party/action-index agreement — and turns green when it lands (then regenerate
-  the file's nlg/schema goldens). All other examples stay green (894/895).
+Designed via a multi-agent design workflow and implemented in the same branch.
+Direct answer to "do we need dependent types / GADTs?": **no** — the actor index
+is an ordinary HM type argument, so one nominal type-equality
+(`checkPartyActionAgreement`) at the clause is enough. Full write-up + roadmap +
+the LiquidHaskell/Dependent-Haskell/GADT lessons:
+`specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`.
+
+Executable markers (all green; the former pending xfail is now a passing
+regression):
+
+- `jl4/examples/ok/regulative-multiparty-residuation.l4` — a `DEONTIC Party
+  Action` contract with *union* types residuates Renter → Landlord → Court
+  freely. Pins that neither rung narrowed multi-agent residuation.
+- `jl4/examples/not-ok/tc/deontic-party-action-agreement.l4` — `DEONTIC Eater
+  (Action Drinker)` is rejected ("an actor may only be obligated to perform its
+  own actions").
+- `jl4/examples/ok/regulative-actor-indexed-action.l4` — the matching case
+  (`DEONTIC Eater (Action Eater)`) is accepted.
+
+Suite: jl4 899/0, core 46/0. Known limitations (double-report on already-ill-typed
+clauses; the `party-type == actor-index` modelling convention) are documented in
+the spec.
 
 ### Not done here
 

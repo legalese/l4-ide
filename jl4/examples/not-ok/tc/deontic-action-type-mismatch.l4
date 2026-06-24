@@ -7,6 +7,12 @@
 -- `seek possession` in its MUST slot must be a type error. Before the fix the
 -- bare action name was treated as a fresh pattern binder, silently dropping the
 -- index and accepting the wrong-actor action.
+--
+-- NOTE: this clause now also trips rung 2 (party/action-index agreement): the
+-- party type `Party` does not match the action's actor index `Landlord`, so the
+-- golden shows two errors. Both are true; see
+-- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md (double-report is a known,
+-- cosmetic limitation — agreement and the declared-type check are redundant here).
 
 DECLARE Court    IS ONE OF TheCourt
 DECLARE Landlord IS ONE OF TheLandlord

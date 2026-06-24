@@ -147,6 +147,7 @@ data ExpectationContext =
   | ExpectRegulativeContractContext -- when invoking a contract directive
   | ExpectRegulativeEventContext -- check an event expr
   | ExpectRegulativeProvidedContext -- the provided clauses are predicates on the variables bound by the pattern
+  | ExpectPartyActionAgreementContext -- a PARTY may only be obligated to perform its own (actor-indexed) actions
   | ExpectAssertContext -- assertions should be Boolean
   | ExpectPostUrlContext -- URL argument of POST
   | ExpectPostHeadersContext -- headers argument of POST

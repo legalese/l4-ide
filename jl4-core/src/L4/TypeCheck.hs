@@ -1121,6 +1121,7 @@ checkDeonton
 checkDeonton ann party action due hence lest partyT actionT = do
   partyR <- checkExpr ExpectRegulativePartyContext party partyT
   (actionR, boundByPattern) <- checkAction action actionT
+  checkPartyActionAgreement partyT actionT
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
@@ -1135,6 +1136,35 @@ checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
     extendKnownMany bounds do
       checkExpr ExpectRegulativeProvidedContext provided boolean
   pure (MkAction {anno, modal, action = pat, provided}, bounds)
+
+-- | Rung 2 of actor-indexed actions: a PARTY may only be obligated to perform
+-- its /own/ actions. When the action's type is a single-index, actor-typed
+-- action (e.g. @Action Drinker@), require that actor index to agree with the
+-- party's type — so @PARTY AnEater MUST Drink@ under @DEONTIC Eater (Action
+-- Drinker)@ is rejected, while @DEONTIC Eater (Action Eater)@ is accepted.
+--
+-- The index is already an ordinary HM type argument (a @MEANS@-defined
+-- @Drink@ has type @Action Drinker@), so this is one nominal-equality
+-- constraint — no GADTs, no dependent types. See
+-- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
+--
+-- Scope (deliberately narrow, so existing contracts are untouched):
+--
+--   * arity-0 action types (plain enums / unions — the whole current corpus,
+--     and multi-agent @DEONTIC Party Action@ contracts) carry no actor index,
+--     so the check is a no-op and residuation is preserved;
+--   * arity-2+ action types (e.g. @Action Object Actor@) have no unambiguous
+--     "the actor" index, so we conservatively skip rather than guess which
+--     argument is the actor;
+--   * only single-index (@Action who@) actions are constrained.
+checkPartyActionAgreement :: Type' Resolved -> Type' Resolved -> Check ()
+checkPartyActionAgreement partyT actionT = do
+  partyT'  <- applySubst partyT
+  actionT' <- applySubst actionT
+  case actionT' of
+    -- exactly one type argument: that argument is the action's actor index
+    TyApp _ _ [idx] -> expect ExpectPartyActionAgreementContext partyT' idx
+    _               -> pure ()
 
 -- | Check the action of a regulative @MUST@/@MAY@ clause against the action
 -- type declared in the contract's @DEONTIC <Party> <Action>@ signature.
@@ -3485,6 +3515,11 @@ prettyTypeMismatch ExpectRegulativeEventContext expected given =
   standardTypeMismatch [ "The event expr passed to a TRACE directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRegulativeProvidedContext expected given =
   standardTypeMismatch [ "The PROVIDED clause for filtering the ACTION is expected to be of type" ] expected given
+prettyTypeMismatch ExpectPartyActionAgreementContext expected given =
+  standardTypeMismatch
+    [ "An actor may only be obligated to perform its own actions."
+    , "This action's actor is expected to match the party, of type"
+    ] expected given
 prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
