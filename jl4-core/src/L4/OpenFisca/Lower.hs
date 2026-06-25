@@ -220,7 +220,9 @@ lowerExpr env = go
       Right (OFVarRef (pyIdent (resolvedToText field)))
     App _ s [] | Just (getUnique s) == env.envMember ->
       Right (OFMembersVar (pyIdent (resolvedToText field)))
-    _ -> Left "only projection off the subject (or a member, inside an aggregation) is supported (nested records are a later milestone)"
+    App _ s [] | Just (getUnique s) == env.envPeriod ->
+      Right (OFPeriodField (pyIdent (resolvedToText field)))  -- period's year → period.start.year
+    _ -> Left "only projection off the subject, a member, or the period is supported (nested records are a later milestone)"
 
   -- After resolution L4 desugars operators to builtin applications
   -- (@a * b@ → @App __TIMES__ [a, b]@), so arithmetic/boolean/comparison ops
@@ -236,7 +238,12 @@ lowerExpr env = go
         Just mk -> traverse go args >>= mk
         Nothing
           | Just b <- boolLit nm                      -> Right (OFBoolLit b)
-          | Just name <- Map.lookup u env.envExported -> Right (OFVarRef name)  -- call another decision
+          -- a call to another @export decision: on a member (inside an
+          -- aggregation) it reads that member's variable; otherwise the entity's.
+          | Just name <- Map.lookup u env.envExported ->
+              Right $ case args of
+                (App _ x [] : _) | Just (getUnique x) == env.envMember -> OFMembersVar name
+                _                                                      -> OFVarRef name
           | not (null args)                           -> Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
           | Just name <- Map.lookup u env.envScalars  -> Right (OFVarRef name)
           | Just u == env.envPeriod                   -> Right (OFLocal "period")

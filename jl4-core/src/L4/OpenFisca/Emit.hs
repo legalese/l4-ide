@@ -217,6 +217,7 @@ emitExpr ent entPy = go
     OFScaleCalc path income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
     OFEnumLit cls mem -> cls <> "." <> mem
     OFNpCall fn as -> "np." <> fn <> "(" <> Text.intercalate ", " (map go as) <> ")"
+    OFPeriodField f -> "period.start." <> f
 
   binOp = \case
     OFAdd -> "+"; OFSub -> "-"; OFMul -> "*"; OFDiv -> "/"; OFMod -> "%"

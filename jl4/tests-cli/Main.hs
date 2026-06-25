@@ -343,6 +343,10 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/dated.l4"]
                        "examples/openfisca/expected/dated.py"
 
+    it "compiles a member decision-call inside an aggregation (agecheck)" $
+      expectGolden bin ["openfisca", "examples/openfisca/agecheck.l4"]
+                       "examples/openfisca/expected/agecheck.py"
+
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
       Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess

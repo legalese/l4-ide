@@ -105,6 +105,7 @@ data OFExpr
   | OFScaleCalc Text OFExpr         -- ^ @parameters(period).<path>.calc(<income>)@
   | OFEnumLit Text Text             -- ^ @<EnumClass>.<member>@
   | OFNpCall  Text [OFExpr]         -- ^ @np.<fn>(<args>)@ — e.g. maximum/minimum
+  | OFPeriodField Text              -- ^ @period.start.<field>@ — e.g. period's year
   deriving stock (Eq, Show, Generic)
 
 -- | One bracket of a marginal-rate scale. Threshold and rate are date-indexed

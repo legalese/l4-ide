@@ -40,6 +40,9 @@ EXAMPLES = [
     ("dated", "Dated formulas",
      "BRANCH IF period reaches Y, M -> OpenFisca formula_YYYY_MM methods; the "
      "engine selects by period."),
+    ("agecheck", "Member decision-calls",
+     "age OF c, period inside any -> household.members('age', period); the called "
+     "decision compiles as a Person variable; period's year -> period.start.year."),
 ]
 
 

@@ -82,6 +82,20 @@ def main():
             print(f"  {occ} sz={sz} {var} = {got}  (L4 expected {exp})  "
                   f"{'OK' if ok else '*** MISMATCH ***'}")
             assert ok, got
+    elif which == "agecheck":
+        def hh(members):
+            return {"persons": {p: {"birth_year": {"2026-01": by}} for p, by in members},
+                    "households": {"h": {"members": [p for p, _ in members]}}}
+        sim = SimulationBuilder().build_from_entities(tbs, hh([("baby", 2020), ("teen", 2010)]))
+        for var, e in [("age", 6.0), ("has_young_child", 1.0)]:
+            got = float(sim.calculate(var, "2026-01")[0]); ok = abs(got - e) < 1e-6
+            print(f"  {var} = {got}  (L4 expected {e})  {'OK' if ok else '*** MISMATCH ***'}")
+            assert ok, got
+        sim2 = SimulationBuilder().build_from_entities(tbs, hh([("teen", 2010)]))
+        got = float(sim2.calculate("has_young_child", "2026-01")[0])
+        print(f"  has_young_child(no kids) = {got}  (L4 expected 0.0)  "
+              f"{'OK' if abs(got) < 1e-6 else '*** MISMATCH ***'}")
+        assert abs(got) < 1e-6, got
     elif which == "dated":
         # dated formulas: OpenFisca picks formula_YYYY_MM by period.
         for per, sal, exp in [("2015-11", 0, 0.0), ("2015-12", 0, 600.0),
