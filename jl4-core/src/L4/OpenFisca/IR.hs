@@ -19,13 +19,23 @@ module L4.OpenFisca.IR
   , OFCmpOp (..)
   , OFBracket (..)
   , OFScaleParam (..)
+  , OFEnumDef (..)
   , OFPackage (..)
   ) where
 
 import Base
 
--- | OpenFisca @value_type@s we support in v1.
-data OFType = OFFloat | OFInt | OFBool | OFStr
+-- | OpenFisca @value_type@s. @OFEnum class default@ carries the Python enum
+-- class name and its default member (for @default_value@).
+data OFType = OFFloat | OFInt | OFBool | OFStr | OFEnum Text Text
+  deriving stock (Eq, Show, Generic)
+
+-- | An @enum@ declaration: a Python class name and its members as
+-- (python attribute, original string value) pairs.
+data OFEnumDef = OFEnumDef
+  { enName    :: !Text
+  , enMembers :: ![(Text, Text)]
+  }
   deriving stock (Eq, Show, Generic)
 
 -- | OpenFisca @definition_period@.
@@ -92,6 +102,8 @@ data OFExpr
   | OFNeg     OFExpr
   | OFCond    OFExpr OFExpr OFExpr   -- ^ @np.where(cond, then, else)@
   | OFScaleCalc Text OFExpr         -- ^ @parameters(period).<path>.calc(<income>)@
+  | OFEnumLit Text Text             -- ^ @<EnumClass>.<member>@
+  | OFNpCall  Text [OFExpr]         -- ^ @np.<fn>(<args>)@ — e.g. maximum/minimum
   deriving stock (Eq, Show, Generic)
 
 -- | One bracket of a marginal-rate scale. Threshold and rate are date-indexed
@@ -116,5 +128,6 @@ data OFPackage = OFPackage
   , pkgEntities   :: ![OFEntity]
   , pkgVariables  :: ![OFVariable] -- ^ input variables first, then computed, in stable order
   , pkgParameters :: ![OFScaleParam]
+  , pkgEnums      :: ![OFEnumDef]
   }
   deriving stock (Eq, Show, Generic)

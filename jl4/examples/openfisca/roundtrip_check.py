@@ -68,6 +68,20 @@ def main():
             print(f"  {var} = {got}  (L4 expected {e})  "
                   f"{'OK' if ok else '*** MISMATCH ***'}")
             assert ok, got
+    elif which == "housing":
+        cases = [("tenant", 40, "housing_tax", 400.0),
+                 ("free_lodger", 40, "housing_tax", 0.0),
+                 ("owner", 100, "housing_tax", 1000.0),
+                 ("free_lodger", 40, "owns_or_rents", 0.0)]
+        for occ, sz, var, exp in cases:
+            sim = SimulationBuilder().build_from_entities(tbs, {"households": {"h": {
+                "occupancy_status": {"2026-01": occ},
+                "accommodation_size": {"2026-01": sz}}}})
+            got = float(sim.calculate(var, "2026-01")[0])
+            ok = abs(got - exp) < 1e-6
+            print(f"  {occ} sz={sz} {var} = {got}  (L4 expected {exp})  "
+                  f"{'OK' if ok else '*** MISMATCH ***'}")
+            assert ok, got
     elif which == "scale":
         # time-varying marginal-rate scale: brackets resolve by period.
         for per, sal, exp in [("2013-01", 2000, 60.0), ("2013-01", 15000, 660.0),

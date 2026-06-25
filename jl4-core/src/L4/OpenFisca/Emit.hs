@@ -21,6 +21,7 @@ renderPackage pkg =
        header pkg
     <> [""]
     <> concatMap entityLines pkg.pkgEntities
+    <> concatMap enumLines pkg.pkgEnums
     <> parameterLines pkg.pkgParameters
     <> concatMap variableLines pkg.pkgVariables
     <> systemLines pkg
@@ -34,8 +35,15 @@ header pkg =
   , "from openfisca_core.variables import Variable"
   , "from openfisca_core.periods import MONTH, YEAR, ETERNITY"
   ]
+  <> [ "from openfisca_core.indexed_enums import Enum" | not (null pkg.pkgEnums) ]
   <> [ "from openfisca_core.parameters import ParameterNode" | not (null pkg.pkgParameters) ]
   <> [ "import numpy as np" ]
+
+enumLines :: OFEnumDef -> [Text]
+enumLines e =
+     [ "class " <> e.enName <> "(Enum):" ]
+  <> [ ind 1 <> mem <> " = " <> pyStr val | (mem, val) <- e.enMembers ]
+  <> [ "" ]
 
 entityLines :: OFEntity -> [Text]
 entityLines e =
@@ -67,12 +75,22 @@ variableLines :: OFVariable -> [Text]
 variableLines v =
      [ "class " <> v.varName <> "(Variable):"
      , ind 1 <> "value_type = " <> pyValueType v.varType
-     , ind 1 <> "entity = " <> v.varEntity
+     ]
+  <> enumAttrs v.varType
+  <> [ ind 1 <> "entity = " <> v.varEntity
      , ind 1 <> "definition_period = " <> pyPeriod v.varPeriod
      , ind 1 <> "label = " <> pyStr v.varLabel
      ]
   <> formulaLines v
   <> [""]
+
+enumAttrs :: OFType -> [Text]
+enumAttrs = \case
+  OFEnum cls dflt ->
+    [ ind 1 <> "possible_values = " <> cls
+    , ind 1 <> "default_value = " <> cls <> "." <> dflt
+    ]
+  _ -> []
 
 formulaLines :: OFVariable -> [Text]
 formulaLines v = case v.varFormula of
@@ -98,6 +116,7 @@ usesParams = \case
   OFSum _ a       -> usesParams a
   OFAny _ a       -> usesParams a
   OFAll _ a       -> usesParams a
+  OFNpCall _ as   -> any usesParams as
   OFCond a b c    -> usesParams a || usesParams b || usesParams c
   _               -> False
 
@@ -190,6 +209,8 @@ emitExpr ent entPy = go
     OFNeg a      -> paren ("-" <> go a)
     OFCond c t e -> "np.where(" <> go c <> ", " <> go t <> ", " <> go e <> ")"
     OFScaleCalc path income -> "parameters(period)." <> path <> ".calc(" <> go income <> ")"
+    OFEnumLit cls mem -> cls <> "." <> mem
+    OFNpCall fn as -> "np." <> fn <> "(" <> Text.intercalate ", " (map go as) <> ")"
 
   binOp = \case
     OFAdd -> "+"; OFSub -> "-"; OFMul -> "*"; OFDiv -> "/"; OFMod -> "%"
@@ -209,6 +230,7 @@ paren t = "(" <> t <> ")"
 pyValueType :: OFType -> Text
 pyValueType = \case
   OFFloat -> "float"; OFInt -> "int"; OFBool -> "bool"; OFStr -> "str"
+  OFEnum _ _ -> "Enum"
 
 pyPeriod :: OFPeriod -> Text
 pyPeriod = \case

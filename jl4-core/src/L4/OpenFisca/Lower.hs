@@ -14,6 +14,7 @@ module L4.OpenFisca.Lower
   ) where
 
 import Base
+import Control.Applicative ((<|>))
 import Data.Char (isAlphaNum, isDigit, toLower)
 import Data.Either (partitionEithers)
 import qualified Data.Map.Strict as Map
@@ -61,14 +62,15 @@ lowerModule mod' =
   case getExportedFunctions mod' of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
     efs ->
-      let records     = collectRecords mod'
+      let (enumDefs, enumCons) = collectEnums mod'
+          records     = collectRecords enumDefs mod'
           scaleParams = collectScaleParams mod'
           scalePaths  = Map.map (.spPath) scaleParams
           exportedU   = Map.fromList
             [ (getUnique (decideName ef.exportDecide), pyIdent ef.exportName)
             | ef <- efs
             ]
-          results    = map (lowerOne records exportedU scalePaths) efs
+          results    = map (lowerOne enumDefs enumCons records exportedU scalePaths) efs
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
@@ -80,17 +82,20 @@ lowerModule mod' =
                   , pkgEntities   = ents
                   , pkgVariables  = vars
                   , pkgParameters = Map.elems scaleParams
+                  , pkgEnums      = Map.elems enumDefs
                   }
 
 -- | Lower a single exported decision into the entity it lives on plus the
 -- variables it introduces (its inputs + the computed variable itself).
 lowerOne
-  :: Map Text RecordInfo
-  -> Map Unique Text   -- ^ exported decisions: unique → variable name
-  -> Map Unique Text   -- ^ scale parameters: unique → dotted path
+  :: Map Text OFEnumDef
+  -> Map Unique (Text, Text)  -- ^ enum constructors: unique → (class, member)
+  -> Map Text RecordInfo
+  -> Map Unique Text          -- ^ exported decisions: unique → variable name
+  -> Map Unique Text          -- ^ scale parameters: unique → dotted path
   -> ExportedFunction
   -> Either LowerError ([OFEntity], [OFVariable])
-lowerOne records exportedU scalePaths ef = do
+lowerOne enums enumCons records exportedU scalePaths ef = do
   let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body = ef.exportDecide
       fnName  = pyIdent ef.exportName
       mSubj   = firstJust [ (g, ri) | g <- givens, ri <- maybeToList (givenRecord records g) ]
@@ -118,6 +123,7 @@ lowerOne records exportedU scalePaths ef = do
         , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
         , envExported   = exportedU
         , envListFields = subjListFields
+        , envEnumCons   = enumCons
         }
   formula <- mapLeft (LowerError fnName) (lowerExpr env body)
 
@@ -139,7 +145,7 @@ lowerOne records exportedU scalePaths ef = do
       scalarInputs =
         [ OFVariable
             { varName    = pyIdent (givenText g)
-            , varType    = maybe OFFloat ofTypeOfL4 (givenType g)
+            , varType    = maybe OFFloat (ofTypeOf enums) (givenType g)
             , varEntity  = ent.entPy
             , varEntKey  = ent.entKey
             , varPeriod  = ofPeriod
@@ -151,7 +157,7 @@ lowerOne records exportedU scalePaths ef = do
       computed =
         OFVariable
           { varName    = fnName
-          , varType    = maybe OFFloat ofTypeFromGiveth mGiveth
+          , varType    = maybe OFFloat (ofTypeFromGiveth enums) mGiveth
           , varEntity  = ent.entPy
           , varEntKey  = ent.entKey
           , varPeriod  = ofPeriod
@@ -174,6 +180,7 @@ data LowerEnv = LowerEnv
   , envScalars    :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
   , envExported   :: !(Map Unique Text)  -- ^ exported decisions → variable names
   , envListFields :: ![Text]             -- ^ the subject's @LIST OF@ field names (roles)
+  , envEnumCons   :: !(Map Unique (Text, Text))  -- ^ enum constructor → (class, member)
   }
 
 lowerExpr :: LowerEnv -> Expr Resolved -> Either Text OFExpr
@@ -199,6 +206,7 @@ lowerExpr env = go
     Lit _ (StringLit _ t)  -> Right (OFStrLit t)
     Proj _ inner field -> lowerProj inner field
     App _ ref args     -> lowerApp ref args
+    Consider _ scrut branches -> lowerConsider scrut branches
     other -> Left (unsupported other)
 
   -- @p's field@: on the subject → a variable read; on a member (inside an
@@ -214,22 +222,28 @@ lowerExpr env = go
   -- (@a * b@ → @App __TIMES__ [a, b]@), so arithmetic/boolean/comparison ops
   -- arrive here rather than as 'Times'/'And'/… constructors.
   lowerApp ref args =
-    let u = getUnique ref
+    let u  = getUnique ref
         nm = resolvedToText ref
-    in case scaleCall nm args of
-     Just res -> res
-     Nothing -> case aggregation nm args of
+        -- specialised recognisers, each returning Maybe (Either Text OFExpr)
+        recognised = scaleCall nm args <|> aggregation nm args <|> npFunc nm args
+    in case recognised of
       Just res -> res
       Nothing -> case builtinOp nm of
-       Just mk -> traverse go args >>= mk
-       Nothing
-        | Just b <- boolLit nm                      -> Right (OFBoolLit b)
-        | Just name <- Map.lookup u env.envExported -> Right (OFVarRef name)  -- call another decision
-        | not (null args)                           -> Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
-        | Just name <- Map.lookup u env.envScalars  -> Right (OFVarRef name)
-        | Just u == env.envPeriod                   -> Right (OFLocal "period")
-        | Just u == env.envSubject                  -> Left "the subject entity cannot be used as a value"
-        | otherwise                                 -> Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+        Just mk -> traverse go args >>= mk
+        Nothing
+          | Just b <- boolLit nm                      -> Right (OFBoolLit b)
+          | Just name <- Map.lookup u env.envExported -> Right (OFVarRef name)  -- call another decision
+          | not (null args)                           -> Left ("cannot compile call to `" <> nm <> "` — OpenFisca formulas take no arguments; only references to other @export decisions are supported")
+          | Just name <- Map.lookup u env.envScalars  -> Right (OFVarRef name)
+          | Just u == env.envPeriod                   -> Right (OFLocal "period")
+          | Just u == env.envSubject                  -> Left "the subject entity cannot be used as a value"
+          | otherwise                                 -> Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+
+  -- numpy elementwise functions reachable as plain L4 calls.
+  npFunc nm args = case nm of
+    "max" -> Just (OFNpCall "maximum" <$> traverse go args)
+    "min" -> Just (OFNpCall "minimum" <$> traverse go args)
+    _     -> Nothing
 
   -- Marginal-rate scale application. @scale tax OF <income>, <scaleRef>@ where
   -- <scaleRef> is a @desc scale <path>@ value → @parameters(period).<path>.calc(<income>)@.
@@ -293,6 +307,22 @@ lowerExpr env = go
     "false" -> Just False
     _       -> Nothing
 
+  -- @CONSIDER scrut WHEN C1 THEN v1 … OTHERWISE d@ over an enum becomes nested
+  -- @np.where(scrut == Class.c1, v1, …, d)@.
+  lowerConsider scrut branches = do
+    scrutE <- go scrut
+    let whens  = [ (con, body) | MkBranch _ (When _ (PatApp _ con [])) body <- branches ]
+        others = [ body        | MkBranch _ (Otherwise _) body            <- branches ]
+    def <- case others of
+      (d : _) -> go d
+      []      -> Left "CONSIDER without an OTHERWISE is not supported for OpenFisca"
+    arms <- traverse (lowerArm scrutE) whens
+    pure (foldr (\(c, v) acc -> OFCond c v acc) def arms)
+
+  lowerArm scrutE (con, body) = case Map.lookup (getUnique con) env.envEnumCons of
+    Just (cls, mem) -> (\v -> (OFCmp OFEq scrutE (OFEnumLit cls mem), v)) <$> go body
+    Nothing -> Left ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor (only enum CONSIDER is supported)")
+
 -- | The builtin operators L4 desugars infix syntax into. Returns a combiner
 -- that consumes the already-lowered argument expressions.
 builtinOp :: Text -> Maybe ([OFExpr] -> Either Text OFExpr)
@@ -350,8 +380,8 @@ constructorName = \case
 -- Module scanning helpers
 -- ---------------------------------------------------------------------------
 
-collectRecords :: Module Resolved -> Map Text RecordInfo
-collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
+collectRecords :: Map Text OFEnumDef -> Module Resolved -> Map Text RecordInfo
+collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
  where
   goSection (MkSection _ _ _ decls) = decls >>= goDecl
   goDecl = \case
@@ -362,7 +392,7 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
               , riPlural = Text.toLower (pyIdent nm) <> "s"
               , riPy     = pyType nm
               , riFields =
-                  [ fieldInfo fRes fTy mMeans
+                  [ fieldInfo enums fRes fTy mMeans
                   | MkTypedName _ fRes fTy mMeans <- fields
                   ]
               })]
@@ -452,14 +482,35 @@ alignByIndex arms =
 epochDate :: Text
 epochDate = "1900-01-01"
 
-fieldInfo :: Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
-fieldInfo fRes fTy mMeans =
+fieldInfo :: Map Text OFEnumDef -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
+fieldInfo enums fRes fTy mMeans =
   case listElemRecord fTy of
-    Just elemName -> FieldInfo nm OFFloat        stored (Just elemName)
-    Nothing       -> FieldInfo nm (ofTypeOfL4 fTy) stored Nothing
+    Just elemName -> FieldInfo nm OFFloat             stored (Just elemName)
+    Nothing       -> FieldInfo nm (ofTypeOf enums fTy) stored Nothing
  where
   nm     = pyIdent (resolvedToText fRes)
   stored = isNothing mMeans
+
+-- | Scan @DECLARE X IS ONE OF a, b, …@ enum declarations. Returns the enum defs
+-- keyed by L4 type name, plus a map from each constructor's 'Unique' to its
+-- (Python enum class, Python member) — used to lower @CONSIDER@.
+collectEnums :: Module Resolved -> (Map Text OFEnumDef, Map Unique (Text, Text))
+collectEnums (MkModule _ _ section) =
+  ( Map.fromList [ (ty, ed) | (ty, ed, _)  <- defs ]
+  , Map.fromList (concat   [ cs | (_, _, cs) <- defs ])
+  )
+ where
+  defs = goSection section
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ conDecls)) ->
+      let ty      = resolvedToText tyRes
+          enPy    = pyType ty
+          members = [ (pyIdent (resolvedToText c), resolvedToText c)      | MkConDecl _ c _ <- conDecls ]
+          cons    = [ (getUnique c, (enPy, pyIdent (resolvedToText c)))   | MkConDecl _ c _ <- conDecls ]
+      in [(ty, OFEnumDef { enName = enPy, enMembers = members }, cons)]
+    Section _ sub -> goSection sub
+    _ -> []
 
 -- | If a type is @LIST OF <Record>@, return the element record's name.
 listElemRecord :: Type' Resolved -> Maybe Text
@@ -540,17 +591,21 @@ typeRecordName _                = Nothing
 -- Types
 -- ---------------------------------------------------------------------------
 
-ofTypeFromGiveth :: GivethSig Resolved -> OFType
-ofTypeFromGiveth (MkGivethSig _ ty) = ofTypeOfL4 ty
+ofTypeFromGiveth :: Map Text OFEnumDef -> GivethSig Resolved -> OFType
+ofTypeFromGiveth enums (MkGivethSig _ ty) = ofTypeOf enums ty
 
-ofTypeOfL4 :: Type' Resolved -> OFType
-ofTypeOfL4 = \case
-  TyApp _ name _ -> case Text.toLower (resolvedToText name) of
-    t | t `elem` ["number", "float", "double", "money", "decimal"] -> OFFloat
-      | t `elem` ["int", "integer"]                                -> OFInt
-      | t `elem` ["boolean", "bool"]                               -> OFBool
-      | t `elem` ["string", "text"]                                -> OFStr
-    _ -> OFFloat
+ofTypeOf :: Map Text OFEnumDef -> Type' Resolved -> OFType
+ofTypeOf enums = \case
+  TyApp _ name _ ->
+    let nm = resolvedToText name
+    in case Map.lookup nm enums of
+         Just ed | ((m, _) : _) <- ed.enMembers -> OFEnum ed.enName m
+         _ -> case Text.toLower nm of
+           t | t `elem` ["number", "float", "double", "money", "decimal"] -> OFFloat
+             | t `elem` ["int", "integer"]                                -> OFInt
+             | t `elem` ["boolean", "bool"]                               -> OFBool
+             | t `elem` ["string", "text"]                                -> OFStr
+           _ -> OFFloat
   _ -> OFFloat
 
 -- ---------------------------------------------------------------------------

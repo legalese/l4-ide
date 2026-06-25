@@ -34,6 +34,9 @@ EXAMPLES = [
     ("roles", "Roles + count / any / all",
      "adults/children roles, with count -> nb_persons, role-restricted sum, "
      "and any/all over members."),
+    ("housing", "Enums + CONSIDER",
+     "DECLARE … IS ONE OF -> an OpenFisca Enum; CONSIDER -> nested np.where on "
+     "enum equality; max -> np.maximum."),
 ]
 
 
