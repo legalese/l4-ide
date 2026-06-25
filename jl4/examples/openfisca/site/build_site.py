@@ -28,6 +28,9 @@ EXAMPLES = [
      "Comparisons, Booleans, IF/THEN/ELSE, and one decision calling another."),
     ("household", "Household — group entity + aggregation",
      "A LIST OF Person makes a group entity; sum (map ...) aggregates over members."),
+    ("scale", "Marginal-rate scale + parameter store",
+     "A @desc scale value + scale tax → an OpenFisca ParameterNode and scale.calc; "
+     "verified on openfisca-core AND policyengine-core (Phase 1)."),
 ]
 
 
@@ -48,7 +51,9 @@ def roundtrip(name, py_text):
 
 
 def code_block(text, lang):
-    return (f'<pre class="code {lang}"><code>'
+    # language-l4 / language-python get Highlight.js coloring; output stays plain.
+    cls = {"l4": "language-l4", "python": "language-python"}.get(lang, "nohighlight")
+    return (f'<pre class="code {lang}"><code class="{cls}">'
             + html.escape(text.rstrip("\n")) + "</code></pre>")
 
 
@@ -107,6 +112,7 @@ TEMPLATE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>L4 → OpenFisca</title>
+<link rel="stylesheet" href="vendor/hljs-github-dark.css">
 <style>
   :root {{
     --ink:#14181f; --muted:#5b6675; --line:#e4e8ee; --bg:#fbfcfe;
@@ -160,6 +166,9 @@ TEMPLATE = """<!doctype html>
   .testrun-head code {{ background:#eef2f7; padding:1px 5px; border-radius:4px; }}
   pre.code.output {{ background:#0c1f17; color:#b8f5d2; border-left:3px solid var(--l4); }}
   footer {{ color:var(--muted); font-size:13px; padding:30px 0 0; }}
+  /* Highlight.js colors the tokens; keep our panel background + accent borders. */
+  pre.code code.hljs {{ background:transparent; padding:0; }}
+  .overview pre code.hljs {{ background:transparent; padding:0; }}
 </style>
 </head>
 <body>
@@ -182,6 +191,12 @@ TEMPLATE = """<!doctype html>
       test numbers are all captured live from the bridge.</footer>
   </main>
 </div>
+<script src="vendor/highlight.min.js"></script>
+<script src="vendor/l4.min.js"></script>
+<script>
+  hljs.configure({{cssSelector:'pre code.language-l4, pre code.language-python'}});
+  hljs.highlightAll();
+</script>
 </body>
 </html>
 """

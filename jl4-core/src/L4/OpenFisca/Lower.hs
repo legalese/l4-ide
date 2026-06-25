@@ -20,6 +20,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 
+import Optics ((^.))
+
+import L4.Annotation (getAnno)
 import L4.Export (ExportedFunction (..), getExportedFunctions)
 import L4.OpenFisca.IR
 import L4.Syntax
@@ -58,12 +61,14 @@ lowerModule mod' =
   case getExportedFunctions mod' of
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
     efs ->
-      let records    = collectRecords mod'
-          exportedU  = Map.fromList
+      let records     = collectRecords mod'
+          scaleParams = collectScaleParams mod'
+          scalePaths  = Map.map (.spPath) scaleParams
+          exportedU   = Map.fromList
             [ (getUnique (decideName ef.exportDecide), pyIdent ef.exportName)
             | ef <- efs
             ]
-          results    = map (lowerOne records exportedU) efs
+          results    = map (lowerOne records exportedU scalePaths) efs
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
@@ -71,19 +76,21 @@ lowerModule mod' =
              let ents  = dedupOn (.entPy)   (concatMap fst ok)
                  vars  = dedupOn (.varName) (concatMap snd ok)
              in Right OFPackage
-                  { pkgSource    = moduleSource mod'
-                  , pkgEntities  = ents
-                  , pkgVariables = vars
+                  { pkgSource     = moduleSource mod'
+                  , pkgEntities   = ents
+                  , pkgVariables  = vars
+                  , pkgParameters = Map.elems scaleParams
                   }
 
 -- | Lower a single exported decision into the entity it lives on plus the
 -- variables it introduces (its inputs + the computed variable itself).
 lowerOne
   :: Map Text RecordInfo
-  -> Map Unique Text
+  -> Map Unique Text   -- ^ exported decisions: unique → variable name
+  -> Map Unique Text   -- ^ scale parameters: unique → dotted path
   -> ExportedFunction
   -> Either LowerError ([OFEntity], [OFVariable])
-lowerOne records exportedU ef = do
+lowerOne records exportedU scalePaths ef = do
   let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body = ef.exportDecide
       fnName  = pyIdent ef.exportName
       mSubj   = firstJust [ (g, ri) | g <- givens, ri <- maybeToList (givenRecord records g) ]
@@ -106,6 +113,7 @@ lowerOne records exportedU ef = do
         { envSubject  = subjU
         , envPeriod   = periodU
         , envMember   = Nothing
+        , envScales   = scalePaths
         , envScalars  = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
         , envExported = exportedU
         }
@@ -160,6 +168,7 @@ data LowerEnv = LowerEnv
   { envSubject  :: !(Maybe Unique)     -- ^ the subject (entity) parameter
   , envPeriod   :: !(Maybe Unique)     -- ^ the conventional period parameter
   , envMember   :: !(Maybe Unique)     -- ^ the lambda-bound member var, inside an aggregation
+  , envScales   :: !(Map Unique Text)  -- ^ scale-parameter values → dotted path
   , envScalars  :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
   , envExported :: !(Map Unique Text)  -- ^ exported decisions → variable names
   }
@@ -204,7 +213,9 @@ lowerExpr env = go
   lowerApp ref args =
     let u = getUnique ref
         nm = resolvedToText ref
-    in case aggregation nm args of
+    in case scaleCall nm args of
+     Just res -> res
+     Nothing -> case aggregation nm args of
       Just res -> res
       Nothing -> case builtinOp nm of
        Just mk -> traverse go args >>= mk
@@ -216,6 +227,17 @@ lowerExpr env = go
         | Just u == env.envPeriod                   -> Right (OFLocal "period")
         | Just u == env.envSubject                  -> Left "the subject entity cannot be used as a value"
         | otherwise                                 -> Left ("unbound reference `" <> nm <> "` (recursion, prelude functions, and local bindings are not supported in v1)")
+
+  -- Marginal-rate scale application. @scale tax OF <income>, <scaleRef>@ where
+  -- <scaleRef> is a @desc scale <path>@ value → @parameters(period).<path>.calc(<income>)@.
+  scaleCall nm args = case args of
+    -- the scale ref may be nullary (single-period) or applied to a year
+    -- (time-varying); either way OpenFisca resolves the brackets by period.
+    [income, App _ sref _scaleArgs]
+      | nm == "scale tax"
+      , Just path <- Map.lookup (getUnique sref) env.envScales ->
+          Just (OFScaleCalc path <$> go income)
+    _ -> Nothing
 
   -- Group-entity aggregation. @sum (map (GIVEN m YIELD <body>) <members>)@
   -- becomes @<group>.sum(<body, with m's f → members('f')>)@.
@@ -309,6 +331,89 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
               })]
     Section _ sub -> goSection sub
     _ -> []
+
+-- | Scan for values annotated @\@desc scale <dotted.path>@ and read their
+-- bracket tables. Returns a map keyed by the value's 'Unique' so that a
+-- @scale tax@ call referencing the value can resolve its path.
+collectScaleParams :: Module Resolved -> Map Unique OFScaleParam
+collectScaleParams (MkModule _ _ section) = Map.fromList (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
+      | Just path <- scaleAnnotation d
+      , Just bs   <- readScale body ->
+          [(getUnique nameRes, OFScaleParam { spPath = path, spBrackets = bs })]
+    Section _ sub -> goSection sub
+    _ -> []
+
+-- | The dotted path from a @scale <path>@ description annotation, if present.
+scaleAnnotation :: Decide Resolved -> Maybe Text
+scaleAnnotation d = do
+  desc <- getAnno d ^. annDesc
+  case Text.words (getDesc desc) of
+    ("scale" : rest) | not (null rest) -> Just (Text.intercalate "." rest)
+    _                                  -> Nothing
+
+-- | Read a scale body into dated brackets. Two shapes:
+--
+--   * @LIST (band OF t, r), …@                       — a single-period scale
+--     (all values dated at a neutral epoch).
+--   * @BRANCH IF y AT LEAST <year> THEN LIST … …@    — a time-varying scale; each
+--     arm's @year@ becomes the effective date and brackets are aligned by index.
+readScale :: Expr Resolved -> Maybe [OFBracket]
+readScale = \case
+  List _ elems -> do
+    rows <- traverse readRow elems
+    pure [ OFBracket [(epochDate, t)] [(epochDate, r)] | (t, r) <- rows ]
+  MultiWayIf _ guards _otherwise -> do
+    arms <- traverse readArm guards
+    pure (alignByIndex arms)
+  _ -> Nothing
+
+-- | @band OF threshold, rate@ → (threshold, rate). Name-agnostic: any 2-arg
+-- application of numeric literals (the bracket constructor).
+readRow :: Expr Resolved -> Maybe (Rational, Rational)
+readRow = \case
+  App _ _ [Lit _ (NumericLit _ t), Lit _ (NumericLit _ r)] -> Just (t, r)
+  _ -> Nothing
+
+-- | One @IF y AT LEAST <year> THEN LIST …@ arm → (effective date, bracket rows).
+readArm :: GuardedExpr Resolved -> Maybe (Text, [(Rational, Rational)])
+readArm (MkGuardedExpr _ cond body) = do
+  yr   <- guardYear cond
+  rows <- case body of
+    List _ es -> traverse readRow es
+    _         -> Nothing
+  pure (isoDate yr, rows)
+
+-- | Pull the year from a @y AT LEAST <year>@ / @y >= <year>@ guard.
+guardYear :: Expr Resolved -> Maybe Integer
+guardYear = \case
+  App _ ref [_, Lit _ (NumericLit _ y)]
+    | resolvedToText ref `elem` ["__GEQ__", "__GT__"] -> Just (round y)
+  _ -> Nothing
+
+isoDate :: Integer -> Text
+isoDate y = tshow y <> "-01-01"
+
+-- | Align brackets across arms by position: bracket /i/ collects (date, value)
+-- from every arm that has an /i/-th bracket, dates ascending. A bracket that
+-- only appears in later years (e.g. a new top band) gets only those dates.
+alignByIndex :: [(Text, [(Rational, Rational)])] -> [OFBracket]
+alignByIndex arms =
+  let sorted = sortOn fst arms
+      width  = maximum (0 : map (length . snd) arms)
+  in [ OFBracket
+         { brThreshold = [ (d, fst (rows !! i)) | (d, rows) <- sorted, i < length rows ]
+         , brRate      = [ (d, snd (rows !! i)) | (d, rows) <- sorted, i < length rows ]
+         }
+     | i <- [0 .. width - 1]
+     ]
+
+-- | The date a single-period (non-time-varying) scale's values take effect.
+epochDate :: Text
+epochDate = "1900-01-01"
 
 fieldInfo :: Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
 fieldInfo fRes fTy mMeans =

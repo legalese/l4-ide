@@ -54,6 +54,13 @@ def main():
         print(f"  household_income(2026-01) = {got}  (L4 expected 2500.0)  "
               f"{'OK' if ok else '*** MISMATCH ***'}")
         assert ok, got
+    elif which == "scale":
+        # time-varying marginal-rate scale: brackets resolve by period.
+        for per, sal, exp in [("2013-01", 2000, 60.0), ("2013-01", 15000, 660.0),
+                              ("2015-01", 2000, 80.0), ("2015-01", 15000, 824.0),
+                              ("2017-01", 2000, 40.0), ("2017-01", 15000, 816.0)]:
+            check(tbs, "persons", {"p": {"salary": {per: sal}}},
+                  "social_security_contribution", per, exp)
     else:
         raise SystemExit(f"unknown example: {which}")
     print("ROUND-TRIP OK")

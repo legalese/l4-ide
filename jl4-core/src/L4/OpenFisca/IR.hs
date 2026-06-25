@@ -17,6 +17,8 @@ module L4.OpenFisca.IR
   , OFExpr (..)
   , OFBinOp (..)
   , OFCmpOp (..)
+  , OFBracket (..)
+  , OFScaleParam (..)
   , OFPackage (..)
   ) where
 
@@ -86,11 +88,30 @@ data OFExpr
   | OFNot     OFExpr
   | OFNeg     OFExpr
   | OFCond    OFExpr OFExpr OFExpr   -- ^ @np.where(cond, then, else)@
+  | OFScaleCalc Text OFExpr         -- ^ @parameters(period).<path>.calc(<income>)@
+  deriving stock (Eq, Show, Generic)
+
+-- | One bracket of a marginal-rate scale. Threshold and rate are date-indexed
+-- time-series (ISO @YYYY-MM-DD@ → value), mirroring OpenFisca's parameter YAML.
+data OFBracket = OFBracket
+  { brThreshold :: ![(Text, Rational)]
+  , brRate      :: ![(Text, Rational)]
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | A legislation parameter holding a marginal-rate scale, addressed by a dotted
+-- path (e.g. @taxes.social_security_contribution@). Emitted into the
+-- 'TaxBenefitSystem' as a @ParameterNode@ so OpenFisca resolves brackets by date.
+data OFScaleParam = OFScaleParam
+  { spPath     :: !Text
+  , spBrackets :: ![OFBracket]
+  }
   deriving stock (Eq, Show, Generic)
 
 data OFPackage = OFPackage
-  { pkgSource    :: !Text         -- ^ provenance (source file / module) for the header
-  , pkgEntities  :: ![OFEntity]
-  , pkgVariables :: ![OFVariable] -- ^ input variables first, then computed, in stable order
+  { pkgSource     :: !Text         -- ^ provenance (source file / module) for the header
+  , pkgEntities   :: ![OFEntity]
+  , pkgVariables  :: ![OFVariable] -- ^ input variables first, then computed, in stable order
+  , pkgParameters :: ![OFScaleParam]
   }
   deriving stock (Eq, Show, Generic)

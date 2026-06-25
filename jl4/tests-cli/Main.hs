@@ -327,6 +327,10 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/household.l4"]
                        "examples/openfisca/expected/household.py"
 
+    it "compiles a time-varying marginal-rate scale + parameter store (scale)" $
+      expectGolden bin ["openfisca", "examples/openfisca/scale.l4"]
+                       "examples/openfisca/expected/scale.py"
+
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
       Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess
