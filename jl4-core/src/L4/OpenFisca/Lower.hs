@@ -125,7 +125,7 @@ lowerOne enums enumCons records exportedU scalePaths ef = do
         , envListFields = subjListFields
         , envEnumCons   = enumCons
         }
-  formula <- mapLeft (LowerError fnName) (lowerExpr env body)
+  (undatedF, datedF) <- mapLeft (LowerError fnName) (lowerBody env body)
 
   -- Stored scalar (non-list) fields of an entity-record become input variables.
   let inputsFor e ri =
@@ -137,6 +137,7 @@ lowerOne enums enumCons records exportedU scalePaths ef = do
             , varPeriod  = ofPeriod
             , varLabel   = fi.fiName
             , varFormula = Nothing
+            , varDated   = []
             }
         | fi <- ri.riFields, fi.fiStored, isNothing fi.fiListElem
         ]
@@ -151,6 +152,7 @@ lowerOne enums enumCons records exportedU scalePaths ef = do
             , varPeriod  = ofPeriod
             , varLabel   = givenText g
             , varFormula = Nothing
+            , varDated   = []
             }
         | g <- others
         ]
@@ -164,7 +166,8 @@ lowerOne enums enumCons records exportedU scalePaths ef = do
           , varLabel   = if Text.null ef.exportDescription
                            then resolvedToText fnRes
                            else ef.exportDescription
-          , varFormula = Just formula
+          , varFormula = Just undatedF
+          , varDated   = datedF
           }
   pure (ent : memberEntities, subjectInputs <> memberInputs <> scalarInputs <> [computed])
 
@@ -207,6 +210,7 @@ lowerExpr env = go
     Proj _ inner field -> lowerProj inner field
     App _ ref args     -> lowerApp ref args
     Consider _ scrut branches -> lowerConsider scrut branches
+    MultiWayIf _ guards oth   -> lowerMultiWay guards oth
     other -> Left (unsupported other)
 
   -- @p's field@: on the subject → a variable read; on a member (inside an
@@ -322,6 +326,12 @@ lowerExpr env = go
   lowerArm scrutE (con, body) = case Map.lookup (getUnique con) env.envEnumCons of
     Just (cls, mem) -> (\v -> (OFCmp OFEq scrutE (OFEnumLit cls mem), v)) <$> go body
     Nothing -> Left ("CONSIDER: `" <> resolvedToText con <> "` is not an enum constructor (only enum CONSIDER is supported)")
+
+  -- A general @BRANCH IF c THEN v … OTHERWISE d@ → nested @np.where@.
+  lowerMultiWay guards oth = do
+    d <- go oth
+    arms <- traverse (\(MkGuardedExpr _ c b) -> (,) <$> go c <*> go b) guards
+    pure (foldr (\(c, v) acc -> OFCond c v acc) d arms)
 
 -- | The builtin operators L4 desugars infix syntax into. Returns a combiner
 -- that consumes the already-lowered argument expressions.
@@ -481,6 +491,39 @@ alignByIndex arms =
 -- | The date a single-period (non-time-varying) scale's values take effect.
 epochDate :: Text
 epochDate = "1900-01-01"
+
+-- | Lower a decision body, splitting a top-level @BRANCH IF period reaches …@
+-- into an undated @formula@ (the OTHERWISE) plus dated @formula_YYYY_MM@ arms.
+lowerBody :: LowerEnv -> Expr Resolved -> Either Text (OFExpr, [(Text, OFExpr)])
+lowerBody env body = case splitDated body of
+  Just (arms, oth) ->
+    (,) <$> lowerExpr env oth
+        <*> traverse (\(d, b) -> (,) d <$> lowerExpr env b) arms
+  Nothing -> (\b -> (b, [])) <$> lowerExpr env body
+
+-- | Recognise a dated-formula BRANCH: every arm guarded by @period reaches@.
+splitDated :: Expr Resolved -> Maybe ([(Text, Expr Resolved)], Expr Resolved)
+splitDated (MultiWayIf _ guards oth) = do
+  arms <- traverse datedArm guards
+  pure (arms, oth)
+splitDated _ = Nothing
+
+datedArm :: GuardedExpr Resolved -> Maybe (Text, Expr Resolved)
+datedArm (MkGuardedExpr _ cond body) = do
+  (y, m) <- periodReaches cond
+  pure (isoYM y m, body)
+
+-- | @period reaches OF period, <year>, <month>@ → (year, month).
+periodReaches :: Expr Resolved -> Maybe (Integer, Integer)
+periodReaches = \case
+  App _ ref [_period, Lit _ (NumericLit _ y), Lit _ (NumericLit _ m)]
+    | resolvedToText ref == "period reaches" -> Just (round y, round m)
+  _ -> Nothing
+
+isoYM :: Integer -> Integer -> Text
+isoYM y m = tshow y <> "-" <> pad m <> "-01"
+ where
+  pad n = (if n < 10 then "0" else "") <> tshow n
 
 fieldInfo :: Map Text OFEnumDef -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
 fieldInfo enums fRes fTy mMeans =

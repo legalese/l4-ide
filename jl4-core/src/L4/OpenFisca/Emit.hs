@@ -93,16 +93,22 @@ enumAttrs = \case
   _ -> []
 
 formulaLines :: OFVariable -> [Text]
-formulaLines v = case v.varFormula of
-  Nothing   -> []  -- input variable: no formula
-  Just body ->
-    -- A formula reading a legislation parameter takes OpenFisca's 3-arg shape.
+formulaLines v =
+     maybe [] (oneFormula "formula") v.varFormula
+  <> concatMap (\(d, b) -> oneFormula ("formula_" <> dateSuffix d) b) v.varDated
+ where
+  -- A formula reading a legislation parameter takes OpenFisca's 3-arg shape.
+  oneFormula name body =
     let args = if usesParams body
                  then v.varEntKey <> ", period, parameters"
                  else v.varEntKey <> ", period"
-    in [ ind 1 <> "def formula(" <> args <> "):"
+    in [ ind 1 <> "def " <> name <> "(" <> args <> "):"
        , ind 2 <> "return " <> emitExpr v.varEntKey v.varEntity body
        ]
+  -- "YYYY-MM-DD" → "YYYY_MM" (OpenFisca dated-formula method suffix).
+  dateSuffix d = case Text.splitOn "-" d of
+    (y : m : _) -> y <> "_" <> m
+    _           -> Text.replace "-" "_" d
 
 usesParams :: OFExpr -> Bool
 usesParams = \case

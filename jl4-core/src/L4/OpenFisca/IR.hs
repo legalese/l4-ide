@@ -72,7 +72,8 @@ data OFVariable = OFVariable
   , varEntKey  :: !Text          -- ^ owning entity's key (the formula's first arg name)
   , varPeriod  :: !OFPeriod
   , varLabel   :: !Text
-  , varFormula :: !(Maybe OFExpr)
+  , varFormula :: !(Maybe OFExpr)        -- ^ the undated @formula@; Nothing = input variable
+  , varDated   :: ![(Text, OFExpr)]      -- ^ dated @formula_YYYY_MM@ overrides (ISO date → body)
   }
   deriving stock (Eq, Show, Generic)
 

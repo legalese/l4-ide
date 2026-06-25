@@ -82,6 +82,12 @@ def main():
             print(f"  {occ} sz={sz} {var} = {got}  (L4 expected {exp})  "
                   f"{'OK' if ok else '*** MISMATCH ***'}")
             assert ok, got
+    elif which == "dated":
+        # dated formulas: OpenFisca picks formula_YYYY_MM by period.
+        for per, sal, exp in [("2015-11", 0, 0.0), ("2015-12", 0, 600.0),
+                              ("2015-12", 1200, 0.0), ("2016-12", 1200, 600.0)]:
+            check(tbs, "persons", {"p": {"salary": {per: sal}}},
+                  "basic_income", per, exp)
     elif which == "scale":
         # time-varying marginal-rate scale: brackets resolve by period.
         for per, sal, exp in [("2013-01", 2000, 60.0), ("2013-01", 15000, 660.0),

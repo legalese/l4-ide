@@ -339,6 +339,10 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/housing.l4"]
                        "examples/openfisca/expected/housing.py"
 
+    it "compiles dated formulas (BRANCH IF period reaches → formula_YYYY_MM)" $
+      expectGolden bin ["openfisca", "examples/openfisca/dated.l4"]
+                       "examples/openfisca/expected/dated.py"
+
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
       Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess

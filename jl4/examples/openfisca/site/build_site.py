@@ -37,6 +37,9 @@ EXAMPLES = [
     ("housing", "Enums + CONSIDER",
      "DECLARE … IS ONE OF -> an OpenFisca Enum; CONSIDER -> nested np.where on "
      "enum equality; max -> np.maximum."),
+    ("dated", "Dated formulas",
+     "BRANCH IF period reaches Y, M -> OpenFisca formula_YYYY_MM methods; the "
+     "engine selects by period."),
 ]
 
 
