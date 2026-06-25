@@ -142,6 +142,24 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert the CLI exits 0 and its stdout exactly matches a committed golden
+-- file. Used for the OpenFisca backend, whose emit is fully deterministic.
+expectGolden :: FilePath -> [String] -> FilePath -> IO ()
+expectGolden bin args goldenPath = do
+  Output code sout serr <- runL4 bin args
+  goldenBytes <- BS.readFile goldenPath
+  let golden = T.unpack (TE.decodeUtf8Lenient goldenBytes)
+  case code of
+    ExitSuccess ->
+      unless (sout == golden) $
+        expectationFailure $
+          "Generated output does not match golden " ++ goldenPath
+          ++ "\n(to update: l4 " ++ unwords args ++ " -o " ++ goldenPath ++ ")"
+          ++ "\n--- got ---\n" ++ sout
+          ++ "\n--- golden ---\n" ++ golden
+    ExitFailure n -> expectationFailure $
+      "Expected success but exited " ++ show n ++ "\n--- stderr ---\n" ++ serr
+
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
@@ -201,6 +219,7 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+      sout `shouldSatisfy` ("openfisca" `isInfixOf`)
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -294,3 +313,25 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  describe "l4 openfisca" $ do
+    it "compiles the flat-tax example to its golden OpenFisca module" $
+      expectGolden bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+                       "examples/openfisca/expected/flat-tax.py"
+
+    it "compiles the means-tested benefit example to its golden module" $
+      expectGolden bin ["openfisca", "examples/openfisca/benefit.l4"]
+                       "examples/openfisca/expected/benefit.py"
+
+    it "compiles a group entity with LIST OF aggregation (household)" $
+      expectGolden bin ["openfisca", "examples/openfisca/household.l4"]
+                       "examples/openfisca/expected/household.py"
+
+    it "emits a Variable subclass and a TaxBenefitSystem" $ do
+      Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("class flat_tax_on_salary(Variable):" `isInfixOf`)
+      sout `shouldSatisfy` ("class L4TaxBenefitSystem(TaxBenefitSystem):" `isInfixOf`)
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["openfisca", errorFixture]

@@ -30,6 +30,7 @@ import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -48,6 +49,7 @@ data Command
   | CmdTrace      TraceOptions
   | CmdStateGraph StateGraphOptions
   | CmdRender     RenderOptions
+  | CmdOpenFisca  OpenFiscaOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -81,6 +83,9 @@ commandParser =
       <> command "render"
            (info (CmdRender <$> renderOptionsParser)
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
+      <> command "openfisca"
+           (info (CmdOpenFisca <$> openFiscaOptionsParser)
+             (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
 
 commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> commandParser)
@@ -122,6 +127,7 @@ main = do
     CmdTrace      opts -> traceCmd      opts
     CmdStateGraph opts -> stateGraphCmd opts
     CmdRender     opts -> renderCmd     opts
+    CmdOpenFisca  opts -> openFiscaCmd  opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.
