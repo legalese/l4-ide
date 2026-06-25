@@ -83,7 +83,7 @@ formulaLines v = case v.varFormula of
                  then v.varEntKey <> ", period, parameters"
                  else v.varEntKey <> ", period"
     in [ ind 1 <> "def formula(" <> args <> "):"
-       , ind 2 <> "return " <> emitExpr v.varEntKey body
+       , ind 2 <> "return " <> emitExpr v.varEntKey v.varEntity body
        ]
 
 usesParams :: OFExpr -> Bool
@@ -95,7 +95,9 @@ usesParams = \case
   OFOr a b        -> usesParams a || usesParams b
   OFNot a         -> usesParams a
   OFNeg a         -> usesParams a
-  OFSum a         -> usesParams a
+  OFSum _ a       -> usesParams a
+  OFAny _ a       -> usesParams a
+  OFAll _ a       -> usesParams a
   OFCond a b c    -> usesParams a || usesParams b || usesParams c
   _               -> False
 
@@ -166,8 +168,8 @@ scaleEntries n bs =
 -- Compound nodes are fully parenthesised. This matters for numpy: the bitwise
 -- operators @& | ~@ (used for boolean and/or/not on arrays) bind /tighter/ than
 -- comparison operators in Python, so @a > b & c@ would misparse without parens.
-emitExpr :: Text -> OFExpr -> Text
-emitExpr ent = go
+emitExpr :: Text -> Text -> OFExpr -> Text
+emitExpr ent entPy = go
  where
   go = \case
     OFNum r      -> renderNum r
@@ -176,7 +178,10 @@ emitExpr ent = go
     OFLocal t    -> t
     OFVarRef nm  -> ent <> "(" <> pyStr nm <> ", period)"
     OFMembersVar nm -> ent <> ".members(" <> pyStr nm <> ", period)"
-    OFSum e      -> ent <> ".sum(" <> go e <> ")"
+    OFSum r e    -> ent <> ".sum(" <> go e <> roleArg r <> ")"
+    OFAny r e    -> ent <> ".any(" <> go e <> roleArg r <> ")"
+    OFAll r e    -> ent <> ".all(" <> go e <> roleArg r <> ")"
+    OFNbPersons r -> ent <> ".nb_persons(" <> maybe "" roleConst r <> ")"
     OFBin op a b -> paren (go a <> " " <> binOp op <> " " <> go b)
     OFCmp op a b -> paren (go a <> " " <> cmpOp op <> " " <> go b)
     OFAnd a b    -> paren (go a <> " & " <> go b)
@@ -190,6 +195,9 @@ emitExpr ent = go
     OFAdd -> "+"; OFSub -> "-"; OFMul -> "*"; OFDiv -> "/"; OFMod -> "%"
   cmpOp = \case
     OFLt -> "<"; OFLeq -> "<="; OFGt -> ">"; OFGeq -> ">="; OFEq -> "=="; OFNeq -> "!="
+
+  roleArg  = maybe "" (\r -> ", role=" <> roleConst r)
+  roleConst r = entPy <> "." <> Text.toUpper r
 
 paren :: Text -> Text
 paren t = "(" <> t <> ")"

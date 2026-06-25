@@ -80,7 +80,10 @@ data OFExpr
   | OFVarRef  Text            -- ^ @<entity>('name', period)@ — read another variable
   | OFLocal   Text            -- ^ a Python local / the @period@ parameter
   | OFMembersVar Text         -- ^ @<group>.members('name', period)@ — a member variable, as an array
-  | OFSum     OFExpr          -- ^ @<group>.sum(<expr>)@ — aggregate over members
+  | OFSum     (Maybe Text) OFExpr   -- ^ @<group>.sum(<expr>[, role=<Entity>.<ROLE>])@
+  | OFAny     (Maybe Text) OFExpr   -- ^ @<group>.any(<expr>[, role=…])@
+  | OFAll     (Maybe Text) OFExpr   -- ^ @<group>.all(<expr>[, role=…])@
+  | OFNbPersons (Maybe Text)        -- ^ @<group>.nb_persons([<Entity>.<ROLE>])@
   | OFBin     OFBinOp OFExpr OFExpr
   | OFCmp     OFCmpOp OFExpr OFExpr
   | OFAnd     OFExpr OFExpr

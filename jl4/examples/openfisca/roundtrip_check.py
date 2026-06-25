@@ -54,6 +54,20 @@ def main():
         print(f"  household_income(2026-01) = {got}  (L4 expected 2500.0)  "
               f"{'OK' if ok else '*** MISMATCH ***'}")
         assert ok, got
+    elif which == "roles":
+        sit = {"persons": {"alice": {"salary": {"2026-01": 2000}},
+                           "bob": {"salary": {"2026-01": 500}},
+                           "carol": {"salary": {"2026-01": 0}}},
+               "households": {"hh": {"adults": ["alice", "bob"],
+                                     "children": ["carol"]}}}
+        for var, e in [("number_of_adults", 2.0), ("adult_income", 2500.0),
+                       ("any_high_earner", 1.0), ("all_adults_earn", 1.0)]:
+            sim = SimulationBuilder().build_from_entities(tbs, sit)
+            got = float(sim.calculate(var, "2026-01")[0])
+            ok = abs(got - e) < 1e-6
+            print(f"  {var} = {got}  (L4 expected {e})  "
+                  f"{'OK' if ok else '*** MISMATCH ***'}")
+            assert ok, got
     elif which == "scale":
         # time-varying marginal-rate scale: brackets resolve by period.
         for per, sal, exp in [("2013-01", 2000, 60.0), ("2013-01", 15000, 660.0),

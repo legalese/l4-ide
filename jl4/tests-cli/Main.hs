@@ -331,6 +331,10 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/scale.l4"]
                        "examples/openfisca/expected/scale.py"
 
+    it "compiles roles + count/any/all aggregation (roles)" $
+      expectGolden bin ["openfisca", "examples/openfisca/roles.l4"]
+                       "examples/openfisca/expected/roles.py"
+
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
       Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess

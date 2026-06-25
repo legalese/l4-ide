@@ -108,14 +108,16 @@ lowerOne records exportedU scalePaths ef = do
       memberRecords  = maybe [] (\ri -> mapMaybe (`Map.lookup` records)
                                           (mapMaybe (.fiListElem) ri.riFields)) mSubjRi
       memberEntities = map recordEntity memberRecords
+      subjListFields = maybe [] (\ri -> [ fi.fiName | fi <- ri.riFields, isJust fi.fiListElem ]) mSubjRi
 
   let env = LowerEnv
-        { envSubject  = subjU
-        , envPeriod   = periodU
-        , envMember   = Nothing
-        , envScales   = scalePaths
-        , envScalars  = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
-        , envExported = exportedU
+        { envSubject    = subjU
+        , envPeriod     = periodU
+        , envMember     = Nothing
+        , envScales     = scalePaths
+        , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
+        , envExported   = exportedU
+        , envListFields = subjListFields
         }
   formula <- mapLeft (LowerError fnName) (lowerExpr env body)
 
@@ -165,12 +167,13 @@ lowerOne records exportedU scalePaths ef = do
 -- ---------------------------------------------------------------------------
 
 data LowerEnv = LowerEnv
-  { envSubject  :: !(Maybe Unique)     -- ^ the subject (entity) parameter
-  , envPeriod   :: !(Maybe Unique)     -- ^ the conventional period parameter
-  , envMember   :: !(Maybe Unique)     -- ^ the lambda-bound member var, inside an aggregation
-  , envScales   :: !(Map Unique Text)  -- ^ scale-parameter values → dotted path
-  , envScalars  :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
-  , envExported :: !(Map Unique Text)  -- ^ exported decisions → variable names
+  { envSubject    :: !(Maybe Unique)     -- ^ the subject (entity) parameter
+  , envPeriod     :: !(Maybe Unique)     -- ^ the conventional period parameter
+  , envMember     :: !(Maybe Unique)     -- ^ the lambda-bound member var, inside an aggregation
+  , envScales     :: !(Map Unique Text)  -- ^ scale-parameter values → dotted path
+  , envScalars    :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
+  , envExported   :: !(Map Unique Text)  -- ^ exported decisions → variable names
+  , envListFields :: ![Text]             -- ^ the subject's @LIST OF@ field names (roles)
   }
 
 lowerExpr :: LowerEnv -> Expr Resolved -> Either Text OFExpr
@@ -239,17 +242,51 @@ lowerExpr env = go
           Just (OFScaleCalc path <$> go income)
     _ -> Nothing
 
-  -- Group-entity aggregation. @sum (map (GIVEN m YIELD <body>) <members>)@
-  -- becomes @<group>.sum(<body, with m's f → members('f')>)@.
+  -- Group-entity aggregations over a member list:
+  --   sum (map (GIVEN m YIELD <body>) <members>) → <group>.sum(<body>[, role=…])
+  --   any (GIVEN m YIELD <pred>) <members>        → <group>.any(<pred>[, role=…])
+  --   all (GIVEN m YIELD <pred>) <members>        → <group>.all(<pred>[, role=…])
+  --   count <members>                             → <group>.nb_persons([role])
+  -- where <members> is `h's <role>` (role-restricted) or `members of OF h` (all).
   aggregation nm args = case (nm, args) of
-    ("sum", [mapApp]) -> Just (lowerSum mapApp)
-    _                 -> Nothing
+    ("sum",   [mapApp])    -> Just (aggSum mapApp)
+    ("count", [lst])       -> Just (aggCount lst)
+    ("any",   [lam, lst])  -> Just (aggPred OFAny lam lst)
+    ("all",   [lam, lst])  -> Just (aggPred OFAll lam lst)
+    _                      -> Nothing
 
-  lowerSum = \case
-    App _ mref [Lam _ (MkGivenSig _ [mp]) lbody, _members]
-      | resolvedToText mref == "map" ->
-          OFSum <$> lowerExpr (env { envMember = Just (getUnique (givenName mp)) }) lbody
-    _ -> Left "`sum` is only supported as `sum (map (GIVEN m YIELD …) (h's members))` in this milestone"
+  aggSum = \case
+    App _ mref [Lam _ (MkGivenSig _ [mp]) lbody, lst]
+      | resolvedToText mref == "map"
+      , Just role <- resolveMembers lst ->
+          OFSum role <$> lowerMember mp lbody
+    _ -> Left "`sum` is only supported as `sum (map (GIVEN m YIELD …) (<members>))`"
+
+  aggCount lst = case resolveMembers lst of
+    Just role -> Right (OFNbPersons role)
+    Nothing   -> Left "`count` expects a member list (`h's <role>` or `members of` OF h)"
+
+  aggPred mk lam lst = case lam of
+    Lam _ (MkGivenSig _ [mp]) pbody
+      | Just role <- resolveMembers lst -> mk role <$> lowerMember mp pbody
+    _ -> Left "`any`/`all` expect `(GIVEN m YIELD <pred>) (<members>)`"
+
+  lowerMember mp body =
+    lowerExpr (env { envMember = Just (getUnique (givenName mp)) }) body
+
+  -- Resolve a member-list expression to a role selection: @Just Nothing@ = all
+  -- members; @Just (Just role)@ = that role; @Nothing@ = not a member list.
+  -- A subject with a single role list treats it as "all members".
+  resolveMembers = \case
+    Proj _ (App _ s []) fieldRes
+      | Just (getUnique s) == env.envSubject
+      , let fld = pyIdent (resolvedToText fieldRes)
+      , fld `elem` env.envListFields ->
+          Just (if length env.envListFields <= 1 then Nothing else Just (singularize fld))
+    App _ ref [App _ s []]
+      | Just (getUnique s) == env.envSubject
+      , resolvedToText ref == "members of" -> Just Nothing
+    _ -> Nothing
 
   boolLit t = case Text.toLower t of
     "true"  -> Just True

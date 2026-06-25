@@ -1,0 +1,49 @@
+IMPORT prelude
+
+DECLARE Person HAS
+    name   IS A STRING
+    salary IS A NUMBER
+
+DECLARE Household HAS
+    adults   IS A LIST OF Person
+    children IS A LIST OF Person
+
+GIVEN h IS A Household
+GIVETH A LIST OF Person
+`members of` MEANS concat (LIST h's adults, h's children)
+
+@export Number of adults in the household
+GIVEN h IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`number of adults` h period MEANS count (h's adults)
+
+@export Total monthly income of the adults
+GIVEN h IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`adult income` h period MEANS sum (map (GIVEN m YIELD m's salary) (h's adults))
+
+@export Whether anyone in the household earns over 1000
+GIVEN h IS A Household
+      period IS A STRING
+GIVETH A BOOLEAN
+`any high earner` h period MEANS any (GIVEN m YIELD m's salary > 1000) (`members of` OF h)
+
+@export Whether every adult earns something
+GIVEN h IS A Household
+      period IS A STRING
+GIVETH A BOOLEAN
+`all adults earn` h period MEANS all (GIVEN m YIELD m's salary > 0) (h's adults)
+
+`alice` MEANS Person WITH name IS "alice", salary IS 2000
+`bob`   MEANS Person WITH name IS "bob",   salary IS 500
+`carol` MEANS Person WITH name IS "carol", salary IS 0
+`grownups` MEANS LIST `alice`, `bob`
+`kids`     MEANS LIST `carol`
+`hh`       MEANS Household WITH adults IS `grownups`, children IS `kids`
+
+#ASSERT (`number of adults` OF `hh`, "2026-01") EQUALS 2
+#ASSERT (`adult income`     OF `hh`, "2026-01") EQUALS 2500
+#ASSERT (`any high earner`  OF `hh`, "2026-01") EQUALS TRUE
+#ASSERT (`all adults earn`  OF `hh`, "2026-01") EQUALS TRUE

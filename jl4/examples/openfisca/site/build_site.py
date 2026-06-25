@@ -31,6 +31,9 @@ EXAMPLES = [
     ("scale", "Marginal-rate scale + parameter store",
      "A @desc scale value + scale tax → an OpenFisca ParameterNode and scale.calc; "
      "verified on openfisca-core AND policyengine-core (Phase 1)."),
+    ("roles", "Roles + count / any / all",
+     "adults/children roles, with count -> nb_persons, role-restricted sum, "
+     "and any/all over members."),
 ]
 
 
