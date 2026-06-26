@@ -351,6 +351,12 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/incometax.l4"]
                        "examples/openfisca/expected/incometax.py"
 
+    it "rejects a name collision (distinct L4 names → same Python identifier)" $
+      expectFail bin ["openfisca", "examples/openfisca/not-ok/name-collision.l4"]
+
+    it "rejects a mis-ordered dated BRANCH (ascending arms)" $
+      expectFail bin ["openfisca", "examples/openfisca/not-ok/branch-misordered.l4"]
+
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
       Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess

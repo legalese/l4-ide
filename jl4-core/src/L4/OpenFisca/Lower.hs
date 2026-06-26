@@ -52,6 +52,7 @@ data RecordInfo = RecordInfo
 -- makes the owning record a /group entity/ whose members are @R@s.
 data FieldInfo = FieldInfo
   { fiName     :: !Text
+  , fiL4       :: !Text  -- ^ original (un-sanitised) field name
   , fiType     :: !OFType
   , fiStored   :: !Bool
   , fiListElem :: !(Maybe Text)
@@ -76,17 +77,17 @@ lowerModule mod' =
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
-           else
-             let ents  = dedupOn (.entPy)   (concatMap fst ok)
-                 vars  = dedupOn (.varName) (concatMap snd ok)
-             in Right OFPackage
-                  { pkgSource     = moduleSource mod'
-                  , pkgEntities   = ents
-                  , pkgVariables  = vars
-                  , pkgParameters = Map.elems scaleParams
-                  , pkgScalars    = Map.elems scalarParams
-                  , pkgEnums      = Map.elems enumDefs
-                  }
+           else case checkCollisions (concatMap snd ok) of
+             Left e     -> Left [e]
+             Right vars ->
+               Right OFPackage
+                 { pkgSource     = moduleSource mod'
+                 , pkgEntities   = dedupOn (.entPy) (concatMap fst ok)
+                 , pkgVariables  = vars
+                 , pkgParameters = Map.elems scaleParams
+                 , pkgScalars    = Map.elems scalarParams
+                 , pkgEnums      = Map.elems enumDefs
+                 }
 
 -- | Lower a single exported decision into the entity it lives on plus the
 -- variables it introduces (its inputs + the computed variable itself).
@@ -136,6 +137,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
   let inputsFor e ri =
         [ OFVariable
             { varName    = fi.fiName
+            , varL4      = fi.fiL4
             , varType    = fi.fiType
             , varEntity  = e.entPy
             , varEntKey  = e.entKey
@@ -151,6 +153,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
       scalarInputs =
         [ OFVariable
             { varName    = pyIdent (givenText g)
+            , varL4      = givenText g
             , varType    = maybe OFFloat (ofTypeOf enums) (givenType g)
             , varEntity  = ent.entPy
             , varEntKey  = ent.entKey
@@ -164,6 +167,7 @@ lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
       computed =
         OFVariable
           { varName    = fnName
+          , varL4      = resolvedToText fnRes
           , varType    = maybe OFFloat (ofTypeFromGiveth enums) mGiveth
           , varEntity  = ent.entPy
           , varEntKey  = ent.entKey
@@ -476,6 +480,7 @@ readScalarParam = \case
     pure [(epochDate, ev), (isoYM y 1, tv)]
   MultiWayIf _ guards oth -> do
     arms <- traverse scalarArm guards
+    guard (strictlyDescDates (map fst arms))   -- first-match must equal latest-date
     ov   <- litNum oth
     pure ((epochDate, ov) : arms)
   _ -> Nothing
@@ -497,10 +502,32 @@ readScale = \case
   List _ elems -> do
     rows <- traverse readRow elems
     pure [ OFBracket [(epochDate, t)] [(epochDate, r)] | (t, r) <- rows ]
-  MultiWayIf _ guards _otherwise -> do
-    arms <- traverse readArm guards
-    pure (alignByIndex arms)
+  MultiWayIf _ guards otherwise' -> do
+    arms    <- traverse readArm guards
+    othRows <- readOtherwiseRows otherwise'
+    -- arms as written must be strictly descending by date: L4 BRANCH is
+    -- first-match, OpenFisca resolves by latest date — they agree only so.
+    guard (strictlyDescDates (map fst arms))
+    -- the OTHERWISE brackets apply before the earliest dated arm.
+    let allArms = arms <> [(epochDate, othRows)]
+    -- a bracket may appear over time but must not vanish (OpenFisca can't drop one).
+    guard (nonShrinking allArms)
+    pure (alignByIndex allArms)
   _ -> Nothing
+ where
+  readOtherwiseRows = \case
+    List _ es -> traverse readRow es
+    _         -> Just []   -- EMPTY / nil → no pre-dated brackets
+
+-- | As-written dates strictly decreasing (so first-match == latest-date).
+strictlyDescDates :: [Text] -> Bool
+strictlyDescDates ds = and (zipWith (>) ds (drop 1 ds))
+
+-- | In ascending date order, the per-arm element count is non-decreasing.
+nonShrinking :: [(Text, [a])] -> Bool
+nonShrinking arms =
+  let counts = map (length . snd) (sortOn fst arms)
+  in and (zipWith (<=) counts (drop 1 counts))
 
 -- | @band OF threshold, rate@ → (threshold, rate). Name-agnostic: any 2-arg
 -- application of numeric literals (the bracket constructor).
@@ -550,9 +577,13 @@ epochDate = "1900-01-01"
 -- into an undated @formula@ (the OTHERWISE) plus dated @formula_YYYY_MM@ arms.
 lowerBody :: LowerEnv -> Expr Resolved -> Either Text (OFExpr, [(Text, OFExpr)])
 lowerBody env body = case splitDated body of
-  Just (arms, oth) ->
-    (,) <$> lowerExpr env oth
-        <*> traverse (\(d, b) -> (,) d <$> lowerExpr env b) arms
+  Just (arms, oth)
+    | strictlyDescDates (map fst arms) ->
+        (,) <$> lowerExpr env oth
+            <*> traverse (\(d, b) -> (,) d <$> lowerExpr env b) arms
+    | otherwise ->
+        Left "dated-formula BRANCH arms must be in strictly-descending date order \
+             \(OpenFisca selects the latest formula by date, but L4 BRANCH is first-match)"
   Nothing -> (\b -> (b, [])) <$> lowerExpr env body
 
 -- | Recognise a dated-formula BRANCH: every arm guarded by @period reaches@.
@@ -582,10 +613,11 @@ isoYM y m = tshow y <> "-" <> pad m <> "-01"
 fieldInfo :: Map Text OFEnumDef -> Resolved -> Type' Resolved -> Maybe (Expr Resolved) -> FieldInfo
 fieldInfo enums fRes fTy mMeans =
   case listElemRecord fTy of
-    Just elemName -> FieldInfo nm OFFloat             stored (Just elemName)
-    Nothing       -> FieldInfo nm (ofTypeOf enums fTy) stored Nothing
+    Just elemName -> FieldInfo nm l4 OFFloat             stored (Just elemName)
+    Nothing       -> FieldInfo nm l4 (ofTypeOf enums fTy) stored Nothing
  where
-  nm     = pyIdent (resolvedToText fRes)
+  l4     = resolvedToText fRes
+  nm     = pyIdent l4
   stored = isNothing mMeans
 
 -- | Scan @DECLARE X IS ONE OF a, b, …@ enum declarations. Returns the enum defs
@@ -671,7 +703,9 @@ givenText :: OptionallyTypedName Resolved -> Text
 givenText = resolvedToText . givenName
 
 isPeriodGiven :: OptionallyTypedName Resolved -> Bool
-isPeriodGiven g = pyIdent (givenText g) == "period"
+-- Detect the conventional period parameter by its raw L4 name (not the
+-- keyword-safe pyIdent, which would rename @period@ → @period_@).
+isPeriodGiven g = Text.toLower (Text.strip (givenText g)) == "period"
 
 -- | If a GIVEN's type names a known record, return that record (it is a subject).
 givenRecord :: Map Text RecordInfo -> OptionallyTypedName Resolved -> Maybe RecordInfo
@@ -723,12 +757,25 @@ pyIdent raw =
   let cleaned = Text.map (\c -> if isIdentChar c then toLower c else ' ') raw
       parts   = Text.words cleaned
       joined  = Text.intercalate "_" parts
-  in ensureNonDigit (if Text.null joined then "v" else joined)
+  in keywordSafe (ensureNonDigit (if Text.null joined then "v" else joined))
  where
   isIdentChar c = isAlphaNum c || c == '_'
   ensureNonDigit t = case Text.uncons t of
     Just (h, _) | isDigit h -> "v_" <> t
     _                       -> t
+  keywordSafe t
+    | t `Set.member` pyReserved = t <> "_"
+    | otherwise                 = t
+
+-- | Python keywords (plus the formula-local names @period@/@parameters@/@entity@/
+-- @formula@) that a variable name must not shadow; such names get a @_@ suffix.
+pyReserved :: Set Text
+pyReserved = Set.fromList
+  [ "and","as","assert","async","await","break","class","continue","def","del"
+  , "elif","else","except","false","finally","for","from","global","if","import"
+  , "in","is","lambda","nonlocal","none","not","or","pass","raise","return","true"
+  , "try","while","with","yield","match","case"
+  , "period","parameters","entity","formula" ]
 
 -- | A Python class/variable name for a type, preserving case (e.g. @Person@).
 pyType :: Text -> Text
@@ -760,3 +807,21 @@ dedupOn key = go Set.empty
     | k `Set.member` seen = go seen xs
     | otherwise           = x : go (Set.insert k seen) xs
     where k = key x
+
+-- | OpenFisca variable names are global, so distinct L4 definitions that
+-- sanitise to the same Python identifier would silently conflate (or, worse,
+-- drop a formula). Reject that. Exact duplicates — the same field read by
+-- several decisions — are collapsed to one.
+checkCollisions :: [OFVariable] -> Either LowerError [OFVariable]
+checkCollisions vs =
+  case [ (nm, grp) | (nm, grp) <- Map.toList byName, length (nub grp) > 1 ] of
+    ((nm, grp) : _) ->
+      Left $ LowerError ""
+        ( "name collision: distinct L4 definitions ("
+        <> Text.intercalate ", " [ "`" <> v.varL4 <> "`" | v <- nub grp ]
+        <> ") both compile to the OpenFisca variable `" <> nm
+        <> "`. A decision, field, or parameter that shares a (sanitised) name "
+        <> "with another is unsafe in OpenFisca — rename one." )
+    [] -> Right (dedupOn (.varName) vs)
+ where
+  byName = Map.fromListWith (<>) [ (v.varName, [v]) | v <- vs ]

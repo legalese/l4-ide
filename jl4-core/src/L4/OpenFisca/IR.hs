@@ -68,6 +68,7 @@ data OFEntity = OFEntity
 -- (a leaf set by the caller); @Just@ marks a /computed/ variable.
 data OFVariable = OFVariable
   { varName    :: !Text          -- ^ variable name == Python class name (sanitised)
+  , varL4      :: !Text          -- ^ the original (un-sanitised) L4 name, for collision detection
   , varType    :: !OFType
   , varEntity  :: !Text          -- ^ owning entity's Python name ('entPy')
   , varEntKey  :: !Text          -- ^ owning entity's key (the formula's first arg name)

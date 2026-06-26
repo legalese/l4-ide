@@ -1,0 +1,9 @@
+-- Two distinct fields sanitise to the same Python identifier `foo_bar`.
+-- The bridge must REJECT this (silently conflating them gives wrong numbers).
+DECLARE Person HAS `foo bar` IS A NUMBER, foo_bar IS A NUMBER
+
+@export Sum of the two fields
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`sum two` p period MEANS (p's `foo bar`) PLUS (p's foo_bar)
