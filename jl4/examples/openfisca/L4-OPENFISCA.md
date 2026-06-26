@@ -183,3 +183,49 @@ uv venv --python 3.12 /tmp/of && uv pip install --python /tmp/of/bin/python open
 
 The golden output of every example is pinned in `expected/` and checked by the
 `l4 openfisca` cases in `jl4/tests-cli/Main.hs`.
+
+---
+
+## 6. Caveats — and what the tests actually prove
+
+This bridge has been through an adversarial review. Be precise about its limits.
+
+### Numeric model
+OpenFisca stores `value_type = float` as **numpy float32**, whereas L4 `NUMBER`
+is an exact rational. So results can diverge once values exceed ~7 significant
+digits or ~16.7 million (e.g. `16777217 → 16777216.0`), or accumulate decimal
+round-off beyond the round-trip's `1e-6 tolerance` (`10000.001 → 10000.0009765625`).
+For money in cents, large aggregates, or high-precision rates, treat the
+OpenFisca output as float32-approximate, not exact.
+
+### Defaults and conventions (must hold, not checked)
+- **Enum `default_value` is the first declared member.** When an enum input is
+  omitted from a situation, OpenFisca answers with that member. Order your
+  `DECLARE … IS ONE OF` so the first listed value is the safe/natural default.
+- **`members of` is recognised by name**, and is assumed to concatenate the
+  subject's role lists (= all members). If you define it to mean something else,
+  aggregations over it will silently disagree with L4.
+- **Dated/scale/parameter BRANCH arms must be written newest-first** (strictly
+  descending date). The compiler now *rejects* other orders rather than
+  mis-compiling them, but it cannot guess your intent.
+
+### What "round-trip passes" means
+The verification has two tiers, and a green check means different things:
+
+- **Golden tests** (`tests-cli`, run in CI) are **regression-only** — they pin
+  that `l4 openfisca` keeps emitting the same `.py`. They prove nothing about
+  semantics.
+- **Round-trips** (`roundtrip_check.py`) genuinely execute the emitted module in
+  real OpenFisca, but the expected numbers come from L4's own `#EVAL`/`#ASSERT`.
+  So a pass proves **L4 and OpenFisca agree** (the bridge faithfully transcribes
+  L4) — *not* that either matches the real-world law.
+- **Law-validated** are only the variables checked against the upstream OpenFisca
+  `country-template` via the independent oracles in `jl4/experiments/openfisca/`
+  (`social_security_contribution`, `basic_income`, the `income_tax` rate). For
+  those, `of == policyengine == upstream golden`. The other worked examples here
+  (flat-tax, benefit, household, roles, housing, the custom income-tax rates) are
+  **consistency demos**: their numbers are L4-asserted, not drawn from any statute.
+
+In short: the bridge is well-proven to *faithfully compile L4 to runnable
+OpenFisca*; whether a given encoding matches the law is a separate question that
+only the upstream-oracle-backed variables currently answer.

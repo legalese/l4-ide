@@ -351,6 +351,10 @@ spec bin = do
       expectGolden bin ["openfisca", "examples/openfisca/incometax.l4"]
                        "examples/openfisca/expected/incometax.py"
 
+    it "compiles the country-template basic_income (dated formulas + scalar params)" $
+      expectGolden bin ["openfisca", "examples/openfisca/basic-income.l4"]
+                       "examples/openfisca/expected/basic-income.py"
+
     it "rejects a name collision (distinct L4 names → same Python identifier)" $
       expectFail bin ["openfisca", "examples/openfisca/not-ok/name-collision.l4"]
 

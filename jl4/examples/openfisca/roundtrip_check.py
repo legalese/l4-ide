@@ -101,6 +101,13 @@ def main():
         for per, exp in [("2013-06", 260.0), ("2015-01", 300.0), ("2012-01", 320.0)]:
             check(tbs, "persons", {"p": {"salary": {per: 2000}}},
                   "income_tax", per, exp)
+    elif which == "basic-income":
+        # the country-template basic_income: dated formulas + scalar params.
+        for per, age, sal, exp in [("2015-11", 18, 0, 0.0), ("2015-12", 18, 0, 600.0),
+                                   ("2015-12", 17, 0, 0.0), ("2015-12", 18, 1200, 0.0),
+                                   ("2016-12", 17, 0, 0.0), ("2016-12", 18, 1200, 600.0)]:
+            check(tbs, "persons", {"p": {"age": {per: age}, "salary": {per: sal}}},
+                  "basic_income", per, exp)
     elif which == "dated":
         # dated formulas: OpenFisca picks formula_YYYY_MM by period.
         for per, sal, exp in [("2015-11", 0, 0.0), ("2015-12", 0, 600.0),

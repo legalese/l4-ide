@@ -46,6 +46,9 @@ EXAMPLES = [
     ("incometax", "Scalar parameter store",
      "@desc parameter <path> with a time-varying rate -> an OpenFisca scalar "
      "parameter; rate OF period's year -> parameters(period).<path>."),
+    ("basic-income", "country-template basic_income",
+     "The real upstream variable: dated formulas + scalar parameters "
+     "(age_of_majority, basic_income amount). Cross-engine == upstream golden."),
 ]
 
 
