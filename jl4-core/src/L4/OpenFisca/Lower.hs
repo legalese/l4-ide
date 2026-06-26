@@ -63,14 +63,16 @@ lowerModule mod' =
     []  -> Left [LowerError "" "no @export-annotated DECIDE found to compile to OpenFisca"]
     efs ->
       let (enumDefs, enumCons) = collectEnums mod'
-          records     = collectRecords enumDefs mod'
-          scaleParams = collectScaleParams mod'
-          scalePaths  = Map.map (.spPath) scaleParams
+          records      = collectRecords enumDefs mod'
+          scaleParams  = collectScaleParams mod'
+          scalarParams = collectScalarParams mod'
+          scalePaths   = Map.map (.spPath) scaleParams
+          scalarPaths  = Map.map (.spsPath) scalarParams
           exportedU   = Map.fromList
             [ (getUnique (decideName ef.exportDecide), pyIdent ef.exportName)
             | ef <- efs
             ]
-          results    = map (lowerOne enumDefs enumCons records exportedU scalePaths) efs
+          results    = map (lowerOne enumDefs enumCons records exportedU scalePaths scalarPaths) efs
           (errs, ok) = partitionEithers results
       in if not (null errs)
            then Left errs
@@ -82,6 +84,7 @@ lowerModule mod' =
                   , pkgEntities   = ents
                   , pkgVariables  = vars
                   , pkgParameters = Map.elems scaleParams
+                  , pkgScalars    = Map.elems scalarParams
                   , pkgEnums      = Map.elems enumDefs
                   }
 
@@ -93,9 +96,10 @@ lowerOne
   -> Map Text RecordInfo
   -> Map Unique Text          -- ^ exported decisions: unique → variable name
   -> Map Unique Text          -- ^ scale parameters: unique → dotted path
+  -> Map Unique Text          -- ^ scalar parameters: unique → dotted path
   -> ExportedFunction
   -> Either LowerError ([OFEntity], [OFVariable])
-lowerOne enums enumCons records exportedU scalePaths ef = do
+lowerOne enums enumCons records exportedU scalePaths scalarPaths ef = do
   let MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes _ _) body = ef.exportDecide
       fnName  = pyIdent ef.exportName
       mSubj   = firstJust [ (g, ri) | g <- givens, ri <- maybeToList (givenRecord records g) ]
@@ -120,6 +124,7 @@ lowerOne enums enumCons records exportedU scalePaths ef = do
         , envPeriod     = periodU
         , envMember     = Nothing
         , envScales     = scalePaths
+        , envScalarParams = scalarPaths
         , envScalars    = Map.fromList [ (getUnique (givenName g), pyIdent (givenText g)) | g <- others ]
         , envExported   = exportedU
         , envListFields = subjListFields
@@ -180,6 +185,7 @@ data LowerEnv = LowerEnv
   , envPeriod     :: !(Maybe Unique)     -- ^ the conventional period parameter
   , envMember     :: !(Maybe Unique)     -- ^ the lambda-bound member var, inside an aggregation
   , envScales     :: !(Map Unique Text)  -- ^ scale-parameter values → dotted path
+  , envScalarParams :: !(Map Unique Text)  -- ^ scalar-parameter values → dotted path
   , envScalars    :: !(Map Unique Text)  -- ^ free scalar params → input-variable names
   , envExported   :: !(Map Unique Text)  -- ^ exported decisions → variable names
   , envListFields :: ![Text]             -- ^ the subject's @LIST OF@ field names (roles)
@@ -238,6 +244,8 @@ lowerExpr env = go
         Just mk -> traverse go args >>= mk
         Nothing
           | Just b <- boolLit nm                      -> Right (OFBoolLit b)
+          -- a scalar legislation parameter, read by period (args ignored)
+          | Just path <- Map.lookup u env.envScalarParams -> Right (OFParamRef path)
           -- a call to another @export decision: on a member (inside an
           -- aggregation) it reads that member's variable; otherwise the entity's.
           | Just name <- Map.lookup u env.envExported ->
@@ -431,13 +439,52 @@ collectScaleParams (MkModule _ _ section) = Map.fromList (goSection section)
     Section _ sub -> goSection sub
     _ -> []
 
--- | The dotted path from a @scale <path>@ description annotation, if present.
-scaleAnnotation :: Decide Resolved -> Maybe Text
-scaleAnnotation d = do
+-- | The dotted path from a @<keyword> a.b.c@ description annotation.
+descKeyword :: Text -> Decide Resolved -> Maybe Text
+descKeyword kw d = do
   desc <- getAnno d ^. annDesc
   case Text.words (getDesc desc) of
-    ("scale" : rest) | not (null rest) -> Just (Text.intercalate "." rest)
-    _                                  -> Nothing
+    (w : rest) | w == kw, not (null rest) -> Just (Text.intercalate "." rest)
+    _                                     -> Nothing
+
+scaleAnnotation, paramAnnotation :: Decide Resolved -> Maybe Text
+scaleAnnotation = descKeyword "scale"
+paramAnnotation = descKeyword "parameter"
+
+-- | Scan @\@desc parameter <path>@ scalar legislation parameters. Their bodies
+-- are a constant, a @IF y AT LEAST Y THEN v ELSE v0@, or a year-keyed BRANCH.
+collectScalarParams :: Module Resolved -> Map Unique OFScalarParam
+collectScalarParams (MkModule _ _ section) = Map.fromList (goSection section)
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ d@(MkDecide _ _ (MkAppForm _ nameRes _ _) body)
+      | Just path <- paramAnnotation d
+      , Just vs   <- readScalarParam body ->
+          [(getUnique nameRes, OFScalarParam { spsPath = path, spsValues = vs })]
+    Section _ sub -> goSection sub
+    _ -> []
+
+-- | Read a scalar parameter body into a date-indexed value series.
+readScalarParam :: Expr Resolved -> Maybe [(Text, Rational)]
+readScalarParam = \case
+  Lit _ (NumericLit _ v) -> Just [(epochDate, v)]
+  IfThenElse _ cond thenE elseE -> do
+    y  <- guardYear cond
+    tv <- litNum thenE
+    ev <- litNum elseE
+    pure [(epochDate, ev), (isoYM y 1, tv)]
+  MultiWayIf _ guards oth -> do
+    arms <- traverse scalarArm guards
+    ov   <- litNum oth
+    pure ((epochDate, ov) : arms)
+  _ -> Nothing
+ where
+  scalarArm (MkGuardedExpr _ cond body) = do
+    y <- guardYear cond
+    v <- litNum body
+    pure (isoYM y 1, v)
+  litNum = \case Lit _ (NumericLit _ v) -> Just v; _ -> Nothing
 
 -- | Read a scale body into dated brackets. Two shapes:
 --

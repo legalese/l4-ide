@@ -43,6 +43,9 @@ EXAMPLES = [
     ("agecheck", "Member decision-calls",
      "age OF c, period inside any -> household.members('age', period); the called "
      "decision compiles as a Person variable; period's year -> period.start.year."),
+    ("incometax", "Scalar parameter store",
+     "@desc parameter <path> with a time-varying rate -> an OpenFisca scalar "
+     "parameter; rate OF period's year -> parameters(period).<path>."),
 ]
 
 

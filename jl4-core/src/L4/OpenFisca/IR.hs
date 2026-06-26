@@ -19,6 +19,7 @@ module L4.OpenFisca.IR
   , OFCmpOp (..)
   , OFBracket (..)
   , OFScaleParam (..)
+  , OFScalarParam (..)
   , OFEnumDef (..)
   , OFPackage (..)
   ) where
@@ -106,6 +107,7 @@ data OFExpr
   | OFEnumLit Text Text             -- ^ @<EnumClass>.<member>@
   | OFNpCall  Text [OFExpr]         -- ^ @np.<fn>(<args>)@ — e.g. maximum/minimum
   | OFPeriodField Text              -- ^ @period.start.<field>@ — e.g. period's year
+  | OFParamRef Text                 -- ^ @parameters(period).<path>@ — a scalar parameter
   deriving stock (Eq, Show, Generic)
 
 -- | One bracket of a marginal-rate scale. Threshold and rate are date-indexed
@@ -125,11 +127,20 @@ data OFScaleParam = OFScaleParam
   }
   deriving stock (Eq, Show, Generic)
 
+-- | A scalar legislation parameter: a dotted path and a date-indexed value
+-- time-series (ISO date → value), emitted as @{"values": {date: v, …}}@.
+data OFScalarParam = OFScalarParam
+  { spsPath   :: !Text
+  , spsValues :: ![(Text, Rational)]
+  }
+  deriving stock (Eq, Show, Generic)
+
 data OFPackage = OFPackage
   { pkgSource     :: !Text         -- ^ provenance (source file / module) for the header
   , pkgEntities   :: ![OFEntity]
   , pkgVariables  :: ![OFVariable] -- ^ input variables first, then computed, in stable order
   , pkgParameters :: ![OFScaleParam]
+  , pkgScalars    :: ![OFScalarParam]
   , pkgEnums      :: ![OFEnumDef]
   }
   deriving stock (Eq, Show, Generic)

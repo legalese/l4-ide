@@ -22,7 +22,7 @@ renderPackage pkg =
     <> [""]
     <> concatMap entityLines pkg.pkgEntities
     <> concatMap enumLines pkg.pkgEnums
-    <> parameterLines pkg.pkgParameters
+    <> parameterLines pkg.pkgParameters pkg.pkgScalars
     <> concatMap variableLines pkg.pkgVariables
     <> systemLines pkg
 
@@ -36,8 +36,12 @@ header pkg =
   , "from openfisca_core.periods import MONTH, YEAR, ETERNITY"
   ]
   <> [ "from openfisca_core.indexed_enums import Enum" | not (null pkg.pkgEnums) ]
-  <> [ "from openfisca_core.parameters import ParameterNode" | not (null pkg.pkgParameters) ]
+  <> [ "from openfisca_core.parameters import ParameterNode" | hasParams pkg ]
   <> [ "import numpy as np" ]
+
+-- | Does the package declare any legislation parameters (scales or scalars)?
+hasParams :: OFPackage -> Bool
+hasParams pkg = not (null pkg.pkgParameters && null pkg.pkgScalars)
 
 enumLines :: OFEnumDef -> [Text]
 enumLines e =
@@ -113,6 +117,7 @@ formulaLines v =
 usesParams :: OFExpr -> Bool
 usesParams = \case
   OFScaleCalc _ _ -> True
+  OFParamRef _    -> True
   OFBin _ a b     -> usesParams a || usesParams b
   OFCmp _ a b     -> usesParams a || usesParams b
   OFAnd a b       -> usesParams a || usesParams b
@@ -132,7 +137,7 @@ systemLines pkg =
      , ind 1 <> "def __init__(self):"
      , ind 2 <> "super().__init__([" <> Text.intercalate ", " (map (.entPy) pkg.pkgEntities) <> "])"
      ]
-  <> [ ind 2 <> "self.parameters = ParameterNode(\"\", data=_PARAMETERS)" | not (null pkg.pkgParameters) ]
+  <> [ ind 2 <> "self.parameters = ParameterNode(\"\", data=_PARAMETERS)" | hasParams pkg ]
   <> [ ind 2 <> "self.add_variables(" <> Text.intercalate ", " (map (.varName) pkg.pkgVariables) <> ")"
      , ""
      , "# Convenience alias for `python -m openfisca` / SimulationBuilder."
@@ -144,27 +149,30 @@ systemLines pkg =
 -- ---------------------------------------------------------------------------
 
 -- | A path-addressed tree of scale parameters, rendered as a nested dict.
-data PTree = PScale [OFBracket] | PMap (Map Text PTree)
+data PTree = PScale [OFBracket] | PScalar [(Text, Rational)] | PMap (Map Text PTree)
 
-parameterLines :: [OFScaleParam] -> [Text]
-parameterLines [] = []
-parameterLines params =
+parameterLines :: [OFScaleParam] -> [OFScalarParam] -> [Text]
+parameterLines [] [] = []
+parameterLines scales scalars =
      [ "_PARAMETERS = {" ]
-  <> renderEntries 1 (foldr ins (PMap Map.empty) params)
+  <> renderEntries 1 tree
   <> [ "}", "" ]
  where
-  ins p t = insertScale (Text.splitOn "." p.spPath) p.spBrackets t
+  tree = foldr insScalar (foldr insScale (PMap Map.empty) scales) scalars
+  insScale  s = insertNode (Text.splitOn "." s.spPath)  (PScale  s.spBrackets)
+  insScalar s = insertNode (Text.splitOn "." s.spsPath) (PScalar s.spsValues)
 
-insertScale :: [Text] -> [OFBracket] -> PTree -> PTree
-insertScale path bs tree = case (path, tree) of
-  ([], _)          -> PScale bs
-  (k : ks, PMap m) -> PMap (Map.alter (Just . insertScale ks bs . fromMaybe (PMap Map.empty)) k m)
-  (k : ks, PScale _) -> PMap (Map.singleton k (insertScale ks bs (PMap Map.empty)))
+insertNode :: [Text] -> PTree -> PTree -> PTree
+insertNode path leaf tree = case (path, tree) of
+  ([], _)          -> leaf
+  (k : ks, PMap m) -> PMap (Map.alter (Just . insertNode ks leaf . fromMaybe (PMap Map.empty)) k m)
+  (k : ks, _)      -> PMap (Map.singleton k (insertNode ks leaf (PMap Map.empty)))
 
 renderEntries :: Int -> PTree -> [Text]
 renderEntries n = \case
-  PScale bs -> scaleEntries n bs
-  PMap m    -> concatMap (uncurry (entry n)) (Map.toList m)
+  PScale bs  -> scaleEntries n bs
+  PScalar vs -> [ ind n <> "'values': " <> datedMap vs <> "," ]
+  PMap m     -> concatMap (uncurry (entry n)) (Map.toList m)
  where
   entry n' k child =
        [ ind n' <> pyStr k <> ": {" ]
@@ -180,8 +188,10 @@ scaleEntries n bs =
   bracketLine b =
     ind (n + 1) <> "{'rate': " <> datedMap b.brRate
       <> ", 'threshold': " <> datedMap b.brThreshold <> "},"
-  datedMap kvs =
-    "{" <> Text.intercalate ", " [ pyStr d <> ": " <> renderNum v | (d, v) <- kvs ] <> "}"
+
+datedMap :: [(Text, Rational)] -> Text
+datedMap kvs =
+  "{" <> Text.intercalate ", " [ pyStr d <> ": " <> renderNum v | (d, v) <- kvs ] <> "}"
 
 -- ---------------------------------------------------------------------------
 -- Expression emission (vectorised numpy semantics)
@@ -218,6 +228,7 @@ emitExpr ent entPy = go
     OFEnumLit cls mem -> cls <> "." <> mem
     OFNpCall fn as -> "np." <> fn <> "(" <> Text.intercalate ", " (map go as) <> ")"
     OFPeriodField f -> "period.start." <> f
+    OFParamRef path -> "parameters(period)." <> path
 
   binOp = \case
     OFAdd -> "+"; OFSub -> "-"; OFMul -> "*"; OFDiv -> "/"; OFMod -> "%"

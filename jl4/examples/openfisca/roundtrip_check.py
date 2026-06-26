@@ -96,6 +96,11 @@ def main():
         print(f"  has_young_child(no kids) = {got}  (L4 expected 0.0)  "
               f"{'OK' if abs(got) < 1e-6 else '*** MISMATCH ***'}")
         assert abs(got) < 1e-6, got
+    elif which == "incometax":
+        # scalar legislation parameter (time-varying rate) read by period.
+        for per, exp in [("2013-06", 260.0), ("2015-01", 300.0), ("2012-01", 320.0)]:
+            check(tbs, "persons", {"p": {"salary": {per: 2000}}},
+                  "income_tax", per, exp)
     elif which == "dated":
         # dated formulas: OpenFisca picks formula_YYYY_MM by period.
         for per, sal, exp in [("2015-11", 0, 0.0), ("2015-12", 0, 600.0),
