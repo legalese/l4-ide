@@ -1,0 +1,16 @@
+-- The OpenFisca textbook example, expressed in L4.
+-- `salary` is a stored attribute of Person; `flat tax on salary` is a
+-- decision rule over a subject (p) and a time period. This is exactly the
+-- shape the OpenFisca backend compiles: subject -> entity, period -> period,
+-- projected fields -> input variables, the DECIDE body -> a formula.
+
+DECLARE Person
+    HAS salary IS A NUMBER
+
+@export Flat tax on salary
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`flat tax on salary` p period MEANS (p's salary) * 0.25
+
+#EVAL `flat tax on salary` (Person WITH salary IS 2000) "2026-01"  -- expect 500.0
