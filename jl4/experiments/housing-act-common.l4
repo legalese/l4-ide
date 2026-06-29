@@ -1,0 +1,39 @@
+§ `Housing Act 1988 — Schedule 2 — Shared vocabulary (Actor, Action)`
+
+-- ===========================================================================
+-- SHARED VOCABULARY for the Schedule 2 corpus.
+--
+-- Every predicate-style ground file in this corpus models the same two
+-- regulative primitives:
+--   * Actor  — the parties who can act under the Schedule (Landlord, Tenant,
+--              Court). The Court is the party that the mandatory/discretionary
+--              outcome binds ("PARTY Court MUST/MAY order possession").
+--   * Action — the operative outcome the grounds confer: `order possession`.
+--
+-- These were previously DECLARE'd identically in 37+ ground files. They are
+-- hoisted here once so the ground files (and the top-level possession-decision
+-- aggregator) can `IMPORT \`housing-act-common\`` instead of re-declaring them.
+--
+-- THREE files intentionally do NOT import this module, because their vocabulary
+-- genuinely differs:
+--   * housing-act-ground-1.l4  — the operative-tenancy-contract demo, whose
+--                                 Action enum has five constructors (give notice,
+--                                 pay rent, apply to court, dispense, order
+--                                 possession).
+--   * housing-act-ground-2.l4  — the mortgagee's power of sale: its Actor is
+--                                 `Mortgagee, Tenant, Court`, not Landlord.
+--   * housing-act-part-6-powers-to-amend.l4 — the Secretary of State's amendment
+--                                 power: Actor `SecretaryOfState, ParliamentHL,
+--                                 ParliamentHC`, Action `amend the Schedule`.
+-- ===========================================================================
+
+DECLARE Actor IS ONE OF Landlord, Tenant, Court
+
+-- `order possession` is the outcome every ground confers on the Court. `seek
+-- possession` is the landlord's own act — the s.7 election by which the landlord
+-- pleads a ground; used by the top-level possession-decision aggregator's Form B.
+-- No ground pattern-matches exhaustively on Action, so the extra constructor is
+-- inert for the grounds and harmless.
+DECLARE Action IS ONE OF
+  `order possession`
+  `seek possession`

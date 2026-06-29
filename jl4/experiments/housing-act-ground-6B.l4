@@ -1,0 +1,552 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 6B (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 6B — the "enforcement" MANDATORY ground, inserted into Schedule 2 to
+-- the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), s. 145(1)(8),
+-- Sch. 1 para. 22 (with ss. 138, 146(1), Sch. 6 paras. 1, 3, 4, 16, 17);
+-- commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b),
+-- marker F40. Part I (mandatory): where made out, the court MUST order
+-- possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("Any of the following applies—", a DISJUNCTION over
+-- (a)-(g)):
+--   (a) letting the dwelling-house causes the landlord to breach a banning order
+--       under section 16 of the Housing and Planning Act 2016, or would do so if
+--       the landlord were to continue to let the dwelling-house;
+--   (b) an improvement notice under section 11 or 12 of the Housing Act 2004—
+--         (i)  specifies the dwelling-house or premises in which the dwelling-
+--              house is contained as requiring remedial action, and
+--         (ii) specifies overcrowding as the deficiency giving rise to the hazard
+--              in respect of which that remedial action is to be taken;
+--   (c) a prohibition order under section 20 or 21 of the Housing Act 2004
+--       prohibits use of—
+--         (i)   the dwelling-house,
+--         (ii)  the common parts, or
+--         (iii) any part of the dwelling-house or of the common parts,
+--       either for all purposes or for any purpose that is incompatible with
+--       continued occupation by the tenant;
+--   (d) the dwelling-house is or is in an HMO which is required to be licensed
+--       under section 61 of the Housing Act 2004, and—
+--         (i)  the landlord applied for a licence under section 63 of the Housing
+--              Act 2004 and the local housing authority refused to grant a
+--              licence, or
+--         (ii) the landlord held a licence but the licence has been revoked;
+--   (e) the dwelling-house is or is in a house which is required to be licensed
+--       under section 85 of the Housing Act 2004, and—
+--         (i)  the landlord applied for a licence under section 87 of the Housing
+--              Act 2004 and the local housing authority refused to grant a
+--              licence, or
+--         (ii) the landlord held a licence but the licence has been revoked;
+--   (f) the dwelling-house is or is in an HMO which is licensed under Part 2 of
+--       the Housing Act 2004 or a house which is licensed under Part 3 of that
+--       Act and that HMO or house is occupied by more than the maximum number of
+--       households or persons specified in the licence;
+--   (g) compliance with a planning enforcement notice or injunction would be, or
+--       is, incompatible with continued occupation of the dwelling-house by the
+--       tenant.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * Made out = (a) OR (b) OR (c) OR (d) OR (e) OR (f) OR (g) — a top-level
+--     DISJUNCTION; each disjunct is spelled with its own sub-structure.
+--   * (a) is itself a DISJUNCTION: letting causes a breach now OR would cause one
+--       on continued letting.
+--   * (b) is a CONJUNCTION of (i) AND (ii) (the notice both specifies the
+--       dwelling-house as requiring remedial action AND specifies overcrowding as
+--       the hazard deficiency).
+--   * (c) is a CONJUNCTION: the prohibition order prohibits use of one or more of
+--       (i)/(ii)/(iii) (a DISJUNCTION) AND that prohibition is for all purposes or
+--       for a purpose incompatible with continued occupation (a DISJUNCTION).
+--   * (d) and (e) are each a CONJUNCTION of the licensing-requirement chapeau
+--       AND a DISJUNCTION over (i) OR (ii) (refusal of a licence application OR
+--       revocation of a held licence). They differ only in the HA2004 sections:
+--       (d) HMO s.61/s.63; (e) house s.85/s.87.
+--   * (f) is a CONJUNCTION: licensed (Part 2 HMO .. Part 3 house) AND over the
+--       maximum number specified in the licence.
+--   * (g) is a single operative atom.
+--   * The "In this ground—" definitions ("common parts" as in Ground 13; "house"
+--     as in Part 3 HA2004; the joint-landlords reading of "landlord"; the
+--     "planning enforcement notice or injunction" enumeration; "P(LBCA)A 1990";
+--     "TCPA 1990"; "the local housing authority" per s.261 HA2004) are carried
+--     as inert prose; their operative effect is folded into the lifted atoms
+--     (e.g. `compliance with a planning enforcement notice or injunction ...`).
+--   * "landlord" reads, per the joint-landlords rule, as "the landlord seeking
+--     possession or, where joint, at least one of them".
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of disjuncts (a)-(g), gathered on the claim.
+DECLARE Ground6BClaim HAS
+  -- (a)
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS A BOOLEAN
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS A BOOLEAN
+  -- (b)
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS A BOOLEAN
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS A BOOLEAN
+  -- (c)
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS A BOOLEAN  -- (c)(i)
+  `that prohibition order prohibits use of the common parts`                                     IS A BOOLEAN  -- (c)(ii)
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS A BOOLEAN  -- (c)(iii)
+  `the prohibition is for all purposes`                                                          IS A BOOLEAN
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS A BOOLEAN
+  -- (d)
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS A BOOLEAN
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS A BOOLEAN  -- (d)(i)
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS A BOOLEAN  -- (d)(ii)
+  -- (e)
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS A BOOLEAN
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS A BOOLEAN  -- (e)(i)
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS A BOOLEAN  -- (e)(ii)
+  -- (f)
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS A BOOLEAN
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS A BOOLEAN
+  -- (g)
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS A BOOLEAN
+
+§§ `(a) — letting breaches, or on continued letting would breach, a banning order`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(a) — banning-order breach` claim MEANS
+        "(a) letting the dwelling-house causes the landlord to breach a banning order under section 16 of the Housing and Planning Act 2016,"
+    ..  claim's `letting the dwelling-house causes the landlord to breach a section 16 banning order`
+    ..  "or would do so if the landlord were to continue to let the dwelling-house;"
+    ..  claim's `letting would cause a breach if the landlord were to continue to let the dwelling-house`
+
+§§ `(b) — improvement notice specifying the dwelling-house and citing overcrowding`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(b) — improvement notice for overcrowding` claim MEANS
+        "(b) an improvement notice under section 11 or 12 of the Housing Act 2004—"
+    ...     "(i) specifies the dwelling-house or premises in which the dwelling-house is contained as requiring remedial action, and"
+        ... claim's `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`
+    AND     "(ii) specifies overcrowding as the deficiency giving rise to the hazard in respect of which that remedial action is to be taken;"
+        ... claim's `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`
+
+§§ `(c) — prohibition order prohibiting use, for all or incompatible purposes`
+
+-- (c) prohibits use of one or more of (i)/(ii)/(iii), AND that prohibition is
+-- either for all purposes or for a purpose incompatible with continued occupation.
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(c) — prohibition order incompatible with occupation` claim MEANS
+        "(c) a prohibition order under section 20 or 21 of the Housing Act 2004 prohibits use of—"
+    ...     "(i) the dwelling-house,"
+        ..  claim's `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`
+        ..  "(ii) the common parts, or"
+        ..  claim's `that prohibition order prohibits use of the common parts`
+        ..  "(iii) any part of the dwelling-house or of the common parts,"
+        ..  claim's `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`
+    AND     "either for all purposes or for any purpose that is incompatible with continued occupation by the tenant;"
+        ..  claim's `the prohibition is for all purposes`
+        ..  claim's `the prohibition is for a purpose incompatible with continued occupation by the tenant`
+
+§§ `(d) — required s.61 HMO licence: application refused or licence revoked`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(d) — HMO licensing failure under s.61` claim MEANS
+        "(d) the dwelling-house is or is in an HMO which is required to be licensed under section 61 of the Housing Act 2004, and—"
+    ... claim's `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`
+    AND     "(i) the landlord applied for a licence under section 63 of the Housing Act 2004 and the local housing authority refused to grant a licence, or"
+        ..  claim's `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`
+        ..  "(ii) the landlord held a licence but the licence has been revoked;"
+        ..  claim's `the landlord held an s.61 HMO licence but the licence has been revoked`
+
+§§ `(e) — required s.85 house licence: application refused or licence revoked`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(e) — house licensing failure under s.85` claim MEANS
+        "(e) the dwelling-house is or is in a house which is required to be licensed under section 85 of the Housing Act 2004, and—"
+    ... claim's `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`
+    AND     "(i) the landlord applied for a licence under section 87 of the Housing Act 2004 and the local housing authority refused to grant a licence, or"
+        ..  claim's `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`
+        ..  "(ii) the landlord held a licence but the licence has been revoked;"
+        ..  claim's `the landlord held an s.85 house licence but the licence has been revoked`
+
+§§ `(f) — licensed HMO/house occupied over the licensed maximum`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(f) — licensed dwelling occupied over the maximum` claim MEANS
+        "(f) the dwelling-house is or is in an HMO which is licensed under Part 2 of the Housing Act 2004 or a house which is licensed under Part 3 of that Act"
+    ... claim's `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`
+    AND "and that HMO or house is occupied by more than the maximum number of households or persons specified in the licence;"
+    ... claim's `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`
+
+§§ `(g) — planning enforcement notice or injunction incompatible with occupation`
+
+-- "planning enforcement notice or injunction" means: (a) a TCPA 1990 s.172/182
+-- enforcement notice that has taken effect, (b) a TCPA 1990 s.187A breach of
+-- condition notice, (c) a TCPA 1990 s.187B injunction, (d) a P(LBCA)A 1990
+-- s.38/45/46 listed building enforcement notice that has taken effect, or (e) a
+-- P(LBCA)A 1990 s.44A injunction. (carried as inert prose; "P(LBCA)A 1990" = the
+-- Planning (Listed Building and Conservation Areas) Act 1990; "TCPA 1990" = the
+-- Town and Country Planning Act 1990.)
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`(g) — planning enforcement incompatible with occupation` claim MEANS
+        "(g) compliance with a planning enforcement notice or injunction would be, or is, incompatible with continued occupation of the dwelling-house by the tenant."
+    ... claim's `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`
+
+§§ `Ground 6B made out — any of (a)-(g) applies`
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A BOOLEAN
+`Ground 6B made out` claim MEANS
+        "Any of the following applies—"
+    ..  `(a) — banning-order breach` claim
+    ..  `(b) — improvement notice for overcrowding` claim
+    ..  `(c) — prohibition order incompatible with occupation` claim
+    ..  `(d) — HMO licensing failure under s.61` claim
+    ..  `(e) — house licensing failure under s.85` claim
+    ..  `(f) — licensed dwelling occupied over the maximum` claim
+    ..  `(g) — planning enforcement incompatible with occupation` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground6BClaim
+GIVETH A DEONTIC Actor Action
+`ground 6B possession order` claim MEANS
+    IF   `Ground 6B made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground6BClaim value (the house style;
+-- L4 has no record-update). The all-false base sets every atom FALSE -> no
+-- disjunct fires. Then one positive scenario per disjunct (a)-(g), each lighting
+-- up exactly that disjunct's atoms (and nothing else), so a single TRUE disjunct
+-- carries the whole top-level OR.
+-- ---------------------------------------------------------------------------
+
+§§ `All-false base — no disjunct applies -> NOT made out`
+
+`base — all false` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT NOT `(a) — banning-order breach`                          `base — all false`
+#ASSERT NOT `(b) — improvement notice for overcrowding`          `base — all false`
+#ASSERT NOT `(c) — prohibition order incompatible with occupation` `base — all false`
+#ASSERT NOT `(d) — HMO licensing failure under s.61`             `base — all false`
+#ASSERT NOT `(e) — house licensing failure under s.85`           `base — all false`
+#ASSERT NOT `(f) — licensed dwelling occupied over the maximum`  `base — all false`
+#ASSERT NOT `(g) — planning enforcement incompatible with occupation` `base — all false`
+#ASSERT NOT `Ground 6B made out`                                 `base — all false`
+
+§§ `(a) made out — letting would breach a banning order on continued letting`
+
+`claim via (a)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS TRUE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(a) — banning-order breach` `claim via (a)`
+#ASSERT `Ground 6B made out`         `claim via (a)`
+
+§§ `(b) made out — improvement notice specifies dwelling-house AND overcrowding`
+
+-- (b) needs BOTH (i) AND (ii). The all-met-(b) scenario sets both TRUE.
+`claim via (b)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS TRUE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS TRUE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(b) — improvement notice for overcrowding` `claim via (b)`
+#ASSERT `Ground 6B made out`                        `claim via (b)`
+
+§§ `(b) knocked out — improvement notice specifies dwelling-house but NOT overcrowding`
+
+-- (b)(ii) missing: only (i) is set, so the (i) AND (ii) conjunction fails.
+`claim via (b) — no overcrowding` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS TRUE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT NOT `(b) — improvement notice for overcrowding` `claim via (b) — no overcrowding`
+#ASSERT NOT `Ground 6B made out`                        `claim via (b) — no overcrowding`
+
+§§ `(c) made out — prohibition order on the dwelling-house, for all purposes`
+
+`claim via (c)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS TRUE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS TRUE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(c) — prohibition order incompatible with occupation` `claim via (c)`
+#ASSERT `Ground 6B made out`                                   `claim via (c)`
+
+§§ `(c) knocked out — a part is prohibited but only for a compatible purpose`
+
+-- (c) needs (one of (i)/(ii)/(iii)) AND (all purposes OR incompatible purpose).
+-- Here (iii) is set, but neither purpose-arm is -> the second conjunct fails.
+`claim via (c) — compatible purpose` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS TRUE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT NOT `(c) — prohibition order incompatible with occupation` `claim via (c) — compatible purpose`
+#ASSERT NOT `Ground 6B made out`                                   `claim via (c) — compatible purpose`
+
+§§ `(d) made out — required s.61 HMO licence revoked`
+
+`claim via (d)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS TRUE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS TRUE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(d) — HMO licensing failure under s.61` `claim via (d)`
+#ASSERT `Ground 6B made out`                     `claim via (d)`
+
+§§ `(d) knocked out — not required to be licensed under s.61 (chapeau fails)`
+
+-- (d)(ii) is set (a licence was held and revoked) but the chapeau "required to be
+-- licensed under s.61" is FALSE -> the chapeau-AND-(disjunct) conjunction fails.
+`claim via (d) — not required to be licensed` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS TRUE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT NOT `(d) — HMO licensing failure under s.61` `claim via (d) — not required to be licensed`
+#ASSERT NOT `Ground 6B made out`                     `claim via (d) — not required to be licensed`
+
+§§ `(e) made out — required s.85 house licence: application refused`
+
+`claim via (e)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS TRUE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS TRUE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(e) — house licensing failure under s.85` `claim via (e)`
+#ASSERT `Ground 6B made out`                       `claim via (e)`
+
+§§ `(f) made out — licensed HMO occupied over the licensed maximum`
+
+`claim via (f)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS TRUE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS TRUE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT `(f) — licensed dwelling occupied over the maximum` `claim via (f)`
+#ASSERT `Ground 6B made out`                                `claim via (f)`
+
+§§ `(f) knocked out — licensed but not over the maximum`
+
+-- (f) needs BOTH conjuncts. Licensed is set but "over the maximum" is not.
+`claim via (f) — within the maximum` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS TRUE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS FALSE
+
+#ASSERT NOT `(f) — licensed dwelling occupied over the maximum` `claim via (f) — within the maximum`
+#ASSERT NOT `Ground 6B made out`                                `claim via (f) — within the maximum`
+
+§§ `(g) made out — planning enforcement incompatible with continued occupation`
+
+`claim via (g)` MEANS Ground6BClaim WITH
+  `letting the dwelling-house causes the landlord to breach a section 16 banning order`         IS FALSE
+  `letting would cause a breach if the landlord were to continue to let the dwelling-house`      IS FALSE
+  `an improvement notice under s.11 or s.12 HA2004 specifies the dwelling-house or premises as requiring remedial action`  IS FALSE
+  `that improvement notice specifies overcrowding as the deficiency giving rise to the hazard`   IS FALSE
+  `a prohibition order under s.20 or s.21 HA2004 prohibits use of the dwelling-house`            IS FALSE
+  `that prohibition order prohibits use of the common parts`                                     IS FALSE
+  `that prohibition order prohibits use of any part of the dwelling-house or of the common parts`  IS FALSE
+  `the prohibition is for all purposes`                                                          IS FALSE
+  `the prohibition is for a purpose incompatible with continued occupation by the tenant`        IS FALSE
+  `the dwelling-house is or is in an HMO required to be licensed under s.61 HA2004`              IS FALSE
+  `the landlord applied for a licence under s.63 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.61 HMO licence but the licence has been revoked`                       IS FALSE
+  `the dwelling-house is or is in a house required to be licensed under s.85 HA2004`             IS FALSE
+  `the landlord applied for a licence under s.87 HA2004 and the local housing authority refused to grant a licence`  IS FALSE
+  `the landlord held an s.85 house licence but the licence has been revoked`                     IS FALSE
+  `the dwelling-house is or is in an HMO licensed under Part 2 HA2004 or a house licensed under Part 3 HA2004`  IS FALSE
+  `that HMO or house is occupied by more than the maximum number of households or persons specified in the licence`  IS FALSE
+  `compliance with a planning enforcement notice or injunction would be or is incompatible with continued occupation by the tenant`  IS TRUE
+
+#ASSERT `(g) — planning enforcement incompatible with occupation` `claim via (g)`
+#ASSERT `Ground 6B made out`                                      `claim via (g)`

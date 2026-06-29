@@ -1,0 +1,89 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 12 (breach of obligation)`
+
+-- ===========================================================================
+-- GROUND 12 — the "breach of an obligation of the tenancy" ground. It is one of
+-- the DISCRETIONARY grounds in Part II of Schedule 2 to the Housing Act 1988
+-- ("GROUNDS ON WHICH COURT MAY ORDER POSSESSION"): where it is made out, the
+-- court MAY order possession (it is not bound to).
+--
+-- HYBRID encoding:
+--   * the constitutive condition -> a predicate carrying the verbatim statute
+--     inline as inert prose; only the operative atom is lifted;
+--   * the discretionary outcome  -> a guarded deontic clause using MAY (not MUST).
+--
+-- Statutory text encoded:
+--   "Any obligation of the tenancy (other than one related to the payment of
+--    rent) has been broken or not performed."
+--
+-- STRUCTURE: a SINGLE operative atom — "an obligation of the tenancy has been
+-- broken or not performed" — qualified by the parenthetical exclusion
+-- "(other than one related to the payment of rent)". The qualifier is carried as
+-- inert prose; its operative effect is folded into the lifted atom, which is
+-- framed as concerning a NON-RENT obligation (the rent-related obligations are
+-- handled by Grounds 8/10/11, not here).
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "broken or not performed" is treated as a single composite operative atom
+--     rather than two separately-pleadable limbs: in either case the obligation
+--     was not honoured. (One could split it into a two-way OR if a downstream use
+--     needed to distinguish active breach from non-performance; not done here.)
+--   * "(other than one related to the payment of rent)" is a SCOPE qualifier on
+--     the kind of obligation, not an independent condition; encoded as inert prose
+--     and baked into the atom's framing ("a non-rent obligation ... ").
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+DECLARE Ground12Claim HAS
+  -- the single operative atom (already scoped to non-rent obligations)
+  `an obligation of the tenancy, other than one related to the payment of rent, has been broken or not performed`  IS A BOOLEAN
+
+§§ `The operative condition`
+
+GIVEN claim IS A Ground12Claim
+GIVETH A BOOLEAN
+`obligation broken or not performed` claim MEANS
+        "Any obligation of the tenancy (other than one related to the payment of rent) has been broken or not performed."
+    ... claim's `an obligation of the tenancy, other than one related to the payment of rent, has been broken or not performed`
+
+§§ `Ground 12 made out`
+
+GIVEN claim IS A Ground12Claim
+GIVETH A BOOLEAN
+`Ground 12 made out` claim MEANS
+    `obligation broken or not performed` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground12Claim
+GIVETH A DEONTIC Actor Action
+`ground 12 possession order` claim MEANS
+    IF   `Ground 12 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — a non-rent obligation has been broken or not performed`
+
+`claim — obligation broken` MEANS Ground12Claim WITH
+  `an obligation of the tenancy, other than one related to the payment of rent, has been broken or not performed`  IS TRUE
+
+#ASSERT `obligation broken or not performed` `claim — obligation broken`
+#ASSERT `Ground 12 made out`                 `claim — obligation broken`
+
+§§ `Ground not made out — no breach (or only a rent-related breach, which is out of scope)`
+
+`claim — no breach` MEANS Ground12Claim WITH
+  `an obligation of the tenancy, other than one related to the payment of rent, has been broken or not performed`  IS FALSE
+
+#ASSERT NOT `obligation broken or not performed` `claim — no breach`
+#ASSERT NOT `Ground 12 made out`                 `claim — no breach`

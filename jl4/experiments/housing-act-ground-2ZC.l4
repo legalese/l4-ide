@@ -1,0 +1,241 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 2ZC (Renters' Rights Act 2025)`
+
+-- Ground 2ZC, inserted into Schedule 2 to the Housing Act 1988 by the
+-- Renters' Rights Act 2025 (c. 26). It is one of the MANDATORY grounds in Part I
+-- of Schedule 2: where it is made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a regulative/deontic clause guarded by the
+--     conjunction (recent-section-18 landlord AND previous landlord was a
+--     qualifying type).
+--
+-- Statutory text encoded (a CONJUNCTION of the section 18 / 6-month chapeau and
+-- the previous-landlord-type list (a)-(d)):
+--   The landlord who is seeking possession became the landlord by virtue of
+--   section 18 no more than 6 months before the date on which the possession
+--   proceedings were commenced, and the previous landlord under the assured
+--   tenancy was, or, in the case of previous joint landlords, at least one of
+--   them was—
+--   (a) a private registered provider of social housing,
+--   (b) a tenant of the superior landlord under a tenancy of an agricultural
+--       holding within the meaning of the Agricultural Holdings Act 1986 which is
+--       a tenancy to which that Act applies, or a farm business tenancy within
+--       the meaning of the Agricultural Tenancies Act 1995,
+--   (c) a person who held the dwelling-house for the purpose of making it
+--       available for occupation as supported accommodation, or
+--   (d) a company of which a local authority owns at least 50% of the issued
+--       share capital.
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The recurring "qualifying landlord types" list (shared in shape with Ground
+-- 2ZA's (i)-(iv) list). Modelled as independent boolean flags an input layer can
+-- CHECKBOX: the previous landlord qualifies iff AT LEAST ONE flag is ticked.
+-- "the previous landlord" reads, per the joint-landlords rule, as "at least one
+-- of the previous joint landlords".
+DECLARE QualifyingLandlordType HAS
+  `is a private registered provider of social housing`                         IS A BOOLEAN  -- (a)
+  `is a tenant under an agricultural holding or farm business tenancy`         IS A BOOLEAN  -- (b)
+  `held the dwelling-house for use as supported accommodation`                 IS A BOOLEAN  -- (c)
+  `is a company of which a local authority owns at least 50% of share capital` IS A BOOLEAN  -- (d)
+
+-- The operative atoms. The chapeau turns on the landlord having become the
+-- landlord by virtue of section 18 (a fact) and on the gap between that date and
+-- the date the possession proceedings were commenced being at most 6 months. The
+-- (a)-(d) list is borne by the previous landlord.
+DECLARE Ground2ZCClaim HAS
+  `became the landlord by virtue of section 18`        IS A BOOLEAN
+  `became-landlord date`                               IS A DATE
+  `proceedings commenced date`                         IS A DATE
+  `previous landlord type`                             IS A QualifyingLandlordType
+
+§§ `Shared helper — became landlord by s.18 no more than 6 months before proceedings`
+
+-- "no more than 6 months before the date on which the possession proceedings were
+-- commenced": equivalently, the proceedings date is no more than 6 months AFTER
+-- the became-landlord date, i.e. proceedings <= became-landlord + 6 months.
+-- Computed leap-safe by building "6 months after the became-landlord date" from
+-- that date's components (month PLUS 6, with the Date constructor rolling an
+-- overflowing month into the next year — verified correct), then comparing.
+-- (We add to the earlier date rather than subtracting from the later one, because
+-- the Date constructor does not roll a month <= 0 back into the previous year.)
+GIVEN `became-landlord date`       IS A DATE
+      `proceedings commenced date` IS A DATE
+GIVETH A BOOLEAN
+`became landlord no more than 6 months before proceedings` MEANS
+        Day `proceedings commenced date`
+    AT MOST
+        Day `six months after became-landlord date`
+    WHERE
+        `six months after became-landlord date` MEANS
+            Date (DATE_DAY   `became-landlord date`)
+                 (DATE_MONTH `became-landlord date` PLUS 6)
+                 (DATE_YEAR  `became-landlord date`)
+
+§§ `Shared helper — the qualifying landlord types list (a)-(d)`
+
+-- The previous landlord qualifies iff it is AT LEAST ONE of the listed types.
+-- Shared in shape with Ground 2ZA's (i)-(iv) list.
+GIVEN `landlord type` IS A QualifyingLandlordType
+GIVETH A BOOLEAN
+`is one of the qualifying landlord types` MEANS
+        "(a) a private registered provider of social housing,"
+    ..  `landlord type`'s `is a private registered provider of social housing`
+    ..  "(b) a tenant of the superior landlord under a tenancy of an agricultural holding within the meaning of the Agricultural Holdings Act 1986 which is a tenancy to which that Act applies, or a farm business tenancy within the meaning of the Agricultural Tenancies Act 1995,"
+    ..  `landlord type`'s `is a tenant under an agricultural holding or farm business tenancy`
+    ..  "(c) a person who held the dwelling-house for the purpose of making it available for occupation as supported accommodation, or"
+    ..  `landlord type`'s `held the dwelling-house for use as supported accommodation`
+    ..  "(d) a company of which a local authority owns at least 50% of the issued share capital."
+    ..  `landlord type`'s `is a company of which a local authority owns at least 50% of share capital`
+
+§§ `The chapeau — became landlord by s.18 within 6 months of proceedings`
+
+GIVEN claim IS A Ground2ZCClaim
+GIVETH A BOOLEAN
+`became landlord by s.18 within 6 months of proceedings` claim MEANS
+        "became the landlord by virtue of section 18"
+    ... claim's `became the landlord by virtue of section 18`
+    AND "no more than 6 months before the date on which the possession proceedings were commenced"
+    ... `became landlord no more than 6 months before proceedings`
+            (claim's `became-landlord date`)
+            (claim's `proceedings commenced date`)
+
+§§ `The previous-landlord-type condition — the (a)-(d) list`
+
+GIVEN claim IS A Ground2ZCClaim
+GIVETH A BOOLEAN
+`previous landlord was a qualifying type` claim MEANS
+        "the previous landlord under the assured tenancy was, or, in the case of previous joint landlords, at least one of them was—"
+    ... `is one of the qualifying landlord types` (claim's `previous landlord type`)
+
+§§ `Ground 2ZC made out — recent s.18 landlord AND previous landlord a qualifying type`
+
+GIVEN claim IS A Ground2ZCClaim
+GIVETH A BOOLEAN
+`Ground 2ZC made out` claim MEANS
+        "The landlord who is seeking possession"
+    ... `became landlord by s.18 within 6 months of proceedings` claim
+    AND `previous landlord was a qualifying type` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground2ZCClaim
+GIVETH A DEONTIC Actor Action
+`ground 2ZC possession order` claim MEANS
+    IF   `Ground 2ZC made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Dates — the 6-month window ending on the proceedings date`
+
+`proceedings commenced 2025`     MEANS July 1 2025
+`became landlord within 6mo`     MEANS March 1 2025    -- 4 months before -> inside the window
+`became landlord exactly 6mo`    MEANS January 1 2025  -- exactly 6 months before -> on the boundary
+`became landlord 7mo before`     MEANS December 1 2024 -- 7 months before -> outside the window
+
+§§ `Qualifying landlord types — one checkbox ticked each (and one "none")`
+
+`prev — private registered provider` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS TRUE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`prev — agricultural tenant` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS TRUE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`prev — supported accommodation holder` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS TRUE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+`prev — LA-owned company` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS TRUE
+
+`prev — none of the list` MEANS QualifyingLandlordType WITH
+  `is a private registered provider of social housing`                         IS FALSE
+  `is a tenant under an agricultural holding or farm business tenancy`         IS FALSE
+  `held the dwelling-house for use as supported accommodation`                 IS FALSE
+  `is a company of which a local authority owns at least 50% of share capital` IS FALSE
+
+-- The (a)-(d) list bites: each listed type qualifies; "none" does not.
+#ASSERT     `is one of the qualifying landlord types` `prev — private registered provider`
+#ASSERT     `is one of the qualifying landlord types` `prev — agricultural tenant`
+#ASSERT     `is one of the qualifying landlord types` `prev — supported accommodation holder`
+#ASSERT     `is one of the qualifying landlord types` `prev — LA-owned company`
+#ASSERT NOT `is one of the qualifying landlord types` `prev — none of the list`
+
+§§ `Ground made out — within the 6-month window, previous landlord a qualifying type`
+
+`claim all-met` MEANS Ground2ZCClaim WITH
+  `became the landlord by virtue of section 18`        IS TRUE
+  `became-landlord date`                               IS `became landlord within 6mo`
+  `proceedings commenced date`                         IS `proceedings commenced 2025`
+  `previous landlord type`                             IS `prev — private registered provider`
+
+#ASSERT `became landlord by s.18 within 6 months of proceedings` `claim all-met`
+#ASSERT `previous landlord was a qualifying type`                `claim all-met`
+#ASSERT `Ground 2ZC made out`                                    `claim all-met`
+
+§§ `Ground made out — at the 6-month boundary, previous landlord an LA-owned company`
+
+`claim all-met at boundary` MEANS Ground2ZCClaim WITH
+  `became the landlord by virtue of section 18`        IS TRUE
+  `became-landlord date`                               IS `became landlord exactly 6mo`
+  `proceedings commenced date`                         IS `proceedings commenced 2025`
+  `previous landlord type`                             IS `prev — LA-owned company`
+
+#ASSERT `became landlord by s.18 within 6 months of proceedings` `claim all-met at boundary`
+#ASSERT `Ground 2ZC made out`                                    `claim all-met at boundary`
+
+§§ `Chapeau knocked out — became landlord more than 6 months before proceedings`
+
+`claim — too long ago` MEANS Ground2ZCClaim WITH
+  `became the landlord by virtue of section 18`        IS TRUE
+  `became-landlord date`                               IS `became landlord 7mo before`
+  `proceedings commenced date`                         IS `proceedings commenced 2025`
+  `previous landlord type`                             IS `prev — private registered provider`
+
+#ASSERT NOT `became landlord by s.18 within 6 months of proceedings` `claim — too long ago`
+#ASSERT NOT `Ground 2ZC made out`                                    `claim — too long ago`
+
+§§ `Chapeau knocked out — did not become landlord by virtue of section 18`
+
+`claim — not s.18` MEANS Ground2ZCClaim WITH
+  `became the landlord by virtue of section 18`        IS FALSE
+  `became-landlord date`                               IS `became landlord within 6mo`
+  `proceedings commenced date`                         IS `proceedings commenced 2025`
+  `previous landlord type`                             IS `prev — private registered provider`
+
+#ASSERT NOT `became landlord by s.18 within 6 months of proceedings` `claim — not s.18`
+#ASSERT NOT `Ground 2ZC made out`                                    `claim — not s.18`
+
+§§ `Previous-landlord condition knocked out — previous landlord is none of the list`
+
+`claim — prev not qualifying` MEANS Ground2ZCClaim WITH
+  `became the landlord by virtue of section 18`        IS TRUE
+  `became-landlord date`                               IS `became landlord within 6mo`
+  `proceedings commenced date`                         IS `proceedings commenced 2025`
+  `previous landlord type`                             IS `prev — none of the list`
+
+#ASSERT NOT `previous landlord was a qualifying type` `claim — prev not qualifying`
+#ASSERT NOT `Ground 2ZC made out`                     `claim — prev not qualifying`

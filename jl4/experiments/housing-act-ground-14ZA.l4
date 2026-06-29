@@ -1,0 +1,162 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 14ZA (riot offence)`
+
+-- ===========================================================================
+-- GROUND 14ZA — the "rioting" DISCRETIONARY ground in Part II of Schedule 2 to
+-- the Housing Act 1988, inserted (13.5.2014) by the Anti-social Behaviour,
+-- Crime and Policing Act 2014 (c. 12), ss. 99(2), 185(1); S.I. 2014/949, art. 3
+-- (marker F62). The in-force reading resolves F62.
+--
+-- PART II IS DISCRETIONARY: where the ground is made out the court MAY (not
+-- MUST) order possession — it must also be satisfied it is reasonable to do so
+-- (Housing Act 1988 s.7(4)). The reasonableness discretion is carried as inert
+-- prose; the operative outcome is `PARTY Court MAY \`order possession\``.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause (MAY).
+--
+-- Statutory text encoded:
+--   "The tenant or an adult residing in the dwelling-house has been convicted
+--    of an indictable offence which took place during, and at the scene of, a
+--    riot in the United Kingdom."
+--   In this Ground—
+--      "adult" means a person aged 18 or over;
+--      "indictable offence" does not include an offence triable only summarily
+--        by virtue of s.22 of the Magistrates' Courts Act 1980;
+--      "riot" is construed in accordance with s.1 of the Public Order Act 1986.
+--   This Ground applies only in relation to dwelling-houses in England.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The single operative limb is a CONJUNCTION: a qualifying conviction of
+--     the right class of person AND the offence's riot-nexus (during, and at
+--     the scene of, a riot in the UK) AND the England-only territorial gate.
+--     The statute states the conviction-and-nexus in one sentence; here the
+--     riot-nexus is lifted as a separate atom so a conviction WITHOUT the nexus
+--     can be shown to fail (an interpretation aid, not a structural split of
+--     the source).
+--   * The actor phrase "The tenant or an adult residing in the dwelling-house"
+--     is folded into the lead conviction atom; "adult" / "indictable offence"
+--     / "riot" definitions are carried as inert prose and presumed assessed
+--     when the conviction atom is set.
+--   * "This Ground applies only in relation to dwelling-houses in England" is a
+--     territorial application gate, lifted as a conjoined operative atom.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms gathered on the claim.
+DECLARE Ground14ZAClaim HAS
+  `tenant or adult resident has been convicted of an indictable offence`             IS A BOOLEAN
+  `the offence took place during, and at the scene of, a riot in the United Kingdom`  IS A BOOLEAN
+  `the dwelling-house is in England`                                                 IS A BOOLEAN
+
+§§ `The conviction-and-riot-nexus limb`
+
+GIVEN claim IS A Ground14ZAClaim
+GIVETH A BOOLEAN
+`conviction for an indictable offence at the scene of a riot` claim MEANS
+        "The tenant or an adult residing in the dwelling-house has been convicted of an indictable offence"
+    ... claim's `tenant or adult resident has been convicted of an indictable offence`
+    AND "which took place during, and at the scene of, a riot in the United Kingdom."
+    ... claim's `the offence took place during, and at the scene of, a riot in the United Kingdom`
+
+§§ `The England-only application gate`
+
+GIVEN claim IS A Ground14ZAClaim
+GIVETH A BOOLEAN
+`the England-only application gate is satisfied` claim MEANS
+        "This Ground applies only in relation to dwelling-houses in England."
+    ... claim's `the dwelling-house is in England`
+
+§§ `Ground 14ZA made out — qualifying conviction AND riot nexus AND in England`
+
+GIVEN claim IS A Ground14ZAClaim
+GIVETH A BOOLEAN
+`Ground 14ZA made out` claim MEANS
+        `conviction for an indictable offence at the scene of a riot` claim
+    AND `the England-only application gate is satisfied` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Part II ground: where made out the court MAY order possession (and only if it
+-- is also satisfied it is reasonable to do so — s.7(4)). MAY, not MUST.
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground14ZAClaim
+GIVETH A DEONTIC Actor Action
+`ground 14ZA possession order` claim MEANS
+    IF   `Ground 14ZA made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground14ZAClaim value (the house style;
+-- L4 has no record-update). The all-false base fails; a made-out scenario lights
+-- all three atoms; targeted negatives drop each conjunct in turn.
+-- ---------------------------------------------------------------------------
+
+§§ `All-false base — nothing met -> NOT made out`
+
+`base — all false` MEANS Ground14ZAClaim WITH
+  `tenant or adult resident has been convicted of an indictable offence`             IS FALSE
+  `the offence took place during, and at the scene of, a riot in the United Kingdom`  IS FALSE
+  `the dwelling-house is in England`                                                 IS FALSE
+
+#ASSERT NOT `Ground 14ZA made out` `base — all false`
+
+§§ `Made out — conviction, riot nexus, dwelling-house in England`
+
+`claim made out` MEANS Ground14ZAClaim WITH
+  `tenant or adult resident has been convicted of an indictable offence`             IS TRUE
+  `the offence took place during, and at the scene of, a riot in the United Kingdom`  IS TRUE
+  `the dwelling-house is in England`                                                 IS TRUE
+
+#ASSERT `conviction for an indictable offence at the scene of a riot` `claim made out`
+#ASSERT `the England-only application gate is satisfied`              `claim made out`
+#ASSERT `Ground 14ZA made out`                                       `claim made out`
+
+§§ `Knocked out — convicted, but the offence had NO riot nexus`
+
+`claim — no riot nexus` MEANS Ground14ZAClaim WITH
+  `tenant or adult resident has been convicted of an indictable offence`             IS TRUE
+  `the offence took place during, and at the scene of, a riot in the United Kingdom`  IS FALSE
+  `the dwelling-house is in England`                                                 IS TRUE
+
+#ASSERT NOT `conviction for an indictable offence at the scene of a riot` `claim — no riot nexus`
+#ASSERT NOT `Ground 14ZA made out`                                       `claim — no riot nexus`
+
+§§ `Knocked out — qualifying conviction at a riot, but the dwelling-house is NOT in England`
+
+`claim — not in England` MEANS Ground14ZAClaim WITH
+  `tenant or adult resident has been convicted of an indictable offence`             IS TRUE
+  `the offence took place during, and at the scene of, a riot in the United Kingdom`  IS TRUE
+  `the dwelling-house is in England`                                                 IS FALSE
+
+#ASSERT `conviction for an indictable offence at the scene of a riot` `claim — not in England`
+#ASSERT NOT `the England-only application gate is satisfied`          `claim — not in England`
+#ASSERT NOT `Ground 14ZA made out`                                   `claim — not in England`
+
+§§ `The discretionary possession order — Court MAY (performing it discharges)`
+
+-- When made out the residual is the Court's PERMISSION to order possession;
+-- exercising it within the window discharges (FULFILLED).
+#TRACE `ground 14ZA possession order` `claim made out` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- MAY is benign: not exercising the permission is not a breach.
+#TRACE `ground 14ZA possession order` `claim made out` AT 0 WITH
+    PARTY Tenant DOES `order possession` AT 99
+
+-- Not made out -> immediately FULFILLED.
+#TRACE `ground 14ZA possession order` `base — all false` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10

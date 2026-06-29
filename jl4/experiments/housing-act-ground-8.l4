@@ -1,0 +1,247 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `housing-act-common`
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 8 (rent arrears; amended, Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 8 — the "rent arrears" MANDATORY ground, as amended by the Renters'
+-- Rights Act 2025 (c. 26), Sch. 1 para. 24 (commencement 1.5.2026 for specified
+-- purposes; S.I. 2026/421, reg. 2(b)). Part I (mandatory): where made out, the
+-- court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- RESOLUTION OF THE F53–F58 AMENDMENTS (current in-force reading at 1.5.2026) —
+-- the source .txt presents Ground 8 with inline amendment markers
+-- "[F53[F54eight][F54thirteen] weeks']" etc. Resolving them to the in-force text:
+--
+--   (a) weekly/fortnightly: F53 substituted para (a) in 1997 (bringing "eight
+--       weeks"); F54 (RRA 2025, Sch. 1 para. 24(a), 1.5.2026) then substituted the
+--       WORD "eight" -> "thirteen". IN-FORCE READING:
+--         "(a) if rent is payable weekly or fortnightly, at least THIRTEEN weeks'
+--              rent is unpaid;"
+--   (b) monthly: F55 substituted para (b) in 1997 (bringing "two months"); F56
+--       (RRA 2025, Sch. 1 para. 24(b), 1.5.2026) then substituted the WORD "two"
+--       -> "three". IN-FORCE READING:
+--         "(b) if rent is payable monthly, at least THREE months' rent is unpaid;"
+--   (c) quarterly AND (d) yearly: F57 (RRA 2025, Sch. 1 para. 24(c), 1.5.2026)
+--       OMITTED Ground 8 paras (c) and (d) (the displayed "[F57(c) ... ]" /
+--       "[ (d) ... ] F57" bracketing spans both). So as of 1.5.2026 there is NO
+--       quarterly limb and NO yearly limb. NOT ENCODED.
+--   F58  RRA 2025, Sch. 1 para. 24(d), 1.5.2026 INSERTED a universal-credit
+--       calculation rule (amounts unpaid only because the UC housing award had not
+--       yet been received are ignored). It modifies HOW arrears are computed; it is
+--       carried here as inert interpretive prose, not as an operative limb.
+--
+-- So the in-force Ground 8 thresholds, per rent period, are:
+--     weekly or fortnightly -> at least 13 weeks' rent unpaid
+--     monthly               -> at least  3 months' rent unpaid
+--   (quarterly and yearly limbs omitted by RRA 2025.)
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The "both dates" requirement is a CONJUNCTION: the per-period threshold must
+--     be met BOTH at the date of service of the section 8 notice AND at the date of
+--     the hearing. Modelled as the per-period test applied to two arrears figures
+--     (arrears at service, arrears at hearing), both of which must clear the
+--     threshold.
+--   * The rent period is modelled as an ENUM. Because the in-force ground only
+--     provides thresholds for weekly/fortnightly and monthly periods, a rent
+--     payable on some other basis (e.g. quarterly or yearly) does NOT engage any
+--     in-force threshold, so the ground is not made out for such a period. The
+--     per-period threshold is expressed as a fraction of one period's rent that
+--     must be in arrears (>= 13/1 of a weekly period's rent, i.e. 13 weeks' worth;
+--     >= 3/1 of a monthly period's rent, i.e. 3 months' worth), captured directly
+--     as a required-arrears amount derived from the period rent.
+--   * "rent" means rent lawfully due from the tenant (carried as inert prose); the
+--     arrears figures supplied are taken to be of rent lawfully due.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The rent period. The in-force ground sets thresholds only for weekly/fortnightly
+-- and monthly periods. `Other` stands for any period the in-force ground no longer
+-- addresses (e.g. the omitted quarterly/yearly limbs): no in-force threshold
+-- applies, so the ground cannot be made out on that footing.
+DECLARE RentPeriod IS ONE OF
+    `weekly or fortnightly`
+    `monthly`
+    `other`
+
+-- The operative atoms of Ground 8, gathered on the claim. The period rent is the
+-- rent for ONE period (one week if weekly, one fortnight if fortnightly, one month
+-- if monthly); the threshold is expressed as a number of such periods' worth of
+-- rent. Arrears are captured at the two operative dates.
+DECLARE Ground8Claim HAS
+  `rent period`                                       IS A RentPeriod
+  `rent for one period`                               IS A NUMBER
+  -- "rent unpaid" at the two dates the ground tests
+  `rent unpaid at the date of service of the section 8 notice`  IS A NUMBER
+  `rent unpaid at the date of the hearing`            IS A NUMBER
+
+§§ `Per-period threshold — the in-force amount of arrears required`
+
+-- The in-force thresholds, per rent period:
+--   weekly or fortnightly -> at least thirteen weeks' rent unpaid;
+--   monthly               -> at least three months' rent unpaid.
+-- For a weekly tenancy, one period = one week, so thirteen weeks' rent = 13 *
+-- (one period's rent). For a fortnightly tenancy, one period = one fortnight = two
+-- weeks, so thirteen weeks' rent = 6.5 * (one period's rent). Rather than split
+-- weekly from fortnightly in the type, we read the threshold directly off the
+-- "thirteen weeks" / "three months" wording: the required-arrears figure is
+-- computed from the WEEKLY-equivalent or MONTHLY rent the claim supplies. To keep
+-- the per-period test uniform and faithful, `rent for one period` is the rent for
+-- ONE of the unit the threshold is stated in — i.e. one week's rent for the
+-- weekly/fortnightly limb (so the threshold is 13 * it) and one month's rent for
+-- the monthly limb (so the threshold is 3 * it). The enum still records whether
+-- the tenancy is weekly/fortnightly vs monthly so the correct multiplier applies.
+GIVEN claim IS A Ground8Claim
+GIVETH A NUMBER
+`required arrears for the period` claim MEANS
+    CONSIDER claim's `rent period`
+    WHEN `weekly or fortnightly` THEN 13 TIMES claim's `rent for one period`   -- thirteen weeks' rent
+    WHEN `monthly`               THEN  3 TIMES claim's `rent for one period`   -- three months' rent
+    WHEN `other`                 THEN -1   -- no in-force threshold engages; unreachable by any finite arrears
+
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`an in-force threshold applies to this rent period` claim MEANS
+    CONSIDER claim's `rent period`
+    WHEN `weekly or fortnightly` THEN TRUE
+    WHEN `monthly`               THEN TRUE
+    WHEN `other`                 THEN FALSE
+
+-- The threshold test applied to a single arrears figure: the unpaid rent must be
+-- AT LEAST the required arrears for the period, and an in-force threshold must
+-- exist for this period at all.
+GIVEN claim   IS A Ground8Claim
+      arrears IS A NUMBER
+GIVETH A BOOLEAN
+`threshold met for arrears` claim arrears MEANS
+        `an in-force threshold applies to this rent period` claim
+    AND arrears AT LEAST `required arrears for the period` claim
+
+§§ `(a)/(b) — the per-period arrears thresholds, stated verbatim (in-force)`
+
+-- The two in-force limbs, carried verbatim as inert prose; the operative content
+-- is the per-period threshold test above. (The omitted quarterly (c) and yearly
+-- (d) limbs are not present in the in-force text and are not encoded.)
+GIVEN claim   IS A Ground8Claim
+      arrears IS A NUMBER
+GIVETH A BOOLEAN
+`per-period threshold met` claim arrears MEANS
+        "(a) if rent is payable weekly or fortnightly, at least thirteen weeks' rent is unpaid;"
+    ... "(b) if rent is payable monthly, at least three months' rent is unpaid;"
+    ... `threshold met for arrears` claim arrears
+
+§§ `The both-dates requirement — threshold met at service AND at the hearing`
+
+-- "Both at the date of the service of the notice under section 8 of this Act
+-- relating to the proceedings for possession and at the date of the hearing—"
+-- the per-period threshold must be met at BOTH dates.
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`Ground 8 made out` claim MEANS
+        "Both at the date of the service of the notice under section 8 of this Act relating to the proceedings for possession and at the date of the hearing—"
+    ... `per-period threshold met` claim (claim's `rent unpaid at the date of service of the section 8 notice`)
+    AND `per-period threshold met` claim (claim's `rent unpaid at the date of the hearing`)
+
+§§ `Definitions and interpretive rules (inert prose)`
+
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`definition — rent means rent lawfully due from the tenant` claim MEANS
+        "and for the purpose of this ground 'rent' means rent lawfully due from the tenant."
+    ... TRUE   -- inert definition; carried as prose, not an operative limb
+
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`rule — universal credit housing amount not yet received is ignored` claim MEANS
+        "When calculating how much rent is unpaid for the purpose of this ground, if the tenant is entitled to receive an amount for housing as part of an award of universal credit under Part 1 of the Welfare Reform Act 2012, any amount that was unpaid only because the tenant had not yet received the payment of that award is to be ignored."
+    ... TRUE   -- inert interpretive rule; carried as prose, not an operative limb
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground8Claim
+GIVETH A DEONTIC Actor Action
+`ground 8 possession order` claim MEANS
+    IF   `Ground 8 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — weekly, thirteen weeks' rent unpaid at both dates`
+
+-- Weekly rent of 100; threshold = 13 weeks = 1300. Arrears of 1300 at both dates
+-- exactly clears the threshold.
+`claim all-met (weekly, exactly 13 weeks)` MEANS Ground8Claim WITH
+  `rent period`                                       IS `weekly or fortnightly`
+  `rent for one period`                               IS 100   -- one week's rent
+  `rent unpaid at the date of service of the section 8 notice`  IS 1300   -- exactly 13 weeks
+  `rent unpaid at the date of the hearing`            IS 1400   -- still >= 13 weeks
+
+#ASSERT `per-period threshold met` `claim all-met (weekly, exactly 13 weeks)` 1300
+#ASSERT `Ground 8 made out`        `claim all-met (weekly, exactly 13 weeks)`
+
+§§ `Ground made out — monthly, three months' rent unpaid at both dates`
+
+-- Monthly rent of 800; threshold = 3 months = 2400.
+`claim all-met (monthly, three months)` MEANS Ground8Claim WITH
+  `rent period`                                       IS `monthly`
+  `rent for one period`                               IS 800   -- one month's rent
+  `rent unpaid at the date of service of the section 8 notice`  IS 2400   -- exactly 3 months
+  `rent unpaid at the date of the hearing`            IS 3200   -- still >= 3 months
+
+#ASSERT `per-period threshold met` `claim all-met (monthly, three months)` 2400
+#ASSERT `Ground 8 made out`        `claim all-met (monthly, three months)`
+
+§§ `Knocked out — weekly, arrears below thirteen weeks at the hearing`
+
+-- 13 weeks' worth at service (1300), but the tenant pays down so only 12 weeks'
+-- worth (1200) is unpaid at the hearing: the both-dates requirement fails.
+`claim — weekly, short at hearing` MEANS Ground8Claim WITH
+  `rent period`                                       IS `weekly or fortnightly`
+  `rent for one period`                               IS 100
+  `rent unpaid at the date of service of the section 8 notice`  IS 1300   -- 13 weeks -> meets
+  `rent unpaid at the date of the hearing`            IS 1200   -- 12 weeks -> below threshold
+
+#ASSERT     `per-period threshold met` `claim — weekly, short at hearing` 1300
+#ASSERT NOT `per-period threshold met` `claim — weekly, short at hearing` 1200
+#ASSERT NOT `Ground 8 made out`        `claim — weekly, short at hearing`
+
+§§ `Knocked out — monthly, arrears below three months at service`
+
+-- Only 2 months' worth (1600) at service, though 3 months (2400) by the hearing:
+-- the both-dates requirement fails on the service-date limb.
+`claim — monthly, short at service` MEANS Ground8Claim WITH
+  `rent period`                                       IS `monthly`
+  `rent for one period`                               IS 800
+  `rent unpaid at the date of service of the section 8 notice`  IS 1600   -- 2 months -> below threshold
+  `rent unpaid at the date of the hearing`            IS 2400   -- 3 months -> meets
+
+#ASSERT NOT `per-period threshold met` `claim — monthly, short at service` 1600
+#ASSERT     `per-period threshold met` `claim — monthly, short at service` 2400
+#ASSERT NOT `Ground 8 made out`        `claim — monthly, short at service`
+
+§§ `Knocked out — a rent period with no in-force threshold (e.g. the omitted quarterly/yearly limbs)`
+
+-- A tenancy whose rent is payable on a basis the in-force ground no longer
+-- addresses: no threshold engages, so the ground is not made out however large the
+-- arrears.
+`claim — other period, large arrears` MEANS Ground8Claim WITH
+  `rent period`                                       IS `other`
+  `rent for one period`                               IS 5000
+  `rent unpaid at the date of service of the section 8 notice`  IS 100000
+  `rent unpaid at the date of the hearing`            IS 100000
+
+#ASSERT NOT `an in-force threshold applies to this rent period` `claim — other period, large arrears`
+#ASSERT NOT `per-period threshold met` `claim — other period, large arrears` 100000
+#ASSERT NOT `Ground 8 made out`        `claim — other period, large arrears`

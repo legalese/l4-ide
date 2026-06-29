@@ -1,0 +1,155 @@
+IMPORT prelude
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 2 (mortgagee's power of sale)`
+
+-- Ground 2 is one of the MANDATORY grounds in Part I of Schedule 2: where it is
+-- made out, the court MUST order possession.  HYBRID encoding:
+--   * the constitutive condition  -> predicates carrying the verbatim statute
+--     inline as inert prose, only the operative atoms lifted to booleans;
+--   * the mandatory outcome        -> a regulative/deontic clause guarded by the
+--     constitutive condition.
+--
+-- Statutory text encoded (Ground 2, as amended — the cross-reference in (c) is
+-- to the notice "mentioned in Ground 1 above"):
+--
+--   The dwelling-house is subject to a mortgage granted before the beginning
+--   of the tenancy and —
+--   (a) the mortgagee is entitled to exercise a power of sale conferred on him
+--       by the mortgage or by section 101 of the Law of Property Act 1925; and
+--   (b) the mortgagee requires possession of the dwelling-house for the purpose
+--       of disposing of it with vacant possession in exercise of that power; and
+--   (c) either notice was given as mentioned in Ground 1 above or the court is
+--       satisfied that it is just and equitable to dispense with the
+--       requirement of notice;
+--   and for the purposes of this ground "mortgage" includes a charge and
+--   "mortgagee" shall be construed accordingly.
+--
+-- Interpretive note: per the closing words of Ground 2, "mortgage" includes a
+-- charge and "mortgagee" is construed accordingly.  We model the mortgage as a
+-- single fact-bearing record; whether the instrument is a mortgage proper or a
+-- charge makes no difference to the booleans below, so the inclusive reading is
+-- honoured by construction (no separate "is a charge" atom is needed).
+
+§§ `Domain model`
+
+DECLARE Actor IS ONE OF Mortgagee, Tenant, Court
+
+-- The operative atoms Ground 2 turns on, gathered on the claim record:
+--   * `mortgage granted before the beginning of the tenancy` — the chapeau.
+--   * `mortgagee entitled to exercise a power of sale`        — limb (a).
+--   * `mortgagee requires possession for disposal with vacant possession` — limb (b).
+--   * `notice was given`                                      — limb (c), first arm.
+--   * `just and equitable to dispense with notice`            — limb (c), second arm.
+DECLARE Ground2Claim HAS
+  `mortgage granted before the beginning of the tenancy`               IS A BOOLEAN
+  `mortgagee entitled to exercise a power of sale`                     IS A BOOLEAN
+  `mortgagee requires possession for disposal with vacant possession`  IS A BOOLEAN
+  `notice was given`                                                  IS A BOOLEAN
+  `just and equitable to dispense with notice`                        IS A BOOLEAN
+
+§§ `Limb (c) — the notice gateway (notice OR just-and-equitable to dispense)`
+
+-- (c) either notice was given as mentioned in Ground 1 above or the court is
+--     satisfied that it is just and equitable to dispense with the requirement
+--     of notice.
+GIVEN claim IS A Ground2Claim
+GIVETH A BOOLEAN
+`notice condition satisfied` claim MEANS
+        "either notice was given as mentioned in Ground 1 above"
+    ..  claim's `notice was given`
+    ..  "or the court is satisfied that it is just and equitable to dispense with the requirement of notice"
+    ..  claim's `just and equitable to dispense with notice`
+
+§§ `Ground 2 made out — chapeau AND limbs (a), (b), (c)`
+
+GIVEN claim IS A Ground2Claim
+GIVETH A BOOLEAN
+`Ground 2 made out` claim MEANS
+        "The dwelling-house is subject to a mortgage granted before the beginning of the tenancy"
+    ... claim's `mortgage granted before the beginning of the tenancy`
+    ... "and —"
+    AND     "(a) the mortgagee is entitled to exercise a power of sale conferred on him by the mortgage or by section 101 of the Law of Property Act 1925; and"
+        ... claim's `mortgagee entitled to exercise a power of sale`
+    AND     "(b) the mortgagee requires possession of the dwelling-house for the purpose of disposing of it with vacant possession in exercise of that power; and"
+        ... claim's `mortgagee requires possession for disposal with vacant possession`
+    AND     "(c) either notice was given as mentioned in Ground 1 above or the court is satisfied that it is just and equitable to dispense with the requirement of notice;"
+        ... `notice condition satisfied` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+DECLARE Action IS ONE OF `order possession`
+
+GIVEN claim IS A Ground2Claim
+GIVETH A DEONTIC Actor Action
+`ground 2 possession order` claim MEANS
+    IF   `Ground 2 made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+-- All limbs met (notice arm of (c) satisfied).
+`claim all-met` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS TRUE
+  `mortgagee entitled to exercise a power of sale`                     IS TRUE
+  `mortgagee requires possession for disposal with vacant possession`  IS TRUE
+  `notice was given`                                                  IS TRUE
+  `just and equitable to dispense with notice`                        IS FALSE
+
+#ASSERT `notice condition satisfied` `claim all-met`
+#ASSERT `Ground 2 made out`          `claim all-met`
+
+-- All limbs met, but via the just-and-equitable arm of (c) instead of notice.
+`claim all-met-via-dispensation` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS TRUE
+  `mortgagee entitled to exercise a power of sale`                     IS TRUE
+  `mortgagee requires possession for disposal with vacant possession`  IS TRUE
+  `notice was given`                                                  IS FALSE
+  `just and equitable to dispense with notice`                        IS TRUE
+
+#ASSERT `notice condition satisfied` `claim all-met-via-dispensation`
+#ASSERT `Ground 2 made out`          `claim all-met-via-dispensation`
+
+§§ `Each limb missing in turn`
+
+-- Chapeau missing: mortgage NOT granted before the tenancy began.
+`claim no-prior-mortgage` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS FALSE
+  `mortgagee entitled to exercise a power of sale`                     IS TRUE
+  `mortgagee requires possession for disposal with vacant possession`  IS TRUE
+  `notice was given`                                                  IS TRUE
+  `just and equitable to dispense with notice`                        IS FALSE
+
+#ASSERT NOT `Ground 2 made out` `claim no-prior-mortgage`
+
+-- Limb (a) missing: mortgagee not entitled to exercise a power of sale.
+`claim no-power-of-sale` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS TRUE
+  `mortgagee entitled to exercise a power of sale`                     IS FALSE
+  `mortgagee requires possession for disposal with vacant possession`  IS TRUE
+  `notice was given`                                                  IS TRUE
+  `just and equitable to dispense with notice`                        IS FALSE
+
+#ASSERT NOT `Ground 2 made out` `claim no-power-of-sale`
+
+-- Limb (b) missing: mortgagee does not require possession for disposal with
+-- vacant possession.
+`claim no-vacant-possession-purpose` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS TRUE
+  `mortgagee entitled to exercise a power of sale`                     IS TRUE
+  `mortgagee requires possession for disposal with vacant possession`  IS FALSE
+  `notice was given`                                                  IS TRUE
+  `just and equitable to dispense with notice`                        IS FALSE
+
+#ASSERT NOT `Ground 2 made out` `claim no-vacant-possession-purpose`
+
+-- Limb (c) missing: neither notice given nor just-and-equitable to dispense.
+`claim no-notice-condition` MEANS Ground2Claim WITH
+  `mortgage granted before the beginning of the tenancy`               IS TRUE
+  `mortgagee entitled to exercise a power of sale`                     IS TRUE
+  `mortgagee requires possession for disposal with vacant possession`  IS TRUE
+  `notice was given`                                                  IS FALSE
+  `just and equitable to dispense with notice`                        IS FALSE
+
+#ASSERT NOT `notice condition satisfied` `claim no-notice-condition`
+#ASSERT NOT `Ground 2 made out`          `claim no-notice-condition`

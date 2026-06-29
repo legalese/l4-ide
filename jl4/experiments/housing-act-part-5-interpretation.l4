@@ -1,0 +1,384 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part 5 — Interpretation (paragraph 12) (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- PART 5 — INTERPRETATION (paragraph 12). Inserted into Schedule 2 to the
+-- Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), s. 145(1)(8),
+-- Sch. 1 para. 25 (commencement 1.5.2026 for specified purposes; S.I. 2026/421,
+-- reg. 2(b), marker F77 — "Sch. 2 Pts. 5, 6 inserted").
+--
+-- This Part contains NO "ground" and confers NO Court MUST/MAY outcome. It is
+-- the shared DEFINITIONS on which the grounds in Part I depend. Each definition
+-- is encoded as L4 (records / enums / predicates / a selector function) carrying
+-- the verbatim para. 12 wording inline as inert prose, with #EVAL/#ASSERT
+-- examples demonstrating it.
+--
+-- WHY THIS FILE MATTERS to the corpus:
+--   * "supported accommodation" / "managed accommodation" / "support services"
+--     are referenced (and previously defined inline) by Ground 5F (see
+--     housing-act-ground-5F.l4, which carries its own inline copy); Part 5 is the
+--     CANONICAL home of those definitions.
+--   * "relevant date" — several ground files (2ZA, 2ZB, 5F) take a `relevant date`
+--     field as a bare DATE input and FLAG, in their headers, the question of WHICH
+--     date that is. Para. 12(1) and 12(2) ANSWER that question: it is a FUNCTION
+--     of the ground class plus the two section-8 notice dates plus whether the
+--     court dispensed with notice. This file encodes that selector once, so the
+--     ground files can be read against it.
+-- ===========================================================================
+
+§§ `"acquiring authority" — para. 12(1) (compulsory acquisition) [inert prose]`
+
+-- An atom: carried as inert prose. Its operative content (who would be authorised
+-- to make the compulsory acquisition) is not lifted to logic here; it is a
+-- party-identity definition used by the compulsory-acquisition grounds.
+GIVETH A BOOLEAN
+`"acquiring authority" — definition` MEANS
+        "“acquiring authority” means, where notice of a compulsory acquisition has been given, the person who would be authorised to make the compulsory acquisition if the order or legislation to which the notice relates were to become operative;"
+    ... TRUE   -- AND-identity: the inert prose above carries the verbatim definition
+
+#EVAL `"acquiring authority" — definition`   -- inert -> TRUE (AND-identity), confirms recorded
+
+§§ `"HMO" — para. 12(1) (Part 2 of the Housing Act 2004, s. 77) [inert prose]`
+
+GIVETH A BOOLEAN
+`"HMO" — definition` MEANS
+        "“HMO” has the same meaning as in Part 2 of the Housing Act 2004 (see section 77 of that Act);"
+    ... TRUE
+
+#EVAL `"HMO" — definition`
+
+§§ `"housing association" — para. 12(1) (s. 1 of the Housing Associations Act 1985) [inert prose]`
+
+GIVETH A BOOLEAN
+`"housing association" — definition` MEANS
+        "“housing association” has the meaning given by section 1 of the Housing Associations Act 1985;"
+    ... TRUE
+
+#EVAL `"housing association" — definition`
+
+§§ `"supported accommodation" — para. 12(1) [predicate over a small record]`
+
+-- "supported accommodation" means a dwelling-house let—
+--   (a) by—
+--         (i)   a housing association,
+--         (ii)  a private registered provider of social housing,
+--         (iii) a registered charity, or
+--         (iv)  a voluntary organisation, and
+--   (b) to a tenant who receives care, support or supervision provided either—
+--         (i)  by the landlord or a person acting on behalf of the landlord, or
+--         (ii) by someone else, if the tenant has been admitted into the
+--              accommodation in order to meet a need for care, support or
+--              supervision.
+--
+-- Modelled as a predicate over a small record: the "let-by" TYPE (the (a)(i)-(iv)
+-- enumeration) and the "care-route" (the (b)(i)/(ii) disjunction).
+
+DECLARE LetByType IS ONE OF
+  `a housing association`                                   -- (a)(i)
+  `a private registered provider of social housing`        -- (a)(ii)
+  `a registered charity`                                    -- (a)(iii)
+  `a voluntary organisation`                                -- (a)(iv)
+
+DECLARE CareRoute IS ONE OF
+  -- (b)(i): provided by the landlord or a person acting on behalf of the landlord
+  `provided by the landlord or a person acting on behalf of the landlord`
+  -- (b)(ii): provided by someone else, IF the tenant was admitted to the
+  --          accommodation in order to meet a need for care/support/supervision
+  `provided by someone else where the tenant was admitted to meet a need for care, support or supervision`
+
+DECLARE Letting HAS
+  `let by`                              IS A  LetByType
+  `tenant receives care via`           IS A  CareRoute
+
+-- (a): "let by" any of the four kinds. Because LetByType is a closed enum, ANY
+-- inhabitant satisfies limb (a); the predicate records the verbatim (a)(i)-(iv)
+-- list as inert prose and is TRUE for any LetByType.
+GIVEN `let by` IS A LetByType
+GIVETH A BOOLEAN
+`let by an eligible body (a)` MEANS
+        "(a) by—"
+    ...     "(i) a housing association,"
+        ..  "(ii) a private registered provider of social housing,"
+        ..  "(iii) a registered charity, or"
+        ..  "(iv) a voluntary organisation,"
+        ..  ( CONSIDER `let by`
+              WHEN `a housing association`                            THEN TRUE
+              WHEN `a private registered provider of social housing`  THEN TRUE
+              WHEN `a registered charity`                             THEN TRUE
+              WHEN `a voluntary organisation`                         THEN TRUE )
+
+-- (b): "to a tenant who receives care, support or supervision provided either—".
+-- Both CareRoute inhabitants satisfy limb (b); recorded as inert prose.
+GIVEN `care via` IS A CareRoute
+GIVETH A BOOLEAN
+`tenant receives qualifying care (b)` MEANS
+        "(b) to a tenant who receives care, support or supervision provided either—"
+    ...     "(i) by the landlord or a person acting on behalf of the landlord, or"
+        ..  "(ii) by someone else, if the tenant has been admitted into the accommodation in order to meet a need for care, support or supervision."
+        ..  ( CONSIDER `care via`
+              WHEN `provided by the landlord or a person acting on behalf of the landlord` THEN TRUE
+              WHEN `provided by someone else where the tenant was admitted to meet a need for care, support or supervision` THEN TRUE )
+
+GIVEN letting IS A Letting
+GIVETH A BOOLEAN
+`is supported accommodation` MEANS
+        "“supported accommodation” means a dwelling-house let—"
+    ... `let by an eligible body (a)`        (letting's `let by`)
+    AND `tenant receives qualifying care (b)` (letting's `tenant receives care via`)
+
+-- examples
+`let by HA, landlord-provided care` MEANS Letting WITH
+  `let by`                    IS `a housing association`
+  `tenant receives care via`  IS `provided by the landlord or a person acting on behalf of the landlord`
+
+`let by charity, third-party-admitted care` MEANS Letting WITH
+  `let by`                    IS `a registered charity`
+  `tenant receives care via`  IS `provided by someone else where the tenant was admitted to meet a need for care, support or supervision`
+
+#ASSERT `is supported accommodation` `let by HA, landlord-provided care`
+#ASSERT `is supported accommodation` `let by charity, third-party-admitted care`
+
+§§ `"managed accommodation" — para. 12(1) [defined in terms of "supported accommodation"]`
+
+-- "managed accommodation" means supported accommodation into which a tenant has
+-- been admitted in order to meet a need for care, support or supervision, in a
+-- case in which that care, support or supervision is provided OTHERWISE than by
+-- the landlord or a person acting on behalf of the landlord.
+--
+-- Modelled in terms of "supported accommodation": managed accommodation is
+-- supported accommodation WHOSE care-route is the (b)(ii) "someone else" route
+-- (i.e. NOT the landlord). The "admitted in order to meet a need" condition IS
+-- the (b)(ii) route in our CareRoute enum.
+GIVEN letting IS A Letting
+GIVETH A BOOLEAN
+`is managed accommodation` MEANS
+        "“managed accommodation” means supported accommodation into which a tenant has been admitted in order to meet a need for care, support or supervision, in a case in which that care, support or supervision is provided otherwise than by the landlord or a person acting on behalf of the landlord;"
+    ... `is supported accommodation` letting
+    AND ( letting's `tenant receives care via`
+          EQUALS `provided by someone else where the tenant was admitted to meet a need for care, support or supervision` )
+
+-- "managed accommodation" is supported accommodation by the (b)(ii) route ...
+#ASSERT `is managed accommodation` `let by charity, third-party-admitted care`
+-- ... but landlord-provided-care supported accommodation is NOT managed accommodation.
+#ASSERT NOT `is managed accommodation` `let by HA, landlord-provided care`
+
+§§ `"support services" — para. 12(1) [predicate over the care-source]`
+
+-- "support services", in relation to a tenant in supported accommodation, means
+-- care, support or supervision—
+--   (a) which is provided by the landlord or a person acting on behalf of the
+--       landlord, or
+--   (b) which the tenant was admitted into the accommodation for the purpose of
+--       receiving.
+GIVEN `provided by the landlord or a person acting on behalf of the landlord` IS A BOOLEAN
+      `which the tenant was admitted into the accommodation for the purpose of receiving` IS A BOOLEAN
+GIVETH A BOOLEAN
+`is support services` MEANS
+        "“support services” in relation to a tenant in supported accommodation, means care, support or supervision—"
+    ...     "(a) which is provided by the landlord or a person acting on behalf of the landlord, or"
+        ..      `provided by the landlord or a person acting on behalf of the landlord`
+        ..  "(b) which the tenant was admitted into the accommodation for the purpose of receiving;"
+        ..      `which the tenant was admitted into the accommodation for the purpose of receiving`
+
+-- (a) route alone
+#ASSERT `is support services` TRUE  FALSE
+-- (b) route alone
+#ASSERT `is support services` FALSE TRUE
+-- neither route -> not support services
+#ASSERT NOT `is support services` FALSE FALSE
+
+§§ `"relevant date" — para. 12(1)(a)/(b) and 12(2) [a SELECTOR function returning the DATE]`
+
+-- "relevant date"—
+--   (a) in Grounds 2ZA, 2ZB and 5F, means the date of service of the notice
+--       under section 8;
+--   (b) otherwise, means the date specified in the notice under section 8,
+--   but see sub-paragraph (2) where the court exercises the power conferred by
+--   section 8(1)(b).
+--   (2) Where the court exercises the power conferred by section 8(1)(b) (power to
+--       dispense with notice under section 8) references in this Schedule to the
+--       relevant date are to be read as references to the date on which
+--       proceedings for possession began.
+--
+-- This RESOLVES the question several ground files flag (2ZA, 2ZB, 5F take a bare
+-- `relevant date` DATE without saying where it comes from). Modelled as a
+-- selector: an enum of WHICH-GROUND-CLASS, the two section-8 notice dates, and a
+-- "dispensed" flag, returning the DATE.
+--
+-- PRECEDENCE / INTERPRETATION CALL: sub-paragraph (2) is a "but see" override.
+-- Read literally it applies to "references in this Schedule to the relevant date"
+-- generally — i.e. WHERE the court dispenses with notice (s.8(1)(b)), the relevant
+-- date becomes the date proceedings began, REGARDLESS of the (a)/(b) class. So the
+-- selector checks "dispensed" FIRST, and only then falls through to the (a) vs (b)
+-- class split. (Sound also on the merits: if there is no s.8 notice because the
+-- court dispensed with it, neither "date of service" (a) nor "date specified in
+-- the notice" (b) exists, so (2) supplies the operative date.)
+
+-- The ground-class split for (a) vs (b). Only the three named grounds take the
+-- "date of service" branch; every other ground takes the "date specified" branch.
+DECLARE GroundClass IS ONE OF
+  `Ground 2ZA`
+  `Ground 2ZB`
+  `Ground 5F`
+  `any other ground`     -- the "otherwise" of limb (b)
+
+GIVEN `ground class` IS A GroundClass
+GIVETH A BOOLEAN
+`is one of Grounds 2ZA, 2ZB and 5F` MEANS
+    CONSIDER `ground class`
+    WHEN `Ground 2ZA`        THEN TRUE
+    WHEN `Ground 2ZB`        THEN TRUE
+    WHEN `Ground 5F`         THEN TRUE
+    WHEN `any other ground`  THEN FALSE
+
+-- The selector's inputs: the ground class, the two candidate section-8 dates, the
+-- date proceedings began, and whether the court exercised the s.8(1)(b) power.
+DECLARE RelevantDateInputs HAS
+  `ground class`                                          IS A GroundClass
+  `date of service of the notice under section 8`         IS A DATE   -- limb (a) date
+  `date specified in the notice under section 8`          IS A DATE   -- limb (b) date
+  `date on which proceedings for possession began`        IS A DATE   -- sub-para (2) date
+  `the court exercised the power conferred by section 8(1)(b)`  IS A BOOLEAN  -- the (2) override
+
+GIVEN inputs IS A RelevantDateInputs
+GIVETH A DATE
+`relevant date` MEANS
+    -- (2) "but see sub-paragraph (2)": the s.8(1)(b) dispensing power overrides.
+    IF   inputs's `the court exercised the power conferred by section 8(1)(b)`
+    THEN inputs's `date on which proceedings for possession began`
+    ELSE -- (a) "in Grounds 2ZA, 2ZB and 5F, means the date of service of the notice"
+         IF   `is one of Grounds 2ZA, 2ZB and 5F` (inputs's `ground class`)
+         THEN inputs's `date of service of the notice under section 8`
+         -- (b) "otherwise, means the date specified in the notice under section 8"
+         ELSE inputs's `date specified in the notice under section 8`
+
+§§ `"relevant date" — worked examples / branch assertions`
+
+`service date`     MEANS March 1 2025      -- date of service of the s.8 notice (a)
+`specified date`   MEANS April 1 2025      -- date specified in the s.8 notice (b)
+`proceedings date` MEANS May 1 2025        -- date proceedings began (sub-para (2))
+
+-- (a) branch — Ground 5F, notice NOT dispensed -> date of SERVICE.
+`inputs — 5F, served` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 5F`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+#ASSERT (Day (`relevant date` `inputs — 5F, served`)) EQUALS (Day `service date`)
+
+-- (a) branch — Ground 2ZA likewise takes the SERVICE date.
+`inputs — 2ZA, served` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 2ZA`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+#ASSERT (Day (`relevant date` `inputs — 2ZA, served`)) EQUALS (Day `service date`)
+
+-- (a) branch — Ground 2ZB likewise.
+`inputs — 2ZB, served` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 2ZB`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+#ASSERT (Day (`relevant date` `inputs — 2ZB, served`)) EQUALS (Day `service date`)
+
+-- (b) branch — any OTHER ground, notice NOT dispensed -> date SPECIFIED in notice.
+`inputs — other, specified` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `any other ground`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+#ASSERT (Day (`relevant date` `inputs — other, specified`)) EQUALS (Day `specified date`)
+
+-- (2) override — court DISPENSED with notice under s.8(1)(b): relevant date is the
+-- date proceedings began, REGARDLESS of ground class. Here even a "5F" class,
+-- which would otherwise take the service date, is overridden.
+`inputs — 5F, dispensed` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 5F`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS TRUE
+
+#ASSERT (Day (`relevant date` `inputs — 5F, dispensed`)) EQUALS (Day `proceedings date`)
+
+-- (2) override also bites on the "otherwise" class.
+`inputs — other, dispensed` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `any other ground`
+  `date of service of the notice under section 8`         IS `service date`
+  `date specified in the notice under section 8`          IS `specified date`
+  `date on which proceedings for possession began`        IS `proceedings date`
+  `the court exercised the power conferred by section 8(1)(b)`  IS TRUE
+
+#ASSERT (Day (`relevant date` `inputs — other, dispensed`)) EQUALS (Day `proceedings date`)
+
+§§ `"giving notice of a compulsory acquisition" — para. 12(3) [predicate over the acquisition type]`
+
+-- (3) For the purposes of this Schedule, each of the following constitutes giving
+-- notice of a compulsory acquisition—
+--   (a) compulsory purchase order: (i) publication of the s.11 / Sch.1 para.2
+--       notice, or (ii) service of the s.12 / Sch.1 para.3 notice (Acquisition of
+--       Land Act 1981);
+--   (b) any OTHER order: publication or service of any notice required by any Act;
+--   (c) special enactment: publication or service of a notice under any Standing
+--       Order of either House relating to private business.
+--
+-- Carried as inert prose, lifted to a thin predicate over the acquisition-type:
+-- ANY of the three routes constitutes "giving notice". The (a)(i)/(ii) sub-routes
+-- and the underlying Act references ride along as inert prose.
+
+DECLARE AcquisitionAuthorisedBy IS ONE OF
+  `a compulsory purchase order`        -- (a)
+  `any other order`                    -- (b)
+  `a special enactment`                -- (c)
+
+GIVEN `authorised by` IS A AcquisitionAuthorisedBy
+GIVETH A BOOLEAN
+`constitutes giving notice of a compulsory acquisition` MEANS
+        "(3) For the purposes of this Schedule, each of the following constitutes giving notice of a compulsory acquisition—"
+    ...     "(a) in the case of a compulsory acquisition which is to be authorised by a compulsory purchase order— (i) publication of the notice required by section 11 of, or (as the case may be) paragraph 2 of Schedule 1 to, the Acquisition of Land Act 1981, in accordance with that Act, or (ii) service of the notice required by section 12 of, or (as the case may be) paragraph 3 of Schedule 1 to, that Act, in accordance with that Act;"
+        ..  "(b) in the case of a compulsory acquisition which is to be authorised by any other order, publication or service of any notice that any provision of or made under any Act requires to be published or served in connection with that acquisition, in accordance with that Act;"
+        ..  "(c) in the case of a compulsory acquisition which is to be authorised by a special enactment, publication or service of a notice that, in connection with that acquisition, is published or served in accordance with any Standing Order of either House of Parliament relating to private business."
+        ..  ( CONSIDER `authorised by`
+              WHEN `a compulsory purchase order` THEN TRUE
+              WHEN `any other order`             THEN TRUE
+              WHEN `a special enactment`         THEN TRUE )
+
+#ASSERT `constitutes giving notice of a compulsory acquisition` `a compulsory purchase order`
+#ASSERT `constitutes giving notice of a compulsory acquisition` `any other order`
+#ASSERT `constitutes giving notice of a compulsory acquisition` `a special enactment`
+
+§§ `"compulsory purchase order" / "special enactment" — para. 12(4) [inert prose]`
+
+-- (4) In sub-paragraph (3)—
+--   "compulsory purchase order" means a compulsory purchase order within the
+--   meaning given by the Acquisition of Land Act 1981 (see section 2 of that Act);
+--   "special enactment" means—
+--     (a) a local or private Act which authorises the compulsory acquisition of
+--         land specifically identified in that Act, or
+--     (b) a provision which— (i) is contained in an Act other than a local or
+--         private Act, and (ii) authorises the compulsory acquisition of land
+--         specifically identified in that Act.
+GIVETH A BOOLEAN
+`"compulsory purchase order" — para. 12(4) definition` MEANS
+        "“compulsory purchase order” means a compulsory purchase order within the meaning given by the Acquisition of Land Act 1981 (see section 2 of that Act);"
+    ... TRUE
+
+GIVETH A BOOLEAN
+`"special enactment" — para. 12(4) definition` MEANS
+        "“special enactment” means—"
+    ... "(a) a local or private Act which authorises the compulsory acquisition of land specifically identified in that Act, or"
+    ... "(b) a provision which— (i) is contained in an Act other than a local or private Act, and (ii) authorises the compulsory acquisition of land specifically identified in that Act."
+
+#EVAL `"compulsory purchase order" — para. 12(4) definition`
+#EVAL `"special enactment" — para. 12(4) definition`

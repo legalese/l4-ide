@@ -1,0 +1,139 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5E (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5E — the "landlord requires possession to let the dwelling-house as
+-- supported accommodation" MANDATORY ground, inserted into Schedule 2 to the
+-- Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), s. 145(1)(8),
+-- Sch. 1 para. 16 (commencement 1.5.2026 for specified purposes; S.I. 2026/421,
+-- reg. 2(b), marker F25). Part I (mandatory): where made out, the court MUST
+-- order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("The landlord seeking possession requires possession
+-- of the dwelling-house to let it as supported accommodation where—", a
+-- CONJUNCTION of the chapeau requirement with (a) and (b)):
+--   (a) the landlord holds the dwelling-house for the purpose of making it
+--       available for occupation as supported accommodation, and
+--   (b) the tenant did not enter the assured tenancy for the purpose of
+--       receiving care, support or supervision.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The chapeau ("requires possession ... to let it as supported
+--     accommodation") is itself an operative requirement, encoded as a leading
+--     conjunct on top of (a) and (b): made out = (chapeau requirement)
+--     AND (a) AND (b).
+--   * Limb (b) is phrased negatively in the statute ("did not enter ... for the
+--     purpose of receiving care, support or supervision"); the operative atom is
+--     lifted in the AFFIRMATIVE ("tenant entered ... for the purpose of receiving
+--     care, support or supervision") and negated in the predicate, so an input
+--     layer can ask the natural affirmative question.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of the chapeau requirement, (a), and (b).
+DECLARE Ground5EClaim HAS
+  -- chapeau
+  `landlord requires possession of the dwelling-house to let it as supported accommodation`  IS A BOOLEAN
+  -- (a)
+  `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`  IS A BOOLEAN
+  -- (b) — lifted affirmative; negated in the predicate
+  `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`  IS A BOOLEAN
+
+§§ `Chapeau — landlord requires possession to let as supported accommodation`
+
+GIVEN claim IS A Ground5EClaim
+GIVETH A BOOLEAN
+`chapeau — requires possession to let as supported accommodation` claim MEANS
+        "The landlord seeking possession requires possession of the dwelling-house to let it as supported accommodation where—"
+    ... claim's `landlord requires possession of the dwelling-house to let it as supported accommodation`
+
+§§ `(a) — holds the dwelling-house to make it available as supported accommodation`
+
+GIVEN claim IS A Ground5EClaim
+GIVETH A BOOLEAN
+`(a) — holds to make available as supported accommodation` claim MEANS
+        "(a) the landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation,"
+    ... claim's `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`
+
+§§ `(b) — tenant did not enter to receive care, support or supervision (negative)`
+
+GIVEN claim IS A Ground5EClaim
+GIVETH A BOOLEAN
+`(b) — tenant did not enter to receive care, support or supervision` claim MEANS
+        "(b) the tenant did not enter the assured tenancy for the purpose of receiving care, support or supervision."
+    ... NOT claim's `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`
+
+§§ `Ground 5E made out — chapeau AND (a) AND (b)`
+
+GIVEN claim IS A Ground5EClaim
+GIVETH A BOOLEAN
+`Ground 5E made out` claim MEANS
+        `chapeau — requires possession to let as supported accommodation` claim
+    AND `(a) — holds to make available as supported accommodation` claim
+    AND `(b) — tenant did not enter to receive care, support or supervision` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground5EClaim
+GIVETH A DEONTIC Actor Action
+`ground 5E possession order` claim MEANS
+    IF   `Ground 5E made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — chapeau and (a) met, and tenant did NOT enter to receive care/support/supervision`
+
+`claim all-met` MEANS Ground5EClaim WITH
+  `landlord requires possession of the dwelling-house to let it as supported accommodation`  IS TRUE
+  `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`  IS TRUE
+  `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`  IS FALSE
+
+#ASSERT `chapeau — requires possession to let as supported accommodation` `claim all-met`
+#ASSERT `(a) — holds to make available as supported accommodation`        `claim all-met`
+#ASSERT `(b) — tenant did not enter to receive care, support or supervision` `claim all-met`
+#ASSERT `Ground 5E made out`                                              `claim all-met`
+
+§§ `Chapeau knocked out — landlord does not require possession to let as supported accommodation`
+
+`claim — chapeau fails` MEANS Ground5EClaim WITH
+  `landlord requires possession of the dwelling-house to let it as supported accommodation`  IS FALSE
+  `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`  IS TRUE
+  `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`  IS FALSE
+
+#ASSERT NOT `chapeau — requires possession to let as supported accommodation` `claim — chapeau fails`
+#ASSERT NOT `Ground 5E made out`                                              `claim — chapeau fails`
+
+§§ `(a) knocked out — landlord does not hold to make available as supported accommodation`
+
+`claim — (a) fails` MEANS Ground5EClaim WITH
+  `landlord requires possession of the dwelling-house to let it as supported accommodation`  IS TRUE
+  `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`  IS FALSE
+  `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`  IS FALSE
+
+#ASSERT NOT `(a) — holds to make available as supported accommodation` `claim — (a) fails`
+#ASSERT NOT `Ground 5E made out`                                       `claim — (a) fails`
+
+§§ `(b) knocked out — the tenant DID enter to receive care, support or supervision`
+
+`claim — (b) fails` MEANS Ground5EClaim WITH
+  `landlord requires possession of the dwelling-house to let it as supported accommodation`  IS TRUE
+  `landlord holds the dwelling-house for the purpose of making it available for occupation as supported accommodation`  IS TRUE
+  `tenant entered the assured tenancy for the purpose of receiving care, support or supervision`  IS TRUE
+
+#ASSERT NOT `(b) — tenant did not enter to receive care, support or supervision` `claim — (b) fails`
+#ASSERT NOT `Ground 5E made out`                                                 `claim — (b) fails`
