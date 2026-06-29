@@ -210,6 +210,10 @@ This would make `TO`, `WITH`, `BEFORE`, `UNDER`, etc. into structured argument m
 
 ### Phase 2: Transpilation to Verification Backends
 
+> Detailed architecture (fan-out to Z3/Alloy/TLA+/NuSMV/UPPAAL/TAPAAL, the core-IR
+> faithfulness obligation, and the defeasibility crux): see
+> [VERIFICATION-BACKEND-LOWERING-SPEC.md](../proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md).
+
 - [ ] Transpile to UPPAAL (timed automata, CTL)
 - [ ] Transpile to SPIN/Promela (LTL model checking)
 - [ ] Transpile to NuSMV (symbolic model checking)
