@@ -25,6 +25,7 @@ module L4.Print.Columnar
   , renderDittoGrid
   ) where
 
+import Data.Char (isSpace, ord)
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -83,7 +84,7 @@ renderDittoGrid opts grid =
 
     cellLen :: Cell -> Int
     cellLen Nothing  = 0
-    cellLen (Just t) = Text.length t
+    cellLen (Just t) = displayWidth t   -- lexer columns are DISPLAY width, not code points
 
     colWidth :: Int -> Int
     colWidth j = maximum (0 : [ cellLen (row !! j) | row <- normRows ])
@@ -92,7 +93,7 @@ renderDittoGrid opts grid =
     gut = Text.replicate (max 0 opts.gutter) " "
 
     pad :: Int -> Text -> Text
-    pad w t = t <> Text.replicate (w - Text.length t) " "
+    pad w t = t <> Text.replicate (max 0 (w - displayWidth t)) " "
 
     renderRow :: Int -> [Cell] -> Text
     renderRow i row =
@@ -105,7 +106,54 @@ renderDittoGrid opts grid =
     display i j (Just t)
       | opts.enableDitto
       , i > 0
+      , not (Text.any isSpace t)               -- a ^ copies exactly ONE lexical token,
+                                               -- so a multi-token cell (e.g. "AT MOST")
+                                               -- must be spelled out, never dittoed
       , (normRows !! (i - 1)) !! j == Just t
       = "^"
       | otherwise
       = t
+
+-- | Display width of a token in L4-lexer columns. The lexer advances source
+-- columns by DISPLAY width, not code points — verified empirically against the
+-- real lexer: @中@ / @가@ / @Ａ@ / @😀@ each advance TWO columns, while ASCII,
+-- half-width kana and combining marks advance one (it is not true @wcwidth@:
+-- combining marks count 1, and there is no grapheme clustering). Column
+-- alignment is load-bearing for @^@ resolution, so the grid MUST measure with
+-- this, never 'Text.length'.
+--
+-- The range table approximates the Unicode East_Asian_Width W/F classes. It is
+-- based on dmnmd's @DMN.Translate.L4.displayWidth@ but ADDS the wide-emoji blocks
+-- (U+1F300–1F64F, 1F900–1F9FF, 1FA70–1FAFF) that the lexer also treats as width 2
+-- and that dmnmd's table currently misses — dmnmd should adopt the same table.
+-- Once @l4-lint@ is extracted this becomes the single shared implementation,
+-- pinned to the lexer by a golden test.
+displayWidth :: Text -> Int
+displayWidth = Text.foldl' (\ acc c -> acc + if isWide c then 2 else 1) 0
+
+isWide :: Char -> Bool
+isWide c = any (\ (lo, hi) -> n >= lo && n <= hi) wideRanges
+  where
+    n = ord c
+    wideRanges =
+      [ (0x1100,  0x115F)   -- Hangul Jamo
+      , (0x2329,  0x232A)   -- angle brackets
+      , (0x2E80,  0x303E)   -- CJK radicals, Kangxi, CJK symbols/punctuation
+      , (0x3041,  0x33FF)   -- Hiragana, Katakana, CJK symbols
+      , (0x3400,  0x4DBF)   -- CJK Unified Ideographs Extension A
+      , (0x4E00,  0x9FFF)   -- CJK Unified Ideographs
+      , (0xA000,  0xA4CF)   -- Yi
+      , (0xA960,  0xA97F)   -- Hangul Jamo Extended-A
+      , (0xAC00,  0xD7A3)   -- Hangul Syllables
+      , (0xF900,  0xFAFF)   -- CJK Compatibility Ideographs
+      , (0xFE10,  0xFE19)   -- Vertical forms
+      , (0xFE30,  0xFE6F)   -- CJK Compatibility / Small Form Variants
+      , (0xFF00,  0xFF60)   -- Fullwidth Forms
+      , (0xFFE0,  0xFFE6)   -- Fullwidth signs
+      , (0x1B000, 0x1B16F)  -- Kana Supplement / Extended
+      , (0x1F200, 0x1F251)  -- Enclosed Ideographic Supplement
+      , (0x1F300, 0x1F64F)  -- Misc Symbols & Pictographs, Emoticons (wide emoji)
+      , (0x1F900, 0x1F9FF)  -- Supplemental Symbols & Pictographs
+      , (0x1FA70, 0x1FAFF)  -- Symbols & Pictographs Extended-A
+      , (0x20000, 0x3FFFD)  -- CJK Unified Ideographs Extensions B–G
+      ]
