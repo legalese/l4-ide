@@ -118,6 +118,9 @@ export interface ViewSpec {
   readonly orient: Orient
   readonly theme: Theme
   readonly connectiveStyle: ConnectiveStyle
+  /** Render current flow (DESIGN §20): closed connectors thick+dark, open thin+light.
+   *  Off by default so static/print demos keep state-coloured connectors. */
+  readonly showCurrent: boolean
 }
 
 export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
@@ -129,6 +132,7 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     orient: partial.orient ?? 'LR',
     theme: partial.theme ?? 'screen',
     connectiveStyle: partial.connectiveStyle ?? 'straddle-wire',
+    showCurrent: partial.showCurrent ?? false,
   }
 }
 
@@ -152,6 +156,13 @@ export interface ClickAct {
   id: NodeId
 }
 
+/** Current-flow level on a connector (DESIGN §20). The "lightning" model:
+ *  - 'closed'   — reached by the LEADER from the source (a complete run so far)
+ *  - 'streamer' — LOCAL closure: a conducting element lights its own connectors even
+ *                 if the leader hasn't arrived (a ground streamer rising to meet the bolt)
+ *  - 'open'     — neither. */
+export type Flow = 'open' | 'streamer' | 'closed'
+
 export type ScenePrim =
   | {
       kind: 'box'
@@ -162,10 +173,10 @@ export type ScenePrim =
       folded?: boolean
       act?: ClickAct
     }
-  | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State; act?: ClickAct }
+  | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State; act?: ClickAct; flow?: Flow }
   /** cubic Bézier connector (DESIGN §17a) — the organic fan from a group's port to
    *  each rung, contrasting the rectilinear boxes. Horizontal tangents at both ends. */
-  | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State; act?: ClickAct }
+  | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State; act?: ClickAct; flow?: Flow }
   | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
   | {
       kind: 'text'

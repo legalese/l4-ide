@@ -645,6 +645,42 @@ box-model spec.
 
 ---
 
+## 20. Current flow — leader + streamer (the lightning model)
+
+Cycling values closes the circuit, drawn by **darkening + thickening** the connectors
+(box-model.pdf: *closed over true, stopped by false*). `ViewSpec.showCurrent` gates it
+(off ⇒ static/print demos keep state-coloured connectors). Three levels per connector:
+
+| level | weight·ink | meaning |
+|---|---|---|
+| **closed** | thick, near-black | reached by the **leader** — a closed run *from the source* |
+| **streamer** | medium, mid-grey | **local closure** — a conducting element lights its own connectors even with no path to the source yet |
+| **open** | thin, light | neither |
+
+**Why the streamer (Meng).** A purely source-driven model only shows the leader
+descending — it can't reveal that a TRUE leaf nested deep in `harm` is *locally*
+closed. The metaphor is lightning: the bolt (leader) reaches down from the cloud while
+**ground streamers rise to meet it** — they join in the middle. Showing local regions
+of closure lets a reader piece a path across the circuit **without** imposing a
+top-down / left-to-right direction of flow. As more atoms go true, streamers grow and
+snap to `closed` when the leader arrives.
+
+**Computation** (pure, DESIGN §3.2):
+- `nodeValue` → three-valued value; `conducts(n) = value===TRUE` (inert conducts
+  trivially; only a TRUE *atom/group* — `trueConducts` — raises a streamer).
+- `energize()` — forward (leader) reachability from the source: a series stops at the
+  first non-conductor; an OR's output closes iff some branch conducts. Fills `inE/outE`.
+- per connector: `flowFor(leader, local)` → leader ? `closed` : local ? `streamer` :
+  `open`. Series link: leader = the upstream child's `outE`; local = either adjacent
+  element conducts. OR fan: in-curve leader = OR's `inE`, out-curve leader = branch
+  `outE`; local = the branch conducts.
+
+Verified: `s415-streamer` — leader stops at `causes harm`, `body` TRUE streamers its
+fan connectors. *(Future: a backward pass from the sink would let streamer + leader
+distinguish a genuinely **complete** source-to-sink path from a merely partial one.)*
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.

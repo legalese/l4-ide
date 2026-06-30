@@ -24,6 +24,7 @@ import type {
   Or,
   ConnectiveStyle,
   UBoolValue,
+  Flow,
 } from './types.js'
 
 const PAD_X = 14
@@ -47,6 +48,7 @@ interface Ctx {
   vs: ViewSpec
   tm: TextMetrics
   values: Map<NodeId, UBoolValue> // evaluated T/F/U per node id
+  em: Map<NodeId, Energ> | null // energization per node id, when showCurrent
 }
 
 const isOperative = (e: IRExpr): boolean => e.$type !== 'InertE'
@@ -80,6 +82,57 @@ function nodeValue(e: IRExpr, val: ReadonlyMap<NodeId, UBoolValue>, out: Map<Nod
   }
   out.set(e.id, v)
   return v
+}
+
+interface Energ {
+  inE: boolean
+  outE: boolean
+}
+
+/** Current-flow propagation from the source (DESIGN §20). A node CONDUCTS when its
+ *  value is TRUE (inert conducts trivially); energization (current reaches a port)
+ *  flows top-down — a series stops at the first non-conducting child; an OR's output
+ *  closes iff some branch conducts. Fills `em` for every node id. */
+function energize(e: IRExpr, inE: boolean, values: Map<NodeId, UBoolValue>, em: Map<NodeId, Energ>): void {
+  const conducts = (n: IRExpr) => (n.$type === 'InertE' ? true : values.get(n.id) === 'TrueV')
+  let outE: boolean
+  if (e.$type === 'And') {
+    let cur = inE
+    for (const a of e.args) {
+      energize(a, cur, values, em)
+      cur = em.get(a.id)!.outE // current after this child (false past the first non-conductor)
+    }
+    outE = e.args.length ? cur : inE
+  } else if (e.$type === 'Or') {
+    let any = false
+    for (const a of e.args) {
+      if (a.$type === 'InertE') {
+        em.set(a.id, { inE, outE: inE })
+        continue
+      }
+      energize(a, inE, values, em) // every operative branch sees the OR's input
+      if (em.get(a.id)!.outE) any = true
+    }
+    outE = inE && any
+  } else if (e.$type === 'Not') {
+    energize(e.negand, inE, values, em)
+    outE = inE && values.get(e.id) === 'TrueV'
+  } else {
+    outE = inE && conducts(e)
+  }
+  em.set(e.id, { inE, outE })
+}
+
+/** Does a node contribute LOCAL closure (a real closed contact)? Inert pass-throughs
+ *  don't count — only a TRUE atom/group raises a streamer. */
+const trueConducts = (vals: Map<NodeId, UBoolValue>, n: IRExpr): boolean =>
+  n.$type !== 'InertE' && vals.get(n.id) === 'TrueV'
+
+/** Connector flow (DESIGN §20): reached by the leader -> 'closed'; else local closure
+ *  nearby -> 'streamer'; else 'open'. Returns undefined when current flow is off. */
+function flowFor(em: Map<NodeId, Energ> | null, leader: boolean, local: boolean): Flow | undefined {
+  if (!em) return undefined
+  return leader ? 'closed' : local ? 'streamer' : 'open'
 }
 
 /** Leading run of inert text = the group's Pre / heading. */
@@ -278,8 +331,11 @@ function measureAnd(e: And, ctx: Ctx): Measured {
         x += k.w + GAP_SERIES
         return p
       })
-      for (let i = 0; i < ports.length - 1; i++)
-        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: { t: 'fold', id: e.id } })
+      for (let i = 0; i < ports.length - 1; i++) {
+        const leader = !!ctx.em?.get(e.args[i].id)?.outE
+        const local = trueConducts(ctx.values, e.args[i]) || trueConducts(ctx.values, e.args[i + 1])
+        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: { t: 'fold', id: e.id }, flow: flowFor(ctx.em, leader, local) })
+      }
       return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
     },
   }
@@ -302,7 +358,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   let start = 0
   while (start < e.args.length && e.args[start].$type === 'InertE') start++
 
-  const rungs: Measured[] = []
+  const rungs: { node: IRExpr; m: Measured }[] = []
   const gapLabel: (string | null)[] = [] // gapLabel[k] = inert between rung k and k+1
   let pending: string[] = []
   for (const it of e.args.slice(start)) {
@@ -311,16 +367,16 @@ function measureOr(e: Or, ctx: Ctx): Measured {
     } else {
       if (rungs.length >= 1) gapLabel.push(pending.length ? pending.join(' ') : null)
       pending = []
-      rungs.push(measure(it, ctx))
+      rungs.push({ node: it, m: measure(it, ctx) })
     }
   }
   // (a trailing `pending` after the last rung would be a Post; dropped for now)
 
   const labelW = (k: number) => (gapLabel[k] ? tm.width(gapLabel[k] as string, FONT) + 2 * INERT_PAD : 0)
   const gapH = (k: number) => (gapLabel[k] ? Math.max(GAP_PARALLEL, lineH + 8) : GAP_PARALLEL)
-  const colW = Math.max(0, ...rungs.map((m) => m.w), ...gapLabel.map((_, k) => labelW(k)))
+  const colW = Math.max(0, ...rungs.map((r) => r.m.w), ...gapLabel.map((_, k) => labelW(k)))
   const totalW = colW + 2 * BUS_PAD
-  const stackH = rungs.reduce((s, m) => s + m.h, 0) + gapLabel.reduce((s, _, k) => s + gapH(k), 0)
+  const stackH = rungs.reduce((s, r) => s + r.m.h, 0) + gapLabel.reduce((s, _, k) => s + gapH(k), 0)
   const band = head ? lineH + 12 : 0
   const h = stackH + 2 * band
 
@@ -336,7 +392,9 @@ function measureOr(e: Or, ctx: Ctx): Measured {
       const groupIn: Pt = { x: leftX, y: centerY }
       const groupOut: Pt = { x: rightX, y: centerY }
       let y = top
-      rungs.forEach((m, i) => {
+      // the leader reaches the fan iff the OR's input is energized (DESIGN §20)
+      const leaderIn = !!ctx.em?.get(e.id)?.inE
+      rungs.forEach(({ node, m }, i) => {
         if (i > 0) {
           const k = i - 1
           const gh = gapH(k)
@@ -349,11 +407,15 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         // organic Bézier fan: group port -> rung port, and back (DESIGN §17a).
         // Clicking a fan curve folds this OR (DESIGN §19).
         const fold = { t: 'fold', id: e.id } as const
+        const local = trueConducts(ctx.values, node) // this branch is a closed contact
+        const leaderOut = !!ctx.em?.get(node.id)?.outE
         const inCurve = hCurve(groupIn, p.inPort, m.state)
         inCurve.act = fold
+        inCurve.flow = flowFor(ctx.em, leaderIn, local)
         out.push(inCurve)
         const outCurve = hCurve(p.outPort, groupOut, m.state)
         outCurve.act = fold
+        outCurve.flow = flowFor(ctx.em, leaderOut, local)
         out.push(outCurve)
         if (m.state === 'eliminable' || m.state === 'dead') {
           const mid = cubicMid(inCurve)
@@ -371,13 +433,15 @@ export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
   const prims: ScenePrim[] = []
   const values = new Map<NodeId, UBoolValue>()
   nodeValue(fn.body, vs.valuation, values)
-  const m = measure(fn.body, { vs, tm, values })
+  const em = vs.showCurrent ? new Map<NodeId, Energ>() : null
+  if (em) energize(fn.body, true, values, em)
+  const m = measure(fn.body, { vs, tm, values, em })
   const ox = MARGIN + LEAD
   const oy = MARGIN
   const { inPort, outPort } = m.emit(ox, oy, prims)
 
-  prims.push({ kind: 'wire', path: [{ x: MARGIN, y: inPort.y }, inPort], role: 'rail', state: 'inert' })
-  prims.push({ kind: 'wire', path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }], role: 'rail', state: 'inert' })
+  prims.push({ kind: 'wire', path: [{ x: MARGIN, y: inPort.y }, inPort], role: 'rail', state: 'inert', flow: em ? 'closed' : undefined })
+  prims.push({ kind: 'wire', path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }], role: 'rail', state: 'inert', flow: flowFor(em, !!em?.get(fn.body.id)?.outE, trueConducts(values, fn.body)) })
   prims.push({ kind: 'glyph', at: { x: MARGIN, y: inPort.y }, role: 'power-terminal' })
   prims.push({ kind: 'glyph', at: { x: ox + m.w + LEAD, y: outPort.y }, role: 'power-terminal' })
 

@@ -71,7 +71,7 @@ function flipIndex(scene: Scene): Map<string, Pos> {
 }
 
 function render(animate: boolean) {
-  const vs = defaultViewSpec({ valuation, foldSet, connectiveStyle: connective })
+  const vs = defaultViewSpec({ valuation, foldSet, connectiveStyle: connective, showCurrent: true })
   const scene = layout(fn, vs, tm)
   const old = lastScene && animate ? flipIndex(lastScene) : null
   container.innerHTML = sceneToSvg(scene)

@@ -3,7 +3,7 @@
  * here, to be split out per §12). Canonical text is <text>/<tspan> so the same
  * emit feeds screen AND print (§4.4). `theme` maps state -> ink; no second layout.
  */
-import type { Scene, ScenePrim, State, Theme } from './types.js'
+import type { Scene, ScenePrim, State, Theme, Flow } from './types.js'
 
 interface Palette {
   live: string
@@ -26,6 +26,11 @@ const SCREEN: Palette = {
 }
 const INK: Palette = { ...SCREEN, live: '#222', inert: '#555', dead: '#555', ghost: '#999', rail: '#222', ink: '#111' }
 
+// current-flow style (DESIGN §20): closed (leader) thick+dark, streamer (local
+// closure) medium, open thin+light.
+const flowStroke = (f: Flow) => (f === 'closed' ? '#1b1b1b' : f === 'streamer' ? '#7c828a' : '#d6dadd')
+const flowWidth = (f: Flow) => (f === 'closed' ? 3.4 : f === 'streamer' ? 2.3 : 1.1)
+
 const strokeFor = (s: State, p: Palette) =>
   s === 'live' ? p.live : s === 'eliminable' ? p.ghost : p.inert
 
@@ -44,16 +49,22 @@ function prim(p: ScenePrim, pal: Palette): string {
     }
     case 'wire': {
       const d = p.path.map((pt) => `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ')
+      const cls = `class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)}`
+      if (p.flow)
+        return `<polyline ${cls} points="${d}" fill="none" stroke="${flowStroke(p.flow)}" stroke-width="${flowWidth(p.flow)}"/>`
       const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
       const col = p.role === 'rail' ? pal.rail : strokeFor(p.state, pal)
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
-      return `<polyline class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)} points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
+      return `<polyline ${cls} points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
     }
     case 'curve': {
+      const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`
+      const cls = `class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)}`
+      if (p.flow)
+        return `<path ${cls} d="${d}" fill="none" stroke="${flowStroke(p.flow)}" stroke-width="${flowWidth(p.flow)}"/>`
       const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
-      const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`
-      return `<path class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`
+      return `<path ${cls} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`
     }
     case 'glyph':
       if (p.role === 'open-contact')
