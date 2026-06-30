@@ -177,7 +177,10 @@ export type ScenePrim =
   /** cubic Bézier connector (DESIGN §17a) — the organic fan from a group's port to
    *  each rung, contrasting the rectilinear boxes. Horizontal tangents at both ends. */
   | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State; act?: ClickAct; flow?: Flow }
-  | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
+  | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' | 'inverter' }
+  /** NOT scope frame (DESIGN §21) — a light enclosure round a negated complex
+   *  subtree, tagged. The inversion itself is the 'inverter' bubble on the output. */
+  | { kind: 'frame'; rect: Rect; label: string }
   | {
       kind: 'text'
       at: Pt

@@ -72,7 +72,16 @@ function prim(p: ScenePrim, pal: Palette): string {
           `<line x1="${(p.at.x - 7).toFixed(1)}" y1="${(p.at.y - 7).toFixed(1)}" x2="${(p.at.x - 7).toFixed(1)}" y2="${(p.at.y + 7).toFixed(1)}" stroke="${pal.ghost}" stroke-width="1.6"/>` +
           `<line x1="${(p.at.x + 7).toFixed(1)}" y1="${(p.at.y - 7).toFixed(1)}" x2="${(p.at.x + 7).toFixed(1)}" y2="${(p.at.y + 7).toFixed(1)}" stroke="${pal.ghost}" stroke-width="1.6"/>`
         )
+      if (p.role === 'inverter') // the NOT bubble — sits on the output wire (DESIGN §21)
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.5"/>`
       return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`
+    case 'frame': {
+      const { x, y, w, h } = p.rect
+      return (
+        `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="10" fill="none" stroke="#b3b7bb" stroke-width="1.2" stroke-dasharray="2 4"/>` +
+        `<text x="${(x + 11).toFixed(1)}" y="${(y + 15).toFixed(1)}" font-family="Georgia, serif" font-size="11" fill="#8a9096" font-style="italic">${esc(p.label)}</text>`
+      )
+    }
     case 'text': {
       const size = p.size ?? 14
       const isCaret = p.tag === 'caret'

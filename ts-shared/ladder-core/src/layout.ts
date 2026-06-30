@@ -290,13 +290,39 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
   if (e.$type === 'InertE') return inertInline(e.text, tm, vs.connectiveStyle)
 
   if (e.$type === 'Not') {
+    // NOT grammar (DESIGN §21): a scope FRAME round a complex negand (so you can see
+    // exactly what's negated) + an inverter BUBBLE on the output. The negand renders
+    // its own internal flow; current flips at the bubble (downstream closes iff the
+    // inside is open). Nests naturally: not(x(not(ys))) -> frames within frames.
     const inner = measure(e.negand, ctx)
+    const complex = e.negand.$type === 'And' || e.negand.$type === 'Or' || e.negand.$type === 'Not'
+    const NPX = 16
+    const NPY = 12
+    const LBL = complex ? 16 : 0
+    const BR = 5 // bubble radius
+    const BUB = 20 // output room for the bubble
+    const band = LBL + NPY // symmetric top/bottom so the port stays centred
+    const framW = inner.w + 2 * NPX
+    const w = framW + BUB
+    const h = inner.h + 2 * band
     return {
-      ...inner,
+      w,
+      h,
+      state: renderState(ctx, e.id),
       emit(ox, oy, out) {
-        const p = inner.emit(ox, oy, out)
-        out.push({ kind: 'text', at: { x: p.inPort.x - 6, y: p.inPort.y - 8 }, text: '¬', anchor: 'middle', state: inner.state })
-        return p
+        if (complex) out.push({ kind: 'frame', rect: { x: ox, y: oy, w: framW, h }, label: 'NOT' })
+        const p = inner.emit(ox + NPX, oy + band, out)
+        const cy = p.inPort.y
+        if (!complex) out.push({ kind: 'text', at: { x: ox + NPX + inner.w / 2, y: oy + band - 5 }, text: 'NOT', anchor: 'middle', state: 'inert', tag: 'heading', size: 11, id: e.id })
+        const bubbleX = ox + framW
+        // lead in: source-side current reaches the negand
+        out.push({ kind: 'wire', path: [{ x: ox, y: cy }, p.inPort], role: 'rung', state: 'inert', flow: flowFor(ctx.em, !!ctx.em?.get(e.id)?.inE, false) })
+        // negand output up to the bubble (shows the INSIDE's flow)
+        out.push({ kind: 'wire', path: [p.outPort, { x: bubbleX - BR, y: cy }], role: 'rung', state: 'inert', flow: flowFor(ctx.em, !!ctx.em?.get(e.negand.id)?.outE, trueConducts(ctx.values, e.negand)) })
+        out.push({ kind: 'glyph', at: { x: bubbleX, y: cy }, role: 'inverter' })
+        // past the bubble = INVERTED (closes iff the inside is open)
+        out.push({ kind: 'wire', path: [{ x: bubbleX + BR, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert', flow: flowFor(ctx.em, !!ctx.em?.get(e.id)?.outE, trueConducts(ctx.values, e)) })
+        return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
       },
     }
   }

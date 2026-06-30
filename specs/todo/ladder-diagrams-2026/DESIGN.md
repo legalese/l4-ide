@@ -681,6 +681,43 @@ distinguish a genuinely **complete** source-to-sink path from a merely partial o
 
 ---
 
+## 21. NOT — scope frame + inverter bubble
+
+`not(complex)` poses two problems a bare `¬` can't: **scope** (is it `not(A and B)`
+or `(not A) and B`?) and **inversion in the flow** (a negated region conducts when
+its insides are *open*). The grammar:
+
+- **Inverter bubble** — a small open circle on the negated element's **output port**
+  (digital-logic convention). The *universal* NOT mark: identical for leaf and
+  complex, so the leaf case stops being special.
+- **Scope frame** — for a *complex* negand, a light dashed rounded enclosure tagged
+  **NOT**. It draws the bracket the algebra implies. (A leaf negand gets just a small
+  `NOT` tag + the bubble — no frame.)
+- **Flip at the bubble.** The negand renders its **own** internal flow (its leaves'
+  values, its leader/streamers). The wire *past* the bubble is energized iff the
+  inside is **open**: `not.outE = inE && !conducts(negand)`. You see the current flip
+  at the mark.
+
+**Nesting** (`not(x(not(ys)))`) falls out for free — frames within frames, each
+NOT's bubble on its own output port at its own level. Two bubbles in series read as
+double-inversion (they "cancel"), which is correct and legible. `nodeValue` /
+`energize` already recurse through `Not`, so the compounded inversions compute right.
+
+Layout: `measure(Not)` wraps the negand with symmetric padding (port stays centred,
+rail straight), emits the frame, a lead in, the negand-output→bubble segment (inside
+flow), the bubble, and the bubble→output segment (inverted flow). Scene IR gains a
+`frame` prim and an `inverter` glyph.
+
+Verified: `not-nested` — `not(And[registered, not(Or[sat, submitted])])`, leader thick
+to the inner bubble, thin between the bubbles, thick past the outer one.
+
+*Alternatives (not chosen): **evaluate-aside** — pull the negand off the main rung as
+a sub-circuit driving a normally-closed contact (relay-accurate, more layout); **De
+Morgan push-down** — rewrite NOT to the leaves (changes displayed structure; better as
+an optional "normalize negation" view).*
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.

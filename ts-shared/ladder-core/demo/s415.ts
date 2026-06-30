@@ -90,6 +90,7 @@ function shift(prims: ScenePrim[], dx: number, dy: number): ScenePrim[] {
     if (p.kind === 'box') return { ...p, rect: { ...p.rect, x: p.rect.x + dx, y: p.rect.y + dy } }
     if (p.kind === 'wire') return { ...p, path: p.path.map(mv) }
     if (p.kind === 'curve') return { ...p, from: mv(p.from), c1: mv(p.c1), c2: mv(p.c2), to: mv(p.to) }
+    if (p.kind === 'frame') return { ...p, rect: { ...p.rect, x: p.rect.x + dx, y: p.rect.y + dy } }
     return { ...p, at: mv(p.at) }
   })
 }
