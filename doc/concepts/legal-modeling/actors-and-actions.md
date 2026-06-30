@@ -11,6 +11,43 @@ roles, STIT logic, agency law) see
 
 ---
 
+## Two encodings — and which to use
+
+There are two ways to attach an actor to an action. **Value-actor is the
+recommended default; reach for type-indexed only in the unusual cases noted
+below.**
+
+- **Value-actor (preferred)** — the actor is a *value* the action carries
+  (`DECLARE Actor IS ONE OF Eater, Drinker`; `eat MEANS Action OF Eater, …`).
+  This page is about this style. It is the more expressive one: it drives events
+  natively and is the *only* encoding that supports duplex actions, parameterised
+  actions, and higher-order procurement. Its actor check is value-level (see
+  [boundaries](#7-what-is-not-checked-boundaries)).
+
+- **Type-indexed (for unusual scenarios)** — the actor is a phantom *type* index
+  (`DECLARE Action who …`; `eat : Action Eater`; contract `DEONTIC Eater (Action
+  Eater)`), and agreement is an ordinary type equality. Its one advantage is that
+  the check is *always* static — it holds across module boundaries and for
+  actions whose actor would otherwise be computed, because the actor lives in the
+  type. Reach for it only when you specifically need that guarantee, or when an
+  action has **no runtime actor data** (a purely compile-time distinction). It
+  cannot express duplex, parameterised, or procured actions.
+
+| | **value-actor** (preferred) | **type-indexed** (unusual) |
+|---|---|---|
+| Actor lives in | a record *value* | the *type* (phantom index) |
+| Agreement check | value-level | type-level (HM) |
+| Always static / cross-module | no (skips computed & cross-module) | **yes** |
+| Duplex / parameterised / procurement | **yes** | no |
+| Event-driving across actors | **yes** | no |
+| Ergonomics | one `DECLARE`, `PARTY Eater` | a type + a value per actor |
+
+**If you are not sure, use value-actor.** The two are not desugarings of each
+other: value-actor is the more general encoding, and type-indexed is the
+narrower, stronger-guarantee special case kept for the situations that need it.
+
+---
+
 ## 1. Actors are values; actions carry them
 
 A contract has type `DEONTIC <PartyType> <ActionType>`. The modern, recommended

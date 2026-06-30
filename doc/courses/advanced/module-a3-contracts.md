@@ -268,6 +268,57 @@ bobLender MEANS IndividualLender (Person WITH name IS "Bob")
 
 ---
 
+## Actor-Correctness and the Performer Rule
+
+L4 enforces that the `PARTY` named in an obligation is the *performer* of the
+action — the actor in the first actor-typed field of the action record (subject-first
+canon). This catches assignment errors and models the principal/agent distinction.
+
+### Procurement: higher-order actions
+
+Law often says "X undertakes to *procure* that Y performs action_Y". L4 models
+this with a recursive action type — an outer `Procure` wrapping an inner action,
+with the procurer in the first slot:
+
+```l4
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+    LogisticsProvider
+
+DECLARE ContractAction IS ONE OF
+    Perform HAS who      IS AN Actor, verb  IS A STRING
+    Procure HAS procurer IS AN Actor, inner IS A ContractAction
+
+-- Leaf actions
+deliverByLogistics     MEANS Perform OF LogisticsProvider, "deliver goods"
+
+-- Seller procures that LogisticsProvider delivers
+sellerProcuresDelivery MEANS Procure OF Seller, deliverByLogistics
+
+-- ✅ Seller bears the procurement obligation (procurer = first slot = Seller)
+GIVETH A DEONTIC Actor ContractAction
+`seller arranges delivery` MEANS
+    PARTY Seller
+    MUST EXACTLY sellerProcuresDelivery
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH BY Seller BECAUSE "seller failed to arrange delivery"
+
+-- ❌ rejected: `sellerProcuresDelivery` is performed by `Seller`, not by `Buyer`
+-- bad MEANS PARTY Buyer MUST EXACTLY sellerProcuresDelivery WITHIN 14 ...
+```
+
+Procurement nests — `Procure(X, Procure(Y, ...))` models a delegation chain. A
+**non-delegable duty** is modelled by requiring a bare `Perform` (no `Procure`
+wrapper) in the obligation slot: the obligated party must perform personally.
+
+See [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md) for
+the full performer-rule reference, duplex actions, and parameterised
+(`EXACTLY`-applied) actions.
+
+---
+
 ## Multi-Party Contracts
 
 Some contracts involve more than two parties:

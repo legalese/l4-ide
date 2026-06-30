@@ -168,10 +168,33 @@ When evaluated with `#TRACE`, a DEONTIC expression produces an obligation graph 
 A regulative rule declares its effect type as:
 
 ```l4
-GIVETH A DEONTIC
+GIVETH DEONTIC <PartyType> <ActionType>
 ```
 
+The two type parameters are both **monomorphic** when actors are encoded as values (the recommended style). With the value-actor encoding, `PartyType` and `ActionType` are concrete declared types (e.g., `Actor` and `Action`), and the contract head drives mixed-actor events without subtyping or GADTs.
+
 Within the type system, DEONTIC acts as a custom monad (in Haskell terms) or, in category-theoretic terms, lives in a Kleisli category.
+
+### Actor-Correctness: Value-Level Performer Check
+
+Beyond the type-level check that the party and action types match the contract head, L4 enforces a **value-level actor-correctness** rule:
+
+> In `PARTY p MUST a` (obligation) and `PARTY p DOES a` (event), the party `p` must equal the *performer* of action `a` — the first actor-typed field of `a` in positional order (the **subject-first canon**).
+
+This check is a complement to, not a replacement for, type-level `checkPartyActionAgreement`. It fires only when both `p` and the performer can be resolved statically; it is silent for computed actors or actions without actor fields (leaving legacy/flat-union contracts untouched).
+
+A violation produces a diagnostic such as:
+
+```
+An actor may only perform its own actions.
+
+  `eat` is performed by `Eater`, not by `Drinker`.
+```
+
+For the full design rationale (value-actors vs. type-indexed actors, the SVO canon, duplex actions, procurement) see:
+
+- [actors-and-actions.md](../../concepts/legal-modeling/actors-and-actions.md) — syntax, worked examples, boundaries
+- [ACTOR-ACTIONS-THEORY.md](../../concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md) — theory & bibliography (thematic roles, STIT logic, agency law)
 
 ---
 
