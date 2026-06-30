@@ -2,6 +2,11 @@
 -- OWN actions (party / action-index agreement). See
 -- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
 --
+-- NOTE: this exercises the TYPE-INDEXED encoding (Action who; DEONTIC Eater
+-- (Action Drinker)), which is DEPRECATED as a surface — new models should use
+-- value-actors (doc/concepts/legal-modeling/actors-and-actions.md). Kept as a
+-- regression test for the still-operational rung-2 check.
+--
 -- The contract type `DEONTIC Eater (Action Drinker)` is incoherent: the party is
 -- an `Eater`, but the action is actor-indexed to `Drinker`. The action itself is
 -- type-correct for this (incoherent) contract — `Drink` *is* an `Action Drinker`,

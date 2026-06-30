@@ -9,7 +9,7 @@
 -- mixed-actor event stream drives it to FULFILLED. The rejection cases live in
 -- not-ok/tc/value-actor-agreement.l4. See
 -- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md and
--- specs/todo/ACTOR-ACTIONS-THEORY.md.
+-- doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md.
 
 DECLARE Actor IS ONE OF Eater, Drinker
 

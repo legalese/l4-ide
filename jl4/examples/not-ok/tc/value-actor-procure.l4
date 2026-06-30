@@ -9,7 +9,7 @@
 --
 -- This is the principal/agent distinction, type-checked, and it falls out of the
 -- value-actor encoding for free (actions are first-class values, so they can be
--- arguments to a higher-order `Procure`). See specs/todo/ACTOR-ACTIONS-THEORY.md
+-- arguments to a higher-order `Procure`). See doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md
 -- (STIT logic; Kanger-Lindahl normative positions; agency law; non-delegable
 -- duties).
 

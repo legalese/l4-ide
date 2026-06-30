@@ -4,6 +4,10 @@
 --
 -- The rejection case lives in not-ok/tc/deontic-party-action-agreement.l4.
 -- See specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
+--
+-- NOTE: this exercises the TYPE-INDEXED encoding, DEPRECATED as a surface — new
+-- models should use value-actors (doc/concepts/legal-modeling/actors-and-actions.md).
+-- Kept as a regression test for the still-operational rung-2 check.
 
 DECLARE Eater   IS ONE OF AnEater
 DECLARE Drinker IS ONE OF ADrinker

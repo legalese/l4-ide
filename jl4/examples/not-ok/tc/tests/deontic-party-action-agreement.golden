@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: deontic-party-action-agreement.l4
   Hidden: no
-  Range: 25:39-25:73
+  Range: 30:39-30:73
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

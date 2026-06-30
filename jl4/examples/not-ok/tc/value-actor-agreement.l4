@@ -1,10 +1,10 @@
 -- Value-actor agreement (rung 3): a PARTY may only perform an action whose
 -- *performer* is itself. `eat`'s performer is Eater, so a Drinker may neither be
 -- obligated to eat (an obligation) nor do so (an event). Both are rejected with
--- a domain message ("performed by Eater, not by Drinker").
+-- a domain message ("`eat` is performed by `Eater`, not by `Drinker`").
 --
 -- The positive lock-in is in ok/regulative-value-actor.l4. See
--- specs/todo/ACTOR-ACTIONS-THEORY.md.
+-- doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md.
 
 DECLARE Actor IS ONE OF Eater, Drinker
 

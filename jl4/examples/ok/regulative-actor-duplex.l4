@@ -7,7 +7,7 @@
 --   * positional `OF`   (subject-first word order)
 --   * prepositional `WITH` (named parameters / thematic roles)
 --
--- See specs/todo/ACTOR-ACTIONS-THEORY.md.
+-- See doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md.
 
 DECLARE Actor IS ONE OF Alice, Bob
 
