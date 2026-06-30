@@ -50,6 +50,12 @@ function prim(p: ScenePrim, pal: Palette): string {
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
       return `<polyline class="lad-wire" points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
     }
+    case 'curve': {
+      const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
+      const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
+      const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`
+      return `<path class="lad-wire" d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`
+    }
     case 'glyph':
       if (p.role === 'open-contact')
         return (

@@ -145,6 +145,9 @@ export type ScenePrim =
       folded?: boolean
     }
   | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State }
+  /** cubic Bézier connector (DESIGN §17a) — the organic fan from a group's port to
+   *  each rung, contrasting the rectilinear boxes. Horizontal tangents at both ends. */
+  | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State }
   | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
   | {
       kind: 'text'

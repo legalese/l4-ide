@@ -590,6 +590,25 @@ isomorphism (source ↔ logic ↔ picture) made legible at once. **Proven in P0*
 
 ---
 
+## 18. Connector style — the Bézier fan
+
+Connectors are **cubic Béziers with horizontal tangents**, fanning from a group's
+single in-port out to every rung (and converging again at the out-port) — the
+Layman / box-model look (Layman sets `sourcePosition: Right` / `targetPosition: Left`
+on ReactFlow's default bezier edges; we emit the curves directly). The OR's vertical
+bus + right-angle stubs are gone; the organic curves now play against the
+**rectilinear** term boxes and the **straight** spine (rails, series links, leads
+stay linear). One reading: boxes + spine are rigid structure, curves are flow.
+
+- Scene IR gains `{ kind: 'curve'; from; c1; c2; to }`; `hCurve(from, to, state)`
+  builds it (tangent `t = clamp(max(0.6·|dx|, 0.35·|dy|), 22, 60)`); svg emits a
+  `<path>` (class `lad-wire`, so it still fades on FLIP).
+- An eliminable/dead rung's in-curve is dashed/ghosted with the open-contact break
+  glyph at the curve's parametric midpoint (`cubicMid`).
+- Curves carry the rung's `state` colour (green live / grey unknown / ghost dead).
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.

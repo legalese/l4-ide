@@ -181,6 +181,20 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
   }
 }
 
+/** A cubic Bézier connector with horizontal tangents (leaves the source rightward,
+ *  enters the target from the left) — the Layman / box-model fan (DESIGN §17a). */
+type Curve = Extract<ScenePrim, { kind: 'curve' }>
+function hCurve(from: Pt, to: Pt, state: State): Curve {
+  const t = Math.min(60, Math.max(Math.abs(to.x - from.x) * 0.6, Math.abs(to.y - from.y) * 0.35, 22))
+  return { kind: 'curve', from, c1: { x: from.x + t, y: from.y }, c2: { x: to.x - t, y: to.y }, to, role: 'conn', state }
+}
+function cubicMid(c: Curve): Pt {
+  return {
+    x: (c.from.x + 3 * c.c1.x + 3 * c.c2.x + c.to.x) / 8,
+    y: (c.from.y + 3 * c.c1.y + 3 * c.c2.y + c.to.y) / 8,
+  }
+}
+
 function measure(e: IRExpr, ctx: Ctx): Measured {
   const { vs, tm } = ctx
 
@@ -278,11 +292,13 @@ function measureOr(e: Or, ctx: Ctx): Measured {
     h,
     state: 'inert',
     emit(ox, oy, out) {
-      const leftBusX = ox
-      const rightBusX = ox + totalW
+      const leftX = ox // the OR's in-port: a single point all rungs fan from
+      const rightX = ox + totalW // the out-port, where they converge again
       const top = oy + band
+      const centerY = top + stackH / 2
+      const groupIn: Pt = { x: leftX, y: centerY }
+      const groupOut: Pt = { x: rightX, y: centerY }
       let y = top
-      const rungCenters: number[] = []
       rungs.forEach((m, i) => {
         if (i > 0) {
           const k = i - 1
@@ -293,26 +309,18 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         }
         const cx = ox + BUS_PAD + (colW - m.w) / 2 // <-- centered horizontally
         const p = m.emit(cx, y, out)
-        const cy = p.inPort.y
-        const broken = m.state === 'eliminable' || m.state === 'dead'
-        if (broken) {
-          const mid = (leftBusX + p.inPort.x) / 2
-          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, { x: mid - 7, y: cy }], role: 'stub', state: m.state })
-          out.push({ kind: 'glyph', at: { x: mid, y: cy }, role: 'open-contact' })
-          out.push({ kind: 'wire', path: [{ x: mid + 7, y: cy }, { x: p.inPort.x, y: cy }], role: 'stub', state: m.state })
-        } else {
-          out.push({ kind: 'wire', path: [{ x: leftBusX, y: cy }, p.inPort], role: 'stub', state: m.state })
+        // organic Bézier fan: group port -> rung port, and back (DESIGN §17a)
+        const inCurve = hCurve(groupIn, p.inPort, m.state)
+        out.push(inCurve)
+        out.push(hCurve(p.outPort, groupOut, m.state))
+        if (m.state === 'eliminable' || m.state === 'dead') {
+          const mid = cubicMid(inCurve)
+          out.push({ kind: 'glyph', at: mid, role: 'open-contact' }) // current can't pass
         }
-        out.push({ kind: 'wire', path: [p.outPort, { x: rightBusX, y: p.outPort.y }], role: 'stub', state: m.state })
-        rungCenters.push(cy)
         y += m.h
       })
-      if (rungCenters.length) {
-        out.push({ kind: 'wire', path: [{ x: leftBusX, y: rungCenters[0] }, { x: leftBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
-        out.push({ kind: 'wire', path: [{ x: rightBusX, y: rungCenters[0] }, { x: rightBusX, y: rungCenters[rungCenters.length - 1] }], role: 'rail', state: 'inert' })
-      }
       if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5, id: e.id })
-      return { inPort: { x: leftBusX, y: top + stackH / 2 }, outPort: { x: rightBusX, y: top + stackH / 2 } }
+      return { inPort: groupIn, outPort: groupOut }
     },
   }
 }
