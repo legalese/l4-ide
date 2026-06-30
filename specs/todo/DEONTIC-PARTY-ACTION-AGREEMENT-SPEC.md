@@ -5,6 +5,21 @@
 (jl4 899/0, core 46/0).
 **Tests:** `not-ok/tc/deontic-party-action-agreement.l4` (rejection),
 `ok/regulative-actor-indexed-action.l4` (acceptance).
+
+> **Rung 3 — RESOLVED via _value-actors_, not the existential route.** Addendum
+> II (below) planned event-driven actor-correct routing as a residual-seam +
+> event-seam relaxation under a subtyping/existential wall (cost M–XL). The
+> shipped solution is cheaper and supersedes that plan: model actors as
+> **values**, give the contract a **monomorphic** `DEONTIC Actor Action` head
+> (which drives mixed-actor events natively — no seam surgery, no subtyping, no
+> existentials), and add a **value-level performer check**
+> (`checkRegulativeActorAgreement` / `subjectOfActionExpr`, the SVO subject-first
+> canon). This handles single-actor, duplex, parameterised (`EXACTLY`-applied),
+> and higher-order _procurement_ actions. Suite 919/0. Fixtures:
+> `ok/regulative-value-actor`, `ok/regulative-actor-duplex`,
+> `not-ok/tc/value-actor-{agreement,duplex,procure}`. User-facing guide:
+> [`doc/concepts/legal-modeling/actors-and-actions.md`](../../doc/concepts/legal-modeling/actors-and-actions.md).
+> Theory & bibliography: [`ACTOR-ACTIONS-THEORY.md`](ACTOR-ACTIONS-THEORY.md).
 **Origin:** synthesized from a multi-agent design workflow (5-subsystem map +
 LiquidHaskell/Dependent-Haskell/GADT/Idris/F\* lessons + 4 scored proposals, two
 of which were prototyped and verified against the golden suite).
