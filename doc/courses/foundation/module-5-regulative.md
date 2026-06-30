@@ -278,7 +278,7 @@ drink MEANS Action OF Drinker, "drink"
 ✅ **Works** — each actor is obligated to its own action:
 
 ```l4
-GIVETH DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
 `eater eats`     MEANS PARTY Eater   MUST eat   WITHIN 30
 `drinker drinks` MEANS PARTY Drinker MUST drink WITHIN 10
 ```
@@ -286,7 +286,7 @@ GIVETH DEONTIC Actor Action
 ❌ **Rejected** — a Drinker cannot be obligated to an Eater action:
 
 ```l4
-GIVETH DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
 bad MEANS PARTY Drinker MUST eat WITHIN 30
 ```
 
