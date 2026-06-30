@@ -1,0 +1,30 @@
+-- Rung 2 of actor-indexed actions: a PARTY may only be obligated to perform its
+-- OWN actions (party / action-index agreement). See
+-- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
+--
+-- NOTE: this exercises the TYPE-INDEXED encoding (Action who; DEONTIC Eater
+-- (Action Drinker)), which is DEPRECATED as a surface — new models should use
+-- value-actors (doc/concepts/legal-modeling/actors-and-actions.md). Kept as a
+-- regression test for the still-operational rung-2 check.
+--
+-- The contract type `DEONTIC Eater (Action Drinker)` is incoherent: the party is
+-- an `Eater`, but the action is actor-indexed to `Drinker`. The action itself is
+-- type-correct for this (incoherent) contract — `Drink` *is* an `Action Drinker`,
+-- so rung 1 (the declared-action-type check) is satisfied — yet the obligation
+-- pairs an Eater party with a Drinker action, which rung 2 rejects.
+--
+-- This needs no GADTs or dependent types: the actor index is an ordinary HM type
+-- argument, so the check is one nominal type-equality between the party type and
+-- the action's index.
+
+DECLARE Eater   IS ONE OF AnEater
+DECLARE Drinker IS ONE OF ADrinker
+
+DECLARE Action who HAS `verb` IS A STRING
+
+GIVETH AN Action Drinker
+Drink MEANS Action WITH `verb` IS "drink"
+
+-- An Eater party bound to a Drinker action: rejected by party/action agreement.
+GIVETH A DEONTIC Eater (Action Drinker)
+`eater bound to drinker action` MEANS PARTY AnEater MUST Drink WITHIN 30

@@ -1,0 +1,24 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: value-actor-procure.l4
+  Hidden: no
+  Range: 30:29-30:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An actor may only perform its own actions.
+
+      `xProcuresShip` is performed by `X`, not by `Z`.
+
+File: value-actor-procure.l4
+  Hidden: no
+  Range: 33:29-33:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An actor may only perform its own actions.
+
+      `shipByY` is performed by `Y`, not by `X`.

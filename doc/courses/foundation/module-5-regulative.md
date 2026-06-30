@@ -199,13 +199,14 @@ Both obligations must be fulfilled for the contract to be fulfilled.
 
 ## Alternative Paths with ROR
 
-Use `ROR` (regulative OR) when either path fulfills the contract:
+Use `ROR` (regulative OR) when either path fulfills the contract. Each branch must carry
+its own `HENCE`/`LEST` consequences — there is no shared trailing `LEST` outside the
+`ROR`:
 
 ```l4
-(PARTY Seller MUST `deliver goods` WITHIN 14 HENCE FULFILLED)
+(PARTY Seller MUST `deliver goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
 ROR
-(PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED)
-LEST BREACH
+(PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
 ```
 
 The seller can choose either option.
@@ -250,6 +251,75 @@ See the wedding vows example which demonstrates:
 - Mutual exchange of vows
 - Prohibitions (fidelity clause)
 - Using `BREACH BY ... BECAUSE ...` for clear blame assignment
+
+---
+
+## The Performer Rule: Who May Do What
+
+When your Action type carries an **actor field**, L4 enforces that the party named in
+`PARTY p MUST a` is also the action `a`'s **performer** — the actor in the first
+actor-typed field (the "subject-first" canon). A Drinker obligated to eat is a
+type error.
+
+This applies to the **value-actor encoding**, where actors are values of one type and
+actions are records that carry their actor(s):
+
+```l4
+DECLARE Actor IS ONE OF Eater, Drinker
+
+DECLARE Action HAS
+  actor IS AN Actor
+  verb  IS A STRING
+
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+```
+
+✅ **Works** — each actor is obligated to its own action:
+
+```l4
+GIVETH DEONTIC Actor Action
+`eater eats`     MEANS PARTY Eater   MUST eat   WITHIN 30
+`drinker drinks` MEANS PARTY Drinker MUST drink WITHIN 10
+```
+
+❌ **Rejected** — a Drinker cannot be obligated to an Eater action:
+
+```l4
+GIVETH DEONTIC Actor Action
+bad MEANS PARTY Drinker MUST eat WITHIN 30
+```
+
+```
+An actor may only perform its own actions.
+
+  `eat` is performed by `Eater`, not by `Drinker`.
+```
+
+> **Note:** The flat-union style used in most of this module (`DECLARE Action IS ONE OF deliver, pay`)
+> carries no actor field, so the performer rule does not apply to it — existing flat-union
+> contracts are unaffected.
+
+### Who may perform: the simple cases
+
+This is the **simple, common case** — a *single-actor* action whose performer is
+**pinned** (`eat` belongs to `Eater`, so only an Eater may be obligated to eat):
+
+```l4
+eat MEANS Action OF Eater, "eat"        -- only Eater performs eat
+```
+
+The actor *type* you `DECLARE` is the **cast** — everyone who may take part. A
+one-line `DECLARE Actor IS ONE OF Eater, Drinker` says exactly who the players
+are; a party outside that type is a plain type error.
+
+The **richer cases live in the advanced course**: actions *any* actor can
+perform and **duplex** actions (one type, both directions) in
+[Module A2](../advanced/module-a2-cross-cutting.md), and **procurement** — "X
+undertakes to procure that Y performs an action" — in
+[Module A3](../advanced/module-a3-contracts.md). The complete reference, with
+every ✅/❌ case (one / some / any actor), is
+[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md).
 
 ---
 

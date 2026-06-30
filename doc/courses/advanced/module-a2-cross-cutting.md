@@ -27,6 +27,57 @@ Some patterns appear repeatedly across legal rules:
 
 Rather than copy-paste these patterns, we create reusable abstractions.
 
+### The Performer Rule in Cross-Cutting Patterns
+
+Whenever an action carries an actor field, L4 enforces that the `PARTY` in an
+obligation matches the action's *performer* (the first actor-typed field in
+positional order). This is especially relevant to **notice-and-cure** and
+**duplex notification** patterns where two actors alternate obligations.
+
+**Duplex notification** — one action type, two directions, performer = first slot:
+
+```l4
+DECLARE Actor IS ONE OF
+    RegulatorActor
+    SubjectActor
+
+DECLARE NotifyAction HAS
+    sender   IS AN Actor    -- first actor field = performer
+    receiver IS AN Actor
+    message  IS A STRING
+
+-- Pinned in each direction
+`regulator notifies subject` MEANS NotifyAction OF RegulatorActor, SubjectActor, "notice issued"
+`subject notifies regulator` MEANS NotifyAction OF SubjectActor, RegulatorActor, "cure completed"
+
+-- ✅ ping-pong: each actor obligated to its own pinned action
+GIVETH A DEONTIC Actor NotifyAction
+`notification exchange` MEANS
+    PARTY RegulatorActor
+    MUST `regulator notifies subject`
+    WITHIN 7
+    HENCE
+        PARTY SubjectActor
+        MUST `subject notifies regulator`
+        WITHIN 14
+        HENCE FULFILLED
+        LEST BREACH BY SubjectActor BECAUSE "failed to acknowledge notice"
+    LEST BREACH BY RegulatorActor BECAUSE "failed to issue notice"
+```
+
+The `sender` field is first, so `RegulatorActor` is the performer of
+`regulator notifies subject` and `SubjectActor` is the performer of
+`subject notifies regulator`. Swapping the parties would produce:
+
+```
+An actor may only perform its own actions.
+  `regulator notifies subject` is performed by `RegulatorActor`, not by `SubjectActor`.
+```
+
+For the full performer-rule reference including parameterised (`EXACTLY`-applied)
+actions and procurement chains, see
+[Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md).
+
 ---
 
 ## Timing Patterns

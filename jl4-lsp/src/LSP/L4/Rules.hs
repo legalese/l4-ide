@@ -530,6 +530,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           , nlgMap = IV.empty
           , scopeMap = IV.empty
           , descMap = IV.empty
+          , constBodies = cState.constBodies
           }
         unionCheckEnv cEnv tcRes =
           TypeCheck.MkCheckEnv

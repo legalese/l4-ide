@@ -1,0 +1,24 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: value-actor-agreement.l4
+  Hidden: no
+  Range: 20:27-20:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An actor may only perform its own actions.
+
+      `eat` is performed by `Eater`, not by `Drinker`.
+
+File: value-actor-agreement.l4
+  Hidden: no
+  Range: 27:9-27:16
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An actor may only perform its own actions.
+
+      `eat` is performed by `Eater`, not by `Drinker`.

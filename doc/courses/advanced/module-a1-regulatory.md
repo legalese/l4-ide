@@ -146,7 +146,64 @@ Notice how we encode the statutory glossary (Article 2) as types. This:
 
 ## Layer B: Deontic Rules
 
-Now encode the obligations, permissions, and prohibitions:
+Now encode the obligations, permissions, and prohibitions.
+
+### Actors and the Performer Rule
+
+L4 enforces **actor-correctness**: a `PARTY p MUST a` obligation requires `p`
+to be the *performer* of action `a`. The performer is the first actor-typed
+field of the action record (the subject-first canon). The older flat-union
+action style (`DECLARE Action IS ONE OF fileReturn, issueNotice`) remains valid;
+the performer check applies when an action record carries an actor field.
+
+For the value-actor encoding (recommended for mixed-actor systems), declare
+actors as an enum and actions as records carrying their performer:
+
+```l4
+-- Minimal example: regulatory system with two actors
+DECLARE RegActor IS ONE OF
+    Charity
+    Commissioner
+
+DECLARE RegAction HAS
+    performer IS A RegActor
+    verb      IS A STRING
+
+-- Pinned actions: performer baked in
+`file return`  MEANS RegAction OF Charity,      "file annual return"
+`issue notice` MEANS RegAction OF Commissioner, "issue notice"
+
+-- ✅ each actor is bound to its own action
+GIVETH A DEONTIC RegActor RegAction
+`charity files` MEANS
+    PARTY Charity      MUST `file return`  WITHIN 60 HENCE FULFILLED LEST FULFILLED
+
+GIVETH A DEONTIC RegActor RegAction
+`commissioner issues` MEANS
+    PARTY Commissioner MUST `issue notice` WITHIN 30 HENCE FULFILLED
+    LEST BREACH BY Commissioner BECAUSE "failed to issue notice"
+
+-- ❌ rejected: `file return` is performed by `Charity`, not by `Commissioner`
+-- bad MEANS PARTY Commissioner MUST `file return` WITHIN 60 ...
+```
+
+The error the compiler emits when a performer check fails:
+
+```
+An actor may only perform its own actions.
+  `file return` is performed by `Charity`, not by `Commissioner`.
+```
+
+See [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md) for
+the full treatment including duplex actions, parameterised `EXACTLY`-applied
+actions, and procurement / principal–agent chains.
+
+### Flat-union style (also valid)
+
+The charity example below uses flat-union actions (`DECLARE Action IS ONE OF …`).
+This style carries no actor field, so no performer check fires — it is the
+right choice when every action variant belongs to exactly one actor class and
+you do not need mixed-actor event driving.
 
 ```l4
 § `Deontic Layer - Rules`

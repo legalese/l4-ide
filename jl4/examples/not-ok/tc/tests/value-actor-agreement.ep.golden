@@ -1,0 +1,28 @@
+-- Value-actor agreement (rung 3): a PARTY may only perform an action whose
+-- *performer* is itself. `eat`'s performer is Eater, so a Drinker may neither be
+-- obligated to eat (an obligation) nor do so (an event). Both are rejected with
+-- a domain message ("`eat` is performed by `Eater`, not by `Drinker`").
+--
+-- The positive lock-in is in ok/regulative-value-actor.l4. See
+-- doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md.
+
+DECLARE Actor IS ONE OF Eater, Drinker
+
+DECLARE Action HAS
+  actor IS AN Actor
+  verb  IS A STRING
+
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+
+-- (1) obligation: a Drinker may not be obligated to perform an Eater action
+GIVETH DEONTIC Actor Action
+badObligation MEANS PARTY Drinker MUST eat WITHIN 30
+
+-- (2) event: a Drinker may not DO an Eater action (this is what makes
+-- cross-actor *driving* actor-correct)
+GIVETH DEONTIC Actor Action
+contract MEANS PARTY Eater MUST eat WITHIN 30
+#TRACE contract AT 0 WITH
+  PARTY 5
+DOES Drinker AT eat 

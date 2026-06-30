@@ -2,6 +2,8 @@
 
 Regulative keywords express legal obligations, permissions, prohibitions, and their consequences. They form the core of L4's contract and regulation modeling.
 
+> **See also:** [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md) — how L4 decides _who may perform which action_ (the performer/agreement rule, duplex actions, `EXACTLY`-applied parameterised actions, and higher-order procurement), with worked ✅/❌ examples.
+
 ## Overview
 
 ### Deontic Modalities
