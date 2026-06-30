@@ -300,8 +300,25 @@ An actor may only perform its own actions.
 > carries no actor field, so the performer rule does not apply to it — existing flat-union
 > contracts are unaffected.
 
-For a full treatment of the performer rule, duplex actions, parameterised actions, and
-procurement, see
+### Who may perform: the simple cases
+
+This is the **simple, common case** — a *single-actor* action whose performer is
+**pinned** (`eat` belongs to `Eater`, so only an Eater may be obligated to eat):
+
+```l4
+eat MEANS Action OF Eater, "eat"        -- only Eater performs eat
+```
+
+The actor *type* you `DECLARE` is the **cast** — everyone who may take part. A
+one-line `DECLARE Actor IS ONE OF Eater, Drinker` says exactly who the players
+are; a party outside that type is a plain type error.
+
+The **richer cases live in the advanced course**: actions *any* actor can
+perform and **duplex** actions (one type, both directions) in
+[Module A2](../advanced/module-a2-cross-cutting.md), and **procurement** — "X
+undertakes to procure that Y performs an action" — in
+[Module A3](../advanced/module-a3-contracts.md). The complete reference, with
+every ✅/❌ case (one / some / any actor), is
 [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md).
 
 ---
