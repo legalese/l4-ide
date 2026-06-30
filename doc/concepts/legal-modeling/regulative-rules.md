@@ -80,6 +80,8 @@ An event is a triple:
 - **action** — what they did (matched against the contract's action shape — see [Conditional obligations with PROVIDED](#conditional-obligations-with-provided))
 - **timestamp** — a number on the same timeline as the start time and `WITHIN` deadlines
 
+> **The party must be the action's performer.** When actors are modelled as values and actions carry their actor(s), a `PARTY p DOES a` event — and a `PARTY p MUST a` obligation — is rejected at type-check time unless `p` is the action `a`'s _performer_. So `PARTY Drinker DOES eat` does not type-check if `eat`'s performer is the Eater. See [Actors, Actions, and Agreement](actors-and-actions.md) for the full rule (the subject-first canon, duplex actions, parameterised actions, and higher-order procurement).
+
 Events are consumed **in order**. As each event is examined, two pieces of internal state move:
 
 - the contract's **current time** advances to the event's timestamp

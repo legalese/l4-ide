@@ -7,7 +7,7 @@ what is rejected (❌).
 This page extends [Regulative Rules](regulative-rules.md). Every example here is
 checked against the current compiler. For the research background (thematic
 roles, STIT logic, agency law) see
-[`specs/todo/ACTOR-ACTIONS-THEORY.md`](../../../specs/todo/ACTOR-ACTIONS-THEORY.md).
+[`ACTOR-ACTIONS-THEORY.md`](ACTOR-ACTIONS-THEORY.md).
 
 ---
 
@@ -296,5 +296,5 @@ is a complement to, not a replacement for, the type-level
   `EXACTLY`
 - [`specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`](../../../specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)
   — the implementation spec
-- [`specs/todo/ACTOR-ACTIONS-THEORY.md`](../../../specs/todo/ACTOR-ACTIONS-THEORY.md)
+- [`ACTOR-ACTIONS-THEORY.md`](ACTOR-ACTIONS-THEORY.md)
   — theory & bibliography (thematic roles, STIT, agency law)

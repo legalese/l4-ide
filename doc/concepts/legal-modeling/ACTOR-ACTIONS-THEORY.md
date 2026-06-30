@@ -1,7 +1,7 @@
 # Actors, Actions, and Agency in L4 — Theory & Bibliography
 
 A research-facing companion to the implementation spec
-([DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md](DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)).
+([DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md](../../../specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)).
 It records the theoretical threads that surfaced while building value-level
 actor agreement, so a paper can be extracted later. Citations are collected as
 BibTeX in [`actor-actions.bib`](actor-actions.bib); keys are given inline as
@@ -176,7 +176,7 @@ This work sits inside L4's broader deontic layer (obligation/permission/
 prohibition with deadlines and residuation), whose lineage runs from von Wright
 [@vonWrightDeontic] through the reduction/dynamic-logic treatments
 [@AndersonReduction; @MeyerDynamic] that also ground the separate *bounded
-deontics* work ([BOUNDED-DEONTICS-SPEC.md](BOUNDED-DEONTICS-SPEC.md)). As a
+deontics* work ([BOUNDED-DEONTICS-SPEC.md](../../../specs/todo/BOUNDED-DEONTICS-SPEC.md)). As a
 programming language for contracts it is kin to the formal-contract-language
 tradition [@LeeElectronic; @AndersenCompositional; @HvitvedContracts;
 @PrisacariuSchneiderCL; @GovernatoriContracts], but distinguished by being a

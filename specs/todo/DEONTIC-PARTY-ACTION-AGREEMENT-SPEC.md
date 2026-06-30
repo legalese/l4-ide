@@ -19,7 +19,7 @@
 > `ok/regulative-value-actor`, `ok/regulative-actor-duplex`,
 > `not-ok/tc/value-actor-{agreement,duplex,procure}`. User-facing guide:
 > [`doc/concepts/legal-modeling/actors-and-actions.md`](../../doc/concepts/legal-modeling/actors-and-actions.md).
-> Theory & bibliography: [`ACTOR-ACTIONS-THEORY.md`](ACTOR-ACTIONS-THEORY.md).
+> Theory & bibliography: [`ACTOR-ACTIONS-THEORY.md`](../../doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md).
 **Origin:** synthesized from a multi-agent design workflow (5-subsystem map +
 LiquidHaskell/Dependent-Haskell/GADT/Idris/F\* lessons + 4 scored proposals, two
 of which were prototyped and verified against the golden suite).
