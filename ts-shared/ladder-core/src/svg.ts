@@ -36,8 +36,7 @@ function prim(p: ScenePrim, pal: Palette): string {
   switch (p.kind) {
     case 'box': {
       const { x, y, w, h } = p.rect
-      const foldable = p.role === 'placeholder'
-      const a = ` data-fnid="${p.id}"${foldable ? ` data-fold="${p.id}"` : ''} class="lad-box${foldable ? ' lad-foldable' : ''}"`
+      const a = ` data-fnid="${p.id}"${actAttr(p.act)} class="lad-box${p.act ? ' lad-clickable' : ''}"`
       if (p.state === 'eliminable')
         return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="#f6f7f8" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`
       const fill = p.role === 'placeholder' ? '#eef1f6' : '#ffffff'
@@ -48,13 +47,13 @@ function prim(p: ScenePrim, pal: Palette): string {
       const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
       const col = p.role === 'rail' ? pal.rail : strokeFor(p.state, pal)
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
-      return `<polyline class="lad-wire" points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
+      return `<polyline class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)} points="${d}" fill="none" stroke="${col}" stroke-width="1.5"${dash}${op}/>`
     }
     case 'curve': {
       const dash = p.state === 'eliminable' ? ' stroke-dasharray="5 4"' : ''
       const op = p.state === 'eliminable' ? ' opacity="0.9"' : ''
       const d = `M ${p.from.x.toFixed(1)},${p.from.y.toFixed(1)} C ${p.c1.x.toFixed(1)},${p.c1.y.toFixed(1)} ${p.c2.x.toFixed(1)},${p.c2.y.toFixed(1)} ${p.to.x.toFixed(1)},${p.to.y.toFixed(1)}`
-      return `<path class="lad-wire" d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`
+      return `<path class="lad-wire${p.act ? ' lad-clickable' : ''}"${actAttr(p.act)} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`
     }
     case 'glyph':
       if (p.role === 'open-contact')
@@ -65,16 +64,21 @@ function prim(p: ScenePrim, pal: Palette): string {
       return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`
     case 'text': {
       const size = p.size ?? 14
-      const inert = p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' || p.tag === 'connective'
-      const dy = inert ? 0 : 5 // vertical-center body text
+      const isCaret = p.tag === 'caret'
+      const inert = !isCaret && (p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' || p.tag === 'connective')
+      const dy = inert ? 0 : 5 // vertical-center body/caret text
       const italic = inert ? ' font-style="italic"' : ''
       const weight = p.tag === 'title' ? ' font-weight="700"' : ''
-      const fill = p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
-      const foldable = p.tag === 'heading' && p.id != null
-      const a = `${p.id != null ? ` data-fnid="${p.id}"` : ''}${foldable ? ` data-fold="${p.id}" class="lad-foldable"` : ''}`
+      const fill = isCaret ? '#7a7f85' : p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
+      const a = `${p.id != null ? ` data-fnid="${p.id}"` : ''}${actAttr(p.act)}${p.act ? ' class="lad-clickable"' : ''}`
       return `<text${a} x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`
     }
   }
+}
+
+/** Renders a ClickAct as a data-attr the host wires (data-value / data-fold). */
+function actAttr(a?: { t: 'value' | 'fold'; id: number }): string {
+  return a ? ` data-${a.t}="${a.id}"` : ''
 }
 
 export function sceneToSvg(scene: Scene, theme: Theme = 'screen'): string {

@@ -16,8 +16,13 @@
       .controls label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
       .grp { font-style: italic; color: #999; letter-spacing: .02em; }
       select { font-family: inherit; font-size: 13px; padding: 2px 4px; }
+      button { font-family: inherit; font-size: 13px; padding: 2px 10px; cursor: pointer;
+        border: 1px solid #ccc; border-radius: 5px; background: #fafafa; }
+      button:hover { background: #f0f0f0; }
       #ladder { padding: 26px 28px; overflow-x: auto; }
       #ladder svg { display: block; }
+      #ladder .lad-clickable { cursor: pointer; }
+      #ladder .lad-box.lad-clickable:hover { filter: brightness(0.97); }
       .hint { padding: 0 28px 22px; font-size: 12px; color: #999; font-style: italic; max-width: 80ch; }
     </style>
   </head>
@@ -25,15 +30,17 @@
     <header>
       <h1>Penal Code s 415, second limb — interactive ladder</h1>
       <p>
-        Boxed atoms carry current; unboxed italic prose is inert scaffolding. Click a heading
-        (or a folded box) to fold / expand — everything re-centres live.
+        Boxed atoms carry current; unboxed italic prose is inert scaffolding.
+        <b>Click a box</b> to cycle its value (unknown → true → false). A
+        <b>folded</b> box takes an <b>override</b> — assign the parent without naming which
+        child decides it. <b>Click a heading, a connector, or a ▸ caret</b> to fold / expand.
       </p>
     </header>
     <div class="controls">
       <fieldset>
-        <span class="grp">reading</span>
-        <label><input type="radio" name="reading" value="court" checked /> court</label>
-        <label><input type="radio" name="reading" value="applicants" /> applicants</label>
+        <span class="grp">values</span>
+        <button id="all-true" type="button">all true</button>
+        <button id="reset" type="button">reset</button>
       </fieldset>
       <fieldset>
         <span class="grp">connective</span>
@@ -52,8 +59,9 @@
     </div>
     <div id="ladder"></div>
     <div class="hint">
-      Switch to the applicants’ reading to ghost the “dishonest concealment” rung — surplusage /
-      dead code, drawn. Folding collapses a group to its verdict (the heading becomes the label).
+      Green = true, grey = unknown. Fold <i>deception</i>, then click the placeholder to assert it
+      true — the override stands in for whichever limb is satisfied. Click a fan connector to fold
+      the group it belongs to.
     </div>
     <script src="./app.js"></script>
   </body>

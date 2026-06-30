@@ -104,6 +104,15 @@ export type ConnectiveStyle = 'on-wire' | 'above-wire' | 'below-wire' | 'straddl
 
 export interface ViewSpec {
   readonly foldSet: ReadonlySet<NodeId>
+  /**
+   * Direct T/F/U valuation, keyed by node `id` (POSITIONAL). For a leaf it's the
+   * atom's value; for a GROUP it's an OVERRIDE / pin — the node is treated opaquely
+   * with this value, its children not consulted (DESIGN §19). Absent => derived
+   * from children (groups) or unknown (leaves).
+   */
+  readonly valuation: ReadonlyMap<NodeId, UBoolValue>
+  /** Manual render-state override (static demos / eliminable). Wins over the value-
+   *  derived state when set. */
   readonly states: ReadonlyMap<NodeId, State>
   readonly scale: Scale
   readonly orient: Orient
@@ -114,6 +123,7 @@ export interface ViewSpec {
 export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
   return {
     foldSet: partial.foldSet ?? new Set(),
+    valuation: partial.valuation ?? new Map(),
     states: partial.states ?? new Map(),
     scale: partial.scale ?? 'full',
     orient: partial.orient ?? 'LR',
@@ -135,6 +145,13 @@ export interface Rect {
   h: number
 }
 
+/** A click affordance the renderer turns into a data-attr; the host wires it.
+ *  'value' -> cycle the node's T/F/U; 'fold' -> toggle folding that node. */
+export interface ClickAct {
+  t: 'value' | 'fold'
+  id: NodeId
+}
+
 export type ScenePrim =
   | {
       kind: 'box'
@@ -143,11 +160,12 @@ export type ScenePrim =
       role: 'leaf' | 'placeholder'
       state: State
       folded?: boolean
+      act?: ClickAct
     }
-  | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State }
+  | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State; act?: ClickAct }
   /** cubic Bézier connector (DESIGN §17a) — the organic fan from a group's port to
    *  each rung, contrasting the rectilinear boxes. Horizontal tangents at both ends. */
-  | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State }
+  | { kind: 'curve'; from: Pt; c1: Pt; c2: Pt; to: Pt; role: 'conn'; state: State; act?: ClickAct }
   | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
   | {
       kind: 'text'
@@ -155,11 +173,12 @@ export type ScenePrim =
       text: string
       anchor: 'start' | 'middle'
       state: State
-      tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective'
+      tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective' | 'caret'
       size?: number
       /** node id this text belongs to (heading -> its group; label -> its box) —
        *  used by renderers for click targets and FLIP matching. */
       id?: NodeId
+      act?: ClickAct
     }
 
 export interface Scene {

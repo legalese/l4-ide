@@ -85,10 +85,12 @@ const sceneFolded = layout(
 
 // ---- compose the two readings into one diff figure ----
 function shift(prims: ScenePrim[], dx: number, dy: number): ScenePrim[] {
+  const mv = (pt: { x: number; y: number }) => ({ x: pt.x + dx, y: pt.y + dy })
   return prims.map((p) => {
     if (p.kind === 'box') return { ...p, rect: { ...p.rect, x: p.rect.x + dx, y: p.rect.y + dy } }
-    if (p.kind === 'wire') return { ...p, path: p.path.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) }
-    return { ...p, at: { x: p.at.x + dx, y: p.at.y + dy } }
+    if (p.kind === 'wire') return { ...p, path: p.path.map(mv) }
+    if (p.kind === 'curve') return { ...p, from: mv(p.from), c1: mv(p.c1), c2: mv(p.c2), to: mv(p.to) }
+    return { ...p, at: mv(p.at) }
   })
 }
 

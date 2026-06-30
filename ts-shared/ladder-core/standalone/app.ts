@@ -1,10 +1,11 @@
 /**
- * Standalone interactive ladder (DESIGN target C). Self-contained page: builds the
- * s415 second-limb tree, renders it through the PURE core (layout -> Scene IR ->
- * SVG), and drives fold/expand + reading + connectiveStyle live. Every interaction
- * just mutates a ViewSpec and re-runs the core — proving live re-centring and the
- * ViewSpec round-trip — with a FLIP animation so boxes glide to their new homes.
- *
+ * Standalone interactive ladder (DESIGN target C, §19). Builds the s415 second-limb
+ * tree and drives it live through the PURE core:
+ *   • click a BOX  -> cycle its value  U → T → F → U  (a folded placeholder cycles
+ *     the parent's OVERRIDE / pin — assign the parent without naming a witness child)
+ *   • click a HEADING, a CONNECTOR, or a ▸ CARET -> fold / expand that group
+ *   • connective-style + fold checkboxes + reset in the control bar
+ * Every interaction just mutates a ViewSpec and re-runs layout (FLIP animates the move).
  * Bundled to dist/app.js by build.sh (esbuild). No framework, no workspace deps.
  */
 import { layout, sceneToSvg, estimateMetrics, defaultViewSpec } from '../src/index.js'
@@ -15,8 +16,8 @@ import type {
   Inert,
   And,
   Or,
-  State,
   NodeId,
+  UBoolValue,
   ConnectiveStyle,
   Scene,
 } from '../src/index.js'
@@ -49,14 +50,11 @@ function leafIds(e: IRExpr, acc: NodeId[] = []): NodeId[] {
   else if (e.$type !== 'InertE') acc.push(e.id)
   return acc
 }
-const allLive = new Map<NodeId, State>(leafIds(second).map((id) => [id, 'live']))
-const courtStates = new Map(allLive)
-const applicantStates = new Map(allLive)
-applicantStates.set(concealment.id, 'eliminable')
+const allLeaves = leafIds(second)
 
 /* ------------------------------------------------------------------------ state */
 const foldSet = new Set<NodeId>()
-let reading: 'court' | 'applicants' = 'court'
+const valuation = new Map<NodeId, UBoolValue>()
 let connective: ConnectiveStyle = 'straddle-wire'
 const tm = estimateMetrics
 let lastScene: Scene | null = null
@@ -73,11 +71,7 @@ function flipIndex(scene: Scene): Map<string, Pos> {
 }
 
 function render(animate: boolean) {
-  const vs = defaultViewSpec({
-    states: reading === 'court' ? courtStates : applicantStates,
-    foldSet,
-    connectiveStyle: connective,
-  })
+  const vs = defaultViewSpec({ valuation, foldSet, connectiveStyle: connective })
   const scene = layout(fn, vs, tm)
   const old = lastScene && animate ? flipIndex(lastScene) : null
   container.innerHTML = sceneToSvg(scene)
@@ -85,7 +79,6 @@ function render(animate: boolean) {
   svg.style.maxWidth = '100%'
   svg.style.height = 'auto'
 
-  // FLIP: invert each surviving node by its user-space delta, then play to 0.
   if (old) {
     const next = flipIndex(scene)
     const play: SVGElement[] = []
@@ -125,20 +118,33 @@ function render(animate: boolean) {
   }
   lastScene = scene
 
-  // click a heading (to fold) or a folded placeholder (to expand)
-  svg.querySelectorAll<SVGElement>('[data-fold]').forEach((el) => {
-    el.style.cursor = 'pointer'
+  svg.querySelectorAll<SVGElement>('[data-value]').forEach((el) =>
+    el.addEventListener('click', () => cycleValue(Number(el.getAttribute('data-value'))))
+  )
+  svg.querySelectorAll<SVGElement>('[data-fold]').forEach((el) =>
     el.addEventListener('click', () => toggleFold(Number(el.getAttribute('data-fold'))))
-  })
+  )
   syncControls()
 }
 
+const NEXT: Record<UBoolValue, UBoolValue> = { UnknownV: 'TrueV', TrueV: 'FalseV', FalseV: 'UnknownV' }
+function cycleValue(id: NodeId) {
+  const cur = valuation.get(id) ?? 'UnknownV'
+  const next = NEXT[cur]
+  if (next === 'UnknownV') valuation.delete(id)
+  else valuation.set(id, next)
+  render(true)
+}
+function toggleFold(id: NodeId) {
+  if (foldSet.has(id)) foldSet.delete(id)
+  else foldSet.add(id)
+  render(true)
+}
 function setFold(id: NodeId, on: boolean) {
   if (on) foldSet.add(id)
   else foldSet.delete(id)
   render(true)
 }
-const toggleFold = (id: NodeId) => setFold(id, !foldSet.has(id))
 
 function syncControls() {
   ;(document.getElementById('fold-deception') as HTMLInputElement).checked = foldSet.has(deception.id)
@@ -146,14 +152,6 @@ function syncControls() {
 }
 
 /* --------------------------------------------------------------------- controls */
-document.querySelectorAll<HTMLInputElement>('input[name=reading]').forEach((r) =>
-  r.addEventListener('change', () => {
-    if (r.checked) {
-      reading = r.value as 'court' | 'applicants'
-      render(true)
-    }
-  })
-)
 ;(document.getElementById('connective') as HTMLSelectElement).addEventListener('change', (e) => {
   connective = (e.target as HTMLSelectElement).value as ConnectiveStyle
   render(true)
@@ -164,5 +162,13 @@ document.querySelectorAll<HTMLInputElement>('input[name=reading]').forEach((r) =
 ;(document.getElementById('fold-harm') as HTMLInputElement).addEventListener('change', (e) =>
   setFold(harm.id, (e.target as HTMLInputElement).checked)
 )
+document.getElementById('all-true')!.addEventListener('click', () => {
+  allLeaves.forEach((id) => valuation.set(id, 'TrueV'))
+  render(true)
+})
+document.getElementById('reset')!.addEventListener('click', () => {
+  valuation.clear()
+  render(true)
+})
 
 render(false)

@@ -23,6 +23,7 @@ import type {
   And,
   Or,
   ConnectiveStyle,
+  UBoolValue,
 } from './types.js'
 
 const PAD_X = 14
@@ -45,10 +46,41 @@ interface Measured {
 interface Ctx {
   vs: ViewSpec
   tm: TextMetrics
+  values: Map<NodeId, UBoolValue> // evaluated T/F/U per node id
 }
 
-const stateOf = (vs: ViewSpec, id: NodeId): State => vs.states.get(id) ?? 'inert'
 const isOperative = (e: IRExpr): boolean => e.$type !== 'InertE'
+
+const valueToState = (v: UBoolValue): State =>
+  v === 'TrueV' ? 'live' : v === 'FalseV' ? 'dead' : 'inert'
+
+/** Render state for a node: manual override (vs.states) wins, else derived from the
+ *  evaluated T/F/U value (DESIGN §19). */
+function renderState(ctx: Ctx, id: NodeId): State {
+  return ctx.vs.states.get(id) ?? valueToState(ctx.values.get(id) ?? 'UnknownV')
+}
+
+/** Three-valued evaluation with per-node OVERRIDE (pins): a node listed in `val`
+ *  takes that value opaquely (children not consulted); otherwise groups derive from
+ *  operative children and leaves are unknown / constant. Fills `out` for every id. */
+function nodeValue(e: IRExpr, val: ReadonlyMap<NodeId, UBoolValue>, out: Map<NodeId, UBoolValue>): UBoolValue {
+  let v: UBoolValue
+  if (e.$type === 'And' || e.$type === 'Or') {
+    const kids = e.args.map((a) => nodeValue(a, val, out)).filter((_, i) => isOperative(e.args[i]))
+    if (val.has(e.id)) v = val.get(e.id)!
+    else if (e.$type === 'And') v = kids.some((k) => k === 'FalseV') ? 'FalseV' : kids.every((k) => k === 'TrueV') ? 'TrueV' : 'UnknownV'
+    else v = kids.some((k) => k === 'TrueV') ? 'TrueV' : kids.every((k) => k === 'FalseV') ? 'FalseV' : 'UnknownV'
+  } else if (e.$type === 'Not') {
+    const c = nodeValue(e.negand, val, out)
+    v = val.has(e.id) ? val.get(e.id)! : c === 'TrueV' ? 'FalseV' : c === 'FalseV' ? 'TrueV' : 'UnknownV'
+  } else if (e.$type === 'InertE') {
+    v = 'TrueV' // inert conducts (identity); nominal, excluded from derivation
+  } else {
+    v = val.has(e.id) ? val.get(e.id)! : e.$type === 'TrueE' ? 'TrueV' : e.$type === 'FalseE' ? 'FalseV' : 'UnknownV'
+  }
+  out.set(e.id, v)
+  return v
+}
 
 /** Leading run of inert text = the group's Pre / heading. */
 function leadingInert(args: readonly IRExpr[]): string | undefined {
@@ -65,11 +97,13 @@ function leadingInert(args: readonly IRExpr[]): string | undefined {
  *  a subtree?" (DESIGN §16.1). */
 function foldLabel(e: And | Or): string {
   const explicit = e.label ?? leadingInert(e.args)
-  if (explicit) return `▸ ${explicit}`
+  if (explicit) return explicit
   const n = e.args.filter(isOperative).length
-  return e.$type === 'And' ? `▸ ALL of ${n}` : `▸ ANY of ${n}`
+  return e.$type === 'And' ? `ALL of ${n}` : `ANY of ${n}`
 }
 
+/** A box for a leaf (click cycles its value) or a folded placeholder (click cycles
+ *  the parent's OVERRIDE value; a ▸ caret expands it). DESIGN §19. */
 function leafBox(
   id: NodeId,
   label: string,
@@ -77,18 +111,21 @@ function leafBox(
   role: 'leaf' | 'placeholder',
   tm: TextMetrics
 ): Measured {
-  const w = tm.width(label, FONT) + 2 * PAD_X
+  const caretW = role === 'placeholder' ? tm.width('▸', FONT) + 8 : 0
+  const w = caretW + tm.width(label, FONT) + 2 * PAD_X
   const h = tm.lineHeight(FONT) + 2 * PAD_Y
   return {
     w,
     h,
     state,
     emit(ox, oy, out) {
-      out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state })
-      out.push({ kind: 'text', at: { x: ox + w / 2, y: oy + h / 2 }, text: label, anchor: 'middle', state, id })
+      const cy = oy + h / 2
+      out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state, act: { t: 'value', id } })
+      if (role === 'placeholder')
+        out.push({ kind: 'text', at: { x: ox + PAD_X, y: cy }, text: '▸', anchor: 'middle', state, tag: 'caret', act: { t: 'fold', id } })
+      out.push({ kind: 'text', at: { x: ox + caretW + (w - caretW) / 2, y: cy }, text: label, anchor: 'middle', state, id })
       if (state === 'eliminable')
         out.push({ kind: 'text', at: { x: ox + w / 2, y: oy - 9 }, text: 'otiose — always open', anchor: 'middle', state, tag: 'otiose', size: 11 })
-      const cy = oy + h / 2
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
     },
   }
@@ -213,11 +250,11 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
   }
 
   if (e.$type !== 'And' && e.$type !== 'Or') {
-    return leafBox(e.id, e.label, stateOf(vs, e.id), 'leaf', tm)
+    return leafBox(e.id, e.label, renderState(ctx, e.id), 'leaf', tm)
   }
 
   if (vs.foldSet.has(e.id)) {
-    return leafBox(e.id, foldLabel(e), rollup(e, vs), 'placeholder', tm)
+    return leafBox(e.id, foldLabel(e), renderState(ctx, e.id), 'placeholder', tm)
   }
 
   return e.$type === 'And' ? measureAnd(e, ctx) : measureOr(e, ctx)
@@ -242,7 +279,7 @@ function measureAnd(e: And, ctx: Ctx): Measured {
         return p
       })
       for (let i = 0; i < ports.length - 1; i++)
-        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert' })
+        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: { t: 'fold', id: e.id } })
       return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
     },
   }
@@ -309,31 +346,32 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         }
         const cx = ox + BUS_PAD + (colW - m.w) / 2 // <-- centered horizontally
         const p = m.emit(cx, y, out)
-        // organic Bézier fan: group port -> rung port, and back (DESIGN §17a)
+        // organic Bézier fan: group port -> rung port, and back (DESIGN §17a).
+        // Clicking a fan curve folds this OR (DESIGN §19).
+        const fold = { t: 'fold', id: e.id } as const
         const inCurve = hCurve(groupIn, p.inPort, m.state)
+        inCurve.act = fold
         out.push(inCurve)
-        out.push(hCurve(p.outPort, groupOut, m.state))
+        const outCurve = hCurve(p.outPort, groupOut, m.state)
+        outCurve.act = fold
+        out.push(outCurve)
         if (m.state === 'eliminable' || m.state === 'dead') {
           const mid = cubicMid(inCurve)
           out.push({ kind: 'glyph', at: mid, role: 'open-contact' }) // current can't pass
         }
         y += m.h
       })
-      if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5, id: e.id })
+      if (head) out.push({ kind: 'text', at: { x: ox + totalW / 2, y: oy + band / 2 + 2 }, text: head, anchor: 'middle', state: 'inert', tag: 'heading', size: 12.5, id: e.id, act: { t: 'fold', id: e.id } })
       return { inPort: groupIn, outPort: groupOut }
     },
   }
 }
 
-function rollup(e: And | Or, vs: ViewSpec): State {
-  const kid = e.args.filter(isOperative).map((a) => ('id' in a ? stateOf(vs, a.id) : 'inert'))
-  if (kid.some((s) => s === 'eliminable')) return 'eliminable'
-  return 'inert'
-}
-
 export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
   const prims: ScenePrim[] = []
-  const m = measure(fn.body, { vs, tm })
+  const values = new Map<NodeId, UBoolValue>()
+  nodeValue(fn.body, vs.valuation, values)
+  const m = measure(fn.body, { vs, tm, values })
   const ox = MARGIN + LEAD
   const oy = MARGIN
   const { inPort, outPort } = m.emit(ox, oy, prims)

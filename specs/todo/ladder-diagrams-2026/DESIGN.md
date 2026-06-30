@@ -609,6 +609,42 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
 
 ---
 
+## 19. Valuation, override & the gesture split
+
+**Valuation.** `ViewSpec.valuation: Map<NodeId, UBoolValue>` — a *positional* (by node
+id) T/F/U. For a **leaf** it's the atom's value; for a **group** it's an **override /
+pin**: the node is treated opaquely with that value and **its children are not
+consulted**. Absent ⇒ groups derive from operative children (`nodeValue`, three-valued),
+leaves are unknown / constant. Box render state = `vs.states.get(id)` (manual override,
+e.g. eliminable) ?? `valueToState(value)`.
+
+**Override, without a witness.** Pinning a group lets you assert *"deception is made
+out"* without committing to which child decides it — the parent is more determined than
+its children. (Stance: **override** — the assertion wins; conflicting child values are
+subsumed. The consistency-checking alternative is the essay's *contradiction-detector*,
+deferred to a later layer.)
+
+**The gesture split.** Every drawable carries an optional `ClickAct` the renderer turns
+into a `data-value` / `data-fold` attribute (host-wired):
+
+- **box** (leaf or folded placeholder) → `value`: click cycles U → T → F → U. A folded
+  placeholder cycles the *parent's* override.
+- **heading**, **fan connector**, **▸ caret** → `fold`: click folds / expands that group.
+  (Clicking a connector folds the group it belongs to; the caret expands a placeholder.)
+
+This makes "value the parent" need no new concept — it's just "click a box," because a
+folded subtree *is* a box. Proven live in `standalone/` and the `s415-interactive`
+snapshot: `harm` folded and pinned true renders a green `▸ ANY of 4` while its children
+stay unknown.
+
+**Next (P1): current flow.** The energization pass (DESIGN discussion): propagate
+current from the source — closed paths drawn **thick + dark**, open ones thin + light,
+the FALSE break-glyph at the stop — so cycling values visibly closes the circuit, and
+satisfied-OR siblings ghost as don't-cares. Binary closed/open (UNKNOWN = open) per the
+box-model spec.
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.
