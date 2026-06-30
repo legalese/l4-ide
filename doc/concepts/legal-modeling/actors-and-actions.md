@@ -11,40 +11,36 @@ roles, STIT logic, agency law) see
 
 ---
 
-## Two encodings — and which to use
+## Use value-actor (one style, by design)
 
-There are two ways to attach an actor to an action. **Value-actor is the
-recommended default; reach for type-indexed only in the unusual cases noted
-below.**
+There are, historically, two ways to attach an actor to an action. **Use
+value-actor.** We single out one style not because the other is unsupported — it
+works fine, and the check behind it is still live — but for a human reason: a
+language is kinder when there is *one obvious way*. A rule author shouldn't have
+to carry two competing forms in their head, and someone fluent in one style
+shouldn't have to come to grips with the other just to read a colleague's
+contract. So the older **type-indexed** style is **deprecated as a surface — do
+not use it in new models**; it is kept *operational* only so existing contracts
+keep type-checking.
 
-- **Value-actor (preferred)** — the actor is a *value* the action carries
+- **Value-actor — use this.** The actor is a *value* the action carries
   (`DECLARE Actor IS ONE OF Eater, Drinker`; `eat MEANS Action OF Eater, …`).
-  This page is about this style. It is the more expressive one: it drives events
-  natively and is the *only* encoding that supports duplex actions, parameterised
-  actions, and higher-order procurement. Its actor check is value-level (see
-  [boundaries](#7-what-is-not-checked-boundaries)).
+  This page is about this style. It is also the more general encoding: it drives
+  events natively and is the *only* one that supports duplex actions,
+  parameterised actions, and higher-order procurement. Its actor check is
+  value-level (see [boundaries](#7-what-is-not-checked-boundaries)).
 
-- **Type-indexed (for unusual scenarios)** — the actor is a phantom *type* index
-  (`DECLARE Action who …`; `eat : Action Eater`; contract `DEONTIC Eater (Action
-  Eater)`), and agreement is an ordinary type equality. Its one advantage is that
-  the check is *always* static — it holds across module boundaries and for
-  actions whose actor would otherwise be computed, because the actor lives in the
-  type. Reach for it only when you specifically need that guarantee, or when an
-  action has **no runtime actor data** (a purely compile-time distinction). It
-  cannot express duplex, parameterised, or procured actions.
+- **Type-indexed — deprecated, don't use.** The actor is a phantom *type* index
+  (`DECLARE Action who …`; `eat : Action Eater`; `DEONTIC Eater (Action Eater)`),
+  with agreement as a type equality. The system still accepts it — and it has a
+  niche strength, the check being *always* static, even across modules — but it
+  is a *second form to learn*, more verbose, and cannot express duplex,
+  parameterised, or procured actions. New models should not use it.
 
-| | **value-actor** (preferred) | **type-indexed** (unusual) |
-|---|---|---|
-| Actor lives in | a record *value* | the *type* (phantom index) |
-| Agreement check | value-level | type-level (HM) |
-| Always static / cross-module | no (skips computed & cross-module) | **yes** |
-| Duplex / parameterised / procurement | **yes** | no |
-| Event-driving across actors | **yes** | no |
-| Ergonomics | one `DECLARE`, `PARTY Eater` | a type + a value per actor |
-
-**If you are not sure, use value-actor.** The two are not desugarings of each
-other: value-actor is the more general encoding, and type-indexed is the
-narrower, stronger-guarantee special case kept for the situations that need it.
+Reach for **value-actor** every time. The two are not desugarings of each
+other — value-actor is the more general encoding, type-indexed the narrower
+special case kept alive operationally — so there is, deliberately, one way to do
+this.
 
 ---
 
@@ -135,16 +131,36 @@ pingpong MEANS
 
 ---
 
-## 3. The performer canon: subject-first, positional, duplex
+## 3. One actor or several? (the performer canon)
 
-When an action has **one** actor field, the performer is unambiguous. When it
-has **several** — a `SendMessage` with both a sender and a recipient — the
-performer is, **by canon, the first actor in positional order**. This mirrors
-English Subject–Verb–Object order: `PARTY Alice MUST send Alice Bob` reads
-"Alice sends Bob".
+An action may name **one** actor or **several** — and this is a modelling choice
+you make when you `DECLARE` it.
 
-This is deliberately positional, which makes an action **duplex**: one type
-carries both directions, and whoever sits in the first slot is the performer.
+- **One-actor action** — a single actor field (e.g. `eat`, below: `actor IS AN
+  Actor`). That actor is the performer; the obligation falls on them, full stop.
+
+  ```l4
+  DECLARE Action HAS actor IS AN Actor, verb IS A STRING
+  eat MEANS Action OF Eater, "eat"        -- Eater is the (only) performer
+  ```
+
+- **Multi-actor action** — several actor fields (e.g. `SendMessage`, with a
+  `from` *and* a `to`). Exactly one of them is the **performer** — by canon, the
+  **first actor in positional order** — and that is the only one the obligation
+  binds. The other actor fields (recipient, object, …) are **participants**:
+  recorded in the action as data, but *not themselves obligated*.
+
+  ```l4
+  DECLARE SendMessage HAS
+    from IS AN Actor          -- first actor field = the performer
+    to   IS AN Actor          -- a participant: recorded, but not obligated
+    body IS A STRING
+  ```
+
+The first-actor rule mirrors English Subject–Verb–Object order: `PARTY Alice MUST
+send Alice Bob` reads "Alice sends Bob". Being positional, it makes a multi-actor
+action **duplex**: one type carries both directions, and whoever sits in the
+first slot is the performer.
 
 ```l4
 DECLARE Actor IS ONE OF Alice, Bob
@@ -206,7 +222,16 @@ p2 MEANS PARTY Alice MUST prepositional WITHIN 10   -- ✓
 
 ---
 
-## 5. Pinned vs. unpinned (parameterised) actions
+## 5. Who may perform: one actor, some actors, any actor
+
+Three gradations, all expressed through the actor **type** and how an action
+names its performer:
+
+- **one specific actor** — *pin* it in the action (see *Pinned* below);
+- **any actor** — leave the performer *open*, a parameter any member of the
+  actor type can fill (see *Unpinned* below);
+- **some actors** — declare an actor **type** that names exactly that cast (see
+  *A named cast* below).
 
 An action can **pin** specific actors, or leave them open and take them as
 arguments (overloading / "duplex by parameter").
@@ -251,6 +276,24 @@ action slot is a pattern):
 
 ```l4
 oops MEANS PARTY Alice MUST send Alice Bob WITHIN 10   -- ERROR: use EXACTLY
+```
+
+**A named cast (some actors).** To allow a *specific subset* of actors and no
+others, declare an actor **type** that lists exactly them, and use it as the
+DEONTIC's actor parameter. There is no subtyping — you choose the cast when you
+declare the type — so a non-member is a plain type error.
+
+```l4
+DECLARE Tenant IS ONE OF Renter, Landlord       -- the cast: these two, nobody else
+DECLARE TAction HAS actor IS A Tenant, verb IS A STRING
+GIVEN who IS A Tenant
+GIVETH A TAction
+negotiate who MEANS TAction OF who, "negotiate"
+
+GIVETH DEONTIC Tenant TAction
+okR MEANS PARTY Renter   MUST EXACTLY negotiate Renter   WITHIN 5   -- ✓
+okL MEANS PARTY Landlord MUST EXACTLY negotiate Landlord WITHIN 5   -- ✓
+-- PARTY Court … is a type error: Court is not a Tenant.
 ```
 
 ---
