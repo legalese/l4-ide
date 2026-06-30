@@ -237,9 +237,9 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
         h,
         state: 'inert',
         emit(ox, oy, out) {
+          // the spine wire under the span is drawn by measureAnd (flow-styled, §20)
           const cy = oy + h / 2
           const mid = ox + w / 2
-          out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
           out.push({ kind: 'text', at: { x: mid, y: cy - CONNECTIVE_GAP - C_DESCENT }, text: lines[0], anchor: 'middle', state: 'inert', tag: 'connective' })
           out.push({ kind: 'text', at: { x: mid, y: cy + CONNECTIVE_GAP + C_ASCENT }, text: lines[1], anchor: 'middle', state: 'inert', tag: 'connective' })
           return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
@@ -261,8 +261,7 @@ function inertInline(text: string, tm: TextMetrics, style: ConnectiveStyle): Mea
       if (style === 'on-wire') {
         out.push({ kind: 'text', at: { x: mid, y: cy }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       } else {
-        // unbroken wire through the span (inert always conducts)
-        out.push({ kind: 'wire', path: [{ x: ox, y: cy }, { x: ox + w, y: cy }], role: 'rung', state: 'inert' })
+        // spine wire under the span is drawn by measureAnd (flow-styled, §20)
         const baseline = style === 'above-wire' ? cy - CONNECTIVE_GAP - C_DESCENT : cy + CONNECTIVE_GAP + C_ASCENT
         out.push({ kind: 'text', at: { x: mid, y: baseline }, text, anchor: 'middle', state: 'inert', tag: 'connective' })
       }
@@ -331,11 +330,23 @@ function measureAnd(e: And, ctx: Ctx): Measured {
         x += k.w + GAP_SERIES
         return p
       })
+      const fold = { t: 'fold', id: e.id } as const
+      const tc = (n: IRExpr | undefined) => (n ? trueConducts(ctx.values, n) : false)
+      // connectors between consecutive children
       for (let i = 0; i < ports.length - 1; i++) {
         const leader = !!ctx.em?.get(e.args[i].id)?.outE
-        const local = trueConducts(ctx.values, e.args[i]) || trueConducts(ctx.values, e.args[i + 1])
-        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: { t: 'fold', id: e.id }, flow: flowFor(ctx.em, leader, local) })
+        const local = tc(e.args[i]) || tc(e.args[i + 1])
+        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local) })
       }
+      // spine UNDER each inert connective (a pass-through) — same current as its
+      // surroundings, so it matches (DESIGN §20). Skipped for 'on-wire' (a real gap).
+      if (ctx.vs.connectiveStyle !== 'on-wire')
+        e.args.forEach((a, i) => {
+          if (a.$type !== 'InertE') return
+          const leader = !!ctx.em?.get(a.id)?.inE
+          const local = tc(e.args[i - 1]) || tc(e.args[i + 1])
+          out.push({ kind: 'wire', path: [ports[i].inPort, ports[i].outPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local) })
+        })
       return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
     },
   }
