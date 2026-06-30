@@ -119,6 +119,7 @@ mkInitialCheckState substitution =
     , nlgMap       = IV.empty
     , scopeMap     = IV.empty
     , descMap      = IV.empty
+    , constBodies  = Map.empty
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -525,6 +526,15 @@ inferDecide (MkDecide ann _tysig appForm expr) = do
             <*> traverse resolvedType dHead.rappForm
             <*> pure rexpr
             >>= nlgDecide
+        -- Capture the body of top-level *nullary* constants (e.g. action
+        -- constants like `eat MEANS Action OF Eater, "eat"`) so the rung-3
+        -- value-level actor-agreement check can recover an action's actor
+        -- field from its definition. Functions (appform with arguments) are
+        -- not record values, so we skip them.
+        case decide of
+          MkDecide _ _ (MkAppForm _ hd [] _) rbody ->
+            modifying' #constBodies (Map.insert (getUnique hd) rbody)
+          _ -> pure ()
         pure (decide, [dHead.name])
 
 -- | We allow the following cases:
@@ -1122,6 +1132,7 @@ checkDeonton ann party action due hence lest partyT actionT = do
   partyR <- checkExpr ExpectRegulativePartyContext party partyT
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
+  checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
@@ -1165,6 +1176,104 @@ checkPartyActionAgreement partyT actionT = do
     -- exactly one type argument: that argument is the action's actor index
     TyApp _ _ [idx] -> expect ExpectPartyActionAgreementContext partyT' idx
     _               -> pure ()
+
+-- | Rung 3, value-actor encoding: when actors are ordinary /values/ (e.g.
+-- @DECLARE Actor IS ONE OF Eater, Drinker@), a @PARTY p MUST a@ obligation (and
+-- a @PARTY p DOES a@ event) must have the party @p@ equal to the action @a@'s
+-- /performer/ — so @PARTY Drinker MUST eat@ is rejected.
+--
+-- This is a /value/ comparison (both actors are constructors of the same party
+-- type), not a type equality, so it complements — rather than duplicates —
+-- 'checkPartyActionAgreement' (which fires only for type-indexed actions). It
+-- only bites when both the party and the performer are statically-known
+-- constructors; a computed action is left to runtime, so existing contracts are
+-- unaffected.
+checkRegulativeActorAgreement :: Type' Resolved -> Expr Resolved -> Maybe (Expr Resolved) -> Check ()
+checkRegulativeActorAgreement partyT partyR mActionExpr =
+  case (exprHeadConstructor partyR, mActionExpr) of
+    (Just party, Just actionExpr@(App _ actionName _)) -> do
+      mPerformer <- subjectOfActionExpr partyT actionExpr
+      forM_ mPerformer \ performer ->
+        unless (getUnique party == getUnique performer) $
+          addError (RegulativeActorMismatch party performer actionName)
+    _ -> pure ()
+
+-- | The /performer/ of an action expression, by the SVO subject-first canon:
+-- the first actor-typed thing in positional order. One rule covers both ways an
+-- action carries its actors —
+--
+--   * a /pinned/ constant — @eat MEANS Action OF Eater, …@ or
+--     @aliceToBob MEANS SendMessage OF Alice, Bob, …@ — whose actors live in
+--     the record body (resolve the name, recurse into the body);
+--   * an /unpinned/ (parameterised) action applied at the use site —
+--     @EXACTLY send Alice Bob@ — whose actors are supplied as arguments.
+--
+-- In both cases the performer is the first argument whose value is a
+-- constructor of the party type, so the one canon governs pinning AND
+-- overloading: the duplex @send@ is performed by whichever actor sits in the
+-- first slot, which is exactly what lets one action type carry both directions.
+subjectOfActionExpr :: Type' Resolved -> Expr Resolved -> Check (Maybe Resolved)
+subjectOfActionExpr partyT = go (0 :: Int)
+  where
+    go depth e
+      | depth > 8 = pure Nothing            -- guard against pathological alias chains
+      | otherwise = case e of
+          App _ _ args@(_ : _) -> subjectField partyT args     -- applied / positional record
+          AppNamed _ _ nes _   -> subjectField partyT [ a | MkNamedExpr _ _ a <- nes ]
+          App _ f []           ->                              -- a bare name: resolve its body
+            use #constBodies >>= \ bodies ->
+              maybe (pure Nothing) (go (depth + 1)) (Map.lookup (getUnique f) bodies)
+          _                    -> pure Nothing
+
+-- | Recover an action /expression/ from a regulative action pattern: a bare
+-- pinned action name (already turned into a value reference by the pattern
+-- checker) or the @EXACTLY f a b@ form used for an applied action. A pattern
+-- that binds variables is left to runtime.
+actionExprOfPattern :: Pattern Resolved -> Maybe (Expr Resolved)
+actionExprOfPattern (PatExpr _ e)     = Just e
+actionExprOfPattern (PatApp ann n []) = Just (App ann n [])
+actionExprOfPattern _                 = Nothing
+
+-- | The action's /subject/ (the agent who performs it) is, by canon, the
+-- __first__ field of its record whose value is a constructor of the party type
+-- — "subject-first", mirroring English SVO word order, and matching the way a
+-- clause reads: @PARTY Alice MUST send Alice Bob@ ≈ "Alice sends [to] Bob".
+--
+-- This is deliberately positional. An action such as
+-- @SendMessage WITH from IS ..., to IS ...@ is /duplex/: the very same type
+-- carries both directions, and which actor is the subject is decided by
+-- position, not by a fixed agent field. So @PARTY Alice MUST send(Alice, Bob)@
+-- is allowed while @PARTY Bob MUST send(Alice, Bob)@ is rejected, and swapping
+-- the two actors swaps the permission. The order-dependence is therefore not a
+-- bug but the governing convention — a footgun elevated to canon, in the long
+-- tradition of legal drafting conventions. Authors who want the other actor to
+-- bear the obligation construct the action with that actor in the subject slot.
+subjectField :: Type' Resolved -> [Expr Resolved] -> Check (Maybe Resolved)
+subjectField _      []       = pure Nothing
+subjectField partyT (e : es) =
+  case exprHeadConstructor e of
+    Just ctor -> do
+      isParty <- constructorHasType partyT ctor
+      if isParty then pure (Just ctor) else subjectField partyT es
+    Nothing -> subjectField partyT es
+
+exprHeadConstructor :: Expr Resolved -> Maybe Resolved
+exprHeadConstructor (App _ n []) = Just n
+exprHeadConstructor _            = Nothing
+
+constructorHasType :: Type' Resolved -> Resolved -> Check Bool
+constructorHasType partyT ctor = do
+  ei <- asks (.entityInfo)
+  case snd <$> Map.lookup (getUnique ctor) ei of
+    Just (KnownTerm ty _) -> do
+      ty'     <- applySubst ty
+      partyT' <- applySubst partyT
+      pure (sameTypeHead ty' partyT')
+    _ -> pure False
+
+sameTypeHead :: Type' Resolved -> Type' Resolved -> Bool
+sameTypeHead (TyApp _ r1 _) (TyApp _ r2 _) = getUnique r1 == getUnique r2
+sameTypeHead _              _              = False
 
 -- | Check the action of a regulative @MUST@/@MAY@ clause against the action
 -- type declared in the contract's @DEONTIC <Party> <Action>@ signature.
@@ -1625,6 +1734,10 @@ inferEvent (MkEvent ann party action timestamp atFirst) = do
   actionT <- fresh (NormalName "action")
   party' <- checkExpr ExpectRegulativePartyContext party partyT
   action' <- checkExpr ExpectRegulativeActionContext action actionT
+  -- Rung 3: an event's acting party must own the action it performs, so a
+  -- @PARTY Drinker DOES eat@ event is rejected even though the union contract
+  -- type accepts it. This is what makes cross-actor /driving/ actor-correct.
+  checkRegulativeActorAgreement partyT party' (Just action')
   timestamp' <- checkExpr ExpectRegulativeTimestampContext timestamp number
   pure (MkEvent ann party' action' timestamp' atFirst, event partyT actionT)
 
@@ -3325,6 +3438,13 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   , "The parameter "
       <> quotedName (getActual paramName)
       <> " has a function type."
+  ]
+prettyCheckError (RegulativeActorMismatch party performer actionName) =
+  [ "An actor may only perform its own actions."
+  , ""
+  , "  " <> quotedName (getActual actionName)
+      <> " is performed by " <> quotedName (getActual performer)
+      <> ", not by " <> quotedName (getActual party) <> "."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.

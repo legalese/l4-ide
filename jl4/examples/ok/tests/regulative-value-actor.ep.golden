@@ -1,0 +1,39 @@
+-- Rung 3, realised via the *value-actor* encoding: actors are ordinary VALUES
+-- (constructors of one `Actor` type), so the contract head `DEONTIC Actor Action`
+-- is monomorphic and DRIVES events natively — no subtyping, no existentials, no
+-- residual/event-seam surgery. Actor-correctness is then a value-level check: a
+-- PARTY may only perform an action whose *performer* is itself, where the
+-- performer is the first actor-positional field (the SVO subject-first canon).
+--
+-- This file is the positive lock-in: the contract type-checks AND the
+-- mixed-actor event stream drives it to FULFILLED. The rejection cases live in
+-- not-ok/tc/value-actor-agreement.l4. See
+-- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md and
+-- specs/todo/ACTOR-ACTIONS-THEORY.md.
+
+DECLARE Actor IS ONE OF Eater, Drinker
+
+DECLARE Action HAS
+  actor IS AN Actor
+  verb  IS A STRING
+
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+
+GIVETH DEONTIC Actor Action
+pingpong MEANS
+  PARTY Eater
+  MUST eat
+  WITHIN 30
+  HENCE PARTY Drinker
+        MUST drink
+        WITHIN 10
+        HENCE FULFILLED
+        LEST FULFILLED
+  LEST FULFILLED
+
+-- The ball routes Eater -> Drinker, driven by a mixed-actor event stream:
+#TRACE pingpong AT 0 WITH
+  PARTY 5
+  DOES Eater   AT eat   PARTY 8
+DOES Drinker AT drink 

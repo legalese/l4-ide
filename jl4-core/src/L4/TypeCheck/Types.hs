@@ -56,6 +56,10 @@ data CheckState =
     , scopeMap     :: !ScopeMap
     , nlgMap       :: !NlgMap
     , descMap      :: !DescMap
+    , constBodies  :: !(Map Unique (Expr Resolved))
+      -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
+      -- they are checked. Used by the rung-3 value-level actor-agreement check
+      -- to recover an action constant's actor field from its definition.
     }
   deriving stock (Generic)
 
@@ -97,6 +101,12 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | RegulativeActorMismatch Resolved Resolved Resolved
+    -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
+    -- party to an action belonging to a different actor. In a value-actor
+    -- @DEONTIC PartyT ActionT@ contract, an action's actor is the field of its
+    -- record whose value is a constructor of @PartyT@. Arguments: the
+    -- obligated/acting party, the action's own actor, the action name.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -198,6 +208,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
+  rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
