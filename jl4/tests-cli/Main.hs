@@ -19,7 +19,7 @@ import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, getTemporaryDirectory, removeFile)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
@@ -169,6 +169,28 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
+batchEligFixture = fixtureDir </> "batch-elig.l4"
+batchDataJson    = fixtureDir </> "batch-data.json"
+batchDataCsv     = fixtureDir </> "batch-data.csv"
+batchMixedJson   = fixtureDir </> "batch-mixed.json"
+
+-- | Decode stdout as a single JSON array (for @l4 batch --format json@).
+decodeArray :: String -> IO [Value]
+decodeArray sout =
+  case eitherDecode (BSL8.pack sout) of
+    Right (Array v)  -> pure (foldr (:) [] v)
+    Right other      -> do
+      expectationFailure ("Expected a JSON array, got: " ++ show other)
+      error "unreachable"
+    Left err         -> do
+      expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
+      error "unreachable"
+
+-- | Count non-blank lines (each NDJSON row is one line).
+nonBlankLines :: String -> Int
+nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -178,7 +200,8 @@ main = do
   bin <- locateL4Binary
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
-  for_ [cleanFixture, evalFixture, errorFixture, garbageFixture] \fp -> do
+  for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -294,3 +317,72 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  describe "l4 batch" $ do
+    it "streams one NDJSON row per input (default format)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "infers CSV cell types so numeric params typecheck" $ do
+      -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
+      -- the rows would come back status=error; success proves inference works.
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+      let statuses = [ s | Object o <- rows
+                         , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
+      statuses `shouldBe` ["success", "success"]
+
+    it "emits a single JSON array with --format json" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+
+    it "emits a CSV table with flattened input_* columns via --format csv" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input_age" `isInfixOf`)
+      sout `shouldSatisfy` ("status" `isInfixOf`)
+
+    it "writes results to a file with --output" $ do
+      tmp <- getTemporaryDirectory
+      let outFile = tmp </> "l4-batch-out.json"
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
+                  , "--format", "json", "--output", outFile ]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null                    -- nothing on stdout
+      exists <- doesFileExist outFile
+      exists `shouldBe` True
+      contents <- readFile outFile
+      rows <- decodeArray contents
+      length rows `shouldBe` 2
+      removeFile outFile
+
+    it "stops at the first failing row by default (and exits non-zero)" $ do
+      -- Row 2 has a non-numeric income; row 3 must NOT be processed.
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+
+    it "processes every row with --continue-on-error (still exits non-zero)" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 3
+
+    it "validate-only reports schema mismatches without evaluating" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchMixedJson
+                  , "--validate-only", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
