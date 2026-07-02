@@ -1,0 +1,26 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-scoping-ambiguous.l4
+  Hidden: no
+  Range: 12:1-12:9
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message: x5
+File: section-scoping-ambiguous.l4
+  Hidden: no
+  Range: 12:8-12:9
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      x
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      x (defined at section-scoping-ambiguous.l4:18:8-9) of type NUMBER
+      x (defined at section-scoping-ambiguous.l4:15:8-9) of type BOOLEAN

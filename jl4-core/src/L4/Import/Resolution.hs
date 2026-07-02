@@ -345,6 +345,7 @@ combineResolvedImports uri imports =
         , TypeCheck.nlgMap = finalState.nlgMap
         , TypeCheck.scopeMap = finalState.scopeMap
         , TypeCheck.descMap = finalState.descMap
+        , TypeCheck.sectionPaths = finalState.sectionPaths
         }
     , finalEnv
     )
@@ -367,6 +368,7 @@ combineResolvedImports uri imports =
              , TypeCheck.nlgMap = IV.empty
              , TypeCheck.scopeMap = IV.empty
              , TypeCheck.descMap = IV.empty
+             , TypeCheck.sectionPaths = accState.sectionPaths
              }
          , TypeCheck.MkCheckEnv
              { TypeCheck.moduleUri = accEnv.moduleUri

@@ -18,6 +18,7 @@ import L4.Mixfix (MixfixInfo(..))
 import qualified Base.Set as Set
 
 import Control.Applicative
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Generics.SOP as SOP
 import Optics.Core (gplate, traverseOf, (%), (?~))
@@ -56,6 +57,12 @@ data CheckState =
     , scopeMap     :: !ScopeMap
     , nlgMap       :: !NlgMap
     , descMap      :: !DescMap
+    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    -- ^ For each defined 'Unique', the section stack (path from the module root
+    -- down to the innermost enclosing section) at the point it was registered.
+    -- Absence means the binding is top-level (empty section path). Used by
+    -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
+    -- when resolving unqualified names (lexical scoping / shadowing).
     }
   deriving stock (Generic)
 
@@ -591,6 +598,111 @@ lookupRawNameInEnvironment rn = do
 
   pure candidates
 
+-- | Record, for each given 'Unique', the section path (the current
+-- 'sectionStack') at which it was registered. This is what enables
+-- lexical (nearest-enclosing-section) resolution of unqualified names.
+--
+-- Top-level bindings (empty section path) are not recorded: their absence
+-- from the map is interpreted as the empty path by 'sectionProximity'.
+recordSectionPath :: [NonEmpty Text] -> [Unique] -> Check ()
+recordSectionPath []    _  = pure ()
+recordSectionPath path us =
+  modifying' #sectionPaths $ \m ->
+    foldl' (\acc u -> Map.insert u path acc) m us
+
+-- | How "close" a candidate binding's section path is to the section in which
+-- an unqualified reference occurs.
+--
+-- Returns @Just 0@ when the candidate is defined in the very same section,
+-- @Just 1@ for the immediately enclosing parent section, and so on. Top-level
+-- bindings (empty candidate path) are ancestors of every section, at a distance
+-- equal to the current nesting depth.
+--
+-- Returns 'Nothing' when the candidate is not on the current section's ancestry
+-- chain (e.g. a sibling section, a cousin, or an imported binding). Such
+-- candidates are not brought into lexical scope by this proximity mechanism.
+sectionProximity :: [NonEmpty Text] -> [NonEmpty Text] -> Maybe Int
+sectionProximity current candidate
+  | candidate `List.isPrefixOf` current = Just (length current - length candidate)
+  | otherwise                           = Nothing
+
+-- | Filter a set of viable resolution candidates down to those in the nearest
+-- enclosing section, implementing lexical scoping with shadowing.
+--
+-- Given the current section stack, a map of each candidate's defining section
+-- path, and the viable candidates (each tagged with its 'Unique'):
+--
+--   * If any candidates lie on the current section's ancestry (same section,
+--     parent, ..., top level), keep only those at the /minimum/ proximity
+--     (the nearest enclosing section). Ties at the same proximity are left for
+--     the caller to disambiguate (type-directed 'choose', else ambiguity error).
+--   * If none lie on the ancestry (all siblings/cousins/imports), fall back to
+--     /all/ viable candidates, preserving the pre-existing flat-scope behaviour.
+selectByProximity :: forall a. [NonEmpty Text] -> Map Unique [NonEmpty Text] -> [(Unique, a)] -> [a]
+selectByProximity current paths viable =
+  case ancestors of
+    [] -> fmap fst withProx
+    _  ->
+      let nearest = minimum (fmap snd ancestors)
+      in [ a | (a, d) <- ancestors, d == nearest ]
+  where
+    withProx :: [(a, Maybe Int)]
+    withProx = [ (a, sectionProximity current (Map.findWithDefault [] u paths)) | (u, a) <- viable ]
+
+    ancestors :: [(a, Int)]
+    ancestors = [ (a, d) | (a, Just d) <- withProx ]
+
+-- | An annotation-insensitive skeleton of a 'Type'' Resolved', used purely as a
+-- grouping key when deciding which resolution candidates are "the same type".
+--
+-- Structural equality on 'Type'' Resolved' cannot be used directly because it
+-- includes source annotations, so e.g. two @NUMBER@ occurrences at different
+-- locations would compare unequal. This skeleton keys type constructors by the
+-- 'Unique' of their head and drops all annotations, so it treats two @NUMBER@s
+-- as equal while keeping genuinely different types (@STRING@, @MAYBE NUMBER@,
+-- ...) distinct — exactly what overload-preserving shadowing needs.
+data TypeKey
+  = TyKType
+  | TyKApp Unique [TypeKey]
+  | TyKFun [TypeKey] TypeKey
+  | TyKForall Int TypeKey
+  | TyKInfVar Int
+  deriving stock (Eq, Show)
+
+typeKey :: Type' Resolved -> TypeKey
+typeKey = \ case
+  Type _        -> TyKType
+  TyApp _ r ts  -> TyKApp (getUnique r) (typeKey <$> ts)
+  Fun _ onts t  -> TyKFun (typeKey . optionallyNamedTypeType <$> onts) (typeKey t)
+  Forall _ ns t -> TyKForall (length ns) (typeKey t)
+  InfVar _ _ i  -> TyKInfVar i
+
+-- | Stable grouping by an equality key (first-seen order preserved, both for
+-- the groups and within each group). Small candidate lists, so the quadratic
+-- cost is irrelevant.
+groupByKey :: forall k a. Eq k => (a -> k) -> [a] -> [(k, [a])]
+groupByKey key = foldl' insertItem []
+  where
+    insertItem :: [(k, [a])] -> a -> [(k, [a])]
+    insertItem acc x =
+      let k = key x
+      in case List.lookup k acc of
+           Just _  -> [ (k', if k' == k then xs <> [x] else xs) | (k', xs) <- acc ]
+           Nothing -> acc <> [(k, [x])]
+
+-- | Apply 'selectByProximity' independently within each group of candidates
+-- that share the same type (or, for types, the same kind).
+--
+-- Grouping by type first is what lets genuinely distinct overloads coexist
+-- across sections: a binding only ever shadows another binding of the /same/
+-- type. Type-directed resolution ('choose') therefore still ranges over every
+-- overload regardless of where it is defined, while same-typed bindings obey
+-- lexical scoping and resolve to the nearest enclosing section.
+selectByProximityPerType :: forall k a. Eq k => [NonEmpty Text] -> Map Unique [NonEmpty Text] -> [(k, Unique, a)] -> [a]
+selectByProximityPerType current paths cands =
+  concatMap (selectByProximity current paths . fmap (\(_, u, a) -> (u, a)) . snd)
+            (groupByKey (\(k, _, _) -> k) cands)
+
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
 isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
@@ -608,7 +720,13 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = do
   options <- lookupRawNameInEnvironment (rawName n)
-  case mapMaybe proc options of
+  -- Lexical scoping: among the viable candidates, prefer those defined in the
+  -- nearest enclosing section (see 'selectByProximity'). Only fall through to
+  -- type-directed 'choose'/ambiguity once proximity can no longer discriminate.
+  current <- asks (.sectionStack)
+  paths <- use #sectionPaths
+  viable <- catMaybes <$> traverse proc options
+  case selectByProximityPerType current paths viable of
     [] -> do
       v <- fresh (rawName n)
       n' <- setAnnResolvedType v Nothing n
@@ -622,11 +740,18 @@ resolveTerm' p n = do
       rn <- ambiguousTerm n' xs'
       pure (rn, v)
   where
-    proc :: (Unique, Name, CheckEntity) -> Maybe (Check (Resolved, Type' Resolved))
-    proc (u, o, KnownTerm t tk) | p tk = Just $ do
-      n' <-  setAnnResolvedType t (Just tk) n
-      pure (Ref n' u o, t)
-    proc _                             = Nothing
+    -- Group by the declared type (via its annotation-insensitive 'typeKey') so
+    -- that same-typed bindings shadow lexically while distinct overloads remain
+    -- visible for type-directed resolution. We apply the current substitution
+    -- first so that inference variables introduced during signature scanning are
+    -- resolved to concrete types before we compare them.
+    proc :: (Unique, Name, CheckEntity) -> Check (Maybe (TypeKey, Unique, Check (Resolved, Type' Resolved)))
+    proc (u, o, KnownTerm t tk) | p tk = do
+      t' <- applySubst t
+      pure $ Just . (typeKey t', u,) $ do
+        n' <-  setAnnResolvedType t (Just tk) n
+        pure (Ref n' u o, t)
+    proc _                             = pure Nothing
 
 resolveTerm :: Name -> Check (Resolved, Type' Resolved)
 resolveTerm = resolveTerm' (const True)
