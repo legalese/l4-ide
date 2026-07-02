@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** OPEN — `UPON` and the `Environment` party are unimplemented; only the underlying deontic + trace-`Event` machinery exists.
+> - No `UPON` keyword (absent from `jl4-core/src/L4/Lexer.hs`); no `Environment` built-in party; no desugaring. Parser accepts only `PARTY <expr> MUST/MAY/SHANT …` (`Parser.hs:1769-1794`).
+> - `UPON`/`EVERY` occur only in non-golden aspirational examples (`jl4/experiments/purchase.l4:92`, `deontic-may.l4:16`). Related-but-distinct: trace `MkEvent{party,action,timestamp}` (`Syntax.hs:172-179`) already models observed party actions.
+
 # Specification: UPON and External Event Modeling in L4
 
 **Status:** Draft
