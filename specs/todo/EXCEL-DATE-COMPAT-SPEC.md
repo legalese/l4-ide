@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** PARTIAL — P0/P1 scalar core shipped in pure L4; weekday extractors, .INTL masks, and array overloads remain.
+> - Shipped (`jl4-core/libraries/excel-date.l4`, +docs `doc/reference/libraries/excel-date.md`, +goldens): 1900/1904 serial conversions with leap-bug handling, `DATEDIF` (+overloads), `ExcelDays`, `DAYS360` (US/EU), `YEARFRAC` (bases 0-4), `ExcelEDate`, `ExcelEOMonth`, `ExcelWorkday`/`ExcelNetworkDays` (+holiday lists), `excelToday`/`excelNow`.
+> - Remaining: `WEEKDAY`/`WEEKNUM`/`ISOWEEKNUM` + `HOUR/MINUTE/SECOND`; `WORKDAY.INTL`/`NETWORKDAYS.INTL` weekend masks; array-lifted (`LIST OF`) overloads.
+> - Body corrections: implemented entirely in L4 (the proposed `jl4-core/src/L4/Excel/Date.hs` runtime module was not created); doc lives at `doc/reference/libraries/excel-date.md`.
+
 # Specification: Excel Date Compatibility Library
 
 ## Executive Summary
