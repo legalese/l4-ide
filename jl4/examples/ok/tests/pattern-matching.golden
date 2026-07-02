@@ -1,0 +1,31 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching.l4:17:1-18:
+  1
+pattern-matching.l4:18:1-18:
+  120
+pattern-matching.l4:27:1-13:
+  55
+pattern-matching.l4:35:1-26:
+  0
+pattern-matching.l4:36:1-38:
+  3
+pattern-matching.l4:48:1-30:
+  99
+pattern-matching.l4:49:1-32:
+  42
+pattern-matching.l4:61:1-36:
+  0
+pattern-matching.l4:62:1-38:
+  5
+pattern-matching.l4:63:1-36:
+  5
+pattern-matching.l4:64:1-36:
+  10
+pattern-matching.l4:73:1-28:
+  0
+pattern-matching.l4:74:1-35:
+  0
+pattern-matching.l4:75:1-36:
+  7

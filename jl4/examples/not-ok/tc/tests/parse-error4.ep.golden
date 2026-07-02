@@ -10,4 +10,4 @@ File: parse-error4.l4
     8 | DECIDE factorial MEANS n
       |                  ^^^^^
     unexpected MEANS
-    expecting AKA, IF, IS, OF, identifier, or space token
+    expecting (, AKA, EXACTLY, Float Literal, IF, IS, Numeric Literal, OF, String Literal, identifier, or space token

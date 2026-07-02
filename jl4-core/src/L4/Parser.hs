@@ -457,7 +457,7 @@ topdecl =
         (Timezone  emptyAnno <$> annoHole (try timezone'))
   <|> withTypeSig (\ sig -> attachAnno $
         Declare   emptyAnno <$> annoHole (declare sig)
-    <|> Decide    emptyAnno <$> annoHole (decide sig)
+    <|> Decide    emptyAnno <$> annoHole (try (decidePatternMatch sig) <|> decide sig)
     <|> Assume    emptyAnno <$> annoHole (assume sig)
   ) <|> attachAnno
         (Directive emptyAnno <$> annoHole directive)
@@ -690,6 +690,209 @@ decide sig = do
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKMeans)
           <*> annoHole (indentedExpr current)
+
+-- ----------------------------------------------------------------------------
+-- Pattern matching in function definitions (Phase 1)
+--
+-- Haskell-style multi-clause function definitions with literal and constructor
+-- patterns on the DECIDE/MEANS left-hand side, desugared here (in the parser) to
+-- the existing CONSIDER/WHEN machinery. See
+-- specs/todo/PATTERN-MATCHING-SPEC.md, "Approach 1: Desugar to CONSIDER/WHEN".
+--
+-- Note: the anonymous wildcard @_@ from the spec is not currently accepted by
+-- the lexer; per the spec's own guidance, an ignored argument reuses its GIVEN
+-- name instead (which desugars to nothing).
+--
+-- Example:
+--
+-- > GIVEN n IS A NUMBER
+-- > GIVETH A NUMBER
+-- > DECIDE factorial 0 IS 1
+-- > DECIDE factorial n IS n * factorial (n - 1)
+--
+-- is lowered to a single 'MkDecide' whose body is:
+--
+-- > CONSIDER n
+-- > WHEN 0 THEN 1
+-- > OTHERWISE n * factorial (n - 1)
+--
+-- The clauses share a single GIVEN/GIVETH signature (as in Haskell, the type
+-- signature precedes the clauses), so an entire pattern-matching function is
+-- one 'TopDecl'.
+-- ----------------------------------------------------------------------------
+
+-- | A single parsed clause of a (potentially) multi-clause pattern-matching
+-- function. This is an internal parser artifact only; it never enters the AST.
+-- (Positional rather than record fields because this module uses
+-- @NoFieldSelectors@.)
+data PMClause = PMClause Name [Pattern Name] (Maybe (Aka Name)) (Expr Name)
+
+pmHead :: PMClause -> Name
+pmHead (PMClause h _ _ _) = h
+
+pmPats :: PMClause -> [Pattern Name]
+pmPats (PMClause _ ps _ _) = ps
+
+pmAka :: PMClause -> Maybe (Aka Name)
+pmAka (PMClause _ _ ak _) = ak
+
+pmBody :: PMClause -> Expr Name
+pmBody (PMClause _ _ _ b) = b
+
+-- | Parse a group of one-or-more DECIDE/MEANS clauses that share a head name
+-- and arity (and the enclosing GIVEN/GIVETH signature), and lower them to a
+-- single 'MkDecide'. Fails (so the caller falls back to the ordinary 'decide'
+-- parser) unless at least one clause carries a /distinguishable/ pattern (a
+-- literal, an applied constructor, a cons, or an EXACTLY expression). This keeps
+-- ordinary single-clause definitions (including mixfix and @OF@ forms), as well
+-- as type-overloaded definitions that share a name but only bind plain
+-- variables, on the existing code path.
+decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
+decidePatternMatch sig = do
+  clauseCol <- Lexer.indentLevel
+  firstClause <- pmClause clauseCol
+  let firstHead  = pmHead firstClause
+      firstArity = length (pmPats firstClause)
+  rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
+  -- Only treat this as pattern matching if at least one clause carries a
+  -- /distinguishable/ pattern (a literal, an applied constructor, a cons, or an
+  -- EXACTLY expression). A group of clauses whose arguments are all bare names
+  -- is indistinguishable, at parse time, from ordinary (type-)overloaded
+  -- definitions such as the two @`is leap year`@ overloads in daydate.l4, so we
+  -- leave those to the ordinary 'decide' path.
+  guard (any clauseIsPatternMatching (firstClause : rest))
+  pure (desugarPatternClauses sig firstClause rest)
+  where
+    sameHeadClause clauseCol h ar = do
+      c <- pmClause clauseCol
+      guard (rawName (pmHead c) == rawName h && length (pmPats c) == ar)
+      pure c
+    clauseIsPatternMatching c = any isDistinguishablePat (pmPats c)
+
+-- | Parse a single clause, in either the @DECIDE head pats IS body@ form or the
+-- @head pats MEANS body@ form. Argument patterns are parsed with
+-- 'atomicPattern', so applied constructors must be parenthesised (as in
+-- Haskell), e.g. @(JUST n)@ or @(x FOLLOWED BY xs)@.
+pmClause :: Pos -> Parser PMClause
+pmClause clauseCol =
+      pmDecideForm
+  <|> pmMeansForm
+  where
+    pmArgs = many (indented atomicPattern clauseCol)
+    pmDecideForm = do
+      _  <- spacedKeyword_ TKDecide
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKIs <|> spacedKeyword_ TKIf
+      b  <- indentedExpr clauseCol
+      pure (PMClause hd ps ak b)
+    pmMeansForm = do
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKMeans
+      b  <- indentedExpr clauseCol
+      pure (PMClause hd ps ak b)
+
+-- | Is this pattern /distinguishable/, i.e. clearly a pattern rather than a
+-- plain parameter name? True for literals, applied constructors (@JUST x@),
+-- cons (@x FOLLOWED BY xs@) and EXACTLY expressions. False for a bare
+-- @PatApp n []@, which at parse time (before scope-checking) is ambiguous
+-- between a variable binder and a nullary constructor such as @EMPTY@ / @TRUE@.
+-- Grouping into a pattern match is only triggered when a clause carries at
+-- least one distinguishable pattern.
+isDistinguishablePat :: Pattern Name -> Bool
+isDistinguishablePat = \ case
+  PatLit {}     -> True
+  PatCons {}    -> True
+  PatExpr {}    -> True
+  PatApp _ _ ps -> not (null ps)
+  PatVar {}     -> False
+
+-- | Extract the term (value) parameter names from a GIVEN signature, skipping
+-- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
+givenTermNames :: TypeSig Name -> [Name]
+givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
+  [ n | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+  where
+    notTypeParam (Just (Type _)) = False
+    notTypeParam _               = True
+
+-- | Lower a non-empty list of same-head clauses to a single 'MkDecide' whose
+-- body is a (possibly nested) CONSIDER. Clauses are tried top-to-bottom,
+-- first match wins (Haskell semantics). If no clause matches at runtime, the
+-- generated CONSIDER falls through with no OTHERWISE, which the evaluator turns
+-- into a 'NonExhaustivePatterns' error (Haskell's non-exhaustive-match error).
+desugarPatternClauses :: TypeSig Name -> PMClause -> [PMClause] -> Decide Name
+desugarPatternClauses sig firstC restCs =
+  MkDecide decideAnno sig theAppForm body
+  where
+    clauses  = firstC : restCs
+    headName = pmHead firstC
+    mAka     = listToMaybe (mapMaybe pmAka clauses)
+    arity    = length (pmPats firstC)
+    givenNs  = givenTermNames sig
+    appFormAnno = mkHoleAnnoFor headName
+    (theAppForm, scrutinees)
+      | length givenNs == arity && arity > 0 =
+          (MkAppForm appFormAnno headName [] mAka, givenNs)
+      | otherwise =
+          let synth = [ MkName emptyAnno (NormalName ("_pm_arg_" <> Text.pack (show i)))
+                      | i <- [1 .. arity] ]
+          in (MkAppForm appFormAnno headName synth mAka, synth)
+    body = matchClauses scrutinees clauses
+    decideAnno =
+      fixAnnoSrcRange (mkHoleAnnoFor sig <> mkHoleAnnoFor theAppForm <> mkHoleAnnoFor body)
+
+-- | Build a decision list from the clauses. The last clause is compiled without
+-- an OTHERWISE fallthrough so that a non-match becomes a runtime
+-- non-exhaustive-pattern error.
+matchClauses :: [Name] -> [PMClause] -> Expr Name
+matchClauses scrutinees = \ case
+  []       -> error "L4.Parser.matchClauses: empty clause list (impossible)"
+  [c]      -> matchLast scrutinees (pmPats c) (pmBody c)
+  (c : cs) -> matchOne scrutinees (pmPats c) (pmBody c) (matchClauses scrutinees cs)
+
+-- | Compile one non-final clause: match every column against its scrutinee; on
+-- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
+matchOne :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
+matchOne _        []       body _  = body
+matchOne (s : ss) (p : ps) body ft
+  -- A variable pattern that reuses the scrutinee's name (as the spec mandates),
+  -- or the anonymous wildcard, always matches and needs no (re)binding.
+  | patAlwaysMatchesAs s p = matchOne ss ps body ft
+  -- Everything else gets a WHEN plus an OTHERWISE fall-through. We must emit the
+  -- OTHERWISE even for a bare @PatApp n []@ because, at desugar time (pre
+  -- scope-check), we cannot tell a fresh variable (always matches) from a
+  -- nullary constructor such as @TRUE@ / @EMPTY@ / @NOTHING@ (can fail). Emitting
+  -- the fall-through is correct for both: a variable simply leaves it dead.
+  | otherwise =
+      Consider emptyAnno (App emptyAnno s [])
+        [ MkBranch emptyAnno (When emptyAnno p) (matchOne ss ps body ft)
+        , MkBranch emptyAnno (Otherwise emptyAnno) ft
+        ]
+matchOne []       (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
+
+-- | Compile the final clause without an OTHERWISE branch (so a non-match is a
+-- runtime non-exhaustive error, matching Haskell semantics).
+matchLast :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name
+matchLast _        []       body = body
+matchLast (s : ss) (p : ps) body
+  | patAlwaysMatchesAs s p = matchLast ss ps body
+  | otherwise =
+      Consider emptyAnno (App emptyAnno s [])
+        [ MkBranch emptyAnno (When emptyAnno p) (matchLast ss ps body) ]
+matchLast []       (_ : _)  body = body -- more patterns than scrutinees: ignore extras
+
+-- | Does this pattern always match its scrutinee /without introducing a new
+-- binding/? True for the anonymous wildcard @_@ and for a variable pattern that
+-- reuses the scrutinee's own name (so the binding is already in scope). Named
+-- wildcards (@_foo@) and differently-named variables still bind, via a WHEN.
+patAlwaysMatchesAs :: Name -> Pattern Name -> Bool
+patAlwaysMatchesAs s (PatApp _ n []) =
+  nameToText n == "_" || rawName n == rawName s
+patAlwaysMatchesAs _ _ = False
 
 appForm :: Parser (AppForm Name)
 appForm = do
