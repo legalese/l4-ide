@@ -175,6 +175,12 @@ batchDataJson    = fixtureDir </> "batch-data.json"
 batchDataCsv     = fixtureDir </> "batch-data.csv"
 batchMixedJson   = fixtureDir </> "batch-mixed.json"
 
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture  = fixtureDir </> "batch-code.l4"
+batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
+batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
+batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
 decodeArray sout =
@@ -201,7 +207,8 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson ] \fp -> do
+       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
+       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -386,3 +393,25 @@ spec bin = do
       code `shouldSatisfy` (/= ExitSuccess)
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
+
+    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+      -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
+      -- but must survive as the string "1E5" against a STRING param rather
+      -- than being coerced to 100000.
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "validate-only type-checks MAYBE primitive params" $ do
+      -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
+      -- as a type mismatch. Before unwrapping MAYBE on the AST this silently
+      -- passed as valid.
+      Output code sout _ <-
+        runL4 bin [ "batch", batchMaybeFixture, "--inputs", batchMaybeBadJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
+      sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)

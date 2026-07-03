@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 -- | @l4 batch FILE --inputs data.{json,yaml,csv} [--entrypoint fn]@
 --
 -- Evaluates a single @\@export@ function against many input rows.
@@ -38,7 +40,6 @@ import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Csv as Csv
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
-import Data.Maybe (fromMaybe)
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -66,7 +67,8 @@ import L4.EvaluateLazy
   , prettyEvalException
   )
 import L4.Print (prettyLayout)
-import L4.Syntax (Module, Resolved, Type')
+import L4.Syntax (Module, Resolved, Type'(..), getUnique)
+import L4.TypeCheck.Environment (maybeUnique)
 
 import L4.Cli.Common
 
@@ -209,14 +211,16 @@ batchCmd opts = do
   let process = processRow opts evalConfig filteredSource exportFn params schema
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
-      -- NDJSON streams line-by-line so huge batches stay memory-flat.
+      -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
+      -- each envelope, let it become garbage, and never build the row list.
       FmtNdjson -> do
-        (_, anyFail) <- runRows opts.batchContinueOnErr inputs process
+        anyFail <- streamRows opts.batchContinueOnErr inputs process
           (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
         finish anyFail
-      -- The buffered formats must see every row before they can render.
+      -- The buffered formats must see every row before they can render, so
+      -- here (and only here) we retain the whole list of envelopes.
       _ -> do
-        (envs, anyFail) <- runRows opts.batchContinueOnErr inputs process (const (pure ()))
+        (envs, anyFail) <- bufferRows opts.batchContinueOnErr inputs process
         writeBuffered h opts.batchOutputFormat envs
         finish anyFail
   where
@@ -235,24 +239,42 @@ withOutputHandle (Just path) act = withFile path WriteMode \h -> do
 -- Row processing
 ----------------------------------------------------------------------------
 
--- | Fold over the input rows, producing one result envelope each.
---
--- The @emit@ callback receives each envelope as it is produced (used for
--- NDJSON streaming; a no-op for buffered formats). Stops at the first
--- failing row unless @continueOnErr@ is set. Returns the collected
--- envelopes (in input order) and whether any row failed.
-runRows
+-- | Fold over the input rows for the streaming (NDJSON) path. Each envelope
+-- is handed to @emit@ as soon as it is produced and then dropped, so the fold
+-- carries only a strict 'Bool' (any-row-failed) accumulator — never the list
+-- of envelopes. This is what keeps NDJSON output memory-flat for huge batches.
+-- Stops at the first failing row unless @continueOnErr@ is set.
+streamRows
   :: Bool
   -> [Aeson.Value]
   -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
   -> (Aeson.Value -> IO ())
+  -> IO Bool
+streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) False
+  where
+    go [] !anyFail = pure anyFail
+    go ((idx, input) : rest) !anyFail = do
+      (env, isErr) <- process idx input
+      emit env
+      let !anyFail' = anyFail || isErr
+      if isErr && not continueOnErr
+        then pure True                   -- stop-on-error (the default)
+        else go rest anyFail'
+
+-- | Fold over the input rows for the buffered formats (json/yaml/csv), which
+-- genuinely need every row in hand before they can render. Returns the
+-- collected envelopes (in input order) and whether any row failed. Stops at
+-- the first failing row unless @continueOnErr@ is set.
+bufferRows
+  :: Bool
+  -> [Aeson.Value]
+  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
   -> IO ([Aeson.Value], Bool)
-runRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) [] False
+bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] False
   where
     go [] acc anyFail = pure (reverse acc, anyFail)
     go ((idx, input) : rest) acc anyFail = do
       (env, isErr) <- process idx input
-      emit env
       let acc'     = env : acc
           anyFail' = anyFail || isErr
       if isErr && not continueOnErr
@@ -352,18 +374,26 @@ kindName :: PrimKind -> Text
 kindName = \case KNum -> "NUMBER"; KBool -> "BOOLEAN"; KStr -> "STRING"
 
 -- | Classify a param's declared type as a primitive kind we can check,
--- unwrapping a single leading @MAYBE@. Returns Nothing for compound or
--- unknown types (which we then treat leniently).
+-- unwrapping @MAYBE@ wrappers on the AST (a @MAYBE NUMBER@ is checked as a
+-- @NUMBER@; presence/nullability is handled separately by 'validateRow').
+-- Returns Nothing for compound or unknown types (which we then treat
+-- leniently). Unwrapping on the AST (rather than string-matching the
+-- pretty-printed form, which renders as @MAYBE OF NUMBER@) is what makes
+-- @--validate-only@ actually type-check optional primitives.
 primKind :: Maybe (Type' Resolved) -> Maybe PrimKind
 primKind mty = do
   ty <- mty
-  let t0 = Text.toUpper (Text.strip (prettyLayout ty))
-      t  = fromMaybe t0 (Text.stripPrefix "MAYBE " t0)
-  case t of
+  case Text.toUpper (Text.strip (prettyLayout (unwrapMaybe ty))) of
     "NUMBER"  -> Just KNum
     "BOOLEAN" -> Just KBool
     "STRING"  -> Just KStr
     _         -> Nothing
+
+-- | Strip any leading @MAYBE OF _@ wrappers, returning the inner type. Matches
+-- the wrapper structurally by unique, mirroring @Export.hs@'s @isMaybeType@.
+unwrapMaybe :: Type' Resolved -> Type' Resolved
+unwrapMaybe (TyApp _ name [inner]) | getUnique name == maybeUnique = unwrapMaybe inner
+unwrapMaybe ty = ty
 
 jsonMatchesKind :: PrimKind -> Aeson.Value -> Bool
 jsonMatchesKind KNum  (Aeson.Number _) = True
@@ -409,14 +439,18 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
 --
 --   * empty cell            -> @null@ (decodes to @NOTHING@ for MAYBE params)
 --   * @true@/@false@ (ci)   -> boolean
---   * a JSON number literal -> number  (leading-zero strings like @007@
---                              are /not/ JSON numbers, so they stay strings)
+--   * a plain integer or simple decimal literal -> number
 --   * everything else       -> string  (dates included: JSON has no date
 --                              type, and JSONDECODE parses date strings)
 --
 -- Numbers are recognised by aeson's own JSON grammar, which rejects
 -- ambiguous forms (leading zeros, thousands separators, leading @+@), so
--- identifiers that merely look numeric survive as strings.
+-- identifiers like @007@ that merely look numeric survive as strings.
+--
+-- We additionally refuse any cell containing @e@ or @E@: JSON's number
+-- grammar accepts exponent notation, which would otherwise silently turn
+-- product/lot codes like @1E5@ or @3e2@ into @100000@ / @300@. Exponent-form
+-- identifiers therefore always stay STRING.
 inferCsvCell :: BS.ByteString -> Aeson.Value
 inferCsvCell raw =
   let rawText = decodeUtf8 raw
@@ -426,9 +460,10 @@ inferCsvCell raw =
        else case Text.toLower s of
          "true"  -> Aeson.Bool True
          "false" -> Aeson.Bool False
-         _ -> case Aeson.decodeStrict (encodeUtf8 s) :: Maybe Aeson.Value of
-           Just n@(Aeson.Number _) -> n
-           _                       -> Aeson.String rawText
+         _ | Text.any (\c -> c == 'e' || c == 'E') s -> Aeson.String rawText
+           | otherwise -> case Aeson.decodeStrict (encodeUtf8 s) :: Maybe Aeson.Value of
+               Just n@(Aeson.Number _) -> n
+               _                       -> Aeson.String rawText
 
 ----------------------------------------------------------------------------
 -- Output writers (buffered formats)
