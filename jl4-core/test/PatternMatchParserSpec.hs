@@ -90,8 +90,16 @@ parseDecides src =
 decideHeadText :: Decide Name -> T.Text
 decideHeadText (MkDecide _ _ (MkAppForm _ n _ _) _) = rawNameToText (rawName n)
 
+-- | Is the desugared body a CONSIDER-based decision tree? We look through any
+-- leading @LET ... IN@: to keep the emitted tree linear (rather than
+-- exponential) in the number of clauses, each non-final clause binds the
+-- desugaring of the remaining clauses to a fresh nullary local via @LET ... IN@,
+-- and the decision CONSIDER is that LET's body. A single-clause desugar has no
+-- fall-through and so is a bare CONSIDER.
 decideBodyIsConsider :: Decide Name -> Bool
-decideBodyIsConsider (MkDecide _ _ _ body) =
-  case body of
-    Consider {} -> True
-    _           -> False
+decideBodyIsConsider (MkDecide _ _ _ body) = go body
+  where
+    go = \ case
+      Consider {}  -> True
+      LetIn _ _ e  -> go e
+      _            -> False

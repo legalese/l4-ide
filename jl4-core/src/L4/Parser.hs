@@ -754,13 +754,26 @@ decidePatternMatch sig = do
   let firstHead  = pmHead firstClause
       firstArity = length (pmPats firstClause)
   rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
-  -- Only treat this as pattern matching if at least one clause carries a
-  -- /distinguishable/ pattern (a literal, an applied constructor, a cons, or an
-  -- EXACTLY expression). A group of clauses whose arguments are all bare names
-  -- is indistinguishable, at parse time, from ordinary (type-)overloaded
-  -- definitions such as the two @`is leap year`@ overloads in daydate.l4, so we
-  -- leave those to the ordinary 'decide' path.
-  guard (any clauseIsPatternMatching (firstClause : rest))
+  let clauses = firstClause : rest
+  -- Treat this as pattern matching when either:
+  --
+  --  * at least one clause carries a clearly /distinguishable/ pattern (a
+  --    literal, an applied constructor, a cons, or an EXACTLY expression); or
+  --
+  --  * it is a genuine multi-clause group (>= 2 clauses) discriminated only by
+  --    differing nullary columns, e.g. @DECIDE f TRUE IS 1 / DECIDE f FALSE IS
+  --    0@ or an enum decision table. A bare @PatApp n []@ is ambiguous at parse
+  --    time between a variable and a nullary constructor (@TRUE@ / @EMPTY@), so
+  --    we require >= 2 clauses AND at least one column whose bare names actually
+  --    differ across the group before committing.
+  --
+  -- This is safe against mis-grouping (type-)overloaded definitions (such as the
+  -- two @`is leap year`@ overloads in daydate.l4): overloads each carry their own
+  -- GIVEN/GIVETH signature, and an intervening GIVEN makes 'sameHeadClause' fail,
+  -- so the parser never gathers overloads into a single group. Every group we see
+  -- here already shares the one signature threaded in as @sig@. A lone bare-name
+  -- clause still falls through to the ordinary 'decide' path.
+  guard (any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses)
   pure (desugarPatternClauses sig firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
@@ -768,6 +781,17 @@ decidePatternMatch sig = do
       guard (rawName (pmHead c) == rawName h && length (pmPats c) == ar)
       pure c
     clauseIsPatternMatching c = any isDistinguishablePat (pmPats c)
+    -- A >= 2-clause group in which every argument column is a bare name and at
+    -- least one column's bare names differ across clauses (the hallmark of
+    -- discrimination by nullary constructors / booleans / enums).
+    nullaryOnlyDiscriminatingGroup cs =
+         length cs >= 2
+      && all (all isBareNullaryPat . pmPats) cs
+      && any columnDiffers (List.transpose (map pmPats cs))
+    isBareNullaryPat (PatApp _ _ []) = True
+    isBareNullaryPat _               = False
+    columnDiffers col =
+      length (List.nub [ rawName n | PatApp _ n [] <- col ]) > 1
 
 -- | Parse a single clause, in either the @DECIDE head pats IS body@ form or the
 -- @head pats MEANS body@ form. Argument patterns are parsed with
@@ -848,11 +872,76 @@ desugarPatternClauses sig firstC restCs =
 -- | Build a decision list from the clauses. The last clause is compiled without
 -- an OTHERWISE fallthrough so that a non-match becomes a runtime
 -- non-exhaustive-pattern error.
+--
+-- To keep the emitted tree /linear/ in (clauses x columns) rather than
+-- exponential, we never duplicate the desugaring of the remaining clauses.
+-- 'matchOne' references the fall-through in every WHEN and OTHERWISE position,
+-- so if we inlined it we would copy the whole clause tail once per
+-- distinguishable column, compounding multiplicatively. Instead, at each
+-- non-final clause boundary we bind the remaining-clauses expression to a single
+-- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
+-- The fresh name (@__pm_fallthrough_<k>@) is hygienic: the double-underscore
+-- prefix keeps it clear of user names and GIVEN params, and @k@ (the nesting
+-- level) makes it unique per boundary.
 matchClauses :: [Name] -> [PMClause] -> Expr Name
-matchClauses scrutinees = \ case
-  []       -> error "L4.Parser.matchClauses: empty clause list (impossible)"
-  [c]      -> matchLast scrutinees (pmPats c) (pmBody c)
-  (c : cs) -> matchOne scrutinees (pmPats c) (pmBody c) (matchClauses scrutinees cs)
+matchClauses scrutinees = go 0
+  where
+    go :: Int -> [PMClause] -> Expr Name
+    go _ []  = error "L4.Parser.matchClauses: empty clause list (impossible)"
+    go _ [c] = matchLast scrutinees (pmPats c) (pmBody c)
+    go k (c : cs)
+      | clauseUsesFallthrough (pmPats c) =
+          -- Bind the desugaring of the remaining clauses ONCE, then reference it
+          -- by name from every WHEN/OTHERWISE that 'matchOne' emits.
+          let ftName = fallthroughName k
+              ftExpr = go (k + 1) cs
+              tree   = matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno ftName)
+          in bindFallthrough ftName (clausesSrcAnno cs) ftExpr tree
+      | otherwise =
+          -- Every column of this clause matches unconditionally, so it always
+          -- fires and the remaining clauses are unreachable. 'matchOne' returns
+          -- the body without ever referencing the fall-through, so we neither
+          -- emit a binding nor desugar @cs@ (matching the previous behaviour).
+          matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno (fallthroughName k))
+    -- Does compiling this clause reference the fall-through? It does iff at least
+    -- one column needs a runtime WHEN test (i.e. does not always match). This
+    -- must mirror 'matchOne' / 'patAlwaysMatchesAs'.
+    clauseUsesFallthrough pats =
+      or (zipWith (\ s p -> not (patAlwaysMatchesAs s p)) scrutinees pats)
+
+-- | A hygienic fresh name for the once-bound fall-through at nesting level @k@.
+fallthroughName :: Int -> Name
+fallthroughName k =
+  MkName emptyAnno (NormalName ("__pm_fallthrough_" <> Text.pack (show k)))
+
+-- | A synthetic source range spanning the remaining clauses' bodies. The
+-- synthesized fall-through 'MkDecide' needs a present, distinct src range because
+-- the type checker keys each function's 'FunTypeSig' by its Decide annotation's
+-- range (see 'scanFunSigDecide' / 'inferDecide'). The clause bodies carry real
+-- source ranges, and each fall-through level covers a strictly different suffix
+-- of the clause tail, so these ranges are non-empty and mutually distinct.
+-- Note: @cs@ is always non-empty here (the singleton clause list is handled by
+-- the @[c]@ case of 'matchClauses', so a fall-through is only bound when at least
+-- one further clause remains).
+clausesSrcAnno :: [PMClause] -> Anno
+clausesSrcAnno []       = emptyAnno
+clausesSrcAnno (c : cs) =
+  fixAnnoSrcRange (foldl' (\ a b -> a <> mkHoleAnnoFor (pmBody b)) (mkHoleAnnoFor (pmBody c)) cs)
+
+-- | Bind @ftExpr@ to @ftName@ via a nullary @LET ... IN@, so the fall-through is
+-- emitted exactly once and referenced by name from the CONSIDER tree. Evaluates
+-- identically to inlining @ftExpr@ at each reference (it is a pure, argument-less
+-- binding), but keeps the emitted AST linear. @ftAnno@ supplies the Decide's
+-- source range (see 'clausesSrcAnno').
+bindFallthrough :: Name -> Anno -> Expr Name -> Expr Name -> Expr Name
+bindFallthrough ftName ftAnno ftExpr body =
+  LetIn emptyAnno
+    [ LocalDecide emptyAnno
+        (MkDecide ftAnno emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
+    ]
+    body
+  where
+    emptyTypeSig = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
 
 -- | Compile one non-final clause: match every column against its scrutinee; on
 -- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
