@@ -136,6 +136,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , computedFields = Map.empty
     , moduleUri
     , sectionStack = []
+    , localBindings = Set.empty
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -203,7 +204,7 @@ checkProgram module' = do
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
-  extendKnownMany topDecides . local \s -> s
+  extendKnownGlobalMany topDecides . local \s -> s
     { functionTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdecides
     , mixfixRegistry = unionMixfixRegistry (buildMixfixRegistry rdecides) s.mixfixRegistry
     }
@@ -215,8 +216,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -260,7 +261,7 @@ withDeclares rdecls =
     go (MkDeclChecked (Left  a) cis) = Left  . (, MkDeclChecked a cis) <$> rangeOf a
     go (MkDeclChecked (Right a) cis) = Right . (, MkDeclChecked a cis) <$> rangeOf a
   in
-    extendKnownMany topDeclares . local \s -> s
+    extendKnownGlobalMany topDeclares . local \s -> s
       { declareDeclarations = Map.fromList rdeclares
       , assumeDeclarations = Map.fromList rassumes
       }
@@ -269,7 +270,7 @@ withDeclares rdecls =
 
 withDeclareTypeSigs :: [DeclTypeSig] -> Check a -> Check a
 withDeclareTypeSigs rdeclares =
-  extendKnownMany topDeclares . local \s -> s
+  extendKnownGlobalMany topDeclares . local \s -> s
     { declTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdeclares
     }
   where
@@ -923,9 +924,17 @@ resolveType n = do
   -- Lexical scoping for type names: same nearest-enclosing-section preference
   -- as 'resolveTerm''. Types and terms scope identically.
   current <- asks (.sectionStack)
+  curUri  <- asks (.moduleUri)
+  locals  <- asks (.localBindings)
   paths <- use #sectionPaths
   let viable = mapMaybe proc options
-  case selectByProximityPerType current paths viable of
+      -- In-scope local type variables take absolute priority over section /
+      -- top-level / imported type bindings of the same name (see 'resolveTerm'').
+      candidates =
+        case [ c | c@(_, u, _) <- viable, u `Set.member` locals ] of
+          []            -> viable
+          localsInScope -> localsInScope
+  case selectByProximityPerType curUri current paths candidates of
     [] -> do
       let kind = 0
       n' <- setAnnResolvedKind kind n

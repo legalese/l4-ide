@@ -1,0 +1,19 @@
+-- Regression test for lexical section scoping — FIX A.
+--
+-- A function parameter (a lexical LOCAL binding) must take absolute priority
+-- over an enclosing section binding of the same name. Previously the parameter
+-- `foo` was silently shadowed by the section binding `foo MEANS 100`, so
+-- `bar 7` wrongly evaluated to 100 (ignoring its argument). It must be 7.
+
+§ s
+foo MEANS 100
+
+GIVEN foo IS A NUMBER
+bar foo MEANS foo PLUS 0
+
+-- The parameter wins inside `bar`.
+#EVAL bar 7     -- 7
+#EVAL bar 42    -- 42
+
+-- Outside `bar` there is no local `foo` in scope, so the section binding is used.
+#EVAL foo       -- 100

@@ -382,6 +382,7 @@ combineResolvedImports uri imports =
              , TypeCheck.computedFields = Map.empty
              , TypeCheck.errorContext = TypeCheck.None
              , TypeCheck.sectionStack = []
+             , TypeCheck.localBindings = Set.empty
              }
          )
 

@@ -549,6 +549,7 @@ jl4Rules evalConfig rootDirectory recorder = do
             -- ^ Merge mixfix registries from imported modules so cross-module mixfix calls work
             , computedFields = Map.empty
             , sectionStack = []
+            , localBindings = mempty
             }
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
