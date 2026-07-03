@@ -19,6 +19,24 @@ import L4.Syntax
   )
 import Test.Hspec
 
+-- | Parse a source snippet and return the @\@ref@ text (if any) attached to
+-- the 'Module' node and to the first top-level declaration ('TopDecl').
+moduleAndFirstDeclRefs :: Text -> IO (Maybe Text, Maybe Text)
+moduleAndFirstDeclRefs src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-module")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m@(MkModule _ _ (MkSection _ _ _ decls)), _, _) -> do
+      let moduleRef = fmap getRef (view annRef (getAnno m))
+      firstDeclRef <- case decls of
+        (d : _) -> pure $ fmap getRef (view annRef (getAnno d))
+        []      -> do
+          expectationFailure "Expected at least one top-level declaration"
+          error "unreachable"
+      pure (moduleRef, firstDeclRef)
+
 -- | Parse a source snippet and return the bodies of every top-level @DECIDE@,
 -- paired with the raw text of any @\@ref@ annotation attached to that body
 -- expression (via its 'Anno'\'s 'Extension').
@@ -78,3 +96,20 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
     case bodies of
       [(_, mRef)] -> mRef `shouldBe` Nothing
       _ -> expectationFailure $ "Expected exactly one DECIDE, got: " <> show (length bodies)
+
+  -- Regression: a @ref on the line ABOVE the first top-level declaration must
+  -- attach to that declaration, NOT be greedily claimed by the enclosing
+  -- Module/Section (which share the first declaration's start position because
+  -- the leading @ref cluster is excluded from their visible range).
+  it "attaches a leading @ref to the first declaration, not the Module" $ do
+    (moduleRef, firstDeclRef) <-
+      moduleAndFirstDeclRefs $
+        Text.unlines
+          [ "@ref https://example.com/section-leading"
+          , "DECIDE answer IS 42"
+          ]
+    moduleRef `shouldBe` Nothing
+    case firstDeclRef of
+      Just t  -> t `shouldSatisfy` Text.isInfixOf "section-leading"
+      Nothing ->
+        expectationFailure "Expected the leading @ref to attach to the first declaration"

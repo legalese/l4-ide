@@ -20,6 +20,7 @@ module L4.Parser.ResolveAnnotation (
   DescWarning(..),
   RefS(..),
   RefWarning(..),
+  renderRefWarning,
   -- * NlgA / NlgM monad
   NlgA(..),
   NlgM(..),
@@ -49,10 +50,19 @@ import L4.Syntax
 import L4.Parser.SrcSpan
 
 -- | Warnings for attaching Nlg comments to the ast.
+--
+-- Although named for the nlg pass, this is the shared diagnostic-warning type
+-- surfaced by the parser. The @Ref*@ constructors carry ref-attachment
+-- warnings ('RefWarning') so they can travel through the same @[Warning]@
+-- channel and be rendered alongside nlg warnings (see 'renderRefWarning').
 data Warning
   = NotAttached NlgWithSpan
   | UnknownLocation Nlg
   | Ambiguous Name [NlgWithSpan] -- Must be at least two
+  | RefUnattached RefWithSpan
+    -- ^ A @ref could not be attached to any following AST node.
+  | RefNoLocation Ref
+    -- ^ A @ref had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -789,6 +799,14 @@ data RefS = RefS
   deriving stock (Generic, Eq, Show)
   deriving anyclass (SOP.Generic)
 
+-- | Convert a ref-attachment warning into the shared 'Warning' type so it can
+-- be surfaced as a diagnostic alongside nlg warnings. This is a faithful
+-- 1:1 mapping onto the dedicated @Ref*@ constructors of 'Warning'.
+renderRefWarning :: RefWarning -> Warning
+renderRefWarning = \ case
+  RefNotAttached r     -> RefUnattached r
+  RefMissingLocation r -> RefNoLocation r
+
 -- | Attach @ref annotations to the AST nodes that immediately follow them.
 --
 -- Unlike @nlg (which targets 'Name' nodes) or @desc (which targets top-level
@@ -875,17 +893,20 @@ class HasRef a where
   addRef :: a -> State RefS a
 
 instance (HasSrcRange n, HasRef n) => HasRef (Module n) where
-  addRef m@(MkModule ann uri sect) = do
-    ann' <- attachRef m ann
-    MkModule ann' uri <$> addRef sect
+  -- Do NOT attach at the container level: a leading @ref shares its start with
+  -- the first declaration, and the Module (visited first in the pre-order walk)
+  -- would greedily claim it. Mirror 'HasDesc (Module n)': recurse only.
+  addRef (MkModule ann uri sect) =
+    MkModule ann uri <$> addRef sect
 
 instance (HasSrcRange n, HasRef n) => HasRef (Section n) where
-  addRef s@(MkSection ann lbl maka decls) = do
-    ann' <- attachRef s ann
+  -- As with 'HasRef (Module n)', do NOT attach at the container level; recurse
+  -- only so a leading @ref reaches the first child declaration.
+  addRef (MkSection ann lbl maka decls) = do
     lbl' <- traverse addRef lbl
     maka' <- traverse addRef maka
     decls' <- traverse addRef decls
-    pure $ MkSection ann' lbl' maka' decls'
+    pure $ MkSection ann lbl' maka' decls'
 
 instance (HasSrcRange n, HasRef n) => HasRef (TopDecl n) where
   addRef a = case a of
@@ -895,7 +916,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (TopDecl n) where
     Directive ann d -> attachRef a ann >>= \ann' -> Directive ann' <$> addRef d
     Import ann d -> attachRef a ann >>= \ann' -> Import ann' <$> addRef d
     Section ann d -> attachRef a ann >>= \ann' -> Section ann' <$> addRef d
-    Timezone ann e -> attachRef a ann >>= \ann' -> pure (Timezone ann' e)
+    Timezone ann e -> attachRef a ann >>= \ann' -> Timezone ann' <$> addRef e
 
 instance (HasSrcRange n, HasRef n) => HasRef (Declare n) where
   addRef d@(MkDeclare ann tySig appForm tyDecl) = do
