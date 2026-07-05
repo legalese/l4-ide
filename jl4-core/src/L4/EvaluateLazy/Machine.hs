@@ -135,9 +135,12 @@ data Frame =
   | WhenLastFrame TemporalContext WHNF Time.Day
   | WhenNextFrame TemporalContext WHNF Time.Day Time.Day
   | ValueAtFrame TemporalContext
-  | UpdateThunk Reference !CtxReads
+  | UpdateThunk Reference !CtxReads !(Maybe (CtxReads, WHNF))
     -- ^ write-back frame for a thunk force; carries the ENCLOSING span's
-    -- saved read accumulator, merged back in 'backward' (T6)
+    -- saved read accumulator, merged back in 'backward' (T6), plus the
+    -- displaced 'WHNFWhen' cache (fingerprint, value) when this force
+    -- re-forces a stale context-dependent cache — so an aborted force can
+    -- put the still-fingerprint-guarded cache back ('unwindFrame')
   | ContractFrame ContractFrame
   | ConcatFrame [WHNF] {- -} [Expr Resolved] Environment -- accumulated values, remaining exprs, env
   | AsStringFrame -- AsString frame
@@ -233,14 +236,67 @@ traceEval ta = do
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
 
 -- | Throw an evaluation exception: unwind the stack frame by frame (so an
--- active trace records the pops, mirroring the historical behaviour) and
--- then throw an IO exception.
+-- active trace records the pops, mirroring the historical behaviour),
+-- interpreting the state-restoring frames along the way ('unwindFrame'),
+-- and then throw an IO exception.
 raiseException :: EvalException -> Eval a
 raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just _f -> raiseException e
+    Just f  -> unwindFrame f >> raiseException e
+
+-- | Interpret the state-restoring effects of a frame while unwinding on an
+-- exception. Most frames are pure control flow and need nothing, but:
+--
+--   * frames that saved a 'TemporalContext' to restore in 'backward' must
+--     restore it during unwinding too — otherwise an exception raised inside
+--     an @EVAL AS OF SYSTEM TIME@ \/ @EVAL UNDER VALID TIME@ \/ iterator
+--     scope leaves the override in the ambient context (and, post-T6, lets
+--     subsequent forces cache values under the leaked context);
+--
+--   * 'UpdateThunk' frames must close their read span (mirroring the
+--     success path in 'backward') and return the thunk to a re-forcible
+--     state — otherwise the blackhole mark left by the aborted force makes
+--     every later force of the thunk report a bogus infinite loop.
+unwindFrame :: Frame -> Eval ()
+unwindFrame = \ case
+  EvalAsOfSystemTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderValidTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderRulesEffectiveAt2 originalCtx -> putTemporalContext originalCtx
+  EvalUnderRulesEncodedAt2 originalCtx   -> putTemporalContext originalCtx
+  EverBetweenFrame originalCtx _ _ _ _   -> putTemporalContext originalCtx
+  AlwaysBetweenFrame originalCtx _ _ _ _ -> putTemporalContext originalCtx
+  WhenLastFrame originalCtx _ _          -> putTemporalContext originalCtx
+  WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
+  ValueAtFrame originalCtx               -> putTemporalContext originalCtx
+  UpdateThunk rf saved displaced         -> do
+    -- Close this force's read span exactly as the success path does (the
+    -- reads made before the abort soundly over-approximate the enclosing
+    -- span's dependencies), then undo the blackhole.
+    mine <- swapCtxReads noReads
+    noteCtxRead (saved <> mine)
+    restoreThunkOnUnwind rf displaced
+  _ -> pure ()
+
+-- | Return an aborted force's thunk to a re-forcible state. If the force had
+-- displaced a stale 'WHNFWhen' cache, put the cache back: it is still
+-- fingerprint-guarded, so it can only ever be served under contexts it is
+-- valid for (and a later force under the original context then correctly
+-- serves the cached value). Otherwise just clear our blackhole mark.
+-- Mirrors the keep-theirs policy of 'updateThunkToWHNFWhen': if the thunk is
+-- no longer 'Unevaluated' (another thread completed it) or our mark is gone,
+-- keep what is there.
+restoreThunkOnUnwind :: Reference -> Maybe (CtxReads, WHNF) -> Eval ()
+restoreThunkOnUnwind rf displaced =
+  pokeThunk rf \tid -> \ case
+    thunk@(Unevaluated tids e env)
+      | tid `Set.member` tids ->
+          case displaced of
+            Just (fp, v) -> (WHNFWhen fp v e env, ())
+            Nothing      -> (Unevaluated (Set.delete tid tids) e env, ())
+      | otherwise -> (thunk, ())
+    other -> (other, ())
 
 internalException :: InternalEvalException -> Eval a
 internalException = raiseException . InternalEvalException
@@ -988,7 +1044,7 @@ backward val = withPoppedFrame $ \ case
       _ ->
         -- Should not happen - field encoding should return ValString
         internalException $ RuntimeTypeError "Expected ValString from field encoding"
-  Just (UpdateThunk rf saved) -> do
+  Just (UpdateThunk rf saved _displaced) -> do
     -- Close this force's read span. LIFO frame discipline guarantees any
     -- scope/iterator frames pushed during the force were popped (restoring
     -- the temporal context) before this frame, so 'mine' reflects exactly
@@ -2426,17 +2482,19 @@ evalRef rf = do
           | validFor tc fp -> (thunk, noteCtxRead fp >> whnfConfig val)
           | otherwise ->
               -- Stale for the current temporal context: re-force under it.
-              (Unevaluated (Set.singleton tid) e env, beginForce e env)
+              -- The displaced cache travels on the UpdateThunk frame so an
+              -- aborted force can put it back ('restoreThunkOnUnwind').
+              (Unevaluated (Set.singleton tid) e env, beginForce (Just (fp, val)) e env)
         thunk@(Unevaluated tids e env)
           | tid `Set.member` tids ->  (thunk, userException (BlackholeForced e))
-          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce e env)
-    beginForce :: Expr Resolved -> Environment -> Machine Config
-    beginForce e env = do
+          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce Nothing e env)
+    beginForce :: Maybe (CtxReads, WHNF) -> Expr Resolved -> Environment -> Machine Config
+    beginForce displaced e env = do
       -- Open a fresh read span for this force; the enclosing span's
       -- accumulator travels on the UpdateThunk frame and is merged back
       -- (together with this force's reads) in 'backward'.
       saved <- swapCtxReads noReads
-      pushFrame (UpdateThunk rf saved)
+      pushFrame (UpdateThunk rf saved displaced)
       continueExpr env e
     whnfConfig :: WHNF -> Machine Config
     whnfConfig val =

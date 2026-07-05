@@ -135,12 +135,18 @@ runConfig = \ case
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
 nfDirective (MkEvalDirective r traced isAssert expr env) = do
-  -- T6: clear residue left in the context-read accumulator when a previous
-  -- directive aborted via raiseException (which unwinds UpdateThunk frames
-  -- without interpreting them). Residue is sound — an over-approximation
-  -- that can only cost sharing, never correctness — but spans should be
-  -- directive-local.
+  -- T6: open a fresh, directive-local context-read span. (Exceptional
+  -- unwinding closes spans as it pops UpdateThunk frames — see
+  -- 'unwindFrame' — but a successful directive legitimately leaves its own
+  -- reads in the root accumulator; spans are directive-local, so clear it.)
   _ <- swapCtxReads noReads
+  -- Snapshot the ambient temporal context and restore it unconditionally
+  -- after the directive. 'unwindFrame' already restores saved contexts
+  -- frame by frame during exceptional unwinding; this directive boundary is
+  -- the belt-and-braces layer guaranteeing that no temporal override active
+  -- during THIS directive can leak into subsequent directives, whatever the
+  -- unwind path.
+  ambientCtx <- getTemporalContext
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -150,6 +156,7 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
+  putTemporalContext ambientCtx
   let
     finalTrace = postprocessTrace <$> mt
     v' =
