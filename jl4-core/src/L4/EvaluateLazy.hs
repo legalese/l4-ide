@@ -31,7 +31,7 @@ import L4.Annotation
 import L4.Print
 import L4.Syntax
 import L4.TypeCheck.Types (EntityInfo)
-import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
+import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
 
 import Control.Exception (throwIO, try)
@@ -135,6 +135,12 @@ runConfig = \ case
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
 nfDirective (MkEvalDirective r traced isAssert expr env) = do
+  -- T6: clear residue left in the context-read accumulator when a previous
+  -- directive aborted via raiseException (which unwinds UpdateThunk frames
+  -- without interpreting them). Residue is sound — an over-approximation
+  -- that can only cost sharing, never correctness — but spans should be
+  -- directive-local.
+  _ <- swapCtxReads noReads
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -327,8 +333,9 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   actualTime <- resolveEvalTime evalConfig
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
+  ctxReads <- newIORef noReads
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,

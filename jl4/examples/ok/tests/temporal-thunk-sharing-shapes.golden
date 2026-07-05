@@ -1,0 +1,35 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+temporal-thunk-sharing-shapes.l4:18:1-11:
+  730484
+temporal-thunk-sharing-shapes.l4:20:1-44:
+  739646
+temporal-thunk-sharing-shapes.l4:28:1-39:
+  730484
+temporal-thunk-sharing-shapes.l4:30:1-9:
+  739646
+temporal-thunk-sharing-shapes.l4:38:1-10:
+  739646
+temporal-thunk-sharing-shapes.l4:40:1-40:
+  730484
+temporal-thunk-sharing-shapes.l4:50:1-43:
+  730484
+temporal-thunk-sharing-shapes.l4:52:1-11:
+  739646
+temporal-thunk-sharing-shapes.l4:61:1-39:
+  730484
+temporal-thunk-sharing-shapes.l4:63:1-9:
+  739646
+temporal-thunk-sharing-shapes.l4:73:1-49:
+  730484
+temporal-thunk-sharing-shapes.l4:75:1-17:
+  739646
+temporal-thunk-sharing-shapes.l4:88:1-15:
+  730484
+temporal-thunk-sharing-shapes.l4:90:1-9:
+  739646
+temporal-thunk-sharing-shapes.l4:101:1-43:
+  730484
+temporal-thunk-sharing-shapes.l4:103:1-11:
+  739646
