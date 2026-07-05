@@ -133,6 +133,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
+    , cyclicSynonyms = Set.empty
     , moduleUri
     , sectionStack = []
     }
@@ -164,9 +165,13 @@ doCheckProgramWithDependencies checkState checkEnv program =
         ]
         ++
         [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
-        | cyc@(synName : _) <- detectTypeSynonymCycles program
+        | cyc@(synName : _) <- synonymCycles
         ]
-      checkEnv' = checkEnv { computedFields = extractComputedFieldNames program }
+      synonymCycles = detectTypeSynonymCycles program
+      checkEnv' = checkEnv
+        { computedFields = extractComputedFieldNames program
+        , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
+        }
   in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
     (w, s) ->
       let
@@ -218,8 +223,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -838,11 +843,20 @@ inferTypeNameAndSynonym rappForm Nothing = do
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 inferTypeNameAndSynonym rappForm (Just t) = do
+  cyclic <- asks (.cyclicSynonyms)
   let
     rs = appFormHeads rappForm
-    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) . Just
+    -- A synonym that is a member of a declaration-time cycle gets NO
+    -- body: it has no finite expansion, and letting the expansion
+    -- machinery at it can blow up exponentially even under fuel. The
+    -- cycle itself is reported as CyclicTypeSynonyms; the body is still
+    -- checked below so its other errors surface.
+    quarantined = case rs of
+      (r : _) -> rawName (getOriginal r) `Set.member` cyclic
+      []      -> False
+    kt body = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) body
   rt <- inferType t
-  pure $ makeKnownMany rs (kt rt)
+  pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do

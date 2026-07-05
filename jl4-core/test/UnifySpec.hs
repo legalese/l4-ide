@@ -128,10 +128,53 @@ spec = describe "Unification" $ do
           [e | MkCheckErrorWithContext e@(CyclicTypeSynonyms _) _ <- r.tcdErrors]
             `shouldSatisfy` (not . null)
 
+    it "does not let an alias shadow a sibling synonym's primary name (either order)" $ do
+      -- Wrap's alias 'Beta' collides with the sibling synonym Beta; the
+      -- body reference 'Beta' resolves (by arity) to the sibling, so the
+      -- program is acyclic and must be accepted regardless of
+      -- declaration order.
+      let prog beforeWrap =
+            Text.unlines $
+              [ "DECLARE Duo OF a, b"
+              , "  HAS fst IS AN a"
+              , "      snd IS A  b"
+              ]
+              <> (if beforeWrap then ["DECLARE Beta IS A NUMBER"] else [])
+              <> [ "DECLARE Wrap a AKA Beta IS A Duo OF a, Beta" ]
+              <> (if beforeWrap then [] else ["DECLARE Beta IS A NUMBER"])
+              <> [ ""
+                 , "GIVEN p IS A Wrap OF STRING"
+                 , "GIVETH A Duo OF STRING, NUMBER"
+                 , "unwrap p MEANS p"
+                 ]
+      okBefore <- checks (prog True)
+      okAfter  <- checks (prog False)
+      (okBefore, okAfter) `shouldBe` (True, True)
+
+    it "terminates promptly unifying two distinct cyclic doubling synonyms" $ do
+      -- Both synonyms are flagged at declaration time, but checking
+      -- continues; with their bodies still expandable this unification
+      -- was a 2^(fuel/2)-wide recursion tree — an effective hang from a
+      -- 4-line file. Quarantining cyclic synonym bodies makes it fail
+      -- fast instead.
+      ok <- checks $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Loop1 IS A PAIR OF Loop1, Loop1"
+        , "DECLARE Loop2 IS A PAIR OF Loop2, Loop2"
+        , ""
+        , "GIVEN x IS A Loop1"
+        , "GIVETH A Loop2"
+        , "f x MEANS x"
+        ]
+      ok `shouldBe` False
+
     it "terminates when a cyclic synonym is applied as a function (matchFunTy fuel)" $ do
-      -- Decl-time errors do not stop checking, so the application below
-      -- still drives matchFunTy's expansion loop over the cyclic synonym;
-      -- pre-fuel this hung forever.
+      -- Decl-time errors do not stop checking. The cyclic synonym's body
+      -- is quarantined, so the application below reports IllegalApp
+      -- instead of driving matchFunTy's expansion loop (whose fuel
+      -- remains as the backstop for cycles arriving via imports);
+      -- pre-fix this hung forever.
       ok <- checks $ Text.unlines
         [ "DECLARE Loop IS A Loop"
         , ""
