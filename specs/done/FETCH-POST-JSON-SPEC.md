@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** RESOLVED — POST + JSONENCODE + JSONDECODE all shipped as L4 builtins; `jl4-core/libraries/llm.l4` does live Anthropic/OpenAI calls end-to-end. Moved to `specs/done/`.
+> - `POST url headers body` builtin: `Syntax.hs:239`, `runPost` `Machine.hs:1595-1630` (Network.HTTP.Req, HTTPS-only, safe-mode gated). `JSONENCODE`/`JSONDECODE`: `Environment.hs:58-59`; type-driven record decode returns `EITHER STRING a` (`Machine.hs:1776-1794`). Reference: `llm.l4` (+ golden `llm.ep.golden`).
+> - Interface diverges from this spec: shipped design is Option B, but the **headers arg is a single newline-separated STRING** (not `LIST OF PAIR`); JSON decode returns **`EITHER STRING a`** (not `MAYBE`); POST/FETCH are **HTTPS-only**.
+
 # L4 HTTP and JSON Enhancement Specification
 
 **Project**: L4 IDE (l4-ide codebase)

@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** PARTIAL — the multi-axis runtime landed; the commit/git axis and the prelude macro layer did not.
+> - Shipped: `L4.TemporalContext` (record + `applyEvalClauses`), `withEvalClauses` threading in `EvaluateLazy.hs`, EVER/ALWAYS BETWEEN + WHEN LAST/NEXT + VALUE AT as real builtins, DATE promoted to a core builtin family, `TemporalContextSpec.hs` + `temporal-acceptance.l4` goldens. EVAL clauses shipped: AS OF SYSTEM TIME, UNDER VALID TIME, UNDER RULES EFFECTIVE AT, UNDER RULES ENCODED AT.
+> - Remaining: `EVAL UNDER COMMIT` / `EVAL RETROACTIVE TO` builtins are NOT in the tree (this tracker's WIP log overstates them); no git checkout / `getRulesAtCommit` / audit wiring; `temporal-prelude.l4` was deleted rather than refactored (no mixfix macros). Live artifact is `jl4/examples/ok/temporal-acceptance.l4`.
+
 # Temporal Work Master Tracker
 
 This note summarizes the current state of temporal support across l4-ide and opm2l4 and records decisions from the temporals-2 branch review. It aligns the historical experiments with the latest proposal `~/src/legalese/opm2l4/docs/PROPOSAL_L4_IDE_TEMPORAL.md` and `doc/dev/specs/todo/TEMPORAL_EVAL_SPEC.md`.

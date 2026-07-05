@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** PARTIAL — 8 of 11 items done; 3 still open (7, 10, 11).
+> - Newly done since this tracker: Item 9 ASSUME Parameter Requirements (PR #893/#780 — ASSUMEs promoted to `@export` params, exposed in decision-service/wizard). Item 4 Boolean Minimization spec moved to `specs/done/` (epic #638); core impl not yet found in `jl4-core/src`.
+> - Confirmed done earlier: Items 1, 2/3, 5, 6, 8.
+> - Still OPEN: Item 10 TYPICALLY (no `TYPICALLY` in jl4-core; spec still in todo), Item 11 Runtime Input State (blocked on 10), Item 7 Import/Export Coordination (no impl/spec).
+
 # Issue #635 Planning and Implementation Status
 
 Planning session: 2025-11-28
