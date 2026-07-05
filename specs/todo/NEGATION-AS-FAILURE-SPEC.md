@@ -1,9 +1,9 @@
 # Specification: Negation as Failure via `MAYBE BOOLEAN`
 
-**Status:** ✅ IMPLEMENTED (prelude combinators, 2026-06-10) · Kleene lift remains an experiment
-**Scope:** Prelude combinators + documentation. No compiler/lexer/parser changes required.
-**Implementation:** `holds` / `naf` / `presumed` added to `jl4-core/libraries/prelude.l4`; worked, runnable demo (including the Kleene lift) at `jl4/experiments/negation-as-failure.l4`.
-**Related:** `TYPICALLY-DEFAULTS-SPEC.md` (rebuttable presumptions), `BOUNDED-DEONTICS-SPEC.md` (deontic modalities), `doc/reference/libraries/prelude.md`
+**Status:** ✅ IMPLEMENTED (dedicated library, 2026-06-10 · moved out of the prelude per review) · Kleene lift remains an experiment
+**Scope:** A new `negation-as-failure` library + documentation. No compiler/lexer/parser changes required.
+**Implementation:** `holds` / `naf` / `presumed` (each with an `@nlg` annotation) live in `jl4-core/libraries/negation-as-failure.l4`, which imports `prelude`; worked, runnable demo (including the Kleene lift) at `jl4/experiments/negation-as-failure-examples.l4`.
+**Related:** `TYPICALLY-DEFAULTS-SPEC.md` (rebuttable presumptions), `BOUNDED-DEONTICS-SPEC.md` (deontic modalities), `doc/reference/libraries/negation-as-failure.md`
 
 ## Executive Summary
 
@@ -256,21 +256,26 @@ p `kand` q MEANS
 #ASSERT holds (NOTHING `kand` (JUST TRUE)) EQUALS FALSE
 ```
 
-## Prelude additions (implemented)
+## Library additions (implemented)
 
-Minimal, additive, no breaking changes. Added to `jl4-core/libraries/prelude.l4`
-immediately after the existing `fromMaybe` / `isJust` Maybe-eliminators:
+Minimal, additive, no breaking changes. Shipped as their own library,
+`jl4-core/libraries/negation-as-failure.l4` (`IMPORT` `` `negation-as-failure` ``),
+rather than folded into the core prelude — a review of the first draft asked for
+the combinators to live in a dedicated module and to carry `@nlg` annotations:
 
 1. `holds : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe FALSE` — closed-world grounding. ✅
 2. `naf   : MAYBE BOOLEAN -> BOOLEAN` ≝ `NOT (holds p)` — negation as failure. ✅
 3. `presumed : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe TRUE` — open-world dual. ✅
-4. *(experiment, not core)* Kleene three-valued `kand` / `kor` / `knot` over
+4. Each of the three carries an `@nlg` annotation (e.g. `` naf p @nlg %p% has not
+   been proven true ``), so both the library's own generated docs and any calling
+   rule without its own `@nlg` override render as plain English. ✅
+5. *(experiment, not core)* Kleene three-valued `kand` / `kor` / `knot` over
    `MAYBE BOOLEAN` for users who want NAF to propagate through connectives — demonstrated
-   in `jl4/experiments/negation-as-failure.l4`. Deliberately kept out of the core prelude
-   (it introduces a second algebra; see Open question 2).
+   in `jl4/experiments/negation-as-failure-examples.l4`. Deliberately kept out of the
+   library itself (it introduces a second algebra; see Open question 2).
 
-`DefBool` itself was **not** added as a named prelude type — `MAYBE BOOLEAN` is already
-legible — but the experiment file declares it locally as a teaching alias.
+`DefBool` itself was **not** added as a named type in the library — `MAYBE BOOLEAN`
+is already legible — but the experiment file declares it locally as a teaching alias.
 
 ## Open questions / design decisions
 

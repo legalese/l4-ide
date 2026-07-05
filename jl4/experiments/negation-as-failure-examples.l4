@@ -4,9 +4,10 @@
 -- The whole idea: a proposition that may or may not have been settled is a
 -- MAYBE BOOLEAN. Negation as failure is the closed-world assumption -- the act
 -- of defaulting "unproven" to FALSE -- and that act is already `fromMaybe FALSE`.
--- The prelude now names it `holds`, with `naf` and the open-world dual `presumed`.
+-- The `negation-as-failure` library names it `holds`, with `naf` and the
+-- open-world dual `presumed`.
 
-IMPORT prelude
+IMPORT `negation-as-failure`
 
 § `The three epistemic states`
 
@@ -16,7 +17,9 @@ IMPORT prelude
 --   NOTHING     no proof either way (the open question / the default)
 DECLARE DefBool IS A MAYBE BOOLEAN
 
--- holds, naf, presumed all come from the prelude. We only demonstrate them here.
+-- holds, naf, presumed all come from the negation-as-failure library (which
+-- itself imports prelude, so isJust below is in scope too). We only
+-- demonstrate them here.
 
 -- holds = fromMaybe FALSE : closed-world grounding (Prolog NAF / CWA)
 #EVAL holds (JUST TRUE)     -- TRUE

@@ -236,6 +236,8 @@ this, so it is allowed").
 **Canonical form:**
 
 ```l4
+IMPORT `negation-as-failure`
+
 -- Closed-world: in breach unless timely filing is proven (NOTHING => breach)
 GIVEN `filed on time` IS A MAYBE BOOLEAN
 GIVETH A BOOLEAN
@@ -249,9 +251,10 @@ GIVETH A BOOLEAN
 
 **Notes:**
 
-- The three prelude combinators are `holds p` (≡ `fromMaybe FALSE`, closed-world
-  grounding), `naf p` (≡ `NOT (holds p)`, negation as failure), and `presumed p`
-  (≡ `fromMaybe TRUE`, the open-world dual).
+- The three combinators live in the dedicated [negation-as-failure](../libraries/negation-as-failure.md)
+  library: `holds p` (≡ `fromMaybe FALSE`, closed-world grounding), `naf p`
+  (≡ `NOT (holds p)`, negation as failure), and `presumed p` (≡ `fromMaybe TRUE`,
+  the open-world dual).
 - `naf` succeeds on everything not provably true -- both the refuted (`JUST FALSE`)
   and the unknown (`NOTHING`) cases -- mirroring Prolog's `\+`.
 - The default value *is* the closed-world / open-world knob: `FALSE` for `holds`,
@@ -259,9 +262,11 @@ GIVETH A BOOLEAN
   failure" (obligations) and "silence = permission" (deontic liberty).
 - Contrast with [UNLESS](#unless): UNLESS negates a *known* `BOOLEAN` exception
   (`p AND NOT q`); negation-as-failure handles a *possibly-undecided* proposition.
-- See the [prelude reference](../libraries/prelude.md) for the full truth table, and
-  the runnable example (with a Kleene three-valued lift)
-  [negation-as-failure.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure.l4).
+- Each combinator carries an `@nlg` annotation, so `in breach` above renders as
+  "In breach if filed on time has not been proven true" without any extra work.
+- See the [negation-as-failure reference](../libraries/negation-as-failure.md) for
+  the full truth table, and the runnable example (with a Kleene three-valued lift)
+  [negation-as-failure-examples.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure-examples.l4).
 
 ---
 

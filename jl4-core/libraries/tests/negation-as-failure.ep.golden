@@ -1,0 +1,35 @@
+IMPORT prelude
+
+-- Negation as failure (NAF), the functional way.
+-- A MAYBE BOOLEAN is a proposition that may or may not have been settled:
+--   JUST TRUE   proven true
+--   JUST FALSE  proven false
+--   NOTHING     no proof either way (the open question / the default)
+-- Negation as failure is the closed-world assumption -- the act of defaulting
+-- "unproven" to FALSE -- and that act is already `fromMaybe FALSE`.
+
+§ `Negation as Failure`
+
+-- `holds` grounds a MAYBE BOOLEAN under the closed-world assumption: absence
+-- of proof is FALSE. This is exactly `fromMaybe FALSE`; the legal reading
+-- earns it a name of its own.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+holds p @nlg %p% has been proven true
+  MEANS fromMaybe FALSE p
+
+-- Negation as failure: succeeds exactly when p cannot be proven true. Both
+-- the refuted case (JUST FALSE) and the unknown case (NOTHING) make `naf`
+-- succeed, mirroring Prolog's `\+` under SLDNF resolution.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+naf p @nlg %p% has not been proven true
+  MEANS NOT (holds p)
+
+-- The open-world dual of `holds`: an undecided proposition defaults to TRUE
+-- ("not forbidden => permitted"). Flipping the default FALSE <-> TRUE is
+-- exactly the closed-world / open-world switch.
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+presumed p @nlg %p% has not been proven false
+  MEANS fromMaybe TRUE p
