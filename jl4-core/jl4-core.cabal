@@ -167,12 +167,14 @@ test-suite jl4-core-test
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    TracePostprocessSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,
