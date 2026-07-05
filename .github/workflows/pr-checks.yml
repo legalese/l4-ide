@@ -2,7 +2,9 @@ name: PR Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, unstable]
+  push:
+    branches: [main, unstable]
 
 # Only run one check per PR to save resources
 concurrency:
