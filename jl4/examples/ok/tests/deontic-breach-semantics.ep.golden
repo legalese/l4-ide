@@ -1,0 +1,216 @@
+-- Regression pins for the deontic breach-semantics fix cluster:
+--
+--   (b) RAND/ROR over ANY both-breached pair (DeadlineMissed and/or
+--       ExplicitBreach) reports a breach instead of a residual:
+--       RAND reports the earliest breach, ROR the latest; untimestamped
+--       ExplicitBreach pairs fall back to the tie-break (RAND left, ROR right).
+--   (c) the event whose timestamp reveals deadline expiry is re-offered to
+--       the HENCE/LEST continuation instead of being silently consumed.
+--   (d) the deadline boundary is strict: arriving exactly AT the deadline is
+--       timely; a violated prohibition reuses the event stamp as its
+--       "deadline" sentinel.
+--   (e) EXACTLY in per-argument position (the corrected README example).
+--   MAY expiry routes to LEST (default FULFILLED) per the README
+--   default-consequence matrix; HENCE fires only on exercise.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  pay HAS amount IS A NUMBER
+  deliver
+  smoke
+  exercise
+
+-- ---------------------------------------------------------------------------
+-- (b) both alternatives breached
+-- ---------------------------------------------------------------------------
+
+GIVETH A DEONTIC Person Action
+`ror both explicit` MEANS
+    (PARTY Alice MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed first")
+    ROR
+    (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
+
+-- Both alternatives definitively breached => single breach (not a residual OR).
+-- ExplicitBreach is untimestamped, so ROR reports the RIGHT operand.
+#TRACE `ror both explicit` AT 0 WITH
+    (`WAIT UNTIL` 20)
+
+GIVETH A DEONTIC Person Action
+`rand both explicit` MEANS
+    (PARTY Alice MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed first")
+    RAND
+    (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
+
+-- RAND over an untimestamped pair reports the LEFT operand ("the reason").
+#TRACE `rand both explicit` AT 0 WITH
+    (`WAIT UNTIL` 20)
+
+GIVETH A DEONTIC Person Action
+`explicit or deadline` MEANS
+    (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
+    ROR
+    (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`deadline or explicit` MEANS
+    (PARTY Bob MUST deliver WITHIN 10)
+    ROR
+    (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
+
+-- Mixed breach kinds, both operand orders: a single breach, the right operand.
+#TRACE `explicit or deadline` AT 0 WITH
+    (`WAIT UNTIL` 20)
+
+#TRACE `deadline or explicit` AT 0 WITH
+    (`WAIT UNTIL` 20)
+
+GIVETH A DEONTIC Person Action
+`one breached one pending` MEANS
+    (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
+    ROR
+    (PARTY Bob MUST deliver WITHIN 10)
+
+-- Control: only ONE alternative breached, the other still live => residual
+-- (Bob may still deliver); the compound must NOT breach yet.
+#TRACE `one breached one pending` AT 0 WITH
+    (`WAIT UNTIL` 7)
+
+-- ---------------------------------------------------------------------------
+-- (c) the deadline-revealing event is re-offered to the continuation
+-- ---------------------------------------------------------------------------
+
+`late delivery discharges the reparation` MEANS
+  PARTY Alice
+  MUST pay 100
+  WITHIN 5
+  LEST (PARTY Bob MUST deliver WITHIN 10)
+
+-- Bob's delivery AT 7 both reveals Alice's expiry (7 > 5) AND is the very
+-- action the LEST reparation waits for => FULFILLED (not a pending residual).
+#TRACE `late delivery discharges the reparation` AT 0 WITH
+  PARTY 7
+
+DOES Bob AT deliver `prohibition hence sees the revealer` MEANS
+  PARTY Alice
+  SHANT smoke
+  WITHIN 5
+  HENCE (PARTY Bob MUST deliver WITHIN 10)
+
+-- Same re-offer on the prohibition HENCE path: the prohibition was respected,
+-- and the revealing delivery discharges the HENCE obligation => FULFILLED.
+#TRACE `prohibition hence sees the revealer` AT 0 WITH
+  PARTY 7
+
+DOES Bob AT deliver `anchor at reveal` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN 2
+  LEST (PARTY Alice MUST pay 2 WITHIN 3)
+
+-- The continuation's clock anchors at the revealing event's stamp: the
+-- re-offered event (Bob at 7, wrong party) decrements the LEST WITHIN by
+-- zero, so the residual still shows WITHIN 3.
+#TRACE `anchor at reveal` AT 0 WITH
+  PARTY 7
+
+DOES Bob AT deliver `nested peel` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN 2
+  LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
+
+-- Each re-offer peels exactly one HENCE/LEST layer (termination), and WAIT
+-- sentinels re-offered to a continuation merely advance its clock:
+-- WAIT@20 expires layer 1, WAIT@30 expires layer 2 (deadline 20+3),
+-- Bob's delivery at 35 discharges layer 3 (deadline 30+10) => FULFILLED.
+#TRACE `nested peel` AT 0 WITH
+  (`WAIT UNTIL` 20)
+  (`WAIT UNTIL` 30)
+  PARTY 35
+
+DOES Bob AT deliver GIVETH A DEONTIC Person Action
+`one event repairs both alternatives` MEANS
+    (PARTY Alice MUST pay 1 WITHIN 2 LEST (PARTY Bob MUST deliver WITHIN 10))
+    ROR
+    (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
+
+-- Re-offer x ROR interaction: the single late delivery reveals expiry on BOTH
+-- alternatives and is then re-offered inside each, fulfilling both LESTs.
+#TRACE `one event repairs both alternatives` AT 0 WITH
+  PARTY 5
+
+-- ---------------------------------------------------------------------------
+-- (d) at-deadline boundary; SHANT stamp-as-deadline sentinel
+-- ---------------------------------------------------------------------------
+
+DOES Bob AT deliver `pay due` MEANS
+  PARTY Alice
+  MUST pay 100
+  WITHIN 5
+
+-- Exactly AT the deadline: timely.
+#TRACE `pay due` AT 0 WITH
+  PARTY 5
+
+-- Clock advanced exactly TO the deadline: not yet expired (residual WITHIN 0).
+DOES Alice AT pay 100 #TRACE `pay due` AT 0 WITH
+  (`WAIT UNTIL` 5)
+
+-- Strictly past the deadline: breach, "deadline, which was at 5".
+#TRACE `pay due` AT 0 WITH
+  (`WAIT UNTIL` 6)
+
+`no smoking` MEANS
+  PARTY Alice
+  SHANT smoke
+  WITHIN 30
+
+-- Prohibited action exactly AT the deadline is still a violation; the breach
+-- record reuses the event stamp as its "deadline" sentinel (both fields 30).
+#TRACE `no smoking` AT 0 WITH
+  PARTY 30
+
+-- Prohibition respected once the deadline has passed => FULFILLED.
+DOES Alice AT smoke #TRACE `no smoking` AT 0 WITH
+  (`WAIT UNTIL` 31)
+
+-- ---------------------------------------------------------------------------
+-- (e) EXACTLY in per-argument position (corrected README example)
+-- ---------------------------------------------------------------------------
+
+`pay exactly 100` MEANS
+  PARTY Alice
+  MUST pay EXACTLY 100
+  WITHIN 30
+
+#TRACE `pay exactly 100` AT 0 WITH
+  PARTY 10
+
+-- ---------------------------------------------------------------------------
+-- MAY expiry routes to LEST; HENCE fires only on exercise
+-- ---------------------------------------------------------------------------
+
+DOES Alice AT pay 100 `may with lest` MEANS
+  PARTY Alice
+  MAY exercise
+  WITHIN 5
+  HENCE (PARTY Bob MUST deliver WITHIN 10)
+  LEST (PARTY Bob MUST deliver WITHIN 20)
+
+-- Permission NOT exercised: expiry routes to LEST, and the revealing delivery
+-- is re-offered to it => FULFILLED.
+#TRACE `may with lest` AT 0 WITH
+  PARTY 7
+
+-- Permission exercised: HENCE obligation becomes the residual.
+DOES Bob AT deliver #TRACE `may with lest` AT 0 WITH
+  PARTY 3
+
+DOES Alice AT exercise `may bare` MEANS
+  PARTY Alice
+  MAY exercise
+  WITHIN 5
+
+-- Bare MAY expiry: LEST defaults to FULFILLED (same outcome as before).
+#TRACE `may bare` AT 0 WITH
+  (`WAIT UNTIL` 9)

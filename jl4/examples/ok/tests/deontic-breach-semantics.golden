@@ -1,0 +1,101 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+deontic-breach-semantics.l4:35:1-36:22:
+  DEONTIC BREACHED:
+    BREACH
+    BY Bob
+    BECAUSE "missed second"
+deontic-breach-semantics.l4:45:1-46:22:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "missed first"
+deontic-breach-semantics.l4:61:1-62:22:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:64:1-65:22:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "missed payment"
+deontic-breach-semantics.l4:75:1-76:21:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "missed payment" OR PARTY Bob
+  MUST deliver
+  WITHIN 3
+  HENCE FULFILLED
+deontic-breach-semantics.l4:90:1-91:30:
+  FULFILLED
+deontic-breach-semantics.l4:101:1-102:30:
+  FULFILLED
+deontic-breach-semantics.l4:113:1-114:30:
+  PARTY Alice
+  MUST pay 2
+  WITHIN 3
+  HENCE FULFILLED
+deontic-breach-semantics.l4:126:1-129:31:
+  FULFILLED
+deontic-breach-semantics.l4:139:1-140:30:
+  FULFILLED
+deontic-breach-semantics.l4:152:1-153:32:
+  FULFILLED
+deontic-breach-semantics.l4:156:1-157:19:
+  PARTY Alice
+  MUST pay 100
+  WITHIN 0
+  HENCE FULFILLED
+deontic-breach-semantics.l4:160:1-161:19:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      6
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST pay 100
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:170:1-171:31:
+  DEONTIC BREACHED:
+    party
+      Alice
+    who did action
+      smoke
+    at
+      30
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST NOT smoke
+    before their deadline, which was at
+      30
+deontic-breach-semantics.l4:174:1-175:20:
+  FULFILLED
+deontic-breach-semantics.l4:186:1-187:33:
+  FULFILLED
+deontic-breach-semantics.l4:202:1-203:30:
+  FULFILLED
+deontic-breach-semantics.l4:206:1-207:33:
+  PARTY Bob
+  MUST deliver
+  WITHIN 10
+  HENCE FULFILLED
+deontic-breach-semantics.l4:215:1-216:19:
+  FULFILLED
