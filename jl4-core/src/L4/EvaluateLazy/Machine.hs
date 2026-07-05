@@ -974,27 +974,50 @@ backwardContractFrame val = \ case
       -- the current time is advances to 3 but the due is
       -- now earlier, it is  due within 2, i.e. 3 - (3 - 2)
       newDue = due' - (stamp - time')
+    -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
+    -- the deadline instant is timely; expiry requires stamp strictly greater.
+    -- The spec (doc/reference/regulative/README.md) speaks of the deadline
+    -- "passing", which at the boundary instant it has not yet done.
     if stamp > deadline
       -- NOTE: the deadline has passed. What happens depends on the deontic modal:
       -- MUST/DO: deadline passed without action = BREACH (or LEST if specified)
       -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
-      -- MAY: deadline passed without exercising permission = FULFILLED (or HENCE if specified)
-      then case act.modal of
-        DMustNot ->
-          -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
-          -- Continue with HENCE (followup), which defaults to FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
-        DMay ->
-          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
-        _ -> -- DMust, DDo: deadline passed = failure
-          case lest of
-            Nothing -> do
-              -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
-              partyR <- either (`allocate_` env) allocateValue party
-              continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
-            Just lestFollowup -> allocateValue ev'time
-              >>= continueWithFollowup env lestFollowup events
+      -- MAY: deadline passed without exercising permission = FULFILLED (or LEST if specified)
+      --
+      -- NOTE: the event whose timestamp reveals that the deadline has passed
+      -- is only a WITNESS that time advanced; it is not consumed by the
+      -- expired obligation (CSL residuation: the obligation reduces to its
+      -- continuation, which then processes the event). So we re-offer the
+      -- revealing event to the HENCE/LEST continuation — e.g. a payment
+      -- arriving after the deadline must still be able to discharge the LEST
+      -- reparation it was authored for. The continuation's clock is anchored
+      -- at the revealing event's stamp (the README is silent on the anchor;
+      -- this is the historical behavior), so the re-offered event decrements
+      -- the continuation's WITHIN by zero. Termination is preserved: each
+      -- re-offer peels one syntactic HENCE/LEST layer.
+      then do
+        let reoffer followup' = do
+              ev'timeR <- allocateValue ev'time
+              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+              eventsR <- allocateValue (ValCons evR events)
+              continueWithFollowup env followup' eventsR ev'timeR
+        case act.modal of
+          DMustNot ->
+            -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
+            -- Continue with HENCE (followup), which defaults to FULFILLED
+            reoffer followup
+          DMay ->
+            -- Permission was NOT EXERCISED: per the README default-consequence
+            -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
+            -- HENCE fires only when the permitted action is taken.
+            reoffer (fromMaybe fulfilExpr lest)
+          _ -> -- DMust, DDo: deadline passed = failure
+            case lest of
+              Nothing -> do
+                -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                partyR <- either (`allocate_` env) allocateValue party
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
+              Just lestFollowup -> reoffer lestFollowup
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -1047,7 +1070,14 @@ backwardContractFrame val = \ case
               ev'partyRef <- allocateValue ev'party
               partyRef <- allocateValue party
               -- For prohibition breach, we use the action time as "deadline"
-              -- since the action should never have happened
+              -- since the action should never have happened. This sentinel
+              -- (deadline == event timestamp) is deliberate and reaches the
+              -- wire: a violated prohibition serializes with equal
+              -- "timestamp" and "deadline" fields (see the ReasonForBreach
+              -- ToJSON instance in L4.Evaluate.ValueLazyJSON). The README
+              -- matrix only mandates SHANT+action => LEST/breach and does not
+              -- prescribe the breach record's deadline field, so this does
+              -- not contradict the spec.
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
           -- MUST, MAY, DO: action done = success
           _ -> allocateValue time
