@@ -8,6 +8,9 @@ module L4.Desugar (
   desugarComputedFields,
   detectComputedFieldCycles,
   extractComputedFieldNames,
+  -- * Type Synonyms
+  --
+  detectTypeSynonymCycles,
   ) where
 
 
@@ -432,6 +435,46 @@ detectCFCDeclare _ = []
 exprFieldRefs :: Set RawName -> Expr Name -> Set RawName
 exprFieldRefs fieldNames expr =
   Set.fromList [rawName n | n <- toList expr, rawName n `Set.member` fieldNames]
+
+-- ----------------------------------------------------------------------------
+-- Cycle Detection for Type Synonyms
+-- ----------------------------------------------------------------------------
+
+-- | Detect cycles among the type synonym declarations of a module.
+-- Returns the members of each cyclic strongly-connected component.
+--
+-- A recursive synonym has no finite expansion, so it would otherwise send
+-- the type checker's synonym-expanding loops into infinite regress.
+-- Like 'detectComputedFieldCycles' this matches names textually, which
+-- over-approximates references; a synonym's own type parameters are
+-- excluded from its dependencies so that a parameter shadowing a sibling
+-- synonym's name cannot manufacture a spurious cycle.
+detectTypeSynonymCycles :: Module Name -> [[Name]]
+detectTypeSynonymCycles (MkModule _ _ section) =
+  let
+    synonyms = synonymsInSection section
+    synonymNames = Set.fromList [rawName n | (n, _, _) <- synonyms]
+    graphData =
+      [ (n, rawName n, Set.toList (typeNameRefs (synonymNames `Set.difference` params) ty))
+      | (n, params, ty) <- synonyms
+      ]
+  in
+    [ cyc | CyclicSCC cyc <- stronglyConnComp graphData ]
+
+-- | All type synonym declarations in a section (recursively):
+-- name, type parameters, body.
+synonymsInSection :: Section Name -> [(Name, Set RawName, Type' Name)]
+synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
+  where
+    go (Declare _ (MkDeclare _ _ (MkAppForm _ n args _) (SynonymDecl _ ty))) =
+      [(n, Set.fromList (rawName <$> args), ty)]
+    go (Section _ s) = synonymsInSection s
+    go _ = []
+
+-- | Names referenced in a type, restricted to the given candidate set.
+typeNameRefs :: Set RawName -> Type' Name -> Set RawName
+typeNameRefs candidates ty =
+  Set.fromList [rawName n | n <- toList ty, rawName n `Set.member` candidates]
 
 -- ----------------------------------------------------------------------------
 -- Extract Computed Field Names

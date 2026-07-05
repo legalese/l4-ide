@@ -91,6 +91,8 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | CyclicTypeSynonyms [Name]
+    -- ^ Circular dependency between type synonym declarations (cycle members)
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
