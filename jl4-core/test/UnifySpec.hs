@@ -111,6 +111,130 @@ spec = describe "Unification" $ do
         ]
       ok `shouldBe` True
 
+    it "rejects a self-recursive synonym hidden behind an AKA alias" $ do
+      -- The cycle detector must see references through aliases, or the
+      -- cycle evades declaration-time rejection and falls through to the
+      -- expansion fuel (which, per-path, is the last line of defense).
+      let result = checkWithImports emptyVFS $ Text.unlines
+            [ "DECLARE Loop AKA L IS A L"
+            , ""
+            , "GIVETH A Loop"
+            , "oops MEANS 42"
+            ]
+      case result of
+        Left errs -> fail ("unexpected pipeline failure: " <> show errs)
+        Right r -> do
+          r.tcdSuccess `shouldBe` False
+          [e | MkCheckErrorWithContext e@(CyclicTypeSynonyms _) _ <- r.tcdErrors]
+            `shouldSatisfy` (not . null)
+
+    it "terminates when a cyclic synonym is applied as a function (matchFunTy fuel)" $ do
+      -- Decl-time errors do not stop checking, so the application below
+      -- still drives matchFunTy's expansion loop over the cyclic synonym;
+      -- pre-fuel this hung forever.
+      ok <- checks $ Text.unlines
+        [ "DECLARE Loop IS A Loop"
+        , ""
+        , "GIVETH A Loop"
+        , "f MEANS 42"
+        , ""
+        , "result MEANS f 1"
+        ]
+      ok `shouldBe` False
+
+    it "accepts a deep acyclic synonym chain well within the fuel budget" $ do
+      -- A 500-link alias chain needs 500 expansions along one path; the
+      -- budget (1000) must not reject legitimate depth.
+      ok <- checks $ Text.unlines $
+        synonymChain 500
+          <> [ ""
+             , "GIVETH A S500"
+             , "x MEANS 42"
+             ]
+      ok `shouldBe` True
+
+    it "rejects (terminating) past the documented fuel bound of 1000 expansions" $ do
+      -- Documented completeness boundary: a >1000-deep chain exhausts the
+      -- per-path expansion fuel and is reported as a mismatch rather than
+      -- hanging. If this test starts failing because the budget changed,
+      -- update the constant in the test name and move on.
+      ok <- checks $ Text.unlines $
+        synonymChain 1200
+          <> [ ""
+             , "GIVETH A S1200"
+             , "x MEANS 42"
+             ]
+      ok `shouldBe` False
+
+    it "unifies identical doubling-synonym towers in linear time (equality short-circuit)" $ do
+      -- DAG-shaped synonyms (body mentions the parameter chain twice)
+      -- explode exponentially if expanded before comparison; identical
+      -- sides must short-circuit. Pre-fix n=22 took >60s; this must
+      -- finish within the watchdog.
+      ok <- checks $ Text.unlines $
+        doublingTower 22
+          <> [ ""
+             , "GIVEN p IS A D22"
+             , "GIVETH A D22"
+             , "same p MEANS p"
+             ]
+      ok `shouldBe` True
+
+  describe "occurs check within one walk" $ do
+    it "rejects PAIR OF a, a against PAIR OF b, LIST OF b" $ do
+      -- Pre-fix, the overwrite in bind masked this indirect infinite
+      -- type: the first component bound b := a, then the second rebound
+      -- rather than noticing a occurs in LIST OF a.
+      ok <- checks $ Text.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "GIVEN a IS A TYPE"
+        , "GIVETH A PAIR OF a, a"
+        , "ASSUME diag"
+        , ""
+        , "GIVEN b IS A TYPE"
+        , "      p IS A PAIR OF b, LIST OF b"
+        , "GIVETH A BOOLEAN"
+        , "g p MEANS TRUE"
+        , ""
+        , "bad MEANS g diag"
+        ]
+      ok `shouldBe` False
+
+  describe "cyclic substitutions via function types" $ do
+    it "terminates and accepts swapped FUNCTION type arguments fed the same unknown" $ do
+      -- Same shape as the PAIR case but through unifyBase's Fun branch,
+      -- which re-substitutes independently of the TyApp branch.
+      ok <- checks $ Text.unlines
+        [ "GIVEN a IS A TYPE"
+        , "      b IS A TYPE"
+        , "      f IS A FUNCTION FROM a TO b"
+        , "      g IS A FUNCTION FROM b TO a"
+        , "GIVETH A BOOLEAN"
+        , "duo f g MEANS TRUE"
+        , ""
+        , "ASSUME mystery"
+        , ""
+        , "ok MEANS duo mystery mystery"
+        ]
+      ok `shouldBe` True
+
+  describe "synonym expansion exposing inference variables" $ do
+    it "accepts an identity synonym used at an inferred instantiation" $ do
+      -- Expanding 'Id OF ?a' yields the bare inference variable ?a, which
+      -- the expansion path must handle (it re-enters the InfVar cases).
+      ok <- checks $ Text.unlines
+        [ "DECLARE Id a IS AN a"
+        , ""
+        , "GIVEN a IS A TYPE"
+        , "      x IS AN Id OF a"
+        , "GIVETH AN a"
+        , "unwrap x MEANS x"
+        , ""
+        , "n MEANS unwrap 42"
+        ]
+      ok `shouldBe` True
+
     it "does not report a cycle when a synonym's parameter matches a sibling's name" $ do
       -- Name resolution rejects the shadowed reference as ambiguous, which
       -- is fine — but the cycle detector must not pile on with a spurious
@@ -129,3 +253,22 @@ spec = describe "Unification" $ do
           r.tcdSuccess `shouldBe` False
           [e | MkCheckErrorWithContext e@(CyclicTypeSynonyms _) _ <- r.tcdErrors]
             `shouldBe` []
+
+-- | DECLARE S0 IS A NUMBER, then a linear alias chain S1 .. Sn.
+synonymChain :: Int -> [Text]
+synonymChain n =
+  "DECLARE S0 IS A NUMBER"
+    : [ "DECLARE S" <> tshow i <> " IS A S" <> tshow (i - 1) | i <- [1 .. n] ]
+
+-- | A DAG-shaped synonym tower: each level pairs the previous level
+-- with itself, so naive expansion is exponential in the height.
+doublingTower :: Int -> [Text]
+doublingTower n =
+  "IMPORT prelude"
+    : "DECLARE D0 IS A NUMBER"
+    : [ "DECLARE D" <> tshow i <> " IS A PAIR OF D" <> tshow (i - 1) <> ", D" <> tshow (i - 1)
+      | i <- [1 .. n]
+      ]
+
+tshow :: Int -> Text
+tshow = Text.pack . show

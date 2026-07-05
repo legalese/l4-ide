@@ -1937,9 +1937,13 @@ matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr 
 matchFunTy _isProjection _r t []   =
   pure ([], t)
 matchFunTy  isProjection r t0 args =
-  -- The fuel bounds the substitution-chasing / synonym-expansion chain so
-  -- that a cyclic type synonym (possible across modules) cannot make us
-  -- loop; when it runs out, we report the current type as non-applicable.
+  -- The fuel bounds the synonym-expansion chain so that a cyclic type
+  -- synonym (which evades declaration-time detection when it arrives via
+  -- imports) cannot make us loop; when it runs out, we report the current
+  -- type as non-applicable. Substitution-chase steps do NOT consume fuel:
+  -- the substitution is acyclic (see 'bind' in L4.TypeCheck.Unify), so
+  -- chasing terminates on its own, and long chains arise from legitimate
+  -- alias definitions.
   go synonymExpansionFuel t0
   where
     go :: Int -> Type' Resolved -> Check ([Expr Resolved], Type' Resolved)
@@ -1964,7 +1968,7 @@ matchFunTy  isProjection r t0 args =
                 rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
                 pure (rargs, rt)
 
-              Just t' -> go (fuel - 1) t'
+              Just t' -> go fuel t'
           Fun _ann onts rt
             -- We know already that the type of the thing we're applying
             -- is a function, good. So we can check the number of arguments

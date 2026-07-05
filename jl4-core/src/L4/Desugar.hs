@@ -444,37 +444,52 @@ exprFieldRefs fieldNames expr =
 -- Returns the members of each cyclic strongly-connected component.
 --
 -- A recursive synonym has no finite expansion, so it would otherwise send
--- the type checker's synonym-expanding loops into infinite regress.
+-- the type checker's synonym-expanding loops into infinite regress (those
+-- loops carry fuel as a backstop, since a cycle can also arrive via
+-- imports — see 'L4.TypeCheck.Unify').
+--
 -- Like 'detectComputedFieldCycles' this matches names textually, which
--- over-approximates references; a synonym's own type parameters are
--- excluded from its dependencies so that a parameter shadowing a sibling
--- synonym's name cannot manufacture a spurious cycle.
+-- over-approximates references (it is blind to arity and to whether a
+-- name would actually resolve to the sibling synonym); a synonym's own
+-- type parameters are excluded from its dependencies so that a parameter
+-- shadowing a sibling synonym's name cannot manufacture a spurious cycle.
+-- A synonym is referenceable through its AKA aliases as well as its
+-- primary name, so aliases participate on both sides of the graph.
 detectTypeSynonymCycles :: Module Name -> [[Name]]
 detectTypeSynonymCycles (MkModule _ _ section) =
   let
     synonyms = synonymsInSection section
-    synonymNames = Set.fromList [rawName n | (n, _, _) <- synonyms]
+    -- alias or primary raw name -> primary raw name
+    primaryName = Map.fromList
+      [ (referenceName, rawName n)
+      | (n, aliases, _, _) <- synonyms
+      , referenceName <- rawName n : aliases
+      ]
     graphData =
-      [ (n, rawName n, Set.toList (typeNameRefs (synonymNames `Set.difference` params) ty))
-      | (n, params, ty) <- synonyms
+      [ (n, rawName n, Set.toList deps)
+      | (n, _aliases, params, ty) <- synonyms
+      , let deps = Set.fromList
+              [ primary
+              | r <- toList ty
+              , not (rawName r `Set.member` params)
+              , Just primary <- [Map.lookup (rawName r) primaryName]
+              ]
       ]
   in
     [ cyc | CyclicSCC cyc <- stronglyConnComp graphData ]
 
 -- | All type synonym declarations in a section (recursively):
--- name, type parameters, body.
-synonymsInSection :: Section Name -> [(Name, Set RawName, Type' Name)]
+-- name, AKA aliases, type parameters, body.
+synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
 synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
   where
-    go (Declare _ (MkDeclare _ _ (MkAppForm _ n args _) (SynonymDecl _ ty))) =
-      [(n, Set.fromList (rawName <$> args), ty)]
+    go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
+      [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
     go (Section _ s) = synonymsInSection s
     go _ = []
 
--- | Names referenced in a type, restricted to the given candidate set.
-typeNameRefs :: Set RawName -> Type' Name -> Set RawName
-typeNameRefs candidates ty =
-  Set.fromList [rawName n | n <- toList ty, rawName n `Set.member` candidates]
+    akaNames Nothing              = []
+    akaNames (Just (MkAka _ ns))  = rawName <$> ns
 
 -- ----------------------------------------------------------------------------
 -- Extract Computed Field Names
