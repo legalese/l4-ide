@@ -237,6 +237,46 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
+  | Record     Anno (Expr n) (Expr n) Bool (Maybe (Expr n))
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). Cell expr, value expr, an
+    -- isOfficial flag, and an optional @HENCE@ continuation (M5).
+    --
+    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger),
+    -- 'True' = @COMMIT@/@ATTEST@ (the shared official record). The flag is stored
+    -- faithfully so M4 can split own/official.
+    --
+    -- The final 'Maybe (Expr n)' is the M5 @HENCE@ continuation: 'Nothing' is the
+    -- M1 expression-position form (@RECORD <cell> IS <v>@ evaluates to @v@);
+    -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
+    -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
+    -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
+  | ReadCell   Anno (Maybe (Expr n)) Bool (Expr n)
+    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5 / M4.5).
+    -- @RECALL [<party>'s | OFFICIAL's] <cell>@. (@OFFICIAL@ is a case-sensitive
+    -- keyword, all-caps like @RECORD@/@COMMIT@/@RECALL@; lowercase @official@
+    -- remains an ordinary identifier.)
+    --
+    -- The fields are: an optional /party-qualifier/ expression, an /isOfficial/
+    -- flag, and the /cell/ expr (a string-keyed path: a backtick ident or string
+    -- literal, the same surface as 'Record').
+    --
+    --   * @RECALL <cell>@            — @(Nothing, False)@: read the CURRENT acting
+    --     party's own ledger (the M1.5 default, unchanged).
+    --   * @RECALL <party>'s <cell>@  — @(Just party, False)@: read ANOTHER party's
+    --     OWN ledger. The party qualifier is a NAME-RESOLVED expression (the same
+    --     party value a PARTY clause uses), rendered via @partyKeyWHNF@ so the
+    --     read key matches a write key exactly.
+    --   * @RECALL OFFICIAL's <cell>@ — @(Nothing, True)@: read the shared OFFICIAL
+    --     record (the COMMIT/ATTEST target).
+    --
+    -- Parser-enforced invariant: @isOfficial == True@ implies the @Maybe@ is
+    -- 'Nothing' (an official read has no party qualifier). This mirrors 'Record'\'s
+    -- flat (cell, val, isOfficial, mHence) encoding rather than a parameterized
+    -- sum, so no extra instance derivation is needed.
+    --
+    -- It forward-evaluates the cell to a 'Path', reads the latest 'snapshot'
+    -- projection of the routed M0/M4 ledger, and yields @MAYBE a@ — @JUST v@ if
+    -- the cell has been written there, @NOTHING@ otherwise.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
@@ -736,6 +776,11 @@ instance ToConcreteNodes PosToken Text where
 
 -- InertContext has no concrete syntax nodes (derived during desugaring)
 instance ToConcreteNodes PosToken InertContext where
+  toNodes _ = pure []
+
+-- Bool has no concrete syntax nodes (used in Record for the isOfficial flag;
+-- the RECORD/COMMIT/ATTEST keyword is already captured in the surrounding Anno)
+instance ToConcreteNodes PosToken Bool where
   toNodes _ = pure []
 
 instance ToConcreteNodes PosToken Name where

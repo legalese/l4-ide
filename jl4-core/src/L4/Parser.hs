@@ -1437,6 +1437,8 @@ baseExpr' =
   <|> fetchExpr
   <|> envExpr
   <|> postExpr
+  <|> recordOrCommitExpr
+  <|> recallExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -1689,6 +1691,90 @@ postExpr = do
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
+
+-- | @RECORD <cell> IS <expr>@ (own ledger) and
+-- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1,
+-- with an optional trailing @HENCE <expr>@ continuation (M5).
+-- Both lower to the same 'Record' node; the keyword choice sets the
+-- @isOfficial@ flag ('False' for @RECORD@, 'True' for @COMMIT@/@ATTEST@).
+--
+-- M5: the value is parsed with 'indentedExpr current', which STOPS at the
+-- reserved @HENCE@ keyword (the deontic-followup parser relies on the same
+-- property) and may not dedent past the RECORD, so the value never swallows
+-- @HENCE k@. When a @HENCE@ follows, it is parsed into the 'Record' node's
+-- optional continuation, making the write an event-free deontic step.
+--
+-- The HENCE *continuation* is parsed at the lenient block threshold @mkPos 1@
+-- (exactly as top-level 'expr' is), NOT at @current@: in the idiomatic flat
+-- chain the chained @HENCE@ sits to the LEFT of @RECORD@ (aligned with the
+-- enclosing obligation's @HENCE@s), so anchoring to the RECORD's own column
+-- would wrongly reject it. @mkPos 1@ still halts cleanly at the next col-1 token
+-- (e.g. a following @#TRACE@ or top-level declaration).
+recordOrCommitExpr :: Parser (Expr Name)
+recordOrCommitExpr = do
+  current <- Lexer.indentLevel
+  attachAnno $
+    (\isOfficial cell val mHence -> Record emptyAnno cell val isOfficial mHence)
+      <$> ( (False <$ annoLexeme (spacedKeyword_ TKRecord))
+        <|> (True  <$ annoLexeme (spacedKeyword_ TKCommit))
+        <|> (True  <$ annoLexeme (spacedKeyword_ TKAttest))
+          )
+      <*> annoHole cellExpr
+      <*  annoLexeme (spacedKeyword_ TKIs)
+      <*> annoHole (indentedExpr current)
+      <*> optionalWithHole (hence (mkPos 1))
+
+-- | @RECALL [<party>'s | OFFICIAL's] <cell>@ — STATE-AS-LEDGER M1.5 + M4.5.
+-- Reads a cell back from a ledger, yielding @MAYBE a@. The cell uses the SAME
+-- 'cellExpr' surface as RECORD/COMMIT/ATTEST (a backtick ident or a string
+-- literal), so a read and a write name a cell the same way.
+--
+-- After @RECALL@ we parse an OPTIONAL qualifier (M4.5), then the cell:
+--
+--   * @OFFICIAL's@      => @(Nothing, True)@  — read the shared OFFICIAL record.
+--   * @<party>'s@       => @(Just party, False)@ — read another party's OWN ledger.
+--     The party is a minimal name atom (NOT a full expression), wrapped as a
+--     @Var@ ('App' with no args), so it is name-resolved exactly like a PARTY.
+--   * (no qualifier)    => @(Nothing, False)@ — read the CURRENT party's own ledger.
+--
+-- Disambiguation: @OFFICIAL@ is a reserved, case-sensitive keyword (@TKOfficial@),
+-- tried first.
+-- The party branch uses @try (name <* TGenitive)@ so that, absent a following
+-- @'s@, it backtracks and the token is parsed as the cell instead (a backtick
+-- 'cellExpr' name and a backtick party 'name' otherwise overlap). 'cellExpr'
+-- being restrictive (backtick/string) keeps it from colliding with the cell.
+recallExpr :: Parser (Expr Name)
+recallExpr =
+  attachAnno $
+    (\(mParty, isOfficial) cell -> ReadCell emptyAnno mParty isOfficial cell)
+      <$  annoLexeme (spacedKeyword_ TKRecall)
+      <*> recallQualifier
+      <*> annoHole cellExpr
+
+-- | The optional party/official qualifier of a @RECALL@ (M4.5). Produces the
+-- @(Maybe partyExpr, isOfficial)@ pair feeding 'ReadCell'. The parsed pieces
+-- contribute to the surrounding annotation via 'annoLexeme'/'annoHole'.
+recallQualifier :: AnnoParser (Maybe (Expr Name), Bool)
+recallQualifier =
+      tryParser ((Nothing, True) <$  annoLexeme (spacedKeyword_ TKOfficial)
+                                 <*  annoLexeme (spacedToken_ (TIdentifiers TGenitive)))
+  <|> ((\p -> (Just p, False)) <$> annoHole (try (App emptyAnno <$> name <*> pure [] <* genitive)))
+  <|> pure (Nothing, False)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
+
+-- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
+-- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a
+-- plain string literal, lowering BOTH to a 'StringLit'. This keeps the cell
+-- out of name resolution: it is data (a key), not a variable reference.
+cellExpr :: Parser (Expr Name)
+cellExpr =
+  attachAnno (Lit emptyAnno <$> annoHole cellLit)
+
+cellLit :: Parser Lit
+cellLit =
+      attachAnno (StringLit emptyAnno <$> annoEpa (spacedToken (#_TIdentifiers % #_TQuoted) "quoted cell name"))
+  <|> stringLit
 
 negation :: Parser (Expr Name)
 negation = do

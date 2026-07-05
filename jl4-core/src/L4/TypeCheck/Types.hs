@@ -154,6 +154,7 @@ data ExpectationContext =
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

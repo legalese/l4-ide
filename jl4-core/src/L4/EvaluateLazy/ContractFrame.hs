@@ -50,6 +50,12 @@ data ContractFrame
   -- ^ Regulative BinOp frame while evaluating a regulative expression
   | RBinOp2 RBinOp2
   -- ^ Regulative BinOp frame while evaluating the second expression of a bin op
+  | ResolveParty ResolvePartyFrame
+  -- ^ STATE-AS-LEDGER: on the deadline-passed / LEST path the obligation party is
+  --   still an unevaluated expression; this frame forces it to a WHNF (via
+  --   'maybeEvaluate') so it can be keyed and the followup (e.g. a RECORD in a
+  --   breach reparation) attributed to the real acting party, not the anonymous
+  --   ledger. Mirrors how 'Contract6 PartyWHNF' forces the party on the match path.
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents
@@ -150,5 +156,13 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  }
+  deriving stock Show
+
+data ResolvePartyFrame = ResolvePartyFrame
+  { followup :: RExpr        -- ^ the HENCE / LEST followup to run once the party is keyed
+  , env :: Environment       -- ^ environment in which to run the followup
+  , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
+  , time :: Reference        -- ^ the (already-allocated) event time
   }
   deriving stock Show

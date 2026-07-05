@@ -1,0 +1,36 @@
+IMPORT prelude
+-- STATE-AS-LEDGER M4.5 demo: cross-party and official-record RECALL.
+-- See specs/todo/STATE-AS-LEDGER-SPEC.md (M4.5).
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+-- Alice MUST deliver; on delivery she RECORDs `fp` into HER OWN ledger, then
+-- imposes Bob MUST pay, on which Bob COMMITs `total` into the OFFICIAL record.
+GIVETH DEONTIC Person Action
+twoParties MEANS
+  PARTY Alice
+  MUST deliver
+  WITHIN 10
+  HENCE RECORD `fp` IS 273.15
+        HENCE PARTY Bob
+              MUST pay 50
+              WITHIN 10
+              HENCE COMMIT `total` IS FULFILLED
+
+§ `cross-party and official reads`
+-- After the trace runs Alice's own ledger has `fp` and the official record has
+-- `total`. A separate #EVAL cannot see them (withFreshLedger isolation), so we
+-- read them WITHIN the deontic chain instead, via the trace below.
+
+#TRACE twoParties AT 0 WITH
+  PARTY Alice DOES deliver AT 2
+  PARTY Bob DOES pay 50 AT 4
+
+§ `RECALL forms parse and typecheck`
+#EVAL RECALL `fp`
+#EVAL RECALL Alice's `fp`
+#EVAL RECALL OFFICIAL's `total`
