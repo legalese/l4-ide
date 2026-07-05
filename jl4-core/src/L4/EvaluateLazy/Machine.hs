@@ -1075,10 +1075,12 @@ backwardContractFrame val = \ case
     maybeEvaluate env rexpr2
 
   RBinOp2 MkRBinOp2 {..}
-    -- if both obligations have been
-    -- breached, then we can return breached
-    | b1@(ValBreached (DeadlineMissed _ _ vt _ _ _)) <- rval1
-    , b2@(ValBreached (DeadlineMissed _ _ vt' _ _ _)) <- val
+    -- if both obligations have been breached — with ANY mix of breach kinds
+    -- (DeadlineMissed / ExplicitBreach) — then the compound is breached:
+    -- for RAND because all components must be fulfilled, for ROR because
+    -- every alternative has been definitively lost.
+    | ValBreached r1 <- rval1
+    , ValBreached r2 <- val
     -> do
       -- NOTE: depending on the operation, we return
       -- the first breach, if the operation was and,
@@ -1086,15 +1088,24 @@ backwardContractFrame val = \ case
       -- the second breach, if the operation was or,
       -- because they "missed their chance"
       -- If both happen at the same time, we return
-      -- an arbitrary one (consistently with CSL)
-      continueBackward
-        if vt <= vt'
-        then case op of
-           ValRAnd -> b1
-           ValROr -> b2
-        else case op of
-           ValROr -> b1
-           ValRAnd -> b2
+      -- an arbitrary one (consistently with CSL):
+      -- the left operand for RAND, the right for ROR.
+      -- ExplicitBreach carries no timestamp (adding one would ripple through
+      -- the constructor arity and the jl4-service wire — known limitation),
+      -- so a pair involving one is treated as simultaneous and resolved by
+      -- the same tie-break.
+      continueBackward $ ValBreached $
+        case (breachTime r1, breachTime r2) of
+          (Just vt, Just vt')
+            | vt <= vt' -> case op of
+                ValRAnd -> r1
+                ValROr -> r2
+            | otherwise -> case op of
+                ValROr -> r1
+                ValRAnd -> r2
+          _ -> case op of
+            ValRAnd -> r1
+            ValROr -> r2
 
   RBinOp2 MkRBinOp2 {..}
     | ValFulfilled <- val
@@ -1143,6 +1154,12 @@ backwardContractFrame val = \ case
       continueRef events
 
     pushCFrame = pushFrame . ContractFrame
+
+    -- | The time at which a breach materialized, if it carries one.
+    -- ExplicitBreach is untimestamped (see NOTE at the both-breached clause).
+    breachTime :: ReasonForBreach a -> Maybe Rational
+    breachTime (DeadlineMissed _ _ stamp _ _ _) = Just stamp
+    breachTime (ExplicitBreach _ _) = Nothing
 
     continueWithFollowup :: Environment -> RExpr -> Reference -> Reference -> Machine Config
     continueWithFollowup env followup events time = do
