@@ -179,6 +179,14 @@ batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 
+-- Import-cycle fixtures (entry points of small multi-file rings) and a clean
+-- multi-file import used as a guard against the cycle check over-firing.
+cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry :: FilePath
+cycle3Entry      = fixtureDir </> "cycle3"     </> "cyca.l4"
+cycle2Entry      = fixtureDir </> "cycle2"     </> "dua.l4"
+selfImportEntry  = fixtureDir </> "selfimport" </> "solo.l4"
+cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -189,7 +197,8 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , batchEscapeFixture, batchEscapeInput, evalTraceFixture ] \fp -> do
+       , batchEscapeFixture, batchEscapeInput, evalTraceFixture
+       , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -345,3 +354,29 @@ spec bin = do
       wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
       removePathForcibly outDir
       wrote `shouldBe` True
+
+  -- Regression tests for the import-cycle false-success bug: `l4 check`/`run`
+  -- previously exited 0 on a 2-/3-module import ring because the engine's cycle
+  -- error attaches to a transitively-imported file, not the entry file, and the
+  -- verdict only inspected the entry file's own typecheck result.
+  describe "l4 import cycles" $ do
+    it "fails check on a 3-module import ring" $
+      expectFail bin ["check", cycle3Entry]
+
+    it "fails run on a 3-module import ring" $
+      expectFail bin ["run", cycle3Entry]
+
+    it "fails check on a 2-module import ring" $
+      expectFail bin ["check", cycle2Entry]
+
+    it "fails check on a self-import" $
+      expectFail bin ["check", selfImportEntry]
+
+    it "reports ok=false in JSON on a cyclic import" $ do
+      env <- jsonEnvelope bin ["check", cycle3Entry, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+
+    it "still succeeds on a clean multi-file import" $
+      -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
+      -- rule must NOT over-fire on a legitimate clean import.
+      expectOk bin ["check", cleanImportEntry] "Check succeeded."
