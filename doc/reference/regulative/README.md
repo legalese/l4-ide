@@ -228,16 +228,22 @@ MUST `Amount Transferred`
 
 Changes how (part of) the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the marked part is an expression that is evaluated to a value and compared for equality against the corresponding part of the event.
 
-EXACTLY is a pattern-position construct: it can appear wherever a pattern is expected inside the action. There are two placements:
+There are two placements:
 
 1. **Whole-action**: `MUST EXACTLY expression` -- the entire action expression is evaluated and the event must equal the result.
-2. **Per-argument**: `MUST action pattern... EXACTLY expression` -- the action's name and other arguments are still matched as patterns, but the argument marked EXACTLY must equal the evaluated expression.
+2. **Per-argument**: `MUST action (EXACTLY expression) pattern...` -- the action's name and its other arguments are still matched as patterns, but the argument marked EXACTLY must equal the evaluated expression.
+
+The per-argument form comes with two constraints:
+
+- **Parenthesize the EXACTLY argument** whenever the action has more than one argument. EXACTLY greedily consumes everything to its right, so `MUST transfer EXACTLY 100 recipient` is read as a single EXACTLY expression spanning `100 recipient` and fails to typecheck ("transfer expects 2 arguments, but you are applying it to 1"). Write `MUST transfer (EXACTLY 100) recipient` instead. For a single-argument action, `MUST pay EXACTLY 100` needs no parentheses.
+- **Order EXACTLY arguments before pattern binders.** A binder to the left of an EXACTLY argument -- e.g. `MUST transfer amt (EXACTLY Bob)` -- is currently rejected at evaluation time with an internal "not in scope" error. Until that limitation is lifted, put the exact arguments first: `MUST transfer (EXACTLY 100) recip` works, matching the amount exactly while still binding `recip`.
 
 ### Syntax
 
 ```l4
 MUST EXACTLY expression
-MUST actionName EXACTLY expression
+MUST actionName EXACTLY expression             -- single-argument action
+MUST actionName (EXACTLY expression) pattern   -- multi-argument action
 ```
 
 ### Examples
@@ -249,9 +255,16 @@ PARTY buyer MUST pay
 -- Whole-action: the expression is evaluated, event must equal the result
 PARTY lender MUST EXACTLY send capital to borrower
 
--- Per-argument: pay's amount argument must equal 100 exactly
+-- Per-argument, single argument: pay's amount must equal 100 exactly
 PARTY Alice
 MUST pay EXACTLY 100
+WITHIN 30
+
+-- Per-argument, multiple arguments: parenthesize EXACTLY and put it before
+-- any binders; the amount must be exactly 100, the recipient is bound
+-- as the pattern variable recip
+PARTY Alice
+MUST transfer (EXACTLY 100) recip
 WITHIN 30
 ```
 
