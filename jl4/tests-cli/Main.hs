@@ -19,7 +19,12 @@ import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
-import System.Directory (doesFileExist)
+import System.Directory
+  ( createDirectoryIfMissing
+  , doesFileExist
+  , getTemporaryDirectory
+  , removePathForcibly
+  )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
@@ -169,6 +174,11 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture = fixtureDir </> "batch-escape.l4"
+batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
+evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -178,7 +188,8 @@ main = do
   bin <- locateL4Binary
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
-  for_ [cleanFixture, evalFixture, errorFixture, garbageFixture] \fp -> do
+  for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , batchEscapeFixture, batchEscapeInput, evalTraceFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -294,3 +305,43 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  -- Regression tests for target T11 (CLI injection / corruption).
+  describe "l4 batch" $ do
+    it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
+      -- The input row's payload contains backslashes (Windows path), embedded
+      -- quotes, newline/tab, and shell metacharacters. A naive quote-only
+      -- escaper produced an unparseable generated wrapper; a correct one
+      -- round-trips every byte as an L4 string literal.
+      env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
+      objField env "status" `shouldBe` Just (String "success")
+
+  describe "l4 trace (output path safety)" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+      -- Render into a directory whose *name* would execute `touch <sentinel>`
+      -- if the path were ever handed to a shell. With a direct `proc` call it
+      -- is just a literal (if unusual) directory name. The sentinel must not
+      -- appear regardless of whether Graphviz's `dot` is installed.
+      tmp <- getTemporaryDirectory
+      let sentinel = tmp </> "l4-trace-injection-sentinel"
+          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
+      removePathForcibly sentinel
+      removePathForcibly evilDir
+      createDirectoryIfMissing True evilDir
+      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist sentinel
+      removePathForcibly evilDir
+      ranShell `shouldBe` False
+
+    it "writes trace output into a directory whose path contains a space" $ do
+      -- The `.dot` branch needs no external tools; it exercises the same
+      -- outDir path-join the png/svg branches feed to `dot`, proving spaces
+      -- survive instead of being word-split.
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4 trace out"   -- note the space
+      removePathForcibly outDir
+      Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      code `shouldBe` ExitSuccess
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      wrote `shouldBe` True
