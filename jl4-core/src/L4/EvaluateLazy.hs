@@ -26,6 +26,7 @@ import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
