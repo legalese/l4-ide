@@ -10,8 +10,12 @@
 --       timely; a violated prohibition reuses the event stamp as its
 --       "deadline" sentinel.
 --   (e) EXACTLY in per-argument position (the corrected README example).
+--   (f) recursive LEST with a non-positive computed WITHIN terminates:
+--       the deadline-revealing event is re-offered AT MOST ONCE.
 --   MAY expiry routes to LEST (default FULFILLED) per the README
---   default-consequence matrix; HENCE fires only on exercise.
+--   default-consequence matrix; HENCE fires only on exercise. The HENCE
+--   and LEST continuations here differ in party AND action so the golden
+--   output distinguishes which branch fired.
 
 DECLARE Person IS ONE OF Alice, Bob
 DECLARE Action IS ONE OF
@@ -190,20 +194,26 @@ DOES Alice AT smoke #TRACE `no smoking` AT 0 WITH
 -- MAY expiry routes to LEST; HENCE fires only on exercise
 -- ---------------------------------------------------------------------------
 
+-- HENCE (Bob delivers) and LEST (Alice pays 50) are deliberately
+-- DISTINGUISHABLE — different party and action — so these traces pin the
+-- ROUTING, not just the outcome: were expiry mis-routed to HENCE, the first
+-- trace would leave Bob's delivery obligation as a residual instead of
+-- FULFILLED.
 DOES Alice AT pay 100 `may with lest` MEANS
   PARTY Alice
   MAY exercise
   WITHIN 5
   HENCE (PARTY Bob MUST deliver WITHIN 10)
-  LEST (PARTY Bob MUST deliver WITHIN 20)
+  LEST (PARTY Alice MUST pay 50 WITHIN 20)
 
--- Permission NOT exercised: expiry routes to LEST, and the revealing delivery
--- is re-offered to it => FULFILLED.
+-- Permission NOT exercised: expiry routes to LEST (Alice's reparation
+-- payment), and the revealing payment is re-offered to it => FULFILLED.
 #TRACE `may with lest` AT 0 WITH
   PARTY 7
 
--- Permission exercised: HENCE obligation becomes the residual.
-DOES Bob AT deliver #TRACE `may with lest` AT 0 WITH
+-- Permission exercised: the HENCE obligation (Bob delivers) becomes the
+-- residual.
+DOES Alice AT pay 50 #TRACE `may with lest` AT 0 WITH
   PARTY 3
 
 DOES Alice AT exercise `may bare` MEANS
@@ -214,3 +224,24 @@ DOES Alice AT exercise `may bare` MEANS
 -- Bare MAY expiry: LEST defaults to FULFILLED (same outcome as before).
 #TRACE `may bare` AT 0 WITH
   (`WAIT UNTIL` 9)
+
+-- ---------------------------------------------------------------------------
+-- (f) recursive LEST with a non-positive WITHIN terminates
+-- ---------------------------------------------------------------------------
+
+`recursive lest` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN 0 - 1
+  LEST `recursive lest`
+
+-- The LEST recursively re-invokes the same obligation, whose computed WITHIN
+-- is negative, so each incarnation's deadline is already past at its own
+-- anchor. The revealing event (Bob's delivery — wrong party, wrong action)
+-- is re-offered ONCE to the first LEST incarnation; when it reveals a second
+-- expiry there, it is consumed instead of being re-offered again, so
+-- evaluation terminates with the recursive obligation as the residual
+-- (before the at-most-once rule this trace looped forever).
+#TRACE `recursive lest` AT 0 WITH
+  PARTY 7
+DOES Bob AT deliver 

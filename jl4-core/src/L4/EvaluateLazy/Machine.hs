@@ -170,6 +170,13 @@ data EvalState =
     , temporalContext :: !(IORef TemporalContext)
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
+    , reofferedEvents :: !(IORef (Set Address))
+      -- ^ addresses of EVENT values that an expiring obligation has re-offered
+      -- to its HENCE/LEST continuation (see the Contract5 expiry NOTE in
+      -- 'backwardContractFrame'). Membership enforces the at-most-once
+      -- re-offer rule: a marked event that reveals a second expiry is
+      -- consumed rather than re-offered again, which bounds evaluation for
+      -- recursive continuations with non-positive deadlines.
     }
 
 data Stack =
@@ -289,6 +296,20 @@ putTemporalContext :: TemporalContext -> Eval ()
 putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
+
+-- | Record that an EVENT value (identified by its store address) has been
+-- re-offered to a HENCE/LEST continuation after revealing a deadline expiry.
+-- See the Contract5 expiry NOTE in 'backwardContractFrame'.
+markReoffered :: Reference -> Eval ()
+markReoffered rf = do
+  r <- asks (.reofferedEvents)
+  liftIO (modifyIORef' r (Set.insert rf.address))
+
+-- | Has this EVENT value already been re-offered once? (see 'markReoffered')
+isReoffered :: Reference -> Eval Bool
+isReoffered rf = do
+  r <- asks (.reofferedEvents)
+  liftIO (Set.member rf.address <$> readIORef r)
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -934,6 +955,7 @@ backwardContractFrame val = \ case
   Contract1 ScrutinizeEvents {..} -> do
     case val of
       ValCons e es -> do
+        ev'reoffered <- isReoffered e
         pushCFrame (Contract2 ScrutinizeEvent {events = es, ..})
         continueRef e
       ValNil -> continueBackward (ValObligation env party act due followup lest)
@@ -993,14 +1015,33 @@ backwardContractFrame val = \ case
       -- reparation it was authored for. The continuation's clock is anchored
       -- at the revealing event's stamp (the README is silent on the anchor;
       -- this is the historical behavior), so the re-offered event decrements
-      -- the continuation's WITHIN by zero. Termination is preserved: each
-      -- re-offer peels one syntactic HENCE/LEST layer.
+      -- the continuation's WITHIN by zero.
+      --
+      -- Termination: an event is re-offered AT MOST ONCE. Peeling one
+      -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
+      -- because a continuation may recursively reference the enclosing
+      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): the
+      -- continuation re-anchors at the revealing stamp, so a non-positive
+      -- computed WITHIN makes its deadline already expired for the very same
+      -- event, and unconditional re-offering would loop forever. Hence each
+      -- re-offered event is marked (by store address, 'markReoffered'); when
+      -- a marked event reveals yet another expiry, the continuation consumes
+      -- it — the pre-re-offer behavior — instead of re-offering it again
+      -- ('ev'reoffered', computed at Contract1). Each real event thus funds
+      -- at most one extra scrutiny, and the event list strictly shrinks on
+      -- every other step, so evaluation terminates.
       then do
-        let reoffer followup' = do
-              ev'timeR <- allocateValue ev'time
-              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-              eventsR <- allocateValue (ValCons evR events)
-              continueWithFollowup env followup' eventsR ev'timeR
+        let reoffer followup'
+              | ev'reoffered =
+                  -- this event was already re-offered once and has now
+                  -- revealed a second expiry: consume it (see NOTE above)
+                  allocateValue ev'time >>= continueWithFollowup env followup' events
+              | otherwise = do
+                  ev'timeR <- allocateValue ev'time
+                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+                  markReoffered evR
+                  eventsR <- allocateValue (ValCons evR events)
+                  continueWithFollowup env followup' eventsR ev'timeR
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline

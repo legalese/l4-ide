@@ -1,17 +1,17 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-deontic-breach-semantics.l4:35:1-36:22:
+deontic-breach-semantics.l4:39:1-40:22:
   DEONTIC BREACHED:
     BREACH
     BY Bob
     BECAUSE "missed second"
-deontic-breach-semantics.l4:45:1-46:22:
+deontic-breach-semantics.l4:49:1-50:22:
   DEONTIC BREACHED:
     BREACH
     BY Alice
     BECAUSE "missed first"
-deontic-breach-semantics.l4:61:1-62:22:
+deontic-breach-semantics.l4:65:1-66:22:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -25,12 +25,12 @@ deontic-breach-semantics.l4:61:1-62:22:
       MUST deliver
     before their deadline, which was at
       10
-deontic-breach-semantics.l4:64:1-65:22:
+deontic-breach-semantics.l4:68:1-69:22:
   DEONTIC BREACHED:
     BREACH
     BY Alice
     BECAUSE "missed payment"
-deontic-breach-semantics.l4:75:1-76:21:
+deontic-breach-semantics.l4:79:1-80:21:
   DEONTIC BREACHED:
     BREACH
     BY Alice
@@ -38,27 +38,27 @@ deontic-breach-semantics.l4:75:1-76:21:
   MUST deliver
   WITHIN 3
   HENCE FULFILLED
-deontic-breach-semantics.l4:90:1-91:30:
+deontic-breach-semantics.l4:94:1-95:30:
   FULFILLED
-deontic-breach-semantics.l4:101:1-102:30:
+deontic-breach-semantics.l4:105:1-106:30:
   FULFILLED
-deontic-breach-semantics.l4:113:1-114:30:
+deontic-breach-semantics.l4:117:1-118:30:
   PARTY Alice
   MUST pay 2
   WITHIN 3
   HENCE FULFILLED
-deontic-breach-semantics.l4:126:1-129:31:
+deontic-breach-semantics.l4:130:1-133:31:
   FULFILLED
-deontic-breach-semantics.l4:139:1-140:30:
+deontic-breach-semantics.l4:143:1-144:30:
   FULFILLED
-deontic-breach-semantics.l4:152:1-153:32:
+deontic-breach-semantics.l4:156:1-157:32:
   FULFILLED
-deontic-breach-semantics.l4:156:1-157:19:
+deontic-breach-semantics.l4:160:1-161:19:
   PARTY Alice
   MUST pay 100
   WITHIN 0
   HENCE FULFILLED
-deontic-breach-semantics.l4:160:1-161:19:
+deontic-breach-semantics.l4:164:1-165:19:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -72,7 +72,7 @@ deontic-breach-semantics.l4:160:1-161:19:
       MUST pay 100
     before their deadline, which was at
       5
-deontic-breach-semantics.l4:170:1-171:31:
+deontic-breach-semantics.l4:174:1-175:31:
   DEONTIC BREACHED:
     party
       Alice
@@ -86,16 +86,22 @@ deontic-breach-semantics.l4:170:1-171:31:
       MUST NOT smoke
     before their deadline, which was at
       30
-deontic-breach-semantics.l4:174:1-175:20:
+deontic-breach-semantics.l4:178:1-179:20:
   FULFILLED
-deontic-breach-semantics.l4:186:1-187:33:
+deontic-breach-semantics.l4:190:1-191:33:
   FULFILLED
-deontic-breach-semantics.l4:202:1-203:30:
+deontic-breach-semantics.l4:211:1-212:31:
   FULFILLED
-deontic-breach-semantics.l4:206:1-207:33:
+deontic-breach-semantics.l4:216:1-217:33:
   PARTY Bob
   MUST deliver
   WITHIN 10
   HENCE FULFILLED
-deontic-breach-semantics.l4:215:1-216:19:
+deontic-breach-semantics.l4:225:1-226:19:
   FULFILLED
+deontic-breach-semantics.l4:245:1-246:30:
+  PARTY Alice
+  MUST pay 1
+  WITHIN 0 MINUS 1
+  HENCE FULFILLED
+  LEST `recursive lest`
