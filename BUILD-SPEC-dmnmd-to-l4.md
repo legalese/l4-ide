@@ -43,6 +43,7 @@ parser; it receives a fully-typed, type-inferred `DecisionTable`. Source of trut
 - `HitPolicy = HP_Unique | HP_Any | HP_Priority | HP_First | HP_OutputOrder | HP_RuleOrder | HP_Collect CollectOperator | HP_Aggregate`.
 
 Helpers to reuse (do not reinvent):
+
 - `DMN.DecisionTable.getInputHeaders / getOutputHeaders / getCommentHeaders` (`src/DMN/DecisionTable.hs:241+`).
 - `DMN.DecisionTable.evalTable :: DecisionTable -> [FEELexp] -> Either String [[[FEELexp]]]` — the
   reference interpreter implementing full hit-policy semantics. **Use it as the oracle** to
@@ -55,21 +56,21 @@ Helpers to reuse (do not reinvent):
 
 ## 1. The DMN → L4 mapping
 
-| DMN construct | L4 emission |
-|---|---|
-| `DecisionTable` (one table) | one `GIVEN … GIVETH … <name> MEANS BRANCH …` definition |
-| input columns (`getInputHeaders`) | `GIVEN` parameters, one per column, typed via the type map below; names backtick-quoted if they contain spaces (`varname`) |
-| output column(s) (`getOutputHeaders`) | `GIVETH` type. One output column → that scalar type. Multiple → a `DECLARE`d result record returned per arm (see §1.4) |
-| each data row (`DTrow`) | one `BRANCH` arm: `IF <guard> THEN <result>` |
-| hit policy `HP_First` / `HP_Unique` / `HP_Priority` | first-match `BRANCH`; arm order = row order; closed by a synthesized `OTHERWISE` (see §1.5) |
-| hit policy `HP_Collect op` | **not** a BRANCH — a `filter`+fold over rows-as-data (see §1.6, deferred) |
-| input cell `FAnything` (`-`) | conjunct **omitted** from the arm guard (the column contributes nothing on that row) |
-| input cell single value | `` `field` EQUALS <val> `` (string/bool) or `` `field` <op> <num> `` (comparison) |
-| input cell multi-value (`Spring, Summer`) | `OR`-of-`EQUALS` expansion `` (`field` EQUALS <v1> OR `field` EQUALS <v2>) `` (default); `` elem `field` (LIST …) `` only via the `useElem` opt (see §1.3) |
-| repeated cell vs the arm directly above | **ditto `^`** for each identical token (see §3) |
-| output cell literal | the L4 literal (`"str"`, number, `TRUE`/`FALSE`) |
-| output cell `FFunction` arithmetic | infix L4 arithmetic (`FNMul`→`TIMES`/`*`, `FNPlus`→`PLUS`/`+`, etc.) |
-| row comment (`row_comments`) | trailing `-- comment` (mirror `annotationsAsComments`) |
+| DMN construct                                       | L4 emission                                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DecisionTable` (one table)                         | one `GIVEN … GIVETH … <name> MEANS BRANCH …` definition                                                                                                |
+| input columns (`getInputHeaders`)                   | `GIVEN` parameters, one per column, typed via the type map below; names backtick-quoted if they contain spaces (`varname`)                             |
+| output column(s) (`getOutputHeaders`)               | `GIVETH` type. One output column → that scalar type. Multiple → a `DECLARE`d result record returned per arm (see §1.4)                                 |
+| each data row (`DTrow`)                             | one `BRANCH` arm: `IF <guard> THEN <result>`                                                                                                           |
+| hit policy `HP_First` / `HP_Unique` / `HP_Priority` | first-match `BRANCH`; arm order = row order; closed by a synthesized `OTHERWISE` (see §1.5)                                                            |
+| hit policy `HP_Collect op`                          | **not** a BRANCH — a `filter`+fold over rows-as-data (see §1.6, deferred)                                                                              |
+| input cell `FAnything` (`-`)                        | conjunct **omitted** from the arm guard (the column contributes nothing on that row)                                                                   |
+| input cell single value                             | `` `field` EQUALS <val> `` (string/bool) or `` `field` <op> <num> `` (comparison)                                                                      |
+| input cell multi-value (`Spring, Summer`)           | `OR`-of-`EQUALS` expansion ``(`field` EQUALS <v1> OR `field` EQUALS <v2>)`` (default); ``elem `field` (LIST …)`` only via the `useElem` opt (see §1.3) |
+| repeated cell vs the arm directly above             | **ditto `^`** for each identical token (see §3)                                                                                                        |
+| output cell literal                                 | the L4 literal (`"str"`, number, `TRUE`/`FALSE`)                                                                                                       |
+| output cell `FFunction` arithmetic                  | infix L4 arithmetic (`FNMul`→`TIMES`/`*`, `FNPlus`→`PLUS`/`+`, etc.)                                                                                   |
+| row comment (`row_comments`)                        | trailing `-- comment` (mirror `annotationsAsComments`)                                                                                                 |
 
 ### 1.1 Type map (`DMNType -> L4 type`)
 
@@ -141,11 +142,12 @@ round-trip is a **semantic** equivalence check, not a byte-exact one (see §7).
   **Inline multi-field record literals on one line do NOT parse — L4 record literals are
   layout-sensitive.** Each arm (and the `OTHERWISE`) must therefore return the record in one of two
   forms:
+
   - **multi-line `WITH` block** — `<Name> WITH` followed by each `fN IS vN` on its own indented line; or
   - **constructor helper (recommended)** — synthesize one `mk<Name> v1 v2 …` function and have every
     arm call it. The golden uses this form: it declares `mkRec theCard theMpd` (whose body is itself a
     multi-line `Recommendation WITH` block) and every arm / `OTHERWISE` returns
-    `` mkRec `PRVI` "1.4" `` etc. on a single line.
+    ``mkRec `PRVI` "1.4"`` etc. on a single line.
 
   Prefer the constructor helper: it keeps each BRANCH arm on one line, which is what the ditto grid
   (§3) needs to collapse. The multi-line `WITH` block is also valid but forces multi-line arms the
@@ -160,7 +162,7 @@ backend **synthesizes** one. The convention is **resolved by the validated golde
   **no** `MAYBE`/`NOTHING` wrapping. The value is the catch-all row's output (the all-`FAnything` row
   when present), rendered to L4 and carried in `L4Opts.defaultResult`. For a **multi-output** table
   the default is therefore a **full record built via the same constructor helper** (§1.4), not a
-  scalar. The golden ends its `card to use` BRANCH with `` OTHERWISE mkRec `PRVI` "1.4" `` (its
+  scalar. The golden ends its `card to use` BRANCH with ``OTHERWISE mkRec `PRVI` "1.4"`` (its
   catch-all row) and its `categorize` BRANCH with `` OTHERWISE `Other` ``.
 - **Optional — `wrapMaybe = True` (non-default).** Emit `GIVETH A MAYBE <type>`, arms return
   `JUST <value>`, and `OTHERWISE NOTHING`. Total and faithful to “no rule matched”, but the golden
@@ -210,6 +212,7 @@ GIVETH A NUMBER
 ```
 
 Notes that the algorithm must honor:
+
 - Arm 3 drops the second conjunct entirely (the `-` cell): columns under `AND … "dining"` are
   **blank**, not `^` (you cannot ditto-copy an absent token).
 - `card tier`, `EQUALS`, `AND`, `spend category`, its `EQUALS` are identical down the column → all
@@ -220,7 +223,7 @@ Notes that the algorithm must honor:
 
 (The default is **resolved**: `OTHERWISE` returns a **bare value** — here `OTHERWISE 0`, the catch-all
 row's output carried in `L4Opts.defaultResult`. In a multi-output table it would be a full record via
-the constructor helper, e.g. the golden's `` OTHERWISE mkRec `PRVI` "1.4" ``. `MAYBE`/`NOTHING` is an
+the constructor helper, e.g. the golden's ``OTHERWISE mkRec `PRVI` "1.4"``. `MAYBE`/`NOTHING` is an
 opt-in mode (`wrapMaybe`), not the default — see §1.5.)
 
 ---
@@ -252,19 +255,23 @@ Algorithm (`renderDittoGrid`):
    line.
 
 ### 3.1 What gets dittoed
+
 Default: ditto the **guard** cells (field, operator, value, `AND`). Keep `IF`, `THEN`, and the result
 literal/expression spelled out on every arm (more readable; matches `mixfix-garden-path.l4`). Make
 this configurable (`emitDitto :: Bool`, `dittoKeywords :: Bool`).
 
 ### 3.2 Fallback
+
 With `emitDitto = False`, skip step 4 entirely → fully spelled-out, still column-aligned arms. This is
 the safe mode for debugging and the basis for the round-trip equivalence test (§7).
 
 ### 3.3 BRANCH needs no AST work in l4-ide
+
 `BRANCH` is already a first-class node (`L4.Syntax.MultiWayIf`, `Parser.hs:1727`) and already prints
 via `L4.Print` (`Print.hs:393-397`). The new work is **only** the ditto/column layer.
 
 ### 3.4 Multi-token operators (optional)
+
 If word-form operators (`AT LEAST`, `AT MOST`) are preferred, treat each word as its own cell so each
 gets an independently column-aligned `^`. Off by default; single-token symbolic operators are the
 ditto-friendly default.
@@ -276,6 +283,7 @@ ditto-friendly default.
 All paths under `/Users/mengwong/src/smucclaw/dmnmd/languages/haskell/`.
 
 ### 4.1 CREATE `src/DMN/Translate/L4.hs`
+
 Module `DMN.Translate.L4`. Model on `src/DMN/Translate/PY.hs` (single-flag opts, no TS complications).
 
 ```haskell
@@ -300,9 +308,9 @@ toL4 :: L4Opts -> DecisionTable -> String
 Self-contained leaf renderers (do **not** thread `"l4"` through `FEELhelpers.hs` — L4 surface syntax
 diverges too far from the C-family):
 
-- `givenBlock  :: L4Opts -> [ColHeader] -> String`   — `GIVEN … IS A <type>` lines + `GIVETH`.
-- `type2l4     :: DMNType -> String`                  — the §1.1 map.
-- `feel2l4In   :: L4Opts -> ColHeader -> [FEELexp] -> Maybe Cell` — one guard conjunct (Nothing for `FAnything`); multi-value inner list → `OR`-of-`EQUALS` by default (`` elem … (LIST …) `` only when `useElem`).
+- `givenBlock  :: L4Opts -> [ColHeader] -> String` — `GIVEN … IS A <type>` lines + `GIVETH`.
+- `type2l4     :: DMNType -> String` — the §1.1 map.
+- `feel2l4In   :: L4Opts -> ColHeader -> [FEELexp] -> Maybe Cell` — one guard conjunct (Nothing for `FAnything`); multi-value inner list → `OR`-of-`EQUALS` by default (`elem … (LIST …)` only when `useElem`).
 - `showFeelL4  :: FEELexp -> String` / `fnf2l4 :: FNumFunction -> String` — output side; `FNF3 l FNMul r -> "(" <> … <> " TIMES " <> … <> ")"`, etc.
 - `showValL4   :: DMNVal -> String`, `showNumL4 :: Float -> String`.
 - `renderDittoGrid :: L4Opts -> [[Maybe Cell]] -> [String]` — §3 algorithm; the rule walker
@@ -316,26 +324,30 @@ Optionally, when `emitAsserts`, run `evalTable` over sampled inputs and append `
 lines so the generated `.l4` self-checks against DMN semantics.
 
 ### 4.2 MODIFY `app/Options.hs`
+
 - Line 58: `data FileFormat = Ts | Js | Py | Xml | Md | L4 | Unknown`.
 - Line 67 `parseFileFormat`: add `"l4" -> return L4`; update the error string to list `l4`.
 - Line 76 `fileExtensionMappings`: add `(".l4", L4)`.
 
 ### 4.3 MODIFY `app/Main.hs`
+
 - Import: `import DMN.Translate.L4 ( toL4, L4Opts(..) )`.
 - Extend the `FileFormat(..)` import list (line 43) with `L4`.
 - `outputTo` (line 148): add
   `outputTo h L4 opts dtable = hPutStrLn h $ toL4 (defaultL4Opts) dtable`
-  (define `defaultL4Opts = L4Opts { emitDitto = True, wordOps = False, useElem = False, defaultResult = "", wrapMaybe = False, emitAsserts = False }`; the backend fills `defaultResult` from the table's catch-all row (all-`FAnything` inputs) — e.g. the golden's `` mkRec `PRVI` "1.4" `` — and falls back to this field only when the table has no catch-all row).
+  (define `defaultL4Opts = L4Opts { emitDitto = True, wordOps = False, useElem = False, defaultResult = "", wrapMaybe = False, emitAsserts = False }`; the backend fills `defaultResult` from the table's catch-all row (all-`FAnything` inputs) — e.g. the golden's ``mkRec `PRVI` "1.4"`` — and falls back to this field only when the table has no catch-all row).
 - `showToJSON` (line 140): optionally add an `L4` clause for `--query`; otherwise `--query --to=l4`
   remains a partial-match error (document “query unsupported for L4 in v1”). Not required for file
   emission.
 
 ### 4.4 MODIFY `dmnmd.cabal`
+
 Add `DMN.Translate.L4` to library `exposed-modules` (after `DMN.Translate.JS`, line 35). Keep
 `package.yaml`/`dmnmd.cabal` in sync — regenerate with `hpack` if available (modules are
 auto-discovered from `source-dirs`, but the checked-in `.cabal` lists them explicitly).
 
 ### 4.5 CREATE test module + fixtures (see §7)
+
 - `test/TranslateL4Spec.hs` (registered in `test/Spec.hs` `forM_` list and in `dmnmd.cabal` test
   `other-modules`).
 - `test/golden/miles-card-dmn.md`, `test/golden/miles-card.l4` — committed copies of the homelab
@@ -352,6 +364,7 @@ lexer), so a `Ditto` constructor would pollute `jl4-core` and could never round-
 layout concern; keep it in an emission helper.
 
 ### 5.1 CREATE `jl4-core/src/L4/Print/Columnar.hs`
+
 Module `L4.Print.Columnar`. A standalone, AST-agnostic grid emitter implementing the **same §3
 algorithm** as dmnmd (the two repos do not share a package, so the algorithm is intentionally
 duplicated — see risk §9):
@@ -370,6 +383,7 @@ This is the reusable primitive l4-ide gains. It is what a future DMN-import-in-I
 “render a decision table back to aligned L4” feature, calls.
 
 ### 5.2 Wire it into source generation
+
 The canonical printer `L4.Print.prettyLayout` (`jl4-core/src/L4/Print.hs:29`) uses `group`/`softline`
 (`prettyConj`, `Print.hs:776-781`) which collapses to single lines and gives no absolute-column
 control — it cannot produce ditto. Two acceptable wirings; pick per appetite:
@@ -380,13 +394,15 @@ control — it cannot produce ditto. Two acceptable wirings; pick per appetite:
   `prettyLayout` untouched.
 - **(format round-trip)** `L4.ExactPrint` already round-trips an existing `^` (a `RealTCopy` displays
   back as `^`, `Lexer.hs:1037`), so `l4 format` preserves hand-written/dmnmd-emitted ditto **today**.
-  Verify this in a test; no change needed for round-trip preservation, only for *generation*.
+  Verify this in a test; no change needed for round-trip preservation, only for _generation_.
 
 ### 5.3 cabal
+
 Add `L4.Print.Columnar` to `jl4-core/jl4-core.cabal` `exposed-modules`. Build with
 `cabal build all` (GHC 9.10.2, `index-state: 2025-03-31`).
 
 ### 5.4 Validator used by the tests
+
 `cabal run l4 -- check <file>.l4` is the typecheck gate; `cabal run l4 -- run <file>.l4` evaluates;
 `cabal run l4 -- format <file>.l4` reformats. The `l4` skill / MCP validator wraps the same check.
 
@@ -410,6 +426,7 @@ dmnmd input.md -o out.l4          # .l4 output extension auto-selects L4 (fileEx
 Three layers, the first being the required gate.
 
 ### 7.1 Golden round-trip wired into `stack test` (required)
+
 `test/TranslateL4Spec.hs`, registered in `test/Spec.hs`:
 
 ```haskell
@@ -447,6 +464,7 @@ l4Spec = describe "dmnmd --to=l4 golden (Option A — semantic, not byte-exact)"
 ```
 
 Wiring:
+
 - Add `l4Spec` to the `forM_ [spec1, …, l4Spec]` list in `test/Spec.hs:31` and add
   `TranslateL4Spec` to `dmnmd.cabal` test-suite `other-modules`.
 - `test/golden/` holds **committed copies** of the two homelab files. A `Makefile` target keeps them
@@ -466,6 +484,7 @@ helper naming), and/or execute the golden's own `#ASSERT`s via `~/.local/bin/l4 
 check (above). The golden is never regenerated to match the emitter byte-for-byte.
 
 ### 7.2 Out-of-tree CLI golden (runs the literal acceptance command, checked semantically)
+
 A `Makefile` target / shell check that runs the **built binary** against the absolute homelab paths,
 then validates the output with the L4 toolchain (Option A — semantic, not a raw `diff`):
 
@@ -482,6 +501,7 @@ golden-homelab:
 Non-blocking in CI (depends on the homelab checkout); run locally/manually.
 
 ### 7.3 Per-hit-policy unit tests + L4 validation
+
 - Reuse the inline `dmn1`…`dmn6a` fixtures already in `test/Spec.hs` (Unique, First, OutputOrder,
   Collect Sum/Count, arithmetic output `dmn6a`). Assert `toL4 opts (parse dmnX)` against small
   expected strings; cover one table per policy class implemented in v1.
@@ -495,6 +515,7 @@ Non-blocking in CI (depends on the homelab checkout); run locally/manually.
   or the `l4` skill validator. Necessary but not sufficient — pair with the equivalence test above.
 
 ### 7.4 Oracle assertions (back the Option A behavioural gate)
+
 With `emitAsserts = True`, the backend appends `#ASSERT` lines computed from `evalTable` (and/or
 carries over the golden's hand-written `#ASSERT` block), so running the generated file under
 `~/.local/bin/l4 run` cross-checks L4 evaluation against DMN semantics and **fails the build** on any
@@ -505,6 +526,7 @@ divergence. This is what the §7.1 gate executes; it is no longer merely optiona
 ## 8. Build/run commands
 
 dmnmd (`languages/haskell/`):
+
 ```
 stack build
 stack test                      # includes the golden round-trip
@@ -514,6 +536,7 @@ make golden-homelab             # literal acceptance diff
 ```
 
 l4-ide (`/Users/mengwong/src/legalese/l4wt/dmnmd-to-l4`):
+
 ```
 cabal build all
 cabal run l4 -- check  generated.l4
@@ -527,14 +550,14 @@ cabal run l4 -- format generated.l4
 1. **OTHERWISE / default semantics — RESOLVED.** The validated golden exists
    (`/Users/mengwong/src/mengwong/homelab/docs/miles-card.l4`; passes `l4 check` and `l4 run`). The
    convention is a **bare-typed `OTHERWISE`** returning the catch-all row's output via the constructor
-   helper — `` OTHERWISE mkRec `PRVI` "1.4" `` for the multi-output `card to use`, `` OTHERWISE `Other` ``
+   helper — ``OTHERWISE mkRec `PRVI` "1.4"`` for the multi-output `card to use`, `` OTHERWISE `Other` ``
    for the scalar `categorize`. `L4Opts.defaultResult` carries that rendered expression; `MAYBE`/`NOTHING`
    (`wrapMaybe`) is an opt-in non-default mode.
 2. **Byte-exact golden + ditto whitespace — RESOLVED / MOOT.** Superseded by **Option A** (§7): the
    golden round-trip is a **semantic / AST-equivalence** check plus a behavioural `~/.local/bin/l4 run`
    of the `#ASSERT`s, not exact-string `shouldBe`, so trailing-space / gutter brittleness no longer
    gates the build and the golden is never regenerated to match the emitter byte-for-byte. (Column
-   alignment still matters for a *correct* `^`; a misaligned caret that copies the wrong token is
+   alignment still matters for a _correct_ `^`; a misaligned caret that copies the wrong token is
    caught by the §7.3 AST-equivalence test, not by string diffing.)
 3. **Algorithm duplication across repos.** The §3 grid algorithm lives in both `DMN.Translate.L4`
    (dmnmd) and `L4.Print.Columnar` (jl4-core). They cannot share a package (dmnmd must stay
@@ -560,4 +583,7 @@ cabal run l4 -- format generated.l4
    multi-value `OR`-of-`EQUALS` chain (or `elem … LIST` under `useElem`) on others breaks that column’s
    ditto alignment (different token shapes). Acceptable (ditto is best-effort per column), but the
    golden must reflect it; do not force ditto across heterogeneous cells.
+
+```
+
 ```

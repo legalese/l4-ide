@@ -18,11 +18,11 @@ export const meta = {
   title: "dmnmd --to=l4 (BRANCH + ditto) + l4-ide ditto codegen",
   spec: "BUILD-SPEC-dmnmd-to-l4.md",
   repos: {
-    dmnmd:  "/Users/mengwong/src/smucclaw/dmnmd/languages/haskell",
-    l4ide:  "/Users/mengwong/src/legalese/l4wt/dmnmd-to-l4",
+    dmnmd: "/Users/mengwong/src/smucclaw/dmnmd/languages/haskell",
+    l4ide: "/Users/mengwong/src/legalese/l4wt/dmnmd-to-l4",
   },
   golden: {
-    input:    "/Users/mengwong/src/mengwong/homelab/docs/miles-card-dmn.md",
+    input: "/Users/mengwong/src/mengwong/homelab/docs/miles-card-dmn.md",
     expected: "/Users/mengwong/src/mengwong/homelab/docs/miles-card.l4",
   },
   phases: [
@@ -30,7 +30,7 @@ export const meta = {
     "1-scaffold",
     "2-printer-core",
     "3-ditto",
-    "4-l4ide-ditto",   // runs in parallel with phase 3
+    "4-l4ide-ditto", // runs in parallel with phase 3
     "5-golden-wire",
     "6-validate",
     "7-finalize",
@@ -196,7 +196,11 @@ EQUALS-vs-OR-of-EQUALS heterogeneity). The check is AST-equivalence + \`l4 run\`
 byte-exact strings (risk 2 is moot). Never regenerate the golden. Report remaining divergence (empty
 when green).`,
   }),
-  { check: (out) => /0 failures|All .* tests passed|miles-card.*PASS/i.test(out), maxIters: 6 },
+  {
+    check: (out) =>
+      /0 failures|All .* tests passed|miles-card.*PASS/i.test(out),
+    maxIters: 6,
+  },
 );
 
 // ---------------------------------------------------------------------------
@@ -239,13 +243,13 @@ and 2 (byte-exact) are RESOLVED). List git status in both repos. Do NOT commit o
 // ---------------------------------------------------------------------------
 export default async function workflow() {
   return pipeline(
-    preflight,      // 0
-    scaffold,       // 1
-    printerCore,    // 2
-    dittoPhase,     // 3 + 4 (parallel)
-    goldenWire,     // 5
-    converge,       // 5b (loop to green)
-    validate,       // 6
-    finalize,       // 7
+    preflight, // 0
+    scaffold, // 1
+    printerCore, // 2
+    dittoPhase, // 3 + 4 (parallel)
+    goldenWire, // 5
+    converge, // 5b (loop to green)
+    validate, // 6
+    finalize, // 7
   );
 }

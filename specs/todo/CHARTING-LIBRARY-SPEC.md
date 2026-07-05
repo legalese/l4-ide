@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** PARTIAL — the Results Panel shipped as the "Results Inspector"; the ECharts charting piece did NOT.
+>
 > - Done: rename to "Show decision graph" + "Simplified" toggle; "Track result" CodeLens (`l4.renderResult`); the `l4/evalDirectiveResult` LSP request (`jl4-lsp/src/LSP/L4/Inspector.hs`, handler in `Handlers.hs`); inspector panel in both `ts-apps/webview` and `ts-apps/jl4-web` with theme-aware L4 pretty-printing via `@repo/l4-highlight`.
 > - Not done: ECharts charts for `LIST OF PAIR` (no `echarts` dep, no chart renderer); the planned `ts-shared/l4-result-visualizer/` package was never created (built as `inspector-panel.svelte` instead).
 

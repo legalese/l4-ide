@@ -10,28 +10,30 @@ Scope: design only — no implementation in this RFC.
 
 The headline open question (§6 Q1) — does the lexer resolve `^` by code-point or display-width
 columns? — has been **settled by experiment, and it is DISPLAY WIDTH**. The RFC's §4.1 ruling for
-code points was **wrong**: the lone adversarial reviewer who *executed* the lexer was right, and the
-three who *read the source* (no `wcwidth` table → "must be code points") were misled.
+code points was **wrong**: the lone adversarial reviewer who _executed_ the lexer was right, and the
+three who _read the source_ (no `wcwidth` table → "must be code points") were misled.
 
 **Evidence (all against the real `~/.local/bin/l4`):**
-1. *Ditto-binding test.* The same `^`, aligned two ways after a `中`, with an input chosen so the
+
+1. _Ditto-binding test._ The same `^`, aligned two ways after a `中`, with an input chosen so the
    bound conjunct flips the result: the **display-width**-aligned caret binds correctly
    (`f(x,zzz)=FALSE`); the **code-point**-aligned one silently loses the conjunct (`=TRUE`).
-2. *`l4 ast` columns.* A line of 43 code points containing one `中` reports `end column = 45` — i.e.
+2. _`l4 ast` columns._ A line of 43 code points containing one `中` reports `end column = 45` — i.e.
    44 display columns + 1. The AST source positions ARE display-width.
-3. *Width characterization* (via `l4 ast` end-column deltas): East-Asian **Wide/Fullwidth = 2**
+3. _Width characterization_ (via `l4 ast` end-column deltas): East-Asian **Wide/Fullwidth = 2**
    (`中`/`字`/`가`/`Ａ`/`😀`); ASCII, half-width kana, NBSP, precomposed `é` = 1; **combining mark = 1**
    (so NOT true `wcwidth`); ZWJ emoji sequences summed per code point (**no grapheme clustering**);
    tab = tab-stop. Net: **East_Asian_Width W/F → 2, else → 1, per code point.**
 
 **What flips (supersedes the body below where they conflict):**
+
 - §4.1 metric → **display width** (`displayWidth`), not `Text.length`. dmnmd's `displayWidth` is the
-  **correct** basis, not the latent bug — *except* its range table **misses the wide-emoji blocks**
+  **correct** basis, not the latent bug — _except_ its range table **misses the wide-emoji blocks**
   (it scores `😀` as 1); the correct table adds U+1F300–1F64F / 1F900–1F9FF / 1FA70–1FAFF.
 - §6 Q1 → **RESOLVED: display width.** The golden test is no longer a blocker; it is retained as a
   **regression** pinning the exact width function to the lexer.
 - §4.7 "do not bail ditto for CJK / visual blemish" → **moot**: under display-width padding CJK
-  carets are both correct *and* visually aligned.
+  carets are both correct _and_ visually aligned.
 - The verifier's column logic and the summary's "code points; kill `displayWidth`" → display width.
 
 **Already actioned:** `L4.Print.Columnar` now measures `displayWidth` (East-Asian table + emoji
@@ -44,30 +46,30 @@ golden-pinned kernel this RFC proposes.
 
 ## 1. Thesis
 
-`l4-lint` is **two tools wearing one codebase**, separated by *proof obligation*, not by surface effect:
+`l4-lint` is **two tools wearing one codebase**, separated by _proof obligation_, not by surface effect:
 
 1. **A formatter** (`l4 format`) — default-on, silent, opinionated, **idempotent** layout
    rules. Headline rule: **COLUMNAR** (align `BRANCH` arms into columns; collapse repeated
    guard tokens to the ditto operator `^`). Its safety contract is the strongest available:
-   *the post-resolution AST and the comment/prose trivia of the output are provably identical
+   _the post-resolution AST and the comment/prose trivia of the output are provably identical
    to the input, verified on every run, with fallback to the unchanged input bytes on any
-   doubt.*
+   doubt._
 
 2. **A codemod / suggestion layer** (`l4 lint`, `l4 rename`) — opt-in, reviewed-diff, never
    on-save. Headline rule: **camelCase → `` `back tick spaced` ``** rename. Its contract is
-   *weaker and different*: semantics-preserving modulo a consistent renaming (alpha-equivalence),
+   _weaker and different_: semantics-preserving modulo a consistent renaming (alpha-equivalence),
    which deliberately changes meaning-bearing tokens and therefore **cannot** ride the
    formatter's byte-equal envelope.
 
 **The organizing axis is the proof obligation, because it mechanically determines the trust
-model, which determines default-on vs opt-in.** The dividing question is precise: *is the
-transform closed under resolved-AST equality (and trivia-preserving)?*
+model, which determines default-on vs opt-in.** The dividing question is precise: _is the
+transform closed under resolved-AST equality (and trivia-preserving)?_
 
-| Class | Obligation | Mutates meaning-bearing tokens? | Trust model | Default |
-|---|---|---|---|---|
-| **Layout** | resolved-AST equal **and** trivia-multiset preserved **and** `f(f(x))==f(x)` | No (whitespace + the `^` token only) | verified every run; region-scoped fallback-to-bytes | **ON, silent** |
-| **Codemod** | alpha-equivalence (Unique-graph iso up to substitution) over the **import closure** | Yes, on explicit request | reviewed diff, conflict-checked, atomic | **OFF** |
-| **Suggestion** | none — pure analysis → diagnostics | No (read-only; a *fix* is delegated to Codemod) | advisory, per-rule/per-site config | **ON as diagnostics** |
+| Class          | Obligation                                                                          | Mutates meaning-bearing tokens?                 | Trust model                                         | Default               |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | --------------------- |
+| **Layout**     | resolved-AST equal **and** trivia-multiset preserved **and** `f(f(x))==f(x)`        | No (whitespace + the `^` token only)            | verified every run; region-scoped fallback-to-bytes | **ON, silent**        |
+| **Codemod**    | alpha-equivalence (Unique-graph iso up to substitution) over the **import closure** | Yes, on explicit request                        | reviewed diff, conflict-checked, atomic             | **OFF**               |
+| **Suggestion** | none — pure analysis → diagnostics                                                  | No (read-only; a _fix_ is delegated to Codemod) | advisory, per-rule/per-site config                  | **ON as diagnostics** |
 
 This is exactly Go's own split (`gofmt` / `gofmt -r`+`gopls rename` / `go vet`), which is the
 evidence the cut is natural. The two halves must stay **architecturally distinct**: one engine,
@@ -85,11 +87,11 @@ empirical results. See §4.1 and §6.
 
 Three candidate strategies, judged against the hard facts of jl4-core:
 
-| Strategy | Verdict |
-|---|---|
-| **A. Pure AST reprint** (`prettyLayout`) | **Rejected.** `L4.Print.printWithLayout`/`prettyLayout` consults only the AST node and **drops every comment, trailing trivia, and `Inert` prose** (Print.hs:161-172). Fatal for statutory L4 where prose is interleaved. |
-| **B. Whole-file CST reprint** (ormolu-style) | Viable but high blast radius: every line regenerated, so any `displayPosToken`/trivia bug corrupts *untouched* code. Noisy diffs. |
-| **C. Surgical span rewrite** (apply-refact-style) | **Chosen.** Emit `TextEdit`s only for spans a rule actively changes; **byte-copy** the rest. Untouched code is byte-identical by construction; comment-safety for untouched regions is trivially true. |
+| Strategy                                          | Verdict                                                                                                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Pure AST reprint** (`prettyLayout`)          | **Rejected.** `L4.Print.printWithLayout`/`prettyLayout` consults only the AST node and **drops every comment, trailing trivia, and `Inert` prose** (Print.hs:161-172). Fatal for statutory L4 where prose is interleaved. |
+| **B. Whole-file CST reprint** (ormolu-style)      | Viable but high blast radius: every line regenerated, so any `displayPosToken`/trivia bug corrupts _untouched_ code. Noisy diffs.                                                                                         |
+| **C. Surgical span rewrite** (apply-refact-style) | **Chosen.** Emit `TextEdit`s only for spans a rule actively changes; **byte-copy** the rest. Untouched code is byte-identical by construction; comment-safety for untouched regions is trivially true.                    |
 
 Synthesis: **globally C** (byte-preserving, surgical), **locally a bounded reprint inside each
 touched group**, where the group renderer sources its cell text from **concrete tokens with
@@ -99,7 +101,7 @@ to an implementation detail of the region renderer.
 `L4.ExactPrint.exactprint` is **not** the fallback serializer and **not** byte-verbatim: it
 reconstructs text from tokens via `displayPosToken`, re-renders resolved carets back to `^`
 (Lexer.hs:1035-1037), and can normalize trivia — and today's `l4 format` (`Rules.ExactPrint`)
-*exits 1 and prints nothing* on parse/typecheck failure (Cli/Format.hs). **Ruling: the fallback
+_exits 1 and prints nothing_ on parse/typecheck failure (Cli/Format.hs). **Ruling: the fallback
 path returns the original source bytes with no printer in the loop.** exactprint survives only
 as an internal serializer for fully-parsed passthrough, never as the safety net.
 
@@ -107,7 +109,7 @@ as an internal serializer for fully-parsed passthrough, never as the safety net.
 
 IR = jl4-core's already-parsed `Module Name` with its `Anno`. We do **not** invent a new CST.
 The `Anno_` payload (`AnnoHole` for child subtrees, `AnnoCsn (CsnCluster_ t)` for real tokens,
-`trailing` carrying `TSpace`/`TLineComment`/`TBlockComment` trivia — Annotation.hs) *is* the
+`trailing` carrying `TSpace`/`TLineComment`/`TBlockComment` trivia — Annotation.hs) _is_ the
 concrete-syntax-with-trivia tree. `l4-lint` reads it; it does not rebuild it.
 
 Every rule emits the same thing:
@@ -172,30 +174,30 @@ failures a formatter must never commit, and to a third:
 - **Comment loss/relocation.** Comments are `Anno` trivia; erasing `Anno` erases them. A relaid
   group that drops or moves a comment **passes** bare-AST equality. → The verifier must include a
   **trivia obligation**: the multiset of comment/`§` tokens (and each comment's resolved anchor
-  token) in `out` equals that in `in`. (`Inert` prose text *is* in the AST — Syntax.hs:243 — so
+  token) in `out` equals that in `in`. (`Inert` prose text _is_ in the AST — Syntax.hs:243 — so
   it is covered by AST equality, but comments are not.)
 - **Non-convergence.** The gate tests `in≡out`, not `f(f(x))==f(x)`. A resolve-preserving
   formatter can still oscillate. → Idempotency is a **CI obligation** over a corpus, plus a
   bounded **N=2 fixpoint guard** in the engine that bails to identity if a rule fails to converge.
 - **Silent no-op masquerading as success.** If the equivalence relation is even slightly too
-  strict (e.g. shipped as derived `==` over the *annotated* AST — which is `False` for any
+  strict (e.g. shipped as derived `==` over the _annotated_ AST — which is `False` for any
   reformat), the verifier fails every file → emits input unchanged → the formatter is a no-op,
   **and `format∘format=format` is green for the identity function.** → CI must include an
-  **effectiveness corpus**: deliberately-unformatted fixtures where `format(x) ≠ x` is *required*.
+  **effectiveness corpus**: deliberately-unformatted fixtures where `format(x) ≠ x` is _required_.
 
 **Needed new primitive (a concrete deliverable, not free):** there is no `stripAnno` /
-alpha-equivalence in jl4-core today — `Syntax` only derives `Eq` over the *annotated* AST. We must
+alpha-equivalence in jl4-core today — `Syntax` only derives `Eq` over the _annotated_ AST. We must
 build `π_AST`: instantiate the tree with `Anno` erased to `()` **and** compare `Name`s by resolved
 `Unique`, not surface text. Pin it with golden tests on pairs known-equivalent (`^`-form vs
 spelled-out) and known-different.
 
 ### 2.6 LSP / CLI surface and relationship to existing `l4 format`
 
-- **`l4 format`** is *upgraded* from today's exact-print identity into the opinionated Layout
+- **`l4 format`** is _upgraded_ from today's exact-print identity into the opinionated Layout
   formatter: columnar default-on, `--reindent-only`, `--check` (gofmt -l), `--diff`. **This is a
   genuine behavior change** — `format` stops being an identity pass. The old behavior is reachable
-  as `--passthrough`. **`--check` must distinguish three states**, not two: *formatted*,
-  *would-change* (exit non-zero, list files), and *refused-region* (exit non-zero, list regions
+  as `--passthrough`. **`--check` must distinguish three states**, not two: _formatted_,
+  _would-change_ (exit non-zero, list files), and _refused-region_ (exit non-zero, list regions
   that could not be verified) — so CI never goes green on a file the tool silently declined to touch.
 - **`l4 lint [--fix]`** is new: Diagnostic rules, severity-tagged, `--fix` routes accepted hints
   through the Codemod class.
@@ -222,51 +224,51 @@ Engine = `L4.Columnar` consumed by `L4.Lint.Layout`. Cells sourced from **concre
 trivia**, never `prettyLayout`. Group boundary = blank line, full-line comment, `§` section
 marker, `Inert` prose, arity change.
 
-| # | Rule | Default | Safety notes |
-|---|---|---|---|
-| A1 | **COLUMNAR** — align `BRANCH` arms into guard columns + collapse repeated guard tokens → `^` | ON | Caret collapse is **verification-gated per group** (§4.6): a group collapses only if it round-trips; otherwise it silently degrades to A2 (reindent, spelled-out). Requires the single-lexical-token guard (§4.4) and prev-non-blank-line adjacency (§4.3). |
-| A2 | **REINDENT-TO-COLUMNS** — reflow guard/result to shared column slots, no `^` | ON | The engine with `enableDitto=False` (kernel's "safe oracle mode"). 100% of alignment benefit, zero caret-resolution fragility. **This is the always-safe substrate A1 degrades to.** |
-| A3 | **Align IS / MEANS / THEN** across sibling decls/arms | ON | Must be part of the **single joint layout solve** (§4.7), not an independent pad-to-max pass, or it fights A1/A4. |
-| A4 | **Align DECLARE record fields + types** into columns | ON | Same joint-solve constraint. |
-| A5 | **Align GIVEN / GIVETH signature blocks** | ON | Same. |
-| A6 | **Align asyndetic `...` / `..` list items** vertically | ON | Same. |
-| A7 | **Gutter normalization + trailing-whitespace strip** | ON | **Right-strip each emitted line** (the kernel deliberately does NOT — that is correct for its suffix-appending callers, but a file formatter must strip or it fights `trailing-whitespace` pre-commit hooks and breaks `--check`). Padding *after* the last token is layout-inert; padding *left of* it is load-bearing — strip only the former. |
-| A8 | **Blank-line + `§` spacing normalization** (≤1 blank between decls) | ON | Safe for ditto: `mkPosTokens` skips whitespace-only lines when snapshotting `prevLineToks` (Lexer.hs:683). |
+| #   | Rule                                                                                         | Default | Safety notes                                                                                                                                                                                                                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A1  | **COLUMNAR** — align `BRANCH` arms into guard columns + collapse repeated guard tokens → `^` | ON      | Caret collapse is **verification-gated per group** (§4.6): a group collapses only if it round-trips; otherwise it silently degrades to A2 (reindent, spelled-out). Requires the single-lexical-token guard (§4.4) and prev-non-blank-line adjacency (§4.3).                                                                                      |
+| A2  | **REINDENT-TO-COLUMNS** — reflow guard/result to shared column slots, no `^`                 | ON      | The engine with `enableDitto=False` (kernel's "safe oracle mode"). 100% of alignment benefit, zero caret-resolution fragility. **This is the always-safe substrate A1 degrades to.**                                                                                                                                                             |
+| A3  | **Align IS / MEANS / THEN** across sibling decls/arms                                        | ON      | Must be part of the **single joint layout solve** (§4.7), not an independent pad-to-max pass, or it fights A1/A4.                                                                                                                                                                                                                                |
+| A4  | **Align DECLARE record fields + types** into columns                                         | ON      | Same joint-solve constraint.                                                                                                                                                                                                                                                                                                                     |
+| A5  | **Align GIVEN / GIVETH signature blocks**                                                    | ON      | Same.                                                                                                                                                                                                                                                                                                                                            |
+| A6  | **Align asyndetic `...` / `..` list items** vertically                                       | ON      | Same.                                                                                                                                                                                                                                                                                                                                            |
+| A7  | **Gutter normalization + trailing-whitespace strip**                                         | ON      | **Right-strip each emitted line** (the kernel deliberately does NOT — that is correct for its suffix-appending callers, but a file formatter must strip or it fights `trailing-whitespace` pre-commit hooks and breaks `--check`). Padding _after_ the last token is layout-inert; padding _left of_ it is load-bearing — strip only the former. |
+| A8  | **Blank-line + `§` spacing normalization** (≤1 blank between decls)                          | ON      | Safe for ditto: `mkPosTokens` skips whitespace-only lines when snapshotting `prevLineToks` (Lexer.hs:683).                                                                                                                                                                                                                                       |
 
-**Excluded from A** (looks like layout, isn't safe): tab→space *as a silent rewrite* (handled
+**Excluded from A** (looks like layout, isn't safe): tab→space _as a silent rewrite_ (handled
 explicitly per §4.8, not ignored); any reflow of `Inert` prose (byte-preserved, immovable);
 trailing-comment column alignment (clang `AlignTrailingComments` — width swings with comment
 length, threatens idempotency; leave trailing comments where they fall).
 
 ### 3.2 Codemod (Class B, OPT-IN, reviewed diff, atomic per file/closure)
 
-| # | Rule | Obligation | Default | Notes |
-|---|---|---|---|---|
-| B1 | **camelCase / snake_case → `` `back tick spaced` ``** | alpha-equiv | OFF | The pipeline of §4.5. Resolver-driven, refuse-on-collision, import-closure-scoped, statute-desync guard. |
-| B2 | **Redundant-backtick removal** (`` `foo` `` → `foo`) | alpha-equiv | OFF | Exact inverse of `quoteIfNeeded` (Print.hs:818) — the canonical predicate both must agree on. |
-| B3 | **Qualified-name canonicalization** | alpha-equiv | OFF | Shortest unambiguous form. |
-| B4 | **Shadowing-rename** (disambiguate a shadowing binder) | alpha-equiv | OFF | Same machinery as B1; collision check is *mandatory*, shared with B1. |
-| B5 | **Denotation-preserving simplifications** (`IF x THEN TRUE ELSE FALSE`→`x`; drop dead `OTHERWISE`; remove unreachable arm) | **denotational** equiv (needs typechecker/solver) | OFF | The apply-side of C2/C5/C6/C7 fixes. **C detects, B applies.** |
+| #   | Rule                                                                                                                       | Obligation                                        | Default | Notes                                                                                                    |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| B1  | **camelCase / snake_case → `` `back tick spaced` ``**                                                                      | alpha-equiv                                       | OFF     | The pipeline of §4.5. Resolver-driven, refuse-on-collision, import-closure-scoped, statute-desync guard. |
+| B2  | **Redundant-backtick removal** (`` `foo` `` → `foo`)                                                                       | alpha-equiv                                       | OFF     | Exact inverse of `quoteIfNeeded` (Print.hs:818) — the canonical predicate both must agree on.            |
+| B3  | **Qualified-name canonicalization**                                                                                        | alpha-equiv                                       | OFF     | Shortest unambiguous form.                                                                               |
+| B4  | **Shadowing-rename** (disambiguate a shadowing binder)                                                                     | alpha-equiv                                       | OFF     | Same machinery as B1; collision check is _mandatory_, shared with B1.                                    |
+| B5  | **Denotation-preserving simplifications** (`IF x THEN TRUE ELSE FALSE`→`x`; drop dead `OTHERWISE`; remove unreachable arm) | **denotational** equiv (needs typechecker/solver) | OFF     | The apply-side of C2/C5/C6/C7 fixes. **C detects, B applies.**                                           |
 
 ### 3.3 Suggestion (Class C, advisory, hlint-style configurable), ranked by value
 
 Pure analysis over `Module Name` / `Module Resolved` → diagnostics, like the in-tree
 `L4.Lint.AndOrDepth.checkAndOrDepth`.
 
-| # | Lint | Default sev | Needs | Why it matters (L4-specific) |
-|---|---|---|---|---|
-| C1 | **Fragile / unresolvable ditto** — a `^` whose column resolves to *nothing* on the previous non-blank line | **error** | lexer | The silent footgun. Re-run `findMatchingToken`; **error only when it resolves to `Nothing`** (an actual miscompile/parse hazard). |
-| C1b | **Suspicious ditto** — `^` resolves, but to a token the author plausibly didn't mean | warning | lexer | Split from C1: "plausibly meant" is not computable, so it must not block CI. |
-| C2 | **Deontic / temporal double-bind** — obligation to do X co-reachable with prohibition on X | **error** | reasoner API | The crown jewel (the gov-agency race condition). Beyond lexer/parser — depends on the reasoner, so it does **not** gate the taxonomy's launch. |
-| C3 | **Mixed AND/OR at same column** | warning | AST | **Already implemented** (`AndOrDepth`). Adopt as-is. |
-| C4 | **Non-exhaustive CONSIDER** — pattern match over a DECLARE'd sum missing a constructor | warning (→error opt) | types | GHC `-Wincomplete-patterns` analogue. |
-| C5 | **Unreachable BRANCH arm** — guard subsumed by an earlier arm | warning | AST (+solver) | Syntactic subsumption first; escalate with solver. Fix = B5. |
-| C6 | **Dead / redundant OTHERWISE** — guards already exhaustive | hint | types | Fix = B5. |
-| C7 | **Redundant boolean** — `… THEN TRUE ELSE FALSE`, `x AND TRUE` | hint | AST | `scanAnd`/`scanOr` to flatten. Fix = B5. |
-| C8 | **Overlapping / nondeterministic guards** — two arms simultaneously satisfiable, different results | warning | solver | The insurance-leak class. |
-| C9 | **Unused binding** — a `Def` Unique with zero `Ref` | hint | resolver | `FindReferences` directly. |
-| C10 | **Out-of-scope reference** — `OutOfScope` in `Resolved` | error | resolver | Catches pre-typecheck. |
-| C11 | **camelCase identifier present** — style nudge toward B1 | hint | resolver | The bridge: C detects style drift, offers B1 as fix. |
+| #   | Lint                                                                                                       | Default sev          | Needs         | Why it matters (L4-specific)                                                                                                                   |
+| --- | ---------------------------------------------------------------------------------------------------------- | -------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | **Fragile / unresolvable ditto** — a `^` whose column resolves to _nothing_ on the previous non-blank line | **error**            | lexer         | The silent footgun. Re-run `findMatchingToken`; **error only when it resolves to `Nothing`** (an actual miscompile/parse hazard).              |
+| C1b | **Suspicious ditto** — `^` resolves, but to a token the author plausibly didn't mean                       | warning              | lexer         | Split from C1: "plausibly meant" is not computable, so it must not block CI.                                                                   |
+| C2  | **Deontic / temporal double-bind** — obligation to do X co-reachable with prohibition on X                 | **error**            | reasoner API  | The crown jewel (the gov-agency race condition). Beyond lexer/parser — depends on the reasoner, so it does **not** gate the taxonomy's launch. |
+| C3  | **Mixed AND/OR at same column**                                                                            | warning              | AST           | **Already implemented** (`AndOrDepth`). Adopt as-is.                                                                                           |
+| C4  | **Non-exhaustive CONSIDER** — pattern match over a DECLARE'd sum missing a constructor                     | warning (→error opt) | types         | GHC `-Wincomplete-patterns` analogue.                                                                                                          |
+| C5  | **Unreachable BRANCH arm** — guard subsumed by an earlier arm                                              | warning              | AST (+solver) | Syntactic subsumption first; escalate with solver. Fix = B5.                                                                                   |
+| C6  | **Dead / redundant OTHERWISE** — guards already exhaustive                                                 | hint                 | types         | Fix = B5.                                                                                                                                      |
+| C7  | **Redundant boolean** — `… THEN TRUE ELSE FALSE`, `x AND TRUE`                                             | hint                 | AST           | `scanAnd`/`scanOr` to flatten. Fix = B5.                                                                                                       |
+| C8  | **Overlapping / nondeterministic guards** — two arms simultaneously satisfiable, different results         | warning              | solver        | The insurance-leak class.                                                                                                                      |
+| C9  | **Unused binding** — a `Def` Unique with zero `Ref`                                                        | hint                 | resolver      | `FindReferences` directly.                                                                                                                     |
+| C10 | **Out-of-scope reference** — `OutOfScope` in `Resolved`                                                    | error                | resolver      | Catches pre-typecheck.                                                                                                                         |
+| C11 | **camelCase identifier present** — style nudge toward B1                                                   | hint                 | resolver      | The bridge: C detects style drift, offers B1 as fix.                                                                                           |
 
 ---
 
@@ -274,14 +276,14 @@ Pure analysis over `Module Name` / `Module Resolved` → diagnostics, like the i
 
 ### 4.1 Column-alignment metric: **display width (with tab expansion)** — RULING (corrected; see §0)
 
-> **CORRECTED.** This section originally ruled for *code points* on the strength of a source read
+> **CORRECTED.** This section originally ruled for _code points_ on the strength of a source read
 > (no `wcwidth` table in `jl4-core/src`, the lexer reads only `unPos sourceColumn`). That was
 > **empirically refuted** — see §0. The metric is **display width**. The reasoning is kept for the
 > record but its ruling is inverted.
 
 `^` is resolved **in the lexer** by exact start-column match (`findMatchingToken`,
-`pt.range.start.column == c`). Column position is therefore *meaning-bearing*; the metric must
-mirror the lexer exactly. The source has no width-table code, which *looked* like code points — but
+`pt.range.start.column == c`). Column position is therefore _meaning-bearing_; the metric must
+mirror the lexer exactly. The source has no width-table code, which _looked_ like code points — but
 the lexer's reported columns come out display-width regardless (mechanism unexplained; a
 megaparsec-version behavior, pinned by the §6 golden regression).
 
@@ -292,10 +294,10 @@ basis (extended with the wide-emoji blocks it omits).** `L4.Print.Columnar` has 
 
 Accepted, stated consequence: a CJK/Tamil guard column is aligned **for the lexer, not for the
 eye** — `中` advances one lexer column but renders two glyph-widths, so a lexically-correct table
-can *look* ragged. **Carets remain correct under code-point padding even with CJK** (they only
+can _look_ ragged. **Carets remain correct under code-point padding even with CJK** (they only
 look misaligned), so we do **not** bail ditto for CJK — it is a visual blemish, not a correctness
 failure. If the language team ever wants "what you see is what resolves," the fix is in the
-**lexer** (teach it display-width advance), and *then* the metric here flips. The metric is a
+**lexer** (teach it display-width advance), and _then_ the metric here flips. The metric is a
 mirror of the lexer, not a formatter preference.
 
 **Caveat — this is the one place the reconnaissance disagreed with itself.** One adversarial
@@ -306,7 +308,7 @@ any width-table code in the source, (b) megaparsec's documented `Stream Text` be
 code points, so this RFC rules for code points — **but because the disagreement is empirical and
 load-bearing, it is settled by a mandatory golden test before any code is written** (§6, Q1):
 round-trip a CJK + emoji + combining-mark + tab `BRANCH` through the real `execLexer` and assert
-which column each `^` binds. Both camps already agree the metric *must* mirror the lexer; the test
+which column each `^` binds. Both camps already agree the metric _must_ mirror the lexer; the test
 is the adjudicator. Pin the megaparsec version as part of the formatter's contract.
 
 ### 4.2 Comment / `Inert`-prose preservation: the actually-hard part
@@ -317,8 +319,8 @@ alone is a formatter.** Architectural commitment:
 
 > The layout pass is a **targeted token-stream rewrite inside `Anno` clusters**, never a
 > whole-file re-`prettyLayout`. Grid cell text comes from the existing **concrete tokens**
-> (their `CsnCluster_` payload + `trailing`), not from reprinting the AST. Only the *inter-token
-> whitespace within a detected group* is regenerated. Everything else is byte-preserved.
+> (their `CsnCluster_` payload + `trailing`), not from reprinting the AST. Only the _inter-token
+> whitespace within a detected group_ is regenerated. Everything else is byte-preserved.
 
 This dissolves most of the comment problem: if cells carry real tokens with attached trivia,
 comments ride along. The cell type the engine consumes is therefore richer than today's
@@ -342,11 +344,11 @@ Trivia rulings, by kind:
    computing `prevLineToks` (they lex as `TSpaces`), so the grid's "row above" and the lexer's
    "nearest non-blank-non-comment row above" agree **only if** no comment/blank line sits between
    two caret-bearing rows. The boundary enforces exactly that. Relaxing it (an "AcrossComments"
-   feature) is one refactor away from silent caret miscompile — document *why* it is forbidden.
+   feature) is one refactor away from silent caret miscompile — document _why_ it is forbidden.
 3. **`Inert` verbatim prose**: immovable, byte-preserved, hard group boundary, internal whitespace
    never touched even inside a `{-# l4-format on #-}` region. **But `Inert` is NOT trivia** — see
    §4.3.
-4. **Comment *inside* a row** (between two guard tokens): if any cell has interior
+4. **Comment _inside_ a row** (between two guard tokens): if any cell has interior
    `cellLead`/`cellTrail`, the row is **non-alignable** — emit it plain, break the group. Do not
    thread a comment through a padded column.
 
@@ -356,7 +358,7 @@ Two corrections the layout/architecture critiques surfaced:
 
 - **`Inert` (Syntax.hs:243) is a real `Expr`**, not trivia. It evaluates to its boolean operator's
   identity (AND→True, OR→False), assigned during typecheck (`setInertContext`). When inert prose is
-  interleaved *between conjuncts of one guard* (the brief says this is the common case),
+  interleaved _between conjuncts of one guard_ (the brief says this is the common case),
   `scanAnd`/`scanOr` return it as a conjunct and `conjunctCells` emits it as a cell. **Ruling: treat
   `Inert` as a first-class compound grid cell — never dittoable, never width-collapsed — and state
   that layout tolerates `InertCtxNone`** (layout runs on `Module Name`, pre-typecheck, so
@@ -365,29 +367,29 @@ Two corrections the layout/architecture critiques surfaced:
   "currently not annotations"). The lexer's `^` resolves against the **immediately preceding
   non-whitespace line** (`prevLineToks`), transitively (`computedPayload`/`RealTCopy`). Comments are
   `TSpaces` → skipped (chain survives). But an `@nlg`/`@desc` line or an interleaved inert-prose line
-  **becomes `prevLineToks`**, so a `^` on the line below resolves against *its* columns. **Ruling:
+  **becomes `prevLineToks`**, so a `^` on the line below resolves against _its_ columns. **Ruling:
   caret eligibility is computed against the lexer's `prevLineToks` rule (previous non-whitespace
   physical line), NOT the grid's logical row index `i-1`.** Annotation/`Inert` lines force
-  "spell out," never "collapse." The `Columnar` engine must take an explicit *"row above is the
-  lexer's predecessor"* bit per row rather than assuming `i-1`.
+  "spell out," never "collapse." The `Columnar` engine must take an explicit _"row above is the
+  lexer's predecessor"_ bit per row rather than assuming `i-1`.
 
 ### 4.4 The single-lexical-token guard (Atom vs Compound) — classify by token count, not by role
 
 The dmnmd twin guards collapse with `singleToken t = ' ' notElem t`; `L4.Print.Columnar` **lacks
 this guard — a latent miscompile today.** A `^` copies exactly one token, so any multi-token cell
-must never collapse. The cell type carries `cellAtomic`, but the *classification rule* must be
+must never collapse. The cell type carries `cellAtomic`, but the _classification rule_ must be
 correct:
 
 - **Wrong rule** (one critique's): "value of a comparison = Atom." The value is `prettyLayout r`
   for an arbitrary `Expr`; `field > 100 USD`, `x >= y + 1` all produce **multi-token** value cells.
-  And the multi-token *operators* `AT MOST` / `AT LEAST` / `LESS THAN` / `GREATER THAN`
+  And the multi-token _operators_ `AT MOST` / `AT LEAST` / `LESS THAN` / `GREATER THAN`
   (`conjunctCells`, Print.hs:143-153) are each **two tokens** — collapsing the second `AT MOST` to
   `^` copies `AT` and drops `MOST`. **This is a miscompile in the code path today, on the default
   rendering of every such comparison.**
 - **Ruling: `cellAtomic = True` iff the cell is exactly one lexer token.** Classify by `Expr`
   atomicity (literal / bare var / backtick-quoted name → atomic; a `` `card to use` `` is a single
   `TQuoted` lexeme, Lexer.hs:444) **or** re-lex the rendered cell and count tokens. Single-
-  lexical-token-ness — not "is it a comparison value" — is the gate. Non-atomic cells still *align*;
+  lexical-token-ness — not "is it a comparison value" — is the gate. Non-atomic cells still _align_;
   they just never collapse to `^`.
 
 ### 4.5 Rename: de-ditto → rename → re-columnar (RENAME depends on COLUMNAR, is not its sibling)
@@ -398,7 +400,7 @@ returns **caret spans**: when a `^` dittoes an identifier, the parser sees a nor
 transitive). So a naïve span-edit inserts the full 13-char `` `card to use` `` at a 1-char caret
 span — different width deltas at def vs ref vs caret sites — which **guarantees** column desync to
 the right of any caret, dangling every downstream `^` (exact-column match). The alpha-eq gate then
-*refuses*, so the feature **silently no-ops on exactly the collapsed columnar tables it exists to
+_refuses_, so the feature **silently no-ops on exactly the collapsed columnar tables it exists to
 serve.**
 
 **Ruling — the rename pipeline:**
@@ -430,7 +432,7 @@ explicit per-identifier override map always wins.
 (term `cardToUse` and type `CardToUse` both → "card to use") — refuse by default, `--allow-cross-sort`
 to override. The collision check is **mandatory for B1**, shared with B4.
 
-**Reversibility — honest answer: lossy, not a function.** `camelify` (backtick→camel) is *not* a
+**Reversibility — honest answer: lossy, not a function.** `camelify` (backtick→camel) is _not_ a
 left inverse (acronyms gone, leading case gone, many-to-one). **Ruling: do not ship `camelify` as a
 general transform in v1.** If an exact inverse is needed, record the original spelling **out-of-band**
 (a sidecar keyed by stable identity) — **NOT** as a `Hidden`-annotated in-band node: inserting an AST
@@ -444,23 +446,23 @@ un-camelifiable).
 Define `R = lex∘resolve` (the lexer's resolution function) and `L` = the layout function. The
 formatter works from the **post-`^`-expansion** AST (lexing expands authorial carets via
 `computedPayload`, transitively), where every column holds its real resolved token; it then
-*regenerates* carets from scratch via the grid. Two facts make idempotency fall out:
+_regenerates_ carets from scratch via the grid. Two facts make idempotency fall out:
 
 - **Collapse compares against the original cell value, not the rendered caret** (`Columnar.hs:108`
-  tests `(normRows!!(i-1))!!j == Just t`, the previous row's *resolved* token — mirroring the
+  tests `(normRows!!(i-1))!!j == Just t`, the previous row's _resolved_ token — mirroring the
   lexer's transitive resolution). Keep this; comparing against the emitted `^` would break
   transitivity.
 - **The collapse decision is a pure function of the resolved grid**, which is a pure function of the
-  resolved AST. `format(format(x))` re-derives the *same* resolved AST (emitted carets expand right
-  back to the same tokens), feeds the *same* grid to the *same* deterministic renderer, reproduces
-  *identical* carets at *identical* code-point columns. Fixpoint.
+  resolved AST. `format(format(x))` re-derives the _same_ resolved AST (emitted carets expand right
+  back to the same tokens), feeds the _same_ grid to the _same_ deterministic renderer, reproduces
+  _identical_ carets at _identical_ code-point columns. Fixpoint.
 
 **Therefore idempotency = round-trip-safety + renderer-determinism + boundary-stability**, all
 already required — guarded (not assumed) by the N=2 fixpoint check and the effectiveness corpus.
 Two proof-breakers and their closing rules:
 
 - **Intent-reading from layout (prettier trap).** If "is this BRANCH vertical?" is read from
-  *whitespace*, formatting changes the whitespace → the next run reads different intent →
+  _whitespace_, formatting changes the whitespace → the next run reads different intent →
   oscillation. **Ruling: every layout/bail decision is a function of the resolved AST, never of
   surface whitespace.** Adopt exactly one intent signal — vertical-vs-inline by arm count (or, more
   conservatively for v1, "already multi-line stays multi-line; never convert") — derived from AST
@@ -469,19 +471,19 @@ Two proof-breakers and their closing rules:
   happens only in the lexer on the next run and yields the same tokens.
 
 **Per-group verification gate (the A1→A2 degrade):** a group emits carets only if that group, with
-carets, reparses to the same resolved tokens *and* its prev-non-blank-line adjacency holds. If not,
+carets, reparses to the same resolved tokens _and_ its prev-non-blank-line adjacency holds. If not,
 the group is emitted reindented-but-spelled-out (A2). So COLUMNAR is default-on **as an aspiration
 applied wherever it is provably safe**, and REINDENT is the guaranteed floor — honoring the brief's
 "columnar default-on" while obeying the architecture critique's safety pushback.
 
 ### 4.7 When to bail on alignment (clang discipline, sharpened)
 
-Alignment is best-effort; misalignment here *re-resolves* `^`, so: **align only when clean;
+Alignment is best-effort; misalignment here _re-resolves_ `^`, so: **align only when clean;
 otherwise emit plain spelled-out arms** (always safe). Bail predicates, all computed from the
 resolved AST (never surface whitespace):
 
 - **Single row** → no column, plain.
-- **Arity/shape mismatch** → grid mostly `Nothing` (sparsity > 0.5) → plain; also bail a *column*
+- **Arity/shape mismatch** → grid mostly `Nothing` (sparsity > 0.5) → plain; also bail a _column_
   with < 2 populated rows.
 - **Over-wide column** → would exceed `targetWidth`, or one cell dwarfs neighbors → plain.
 - **Non-atomic cell** (§4.4) → still align, never collapse.
@@ -499,7 +501,7 @@ resolved AST (never surface whitespace):
 
 `whitespace` accepts `\t`; megaparsec expands it to width-8 tab stops. A space-only kernel cannot
 reproduce a tab-indented file's caret columns. **Ruling: state a tab policy explicitly** — on the
-*touched* path, expand tabs to spaces and re-run the verifier; for *untouched* (byte-copied)
+_touched_ path, expand tabs to spaces and re-run the verifier; for _untouched_ (byte-copied)
 groups, either replicate the tab-stop math when modeling caret alignment or exclude tab-containing
 groups from caret analysis. Tabs are code points that are not column-units; "code points" in §4.1
 means "code points **with tab expansion**."
@@ -510,7 +512,7 @@ means "code points **with tab expansion**."
 
 **v1 — the safe layout family (PR #42 follow-up).** Extract `l4-columnar` (`text`-only) with the
 **two mandatory fixes**: (a) the single-lexical-token guard `cellAtomic` (§4.4), (b) confirm
-code-point metric + tab expansion (§4.1, §4.8) and *do not* port `displayWidth`. Generalize
+code-point metric + tab expansion (§4.1, §4.8) and _do not_ port `displayWidth`. Generalize
 `Cell → LCell` to carry trivia (§4.2). Build `L4.Lint.Engine` (the `Edit` primitive, the
 region-scoped applier, the **trivia+idempotency+effectiveness** verifier of §2.5, the N=2 fixpoint
 guard) and `L4.Lint.Layout` (AST→Grid bridge sourced from concrete tokens, prev-non-blank-line
@@ -523,11 +525,12 @@ error** and **C3 mixed-AND/OR**. Move `AndOrDepth` into `l4-lint`.
 **v2 — the opt-in rename codemod, with rails.** `L4.Lint.Rename` as the **de-ditto → rename →
 re-columnar** pipeline of §4.5. Consumes `Module Resolved`; `camelSplit` with confidence tiers and
 override map; mandatory collision-refuse; **import-closure-scoped** alpha-eq gate (Unique-bijection
-+ substitution, spans ignored, reparsed through `mkPosTokens`); statute-desync guard (scan
-`Inert`/annotation trivia for the old surface form; refuse-or-warn in statutory mode). Dry-run
-default, `--write` to apply, atomic, LSP code action + `l4 rename` / `l4 lint --fix Rename` at
-**suggestion** severity. Provenance stored out-of-band, not `Hidden` in-band. Ship B2
-(backtick-removal) as the agreeing inverse of `quoteIfNeeded`.
+
+- substitution, spans ignored, reparsed through `mkPosTokens`); statute-desync guard (scan
+  `Inert`/annotation trivia for the old surface form; refuse-or-warn in statutory mode). Dry-run
+  default, `--write` to apply, atomic, LSP code action + `l4 rename` / `l4 lint --fix Rename` at
+  **suggestion** severity. Provenance stored out-of-band, not `Hidden` in-band. Ship B2
+  (backtick-removal) as the agreeing inverse of `quoteIfNeeded`.
 
 **v3 — the suggestion lints.** Grow `L4.Lint.*`: C4-C11 (resolver/type/solver-backed), with C
 detecting and B5 applying fixes; `.l4lint.yaml` + inline suppression for Class C only. **Defer C2
@@ -562,14 +565,14 @@ is a meaningfully larger build than this RFC assumes.
 
 **Q3. Is RENAME's single-module resolution + per-module gate ever safe for exported names?**
 `buildReferenceMapping`/`findReferences` run over **one** `Module Resolved`, and `Unique` is
-`moduleUri`-qualified precisely because refs to an exported binder live in *other* files. The trap:
+`moduleUri`-qualified precisely because refs to an exported binder live in _other_ files. The trap:
 the alpha-eq gate also runs per-module, so it **passes** (local refs updated) while downstream
 importers silently break. Mitigation: require the whole import closure before renaming any exported
 name and **refuse** when the workspace index is incomplete/stale. If closure-completeness can't be
 guaranteed, restrict RENAME to single-file scripts and say so loudly — it is safe there and unsafe
 exactly where it is most useful.
 
-**Q4. Does default-on COLUMNAR fire its A2 degrade *frequently* on real statutes?** If the gnarliest,
+**Q4. Does default-on COLUMNAR fire its A2 degrade _frequently_ on real statutes?** If the gnarliest,
 most-aligned fee tables (the highest-value targets, already hand-tuned with carets at specific
 columns) routinely fail the per-group caret verification, COLUMNAR becomes a frequent silent reindent
 on its best targets — at which point caret-collapse arguably belongs in Class C (suggestion) with a
@@ -577,10 +580,10 @@ Class B opt-in fix, dissolving the A1-as-default-on premise. Measure the degrade
 corpora (the payments-fintech fee tables, the SG statute) before committing to caret-collapse-on-save.
 
 **Q5. Is identifier spelling ever an external contract the alpha-eq gate cannot see?** The
-payments-fintech use case serves L4 via an SQL-like API; if an L4 identifier's spelling *is* a
+payments-fintech use case serves L4 via an SQL-like API; if an L4 identifier's spelling _is_ a
 column/field name on the wire, B1 rename changes the external contract while the resolved AST is
 "equal" — the gate green-lights a breaking change, and editing the bound `Inert` statute prose to
-match would be *altering the statute*. B1 in statutory/published-API mode must **refuse or warn-only**,
+match would be _altering the statute_. B1 in statutory/published-API mode must **refuse or warn-only**,
 not merely be opt-in; this gates B1's launch in those uses, not a risk-appendix footnote.
 
 ---

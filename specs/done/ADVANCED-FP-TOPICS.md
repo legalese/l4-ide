@@ -1,6 +1,7 @@
 > **Status (audited 2026-07-03):** RESOLVED — the FP topics are taught (in Foundation Module 4 rather than new Advanced modules). Moved to `specs/done/`.
+>
 > - Recursion, list recursion, higher-order functions, `GIVEN…YIELD` lambdas, and map/filter live in `doc/courses/foundation/module-4-functions.md` (lines ~146-208); `fold` is covered in `doc/courses/advanced/module-a4-production.md:318`.
-> - Deviation: no dedicated "Module A5/A6" were created; the spec's premise that these topics were *removed* from Foundation Module 4 is stale — they are present there now.
+> - Deviation: no dedicated "Module A5/A6" were created; the spec's premise that these topics were _removed_ from Foundation Module 4 is stale — they are present there now.
 
 # Advanced Topics to Add
 
