@@ -90,6 +90,10 @@ PARTY Alice MUST pay 100 WITHIN 30
 PARTY Seller MUST deliver WITHIN 5 days OF `order confirmation`
 ```
 
+### Boundary
+
+The deadline boundary is inclusive: an action arriving _exactly at_ the deadline instant is timely. The failure/expiry path fires only once an event's timestamp is _strictly greater_ than the deadline (i.e. the deadline has _passed_).
+
 ### See Also
 
 - **BEFORE** (planned, not yet implemented -- will support absolute deadlines)
@@ -222,12 +226,18 @@ MUST `Amount Transferred`
 
 ## EXACTLY (Exact Action Matching)
 
-Changes how the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the action is an expression that is evaluated to a value and compared for equality against the event.
+Changes how (part of) the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the marked part is an expression that is evaluated to a value and compared for equality against the corresponding part of the event.
+
+EXACTLY is a pattern-position construct: it can appear wherever a pattern is expected inside the action. There are two placements:
+
+1. **Whole-action**: `MUST EXACTLY expression` -- the entire action expression is evaluated and the event must equal the result.
+2. **Per-argument**: `MUST action pattern... EXACTLY expression` -- the action's name and other arguments are still matched as patterns, but the argument marked EXACTLY must equal the evaluated expression.
 
 ### Syntax
 
 ```l4
 MUST EXACTLY expression
+MUST actionName EXACTLY expression
 ```
 
 ### Examples
@@ -236,12 +246,12 @@ MUST EXACTLY expression
 -- Without EXACTLY: "pay" is a pattern, matches any pay-shaped event
 PARTY buyer MUST pay
 
--- With EXACTLY: expression is evaluated, event must equal the result
+-- Whole-action: the expression is evaluated, event must equal the result
 PARTY lender MUST EXACTLY send capital to borrower
 
--- Exact value match
+-- Per-argument: pay's amount argument must equal 100 exactly
 PARTY Alice
-MUST pay price EXACTLY 100
+MUST pay EXACTLY 100
 WITHIN 30
 ```
 
@@ -346,6 +356,8 @@ RAND
 ## ROR (Parallel OR of Obligations)
 
 Disjunctive choice between deontic obligations. EITHER obligation being fulfilled suffices for the compound to be fulfilled. If either side fulfills, the whole compound fulfills (short-circuit).
+
+If ALL alternatives are breached, the compound is breached; the reported breach is the latest one (the last alternative "missed its chance"), falling back to the right operand when the breaches carry no distinguishing timestamps.
 
 In concurrency theory terms, this is a race where the first to complete determines the outcome.
 
