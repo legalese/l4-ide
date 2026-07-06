@@ -1,0 +1,9 @@
+§ BatchEscapeFixture
+
+-- Regression fixture for `l4 batch` string-literal escaping (target T11).
+-- The exported function's body deliberately ignores its parameter so the
+-- test isolates payload escaping from unrelated name-resolution behaviour.
+
+@export Return a fixed token regardless of input
+GIVEN payload IS A STRING @desc unused; the test exercises payload escaping only
+echoFixed payload MEANS "ok"

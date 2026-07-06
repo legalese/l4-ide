@@ -19,7 +19,13 @@ import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
-import System.Directory (doesFileExist, getTemporaryDirectory, removeFile)
+import System.Directory
+  ( createDirectoryIfMissing
+  , doesFileExist
+  , getTemporaryDirectory
+  , removeFile
+  , removePathForcibly
+  )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
@@ -201,6 +207,11 @@ decodeArray sout =
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
+batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture = fixtureDir </> "batch-escape.l4"
+batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
+evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -213,7 +224,8 @@ main = do
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , breachTraceFixture, breachInputsFixture
        , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
-       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson ] \fp -> do
+       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
+       , batchEscapeFixture, batchEscapeInput, evalTraceFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -452,5 +464,44 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
       sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- Regression tests for target T11 (CLI injection / corruption).
+    it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
+      -- The input row's payload contains backslashes (Windows path), embedded
+      -- quotes, newline/tab, and shell metacharacters. A naive quote-only
+      -- escaper produced an unparseable generated wrapper; a correct one
+      -- round-trips every byte as an L4 string literal.
+      env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
+      objField env "status" `shouldBe` Just (String "success")
+
+  describe "l4 trace (output path safety)" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+      -- Render into a directory whose *name* would execute `touch <sentinel>`
+      -- if the path were ever handed to a shell. With a direct `proc` call it
+      -- is just a literal (if unusual) directory name. The sentinel must not
+      -- appear regardless of whether Graphviz's `dot` is installed.
+      tmp <- getTemporaryDirectory
+      let sentinel = tmp </> "l4-trace-injection-sentinel"
+          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
+      removePathForcibly sentinel
+      removePathForcibly evilDir
+      createDirectoryIfMissing True evilDir
+      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist sentinel
+      removePathForcibly evilDir
+      ranShell `shouldBe` False
+
+    it "writes trace output into a directory whose path contains a space" $ do
+      -- The `.dot` branch needs no external tools; it exercises the same
+      -- outDir path-join the png/svg branches feed to `dot`, proving spaces
+      -- survive instead of being word-split.
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4 trace out"   -- note the space
+      removePathForcibly outDir
+      Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      code `shouldBe` ExitSuccess
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      wrote `shouldBe` True
   where
     for_ xs f = mapM_ f xs
