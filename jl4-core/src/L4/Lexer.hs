@@ -900,7 +900,14 @@ errorBundleToErrorMessages ParseErrorBundle{..} =
     let
       (msline, pst') = calculateOffset pst
       epos = pstateSourcePos pst'
-      eposNext = pstateSourcePos $ reachOffsetNoLine 1 pst'
+      -- Give the error span real width: advance one stream unit (one character
+      -- for the lexer's Text stream, one token for the parser's TokenStream)
+      -- past the error offset. `pst'` is already positioned at `errorOffset e`
+      -- (via `calculateOffset` below), and `reachOffset` never moves backwards,
+      -- so the old literal `1` collapsed to a zero-width span for every error at
+      -- offset >= 1. Residual: an end-of-input error sits at an empty stream,
+      -- where `reachOffset` cannot advance, so those spans stay zero-width.
+      eposNext = pstateSourcePos $ reachOffsetNoLine (errorOffset e + 1) pst'
       errMsg = parseErrorTextPretty e
       parseErrCtx = offendingLine msline epos
     put pst'
@@ -999,7 +1006,7 @@ displayPosToken (MkPosToken _r tt) =
 -- be a good target for potential future optimizations
 inverseCompleteLookup :: (Eq a, Show a) => a -> Map c a -> c
 inverseCompleteLookup k
-  = fromMaybe (error $ "inverse complete lookup for " <> show k <> "was actually not cmoplete")
+  = fromMaybe (error $ "inverseCompleteLookup: no inverse image for " <> show k)
   . lookup k
   . map (\(a, b) -> (b, a))
   . Map.toList
@@ -1035,6 +1042,14 @@ displayTokenType = \case
   -- NOTE: we cannot look up TCopy (Just _) in the map - instead we just act as if it was
   -- TCopy Nothing, which is fine
   RealTCopy _ -> displayTokenType (TSymbols (TCopy Nothing))
+  -- `TOtherSymbolic` carries the verbatim source run of an unrecognized
+  -- operator; render it as-is rather than looking it up (it is not a key in
+  -- `symbols`, so the lookup below would otherwise hit a partial-function
+  -- `error`). This branch is currently unreachable — the producer at the
+  -- `TOtherSymbolic` lexer rule is shadowed by `operatorsPayload`'s
+  -- consumed-failure — but keeping `displayTokenType` total removes the
+  -- landmine if that ever changes.
+  TSymbols (TOtherSymbolic t) -> t
   TSymbols sym -> inverseCompleteLookup sym symbols
   TOperators op -> inverseCompleteLookup op operators
 
