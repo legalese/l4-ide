@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** PARTIAL / SUPERSEDED — the interval primitives shipped as builtins, but this spec's macro module and monad plan were abandoned.
+> - Shipped: `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST/NEXT`, `VALUE AT` as runtime builtins (`Environment.hs:71-75`); date arithmetic via `DATE_SERIAL`/`DATE_FROM_SERIAL`. Demonstrated in `jl4/examples/ok/temporal-acceptance.l4`.
+> - Not shipped: no `temporal-prelude.l4`; no `within…days after…ever` / `strictly after…ever` / `retroactive to…evaluate` combinators; no `MonadTemporal`/`withinDaysAfter`/`lookupEncoding` bindings. The "desugar to a temporal monad" architecture was dropped in favour of direct builtins; there is no `docs/L4_TEMPORAL_MONAD_SPEC.md`.
+
 # Temporal Prelude Macros (Draft)
 
 This note implements the "next step" from the temporal monad spec: give L4

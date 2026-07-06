@@ -2,12 +2,20 @@ name: PR Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, unstable]
+  push:
+    branches: [main, unstable]
+  # Required so these checks report against the merge queue's speculative
+  # commit. Without a merge_group trigger, queued PRs sit in AWAITING_CHECKS
+  # forever because the required contexts never run for the merge group.
+  merge_group:
 
-# Only run one check per PR to save resources
+# Only run one check per PR to save resources. Key the group on a per-run
+# identifier for merge_group (the speculative head SHA) so queue entries never
+# cancel each other, and only cancel superseded runs for pull_request pushes.
 concurrency:
-  group: pr-checks-${{ github.ref }}
-  cancel-in-progress: true
+  group: pr-checks-${{ github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ============================================
@@ -23,6 +31,13 @@ jobs:
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
+      # For merge_group, paths-filter diffs base_sha..head_sha via git, so the
+      # repo must be checked out with history. (pull_request uses the API and
+      # needs no checkout.)
+      - uses: actions/checkout@v5
+        if: github.event_name == 'merge_group'
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v4
         id: filter
         with:

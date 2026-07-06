@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** OPEN — only R1's naming has landed; first-class obligation manipulation (R2-R10) is unimplemented.
+> - LANDED: internal `Deonton` type (`jl4-core/src/L4/Syntax.hs:270`), surface `DEONTIC` (`TypeCheck/Environment.hs:35`), deprecated `PROVISION` alias (`Environment.hs:915`), parameterized `DEONTIC a b` — matches this spec's own note (lines ~170-172).
+> - OPEN: no `PROCURE`/`YIELDS`/`AUTOMATICALLY`/`WAIVE`/`GRANT`/`REVOKE`/`CANCEL`/`CREATE`/`net` keywords or builtins; no deontic collections, runtime registry, or rule-graph introspection.
+
 # Specification: Homoiconicity and Higher-Order Obligations for L4
 
 **Status:** Draft

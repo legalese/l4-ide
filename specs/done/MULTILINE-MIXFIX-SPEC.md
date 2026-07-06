@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** RESOLVED — vertically-aligned mixfix/postfix keywords are supported; moved to `specs/done/`.
+> - `mixfixKeywordOnLine` was generalized into `mixfixKeywordAligned` (`jl4-core/src/L4/Parser.hs:1394`); alignment via `keywordAlignedWith` (`Parser.hs:1161`) with an `allowNextLine` flag gated on `hasMixfixHints`. Postfix ops share it (`mixfixPostfixOp`, `Parser.hs:1234-1245`).
+> - Regression example `jl4/examples/ok/mixfix-multiline.l4` + goldens are in the tree.
+> - Body correction: the proposed symbol `mixfixKeywordOnLine (~1211)` no longer exists; see `mixfixKeywordAligned`.
+
 # Multiline Mixfix Spec
 
 ## Context

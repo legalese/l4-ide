@@ -196,12 +196,18 @@ DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) #
     PARTY Day (April 3 2025)
 
 -- In this last #TRACE you see the state after just one event where Borrower pays once and late.
--- The #TRACE returns the next obligation definition:
+-- The #TRACE returns the next obligation definition. Because the late payment
+-- was offered to this residual obligation (it reveals that the first monthly
+-- deadline expired, so it is re-offered to the LEST reparation, whose PROVIDED
+-- guard then rejects it), the obligation's PARTY and WITHIN print in evaluated
+-- form: the borrower as the full `Commercial Borrower` value, and the deadline
+-- as the concrete 61 days rather than the symbolic
+-- `Default After Days Beyond Commencement`:
 --
--- PARTY `The Borrower`
+-- PARTY `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG"))
 -- MUST `pay monthly installment to` EXACTLY `The Lender`
 --                                    `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`
--- WITHIN `Default After Days Beyond Commencement`
+-- WITHIN 61
 -- HENCE FULFILLED
 -- LEST PARTY `The Borrower`
 -- MUST `pay monthly installment to` EXACTLY `The Lender`

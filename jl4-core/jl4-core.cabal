@@ -100,6 +100,7 @@ library
     L4.DirectiveFilter
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
+    L4.Evaluate.ValueLazyJSON
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
@@ -162,11 +163,13 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
