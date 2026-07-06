@@ -1,0 +1,53 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: empty.l4
+  Hidden: no
+  Range: 11:10-13:18
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    The following branches still need to be considered:
+
+      WHEN faz `_`
+              bar THEN
+      WHEN faz `_`
+              qux THEN
+
+
+File: empty.l4
+  Hidden: no
+  Range: 16:10-19:26
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    The following CONSIDER branch is redundant: 
+
+      WHEN faz qux
+              qux THEN 2
+
+
+File: empty.l4
+  Hidden: no
+  Range: 16:10-19:26
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    The following branches still need to be considered:
+
+      WHEN faz qux
+              bar THEN
+      WHEN faz qux
+              baz THEN
+      WHEN faz bar
+              bar THEN
+      WHEN faz bar
+              baz THEN
+      WHEN faz baz
+              bar THEN
+      WHEN faz baz
+              baz THEN
+
