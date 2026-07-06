@@ -5,7 +5,12 @@
 
 # Qualia-Based Contract Classification
 
-## Status: Proposed
+> **Archive note (2026-07-06):** This spec extends `jl4-actus-analyzer`, which
+> was removed from `main` as inactive demo code. The package source is preserved
+> at branch `archive/actus-analyzer` and tag `archive/actus-analyzer-v0.1.0`
+> (pinned at commit `fbc90947`). Revive it from there before acting on this spec.
+
+## Status: Proposed (implementation archived)
 
 ## Overview
 
