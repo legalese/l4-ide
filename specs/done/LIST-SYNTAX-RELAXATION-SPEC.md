@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** RESOLVED — the constrained inline-LET RHS relaxation shipped; moved to `specs/done/`.
+>
 > - Implemented as `singleInlineLetDeclRelaxed` + `letDecideWithExprIndent` in `jl4-core/src/L4/Parser.hs` (wired into `letInExpr`); single-binding constraint enforced by requiring `IN` right after the binding.
 > - Regression examples present: `jl4/examples/ok/list-vertical-in-let-inline.l4`, `list-vertical-in-let-block.l4`, `let-inline-record-construction.l4`.
 > - Body correction: the "Current implementation" reference to `jl4-core/src/L4/Syntax/Parser.hs` is wrong; the parser is `jl4-core/src/L4/Parser.hs`.

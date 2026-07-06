@@ -227,8 +227,8 @@ DECIDE `is eligible` IF
 
 ## Negation as Failure (Closed-World and Open-World Defaults)
 
-**When to use:** When a fact may be *undecided* -- modelled as `MAYBE BOOLEAN`
-(`JUST TRUE` / `JUST FALSE` / `NOTHING`) -- and you must say what the *absence* of
+**When to use:** When a fact may be _undecided_ -- modelled as `MAYBE BOOLEAN`
+(`JUST TRUE` / `JUST FALSE` / `NOTHING`) -- and you must say what the _absence_ of
 proof means. Regulatory silence often means failure ("you did not prove you filed,
 so you are in breach"); a permission regime often means liberty ("nothing prohibits
 this, so it is allowed").
@@ -257,11 +257,11 @@ GIVETH A BOOLEAN
   the open-world dual).
 - `naf` succeeds on everything not provably true -- both the refuted (`JUST FALSE`)
   and the unknown (`NOTHING`) cases -- mirroring Prolog's `\+`.
-- The default value *is* the closed-world / open-world knob: `FALSE` for `holds`,
+- The default value _is_ the closed-world / open-world knob: `FALSE` for `holds`,
   `TRUE` for `presumed`. This is how one `MAYBE BOOLEAN` supports both "silence =
   failure" (obligations) and "silence = permission" (deontic liberty).
-- Contrast with [UNLESS](#unless): UNLESS negates a *known* `BOOLEAN` exception
-  (`p AND NOT q`); negation-as-failure handles a *possibly-undecided* proposition.
+- Contrast with [UNLESS](#unless): UNLESS negates a _known_ `BOOLEAN` exception
+  (`p AND NOT q`); negation-as-failure handles a _possibly-undecided_ proposition.
 - Each combinator carries an `@nlg` annotation, so `in breach` above renders as
   "In breach if filed on time has not been proven true" without any extra work.
 - See the [negation-as-failure reference](../libraries/negation-as-failure.md) for

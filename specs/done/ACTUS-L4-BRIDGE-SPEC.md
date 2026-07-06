@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** RESOLVED — the ACTUS bridge is a shipped jl4-core library, not just a proposal. Moved to `specs/done/`.
+>
 > - Implemented: `jl4-core/libraries/actus-core.l4`, `actus-terms.l4`, `actus-state.l4`, `actus-events.l4`, `actus-daycount.l4`, `actus-schedule.l4`, `actus.l4` (engine w/ POF/STF); reference test `jl4/examples/ok/actus-library-test.l4` with `.ep`/`.nlg` goldens.
 > - Residual follow-ons (not blockers): JSON import/export layer (`actus-json.l4`) absent; `promissory-note.l4` not yet refactored onto ACTUS types; advanced contracts (OPTNS/SWPPV, Phase 3) unverified.
 > - Body correction: proposed split `actus-payoff.l4`/`actus-stf.l4`/`actus-engine.l4` were merged into `jl4-core/libraries/actus.l4`.

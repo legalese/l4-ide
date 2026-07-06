@@ -23,8 +23,8 @@ its open-world dual (defaulting the open question the other way) is `presumed`.
 
 ### Functions
 
-| Function     | Signature              | Definition          | `JUST TRUE` | `JUST FALSE` | `NOTHING` |
-| ------------ | ---------------------- | -------------------- | ----------- | ------------ | --------- |
+| Function     | Signature                 | Definition          | `JUST TRUE` | `JUST FALSE` | `NOTHING` |
+| ------------ | ------------------------- | ------------------- | ----------- | ------------ | --------- |
 | `holds p`    | `MAYBE BOOLEAN → BOOLEAN` | `fromMaybe FALSE p` | `TRUE`      | `FALSE`      | `FALSE`   |
 | `naf p`      | `MAYBE BOOLEAN → BOOLEAN` | `NOT (holds p)`     | `FALSE`     | `TRUE`       | `TRUE`    |
 | `presumed p` | `MAYBE BOOLEAN → BOOLEAN` | `fromMaybe TRUE p`  | `TRUE`      | `FALSE`      | `TRUE`    |

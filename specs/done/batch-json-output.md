@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** RESOLVED — shipped as the `l4 batch` subcommand (commit `e7bae57c`, folded into the subcommand CLI by `74efdc5d`). Moved to `specs/done/`.
+>
 > - `ToJSON` instances for the runtime value types exist (`jl4-core/src/L4/EvaluateLazy.hs:217-231`, `Evaluate/ValueLazy.hs:266-303`); `l4 batch` emits NDJSON envelopes (`jl4/app/L4/Cli/Batch.hs`).
 > - Optional gap NOT done: records serialize as `{"Ctor":[v1,v2]}` (positional), not the "preferred" `{"field":val}` form — that needs `ConstructorFieldNames` threaded into a `nfToJSONWithFields` (the pretty-printer already has this machinery).
 
