@@ -1,0 +1,20 @@
+executing contract `ror both explicit` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `rand both explicit` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `explicit or deadline` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `deadline or explicit` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `one breached one pending` at 0 with the following events:  `WAIT UNTIL` with 7
+executing contract `late delivery discharges the reparation` at 0 with the following events:  party `Bob` did `deliver` at 7
+executing contract `prohibition hence sees the revealer` at 0 with the following events:  party `Bob` did `deliver` at 7
+executing contract `anchor at reveal` at 0 with the following events:  party `Bob` did `deliver` at 7
+executing contract `nested peel` at 0 with the following events:  `WAIT UNTIL` with 20 `WAIT UNTIL` with 30 party `Bob` did `deliver` at 35
+executing contract `one event repairs both alternatives` at 0 with the following events:  party `Bob` did `deliver` at 5
+executing contract `pay due` at 0 with the following events:  party `Alice` did `pay` with 100 at 5
+executing contract `pay due` at 0 with the following events:  `WAIT UNTIL` with 5
+executing contract `pay due` at 0 with the following events:  `WAIT UNTIL` with 6
+executing contract `no smoking` at 0 with the following events:  party `Alice` did `smoke` at 30
+executing contract `no smoking` at 0 with the following events:  `WAIT UNTIL` with 31
+executing contract `pay exactly 100` at 0 with the following events:  party `Alice` did `pay` with 100 at 10
+executing contract `may with lest` at 0 with the following events:  party `Alice` did `pay` with 50 at 7
+executing contract `may with lest` at 0 with the following events:  party `Alice` did `exercise` at 3
+executing contract `may bare` at 0 with the following events:  `WAIT UNTIL` with 9
+executing contract `recursive lest` at 0 with the following events:  party `Bob` did `deliver` at 7

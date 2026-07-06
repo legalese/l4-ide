@@ -26,6 +26,7 @@ import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
@@ -342,7 +343,8 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   temporalContext <- newIORef temporalCtx
   ctxReads <- newIORef noReads
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+  reofferedEvents <- newIORef mempty
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,
