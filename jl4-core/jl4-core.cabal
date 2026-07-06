@@ -168,6 +168,7 @@ test-suite jl4-core-test
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
