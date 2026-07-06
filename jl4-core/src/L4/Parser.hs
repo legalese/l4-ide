@@ -2415,28 +2415,30 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
-        (annotatedA, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withDesc
+        refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, nlgS.warnings, pstate)
+        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -2500,7 +2502,7 @@ execProgramParserWithHintPass uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

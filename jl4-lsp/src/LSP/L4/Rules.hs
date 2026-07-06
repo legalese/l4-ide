@@ -848,6 +848,10 @@ prettyNlgResolveWarning = \ case
     , "The following annotations would be attached:"
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
+  Resolve.RefUnattached r ->
+    "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
+  Resolve.RefNoLocation ref ->
+    "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -863,6 +867,10 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange Nothing
   Resolve.Ambiguous name _ ->
     srcRangeToLspRange $ rangeOf name
+  Resolve.RefUnattached r ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefNoLocation _ ->
+    srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

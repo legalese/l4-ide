@@ -6,15 +6,21 @@ module L4.Parser.ResolveAnnotation (
   addNlgCommentsToAst,
   HasDesc(..),
   addDescCommentsToAst,
+  HasRef(..),
+  addRefCommentsToAst,
   -- * Annotate Syntax Nodes with definite 'SrcSpan's.
   WithSpan (..),
   NlgWithSpan,
   DescWithSpan,
+  RefWithSpan,
   -- * Warnings and state
   NlgS(..),
   Warning (..),
   DescS(..),
   DescWarning(..),
+  RefS(..),
+  RefWarning(..),
+  renderRefWarning,
   -- * NlgA / NlgM monad
   NlgA(..),
   NlgM(..),
@@ -44,10 +50,19 @@ import L4.Syntax
 import L4.Parser.SrcSpan
 
 -- | Warnings for attaching Nlg comments to the ast.
+--
+-- Although named for the nlg pass, this is the shared diagnostic-warning type
+-- surfaced by the parser. The @Ref*@ constructors carry ref-attachment
+-- warnings ('RefWarning') so they can travel through the same @[Warning]@
+-- channel and be rendered alongside nlg warnings (see 'renderRefWarning').
 data Warning
   = NotAttached NlgWithSpan
   | UnknownLocation Nlg
   | Ambiguous Name [NlgWithSpan] -- Must be at least two
+  | RefUnattached RefWithSpan
+    -- ^ A @ref could not be attached to any following AST node.
+  | RefNoLocation Ref
+    -- ^ A @ref had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -761,6 +776,429 @@ topLevelColumnSlack = 8
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
 lastMaybe xs = Just (last xs)
+
+-- ----------------------------------------------------------------------------
+-- Ref attachment scaffolding
+-- ----------------------------------------------------------------------------
+
+type RefWithSpan = WithSpan Ref
+
+data RefWarning
+  = RefMissingLocation Ref
+    -- ^ A 'Ref' had no 'SrcRange', so we could not place it. That's a bug.
+  | RefNotAttached RefWithSpan
+    -- ^ A 'Ref' could not be attached to any following AST node.
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (SOP.Generic)
+
+data RefS = RefS
+  { refs :: ![RefWithSpan]
+    -- ^ Refs that have not yet been attached to an AST node.
+  , refWarnings :: ![RefWarning]
+  }
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+-- | Convert a ref-attachment warning into the shared 'Warning' type so it can
+-- be surfaced as a diagnostic alongside nlg warnings. This is a faithful
+-- 1:1 mapping onto the dedicated @Ref*@ constructors of 'Warning'.
+renderRefWarning :: RefWarning -> Warning
+renderRefWarning = \ case
+  RefNotAttached r     -> RefUnattached r
+  RefMissingLocation r -> RefNoLocation r
+
+-- | Attach @ref annotations to the AST nodes that immediately follow them.
+--
+-- Unlike @nlg (which targets 'Name' nodes) or @desc (which targets top-level
+-- declarations), a @ref can attach to /any/ AST node. The attachment rule is
+-- \"the immediately following AST node, regardless of type\".
+--
+-- We rely on the fact that a pre-order traversal of a well-formed AST visits
+-- nodes in non-decreasing start position. Therefore, the first node whose
+-- start position is at or after a ref's end position is the immediately
+-- following node, and it claims the ref. Refs are removed from the state as
+-- soon as they are claimed, so each ref is used at most once.
+--
+-- Like 'addNlgCommentsToAst', we merely add structured data to the ast node's
+-- respective 'Anno'; the exact-print annotations are left untouched.
+addRefCommentsToAst :: HasRef a => [Ref] -> a -> (a, RefS)
+addRefCommentsToAst refs0 ast =
+  let
+    (withSpan, missing) = preprocessRefs refs0
+    initialS =
+      RefS
+        { refs = List.sortOn (.range.start) withSpan
+        , refWarnings = fmap RefMissingLocation missing
+        }
+    (ast', s') = runState (addRef ast) initialS
+    -- Any refs that were never claimed become warnings.
+    leftovers = fmap RefNotAttached s'.refs
+  in
+    (ast', s'{refs = [], refWarnings = s'.refWarnings <> leftovers})
+
+preprocessRefs :: [Ref] -> ([RefWithSpan], [Ref])
+preprocessRefs = foldl' go ([], [])
+ where
+  go (located, missing) ref =
+    case rangeOf ref of
+      Nothing -> (located, ref : missing)
+      Just r -> (WithSpan (fromSrcRange r) ref : located, missing)
+
+takeMatchingRefs :: (RefWithSpan -> Bool) -> State RefS [RefWithSpan]
+takeMatchingRefs predicate = do
+  s <- get
+  let (matches, rest) = List.partition predicate s.refs
+  put s{refs = rest}
+  pure matches
+
+addRefWarning :: RefWarning -> State RefS ()
+addRefWarning w = modify' $ \s -> s{refWarnings = w : s.refWarnings}
+
+-- | True if a ref sits (entirely) before the given node's start position, i.e.
+-- the node is a candidate for being the ref's \"immediately following node\".
+refPrecedesNode :: SrcSpan -> RefWithSpan -> Bool
+refPrecedesNode nodeRange ref =
+  let
+    nodeStart = nodeRange.start
+    refEnd = ref.range.end
+  in
+    refEnd.line < nodeStart.line
+      || (refEnd.line == nodeStart.line && refEnd.column <= nodeStart.column)
+
+-- | Attach at most one pending ref (the one closest to the node) to the node's
+-- 'Anno'. When multiple refs precede the same node, the nearest one wins and
+-- the others are reported as 'RefNotAttached' warnings (a node's 'Anno' can
+-- only carry a single 'Ref').
+attachRef :: HasSrcRange a => a -> Anno -> State RefS Anno
+attachRef node ann =
+  case nodeSpan node of
+    Nothing -> pure ann
+    Just nodeRange -> do
+      matches <- takeMatchingRefs (refPrecedesNode nodeRange)
+      case reverse (List.sortOn (.range.start) matches) of
+        [] -> pure ann
+        (nearest : extras) -> do
+          traverse_ (addRefWarning . RefNotAttached) extras
+          pure $ setRef nearest.payload ann
+
+-- ----------------------------------------------------------------------------
+-- HasRef Class and Instances
+-- ----------------------------------------------------------------------------
+
+-- | Any type that implements this type class can either carry a @ref
+-- annotation on its own 'Anno', or has children that can. The traversal
+-- visits every node in concrete-syntax (source) order and, at each node,
+-- attaches any pending refs that precede it.
+class HasRef a where
+  addRef :: a -> State RefS a
+
+instance (HasSrcRange n, HasRef n) => HasRef (Module n) where
+  -- Do NOT attach at the container level: a leading @ref shares its start with
+  -- the first declaration, and the Module (visited first in the pre-order walk)
+  -- would greedily claim it. Mirror 'HasDesc (Module n)': recurse only.
+  addRef (MkModule ann uri sect) =
+    MkModule ann uri <$> addRef sect
+
+instance (HasSrcRange n, HasRef n) => HasRef (Section n) where
+  -- As with 'HasRef (Module n)', do NOT attach at the container level; recurse
+  -- only so a leading @ref reaches the first child declaration.
+  addRef (MkSection ann lbl maka decls) = do
+    lbl' <- traverse addRef lbl
+    maka' <- traverse addRef maka
+    decls' <- traverse addRef decls
+    pure $ MkSection ann lbl' maka' decls'
+
+instance (HasSrcRange n, HasRef n) => HasRef (TopDecl n) where
+  addRef a = case a of
+    Declare ann d -> attachRef a ann >>= \ann' -> Declare ann' <$> addRef d
+    Decide ann d -> attachRef a ann >>= \ann' -> Decide ann' <$> addRef d
+    Assume ann d -> attachRef a ann >>= \ann' -> Assume ann' <$> addRef d
+    Directive ann d -> attachRef a ann >>= \ann' -> Directive ann' <$> addRef d
+    Import ann d -> attachRef a ann >>= \ann' -> Import ann' <$> addRef d
+    Section ann d -> attachRef a ann >>= \ann' -> Section ann' <$> addRef d
+    Timezone ann e -> attachRef a ann >>= \ann' -> Timezone ann' <$> addRef e
+
+instance (HasSrcRange n, HasRef n) => HasRef (Declare n) where
+  addRef d@(MkDeclare ann tySig appForm tyDecl) = do
+    ann' <- attachRef d ann
+    tySig' <- addRef tySig
+    appForm' <- addRef appForm
+    tyDecl' <- addRef tyDecl
+    pure $ MkDeclare ann' tySig' appForm' tyDecl'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Decide n) where
+  addRef d@(MkDecide ann tySig appForm expr) = do
+    ann' <- attachRef d ann
+    tySig' <- addRef tySig
+    appForm' <- addRef appForm
+    expr' <- addRef expr
+    pure $ MkDecide ann' tySig' appForm' expr'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Assume n) where
+  addRef a@(MkAssume ann tySig appForm order) = do
+    ann' <- attachRef a ann
+    tySig' <- addRef tySig
+    appForm' <- addRef appForm
+    order' <- traverse addRef order
+    pure $ MkAssume ann' tySig' appForm' order'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
+  addRef a = case a of
+    LazyEval ann e -> attachRef a ann >>= \ann' -> LazyEval ann' <$> addRef e
+    LazyEvalTrace ann e -> attachRef a ann >>= \ann' -> LazyEvalTrace ann' <$> addRef e
+    Check ann e -> attachRef a ann >>= \ann' -> Check ann' <$> addRef e
+    Contract ann e t evs -> attachRef a ann >>= \ann' ->
+      Contract ann' <$> addRef e <*> addRef t <*> traverse addRef evs
+    Assert ann e -> attachRef a ann >>= \ann' -> Assert ann' <$> addRef e
+
+instance (HasSrcRange n, HasRef n) => HasRef (Event n) where
+  addRef a@(MkEvent ann party act timestamp atFirst) = do
+    ann' <- attachRef a ann
+    party' <- addRef party
+    act' <- addRef act
+    timestamp' <- addRef timestamp
+    pure $ MkEvent ann' party' act' timestamp' atFirst
+
+instance (HasSrcRange n, HasRef n) => HasRef (Import n) where
+  addRef a@(MkImport ann n mr) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    pure $ MkImport ann' n' mr
+
+instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
+  addRef a = case a of
+    RecordDecl ann mcon typedNames -> attachRef a ann >>= \ann' ->
+      RecordDecl ann' mcon <$> traverse addRef typedNames
+    EnumDecl ann conDecls -> attachRef a ann >>= \ann' ->
+      EnumDecl ann' <$> traverse addRef conDecls
+    SynonymDecl ann ty -> attachRef a ann >>= \ann' ->
+      SynonymDecl ann' <$> addRef ty
+
+instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
+  addRef a@(MkTypedName ann n ty mExpr) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    ty' <- addRef ty
+    mExpr' <- traverse addRef mExpr
+    pure $ MkTypedName ann' n' ty' mExpr'
+
+instance (HasSrcRange n, HasRef n) => HasRef (ConDecl n) where
+  addRef a@(MkConDecl ann n typedNames) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    typedNames' <- traverse addRef typedNames
+    pure $ MkConDecl ann' n' typedNames'
+
+instance (HasSrcRange n, HasRef n) => HasRef (TypeSig n) where
+  addRef a@(MkTypeSig ann givenSig givethSig) = do
+    ann' <- attachRef a ann
+    givenSig' <- addRef givenSig
+    givethSig' <- traverse addRef givethSig
+    pure $ MkTypeSig ann' givenSig' givethSig'
+
+instance (HasSrcRange n, HasRef n) => HasRef (GivenSig n) where
+  addRef a@(MkGivenSig ann tys) = do
+    ann' <- attachRef a ann
+    tys' <- traverse addRef tys
+    pure $ MkGivenSig ann' tys'
+
+instance (HasSrcRange n, HasRef n) => HasRef (OptionallyTypedName n) where
+  addRef a@(MkOptionallyTypedName ann n mty) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    mty' <- traverse addRef mty
+    pure $ MkOptionallyTypedName ann' n' mty'
+
+instance (HasSrcRange n, HasRef n) => HasRef (GivethSig n) where
+  addRef a@(MkGivethSig ann mty) = do
+    ann' <- attachRef a ann
+    mty' <- addRef mty
+    pure $ MkGivethSig ann' mty'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Type' n) where
+  addRef a = case a of
+    Type ann -> attachRef a ann >>= \ann' -> pure (Type ann')
+    TyApp ann n tys -> attachRef a ann >>= \ann' -> do
+      n' <- addRef n
+      tys' <- traverse addRef tys
+      pure $ TyApp ann' n' tys'
+    Fun ann names ty -> attachRef a ann >>= \ann' -> do
+      names' <- traverse addRef names
+      ty' <- addRef ty
+      pure $ Fun ann' names' ty'
+    Forall ann ns ty -> attachRef a ann >>= \ann' -> do
+      ns' <- traverse addRef ns
+      ty' <- addRef ty
+      pure $ Forall ann' ns' ty'
+    InfVar ann raw i -> attachRef a ann >>= \ann' -> pure (InfVar ann' raw i)
+
+instance (HasSrcRange n, HasRef n) => HasRef (OptionallyNamedType n) where
+  addRef a@(MkOptionallyNamedType ann mName ty) = do
+    ann' <- attachRef a ann
+    mName' <- traverse addRef mName
+    ty' <- addRef ty
+    pure $ MkOptionallyNamedType ann' mName' ty'
+
+instance (HasSrcRange n, HasRef n) => HasRef (AppForm n) where
+  addRef a@(MkAppForm ann n ns maka) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    ns' <- traverse addRef ns
+    maka' <- traverse addRef maka
+    pure $ MkAppForm ann' n' ns' maka'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Aka n) where
+  addRef a@(MkAka ann ns) = do
+    ann' <- attachRef a ann
+    ns' <- traverse addRef ns
+    pure $ MkAka ann' ns'
+
+instance HasRef Name where
+  addRef a@(MkName ann raw) = do
+    ann' <- attachRef a ann
+    pure $ MkName ann' raw
+
+instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
+  addRef expr = case expr of
+    And ann e1 e2 -> bin And ann e1 e2
+    Or ann e1 e2 -> bin Or ann e1 e2
+    RAnd ann e1 e2 -> bin RAnd ann e1 e2
+    ROr ann e1 e2 -> bin ROr ann e1 e2
+    Implies ann e1 e2 -> bin Implies ann e1 e2
+    Equals ann e1 e2 -> bin Equals ann e1 e2
+    Plus ann e1 e2 -> bin Plus ann e1 e2
+    Minus ann e1 e2 -> bin Minus ann e1 e2
+    Times ann e1 e2 -> bin Times ann e1 e2
+    DividedBy ann e1 e2 -> bin DividedBy ann e1 e2
+    Modulo ann e1 e2 -> bin Modulo ann e1 e2
+    Exponent ann e1 e2 -> bin Exponent ann e1 e2
+    Cons ann e1 e2 -> bin Cons ann e1 e2
+    Leq ann e1 e2 -> bin Leq ann e1 e2
+    Lt ann e1 e2 -> bin Lt ann e1 e2
+    Gt ann e1 e2 -> bin Gt ann e1 e2
+    Geq ann e1 e2 -> bin Geq ann e1 e2
+    Not ann e -> attachRef expr ann >>= \ann' -> Not ann' <$> addRef e
+    Proj ann e1 n -> attachRef expr ann >>= \ann' -> do
+      e1' <- addRef e1
+      n' <- addRef n
+      pure $ Proj ann' e1' n'
+    Var ann v -> attachRef expr ann >>= \ann' -> Var ann' <$> addRef v
+    Lam ann sig body -> attachRef expr ann >>= \ann' -> do
+      sig' <- addRef sig
+      body' <- addRef body
+      pure $ Lam ann' sig' body'
+    App ann n ns -> attachRef expr ann >>= \ann' -> do
+      n' <- addRef n
+      ns' <- traverse addRef ns
+      pure $ App ann' n' ns'
+    AppNamed ann n ns order -> attachRef expr ann >>= \ann' -> do
+      n' <- addRef n
+      ns' <- traverse addRef ns
+      pure $ AppNamed ann' n' ns' order
+    IfThenElse ann b e1 e2 -> attachRef expr ann >>= \ann' -> do
+      b' <- addRef b
+      e1' <- addRef e1
+      e2' <- addRef e2
+      pure $ IfThenElse ann' b' e1' e2'
+    MultiWayIf ann es e2 -> attachRef expr ann >>= \ann' -> do
+      es' <- for es \(MkGuardedExpr gann l r) -> do
+        gann' <- attachRef (MkGuardedExpr gann l r) gann
+        l' <- addRef l
+        r' <- addRef r
+        pure $ MkGuardedExpr gann' l' r'
+      e2' <- addRef e2
+      pure $ MultiWayIf ann' es' e2'
+    Regulative ann r -> attachRef expr ann >>= \ann' -> Regulative ann' <$> addRef r
+    Consider ann e branches -> attachRef expr ann >>= \ann' -> do
+      e' <- addRef e
+      branches' <- traverse addRef branches
+      pure $ Consider ann' e' branches'
+    Lit ann lit -> attachRef expr ann >>= \ann' -> pure (Lit ann' lit)
+    Percent ann e -> attachRef expr ann >>= \ann' -> Percent ann' <$> addRef e
+    List ann es -> attachRef expr ann >>= \ann' -> List ann' <$> traverse addRef es
+    Where ann e lcl -> attachRef expr ann >>= \ann' -> do
+      e' <- addRef e
+      lcl' <- traverse addRef lcl
+      pure $ Where ann' e' lcl'
+    LetIn ann lcl e -> attachRef expr ann >>= \ann' -> do
+      lcl' <- traverse addRef lcl
+      e' <- addRef e
+      pure $ LetIn ann' lcl' e'
+    Event ann e -> attachRef expr ann >>= \ann' -> Event ann' <$> addRef e
+    Fetch ann e -> attachRef expr ann >>= \ann' -> Fetch ann' <$> addRef e
+    Env ann e -> attachRef expr ann >>= \ann' -> Env ann' <$> addRef e
+    Post ann e1 e2 e3 -> attachRef expr ann >>= \ann' -> do
+      e1' <- addRef e1
+      e2' <- addRef e2
+      e3' <- addRef e3
+      pure $ Post ann' e1' e2' e3'
+    Concat ann es -> attachRef expr ann >>= \ann' -> Concat ann' <$> traverse addRef es
+    AsString ann e -> attachRef expr ann >>= \ann' -> AsString ann' <$> addRef e
+    Breach ann mParty mReason -> attachRef expr ann >>= \ann' -> do
+      mParty' <- traverse addRef mParty
+      mReason' <- traverse addRef mReason
+      pure $ Breach ann' mParty' mReason'
+    Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
+   where
+    bin f ann e1 e2 = do
+      ann' <- attachRef expr ann
+      e1' <- addRef e1
+      e2' <- addRef e2
+      pure $ f ann' e1' e2'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Deonton n) where
+  addRef (MkDeonton ann party event deadline followup lest) = do
+    -- 'Deonton' has no 'HasSrcRange' handle of its own here; attach via children.
+    party' <- addRef party
+    event' <- addRef event
+    deadline' <- traverse addRef deadline
+    followup' <- traverse addRef followup
+    lest' <- traverse addRef lest
+    pure $ MkDeonton ann party' event' deadline' followup' lest'
+
+instance (HasSrcRange n, HasRef n) => HasRef (RAction n) where
+  addRef (MkAction ann modal rule provided) = do
+    rule' <- addRef rule
+    provided' <- traverse addRef provided
+    pure $ MkAction ann modal rule' provided'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Branch n) where
+  addRef a = case a of
+    MkBranch bann (When wann pat) e -> do
+      bann' <- attachRef a bann
+      pat' <- addRef pat
+      e' <- addRef e
+      pure $ MkBranch bann' (When wann pat') e'
+    MkBranch bann (Otherwise wann) e -> do
+      bann' <- attachRef a bann
+      e' <- addRef e
+      pure $ MkBranch bann' (Otherwise wann) e'
+
+instance (HasSrcRange n, HasRef n) => HasRef (Pattern n) where
+  addRef a = case a of
+    PatVar ann n -> attachRef a ann >>= \ann' -> PatVar ann' <$> addRef n
+    PatApp ann n pats -> attachRef a ann >>= \ann' -> do
+      n' <- addRef n
+      pats' <- traverse addRef pats
+      pure $ PatApp ann' n' pats'
+    PatCons ann patHead patTail -> attachRef a ann >>= \ann' -> do
+      patHead' <- addRef patHead
+      patTail' <- addRef patTail
+      pure $ PatCons ann' patHead' patTail'
+    PatExpr ann e -> attachRef a ann >>= \ann' -> PatExpr ann' <$> addRef e
+    PatLit ann lit -> attachRef a ann >>= \ann' -> pure (PatLit ann' lit)
+
+instance (HasSrcRange n, HasRef n) => HasRef (NamedExpr n) where
+  addRef a@(MkNamedExpr ann n e) = do
+    ann' <- attachRef a ann
+    n' <- addRef n
+    e' <- addRef e
+    pure $ MkNamedExpr ann' n' e'
+
+instance (HasSrcRange n, HasRef n) => HasRef (LocalDecl n) where
+  addRef a = case a of
+    LocalDecide ann d -> attachRef a ann >>= \ann' -> LocalDecide ann' <$> addRef d
+    LocalAssume ann d -> attachRef a ann >>= \ann' -> LocalAssume ann' <$> addRef d
 
 -- ----------------------------------------------------------------------------
 -- NlgA Definition
