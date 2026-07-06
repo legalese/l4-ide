@@ -285,12 +285,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (GivethSig a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
   printWithLayout = \ case
     MkDeclare _ tySig appForm tyDecl  ->
-      fillCat
-        [ printWithLayout tySig
-        ]
-      <>
+      -- `vcat` (not `fillCat`): under the Unbounded layout `fillCat`'s
+      -- separators render empty, jamming a non-empty GIVEN signature straight
+      -- onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not re-parse.
+      -- Mirrors the Decide instance below.
       vcat
-        [ "DECLARE" <+> printWithLayout appForm
+        [ printWithLayout tySig
+        , "DECLARE" <+> printWithLayout appForm
         , indent 2 (printWithLayout tyDecl)
         ]
 
@@ -337,7 +338,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
   printWithLayout = \ case
     MkAssume _ tySig appForm ty ->
-      fillCat
+      -- `vcat` (not `fillCat`): see the Declare note above — `fillCat` jams a
+      -- non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
+      vcat
         [ printWithLayout tySig
         , "ASSUME" <+> printWithLayout appForm <> case ty of
             Nothing -> mempty
@@ -405,7 +408,7 @@ instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, TopDecl a) wher
     (_, Directive _ t) -> printWithLayout t
     (_, Import    _ t) -> printWithLayout t
     (i, Section   _ t) -> printWithLayout (i, t)
-    (_, Timezone  _ _) -> mempty  -- TIMEZONE IS declarations are not pretty-printed
+    (_, Timezone  _ e) -> "TIMEZONE IS" <+> printWithLayout e
 
 instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
   printWithLayout :: LayoutPrinter a => Expr a -> Doc ann
@@ -443,11 +446,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Times      _ e1 e2 ->
       parensIfNeeded e1 <+> "TIMES" <+> parensIfNeeded e2
     DividedBy  _ e1 e2 ->
-      parensIfNeeded e1 <+> "DIVIDED" <+> parensIfNeeded e2
+      parensIfNeeded e1 <+> "DIVIDED BY" <+> parensIfNeeded e2
     Modulo     _ e1 e2 ->
       parensIfNeeded e1 <+> "MODULO" <+> parensIfNeeded e2
+    -- Power has no infix surface syntax; it is the prefix builtin
+    -- `EXPONENT base exp` (`^` is copy/ditto, not power). Printing the old
+    -- `<e1> TO THE POWER OF <e2>` produced unparseable output.
     Exponent   _ e1 e2 ->
-      parensIfNeeded e1 <+> "TO THE POWER OF" <+> parensIfNeeded e2
+      "EXPONENT" <+> parensIfNeeded e1 <+> parensIfNeeded e2
     Cons       _ e1 e2 ->
       parensIfNeeded e1 <+> "FOLLOWED BY" <+> parensIfNeeded e2
     Leq        _ e1 e2 ->
@@ -742,7 +748,7 @@ instance LayoutPrinter BinOp where
     BinOpPlus -> "PLUS"
     BinOpMinus -> "MINUS"
     BinOpTimes -> "TIMES"
-    BinOpDividedBy -> "DIVIDED"
+    BinOpDividedBy -> "DIVIDED BY"
     BinOpModulo -> "MODULO"
     BinOpExponent -> "TO THE POWER OF"
     BinOpTrunc -> "TRUNC"

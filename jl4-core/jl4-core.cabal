@@ -177,6 +177,7 @@ test-suite jl4-core-test
     RefAnnotationSpec
     TracePostprocessSpec
     EdgeCrashSpec
+    PrintRoundtripSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
