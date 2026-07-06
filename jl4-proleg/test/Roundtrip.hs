@@ -1,5 +1,8 @@
 -- | Phase 1 milestone check: @parse (print (parse s)) == parse s@ on the AST,
--- for the canonical PROLEG fixtures. Run from the repo root.
+-- for the canonical PROLEG fixtures. @cabal test@ runs test-suite binaries
+-- with the working directory set to this package's source directory
+-- (@jl4-proleg/@), not the repo root, so the fixture paths below are relative
+-- to @jl4-proleg/@.
 module Main (main) where
 
 import Control.Monad (unless)
@@ -12,8 +15,8 @@ import L4.Proleg.Syntax (Program (..))
 
 fixtures :: [FilePath]
 fixtures =
-  [ "jl4-proleg/examples/lease.pl"
-  , "jl4-proleg/examples/minor-duress.pl"
+  [ "examples/lease.pl"
+  , "examples/minor-duress.pl"
   ]
 
 clauseCount :: Program -> Int
