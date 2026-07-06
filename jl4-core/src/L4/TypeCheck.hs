@@ -335,7 +335,26 @@ applyFinalSubstitution subst moduleUri t =
         in
           r
 
--- | Helper function to run the check monad an expect a unique result.
+-- | Helper function to run the check monad and expect a unique result.
+--
+-- INVARIANT (callers must guarantee determinism): every alternative-producing
+-- path under 'checkProgram' must be collapsed by 'prune' (or 'softprune')
+-- before results merge into the module traversal. At the time of writing, the
+-- forking consumers are all pruned: the scan phases prune per declaration
+-- ('scanTyDeclDeclare', 'inferTyDeclDeclare', 'scanFunSigDecide'),
+-- 'inferTopDecl' prunes Declare/Decide/Assume/Timezone, and 'inferDirective'
+-- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert; Import/Section name
+-- handling is deterministic ('def'/'ref'). The other two callers of this
+-- function only run 'applySubst', which never forks.
+--
+-- If you add a directive or top-level declaration case that runs
+-- 'checkExpr'/'inferExpr', wrap it in 'prune', or the 'error' below becomes
+-- reachable from ordinary user input (this happened for #ASSERT and
+-- TIMEZONE IS; see T4). We deliberately keep these arms as 'error' rather
+-- than auto-recovering: post-T4, reaching them requires a compiler bug (a
+-- missing 'prune'), and failing loudly in CI/golden runs beats silently
+-- committing to an arbitrary typing. The CLI/LSP drivers have catch-alls
+-- that keep interactive sessions alive.
 runCheckUnique :: Check a -> CheckEnv -> CheckState  -> (With CheckErrorWithContext a, CheckState)
 runCheckUnique c e s =
   case runCheck c e s of
@@ -449,7 +468,11 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   pure (Contract ann re rt revs)
 inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
-  e' <- checkExpr ExpectAssertContext e boolean
+  -- The 'prune' is load-bearing: like the sibling directive cases above, we must
+  -- collapse candidate results here, so that an ambiguous-but-well-typed expression
+  -- surfaces as an 'AmbiguousTermError' diagnostic instead of leaking multiple
+  -- results into 'runCheckUnique' (which calls 'error'). See T4.
+  e' <- prune $ checkExpr ExpectAssertContext e boolean
   pure (Assert ann e')
 
 -- We process imports prior to normal scope- and type-checking. Therefore, this is trivial.
@@ -500,8 +523,12 @@ inferTopDecl (Import ann import_) = do
 inferTopDecl (Section ann sec) = do
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
-inferTopDecl (Timezone ann tzExpr) = do
-  (rtzExpr, _ty) <- inferExpr tzExpr
+inferTopDecl (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
+  -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
+  -- (instead of crashing in 'runCheckUnique'), and the context supplies the
+  -- source range for that diagnostic. See T4.
+  (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
@@ -1359,7 +1386,15 @@ inferExpr' g =
           re <-
             case res of
               [re'] -> pure re'
-              _ -> pure $ error "internal error in matchFunTy"
+              -- Unreachable invariant: we pass the singleton [projE] above, and
+              -- every 'matchFunTy' branch returns exactly one resolved expr per
+              -- argument (zip3 traversals; error branches 'traverse inferExpr args';
+              -- Check nondeterminism forks whole computations, never concatenates
+              -- result lists), so the singleton match always succeeds (T4).
+              -- Fail strictly at the site rather than 'pure $ error ...', which
+              -- would plant a lazy bottom inside the returned 'Proj' node that
+              -- detonates arbitrarily far away (eval/nlg/serialization).
+              _ -> error "internal error in matchFunTy: projection expected exactly one resolved argument"
 
           pure (Proj projAnn re rl, rt)
     Var ann n -> do
@@ -1769,6 +1804,14 @@ desugarBranches scrut nebs = do
     PatVar _ _ -> pure []
     PatExpr _ _ -> pure []
     PatLit _ _ -> pure []
+    -- This wildcard fires only for a PatApp/PatCons whose anno lacks
+    -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
+    -- routes through 'withRange', which is a silent no-op when the anno has no
+    -- 'SrcRange'. The parser always stamps ranges on pattern annos, so this is
+    -- unreachable from surface syntax (verified empirically across all
+    -- user-writable pattern forms, T4). However, any future stage that
+    -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
+    -- root cause would be the missing range, not missing type information.
     _ -> error "fatal internal error: expected type information but didn't get any"
 
 type VarEnv = Map Unique [Resolved]
