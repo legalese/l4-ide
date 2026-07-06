@@ -4,6 +4,7 @@ import Base
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
+import L4.Print.Columnar (Cell, Grid, DittoOpts, defaultDittoOpts, renderDittoGrid)
 import L4.Syntax
 import qualified L4.TypeCheck.Types as TC
 
@@ -69,6 +70,87 @@ docLines = fmap pretty . Text.lines . docText
 
 prettyLayout' :: LayoutPrinter a => a -> String
 prettyLayout' = Text.unpack . prettyLayout
+
+-- | Ditto-aware printer for 'MultiWayIf' (BUILD-SPEC §5.2, preferred minimal
+-- wiring). Renders the @BRANCH@ header structurally and delegates the arm block
+-- to 'renderDittoGrid' so that repeated guard tokens collapse to column-aligned
+-- carets (@^@). For any other expression it falls back to the canonical
+-- 'prettyLayout', leaving the default printer untouched.
+--
+-- This adds NO AST node: ditto is an emission-layer concern only. The guard of
+-- each arm is decomposed into per-field @[field, operator, value]@ slots with an
+-- @AND@ connector between present conjuncts; @IF@, @THEN@ and the result
+-- expression are kept spelled out on every arm (only the guard cells ditto). The
+-- shared field ordering across arms is what makes column @j@ a stable logical
+-- slot — the precondition 'renderDittoGrid' needs to align carets correctly.
+prettyLayoutDitto :: LayoutPrinterWithName a => DittoOpts -> Expr a -> Text
+prettyLayoutDitto opts = \ case
+  MultiWayIf _ conds o ->
+    let grid      = multiWayIfGrid conds
+        gridText  = renderDittoGrid opts grid
+        gridLines = if null conds then [] else Text.splitOn "\n" gridText
+        results   = map (\ (MkGuardedExpr _ _ r) -> prettyLayout r) conds
+        armLines  = zipWith (\ g r -> "  IF " <> g <> " THEN " <> r) gridLines results
+        otherLine = "  OTHERWISE " <> prettyLayout o
+    in Text.intercalate "\n" (["BRANCH"] <> armLines <> [otherLine])
+  e -> prettyLayout e
+
+-- | 'prettyLayoutDitto' with 'defaultDittoOpts'.
+prettyLayoutDitto' :: LayoutPrinterWithName a => Expr a -> Text
+prettyLayoutDitto' = prettyLayoutDitto defaultDittoOpts
+
+-- | Build the guard 'Grid' for a list of BRANCH arms. Each arm's guard is split
+-- into conjuncts (an @AND@-chain), each conjunct into @[field, op, value]@; the
+-- conjuncts are then placed into columns keyed by field text, using first-
+-- appearance order across all arms so identical fields share a column.
+multiWayIfGrid :: LayoutPrinterWithName a => [GuardedExpr a] -> Grid
+multiWayIfGrid conds = map row armConjs
+  where
+    guardOf :: GuardedExpr a -> Expr a
+    guardOf (MkGuardedExpr _ g _) = g
+
+    -- per arm: the list of (field-key, [fieldCell, opCell, valCell]) conjuncts
+    armConjs :: [[(Text, [Cell])]]
+    armConjs = map (map conjunctCells . scanAnd . guardOf) conds
+
+    -- global column order: every distinct field, first-appearance order
+    fieldOrder :: [Text]
+    fieldOrder = nub [ k | arm <- armConjs, (k, _) <- arm ]
+
+    row :: [(Text, [Cell])] -> [Cell]
+    row arm = concat (zipWith fieldBlock [0 ..] fieldOrder)
+      where
+        present :: Text -> Bool
+        present k = isJust (lookup k arm)
+
+        anyEarlier :: Int -> Bool
+        anyEarlier idx = any present (take idx fieldOrder)
+
+        fieldBlock :: Int -> Text -> [Cell]
+        fieldBlock idx k =
+          let conn = if idx > (0 :: Int)
+                       then [ if present k && anyEarlier idx then Just "AND" else Nothing ]
+                       else []
+              body = fromMaybe [Nothing, Nothing, Nothing] (lookup k arm)
+          in conn <> body
+
+-- | Decompose one guard conjunct into a field key plus its @[field, op, value]@
+-- cells. Recognised comparison operators get a three-cell decomposition;
+-- anything else becomes a single spelled-out cell (keyed by its own text) with
+-- empty operator/value slots.
+conjunctCells :: LayoutPrinterWithName a => Expr a -> (Text, [Cell])
+conjunctCells e = case e of
+  Equals _ l r -> cmp l "EQUALS"        r
+  Leq    _ l r -> cmp l "AT MOST"       r
+  Geq    _ l r -> cmp l "AT LEAST"      r
+  Lt     _ l r -> cmp l "LESS THAN"     r
+  Gt     _ l r -> cmp l "GREATER THAN"  r
+  _            -> let t = prettyLayout e in (t, [Just t, Nothing, Nothing])
+  where
+    cmp :: LayoutPrinterWithName a => Expr a -> Text -> Expr a -> (Text, [Cell])
+    cmp l op r =
+      let lt = prettyLayout l
+      in (lt, [Just lt, Just op, Just (prettyLayout r)])
 
 quotedName :: Name -> Text
 quotedName n =
