@@ -70,19 +70,19 @@ lazytrace-exception.l4:10:1-66:
   └ ↯ stuck
 lazytrace-exception.l4:19:1-52:
   Division by zero in the operation:
-  DIVIDED
+  DIVIDED BY
   
   ─────
-  ┌ sum OF (LIST 1, 2, 3, (4 DIVIDED 0), 5, 6)
-  │┌ LIST 1, 2, 3, (4 DIVIDED 0), 5, 6
-  │├ 1 FOLLOWED BY (LIST 2, 3, (4 DIVIDED 0), 5, 6)
-  ││┌ LIST 2, 3, (4 DIVIDED 0), 5, 6
-  ││├ 2 FOLLOWED BY (LIST 3, (4 DIVIDED 0), 5, 6)
-  │││┌ LIST 3, (4 DIVIDED 0), 5, 6
-  │││├ 3 FOLLOWED BY (LIST (4 DIVIDED 0), 5, 6)
-  ││││┌ LIST (4 DIVIDED 0), 5, 6
-  ││││├ (4 DIVIDED 0) FOLLOWED BY (LIST 5, 6)
-  │││││┌ 4 DIVIDED 0
+  ┌ sum OF (LIST 1, 2, 3, (4 DIVIDED BY 0), 5, 6)
+  │┌ LIST 1, 2, 3, (4 DIVIDED BY 0), 5, 6
+  │├ 1 FOLLOWED BY (LIST 2, 3, (4 DIVIDED BY 0), 5, 6)
+  ││┌ LIST 2, 3, (4 DIVIDED BY 0), 5, 6
+  ││├ 2 FOLLOWED BY (LIST 3, (4 DIVIDED BY 0), 5, 6)
+  │││┌ LIST 3, (4 DIVIDED BY 0), 5, 6
+  │││├ 3 FOLLOWED BY (LIST (4 DIVIDED BY 0), 5, 6)
+  ││││┌ LIST (4 DIVIDED BY 0), 5, 6
+  ││││├ (4 DIVIDED BY 0) FOLLOWED BY (LIST 5, 6)
+  │││││┌ 4 DIVIDED BY 0
   │││││└ ↯ division by zero
   │││││┌ LIST 5, 6
   │││││├ 5 FOLLOWED BY (LIST 6)
