@@ -1,10 +1,16 @@
 > **Status (audited 2026-07-03):** RESOLVED — implemented in commit `031f1569` and wired into the analyzer. Moved to `specs/done/`.
+>
 > - Modules: `jl4-actus-analyzer/src/L4/ACTUS/Qualia/{ObligationGraph,Essence,Archetypes,Hybrid}.hs`, consuming `L4.StateGraph` from jl4-core.
 > - Entry point `analyzeModuleHybrid`/`classifyHybrid` (`Analyzer.hs`) exposes the hybrid symbolic+qualia path; tests in `test/{EssenceSpec,ObligationGraphSpec,ArchetypesSpec,HybridSpec}.hs`.
 
 # Qualia-Based Contract Classification
 
-## Status: Proposed
+> **Archive note (2026-07-06):** This spec extends `jl4-actus-analyzer`, which
+> was removed from `main` as inactive demo code. The package source is preserved
+> at branch `archive/actus-analyzer` and tag `archive/actus-analyzer-v0.1.0`
+> (pinned at commit `fbc90947`). Revive it from there before acting on this spec.
+
+## Status: Proposed (implementation archived)
 
 ## Overview
 

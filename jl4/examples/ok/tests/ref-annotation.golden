@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+ref-annotation.l4:18:1-17:
+  42
+ref-annotation.l4:19:1-19:
+  TRUE

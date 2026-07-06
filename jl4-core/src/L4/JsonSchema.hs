@@ -176,21 +176,36 @@ typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text Sch
 typeToJsonSchema ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
+    -- Match on the lower-cased builtin name: L4's resolved builtin type names
+    -- are ALL-CAPS (NUMBER/STRING/BOOLEAN/DATE/DATETIME/LIST/MAYBE), so a
+    -- case-sensitive match against "Number"/… never fired and every builtin
+    -- fell through to a dangling `$ref: "#/$defs/NUMBER"`. Mirror the naming
+    -- convention used by L4.FunctionSchema.primitiveJsonType. The declares
+    -- lookup below deliberately keeps the ORIGINAL-case `typeName` as its key.
     let typeName = resolvedToText name
-     in case (typeName, args) of
-          ("Number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("String", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("Boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("Integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("Date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-          ("DateTime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-          ("List", [inner]) ->
+     in case (Text.toLower typeName, args) of
+          ("number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("int", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
+          ("integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
+          ("float", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("double", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
+          ("string", []) -> (SString Nothing, ctx.ctxCollectedDefs)
+          ("text", []) -> (SString Nothing, ctx.ctxCollectedDefs)
+          ("boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+          ("bool", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+          ("date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
+          ("datetime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
+          ("time", []) -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
+          ("list", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SArray innerSchema Nothing, defs)
-          ("Optional", [inner]) ->
+          ("listof", [inner]) ->
+            let (innerSchema, defs) = typeToJsonSchema ctx inner
+             in (SArray innerSchema Nothing, defs)
+          ("optional", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          ("Maybe", [inner]) ->
+          ("maybe", [inner]) ->
             let (innerSchema, defs) = typeToJsonSchema ctx inner
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
@@ -303,9 +318,12 @@ enumWithPayloads ctx' desc constructors =
             SNull -> SNull
      in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy)) : acc, newDefs)
 
--- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema
+-- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
+-- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",
+-- so the old case-sensitive match never fired and MAYBE-typed record fields were
+-- wrongly emitted as required.
 isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = resolvedToText name `elem` ["Maybe", "Optional"]
+isMaybeOrOptionalType (TyApp _ name [_]) = Text.toLower (resolvedToText name) `elem` ["maybe", "optional"]
 isMaybeOrOptionalType _ = False
 
 resolvedToText :: Resolved -> Text

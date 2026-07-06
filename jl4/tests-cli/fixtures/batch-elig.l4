@@ -1,0 +1,7 @@
+@export This function checks if a person is eligible
+GIVEN age IS A NUMBER
+      income IS A NUMBER
+      hasViolations IS A BOOLEAN
+GIVETH A BOOLEAN
+checkEligibility age income hasViolations MEANS
+  age >= 18 AND income >= 25000 AND NOT hasViolations

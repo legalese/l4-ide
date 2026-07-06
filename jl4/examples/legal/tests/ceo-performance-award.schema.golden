@@ -3,25 +3,40 @@
         "CEO Award State": {
             "properties": {
                 "CEO Succession Framework": {
-                    "$ref": "#/$defs/BOOLEAN"
+                    "type": "boolean"
                 },
                 "Covered Event Occurred": {
-                    "$ref": "#/$defs/BOOLEAN"
+                    "type": "boolean"
                 },
                 "Covered Event Type": {
-                    "$ref": "#/$defs/MAYBE"
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Covered Event Type"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 },
                 "Current Date": {
-                    "$ref": "#/$defs/DATE"
+                    "format": "date",
+                    "type": "string"
                 },
                 "Earned Dates": {
-                    "$ref": "#/$defs/LIST"
+                    "items": {
+                        "format": "date",
+                        "type": "string"
+                    },
+                    "type": "array"
                 },
                 "Earned Tranches": {
-                    "$ref": "#/$defs/LIST"
+                    "items": {
+                        "type": "number"
+                    },
+                    "type": "array"
                 },
                 "HSR Waiting Period Expired": {
-                    "$ref": "#/$defs/BOOLEAN"
+                    "type": "boolean"
                 },
                 "Musk Service Status": {
                     "$ref": "#/$defs/Service Status"
@@ -30,10 +45,17 @@
                     "$ref": "#/$defs/Tesla Performance Metrics"
                 },
                 "Shareholder Approval Received": {
-                    "$ref": "#/$defs/BOOLEAN"
+                    "type": "boolean"
                 },
                 "Termination Reason": {
-                    "$ref": "#/$defs/MAYBE"
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Termination Reason"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
@@ -43,13 +65,18 @@
                 "Earned Tranches",
                 "Earned Dates",
                 "CEO Succession Framework",
-                "Termination Reason",
                 "Covered Event Occurred",
-                "Covered Event Type",
                 "HSR Waiting Period Expired",
                 "Shareholder Approval Received"
             ],
             "type": "object"
+        },
+        "Covered Event Type": {
+            "enum": [
+                "External Event Affecting Product Goals",
+                "Other External Event"
+            ],
+            "type": "string"
         },
         "Service Status": {
             "enum": [
@@ -59,43 +86,61 @@
             ],
             "type": "string"
         },
+        "Termination Reason": {
+            "enum": [
+                "Without Cause",
+                "For Cause",
+                "Death",
+                "Disability",
+                "Change In Control",
+                "Voluntary Resignation"
+            ],
+            "type": "string"
+        },
         "Tesla Performance Metrics": {
             "properties": {
                 "Active FSD Subscriptions": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Bots Delivered": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Current Adjusted EBITDA": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Current Market Cap": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Last Closing Price": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "One Year Avg Market Cap": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Outstanding Shares": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Per Share Consideration": {
-                    "$ref": "#/$defs/MAYBE"
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 },
                 "Robotaxis In Operation": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Six Month Avg Market Cap": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Tesla Vehicles Delivered": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "Thirty Day Avg Market Cap": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 }
             },
             "required": [
@@ -109,8 +154,7 @@
                 "Robotaxis In Operation",
                 "Current Adjusted EBITDA",
                 "Outstanding Shares",
-                "Last Closing Price",
-                "Per Share Consideration"
+                "Last Closing Price"
             ],
             "type": "object"
         }

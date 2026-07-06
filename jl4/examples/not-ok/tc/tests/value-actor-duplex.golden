@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: value-actor-duplex.l4
+  Hidden: no
+  Range: 16:19-16:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    An actor may only perform its own actions.
+
+      `aliceToBob` is performed by `Alice`, not by `Bob`.

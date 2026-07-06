@@ -55,7 +55,9 @@ library
     graphviz,
     logict,
     lsp-types,
-    megaparsec,
+    -- >=9.7: the lexer's ditto (^) column metric is display width, which the
+    -- Text stream instance only provides from 9.7.0 (Text.Megaparsec.Unicode).
+    megaparsec >=9.7,
     mtl,
     optics,
     optics-core,
@@ -129,6 +131,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Print.Columnar
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -165,17 +168,23 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     MixfixParserSpec
+    PatternMatchParserSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
+    RefAnnotationSpec
+    TracePostprocessSpec
+    EdgeCrashSpec
+    PrintRoundtripSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
     text,

@@ -136,11 +136,11 @@ See [prelude.md](prelude.md) for the complete function list including `sortBy`, 
 
 Requires: `IMPORT prelude` (imported transitively -- `` IMPORT `negation-as-failure` `` alone is enough)
 
-| Function     | Type                       | Description                                          |
-| ------------ | -------------------------- | ----------------------------------------------------- |
-| `holds p`    | `Maybe Bool → Bool`        | Closed-world (NAF); `NOTHING` → `FALSE`                |
-| `naf p`      | `Maybe Bool → Bool`        | Negation as failure; succeeds unless provably true     |
-| `presumed p` | `Maybe Bool → Bool`        | Open-world dual; `NOTHING` → `TRUE`                    |
+| Function     | Type                | Description                                        |
+| ------------ | ------------------- | -------------------------------------------------- |
+| `holds p`    | `Maybe Bool → Bool` | Closed-world (NAF); `NOTHING` → `FALSE`            |
+| `naf p`      | `Maybe Bool → Bool` | Negation as failure; succeeds unless provably true |
+| `presumed p` | `Maybe Bool → Bool` | Open-world dual; `NOTHING` → `TRUE`                |
 
 See [negation-as-failure.md](negation-as-failure.md) for the truth table and natural-language rendering notes.
 
