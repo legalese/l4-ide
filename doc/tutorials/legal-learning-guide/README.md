@@ -270,6 +270,16 @@ DECLARE Action IS ONE OF
 - **Prevents errors:** A charity can't issue regulatory notices
 - **Clear authority:** Shows who has power to do what
 
+> **Tip — the performer rule.** When you write `PARTY Commissioner MUST
+> AssessApplication OF application`, L4 checks that `Commissioner` is the
+> *performer* of `AssessApplication`. In the value-actor encoding (where an
+> action record carries an `actor` field naming who performs it), the compiler
+> catches it automatically if you accidentally assign an action to the wrong
+> party — for example, obligating a charity to issue a regulatory notice. This
+> catches drafting errors early, before they reach production. See
+> [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md)
+> for the full details.
+
 **Example using structured actors/actions:**
 
 ```l4

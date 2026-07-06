@@ -354,6 +354,23 @@ Metadata annotations for documentation and generation.
 
 ---
 
+## Concepts
+
+Key concepts in L4 legal modeling, alphabetically ordered.
+
+| Concept | Definition |
+| ------- | ---------- |
+| **actor (value-actor encoding)** | In a regulative rule, actors are **values** (constructors of one `Actor` sum type) rather than types. Actions carry their actor(s) as ordinary record fields. The contract head `DEONTIC Actor Action` is therefore monomorphic, which lets one contract drive mixed-actor events natively without subtyping or GADTs. See [actors-and-actions.md](../concepts/legal-modeling/actors-and-actions.md). |
+| **actor-correctness** | The well-formedness property enforced at compile time: in `PARTY p MUST a` and `PARTY p DOES a`, the party `p` must equal the *performer* of action `a`. Violations produce a diagnostic naming the performer: `` `eat` is performed by `Eater`, not by `Drinker`. `` The check is value-level (complements type-level checks) and is silent when the actor or action cannot be resolved statically. |
+| **duplex action** | An action type that carries **both directions** of a bilateral event. The performer is identified by position (the subject-first canon), so the same type covers both `aliceToBob` (performer: Alice) and `bobToAlice` (performer: Bob) without requiring two separate action types. See [actors-and-actions.md §3](../concepts/legal-modeling/actors-and-actions.md). |
+| **non-delegable duty** | An obligation that the bound party must discharge personally, modelled by requiring a bare `Perform` action (no `Procure` wrapper) in that obligation slot. Contrast with a delegable duty, which permits a `Procure`-wrapped action. See *procurement* and [actors-and-actions.md §6](../concepts/legal-modeling/actors-and-actions.md). |
+| **parameterised action** | An action whose actors are not fixed at definition time but supplied as arguments at the use site. Introduced in a deontic slot with `EXACTLY` (e.g., `PARTY Alice MUST EXACTLY send Alice Bob WITHIN 10`). Without `EXACTLY`, an applied action expression does not parse in the action slot. |
+| **performer** | The actor who must carry out an action — the **first actor-typed field in positional order** in the action record (the subject-first canon). For an obligation `PARTY p MUST a`, the compiler checks that `p` equals `a`'s performer. |
+| **procurement / Procure** | A higher-order action pattern: `Procure HAS procurer IS AN Actor, inner IS AN Action`. It models "X undertakes to procure that Y performs action_Y" — the outer obligation binds the *procurer*; the inner action retains its own performer. Procurement nests (delegation chains). A stranger cannot procure an instance that already names another procurer; the principal cannot directly perform the inner action either. See [actors-and-actions.md §6](../concepts/legal-modeling/actors-and-actions.md). |
+| **subject-first canon** | The positional convention by which the performer of an action is the **first actor-typed field in the record**, mirroring English Subject–Verb–Object order. This makes multi-actor actions duplex and unambiguous without extra type-system machinery. See [ACTOR-ACTIONS-THEORY.md §2](../concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md). |
+
+---
+
 ## Navigation
 
 - **[Reference Home](README.md)** - Reference documentation overview

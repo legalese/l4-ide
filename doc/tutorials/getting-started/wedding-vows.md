@@ -78,6 +78,15 @@ GIVETH DEONTIC Person Action
 | `HENCE ...`                    | If they do, then Spouse2 must respond                                    |
 | `LEST BREACH`                  | If they don't, it's a breach                                             |
 
+> **Who performs what?** L4 now enforces that the party named in `PARTY p MUST a`
+> is the *performer* of action `a`. In the flat-union style used here — where
+> `Action IS ONE OF` lists action names without an actor field — actions carry no
+> performer, so any party may be obligated to any action. If you later switch to
+> the value-actor encoding (where each action record names its actor), the
+> compiler will catch mismatches automatically. See
+> [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md) for
+> details.
+
 ---
 
 ## Step 3: Core Obligations

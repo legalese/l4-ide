@@ -1,0 +1,33 @@
+-- Procurement as a HIGHER-ORDER action. "X undertakes to procure that Y performs
+-- action_Y" composes as procure_X(action_Y): `Procure` is an `Action` that wraps
+-- another `Action`. The OUTER obligation binds the procurer (X, the first actor
+-- positionally); the bare inner action binds its own performer (Y). So:
+--
+--   * X may PROCURE Y's act            -> accepted (goodProcure, no error below)
+--   * a stranger Z may not procure it  -> rejected (strangerProcure)
+--   * X may not directly PERFORM it    -> rejected (xCannotPerform)
+--
+-- This is the principal/agent distinction, type-checked, and it falls out of the
+-- value-actor encoding for free (actions are first-class values, so they can be
+-- arguments to a higher-order `Procure`). See doc/concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md
+-- (STIT logic; Kanger-Lindahl normative positions; agency law; non-delegable
+-- duties).
+
+DECLARE Actor IS ONE OF X, Y, Z
+
+DECLARE Action IS ONE OF
+  Perform HAS who      IS AN Actor, verb  IS A STRING
+  Procure HAS procurer IS AN Actor, inner IS AN Action   -- higher-order: wraps an Action
+
+shipByY       MEANS Perform OF Y, "ship"
+xProcuresShip MEANS Procure OF X, shipByY                 -- X procures that Y ships
+
+GIVETH DEONTIC Actor Action
+-- GOOD (no error): the procurement obligation falls on the procurer X
+goodProcure     MEANS PARTY X MUST EXACTLY xProcuresShip WITHIN 10
+
+-- BAD: a stranger cannot bear this particular procurement
+strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
+
+-- BAD: X cannot directly PERFORM Y's action — only procure it
+xCannotPerform  MEANS PARTY X MUST EXACTLY shipByY WITHIN 10

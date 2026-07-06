@@ -240,6 +240,15 @@ DECIDE amount IS
 
 ## Regulative Rule Patterns
 
+> **The performer rule.** When `PARTY p MUST a` appears in a regulative rule,
+> L4 checks that `p` is the *performer* of action `a`. For the flat-union style
+> (`DECLARE Action IS ONE OF ...`) used in the examples below, actions carry no
+> actor field and the check is skipped — any party may be obligated to any
+> action. If you use the value-actor encoding (actions that carry their own
+> actor) the compiler enforces the match automatically and reports a clear error
+> if a wrong party is assigned. See
+> [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md).
+
 ### Simple Obligation
 
 ```l4
@@ -317,10 +326,9 @@ GIVETH DEONTIC Party Action
 ```l4
 GIVETH DEONTIC Party Action
 `delivery options` MEANS
-    (PARTY Seller MUST `ship goods` WITHIN 14 HENCE FULFILLED)
+    (PARTY Seller MUST `ship goods` WITHIN 14 HENCE FULFILLED LEST BREACH)
     ROR
-    (PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED)
-    LEST BREACH
+    (PARTY Seller MUST `arrange pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
 ```
 
 ---
