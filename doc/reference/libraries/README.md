@@ -7,6 +7,7 @@ L4 ships with a set of core libraries that provide essential functions for commo
 Core libraries are located in the [jl4-core/libraries/](https://github.com/legalese/l4-ide/tree/main/jl4-core/libraries) directory:
 
 - **[prelude](prelude.md)** - Standard functions (automatically imported)
+- **[negation-as-failure](negation-as-failure.md)** - NAF combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
 - **[daydate](daydate.md)** - Date calculations and temporal logic
 - **[time](time.md)** - Wall-clock time-of-day operations
 - **[datetime](datetime.md)** - Absolute points in time with timezones
@@ -130,6 +131,18 @@ Automatically imported. Provides foundational functions for lists, numbers, and 
 | `filterDict f dict`       | `(v→Bool) → Dict → Dict`                  | Filter by value   |
 
 See [prelude.md](prelude.md) for the complete function list including `sortBy`, `zipWith`, `deleteBy`, `dictUnion`, and more.
+
+### negation-as-failure
+
+Requires: `IMPORT prelude` (imported transitively -- `` IMPORT `negation-as-failure` `` alone is enough)
+
+| Function     | Type                       | Description                                          |
+| ------------ | -------------------------- | ----------------------------------------------------- |
+| `holds p`    | `Maybe Bool → Bool`        | Closed-world (NAF); `NOTHING` → `FALSE`                |
+| `naf p`      | `Maybe Bool → Bool`        | Negation as failure; succeeds unless provably true     |
+| `presumed p` | `Maybe Bool → Bool`        | Open-world dual; `NOTHING` → `TRUE`                    |
+
+See [negation-as-failure.md](negation-as-failure.md) for the truth table and natural-language rendering notes.
 
 ### math
 
