@@ -17,6 +17,9 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, postprocessTrace
+, safePostprocessTrace
+, tracePostprocessFailed
 )
 where
 
@@ -26,6 +29,7 @@ import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
@@ -34,7 +38,7 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (throwIO, try)
+import Control.Exception (throwIO, try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -144,8 +148,10 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
+  finalTrace <- case mt of
+    Nothing      -> pure Nothing
+    Just actions -> Just <$> liftIO (safePostprocessTrace actions)
   let
-    finalTrace = postprocessTrace <$> mt
     v' =
       if isAssert
         then Assertion
@@ -154,6 +160,26 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
             _                           -> False
         else Reduction v
   pure (MkEvalDirectiveResult r v' finalTrace)
+
+-- | 'postprocessTrace', guarded so it can never escape an exception: if trace
+-- post-processing throws (e.g. a malformed action sequence produced by an
+-- unbalanced push/pop), degrade to a one-node fallback trace instead of letting
+-- an ErrorCall abort the surrounding evaluation and discard the already-computed
+-- #EVAL result (see T7). Catches 'ErrorCall' specifically — not 'SomeException'
+-- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
+safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace actions = do
+  r <- try (evaluate (force (postprocessTrace actions)))
+  pure $ case r of
+    Right t               -> t
+    Left (_ :: ErrorCall) -> tracePostprocessFailed
+
+-- | Fallback substituted for a trace when post-processing it fails. Keeps the
+-- directive's result intact and degrades only the trace to a single marker
+-- node, instead of letting the failure abort the surrounding evaluation.
+tracePostprocessFailed :: EvalTrace
+tracePostprocessFailed =
+  Trace Nothing [] (Right (MkNF (ValString "trace unavailable (internal error during trace post-processing)")))
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
@@ -328,7 +354,8 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+  reofferedEvents <- newIORef mempty
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,

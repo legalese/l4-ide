@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** OPEN — analysis-only; none of the proposed override constructs are implemented.
+>
+> - `SUBJECT TO`/`NOTWITHSTANDING`/`DESPITE`/`EXCEPT WHEN`/`WITHOUT AFFECTING` are not lexer keywords (`jl4-core/src/L4/Lexer.hs:230-299`) and appear nowhere in core; no priority-graph or defeater machinery.
+> - Only `UNLESS` exists as a keyword (`Lexer.hs:298`) but without the defeasibility semantics §6.1 proposes. "Next Steps" remain unstarted.
+
 # SUBJECT TO / DESPITE / NOTWITHSTANDING: Taxonomic Analysis and Specification
 
 **Status:** Draft

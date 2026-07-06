@@ -108,7 +108,7 @@ import Optics ((%~), (^.))
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
-import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, extractComputedFieldNames)
+import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -119,6 +119,7 @@ mkInitialCheckState substitution =
     , nlgMap       = IV.empty
     , scopeMap     = IV.empty
     , descMap      = IV.empty
+    , constBodies  = Map.empty
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -133,6 +134,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
+    , cyclicSynonyms = Set.empty
     , moduleUri
     , sectionStack = []
     }
@@ -162,7 +164,15 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
         ]
-      checkEnv' = checkEnv { computedFields = extractComputedFieldNames program }
+        ++
+        [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
+        | cyc@(synName : _) <- synonymCycles
+        ]
+      synonymCycles = detectTypeSynonymCycles program
+      checkEnv' = checkEnv
+        { computedFields = extractComputedFieldNames program
+        , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
+        }
   in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
     (w, s) ->
       let
@@ -214,8 +224,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -326,7 +336,26 @@ applyFinalSubstitution subst moduleUri t =
         in
           r
 
--- | Helper function to run the check monad an expect a unique result.
+-- | Helper function to run the check monad and expect a unique result.
+--
+-- INVARIANT (callers must guarantee determinism): every alternative-producing
+-- path under 'checkProgram' must be collapsed by 'prune' (or 'softprune')
+-- before results merge into the module traversal. At the time of writing, the
+-- forking consumers are all pruned: the scan phases prune per declaration
+-- ('scanTyDeclDeclare', 'inferTyDeclDeclare', 'scanFunSigDecide'),
+-- 'inferTopDecl' prunes Declare/Decide/Assume/Timezone, and 'inferDirective'
+-- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert; Import/Section name
+-- handling is deterministic ('def'/'ref'). The other two callers of this
+-- function only run 'applySubst', which never forks.
+--
+-- If you add a directive or top-level declaration case that runs
+-- 'checkExpr'/'inferExpr', wrap it in 'prune', or the 'error' below becomes
+-- reachable from ordinary user input (this happened for #ASSERT and
+-- TIMEZONE IS; see T4). We deliberately keep these arms as 'error' rather
+-- than auto-recovering: post-T4, reaching them requires a compiler bug (a
+-- missing 'prune'), and failing loudly in CI/golden runs beats silently
+-- committing to an arbitrary typing. The CLI/LSP drivers have catch-alls
+-- that keep interactive sessions alive.
 runCheckUnique :: Check a -> CheckEnv -> CheckState  -> (With CheckErrorWithContext a, CheckState)
 runCheckUnique c e s =
   case runCheck c e s of
@@ -440,7 +469,11 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   pure (Contract ann re rt revs)
 inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
-  e' <- checkExpr ExpectAssertContext e boolean
+  -- The 'prune' is load-bearing: like the sibling directive cases above, we must
+  -- collapse candidate results here, so that an ambiguous-but-well-typed expression
+  -- surfaces as an 'AmbiguousTermError' diagnostic instead of leaking multiple
+  -- results into 'runCheckUnique' (which calls 'error'). See T4.
+  e' <- prune $ checkExpr ExpectAssertContext e boolean
   pure (Assert ann e')
 
 -- We process imports prior to normal scope- and type-checking. Therefore, this is trivial.
@@ -491,8 +524,12 @@ inferTopDecl (Import ann import_) = do
 inferTopDecl (Section ann sec) = do
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
-inferTopDecl (Timezone ann tzExpr) = do
-  (rtzExpr, _ty) <- inferExpr tzExpr
+inferTopDecl (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
+  -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
+  -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
+  -- (instead of crashing in 'runCheckUnique'), and the context supplies the
+  -- source range for that diagnostic. See T4.
+  (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
@@ -525,6 +562,15 @@ inferDecide (MkDecide ann _tysig appForm expr) = do
             <*> traverse resolvedType dHead.rappForm
             <*> pure rexpr
             >>= nlgDecide
+        -- Capture the body of top-level *nullary* constants (e.g. action
+        -- constants like `eat MEANS Action OF Eater, "eat"`) so the rung-3
+        -- value-level actor-agreement check can recover an action's actor
+        -- field from its definition. Functions (appform with arguments) are
+        -- not record values, so we skip them.
+        case decide of
+          MkDecide _ _ (MkAppForm _ hd [] _) rbody ->
+            modifying' #constBodies (Map.insert (getUnique hd) rbody)
+          _ -> pure ()
         pure (decide, [dHead.name])
 
 -- | We allow the following cases:
@@ -834,11 +880,20 @@ inferTypeNameAndSynonym rappForm Nothing = do
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 inferTypeNameAndSynonym rappForm (Just t) = do
+  cyclic <- asks (.cyclicSynonyms)
   let
     rs = appFormHeads rappForm
-    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) . Just
+    -- A synonym that is a member of a declaration-time cycle gets NO
+    -- body: it has no finite expansion, and letting the expansion
+    -- machinery at it can blow up exponentially even under fuel. The
+    -- cycle itself is reported as CyclicTypeSynonyms; the body is still
+    -- checked below so its other errors surface.
+    quarantined = case rs of
+      (r : _) -> rawName (getOriginal r) `Set.member` cyclic
+      []      -> False
+    kt body = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) body
   rt <- inferType t
-  pure $ makeKnownMany rs (kt rt)
+  pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do
@@ -1121,6 +1176,8 @@ checkDeonton
 checkDeonton ann party action due hence lest partyT actionT = do
   partyR <- checkExpr ExpectRegulativePartyContext party partyT
   (actionR, boundByPattern) <- checkAction action actionT
+  checkPartyActionAgreement partyT actionT
+  checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
@@ -1129,12 +1186,194 @@ checkDeonton ann party action due hence lest partyT actionT = do
 
 checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [CheckInfo])
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
-  (pat, bounds) <- checkPattern ExpectRegulativeActionContext action actionT
+  (pat, bounds) <- checkActionPattern action actionT
   -- NOTE: the provided clauses must evaluate to booleans
   provided <- forM mprovided \provided ->
     extendKnownMany bounds do
       checkExpr ExpectRegulativeProvidedContext provided boolean
   pure (MkAction {anno, modal, action = pat, provided}, bounds)
+
+-- | Rung 2 of actor-indexed actions: a PARTY may only be obligated to perform
+-- its /own/ actions. When the action's type is a single-index, actor-typed
+-- action (e.g. @Action Drinker@), require that actor index to agree with the
+-- party's type — so @PARTY AnEater MUST Drink@ under @DEONTIC Eater (Action
+-- Drinker)@ is rejected, while @DEONTIC Eater (Action Eater)@ is accepted.
+--
+-- The index is already an ordinary HM type argument (a @MEANS@-defined
+-- @Drink@ has type @Action Drinker@), so this is one nominal-equality
+-- constraint — no GADTs, no dependent types. See
+-- specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md.
+--
+-- Scope (deliberately narrow, so existing contracts are untouched):
+--
+--   * arity-0 action types (plain enums / unions — the whole current corpus,
+--     and multi-agent @DEONTIC Party Action@ contracts) carry no actor index,
+--     so the check is a no-op and residuation is preserved;
+--   * arity-2+ action types (e.g. @Action Object Actor@) have no unambiguous
+--     "the actor" index, so we conservatively skip rather than guess which
+--     argument is the actor;
+--   * only single-index (@Action who@) actions are constrained.
+checkPartyActionAgreement :: Type' Resolved -> Type' Resolved -> Check ()
+checkPartyActionAgreement partyT actionT = do
+  partyT'  <- applySubst partyT
+  actionT' <- applySubst actionT
+  case actionT' of
+    -- exactly one type argument: that argument is the action's actor index
+    TyApp _ _ [idx] -> expect ExpectPartyActionAgreementContext partyT' idx
+    _               -> pure ()
+
+-- | Rung 3, value-actor encoding: when actors are ordinary /values/ (e.g.
+-- @DECLARE Actor IS ONE OF Eater, Drinker@), a @PARTY p MUST a@ obligation (and
+-- a @PARTY p DOES a@ event) must have the party @p@ equal to the action @a@'s
+-- /performer/ — so @PARTY Drinker MUST eat@ is rejected.
+--
+-- This is a /value/ comparison (both actors are constructors of the same party
+-- type), not a type equality, so it complements — rather than duplicates —
+-- 'checkPartyActionAgreement' (which fires only for type-indexed actions). It
+-- only bites when both the party and the performer are statically-known
+-- constructors; a computed action is left to runtime, so existing contracts are
+-- unaffected.
+checkRegulativeActorAgreement :: Type' Resolved -> Expr Resolved -> Maybe (Expr Resolved) -> Check ()
+checkRegulativeActorAgreement partyT partyR mActionExpr =
+  case (exprHeadConstructor partyR, mActionExpr) of
+    (Just party, Just actionExpr@(App _ actionName _)) -> do
+      mPerformer <- subjectOfActionExpr partyT actionExpr
+      forM_ mPerformer \ performer ->
+        unless (getUnique party == getUnique performer) $
+          addError (RegulativeActorMismatch party performer actionName)
+    _ -> pure ()
+
+-- | The /performer/ of an action expression, by the SVO subject-first canon:
+-- the first actor-typed thing in positional order. One rule covers both ways an
+-- action carries its actors —
+--
+--   * a /pinned/ constant — @eat MEANS Action OF Eater, …@ or
+--     @aliceToBob MEANS SendMessage OF Alice, Bob, …@ — whose actors live in
+--     the record body (resolve the name, recurse into the body);
+--   * an /unpinned/ (parameterised) action applied at the use site —
+--     @EXACTLY send Alice Bob@ — whose actors are supplied as arguments.
+--
+-- In both cases the performer is the first argument whose value is a
+-- constructor of the party type, so the one canon governs pinning AND
+-- overloading: the duplex @send@ is performed by whichever actor sits in the
+-- first slot, which is exactly what lets one action type carry both directions.
+subjectOfActionExpr :: Type' Resolved -> Expr Resolved -> Check (Maybe Resolved)
+subjectOfActionExpr partyT = go (0 :: Int)
+  where
+    go depth e
+      | depth > 8 = pure Nothing            -- guard against pathological alias chains
+      | otherwise = case e of
+          App _ _ args@(_ : _) -> subjectField partyT args     -- applied / positional record
+          AppNamed _ _ nes _   -> subjectField partyT [ a | MkNamedExpr _ _ a <- nes ]
+          App _ f []           ->                              -- a bare name: resolve its body
+            use #constBodies >>= \ bodies ->
+              maybe (pure Nothing) (go (depth + 1)) (Map.lookup (getUnique f) bodies)
+          _                    -> pure Nothing
+
+-- | Recover an action /expression/ from a regulative action pattern: a bare
+-- pinned action name (already turned into a value reference by the pattern
+-- checker) or the @EXACTLY f a b@ form used for an applied action. A pattern
+-- that binds variables is left to runtime.
+actionExprOfPattern :: Pattern Resolved -> Maybe (Expr Resolved)
+actionExprOfPattern (PatExpr _ e)     = Just e
+actionExprOfPattern (PatApp ann n []) = Just (App ann n [])
+actionExprOfPattern _                 = Nothing
+
+-- | The action's /subject/ (the agent who performs it) is, by canon, the
+-- __first__ field of its record whose value is a constructor of the party type
+-- — "subject-first", mirroring English SVO word order, and matching the way a
+-- clause reads: @PARTY Alice MUST send Alice Bob@ ≈ "Alice sends [to] Bob".
+--
+-- This is deliberately positional. An action such as
+-- @SendMessage WITH from IS ..., to IS ...@ is /duplex/: the very same type
+-- carries both directions, and which actor is the subject is decided by
+-- position, not by a fixed agent field. So @PARTY Alice MUST send(Alice, Bob)@
+-- is allowed while @PARTY Bob MUST send(Alice, Bob)@ is rejected, and swapping
+-- the two actors swaps the permission. The order-dependence is therefore not a
+-- bug but the governing convention — a footgun elevated to canon, in the long
+-- tradition of legal drafting conventions. Authors who want the other actor to
+-- bear the obligation construct the action with that actor in the subject slot.
+subjectField :: Type' Resolved -> [Expr Resolved] -> Check (Maybe Resolved)
+subjectField _      []       = pure Nothing
+subjectField partyT (e : es) =
+  case exprHeadConstructor e of
+    Just ctor -> do
+      isParty <- constructorHasType partyT ctor
+      if isParty then pure (Just ctor) else subjectField partyT es
+    Nothing -> subjectField partyT es
+
+exprHeadConstructor :: Expr Resolved -> Maybe Resolved
+exprHeadConstructor (App _ n []) = Just n
+exprHeadConstructor _            = Nothing
+
+constructorHasType :: Type' Resolved -> Resolved -> Check Bool
+constructorHasType partyT ctor = do
+  ei <- asks (.entityInfo)
+  case snd <$> Map.lookup (getUnique ctor) ei of
+    Just (KnownTerm ty _) -> do
+      ty'     <- applySubst ty
+      partyT' <- applySubst partyT
+      pure (sameTypeHead ty' partyT')
+    _ -> pure False
+
+sameTypeHead :: Type' Resolved -> Type' Resolved -> Bool
+sameTypeHead (TyApp _ r1 _) (TyApp _ r2 _) = getUnique r1 == getUnique r2
+sameTypeHead _              _              = False
+
+-- | Check the action of a regulative @MUST@/@MAY@ clause against the action
+-- type declared in the contract's @DEONTIC <Party> <Action>@ signature.
+--
+-- This is 'checkPattern' specialised to 'ExpectRegulativeActionContext', with
+-- one wrinkle that matters once actions carry a type argument.
+--
+-- A bare action name is parsed as a nullary 'PatApp'. The generic pattern
+-- checker resolves it as a data constructor if it can, and otherwise treats it
+-- as a /fresh binder/ whose type is an unconstrained inference variable — which
+-- then unifies with whatever action type the contract declares. That is
+-- harmless for plain-enum actions (their names /are/ constructors, so they go
+-- through full unification), but it means a name that refers to an existing
+-- action /value/ — e.g. a parametric @Action Court@ introduced by a @MEANS@
+-- clause — is silently accepted in a contract pinned to @Action Landlord@,
+-- dropping exactly the index we want the deontic layer to enforce.
+--
+-- So when a bare name resolves to an in-scope non-constructor term, we treat it
+-- as a reference to that value — precisely as the explicit @EXACTLY@ form
+-- ('PatExpr') already does — and check its type against the contract's declared
+-- action type. The decision rule (see 'namesNonConstructorTerm'):
+--
+--   * any constructor candidate  -> constructor-pattern semantics (unchanged);
+--     this keeps plain-enum actions, and overloaded names that /also/ name a
+--     constructor, on their existing path;
+--   * else any term candidate (a @MEANS@/global @Computable@, a @GIVEN@
+--     parameter, an @ASSUME@'d term, a record selector, ...) -> reference;
+--   * no term candidate at all -> a genuine fresh binder (e.g. a wildcard
+--     action whose value a @HENCE@ clause inspects).
+--
+-- The reference branch is intentionally broader than just @MEANS@-defined
+-- actions: a bare action name that refers to /anything/ in scope denotes that
+-- value, and silently re-binding it as a fresh same-named pattern variable was
+-- exactly the footgun behind this bug. A consequence is that a name which
+-- merely collides with an unrelated in-scope term now surfaces as a type
+-- mismatch instead of quietly shadowing it — the intended trade-off.
+checkActionPattern :: Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
+checkActionPattern action actionT = case action of
+  PatApp ann n [] -> do
+    refersToValue <- namesNonConstructorTerm n
+    if refersToValue
+      then checkPattern ExpectRegulativeActionContext (PatExpr ann (Var ann n)) actionT
+      else checkPattern ExpectRegulativeActionContext action actionT
+  _ -> checkPattern ExpectRegulativeActionContext action actionT
+
+-- | Does this name resolve to at least one in-scope term, none of which is a
+-- data constructor? Used to decide whether a bare action name denotes a
+-- reference to an existing value rather than a fresh pattern binder. Any
+-- constructor candidate keeps constructor-pattern semantics (returns 'False');
+-- a name with no term candidate at all is a binder (also 'False').
+namesNonConstructorTerm :: Name -> Check Bool
+namesNonConstructorTerm n = do
+  options <- lookupRawNameInEnvironment (rawName n)
+  let termKinds = [ tk | (_, _, KnownTerm _ tk) <- options ]
+  pure (not (null termKinds) && all (/= Constructor) termKinds)
 
 buildConstructorLookup :: [DeclChecked (Declare Resolved)] -> Map Unique [Resolved]
 buildConstructorLookup = foldMap \decl ->
@@ -1341,7 +1580,15 @@ inferExpr' g =
           re <-
             case res of
               [re'] -> pure re'
-              _ -> pure $ error "internal error in matchFunTy"
+              -- Unreachable invariant: we pass the singleton [projE] above, and
+              -- every 'matchFunTy' branch returns exactly one resolved expr per
+              -- argument (zip3 traversals; error branches 'traverse inferExpr args';
+              -- Check nondeterminism forks whole computations, never concatenates
+              -- result lists), so the singleton match always succeeds (T4).
+              -- Fail strictly at the site rather than 'pure $ error ...', which
+              -- would plant a lazy bottom inside the returned 'Proj' node that
+              -- detonates arbitrarily far away (eval/nlg/serialization).
+              _ -> error "internal error in matchFunTy: projection expected exactly one resolved argument"
 
           pure (Proj projAnn re rl, rt)
     Var ann n -> do
@@ -1540,6 +1787,10 @@ inferEvent (MkEvent ann party action timestamp atFirst) = do
   actionT <- fresh (NormalName "action")
   party' <- checkExpr ExpectRegulativePartyContext party partyT
   action' <- checkExpr ExpectRegulativeActionContext action actionT
+  -- Rung 3: an event's acting party must own the action it performs, so a
+  -- @PARTY Drinker DOES eat@ event is rejected even though the union contract
+  -- type accepts it. This is what makes cross-actor /driving/ actor-correct.
+  checkRegulativeActorAgreement partyT party' (Just action')
   timestamp' <- checkExpr ExpectRegulativeTimestampContext timestamp number
   pure (MkEvent ann party' action' timestamp' atFirst, event partyT actionT)
 
@@ -1751,6 +2002,14 @@ desugarBranches scrut nebs = do
     PatVar _ _ -> pure []
     PatExpr _ _ -> pure []
     PatLit _ _ -> pure []
+    -- This wildcard fires only for a PatApp/PatCons whose anno lacks
+    -- 'resolvedInfo'. That requires a RANGELESS anno: 'setAnnResolvedType'
+    -- routes through 'withRange', which is a silent no-op when the anno has no
+    -- 'SrcRange'. The parser always stamps ranges on pattern annos, so this is
+    -- unreachable from surface syntax (verified empirically across all
+    -- user-writable pattern forms, T4). However, any future stage that
+    -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
+    -- root cause would be the missing range, not missing type information.
     _ -> error "fatal internal error: expected type information but didn't get any"
 
 type VarEnv = Map Unique [Resolved]
@@ -1932,48 +2191,60 @@ inferLit (StringLit _ _) =
 matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
 matchFunTy _isProjection _r t []   =
   pure ([], t)
-matchFunTy  isProjection r t args =
-  case t of
-    InfVar _ann _pre i -> do
-      subst <- use #substitution
-      case Map.lookup i subst of
-        Nothing -> do
-          -- We know nothing about the type of the thing we're applying.
-          -- So we construct a new function type of the right shape by
-          -- generating variables and bind the variable to that type.
-          --
-          -- Then we can proceed to checking the arguments.
-          argts <- traverse (const (fresh (NormalName "arg"))) args
-          rt <- fresh (NormalName "res")
-          let tf = fun_ argts rt
-          assign #substitution (Map.insert i tf subst)
-
-          rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
-          pure (rargs, rt)
-
-        Just t' -> matchFunTy isProjection r t' args
-    Fun _ann onts rt
-      -- We know already that the type of the thing we're applying
-      -- is a function, good. So we can check the number of arguments
-      -- and then check the arguments against their expected result
-      -- types.
-      | nonts == nargs -> do
-        rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
-        pure (rargs, rt)
-
-      | otherwise -> do
-        addError (IncorrectArgsNumberApp r nonts nargs)
-        rargs <- fst . unzip <$> traverse inferExpr args
-        pure (rargs, rt)
-      where
-        nonts = length onts
-        nargs = length args
-    TyApp _ann n ts -> do
-      mt' <- tryExpandTypeSynonym n ts
-      maybe illegalAppError (\ t' -> matchFunTy isProjection r t' args) mt'
-    _ -> illegalAppError
+matchFunTy  isProjection r t0 args =
+  -- The fuel bounds the synonym-expansion chain so that a cyclic type
+  -- synonym (which evades declaration-time detection when it arrives via
+  -- imports) cannot make us loop; when it runs out, we report the current
+  -- type as non-applicable. Substitution-chase steps do NOT consume fuel:
+  -- the substitution is acyclic (see 'bind' in L4.TypeCheck.Unify), so
+  -- chasing terminates on its own, and long chains arise from legitimate
+  -- alias definitions.
+  go synonymExpansionFuel t0
   where
-    illegalAppError = do
+    go :: Int -> Type' Resolved -> Check ([Expr Resolved], Type' Resolved)
+    go fuel t
+      | fuel <= 0 = illegalAppError t
+      | otherwise =
+        case t of
+          InfVar _ann _pre i -> do
+            subst <- use #substitution
+            case Map.lookup i subst of
+              Nothing -> do
+                -- We know nothing about the type of the thing we're applying.
+                -- So we construct a new function type of the right shape by
+                -- generating variables and bind the variable to that type.
+                --
+                -- Then we can proceed to checking the arguments.
+                argts <- traverse (const (fresh (NormalName "arg"))) args
+                rt <- fresh (NormalName "res")
+                let tf = fun_ argts rt
+                assign #substitution (Map.insert i tf subst)
+
+                rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
+                pure (rargs, rt)
+
+              Just t' -> go fuel t'
+          Fun _ann onts rt
+            -- We know already that the type of the thing we're applying
+            -- is a function, good. So we can check the number of arguments
+            -- and then check the arguments against their expected result
+            -- types.
+            | nonts == nargs -> do
+              rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+              pure (rargs, rt)
+
+            | otherwise -> do
+              addError (IncorrectArgsNumberApp r nonts nargs)
+              rargs <- fst . unzip <$> traverse inferExpr args
+              pure (rargs, rt)
+            where
+              nonts = length onts
+              nargs = length args
+          TyApp _ann n ts -> do
+            mt' <- tryExpandTypeSynonym n ts
+            maybe (illegalAppError t) (go (fuel - 1)) mt'
+          _ -> illegalAppError t
+    illegalAppError t = do
       -- We are trying to apply a non-function.
       addError (IllegalApp r t (length args))
       rargs <- fst . unzip <$> traverse inferExpr args
@@ -3219,6 +3490,14 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (CyclicTypeSynonyms cycleSyns) =
+  [ "Circular dependency detected between type synonyms:"
+  , ""
+  ] ++ map (\ n -> "  " <> quotedName n) cycleSyns ++
+  [ ""
+  , "A type synonym must not refer to itself, directly or via other"
+  , "synonyms, because it could then never be fully expanded."
+  ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
   , ""
@@ -3240,6 +3519,13 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   , "The parameter "
       <> quotedName (getActual paramName)
       <> " has a function type."
+  ]
+prettyCheckError (RegulativeActorMismatch party performer actionName) =
+  [ "An actor may only perform its own actions."
+  , ""
+  , "  " <> quotedName (getActual actionName)
+      <> " is performed by " <> quotedName (getActual performer)
+      <> ", not by " <> quotedName (getActual party) <> "."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
@@ -3430,6 +3716,11 @@ prettyTypeMismatch ExpectRegulativeEventContext expected given =
   standardTypeMismatch [ "The event expr passed to a TRACE directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRegulativeProvidedContext expected given =
   standardTypeMismatch [ "The PROVIDED clause for filtering the ACTION is expected to be of type" ] expected given
+prettyTypeMismatch ExpectPartyActionAgreementContext expected given =
+  standardTypeMismatch
+    [ "An actor may only be obligated to perform its own actions."
+    , "This action's actor is expected to match the party, of type"
+    ] expected given
 prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =

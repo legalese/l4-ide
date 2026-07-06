@@ -19,7 +19,13 @@ import qualified Data.Text.Encoding as TE
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
-import System.Directory (doesFileExist)
+import System.Directory
+  ( createDirectoryIfMissing
+  , doesFileExist
+  , getTemporaryDirectory
+  , removeFile
+  , removePathForcibly
+  )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
@@ -187,6 +193,43 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+breachTraceFixture, breachInputsFixture :: FilePath
+breachTraceFixture  = fixtureDir </> "breach-trace.l4"
+breachInputsFixture = fixtureDir </> "breach-inputs.json"
+
+batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
+batchEligFixture = fixtureDir </> "batch-elig.l4"
+batchDataJson    = fixtureDir </> "batch-data.json"
+batchDataCsv     = fixtureDir </> "batch-data.csv"
+batchMixedJson   = fixtureDir </> "batch-mixed.json"
+
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture  = fixtureDir </> "batch-code.l4"
+batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
+batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
+batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | Decode stdout as a single JSON array (for @l4 batch --format json@).
+decodeArray :: String -> IO [Value]
+decodeArray sout =
+  case eitherDecode (BSL8.pack sout) of
+    Right (Array v)  -> pure (foldr (:) [] v)
+    Right other      -> do
+      expectationFailure ("Expected a JSON array, got: " ++ show other)
+      error "unreachable"
+    Left err         -> do
+      expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
+      error "unreachable"
+
+-- | Count non-blank lines (each NDJSON row is one line).
+nonBlankLines :: String -> Int
+nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
+
+batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture = fixtureDir </> "batch-escape.l4"
+batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
+evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -196,7 +239,11 @@ main = do
   bin <- locateL4Binary
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
-  for_ [cleanFixture, evalFixture, errorFixture, garbageFixture] \fp -> do
+  for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , breachTraceFixture, breachInputsFixture
+       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
+       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
+       , batchEscapeFixture, batchEscapeInput, evalTraceFixture ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -314,6 +361,168 @@ spec bin = do
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
 
+  describe "l4 batch" $ do
+    it "serializes a #TRACE breach with correctly-labeled fields" $ do
+      -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
+      -- re-prints the module and re-parses it once per input row.
+      Output code sout serr <- runL4 bin
+        ["batch", breachTraceFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      -- DeadlineMissed labels must follow the constructor slots:
+      --   event party/action/timestamp, obligated party, obligation action,
+      --   deadline (see L4.Evaluate.ValueLazyJSON).
+      let expectedFragments =
+            [ "\"type\":\"deadline_missed\""
+            , "\"eventParty\":\"Bob\""
+            , "\"eventAction\":\"ping\""
+            , "\"timestamp\":15"
+            , "\"obligatedParty\":\"Alice\""
+            , "\"obligationAction\":\"MUST pay 100\""
+            , "\"deadline\":10"
+            ]
+      for_ expectedFragments \frag ->
+        unless (frag `isInfixOf` sout) $
+          expectationFailure $
+            "Expected batch stdout to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+            ++ "\n--- stderr ---\n" ++ serr
+      -- The old mislabeled fields and the derived-Show AST blob must be gone.
+      let forbiddenFragments = ["\"now\":", "\"elapsed\":", "\"limit\":", "MkAction"]
+      for_ forbiddenFragments \frag ->
+        unless (not (frag `isInfixOf` sout)) $
+          expectationFailure $
+            "Expected batch stdout NOT to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+
+    it "streams one NDJSON row per input (default format)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "infers CSV cell types so numeric params typecheck" $ do
+      -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
+      -- the rows would come back status=error; success proves inference works.
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+      let statuses = [ s | Object o <- rows
+                         , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
+      statuses `shouldBe` ["success", "success"]
+
+    it "emits a single JSON array with --format json" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+
+    it "emits a CSV table with flattened input_* columns via --format csv" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input_age" `isInfixOf`)
+      sout `shouldSatisfy` ("status" `isInfixOf`)
+
+    it "writes results to a file with --output" $ do
+      tmp <- getTemporaryDirectory
+      let outFile = tmp </> "l4-batch-out.json"
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
+                  , "--format", "json", "--output", outFile ]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null                    -- nothing on stdout
+      exists <- doesFileExist outFile
+      exists `shouldBe` True
+      contents <- readFile outFile
+      rows <- decodeArray contents
+      length rows `shouldBe` 2
+      removeFile outFile
+
+    it "stops at the first failing row by default (and exits non-zero)" $ do
+      -- Row 2 has a non-numeric income; row 3 must NOT be processed.
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+
+    it "processes every row with --continue-on-error (still exits non-zero)" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 3
+
+    it "validate-only reports schema mismatches without evaluating" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchMixedJson
+                  , "--validate-only", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
+
+    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+      -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
+      -- but must survive as the string "1E5" against a STRING param rather
+      -- than being coerced to 100000.
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "validate-only type-checks MAYBE primitive params" $ do
+      -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
+      -- as a type mismatch. Before unwrapping MAYBE on the AST this silently
+      -- passed as valid.
+      Output code sout _ <-
+        runL4 bin [ "batch", batchMaybeFixture, "--inputs", batchMaybeBadJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
+      sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- Regression tests for target T11 (CLI injection / corruption).
+    it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
+      -- The input row's payload contains backslashes (Windows path), embedded
+      -- quotes, newline/tab, and shell metacharacters. A naive quote-only
+      -- escaper produced an unparseable generated wrapper; a correct one
+      -- round-trips every byte as an L4 string literal.
+      env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
+      objField env "status" `shouldBe` Just (String "success")
+
+  describe "l4 trace (output path safety)" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+      -- Render into a directory whose *name* would execute `touch <sentinel>`
+      -- if the path were ever handed to a shell. With a direct `proc` call it
+      -- is just a literal (if unusual) directory name. The sentinel must not
+      -- appear regardless of whether Graphviz's `dot` is installed.
+      tmp <- getTemporaryDirectory
+      let sentinel = tmp </> "l4-trace-injection-sentinel"
+          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
+      removePathForcibly sentinel
+      removePathForcibly evilDir
+      createDirectoryIfMissing True evilDir
+      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist sentinel
+      removePathForcibly evilDir
+      ranShell `shouldBe` False
+
+    it "writes trace output into a directory whose path contains a space" $ do
+      -- The `.dot` branch needs no external tools; it exercises the same
+      -- outDir path-join the png/svg branches feed to `dot`, proving spaces
+      -- survive instead of being word-split.
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4 trace out"   -- note the space
+      removePathForcibly outDir
+      Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      code `shouldBe` ExitSuccess
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      wrote `shouldBe` True
+
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $
       expectGolden bin ["openfisca", "examples/openfisca/flat-tax.l4"]
@@ -369,3 +578,5 @@ spec bin = do
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["openfisca", errorFixture]
+  where
+    for_ xs f = mapM_ f xs

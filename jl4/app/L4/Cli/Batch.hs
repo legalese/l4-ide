@@ -1,16 +1,31 @@
+{-# LANGUAGE BangPatterns #-}
+
 -- | @l4 batch FILE --inputs data.{json,yaml,csv} [--entrypoint fn]@
 --
--- Evaluates a single @\@export@ function against many input rows,
--- streaming one NDJSON result object per line as each row completes.
--- Stays buffer-free so large CSV batches can be piped through @jq@
--- without running the evaluator dry on memory.
+-- Evaluates a single @\@export@ function against many input rows.
+--
+-- By default the results stream out one NDJSON object per line as each row
+-- completes ('FmtNdjson'), so large CSV batches can be piped through @jq@
+-- without running the evaluator dry on memory. @--format@ additionally
+-- offers a single pretty JSON array ('FmtJson'), a flattened CSV table
+-- ('FmtCsv'), or a YAML document ('FmtYaml'). @--output FILE@ redirects the
+-- results to a file.
+--
+-- Each result row is an envelope
+-- @{ input, output, status, diagnostics }@ (validate-only mode emits
+-- @{ input, status, errors }@ instead).
+--
+-- Error handling follows the spec: batch processing stops at the first
+-- failing row by default; pass @--continue-on-error@ to process every row
+-- and aggregate failures. Either way the process exits non-zero if any row
+-- failed.
 module L4.Cli.Batch
   ( BatchOptions(..)
+  , OutputFormat(..)
   , batchOptionsParser
   , batchCmd
   ) where
 
-import Base (NonEmpty, forM)
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Text.IO as TIO
@@ -19,6 +34,7 @@ import qualified Data.Text.Lazy.Encoding as Text.Lazy.Encoding
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Csv as Csv
@@ -26,10 +42,17 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
-import System.IO (hFlush, stdout, stdin)
+import System.IO
+  ( Handle
+  , IOMode(WriteMode)
+  , hFlush
+  , stdin
+  , stdout
+  , withFile
+  )
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
@@ -37,26 +60,54 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePat
 
 import L4.Export (ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions)
 import L4.DirectiveFilter (filterIdeDirectives)
+import L4.EvaluateLazy
+  ( EvalConfig
+  , EvalDirectiveResult(..)
+  , EvalDirectiveValue(..)
+  , prettyEvalException
+  )
+import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout)
-import L4.Syntax (Module, Resolved, Type')
+import L4.Syntax (Module, Resolved, Type'(..), getUnique)
+import L4.TypeCheck.Environment (maybeUnique)
 
 import L4.Cli.Common
-
--- NonEmpty is re-exported from Base but we import it only for a type sig.
-_unusedNE :: NonEmpty Int -> Int
-_unusedNE _ = 0
 
 ----------------------------------------------------------------------------
 -- Options
 ----------------------------------------------------------------------------
 
+-- | How to serialise the batch result rows.
+data OutputFormat
+  = FmtNdjson  -- ^ One JSON object per line (default; streams).
+  | FmtJson    -- ^ A single JSON array of the row envelopes.
+  | FmtCsv     -- ^ A flattened CSV table (input_* columns + output/status).
+  | FmtYaml    -- ^ A YAML sequence of the row envelopes.
+  deriving (Eq, Show)
+
 data BatchOptions = BatchOptions
-  { batchFile        :: FilePath
-  , batchInputs      :: FilePath      -- path or "-" for stdin
-  , batchInputFormat :: Maybe Text    -- inferred from extension if omitted
-  , batchEntrypoint  :: Maybe Text
-  , batchFixedNow    :: FixedNowOpt
+  { batchFile           :: FilePath
+  , batchInputs         :: FilePath      -- path or "-" for stdin
+  , batchInputFormat    :: Maybe Text    -- inferred from extension if omitted
+  , batchEntrypoint     :: Maybe Text
+  , batchOutputFormat   :: OutputFormat
+  , batchOutput         :: Maybe FilePath -- Nothing = stdout
+  , batchContinueOnErr  :: Bool
+  , batchValidateOnly   :: Bool
+  , batchFixedNow       :: FixedNowOpt
   }
+
+outputFormatReader :: ReadM OutputFormat
+outputFormatReader = eitherReader \input ->
+  case Text.toLower (Text.pack input) of
+    "ndjson"   -> Right FmtNdjson
+    "jsonl"    -> Right FmtNdjson
+    "json"     -> Right FmtJson
+    "csv"      -> Right FmtCsv
+    "yaml"     -> Right FmtYaml
+    "yml"      -> Right FmtYaml
+    other      -> Left $ "Invalid output format: " <> Text.unpack other
+                       <> " (expected ndjson|json|csv|yaml)"
 
 batchOptionsParser :: Parser BatchOptions
 batchOptionsParser = BatchOptions
@@ -78,6 +129,30 @@ batchOptionsParser = BatchOptions
         <> metavar "FUNCTION"
         <> help "Name of the @export function to call (defaults to @export default or the first one)"
         ))
+  <*> option outputFormatReader
+        ( long "format"
+        <> long "output-format"
+        <> short 'f'
+        <> metavar "FORMAT"
+        <> value FmtNdjson
+        <> showDefaultWith (const "ndjson")
+        <> help "Output format: ndjson (default, streams) | json | csv | yaml"
+        )
+  <*> optional (strOption
+        ( long "output"
+        <> short 'o'
+        <> metavar "FILE"
+        <> help "Write results to FILE instead of stdout"
+        ))
+  <*> switch
+        ( long "continue-on-error"
+        <> short 'c'
+        <> help "Process every row and aggregate failures (default: stop at the first failing row)"
+        )
+  <*> switch
+        ( long "validate-only"
+        <> help "Validate each row against the @export parameter schema without evaluating"
+        )
   <*> fixedNowParser
 
 ----------------------------------------------------------------------------
@@ -129,33 +204,212 @@ batchCmd opts = do
       exitFailure
   let filteredModule = filterIdeDirectives tcRes.module'
       filteredSource = prettyLayout filteredModule
-      params = extractParamsFromExport exportFn
+      params         = extractParamsFromExport exportFn
+      schema         = exportFn.exportParams
 
-  -- Step 3: for each input, generate wrapper, eval, emit one NDJSON line.
-  anyFailure <- fmap or $ forM (zip [1 :: Int ..] inputs) \(idx, input) -> do
-    let wrapperCode     = generateBatchWrapper exportFn.exportName params input
-        combinedProgram = filteredSource <> wrapperCode
-        virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
-    (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
-      let uri = normalizedFilePathToUri nfp
-      _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
-      Shake.use Rules.EvaluateLazy uri
-    let (status, outputJson, diags) = case mEval of
-          Nothing ->
-            ("error" :: Text, Aeson.Null, Aeson.toJSON evalErrs)
-          Just evalResults ->
-            ("success" :: Text, Aeson.toJSON evalResults, Aeson.Array mempty)
-        line = Aeson.object
-          [ Key.fromString "input"       Aeson..= input
-          , Key.fromString "output"      Aeson..= outputJson
-          , Key.fromString "status"      Aeson..= status
-          , Key.fromString "diagnostics" Aeson..= diags
-          ]
-    BSL8.putStrLn (Aeson.encode line)
-    hFlush stdout
-    pure (status == "error")
+  -- Step 3: process each row into an envelope, honoring stop-on-error, and
+  -- write the results in the requested format.
+  let process = processRow opts evalConfig filteredSource exportFn params schema
+  withOutputHandle opts.batchOutput \h ->
+    case opts.batchOutputFormat of
+      -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
+      -- each envelope, let it become garbage, and never build the row list.
+      FmtNdjson -> do
+        anyFail <- streamRows opts.batchContinueOnErr inputs process
+          (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
+        finish anyFail
+      -- The buffered formats must see every row before they can render, so
+      -- here (and only here) we retain the whole list of envelopes.
+      _ -> do
+        (envs, anyFail) <- bufferRows opts.batchContinueOnErr inputs process
+        writeBuffered h opts.batchOutputFormat envs
+        finish anyFail
+  where
+    finish anyFail = if anyFail then exitFailure else exitSuccess
 
-  if anyFailure then exitFailure else exitSuccess
+-- | Open the requested output sink (a file, or stdout) and run an action
+-- against its handle.
+withOutputHandle :: Maybe FilePath -> (Handle -> IO a) -> IO a
+withOutputHandle Nothing     act = act stdout
+withOutputHandle (Just path) act = withFile path WriteMode \h -> do
+  r <- act h
+  hFlush h
+  pure r
+
+----------------------------------------------------------------------------
+-- Row processing
+----------------------------------------------------------------------------
+
+-- | Fold over the input rows for the streaming (NDJSON) path. Each envelope
+-- is handed to @emit@ as soon as it is produced and then dropped, so the fold
+-- carries only a strict 'Bool' (any-row-failed) accumulator — never the list
+-- of envelopes. This is what keeps NDJSON output memory-flat for huge batches.
+-- Stops at the first failing row unless @continueOnErr@ is set.
+streamRows
+  :: Bool
+  -> [Aeson.Value]
+  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
+  -> (Aeson.Value -> IO ())
+  -> IO Bool
+streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) False
+  where
+    go [] !anyFail = pure anyFail
+    go ((idx, input) : rest) !anyFail = do
+      (env, isErr) <- process idx input
+      emit env
+      let !anyFail' = anyFail || isErr
+      if isErr && not continueOnErr
+        then pure True                   -- stop-on-error (the default)
+        else go rest anyFail'
+
+-- | Fold over the input rows for the buffered formats (json/yaml/csv), which
+-- genuinely need every row in hand before they can render. Returns the
+-- collected envelopes (in input order) and whether any row failed. Stops at
+-- the first failing row unless @continueOnErr@ is set.
+bufferRows
+  :: Bool
+  -> [Aeson.Value]
+  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
+  -> IO ([Aeson.Value], Bool)
+bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] False
+  where
+    go [] acc anyFail = pure (reverse acc, anyFail)
+    go ((idx, input) : rest) acc anyFail = do
+      (env, isErr) <- process idx input
+      let acc'     = env : acc
+          anyFail' = anyFail || isErr
+      if isErr && not continueOnErr
+        then pure (reverse acc', True)   -- stop-on-error (the default)
+        else go rest acc' anyFail'
+
+-- | Process a single input row into a result envelope, returning the
+-- envelope and whether the row failed.
+processRow
+  :: BatchOptions
+  -> EvalConfig
+  -> Text                                    -- ^ filtered source
+  -> ExportedFunction
+  -> [(Text, Maybe (Type' Resolved))]        -- ^ params for wrapper gen
+  -> [ExportedParam]                         -- ^ full schema for validation
+  -> Int
+  -> Aeson.Value
+  -> IO (Aeson.Value, Bool)
+processRow opts evalConfig filteredSource exportFn params schema idx input
+  | opts.batchValidateOnly =
+      let errs = validateRow schema input
+          ok   = null errs
+          env  = Aeson.object
+            [ Key.fromString "input"  Aeson..= input
+            , Key.fromString "status" Aeson..= (if ok then "valid" else "invalid" :: Text)
+            , Key.fromString "errors" Aeson..= errs
+            ]
+      in pure (env, not ok)
+  | otherwise = do
+      let wrapperCode     = generateBatchWrapper exportFn.exportName params input
+          combinedProgram = filteredSource <> wrapperCode
+          virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
+      (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
+        let uri = normalizedFilePathToUri nfp
+        _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
+        Shake.use Rules.EvaluateLazy uri
+      let (status, outputJson, diags) = case mEval of
+            Nothing ->
+              -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
+              ("error" :: Text, Aeson.Null, Aeson.toJSON evalErrs)
+            Just evalResults ->
+              -- The wrapper evaluated; a row still "fails" if evaluation raised
+              -- an exception (e.g. JSONDECODE could not coerce a cell to the
+              -- declared type). Those surface as `Reduction (Left …)`.
+              let excMsgs = concatMap resultExceptionMsgs evalResults
+              in if null excMsgs
+                   then ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
+                   else ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+          env = Aeson.object
+            [ Key.fromString "input"       Aeson..= input
+            , Key.fromString "output"      Aeson..= outputJson
+            , Key.fromString "status"      Aeson..= status
+            , Key.fromString "diagnostics" Aeson..= diags
+            ]
+      pure (env, status == "error")
+
+-- | Pretty-printed exception messages for any @#EVAL@ result that reduced
+-- to an evaluation exception. An empty list means the row evaluated cleanly.
+resultExceptionMsgs :: EvalDirectiveResult -> [Text]
+resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
+  Reduction (Left exc) -> prettyEvalException exc
+  _                    -> []
+
+----------------------------------------------------------------------------
+-- Row validation (for --validate-only)
+----------------------------------------------------------------------------
+
+-- | Best-effort validation of one input row against the export schema.
+-- Checks that required (non-@MAYBE@) params are present and non-null, and
+-- that primitive-typed values have the right JSON kind. Lenient on
+-- compound/unknown types (never rejects what it cannot judge).
+validateRow :: [ExportedParam] -> Aeson.Value -> [Text]
+validateRow schema (Aeson.Object o) = concatMap checkParam schema
+  where
+    checkParam p =
+      case KeyMap.lookup (Key.fromText p.paramName) o of
+        Nothing ->
+          [ "Missing required field: '" <> p.paramName <> "'" <> descSuffix p
+          | p.paramRequired ]
+        Just Aeson.Null ->
+          [ "Field '" <> p.paramName <> "' is null but required" <> descSuffix p
+          | p.paramRequired ]
+        Just v -> case primKind p.paramType of
+          Just k | not (jsonMatchesKind k v) ->
+            [ "Type mismatch for field '" <> p.paramName <> "': expected "
+              <> kindName k <> ", got " <> jsonKindName v <> descSuffix p ]
+          _ -> []
+    descSuffix p = case p.paramDescription of
+      Just d | not (Text.null d) -> " (" <> d <> ")"
+      _ -> ""
+validateRow _ other =
+  [ "Input record is not a JSON object: " <> jsonKindName other ]
+
+data PrimKind = KNum | KBool | KStr
+
+kindName :: PrimKind -> Text
+kindName = \case KNum -> "NUMBER"; KBool -> "BOOLEAN"; KStr -> "STRING"
+
+-- | Classify a param's declared type as a primitive kind we can check,
+-- unwrapping @MAYBE@ wrappers on the AST (a @MAYBE NUMBER@ is checked as a
+-- @NUMBER@; presence/nullability is handled separately by 'validateRow').
+-- Returns Nothing for compound or unknown types (which we then treat
+-- leniently). Unwrapping on the AST (rather than string-matching the
+-- pretty-printed form, which renders as @MAYBE OF NUMBER@) is what makes
+-- @--validate-only@ actually type-check optional primitives.
+primKind :: Maybe (Type' Resolved) -> Maybe PrimKind
+primKind mty = do
+  ty <- mty
+  case Text.toUpper (Text.strip (prettyLayout (unwrapMaybe ty))) of
+    "NUMBER"  -> Just KNum
+    "BOOLEAN" -> Just KBool
+    "STRING"  -> Just KStr
+    _         -> Nothing
+
+-- | Strip any leading @MAYBE OF _@ wrappers, returning the inner type. Matches
+-- the wrapper structurally by unique, mirroring @Export.hs@'s @isMaybeType@.
+unwrapMaybe :: Type' Resolved -> Type' Resolved
+unwrapMaybe (TyApp _ name [inner]) | getUnique name == maybeUnique = unwrapMaybe inner
+unwrapMaybe ty = ty
+
+jsonMatchesKind :: PrimKind -> Aeson.Value -> Bool
+jsonMatchesKind KNum  (Aeson.Number _) = True
+jsonMatchesKind KBool (Aeson.Bool _)   = True
+jsonMatchesKind KStr  (Aeson.String _) = True
+jsonMatchesKind _     _                = False
+
+jsonKindName :: Aeson.Value -> Text
+jsonKindName = \case
+  Aeson.Number _ -> "NUMBER"
+  Aeson.Bool _   -> "BOOLEAN"
+  Aeson.String _ -> "STRING"
+  Aeson.Null     -> "null"
+  Aeson.Array _  -> "array"
+  Aeson.Object _ -> "object"
 
 ----------------------------------------------------------------------------
 -- Input parsing
@@ -163,7 +417,10 @@ batchCmd opts = do
 
 parseBatchInput :: Text -> BSL.ByteString -> Either String [Aeson.Value]
 parseBatchInput fmt bytes = case Text.toLower fmt of
-  "json" -> Aeson.eitherDecode' bytes
+  "json" -> case Aeson.eitherDecode' bytes of
+    Left err -> Left err
+    Right (Aeson.Array arr) -> Right (Vector.toList arr)
+    Right single            -> Right [single]
   "yaml" -> case Yaml.decodeEither' (BSL.toStrict bytes) of
     Left err -> Left (Yaml.prettyPrintParseException err)
     Right val -> case val of
@@ -175,9 +432,116 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
       where
         rowToJson :: Csv.NamedRecord -> Aeson.Value
         rowToJson record = Aeson.Object $ KeyMap.fromList $
-          map (\(k, v) -> (Key.fromText (decodeUtf8 k), Aeson.String (decodeUtf8 v))) $
+          map (\(k, v) -> (Key.fromText (decodeUtf8 k), inferCsvCell v)) $
           HashMap.toList record
   other -> Left ("Unsupported format: " ++ Text.unpack other)
+
+-- | Infer a JSON value for a raw CSV cell, per the spec's rules:
+--
+--   * empty cell            -> @null@ (decodes to @NOTHING@ for MAYBE params)
+--   * @true@/@false@ (ci)   -> boolean
+--   * a plain integer or simple decimal literal -> number
+--   * everything else       -> string  (dates included: JSON has no date
+--                              type, and JSONDECODE parses date strings)
+--
+-- Numbers are recognised by aeson's own JSON grammar, which rejects
+-- ambiguous forms (leading zeros, thousands separators, leading @+@), so
+-- identifiers like @007@ that merely look numeric survive as strings.
+--
+-- We additionally refuse any cell containing @e@ or @E@: JSON's number
+-- grammar accepts exponent notation, which would otherwise silently turn
+-- product/lot codes like @1E5@ or @3e2@ into @100000@ / @300@. Exponent-form
+-- identifiers therefore always stay STRING.
+inferCsvCell :: BS.ByteString -> Aeson.Value
+inferCsvCell raw =
+  let rawText = decodeUtf8 raw
+      s       = Text.strip rawText
+  in if Text.null s
+       then Aeson.Null
+       else case Text.toLower s of
+         "true"  -> Aeson.Bool True
+         "false" -> Aeson.Bool False
+         _ | Text.any (\c -> c == 'e' || c == 'E') s -> Aeson.String rawText
+           | otherwise -> case Aeson.decodeStrict (encodeUtf8 s) :: Maybe Aeson.Value of
+               Just n@(Aeson.Number _) -> n
+               _                       -> Aeson.String rawText
+
+----------------------------------------------------------------------------
+-- Output writers (buffered formats)
+----------------------------------------------------------------------------
+
+writeBuffered :: Handle -> OutputFormat -> [Aeson.Value] -> IO ()
+writeBuffered h fmt envs = case fmt of
+  FmtNdjson -> mapM_ (BSL8.hPutStrLn h . Aeson.encode) envs
+  FmtJson   -> BSL8.hPutStrLn h (encodeJsonArray envs)
+  FmtYaml   -> BS.hPutStr h (Yaml.encode (Aeson.Array (Vector.fromList envs)))
+  FmtCsv    -> BSL.hPutStr h (encodeCsv envs)
+
+-- | A readable (one-envelope-per-line) JSON array. We avoid a dependency on
+-- aeson-pretty by laying the array out ourselves; each element is compact.
+encodeJsonArray :: [Aeson.Value] -> BSL.ByteString
+encodeJsonArray [] = BSL8.pack "[]"
+encodeJsonArray envs =
+  BSL8.pack "[\n"
+    <> BSL8.intercalate (BSL8.pack ",\n")
+         (map (\e -> BSL8.pack "  " <> Aeson.encode e) envs)
+    <> BSL8.pack "\n]"
+
+----------------------------------------------------------------------------
+-- CSV output
+----------------------------------------------------------------------------
+
+-- | Flatten the row envelopes to a CSV table. Input object fields become
+-- @input_<field>@ columns (union across all rows, sorted for determinism);
+-- the envelope's other scalar fields (@output@, @status@, @errors@, …)
+-- follow. Compound cell values are rendered as compact JSON.
+encodeCsv :: [Aeson.Value] -> BSL.ByteString
+encodeCsv envs =
+  let rows       = map flattenEnvelope envs
+      inputCols  = List.sort (List.nub (concatMap (map fst . fst) rows))
+      envCols    = orderedEnvCols (concatMap (map fst . snd) rows)
+      colNames   = map ("input_" <>) inputCols ++ envCols
+      headerBs   = Vector.fromList (map encodeUtf8 colNames)
+      toRecord (inputFields, envFields) =
+        let m = HashMap.fromList
+                  (  [ (encodeUtf8 ("input_" <> k), encodeUtf8 v) | (k, v) <- inputFields ]
+                  ++ [ (encodeUtf8 k, encodeUtf8 v)               | (k, v) <- envFields ] )
+        in HashMap.union m (HashMap.fromList [ (encodeUtf8 c, BS.empty) | c <- colNames ])
+  in Csv.encodeByName headerBs (map toRecord rows)
+
+-- | Preserve the canonical envelope-column order (output/status/errors/…)
+-- while only emitting columns that actually appear.
+orderedEnvCols :: [Text] -> [Text]
+orderedEnvCols present =
+  let canonical = ["output", "status", "errors", "diagnostics"]
+      seen c    = c `elem` present
+  in filter seen canonical ++ List.sort (List.nub (filter (`notElem` canonical) present))
+
+-- | Split an envelope into (input-object fields, other scalar fields), each
+-- as an association list of Text cells.
+flattenEnvelope :: Aeson.Value -> ([(Text, Text)], [(Text, Text)])
+flattenEnvelope (Aeson.Object o) =
+  let inputFields = case KeyMap.lookup (Key.fromText "input") o of
+        Just (Aeson.Object inp) -> [ (Key.toText k, cellText v) | (k, v) <- KeyMap.toList inp ]
+        Just other              -> [ ("value", cellText other) ]
+        Nothing                 -> []
+      envFields =
+        [ (Key.toText k, cellText v)
+        | (k, v) <- KeyMap.toList o
+        , Key.toText k /= "input"
+        ]
+  in (inputFields, envFields)
+flattenEnvelope other = ([], [("value", cellText other)])
+
+-- | Render a JSON value as a single CSV cell. Scalars go in verbatim;
+-- arrays/objects are re-encoded as compact JSON.
+cellText :: Aeson.Value -> Text
+cellText = \case
+  Aeson.String s -> s
+  Aeson.Bool b   -> if b then "true" else "false"
+  Aeson.Null     -> ""
+  Aeson.Number n -> Text.Lazy.toStrict (Text.Lazy.Encoding.decodeUtf8 (Aeson.encode (Aeson.Number n)))
+  other          -> Text.Lazy.toStrict (Text.Lazy.Encoding.decodeUtf8 (Aeson.encode other))
 
 ----------------------------------------------------------------------------
 -- Wrapper code generation
@@ -231,11 +595,17 @@ generateJsonPayload :: Aeson.Value -> Text
 generateJsonPayload json =
   "DECIDE inputJson IS " <> escapeAsL4String json
 
+-- | Render a JSON value as an L4 string literal.
+--
+-- Delegates to the lexer's own 'showStringLit', which emits Haskell-style
+-- escapes — the exact inverse of the @Lexer.charLiteral@ the parser uses to
+-- read string literals back in. A hand-rolled @"@-only replacement corrupts
+-- any payload containing a backslash (e.g. a Windows path @C:\\Users@) or a
+-- control character, producing a wrapper that fails to lex.
 escapeAsL4String :: Aeson.Value -> Text
 escapeAsL4String val =
   let jsonText = Text.Lazy.toStrict $ Text.Lazy.Encoding.decodeUtf8 $ Aeson.encode val
-      escaped  = Text.replace "\"" "\\\"" jsonText
-  in "\"" <> escaped <> "\""
+  in showStringLit jsonText
 
 generateEvalDirective :: Text -> [(Text, Maybe (Type' Resolved))] -> Text
 generateEvalDirective funName params = Text.unlines

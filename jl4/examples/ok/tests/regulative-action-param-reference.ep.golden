@@ -1,0 +1,35 @@
+-- Lock-in test for the deontic action-type-check fix (checkActionPattern).
+--
+-- An obligation can be parameterised over the action it requires:
+--   GIVEN action IS A Action ... MUST action
+-- Here `action` is a *reference* to the GIVEN parameter, not a fresh pattern
+-- binder. So the obligation is discharged only by an event whose action equals
+-- the supplied one — a non-matching action must leave it pending.
+--
+-- Before the fix the bare name `action` shadowed the parameter as a fresh binder
+-- that matched ANY event, so feeding a different action wrongly FULFILLED the
+-- obligation. The globbed test suite never exercised this (the only corpus user,
+-- doc/courses/.../module-a2, lives outside the globbed roots), so this file pins
+-- the corrected behaviour. It mirrors the `obligation within days` pattern there.
+
+DECLARE Actor  IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF doThis, doThat
+
+GIVEN party  IS AN Actor
+      action IS AN Action
+GIVETH A DEONTIC Actor Action
+`obligation to act` MEANS
+    PARTY party
+    MUST action
+    WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH
+
+-- Obligation: Alice must do `doThis`. A DIFFERENT action must NOT discharge it.
+#TRACE (`obligation to act` Alice doThis) AT 0 WITH
+  PARTY 5
+
+-- The MATCHING action discharges the obligation.
+DOES Alice AT doThat #TRACE (`obligation to act` Alice doThis) AT 0 WITH
+  PARTY 5
+DOES Alice AT doThis 

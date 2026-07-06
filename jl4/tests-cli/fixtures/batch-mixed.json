@@ -1,0 +1,3 @@
+[ {"age":25,"income":50000,"hasViolations":false},
+  {"age":30,"income":"NOT_A_NUMBER","hasViolations":false},
+  {"age":40,"income":90000,"hasViolations":false} ]

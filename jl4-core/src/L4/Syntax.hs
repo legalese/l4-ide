@@ -425,16 +425,17 @@ data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
   , desc         :: Maybe Desc
+  , ref          :: Maybe Ref
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc <> Extension i2 nlg2 desc' =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc')
+  Extension i1 nlg1 desc ref1 <> Extension i2 nlg2 desc' ref2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -444,7 +445,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -460,11 +461,17 @@ annNlg = #extra % #nlg
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
+annRef :: Lens' Anno (Maybe Ref)
+annRef = #extra % #ref
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
+
+setRef :: Ref -> Anno -> Anno
+setRef r a = a & annRef ?~ r
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)

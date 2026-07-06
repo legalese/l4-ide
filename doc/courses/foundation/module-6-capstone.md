@@ -133,6 +133,12 @@ Key patterns:
 3. **Chained obligations:** Non-compliance triggers Commissioner action
 4. **Clear blame assignment:** `BREACH BY ... BECAUSE ...`
 
+> **Flat-union actors and actions** (as used here) carry no actor field, so L4 does not
+> enforce a performer rule on them. If you move to the value-actor encoding — where each
+> action record carries its actor — L4 will type-check that the right party is obligated
+> to each action. See
+> [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md).
+
 ---
 
 ## Step 4: Create Test Data

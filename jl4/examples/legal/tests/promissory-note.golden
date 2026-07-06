@@ -12,10 +12,10 @@ promissory-note.l4:173:1-35:
 promissory-note.l4:179:1-191:111:
   FULFILLED
 promissory-note.l4:195:1-196:108:
-  PARTY `The Borrower`
+  PARTY `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG"))
   MUST `pay monthly installment to` EXACTLY `The Lender`
                                      `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`
-  WITHIN `Default After Days Beyond Commencement`
+  WITHIN 61
   HENCE FULFILLED
   LEST PARTY `The Borrower`
   MUST `pay monthly installment to` EXACTLY `The Lender`
