@@ -5,6 +5,10 @@ on:
     branches: [main, unstable]
   push:
     branches: [main, unstable]
+  # Required so these checks report against the merge queue's speculative
+  # commit. Without a merge_group trigger, queued PRs sit in AWAITING_CHECKS
+  # forever because the required contexts never run for the merge group.
+  merge_group:
 
 # Only run one check per PR to save resources
 concurrency:
@@ -17,6 +21,9 @@ jobs:
   # ============================================
   changes:
     name: Detect Changes
+    # On merge_group there is no PR context for paths-filter; skip detection and
+    # let the heavy jobs run unconditionally (full validation at the final gate).
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -53,7 +60,7 @@ jobs:
   typescript:
     name: TypeScript Checks
     needs: changes
-    if: needs.changes.outputs.typescript == 'true'
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
@@ -86,7 +93,7 @@ jobs:
   haskell:
     name: Haskell Build & Test
     needs: changes
-    if: needs.changes.outputs.haskell == 'true' || needs.changes.outputs.docs == 'true'
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.changes.outputs.haskell == 'true' || needs.changes.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
@@ -191,7 +198,7 @@ jobs:
   wasm-build:
     name: WASM Build & Test
     needs: changes
-    if: needs.changes.outputs.haskell == 'true'
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.changes.outputs.haskell == 'true') }}
     runs-on: ubuntu-latest
     env:
       GHC_WASM_VERSION: "9.10"
