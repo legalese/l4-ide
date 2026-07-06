@@ -29,6 +29,7 @@ import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
 import Optics
+import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
@@ -46,6 +47,16 @@ main :: IO ()
 main = do
   dataDir <- Paths_jl4.getDataDir
   dataDirCore <- Paths_jl4_core.getDataDir
+  -- Make the golden suite self-sufficient under a bare `cabal test`: point
+  -- library resolution at the bundled core libraries unless the caller has
+  -- already chosen a store. Without this, examples that IMPORT a library (e.g.
+  -- actus-library-test) fail locally because embedded transitive resolution is
+  -- incomplete. CI already exports JL4_LIBRARY_PATH, so this only restores
+  -- local/CI parity; an explicit setting is respected.
+  mLibEnv <- lookupEnv "JL4_LIBRARY_PATH"
+  case mLibEnv of
+    Just _  -> pure ()
+    Nothing -> setEnv "JL4_LIBRARY_PATH" (dataDirCore </> "libraries")
   envFixed <- JL4Lazy.readFixedNowEnv
   let fallbackNow =
         fromMaybe (error "Internal: invalid fallback timestamp for JL4 tests")
@@ -61,10 +72,29 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
+  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
+  -- empty.l4 genuinely fails typecheck (exhaustiveness/redundancy diagnostics);
+  -- the export-*.l4 files typecheck fine but assert (via their schema golden)
+  -- that an @export in an unsupported position yields no default export.
+  notOkRootTcFiles     <- sort <$> globDir1 (compile "not-ok/empty.l4")     examplesRoot
+  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
+    describe "corpus sanity (every glob matched something)" $ do
+      let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
+      corpusNonEmpty "ok"              okFiles
+      corpusNonEmpty "libraries"       librariesFiles
+      corpusNonEmpty "legal"           legalFiles
+      corpusNonEmpty "tc-fails"        tcFailsFiles
+      corpusNonEmpty "nlg-fails"       nlgFailsFiles
+      corpusNonEmpty "semantic-tokens" semanticTokenFiles
+      corpusNonEmpty "hover"           hoverFiles
+      corpusNonEmpty "not-ok-root-tc"  notOkRootTcFiles
+      corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
-    describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
+    describe "tc fails" $ tests evalConfig (False, True) (tcFailsFiles <> notOkRootTcFiles) examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+    describe "export placement (typechecks; no default export)" $
+      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
   where
