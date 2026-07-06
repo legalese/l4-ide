@@ -351,7 +351,7 @@ obligation slot: the party must do it personally.
 
 ---
 
-## 7. What is _not_ checked (boundaries)
+## 7. What is not checked (boundaries)
 
 The check is conservative — it only ever _rejects_, and only when it can decide
 statically. It is silent (the obligation is left to runtime) when:
