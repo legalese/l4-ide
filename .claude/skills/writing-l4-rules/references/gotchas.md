@@ -19,6 +19,7 @@ Things that will trip up a general-purpose LLM because they are not in any other
 - [Backtick identifiers and mixfix](#backtick-identifiers-and-mixfix)
 - [Layout sensitivity](#layout-sensitivity)
 - [No implicit coercion](#no-implicit-coercion)
+- [The `daydate` month-subtraction footgun](#the-daydate-month-subtraction-footgun)
 - [Genitive field access with `'s`](#genitive-field-access-with-s)
 - [`AKA` aliases](#aka-aliases)
 - [`LET … IN` vs `WHERE`](#let--in-vs-where)
@@ -194,6 +195,34 @@ The `THEN`/`ELSE` alignment and the indentation of the inner `IF` matter. If you
 ## No implicit coercion
 
 L4 never silently converts between types. `"42" + 1` is a type error. Use the explicit coercions (`TOSTRING`, `TONUMBER`, `TODATE`, `TOTIME`, `TODATETIME`, `TRUNC`) from [builtins.md](builtins.md). `TONUMBER`/`TODATE`/etc. return `MAYBE` — you must pattern-match with `CONSIDER` to extract the value.
+
+---
+
+## The `daydate` month-subtraction footgun
+
+After `IMPORT daydate`, you build calendar dates with `Date day month year`. The constructor does **not** normalise a non-positive month by rolling back a year — it **clamps a month `≤ 0` to January of the same year**. So `Date 1 (3 MINUS 6) 2025` is **January 2025**, *not* September 2024. Month **overflow** past 12, by contrast, *does* roll forward correctly: `month PLUS 6` on a December date lands in the next year.
+
+```l4
+-- ✘ WRONG — "6 months before March 2025" by subtracting months:
+Date 1 (3 MINUS 6) 2025          -- clamps to January 2025, NOT September 2024
+
+-- ✔ RIGHT — compute "N months before X" by ADDING to the EARLIER date,
+--           then comparing, so the subtraction never happens:
+`became landlord no more than 6 months before proceedings` MEANS
+        Day `proceedings commenced date`
+    AT MOST Day `six months after became-landlord date`
+    WHERE
+        `six months after became-landlord date` MEANS
+            Date (DATE_DAY   `became-landlord date`)
+                 (DATE_MONTH `became-landlord date` PLUS 6)   -- overflow rolls forward, correctly
+                 (DATE_YEAR  `became-landlord date`)
+
+-- ✔ RIGHT — to go backward a whole year, decrement the YEAR
+--           (this can never produce month ≤ 0, so the clamp never fires):
+Date (DATE_DAY x) (DATE_MONTH x) (DATE_YEAR x MINUS 1)
+```
+
+**Rule of thumb:** never compute "N months before X" by subtracting months from `X`. Either **add** N months to the earlier date (`DATE_MONTH earlier PLUS N`) and compare, or step back a whole year via `DATE_YEAR … MINUS 1`. The "≤ 6 months before proceedings" tests in the Housing Act corpus (`ground-2ZC.l4`, `ground-2ZD.l4`) do exactly this.
 
 ---
 
