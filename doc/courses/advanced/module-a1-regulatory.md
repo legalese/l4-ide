@@ -151,7 +151,7 @@ Now encode the obligations, permissions, and prohibitions.
 ### Actors and the Performer Rule
 
 L4 enforces **actor-correctness**: a `PARTY p MUST a` obligation requires `p`
-to be the *performer* of action `a`. The performer is the first actor-typed
+to be the _performer_ of action `a`. The performer is the first actor-typed
 field of the action record (the subject-first canon). The older flat-union
 action style (`DECLARE Action IS ONE OF fileReturn, issueNotice`) remains valid;
 the performer check applies when an action record carries an actor field.

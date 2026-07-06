@@ -302,18 +302,18 @@ An actor may only perform its own actions.
 
 ### Who may perform: the simple cases
 
-This is the **simple, common case** — a *single-actor* action whose performer is
+This is the **simple, common case** — a _single-actor_ action whose performer is
 **pinned** (`eat` belongs to `Eater`, so only an Eater may be obligated to eat):
 
 ```l4
 eat MEANS Action OF Eater, "eat"        -- only Eater performs eat
 ```
 
-The actor *type* you `DECLARE` is the **cast** — everyone who may take part. A
+The actor _type_ you `DECLARE` is the **cast** — everyone who may take part. A
 one-line `DECLARE Actor IS ONE OF Eater, Drinker` says exactly who the players
 are; a party outside that type is a plain type error.
 
-The **richer cases live in the advanced course**: actions *any* actor can
+The **richer cases live in the advanced course**: actions _any_ actor can
 perform and **duplex** actions (one type, both directions) in
 [Module A2](../advanced/module-a2-cross-cutting.md), and **procurement** — "X
 undertakes to procure that Y performs an action" — in

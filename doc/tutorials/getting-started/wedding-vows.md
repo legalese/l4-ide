@@ -79,7 +79,7 @@ GIVETH DEONTIC Person Action
 | `LEST BREACH`                  | If they don't, it's a breach                                             |
 
 > **Who performs what?** L4 now enforces that the party named in `PARTY p MUST a`
-> is the *performer* of action `a`. In the flat-union style used here — where
+> is the _performer_ of action `a`. In the flat-union style used here — where
 > `Action IS ONE OF` lists action names without an actor field — actions carry no
 > performer, so any party may be obligated to any action. If you later switch to
 > the value-actor encoding (where each action record names its actor), the

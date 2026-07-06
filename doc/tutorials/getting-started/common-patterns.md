@@ -241,7 +241,7 @@ DECIDE amount IS
 ## Regulative Rule Patterns
 
 > **The performer rule.** When `PARTY p MUST a` appears in a regulative rule,
-> L4 checks that `p` is the *performer* of action `a`. For the flat-union style
+> L4 checks that `p` is the _performer_ of action `a`. For the flat-union style
 > (`DECLARE Action IS ONE OF ...`) used in the examples below, actions carry no
 > actor field and the check is skipped — any party may be obligated to any
 > action. If you use the value-actor encoding (actions that carry their own

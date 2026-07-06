@@ -2,7 +2,7 @@
 
 A regulative contract residuates over a trace of timestamped events (see [regulative.md](regulative.md) for
 `MUST`/`MAY`/`SHANT`, `HENCE`/`LEST`, `RAND`/`ROR`, and `#TRACE`). The **state ledger** lets a contract also
-*write* and *read* facts as it runs: an append-only, event-sourced store (Reader-over-Writer) that shares the
+_write_ and _read_ facts as it runs: an append-only, event-sourced store (Reader-over-Writer) that shares the
 same trace. Constitutive predicates can `RECALL` from it; deontic steps can `RECORD`/`COMMIT` into it.
 
 > **Availability caveat.** `RECALL ALL`, recipient-qualified `RECORD`, and the `HENCE`-block sugar live on the
@@ -31,31 +31,31 @@ There are two kinds of store:
   (`COMMIT`/`ATTEST` always target the official record; there is no party qualifier on them.)
 
 A write can sequence into a continuation (deontic sequencing): `p HENCE RECORD <cell> IS <v> HENCE q` — the write
-is a step that then continues. Because `MUST`'s `HENCE` fires on *performance*, a wrapper
+is a step that then continues. Because `MUST`'s `HENCE` fires on _performance_, a wrapper
 
 ```l4
 PARTY p MUST <act> WITHIN n HENCE RECORD <cell> IS <v> HENCE onwards LEST onwards
 ```
 
-makes "doing `<act>` IS the ledger write" — recorded iff `<act>` is actually performed, and *soft* when `LEST`
+makes "doing `<act>` IS the ledger write" — recorded iff `<act>` is actually performed, and _soft_ when `LEST`
 routes to a benign continuation rather than `BREACH`.
 
 ---
 
 ## Reading: `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all)
 
-Plain `RECALL` is **last-write-wins**: it returns only the *latest* write to a cell, as `MAYBE a` (`NOTHING` if
+Plain `RECALL` is **last-write-wins**: it returns only the _latest_ write to a cell, as `MAYBE a` (`NOTHING` if
 never written). `RECALL ALL` instead folds **every** write to the cell into a `LIST OF a`, **oldest → newest**
 (`[]` if never written). Both come in three address forms — own, `<party>'s`, and `OFFICIAL's`:
 
-| Read | Returns | Reads from |
-| --- | --- | --- |
-| `RECALL <cell>` | `MAYBE a` (latest) | acting party's own ledger |
-| `RECALL <party>'s <cell>` | `MAYBE a` (latest) | a named party's own ledger |
-| `RECALL OFFICIAL's <cell>` | `MAYBE a` (latest) | the official record |
-| `RECALL ALL <cell>` | `LIST OF a` (oldest→newest) | acting party's own ledger |
-| `RECALL ALL <party>'s <cell>` | `LIST OF a` (oldest→newest) | a named party's own ledger |
-| `RECALL ALL OFFICIAL's <cell>` | `LIST OF a` (oldest→newest) | the official record |
+| Read                           | Returns                     | Reads from                 |
+| ------------------------------ | --------------------------- | -------------------------- |
+| `RECALL <cell>`                | `MAYBE a` (latest)          | acting party's own ledger  |
+| `RECALL <party>'s <cell>`      | `MAYBE a` (latest)          | a named party's own ledger |
+| `RECALL OFFICIAL's <cell>`     | `MAYBE a` (latest)          | the official record        |
+| `RECALL ALL <cell>`            | `LIST OF a` (oldest→newest) | acting party's own ledger  |
+| `RECALL ALL <party>'s <cell>`  | `LIST OF a` (oldest→newest) | a named party's own ledger |
+| `RECALL ALL OFFICIAL's <cell>` | `LIST OF a` (oldest→newest) | the official record        |
 
 ```l4
 #EVAL LIST (RECORD `seq` IS 1), (RECORD `seq` IS 2), (RECORD `seq` IS 3),
@@ -71,7 +71,7 @@ never written). `RECALL ALL` instead folds **every** write to the cell into a `L
 ## Recipient-qualified `RECORD` (NOTIFY)
 
 `RECORD <party>'s <cell> IS <v>` writes into **party q's own** ledger — the symmetric WRITE to the cross-party
-read `RECALL <party>'s <cell>`. The acting party performs the write; the value lands in the *recipient's* ledger,
+read `RECALL <party>'s <cell>`. The acting party performs the write; the value lands in the _recipient's_ ledger,
 keyed by the same party key the cross-party `RECALL` reads (provenance source `NOTIFY`). This **is** the NOTIFY
 mechanism — there is no new keyword; "giving notice" is just a recipient-qualified `RECORD`:
 
@@ -82,9 +82,9 @@ PARTY Landlord MUST `serve notice` WITHIN 14
         HENCE PARTY Tenant MUST acknowledge WITHIN 14
 ```
 
-After this performs, `RECALL Tenant's `noticeReceived`` sees a `JUST`; the acting party's own `RECALL` does not.
-**"Notify the world" is still `COMMIT`/`ATTEST` to `OFFICIAL`** (anyone can `RECALL OFFICIAL's …` it);
-recipient-qualification is a `RECORD`-only feature.
+After this performs, `RECALL Tenant's `noticeReceived``sees a`JUST`; the acting party's own `RECALL`does not.
+**"Notify the world" is still`COMMIT`/`ATTEST`to`OFFICIAL`** (anyone can `RECALL OFFICIAL's …`it);
+recipient-qualification is a`RECORD`-only feature.
 
 ---
 
@@ -106,22 +106,22 @@ PARTY P MUST serve WITHIN 10
 - The block **terminates at the first non-`RECORD` provision** (which may itself be a `RAND`/`ROR` expr — that
   expr becomes the continuation).
 - Flat `HENCE` and block siblings **mix freely** in one chain.
-- Works for `COMMIT`/`ATTEST` blocks too (`HENCE COMMIT `a` IS … / ATTEST `b` IS …`).
+- Works for `COMMIT`/`ATTEST` blocks too (`HENCE COMMIT `a`IS … / ATTEST`b` IS …`).
 
 ---
 
 ## Framings worth knowing (formalization guidance)
 
-- **The trace IS the ledger IS the CSL event stream** — one structure. The deontic graph *residuates* over it
-  (`HENCE`/`LEST`); constitutive predicates *`RECALL`* from it. A single event can both advance the contract and
+- **The trace IS the ledger IS the CSL event stream** — one structure. The deontic graph _residuates_ over it
+  (`HENCE`/`LEST`); constitutive predicates _`RECALL`_ from it. A single event can both advance the contract and
   record a fact.
 - **Epistemic modals as a thin cap on the ledger.** "Giving notice" = a write into the recipient's epistemic
   state — `RECORD <recipient>'s <cell> IS <v>` (the recipient-qualified RECORD / NOTIFY mechanism, above);
   "notify the world" = `COMMIT` to the official record (anyone can `RECALL OFFICIAL's …` it); "was notified" /
   "is aware that" = a `RECALL <recipient>'s <cell>` projection.
-- **Operative vs forensic framing.** Prefer writing the *live* contract (e.g. a tenancy agreement) authored at
+- **Operative vs forensic framing.** Prefer writing the _live_ contract (e.g. a tenancy agreement) authored at
   signing and run forward, with formation-time obligations placed where the parties heed them. A court-facing
-  question ("must possession be ordered?") is then a query over the *same* trace, not a separate after-the-fact
+  question ("must possession be ordered?") is then a query over the _same_ trace, not a separate after-the-fact
   contract.
 
 ---

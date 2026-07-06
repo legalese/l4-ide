@@ -14,7 +14,7 @@ enforced through the deontic layer, not just at function boundaries.
 ## Definition of done
 
 - **R2** below becomes a type error matching **R3**'s shape ("expected `Action OF
-  Court`, but is here of type `Action OF Landlord`").
+Court`, but is here of type `Action OF Landlord`").
 - **R1** still errors; **R3** still errors (no regression in function-boundary
   unification).
 - The existing corpus is unaffected — plain-enum actions have no type arguments,
@@ -41,13 +41,13 @@ message as legible as the function-boundary one.
 When type-checking a regulative `PARTY p MUST|MAY <action>` clause against a
 contract's declared type `DEONTIC <ActorType> <ActionType>`, the checker verifies
 the action against `<ActionType>` only up to the **head type constructor** — it
-does not unify the type *arguments*. So a contract declared `DEONTIC Party
+does not unify the type _arguments_. So a contract declared `DEONTIC Party
 (Action Court)` accepts an action of type `Action Landlord` in its `MUST` slot,
 even though the same value is rejected where an `Action Court` is required at an
 ordinary function boundary (which performs full unification).
 
 This is harmless for the common case where actions are a plain enum (no type
-arguments — the head *is* the whole type). It surfaces — and blocks — as soon as
+arguments — the head _is_ the whole type). It surfaces — and blocks — as soon as
 actions are given a type parameter, e.g. the phantom-indexed "actor-typed actions"
 pattern (see `specs/roadmap/future-features.md`, "Actor-indexed actions"), where
 the index is exactly what we want the deontic layer to enforce.
@@ -135,7 +135,7 @@ The first argument of function `landlord does` ...
 
 - **Expected:** the `MUST`/`MAY` action in a regulative clause is unified with the
   contract's declared `Action` type the same way a function argument is unified
-  with its parameter type — i.e. *deeply*, including type arguments. R2 should be a
+  with its parameter type — i.e. _deeply_, including type arguments. R2 should be a
   type error, matching R3.
 - **Actual:** R1 is caught but R2 is not. Together with R3 this indicates the
   regulative action check compares only the **head type constructor** of the action
@@ -155,7 +155,7 @@ black-box behaviour; **confirm in Step 0**.)
 
 - **None** for plain-enum actions (the entire current corpus): such types have no
   arguments, so head-only and deep checks coincide.
-- **Blocks** giving `Action` a type parameter to make actions *actor-indexed*
+- **Blocks** giving `Action` a type parameter to make actions _actor-indexed_
   (phantom-typed or, eventually, GADT-indexed), because the deontic layer — the one
   place we actually want `PARTY Court MUST <a court action>` enforced — silently
   accepts the wrong index. Deepening this check is a prerequisite for rung 2b of the
@@ -172,8 +172,9 @@ for function-argument checking, so R2 fails with the R3-style message.
 ## Outcome (implemented + verified)
 
 **Status:** done. Fix landed in `jl4-core/src/L4/TypeCheck.hs` (`checkActionPattern`
-+ `namesNonConstructorTerm`, wired into `checkAction`). Suites green: jl4 golden
-887/0, jl4-core 46/0, l4-cli 20/0.
+
+- `namesNonConstructorTerm`, wired into `checkAction`). Suites green: jl4 golden
+  887/0, jl4-core 46/0, l4-cli 20/0.
 
 ### Step 0 result — the "head-only unification" hypothesis was wrong
 
@@ -181,10 +182,10 @@ The writeup guessed the action type was compared "up to the head type constructo
 That was **refuted** (Step 0 invited this). The general unifier (`TypeCheck/Unify.hs`
 `unifyBase`) already recurses into `TyApp` type arguments. The real bug is in
 **elaboration, not the type system**: the regulative action is a `Pattern`, and a
-bare name parses as `PatApp n []`. `inferPattern` resolves it as a *constructor* if
+bare name parses as `PatApp n []`. `inferPattern` resolves it as a _constructor_ if
 it can, else falls back to `inferPatternVar` — a **fresh binder** with an
 unconstrained inference-variable type that unifies with any contract action type.
-Plain enums escaped the bug only because their names *are* constructors; a
+Plain enums escaped the bug only because their names _are_ constructors; a
 `MEANS`-defined action value (or any non-constructor term) was silently re-bound,
 dropping its type. No new type-system power (and certainly no dependent types) was
 needed — only correct name resolution.
@@ -203,14 +204,14 @@ names that resolve to nothing remain fresh binders.
 - **Regression fixture:** `jl4/examples/not-ok/tc/deontic-action-type-mismatch.l4`
   (+ goldens). ✅ Plus a positive lock-in:
   `jl4/examples/ok/regulative-action-param-reference.l4` (see below).
-- **Message shape — corrected expectation.** The DoD asked for R2 to match *R3's*
+- **Message shape — corrected expectation.** The DoD asked for R2 to match _R3's_
   shape (`expected Action OF Court … Action OF Landlord`). Verified: that bare-`Action`
   shape is **structurally unreachable** for a regulative clause. `inferExpr`
   (`Regulative`) infers the clause type as `contract <freshParty> <freshAction>`, so
   the action mismatch can only surface where the whole `DEONTIC` type is unified at
   the definition/signature boundary. So R2 lands at the **signature level, matching
-  R1's shape**: *"…must match its type signature … `DEONTIC OF Party, Action OF Court`
-  but is here of type `DEONTIC OF Party, Action OF Landlord`."* This is consistent
+  R1's shape**: _"…must match its type signature … `DEONTIC OF Party, Action OF Court`
+  but is here of type `DEONTIC OF Party, Action OF Landlord`."_ This is consistent
   with R1 (same clause kind) and still names both action indices.
 
 ### Scope is broader than "MEANS-defined actions" (deliberate)
@@ -222,14 +223,14 @@ a `GIVEN` parameter, an `ASSUME`'d term, a record selector — not only parametr
 
 - **Parameterised actions are now correct.** `GIVEN action … MUST action` (e.g.
   `doc/courses/.../module-a2`'s `obligation within days`) now references the `action`
-  parameter instead of shadowing it with a wildcard binder that matched *any* event.
+  parameter instead of shadowing it with a wildcard binder that matched _any_ event.
   The teaching file's own traces are unchanged; the corrected behaviour is pinned by
   the new `ok` lock-in (a non-matching action leaves the obligation pending; the
   matching one FULFILLs). This file is outside the globbed test roots, hence the pin.
 - **Accidental name collisions now surface** as a type mismatch rather than silently
   shadowing — the same footgun class that caused this bug.
 
-Overloaded names that are *both* a constructor and a term keep **constructor
+Overloaded names that are _both_ a constructor and a term keep **constructor
 precedence** (the constructor candidate wins; no behaviour change for enums).
 
 ### Adversarial review
@@ -253,10 +254,10 @@ Executable markers (all green; the former pending xfail is now a passing
 regression):
 
 - `jl4/examples/ok/regulative-multiparty-residuation.l4` — a `DEONTIC Party
-  Action` contract with *union* types residuates Renter → Landlord → Court
+Action` contract with _union_ types residuates Renter → Landlord → Court
   freely. Pins that neither rung narrowed multi-agent residuation.
 - `jl4/examples/not-ok/tc/deontic-party-action-agreement.l4` — `DEONTIC Eater
-  (Action Drinker)` is rejected ("an actor may only be obligated to perform its
+(Action Drinker)` is rejected ("an actor may only be obligated to perform its
   own actions").
 - `jl4/examples/ok/regulative-actor-indexed-action.l4` — the matching case
   (`DEONTIC Eater (Action Eater)`) is accepted.
@@ -269,7 +270,7 @@ the spec.
 
 The housing-act sweep could not be run on this branch (the corpus lives on
 `mengwong/housing-act-ground-1`); rerun it there when merging forward. The
-action-level *"DO clause"* diagnostic was **not** pursued — it would require pushing
+action-level _"DO clause"_ diagnostic was **not** pursued — it would require pushing
 the declared contract type down into `inferExpr (Regulative …)`, which also relocates
 R1's message and touches party-type checking, for a cosmetic gain over the clear
 signature-level message above.

@@ -537,20 +537,20 @@ Keep the new AST node but desugar to `CONSIDER`/`WHEN` before evaluation:
 **Phase 1 implementation notes / limitations:**
 
 - **Linear desugaring.** Each non-final clause's fall-through (the desugaring of
-  the remaining clauses) is bound *once* to a fresh nullary local
+  the remaining clauses) is bound _once_ to a fresh nullary local
   (`LET __pm_fallthrough_<k> BE ... IN ...`) and referenced by name from every
   `WHEN`/`OTHERWISE`, so the emitted `CONSIDER` tree is linear in
   (clauses × columns). An earlier version inlined the fall-through into every
   branch, making the tree grow multiplicatively and `l4 check` exponential.
 - **Nullary-only clause groups** (booleans/enums, e.g. `DECIDE f TRUE IS 1 /
-  DECIDE f FALSE IS 0`, or an insurance-perils/tax-bracket enum table — Examples
-  4 & 5) *are* supported: a bare `PatApp n []` is ambiguous at parse time between
+DECIDE f FALSE IS 0`, or an insurance-perils/tax-bracket enum table — Examples
+  4 & 5) _are_ supported: a bare `PatApp n []` is ambiguous at parse time between
   a variable and a nullary constructor, so such a group is only treated as
   pattern matching when there are ≥ 2 clauses **sharing one GIVEN/GIVETH
   signature** and at least one column's bare names differ across the clauses.
   This deliberately excludes (type-)overloaded definitions, which each carry
   their own signature and are therefore never gathered into one group.
-- **Limitation:** a *single* clause whose arguments are all bare names, or a
+- **Limitation:** a _single_ clause whose arguments are all bare names, or a
   multi-clause group in which no nullary column varies, is left on the ordinary
   single-clause `decide` path (it is indistinguishable from a plain definition).
 

@@ -10,7 +10,7 @@ A cross-cutting surface note: across the constitutive limbs below, **`...` is AN
 (asyndetic con/disjunction; see the "Asyndetic operators `...` and `..`" section of
 [gotchas.md](gotchas.md)). A string literal in boolean context is **inert** — it carries the verbatim
 statutory prose but evaluates to the identity of its context (`TRUE` under `AND`, `FALSE` under `OR`), so it
-never changes the result. A limb that reads `NOT P .. Q` *is* `(NOT P) OR Q` — the `..` is the OR, with the
+never changes the result. A limb that reads `NOT P .. Q` _is_ `(NOT P) OR Q` — the `..` is the OR, with the
 verbatim statutory prose riding inert between the operands.
 
 ---
@@ -18,18 +18,22 @@ verbatim statutory prose riding inert between the operands.
 ## Constitutive limbs (the predicate tree)
 
 ### Conditional / proviso limb — `(NOT X) OR Y`
-**Statute:** "if X, then Y" — a limb that only *bites* when its antecedent X holds.
+
+**Statute:** "if X, then Y" — a limb that only _bites_ when its antecedent X holds.
 **Shape:** material implication `(NOT X) OR Y`, vacuously satisfied (TRUE) when X is false.
 
 Spelled-out form (`ground-4.l4`, limb (c), succession notice):
+
 ```l4
 `(c) — succession notice condition` claim MEANS
         "(c) if the tenancy arose by succession as mentioned in section 39(5), notice was given ..."
     ...     NOT claim's `tenancy arose by succession as mentioned in section 39(5)`
         OR  claim's `notice given to previous tenant under Case 14 of Sch.15 Rent Act 1977`
 ```
+
 OR-sugar form, where the prose interleaves the two operands (`ground-13.l4` / `ground-15.l4`, the
 lodger-or-sub-tenant removal proviso):
+
 ```l4
 `lodger or sub-tenant removal proviso` claim MEANS
         "and, in the case of an act of waste by ... a person lodging with the tenant or a sub-tenant of his,"
@@ -37,22 +41,27 @@ lodger-or-sub-tenant removal proviso):
     ..  "the tenant has not taken such steps as he ought reasonably to have taken for the removal ..."
     ..  claim's `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`
 ```
+
 The `ground-4.l4` (explicit `OR`) vs `ground-13/15.l4` (`..`) pair is a clean before/after of the two surface
-forms for the *same* `(NOT P) OR Q` logic.
+forms for the _same_ `(NOT P) OR Q` logic.
 
 ### Negative limb — `NOT atom`, and the negated disjunction
+
 **Statute:** "the tenancy is **not** an assured agricultural occupancy"; or "**not** granted via any of (i)/(ii)/(iii)".
 **Shape:** a single positive atom wrapped in `NOT` for the simple case; a **negated disjunction**
 `NOT (i OR ii OR iii)` (De Morgan) for "not via any of …".
 
 Simple (`ground-4.l4`, limb (d)):
+
 ```l4
 `(d) — not an assured agricultural occupancy` claim MEANS
         "(d) the tenancy is not an assured agricultural occupancy ... by virtue of paragraph 3 of Schedule 3."
     ... NOT claim's `tenancy is an assured agricultural occupancy (agric. worker condition fulfilled, Sch.3 para.3)`
 ```
+
 Negated disjunction (`ground-5H.l4`, limb (e)) — build the three routes as one named disjunction, then negate
 it (more readable than `NOT(i) AND NOT(ii) AND NOT(iii)`, and keeps each route with its verbatim text):
+
 ```l4
 `tenancy was granted via an excluded route` claim MEANS
         "(i) pursuant to a nomination as mentioned in section 159(2)(c) of the Housing Act 1996,"
@@ -68,12 +77,14 @@ it (more readable than `NOT(i) AND NOT(ii) AND NOT(iii)`, and keeps each route w
 ```
 
 ### "Only in a case where X applies" gate — `(NOT gate) OR condition`
+
 **Statute:** "the … condition, **but only in a case where** section 7(5ZA) applies".
 **Shape:** an implication `(NOT gate) OR condition` — vacuous (TRUE) when the gate is off; the gate is itself a
 named predicate (possibly a conjunction). Same machinery as the proviso limb, but the antecedent is a
 jurisdictional gate rather than a fact.
 
 `ground-6.l4`, limbs (b) and (c):
+
 ```l4
 `(b) landlord's acquisition condition, only where s.7(5ZA) applies` claim MEANS
         "(b) the landlord's acquisition condition, but only in a case where section 7(5ZA) applies ..."
@@ -87,11 +98,13 @@ jurisdictional gate rather than a fact.
 ```
 
 ### Enumerated cases (Case A / B / C) — a disjunction of predicates
+
 **Statute:** "is a qualifying X **in case A or B**" / "met **in case A, case B or case C**".
 **Shape:** an OR over named per-case predicates; each Case is its own `GIVEN claim … MEANS` predicate, so the
 disjunction reads like the statute.
 
 `ground-5A.l4` (qualifying agricultural worker) / `ground-6.l4` (additional RSL condition):
+
 ```l4
 `is a qualifying agricultural worker` claim MEANS
         "For the purpose of this ground a person is a \"qualifying agricultural worker\" in case A or B."
@@ -100,6 +113,7 @@ disjunction reads like the statute.
 ```
 
 ### Checkbox relation-on-an-entity — independent BOOLEAN flags + a disjunction
+
 **Statute:** a kinship / category list — "(a) the landlord; (b) the landlord's spouse …; (c) the landlord's
 parent/grandparent/sibling/child/grandchild; (d) …".
 **Shape:** independent BOOLEAN flags on the entity record + a disjunction over them — **not an enum**. This is
@@ -108,6 +122,7 @@ catch-all "other" flag that is **deliberately omitted from the disjunction** so 
 FALSE.
 
 `ground-1-amended-2025.l4` (family occupier (a)–(d)):
+
 ```l4
 DECLARE Occupier HAS
     name                                                  IS A STRING
@@ -128,12 +143,14 @@ DECLARE Occupier HAS
 ```
 
 ### Statutory tables as DATA — a record per row + enums + membership via `any`
+
 **Statute:** a table (e.g. landlord-type × tenancy-type × redeveloper).
 **Shape:** an enum per column's cell-type, a `TableRow` record (cells, with list-valued cells as `LIST OF` the
 enum), one `… WITH …` literal per row, and membership tested structurally with `any` + a local equality
 predicate.
 
 `ground-6.l4`:
+
 ```l4
 DECLARE RedeveloperType IS ONE OF `the landlord who is seeking possession`, `a superior landlord`, `the commonhold association`
 DECLARE LandlordColumnType IS ONE OF `col1 a relevant social landlord`, ...
@@ -153,12 +170,14 @@ DECLARE TableRow HAS
 ## Dates
 
 ### Leap-safe date windows — build from the actual dates, never hardcode 365
+
 **Statute:** "within 12 months" / "at least 1 year", inclusive of both endpoints.
 **Shape:** `IMPORT daydate`; build the window endpoint from the actual date's components, incrementing the
 **year** (`DATE_YEAR … PLUS 1`), and compare via inclusive day-spans (`(Day b MINUS Day a) PLUS 1`). The
 calendar handles leap years; a magic `365` does not.
 
 `ground-1-amended-2025.l4` ("at least 1 year") / `ground-2ZA.l4` ("within 12 months beginning with …"):
+
 ```l4
 `one year after tenancy start` c MEANS
     Date (DATE_DAY   (c's `tenancy began`))
@@ -168,17 +187,19 @@ calendar handles leap years; a magic `365` does not.
 ```
 
 ### ⚠️ The `daydate` month-subtraction FOOTGUN
-> **`Date day month year` does NOT roll a month `≤ 0` back into the previous year.**
-> `Date 1 (3 MINUS 6) 2025` clamps to **January 2025**, *not* September 2024. Month **overflow** past 12 *does*
+
+> **`Date day month year` does NOT roll a month `≤ 0` back into the previous year.** > `Date 1 (3 MINUS 6) 2025` clamps to **January 2025**, _not_ September 2024. Month **overflow** past 12 _does_
 > roll forward correctly (`month PLUS 6` on a December date lands in the next year).
 >
 > So to compute "**N months before** X", never subtract months from X. Instead:
-> - **ADD** N months to the *earlier* date (`DATE_MONTH earlier PLUS N`) and compare, or
+>
+> - **ADD** N months to the _earlier_ date (`DATE_MONTH earlier PLUS N`) and compare, or
 > - go back a whole year via `DATE_YEAR … MINUS 1` (which can never produce `month ≤ 0`, so the clamp never fires).
 >
 > (Same footgun is catalogued in [gotchas.md](gotchas.md) under "The `daydate` month-subtraction footgun".)
 
 "≤ 6 months before proceedings" done safely by **adding** to the earlier date (`ground-2ZC.l4` / `ground-2ZD.l4`):
+
 ```l4
 -- proceedings <= became-landlord + 6 months. We ADD to the earlier date rather than
 -- subtracting from the later one, because the Date constructor does not roll a
@@ -192,7 +213,9 @@ calendar handles leap years; a magic `365` does not.
                  (DATE_MONTH `became-landlord date` PLUS 6)   -- overflow rolls forward, correctly
                  (DATE_YEAR  `became-landlord date`)
 ```
-The clamp-immune way to go *backward* — decrement the YEAR (`ground-2ZD.l4`, "12 months ending with …"):
+
+The clamp-immune way to go _backward_ — decrement the YEAR (`ground-2ZD.l4`, "12 months ending with …"):
+
 ```l4
 `twelve months before would-have-expired date` MEANS
     Date (DATE_DAY   `would-have-expired date`)
@@ -205,10 +228,10 @@ The clamp-immune way to go *backward* — decrement the YEAR (`ground-2ZD.l4`, "
 ## The deontic outcome
 
 ### Mandatory vs discretionary — `MUST` vs `MAY` (+ reasonableness)
+
 **Statute:** Part I grounds are **mandatory** ("the court … shall … make an order"); Part II grounds are
 **discretionary** ("the court may … if it considers it reasonable").
-**Shape:** Part I → `PARTY Court MUST \`order possession\``; Part II → `PARTY Court MAY \`order possession\``
-(with a reasonableness conjunct). This rides the MUST/MAY default semantics: **MUST** — omission ⇒ `BREACH`;
+**Shape:** Part I → `PARTY Court MUST \`order possession\``; Part II → `PARTY Court MAY \`order possession\``(with a reasonableness conjunct). This rides the MUST/MAY default semantics: **MUST** — omission ⇒`BREACH`;
 **MAY** — benign omission ⇒ `FULFILLED` (no breach), which is exactly what makes the ground *discretionary*.
 The deadline keyword is **`WITHIN <number>` only** (`BEFORE` is not valid). See [regulative.md](regulative.md)
 for the full HENCE/LEST default table.
@@ -228,11 +251,13 @@ for the full HENCE/LEST default table.
 ```
 
 ### Exercising a DEONTIC — `#ASSERT` the boolean, `#TRACE` the deontic
+
 **Gotcha:** a `DEONTIC` value **cannot** be `EQUALS`-compared in `#ASSERT`. So land your `#ASSERT`s on the
-`\`<x> made out\`` BOOLEAN, and *exercise* the guarded deontic via **`#TRACE`** (which residuates it against an
+`\`<x> made out\`` BOOLEAN, and *exercise* the guarded deontic via **`#TRACE`\*\* (which residuates it against an
 event stream and prints what is left standing).
 
 `ground-9.l4` (a MAY ground):
+
 ```l4
 #ASSERT `Ground 9 made out`     `claim all-met (deemed suitable, available now)`
 #ASSERT NOT `Ground 9 made out` `claim — suitable but unavailable`
@@ -242,6 +267,7 @@ event stream and prints what is left standing).
     PARTY Court DOES `order possession` AT 10
 -- The court declines (never orders): MAY's benign omission -> residual FULFILLED, no breach.
 ```
+
 The residual tells the story: a Part I case residuates to `Court MUST … HENCE FULFILLED`; a benign MAY case
 left unexercised stays a standing permission and collapses to `FULFILLED`; a claim where nothing is made out
 is `FULFILLED` outright.
@@ -251,13 +277,15 @@ is `FULFILLED` outright.
 ## Provenance, repeal, aggregation
 
 ### No record-update operator — full literals or a `GIVEN`-parameterised constructor
+
 **Gotcha:** `existingValue WITH field IS v` works **only on a TYPE CONSTRUCTOR** (`MyType WITH …`), never on an
-*existing* record value — applied to a value it parses as function application and errors. There is no in-place
+_existing_ record value — applied to a value it parses as function application and errors. There is no in-place
 record update.
 **Fix:** spell full record literals per scenario, or expose a `GIVEN`-parameterised constructor and partially
 apply it, varying just the operative field.
 
 `ground-4A.l4` (the constructor approach):
+
 ```l4
 -- This L4 builds records only from a type name (`Ground4AClaim WITH ...`); there is no
 -- in-place record-update operator. So we expose a GIVEN-parameterised constructor; each
@@ -269,14 +297,17 @@ GIVETH A Ground4AClaim
   -- ... all other fields ...
 -- then: `probe (e)` MEANS `mk claim` TRUE (LIST `student now`) TRUE TRUE ... varying one field
 ```
+
 (`ground-6.l4` takes the other road: it spells a FULLY-SPELLED `Ground6Claim WITH …` literal per scenario.)
 
 ### Repealed / omitted provision → a labelled stub
+
 **Statute:** a ground that has been repealed/omitted (so the in-order corpus would otherwise have a silent gap).
 **Shape:** a `§§`-labelled stub carrying the former text as **inert prose** + the repeal provenance, with **no
 operative outcome** (no `DECIDE`/deontic). Keeps the corpus gap-free and auditable.
 
 `ground-3-repealed.l4` (and `part-4-repealed.l4` at Part level):
+
 ```l4
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 3 (REPEALED / OMITTED by Renters' Rights Act 2025)`
 -- Provenance (Textual Amendment F9):
@@ -291,13 +322,15 @@ operative outcome** (no `DECIDE`/deontic). Keeps the corpus gap-free and auditab
 ```
 
 ### Provenance — pin every inert string; resolve amendments to the in-force reading
+
 **Practice:** pin every inert string to authoritative text. Resolve textual-amendment markers
 (omit / insert / renumber) to the **in-force reading**, and carry the amendment provenance as inert prose. Pin it
 two ways: a header comment citing the amending Act / section / commencement, and inline inert prose at the
-amendment site recording the *omitted* words plus how the in-force reading was derived.
+amendment site recording the _omitted_ words plus how the in-force reading was derived.
 
-Header pin + an *omit* resolved to the in-force text, omitted words kept inert for audit
+Header pin + an _omit_ resolved to the in-force text, omitted words kept inert for audit
 (`ground-1-amended-2025.l4` / `ground-9.l4`):
+
 ```l4
 § `Housing Act 1988 — Schedule 2 — Part I — Ground 1 (amended; Renters' Rights Act 2025)`
 -- The amended Ground 1, as substituted by the Renters' Rights Act 2025 (c. 26)
@@ -306,8 +339,10 @@ Header pin + an *omit* resolved to the in-force text, omitted words kept inert f
 -- F75 (RRA 2025, 1.5.2026) OMITTED the para-2(a) exclusions; carried inert for audit:
     ... "[omitted 1.5.2026: other than— (i) a tenancy in respect of which notice is given ...]"
 ```
+
 For "ordered on Grounds 1 and 8" explainability, build a **`satisfied grounds`** LIST by `mapMaybe` over
 labelled booleans (`possession-decision.l4`):
+
 ```l4
 `satisfied grounds` cf MEANS
   mapMaybe `label if satisfied` (`pleaded grounds` cf)   -- pleaded grounds :: LIST OF PAIR STRING BOOLEAN
@@ -316,11 +351,13 @@ labelled booleans (`possession-decision.l4`):
 ```
 
 ### Top-level aggregation (entry point) — two complementary forms
+
 The runnable PoC is `possession-decision.l4`. Two ways to express "what now?":
 
 **Form A — the COURT's decision as a two-tier guarded deontic.** Test the mandatory tier first; else the
 discretionary tier (gated on reasonableness); else `FULFILLED`. Do **not** collapse into a flat
 `MUST IF (g1 OR … OR g14)` — that would wrongly make discretionary grounds mandatory and drop the reasonableness gate.
+
 ```l4
 `court possession decision` cf MEANS
     IF   `any Part I ground made out` cf                       -- s.7(3): a mandatory ground
@@ -331,15 +368,17 @@ discretionary tier (gated on reasonableness); else `FULFILLED`. Do **not** colla
          ELSE FULFILLED                                        -- no ground stands
 ```
 
-**Form B — the obligated/electing party's choice via `ROR`.** Models a genuine election among the *available*
+**Form B — the obligated/electing party's choice via `ROR`.** Models a genuine election among the _available_
 grounds.
+
 > **ROR GOTCHA — the else-FULFILLED trap.** A branch shaped `IF made out THEN MUST … ELSE FULFILLED` is **poison**
 > under `ROR`: ROR ("any one fulfils") treats the `FULFILLED` arm as success, so a not-made-out branch makes the
-> whole choice fire *trivially*. And `foldr ROR FULFILLED` re-introduces it from the other side —
+> whole choice fire _trivially_. And `foldr ROR FULFILLED` re-introduces it from the other side —
 > `dutyA ROR (dutyB ROR FULFILLED)` collapses to `FULFILLED` immediately.
 >
-> **Fix:** ROR-fold only the *available* branches as **UNGUARDED** duties (no `ELSE FULFILLED` short-circuit),
+> **Fix:** ROR-fold only the _available_ branches as **UNGUARDED** duties (no `ELSE FULFILLED` short-circuit),
 > with a **one-element base case** (the single branch itself) — `FULFILLED` appears **only** in the empty-list case.
+
 ```l4
 `ror together` branches MEANS
   CONSIDER branches
@@ -354,6 +393,7 @@ grounds.
 ## Reference files (housing-act corpus)
 
 All under `…/jl4/experiments/housing-act-<name>.l4` (43 files). By pattern:
+
 - Proviso / negative / gate limbs: `ground-4.l4`, `ground-13.l4`, `ground-15.l4`, `ground-5H.l4`, `ground-6.l4`
 - Cases / checkbox / tables: `ground-5A.l4`, `ground-1-amended-2025.l4`, `ground-6.l4`
 - Dates (+ the footgun): `ground-1-amended-2025.l4`, `ground-2ZA.l4`, `ground-2ZC.l4`, `ground-2ZD.l4`

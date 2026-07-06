@@ -11,7 +11,7 @@ The running example throughout: a contract `DEONTIC Actor Action`, actors
 declared as values (`DECLARE Actor IS ONE OF Eater, Drinker`), actions as
 records carrying their actor(s). The governing rule we implement: **a party may
 only perform an action whose performer is itself**, where the performer is the
-*first actor in positional order* (the "SVO subject-first canon").
+_first actor in positional order_ (the "SVO subject-first canon").
 
 ---
 
@@ -22,25 +22,25 @@ and reduces them against an event stream (a contract is a state machine;
 HENCE/LEST are residuals; subject reduction requires each residual to keep the
 contract's type). Two encodings of "who may do what" were on the table:
 
-- **type-indexed actors** — an actor is a *type* (`Eater`), actions carry it as
+- **type-indexed actors** — an actor is a _type_ (`Eater`), actions carry it as
   a phantom index (`Action Eater`), and agreement is a Hindley–Milner type
-  equality [@MilnerPolymorphism; @PierceTAPL]. Clean, *but*: to let one contract
+  equality [@MilnerPolymorphism; @PierceTAPL]. Clean, _but_: to let one contract
   route the ball between actors **and** ingest their events, the contract head
   must name one type while specific actions (`Action Eater`) inhabit a union
   slot (`Action Actor`) — which is covariant subtyping, and L4 deliberately has
   none. Reaching for existentials/GADTs [@XiGADT; @EisenbergDH] or refinement
   types [@VazouRefinement] is the "climbing the lambda cube" move, and the
-  decade-long slow burn of *Dependent Haskell* / *LiquidHaskell* is the standing
+  decade-long slow burn of _Dependent Haskell_ / _LiquidHaskell_ is the standing
   warning about its cost.
 
-- **value-actors** — an actor is a *value* (a constructor of one `Actor` type),
+- **value-actors** — an actor is a _value_ (a constructor of one `Actor` type),
   actions carry actors as ordinary record fields, and the contract head
   `DEONTIC Actor Action` is **monomorphic**. The head names one real type, so it
-  drives mixed-actor events *natively* (the same machinery as a plain
+  drives mixed-actor events _natively_ (the same machinery as a plain
   multi-party union contract). The subtyping wall simply isn't there.
 
 The price of value-actors is that "a Drinker may not eat" is now a constraint on
-*data*, not types, so it is a dedicated value-level well-formedness check rather
+_data_, not types, so it is a dedicated value-level well-formedness check rather
 than a by-product of unification. **The contribution to claim is that this trade
 is favourable**: a ~120-line value check buys what an XL type-system extension
 was being contemplated for, and it composes with higher-order action operators
@@ -51,11 +51,11 @@ was being contemplated for, and it composes with higher-order action operators
 
 ## 2. The SVO subject-first canon, and "footguns as canon"
 
-With actors as data, *which* field is the performer? When an action has one
+With actors as data, _which_ field is the performer? When an action has one
 actor field the answer is forced; when it has several — `SendMessage(from, to)`
 — it is genuinely ambiguous. We resolve it by **convention**: the performer is
 the **first actor in positional order**. This is deliberately order-dependent,
-and that is the point — it makes `SendMessage` *duplex* (one type, both
+and that is the point — it makes `SendMessage` _duplex_ (one type, both
 directions; whoever sits in the first slot is the agent).
 
 Two observations make this more than a hack:
@@ -63,18 +63,18 @@ Two observations make this more than a hack:
 1. **It mirrors word order.** `PARTY Alice MUST send Alice Bob` reads
    Subject–Verb–Object — "Alice sends Bob". Putting the agent first aligns the
    formal rule with the dominant English constituent order, so the rule is
-   *predictable from the surface* rather than memorised. SVO and subject-first
+   _predictable from the surface_ rather than memorised. SVO and subject-first
    word-order are the cross-linguistic default [@GreenbergUniversals]. This is
-   the same "the keyword *is* its meaning" win L4 gets from `OF` (application)
+   the same "the keyword _is_ its meaning" win L4 gets from `OF` (application)
    and `'s` (possession).
 
 2. **Canonising an ambiguity is what legal interpretation does.** Statutory
    construction is a catalogue of conventions that fix otherwise-ambiguous
-   readings by fiat — the *last-antecedent rule* (a positional canon: a modifier
-   binds the nearest noun), *ejusdem generis*, *expressio unius*
+   readings by fiat — the _last-antecedent rule_ (a positional canon: a modifier
+   binds the nearest noun), _ejusdem generis_, _expressio unius_
    [@ScaliaGarnerReadingLaw]. Each trades "learn the convention" for "the text
    is now determinate". The subject-first canon sits squarely in that tradition,
-   with the advantage that it *matches* natural word order rather than fighting
+   with the advantage that it _matches_ natural word order rather than fighting
    it. Discoverability is what converts a footgun into a canon: the diagnostic
    names the performer ("`eat` is performed by `Eater`, not by `Drinker`"), so
    the rule is taught exactly where it would be violated.
@@ -87,7 +87,7 @@ identification without any type-system machinery.
 
 ## 3. Prepositional logic: named parameters as thematic roles
 
-L4 also constructs actions with *named* parameters
+L4 also constructs actions with _named_ parameters
 (`SendMessage WITH from IS Alice, to IS Bob, by IS Courier, under IS Seal`).
 Read the field names aloud and they are **prepositions** — and prepositions are
 the surface markers of **thematic roles** (agent, source, goal, instrument,
@@ -108,13 +108,13 @@ surface realisations of the same role assignment — exactly as English uses wor
 order for core arguments (subject/object) and prepositions for obliques.
 
 A wrinkle the prepositions expose is pure law. In `from=Alice, by=Courier`,
-linguistically "by" is the *agent* marker (passive: "sent **by** the courier"),
+linguistically "by" is the _agent_ marker (passive: "sent **by** the courier"),
 yet deontically Alice is the obligated principal and the courier her delegate.
 So a role-keyed (rather than positional) performer rule would have to take a
 stance on **principal vs. agent** — which is the bridge to §4.
 
 **Claim (design direction, not yet implemented):** keying the performer to a
-*role name* (`from`/subject for the principal, `by` reserved for the
+_role name_ (`from`/subject for the principal, `by` reserved for the
 instrument) generalises the positional canon to the prepositional surface, with
 Fillmore's case roles as the justification rather than fiat.
 
@@ -139,7 +139,7 @@ actor of `Procure`), while the inner action keeps its own performer Y shielded
 as data. The result, type-checked:
 
 - X may **procure** Y's act — accepted;
-- a stranger Z may not procure *this* instance — rejected;
+- a stranger Z may not procure _this_ instance — rejected;
 - X may not directly **perform** Y's act — rejected (only procure it).
 
 This is the **principal/agent** distinction made structural, and it is the
@@ -153,11 +153,11 @@ formal counterpart of well-studied agency operators:
   sees to it that Y sees to it that p".
 - **Agency law** [@RestatementAgency]: the doctrine of when a principal is bound
   by an agent's acts. The sharp edge is **non-delegable duties** — obligations
-  that *cannot* be discharged by procuring (personal service, certain fiduciary
+  that _cannot_ be discharged by procuring (personal service, certain fiduciary
   and statutory duties). These are encodable as a type stance: an obligation
   slot that admits a `Procure`-wrapped discharge is delegable; one that demands a
-  bare `Perform` is non-delegable. The type system can say *"you must do this
-  yourself."*
+  bare `Perform` is non-delegable. The type system can say _"you must do this
+  yourself."_
 
 Procurement nests (`procure_X(procure_Y(act_Z))` — a delegation chain), and it
 is composable **only because** value-actors make actions first-class values that
@@ -165,7 +165,7 @@ can be arguments to `Procure` — tying §4 back to §1.
 
 **Claim:** higher-order action operators give a typed account of procurement /
 delegation / non-delegable duties that is standard in agency logic but, to our
-knowledge, novel as a *typed regulative-language* construct that falls out of
+knowledge, novel as a _typed regulative-language_ construct that falls out of
 the value-actor encoding without bespoke modal machinery.
 
 ---
@@ -175,12 +175,12 @@ the value-actor encoding without bespoke modal machinery.
 This work sits inside L4's broader deontic layer (obligation/permission/
 prohibition with deadlines and residuation), whose lineage runs from von Wright
 [@vonWrightDeontic] through the reduction/dynamic-logic treatments
-[@AndersonReduction; @MeyerDynamic] that also ground the separate *bounded
-deontics* work ([BOUNDED-DEONTICS-SPEC.md](../../../specs/todo/BOUNDED-DEONTICS-SPEC.md)). As a
+[@AndersonReduction; @MeyerDynamic] that also ground the separate _bounded
+deontics_ work ([BOUNDED-DEONTICS-SPEC.md](../../../specs/todo/BOUNDED-DEONTICS-SPEC.md)). As a
 programming language for contracts it is kin to the formal-contract-language
 tradition [@LeeElectronic; @AndersenCompositional; @HvitvedContracts;
 @PrisacariuSchneiderCL; @GovernatoriContracts], but distinguished by being a
-typed CNL whose *type checker* — not a separate logic — enforces who-may-do-what.
+typed CNL whose _type checker_ — not a separate logic — enforces who-may-do-what.
 
 ---
 

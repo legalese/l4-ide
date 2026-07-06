@@ -270,13 +270,13 @@ bobLender MEANS IndividualLender (Person WITH name IS "Bob")
 
 ## Actor-Correctness and the Performer Rule
 
-L4 enforces that the `PARTY` named in an obligation is the *performer* of the
+L4 enforces that the `PARTY` named in an obligation is the _performer_ of the
 action — the actor in the first actor-typed field of the action record (subject-first
 canon). This catches assignment errors and models the principal/agent distinction.
 
 ### Procurement: higher-order actions
 
-Law often says "X undertakes to *procure* that Y performs action_Y". L4 models
+Law often says "X undertakes to _procure_ that Y performs action_Y". L4 models
 this with a recursive action type — an outer `Procure` wrapping an inner action,
 with the procurer in the first slot:
 

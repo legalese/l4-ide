@@ -16,25 +16,25 @@ roles, STIT logic, agency law) see
 There are, historically, two ways to attach an actor to an action. **Use
 value-actor.** We single out one style not because the other is unsupported — it
 works fine, and the check behind it is still live — but for a human reason: a
-language is kinder when there is *one obvious way*. A rule author shouldn't have
+language is kinder when there is _one obvious way_. A rule author shouldn't have
 to carry two competing forms in their head, and someone fluent in one style
 shouldn't have to come to grips with the other just to read a colleague's
 contract. So the older **type-indexed** style is **deprecated as a surface — do
-not use it in new models**; it is kept *operational* only so existing contracts
+not use it in new models**; it is kept _operational_ only so existing contracts
 keep type-checking.
 
-- **Value-actor — use this.** The actor is a *value* the action carries
+- **Value-actor — use this.** The actor is a _value_ the action carries
   (`DECLARE Actor IS ONE OF Eater, Drinker`; `eat MEANS Action OF Eater, …`).
   This page is about this style. It is also the more general encoding: it drives
-  events natively and is the *only* one that supports duplex actions,
+  events natively and is the _only_ one that supports duplex actions,
   parameterised actions, and higher-order procurement. Its actor check is
   value-level (see [boundaries](#7-what-is-not-checked-boundaries)).
 
-- **Type-indexed — deprecated, don't use.** The actor is a phantom *type* index
+- **Type-indexed — deprecated, don't use.** The actor is a phantom _type_ index
   (`DECLARE Action who …`; `eat : Action Eater`; `DEONTIC Eater (Action Eater)`),
   with agreement as a type equality. The system still accepts it — and it has a
-  niche strength, the check being *always* static, even across modules — but it
-  is a *second form to learn*, more verbose, and cannot express duplex,
+  niche strength, the check being _always_ static, even across modules — but it
+  is a _second form to learn_, more verbose, and cannot express duplex,
   parameterised, or procured actions. New models should not use it.
 
 Reach for **value-actor** every time. The two are not desugarings of each
@@ -103,7 +103,7 @@ An actor may only perform its own actions.
   `eat` is performed by `Eater`, not by `Drinker`.
 ```
 
-The same check fires on **events**, which is what makes cross-actor *driving*
+The same check fires on **events**, which is what makes cross-actor _driving_
 correct:
 
 ❌ **Rejected** — a Drinker doing an Eater action in a trace:
@@ -137,7 +137,7 @@ An action may name **one** actor or **several** — and this is a modelling choi
 you make when you `DECLARE` it.
 
 - **One-actor action** — a single actor field (e.g. `eat`, below: `actor IS AN
-  Actor`). That actor is the performer; the obligation falls on them, full stop.
+Actor`). That actor is the performer; the obligation falls on them, full stop.
 
   ```l4
   DECLARE Action HAS actor IS AN Actor, verb IS A STRING
@@ -145,10 +145,10 @@ you make when you `DECLARE` it.
   ```
 
 - **Multi-actor action** — several actor fields (e.g. `SendMessage`, with a
-  `from` *and* a `to`). Exactly one of them is the **performer** — by canon, the
+  `from` _and_ a `to`). Exactly one of them is the **performer** — by canon, the
   **first actor in positional order** — and that is the only one the obligation
   binds. The other actor fields (recipient, object, …) are **participants**:
-  recorded in the action as data, but *not themselves obligated*.
+  recorded in the action as data, but _not themselves obligated_.
 
   ```l4
   DECLARE SendMessage HAS
@@ -191,7 +191,7 @@ wrong MEANS PARTY Bob MUST aliceToBob WITHIN 10
   `aliceToBob` is performed by `Alice`, not by `Bob`.
 ```
 
-> **Canon, not bug.** The order-dependence *is* the convention — like the
+> **Canon, not bug.** The order-dependence _is_ the convention — like the
 > last-antecedent rule in statutory interpretation. To make Bob the performer,
 > construct the message with Bob first. The diagnostic always names the
 > performer, so the rule is visible exactly where you'd trip on it.
@@ -202,7 +202,7 @@ wrong MEANS PARTY Bob MUST aliceToBob WITHIN 10
 
 The same performer is selected whether you build the action positionally or with
 named parameters. Read the named fields aloud and they are prepositions —
-*from*, *to*, *by* — the markers of thematic roles.
+_from_, _to_, _by_ — the markers of thematic roles.
 
 ✅ Both **work** and select `from`/first-slot as the performer:
 
@@ -216,7 +216,7 @@ p2 MEANS PARTY Alice MUST prepositional WITHIN 10   -- ✓
 ```
 
 > **Note (current limitation).** With named `WITH` construction the performer is
-> currently read in *source* order. Positional `OF` is the canonical form and is
+> currently read in _source_ order. Positional `OF` is the canonical form and is
 > always correct; keying the performer to a role name (e.g. always `from`) is a
 > planned refinement. See the theory note, §3.
 
@@ -227,11 +227,11 @@ p2 MEANS PARTY Alice MUST prepositional WITHIN 10   -- ✓
 Three gradations, all expressed through the actor **type** and how an action
 names its performer:
 
-- **one specific actor** — *pin* it in the action (see *Pinned* below);
-- **any actor** — leave the performer *open*, a parameter any member of the
-  actor type can fill (see *Unpinned* below);
+- **one specific actor** — _pin_ it in the action (see _Pinned_ below);
+- **any actor** — leave the performer _open_, a parameter any member of the
+  actor type can fill (see _Unpinned_ below);
 - **some actors** — declare an actor **type** that names exactly that cast (see
-  *A named cast* below).
+  _A named cast_ below).
 
 An action can **pin** specific actors, or leave them open and take them as
 arguments (overloading / "duplex by parameter").
@@ -243,7 +243,7 @@ aliceToBob MEANS SendMessage OF Alice, Bob, "hi"
 ```
 
 **Unpinned** — a function over actors, supplied at the use site. Note the
-`EXACTLY` keyword: an applied action is an *expression*, not a pattern, so it
+`EXACTLY` keyword: an applied action is an _expression_, not a pattern, so it
 must be introduced with `EXACTLY`.
 
 ```l4
@@ -271,14 +271,14 @@ bad MEANS PARTY Bob MUST EXACTLY send Alice Bob WITHIN 10
   `send` is performed by `Alice`, not by `Bob`.
 ```
 
-⚠️ **Gotcha** — the *bare* applied form does **not** parse as an action (the
+⚠️ **Gotcha** — the _bare_ applied form does **not** parse as an action (the
 action slot is a pattern):
 
 ```l4
 oops MEANS PARTY Alice MUST send Alice Bob WITHIN 10   -- ERROR: use EXACTLY
 ```
 
-**A named cast (some actors).** To allow a *specific subset* of actors and no
+**A named cast (some actors).** To allow a _specific subset_ of actors and no
 others, declare an actor **type** that lists exactly them, and use it as the
 DEONTIC's actor parameter. There is no subtyping — you choose the cast when you
 declare the type — so a non-member is a plain type error.
@@ -300,8 +300,8 @@ okL MEANS PARTY Landlord MUST EXACTLY negotiate Landlord WITHIN 5   -- ✓
 
 ## 6. Procurement: higher-order actions and the principal/agent line
 
-Law routinely says "X undertakes to **procure** that Y performs action_Y". That
-is a *higher-order* action — one action wrapping another — modelled as a
+Law routinely says "X undertakes to **procure** that Y performs action*Y". That
+is a \_higher-order* action — one action wrapping another — modelled as a
 recursive action type:
 
 ```l4
@@ -325,7 +325,7 @@ GIVETH DEONTIC Actor Action
 goodProcure MEANS PARTY X MUST EXACTLY xProcuresShip WITHIN 10   -- performer X ✓
 ```
 
-❌ **Rejected** — a stranger cannot procure *this* instance:
+❌ **Rejected** — a stranger cannot procure _this_ instance:
 
 ```l4
 strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
@@ -335,7 +335,7 @@ strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
   `xProcuresShip` is performed by `X`, not by `Z`.
 ```
 
-❌ **Rejected** — X cannot directly *perform* Y's action, only *procure* it:
+❌ **Rejected** — X cannot directly _perform_ Y's action, only _procure_ it:
 
 ```l4
 xCannotPerform MEANS PARTY X MUST EXACTLY shipByY WITHIN 10
@@ -351,9 +351,9 @@ obligation slot: the party must do it personally.
 
 ---
 
-## 7. What is *not* checked (boundaries)
+## 7. What is _not_ checked (boundaries)
 
-The check is conservative — it only ever *rejects*, and only when it can decide
+The check is conservative — it only ever _rejects_, and only when it can decide
 statically. It is silent (the obligation is left to runtime) when:
 
 - **the actor is computed**, not a statically-known constructor;
@@ -362,7 +362,7 @@ statically. It is silent (the obligation is left to runtime) when:
 - **the action reference crosses a module import** (constant bodies are not yet
   threaded through imports).
 
-It selects the performer by *value* and compares it to the party by *value*; it
+It selects the performer by _value_ and compares it to the party by _value_; it
 is a complement to, not a replacement for, the type-level
 `checkPartyActionAgreement` used by type-indexed (`Action Eater`) actions.
 

@@ -200,7 +200,7 @@ L4 never silently converts between types. `"42" + 1` is a type error. Use the ex
 
 ## The `daydate` month-subtraction footgun
 
-After `IMPORT daydate`, you build calendar dates with `Date day month year`. The constructor does **not** normalise a non-positive month by rolling back a year — it **clamps a month `≤ 0` to January of the same year**. So `Date 1 (3 MINUS 6) 2025` is **January 2025**, *not* September 2024. Month **overflow** past 12, by contrast, *does* roll forward correctly: `month PLUS 6` on a December date lands in the next year.
+After `IMPORT daydate`, you build calendar dates with `Date day month year`. The constructor does **not** normalise a non-positive month by rolling back a year — it **clamps a month `≤ 0` to January of the same year**. So `Date 1 (3 MINUS 6) 2025` is **January 2025**, _not_ September 2024. Month **overflow** past 12, by contrast, _does_ roll forward correctly: `month PLUS 6` on a December date lands in the next year.
 
 ```l4
 -- ✘ WRONG — "6 months before March 2025" by subtracting months:

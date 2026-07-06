@@ -30,7 +30,7 @@ Rather than copy-paste these patterns, we create reusable abstractions.
 ### The Performer Rule in Cross-Cutting Patterns
 
 Whenever an action carries an actor field, L4 enforces that the `PARTY` in an
-obligation matches the action's *performer* (the first actor-typed field in
+obligation matches the action's _performer_ (the first actor-typed field in
 positional order). This is especially relevant to **notice-and-cure** and
 **duplex notification** patterns where two actors alternate obligations.
 

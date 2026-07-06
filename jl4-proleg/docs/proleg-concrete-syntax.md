@@ -2,8 +2,8 @@
 
 This is the grammar the `jl4-proleg` front end parses. It targets **canonical
 PROLEG** (Satoh, JURISIN 2010), the dialect in which the Japanese Civil Code
-corpus and the 2009–2022 bar-exam validation are written. The *Modular-PROLEG /
-PIL* dialect (jurisdiction tags `#Country`, `solve/3` phases, `negation/1`) is a
+corpus and the 2009–2022 bar-exam validation are written. The _Modular-PROLEG /
+PIL_ dialect (jurisdiction tags `#Country`, `solve/3` phases, `negation/1`) is a
 later extension; see "Dialect notes" below. We parse the canonical dialect first
 and keep the grammar modular so the PIL layer can be added later.
 
@@ -22,10 +22,10 @@ PROLEG is syntactically ordinary Prolog plus the `<=` operator.
 
 ## Operators
 
-| Operator | Prolog priority | Meaning |
-|----------|-----------------|---------|
+| Operator | Prolog priority | Meaning                                          |
+| -------- | --------------- | ------------------------------------------------ |
 | `<=`     | `xfx`, 1100     | rule: `Head <= Body` (necessary-condition arrow) |
-| `,`      | `xfy`, 1000     | conjunction in a rule body |
+| `,`      | `xfy`, 1000     | conjunction in a rule body                       |
 
 (The PIL dialect additionally declares `#` as `xfy`, 800, for jurisdiction tags.)
 
@@ -65,7 +65,7 @@ one containing `<=` is a `rule`; anything else terminated by `.` is a `fact`
 
 A PROLEG program is conceptually a **rulebase** (`rule`, `exception`) plus a
 **factbase** (`fact`, `proc_decl`). We keep source order in the AST and classify
-per-clause; the rulebase/factbase split is a *view*, not a parse-time partition.
+per-clause; the rulebase/factbase split is a _view_, not a parse-time partition.
 
 ## Defeasibility & burden of proof (semantics we must preserve)
 
@@ -74,7 +74,7 @@ per-clause; the rulebase/factbase split is a *view*, not a parse-time partition.
   `H :- Body, not E1, not E2, ...` — i.e. functional `AND NOT` in L4 (Mode B).
 - The procedural predicates encode the JUF burden of proof. The reference
   meta-interpreter `prove(Goal, Party)` descends into an exception by proving it
-  for the *opposite* party. A fact counts as established iff
+  for the _opposite_ party. A fact counts as established iff
   `plausible(F)` holds, or the opposing party gave `admission(F, opposite(P))`,
   and (for the burdened party) it was both `allege`d and `provide_evidence`d.
   - **Mode B (decision-only, default):** erase this layer — pre-resolve each
@@ -98,4 +98,7 @@ negation(P)                        % NAF, via exception(negation(P), P)
 
 Not parsed in Phase 1. The `#Country` tag, the `fact(...)` wrapper, the
 `negation/1` NAF encoding, and the `pil`/`pln` phases of `solve/3` are PIL-only.
+
+```
+
 ```

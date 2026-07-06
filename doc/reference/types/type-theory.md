@@ -179,7 +179,7 @@ Within the type system, DEONTIC acts as a custom monad (in Haskell terms) or, in
 
 Beyond the type-level check that the party and action types match the contract head, L4 enforces a **value-level actor-correctness** rule:
 
-> In `PARTY p MUST a` (obligation) and `PARTY p DOES a` (event), the party `p` must equal the *performer* of action `a` — the first actor-typed field of `a` in positional order (the **subject-first canon**).
+> In `PARTY p MUST a` (obligation) and `PARTY p DOES a` (event), the party `p` must equal the _performer_ of action `a` — the first actor-typed field of `a` in positional order (the **subject-first canon**).
 
 This check is a complement to, not a replacement for, type-level `checkPartyActionAgreement`. It fires only when both `p` and the performer can be resolved statically; it is silent for computed actors or actions without actor fields (leaving legacy/flat-union contracts untouched).
 
