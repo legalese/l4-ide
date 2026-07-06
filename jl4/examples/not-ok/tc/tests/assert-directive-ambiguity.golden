@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: assert-directive-ambiguity.l4
+  Hidden: no
+  Range: 12:9-12:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      foo
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      foo (defined at assert-directive-ambiguity.l4:9:8-11) of type FUNCTION FROM BOOLEAN TO BOOLEAN
+      foo (defined at assert-directive-ambiguity.l4:6:8-11) of type FUNCTION FROM BOOLEAN TO BOOLEAN

@@ -380,6 +380,7 @@ combineResolvedImports uri imports =
              , TypeCheck.assumeDeclarations = Map.empty
              , TypeCheck.mixfixRegistry = TypeCheck.unionMixfixRegistry accEnv.mixfixRegistry r.mixfixRegistry
              , TypeCheck.computedFields = Map.empty
+             , TypeCheck.cyclicSynonyms = mempty
              , TypeCheck.errorContext = TypeCheck.None
              , TypeCheck.sectionStack = []
              , TypeCheck.localBindings = Set.empty

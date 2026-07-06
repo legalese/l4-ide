@@ -548,6 +548,7 @@ jl4Rules evalConfig rootDirectory recorder = do
             , mixfixRegistry = TypeCheck.unionMixfixRegistry cEnv.mixfixRegistry tcRes.mixfixRegistry
             -- ^ Merge mixfix registries from imported modules so cross-module mixfix calls work
             , computedFields = Map.empty
+            , cyclicSynonyms = mempty
             , sectionStack = []
             , localBindings = mempty
             }

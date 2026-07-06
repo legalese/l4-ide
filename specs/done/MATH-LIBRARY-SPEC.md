@@ -1,3 +1,7 @@
+> **Status (audited 2026-07-03):** RESOLVED — Phases 1-3 all shipped. Moved to `specs/done/`.
+> - `jl4-core/libraries/math.l4` defines `EULER`, `exp`, `ln`, `log10`, `sqrt`, and trig (`sin/cos/tan/asin/acos/atan`), with goldens under `jl4-core/libraries/tests/math.*` and docs at `doc/reference/libraries/math.md`.
+> - `exp`/`EULER` are pure L4 (built on `EXPONENT`); later phases added native `LN`/`LOG10`/trig primitives (commit `860b3b9f`).
+
 # Math Helper Library for L4
 
 ## Context

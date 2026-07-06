@@ -1,0 +1,13 @@
+-- T4 regression test: TIMEZONE IS infers its expression with no expected
+-- type, so even candidates with DIFFERENT result types (BOOLEAN vs NUMBER
+-- here) tie. This must be reported as AmbiguousTermError — listing both
+-- candidate types — not crash the typechecker. (The same overload shape
+-- under #ASSERT is disambiguated by the expected BOOLEAN and checks cleanly.)
+
+ASSUME foo IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+
+GIVEN p IS A BOOLEAN
+DECIDE foo OF p
+  IS 42
+
+TIMEZONE IS foo TRUE

@@ -98,6 +98,8 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | CyclicTypeSynonyms [Name]
+    -- ^ Circular dependency between type synonym declarations (cycle members)
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -369,6 +371,12 @@ data CheckEnv =
     -- ^ Map from record type RawName to set of computed field RawNames.
     -- Used to produce better error messages when a user tries to supply
     -- a computed field in a record constructor.
+    , cyclicSynonyms       :: !(Set RawName)
+    -- ^ Primary names of type synonyms found to be cyclic at declaration
+    -- time. Their bodies are quarantined (installed as bodyless
+    -- 'KnownType's) so that synonym expansion never touches them — a
+    -- cyclic synonym has no finite expansion, and expanding one can
+    -- blow up exponentially before the expansion fuel runs out.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -1188,6 +1196,7 @@ extendEnv cis env =
     , assumeDeclarations = e.assumeDeclarations
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
+    , cyclicSynonyms = e.cyclicSynonyms
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     }
