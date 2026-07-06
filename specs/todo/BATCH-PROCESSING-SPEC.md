@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** PARTIAL — `l4 batch` subcommand shipped; core multi-format input + entrypoint discovery done, validation/output-format/parallel still open.
+>
 > - DONE (`jl4/app/L4/Cli/Batch.hs`, wired at `Main.hs:72`): JSON/YAML/CSV input parse, format inference + stdin, entrypoint discovery via `getExportedFunctions`/`getDefaultFunction`, per-row wrapper eval, streaming NDJSON `{input,output,status,diagnostics}`.
 > - MISSING: schema/type validation + `--validate-only`; `--continue-on-error` (always runs all rows); multi-format output/`--format` (NDJSON only); `--output`, `--parallel`, `--simple`, `--trace`; CSV type inference (every cell is STRING).
 > - Body correction: CLI shape is `l4 batch <FILE.l4> --inputs <PATH> [--input-format …] [--entrypoint …]`, not `jl4-cli --batch BATCH_FILE L4FILE`.

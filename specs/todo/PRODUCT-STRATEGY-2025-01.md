@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** PARTIAL / SUPERSEDED — a Jan-2026 sprint roadmap now ~6 months stale; strategy has since shifted to the skills/plugin marketplace.
+>
 > - Done since writing: `dev-healthcheck.sh`, `dev-stop.sh`, `docker-compose.yml`; deployment + version automation (MAJOR.BREAKING.RUNNING baking, marketplace skill/plugin distribution) well beyond the roadmap's Week-3 asks.
 > - Not evidenced: one-click `setup.sh`, demo video, l4-wizard landing page, template gallery; `#313` hover fix unverifiable (no `jl4-lsp/src/LSP/L4/Hover.hs`).
 > - Treat as a historical planning record; live priorities now tracked elsewhere.

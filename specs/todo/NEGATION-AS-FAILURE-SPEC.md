@@ -16,7 +16,7 @@ The entire treatment of NAF reduces to one idea:
 
 > A proposition that may or may not have been settled is a `MAYBE BOOLEAN`. Negation as
 > failure is the **closed-world assumption** — the act of defaulting "unproven" to FALSE —
-> and that act is *already* expressed by the prelude's `fromMaybe FALSE`.
+> and that act is _already_ expressed by the prelude's `fromMaybe FALSE`.
 
 No new keyword, no new type machinery. The proposal is to **name** the combinators (so
 they read like the legal concept) and to **document** the design, including the optional
@@ -36,8 +36,8 @@ naf   p MEANS NOT (holds p)            -- succeeds exactly when p is unprovable
 Logic programming has spent forty years working out what "not" should mean when knowledge
 is incomplete (Clark's completion, 1978; the well-founded semantics of Van Gelder, Ross &
 Schlipf, 1991; the stable-model semantics of Gelfond & Lifschitz, 1988). Legal reasoning is
-shot through with the same pattern: a rule applies *unless* an exception is shown; a fact is
-presumed *until* rebutted; an act is permitted *because* nothing forbids it. These are all
+shot through with the same pattern: a rule applies _unless_ an exception is shown; a fact is
+presumed _until_ rebutted; an act is permitted _because_ nothing forbids it. These are all
 NAF in disguise. We should reuse the mature semantics rather than reinvent it.
 
 ### Why L4 can do it in three lines
@@ -55,11 +55,11 @@ not new code.
 
 A **Default Boolean** is a proposition in one of three epistemic states:
 
-| Value        | Reading                                   |
-|--------------|-------------------------------------------|
-| `JUST TRUE`  | proven true                               |
-| `JUST FALSE` | proven false                              |
-| `NOTHING`    | no proof either way (the open question)   |
+| Value        | Reading                                 |
+| ------------ | --------------------------------------- |
+| `JUST TRUE`  | proven true                             |
+| `JUST FALSE` | proven false                            |
+| `NOTHING`    | no proof either way (the open question) |
 
 ```l4
 DECLARE DefBool IS A MAYBE BOOLEAN
@@ -85,34 +85,34 @@ naf p MEANS NOT (holds p)
 ### Truth tables (verified against `jl4-cli`)
 
 | `p`          | `holds p` | `naf p` |
-|--------------|-----------|---------|
+| ------------ | --------- | ------- |
 | `JUST TRUE`  | TRUE      | FALSE   |
 | `JUST FALSE` | FALSE     | TRUE    |
 | `NOTHING`    | FALSE     | TRUE    |
 
 `holds` defaults to FALSE on `NOTHING`; `naf` succeeds on everything that is not provably
-true — i.e. both the *refuted* (`JUST FALSE`) and the *unknown* (`NOTHING`) cases. That is
+true — i.e. both the _refuted_ (`JUST FALSE`) and the _unknown_ (`NOTHING`) cases. That is
 the behaviour Prolog's `\+` exhibits under SLDNF resolution.
 
-## Why `MAYBE BOOLEAN` is the *right* representation, not merely a short one
+## Why `MAYBE BOOLEAN` is the _right_ representation, not merely a short one
 
 The elegance is not the brevity — it is that **the type keeps three states distinct while
 the eliminator deliberately collapses two of them.**
 
-`MAYBE BOOLEAN` is honest about the difference between *proven false* (`JUST FALSE`) and
-*unprovable* (`NOTHING`). The closed-world assumption is precisely the act of conflating
+`MAYBE BOOLEAN` is honest about the difference between _proven false_ (`JUST FALSE`) and
+_unprovable_ (`NOTHING`). The closed-world assumption is precisely the act of conflating
 those two into FALSE — and `fromMaybe FALSE` is exactly that conflation (`JUST FALSE ↦
 FALSE`, `NOTHING ↦ FALSE`).
 
 So we separate **the data** (three-valued, honest about ignorance) from **its
-interpretation** (the fold). This is L4's FP-heritage argument in miniature: *you choose
-your epistemics at the eliminator, not at the type.* The same `DefBool` value can be read
+interpretation** (the fold). This is L4's FP-heritage argument in miniature: _you choose
+your epistemics at the eliminator, not at the type._ The same `DefBool` value can be read
 under different assumptions without changing how it was produced.
 
 ## A lattice of readings, one combinator
 
 Because the eliminator carries the epistemics, a single combinator — `fromMaybe d` — yields
-a family of readings over the *same* data simply by varying the default `d`:
+a family of readings over the _same_ data simply by varying the default `d`:
 
 ```l4
 holds    p MEANS fromMaybe FALSE p   -- provably-true        (Prolog NAF / closed world)
@@ -122,11 +122,11 @@ decided  p MEANS isJust p            -- do we have a verdict at all?  (strong kn
 
 - `holds` / `fromMaybe FALSE` — the **closed-world** reading. Absence of proof is failure.
 - `presumed` / `fromMaybe TRUE` — the **open-world** dual. Absence of a prohibition is
-  permission. This is the natural default for deontic *permission* and connects directly to
+  permission. This is the natural default for deontic _permission_ and connects directly to
   `BOUNDED-DEONTICS-SPEC.md`.
 - `decided` / `isJust` — the orthogonal **epistemic** question NAF throws away: is there a
-  verdict at all? A forbidden act is *decided*; a merely non-obligatory act may be only
-  *undecided*. Deontic reasoning needs both axes.
+  verdict at all? A forbidden act is _decided_; a merely non-obligatory act may be only
+  _undecided_. Deontic reasoning needs both axes.
 
 **The default value is the knob** that turns NAF into general defeasible / default
 reasoning, and flipping it `FALSE → TRUE` is exactly the closed-world / open-world switch.
@@ -136,8 +136,8 @@ presumptions, approached from the value level rather than via a new keyword.
 ## A naming nuance (for the wordsmiths)
 
 The user's working name `isProvable` deserves a second look. Under `fromMaybe FALSE`, the
-case `JUST FALSE ↦ FALSE` means the function actually answers **"is it provably *true*?"**,
-not "is it provable?". A proven-false proposition *is* provable — provably false — it just
+case `JUST FALSE ↦ FALSE` means the function actually answers **"is it provably _true_?"**,
+not "is it provable?". A proven-false proposition _is_ provable — provably false — it just
 is not true. We therefore recommend:
 
 - `holds` (or `provablyTrue`) for the closed-world grounding `fromMaybe FALSE`;
@@ -154,7 +154,7 @@ above. That is sufficient for most isomorphic encodings and keeps the truth tabl
 If instead you want `NOTHING` ("unknown") to **flow through** the connectives — the road to
 the well-founded and stable-model semantics that give Prolog NAF its maturity — lift the
 operators to **Kleene strong three-valued logic** over `DefBool`, treating `NOTHING` as the
-undefined element ⊥, and ground to two-valued *once*, at the top, with the same `holds`:
+undefined element ⊥, and ground to two-valued _once_, at the top, with the same `holds`:
 
 ```l4
 GIVEN p IS A DefBool
@@ -174,12 +174,12 @@ Kleene `kor` and `knot` are the obvious duals (`knot` swaps `JUST TRUE`/`JUST FA
 `holds = fromMaybe FALSE` collapses the three-valued result back to a yes/no whenever a
 decision is required.
 
-| `p`       | `q`        | `p kand q`  |
-|-----------|------------|-------------|
-| `NOTHING` | `JUST FALSE` | `JUST FALSE` |
-| `NOTHING` | `JUST TRUE`  | `NOTHING`    |
-| `JUST TRUE` | `NOTHING`  | `NOTHING`    |
-| `JUST FALSE` | anything  | `JUST FALSE` |
+| `p`          | `q`          | `p kand q`   |
+| ------------ | ------------ | ------------ |
+| `NOTHING`    | `JUST FALSE` | `JUST FALSE` |
+| `NOTHING`    | `JUST TRUE`  | `NOTHING`    |
+| `JUST TRUE`  | `NOTHING`    | `NOTHING`    |
+| `JUST FALSE` | anything     | `JUST FALSE` |
 
 ## Worked, verified examples
 
@@ -266,10 +266,10 @@ the combinators to live in a dedicated module and to carry `@nlg` annotations:
 1. `holds : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe FALSE` — closed-world grounding. ✅
 2. `naf   : MAYBE BOOLEAN -> BOOLEAN` ≝ `NOT (holds p)` — negation as failure. ✅
 3. `presumed : MAYBE BOOLEAN -> BOOLEAN` ≝ `fromMaybe TRUE` — open-world dual. ✅
-4. Each of the three carries an `@nlg` annotation (e.g. `` naf p @nlg %p% has not
-   been proven true ``), so both the library's own generated docs and any calling
+4. Each of the three carries an `@nlg` annotation (e.g. `naf p @nlg %p% has not
+been proven true`), so both the library's own generated docs and any calling
    rule without its own `@nlg` override render as plain English. ✅
-5. *(experiment, not core)* Kleene three-valued `kand` / `kor` / `knot` over
+5. _(experiment, not core)_ Kleene three-valued `kand` / `kor` / `knot` over
    `MAYBE BOOLEAN` for users who want NAF to propagate through connectives — demonstrated
    in `jl4/experiments/negation-as-failure-examples.l4`. Deliberately kept out of the
    library itself (it introduces a second algebra; see Open question 2).
@@ -285,8 +285,8 @@ is already legible — but the experiment file declares it locally as a teaching
 2. **Ship the Kleene lift in the prelude or keep it as a documented pattern?** It introduces
    a second algebra; some users will want two-valued connectives only. Leaning: separate
    optional library module, not the core prelude.
-3. **Relationship to `TYPICALLY`.** `TYPICALLY` attaches a default to a *declaration* site;
-   `holds`/`presumed` apply a default at the *use* site. They are complementary, not
+3. **Relationship to `TYPICALLY`.** `TYPICALLY` attaches a default to a _declaration_ site;
+   `holds`/`presumed` apply a default at the _use_ site. They are complementary, not
    competing. Worth a cross-reference paragraph in both specs.
 4. **Interaction with deontic modalities.** `presumed`/open-world is the natural reading for
    permission; `holds`/closed-world for obligation discharge. Coordinate with
@@ -294,8 +294,8 @@ is already legible — but the experiment file declares it locally as a teaching
 
 ## References
 
-- K. L. Clark, *Negation as Failure*, in *Logic and Data Bases*, 1978.
-- A. Van Gelder, K. Ross, J. Schlipf, *The Well-Founded Semantics for General Logic
-  Programs*, JACM 1991.
-- M. Gelfond, V. Lifschitz, *The Stable Model Semantics for Logic Programming*, ICLP 1988.
-- S. C. Kleene, *Introduction to Metamathematics*, 1952 (strong three-valued logic).
+- K. L. Clark, _Negation as Failure_, in _Logic and Data Bases_, 1978.
+- A. Van Gelder, K. Ross, J. Schlipf, _The Well-Founded Semantics for General Logic
+  Programs_, JACM 1991.
+- M. Gelfond, V. Lifschitz, _The Stable Model Semantics for Logic Programming_, ICLP 1988.
+- S. C. Kleene, _Introduction to Metamathematics_, 1952 (strong three-valued logic).
