@@ -20,7 +20,6 @@ Coding guidelines for AI agents working in this repository.
 | `jl4-websessions/`    | Session persistence service                            |
 | `jl4-query-plan/`     | Query planning utilities                               |
 | `jl4-wasm/`           | WASM build of L4 for in-browser evaluation             |
-| `jl4-actus-analyzer/` | Static analyzer classifying L4 contracts by ACTUS/FIBO |
 
 ### TypeScript (npm workspaces + Turborepo)
 
