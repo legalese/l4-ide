@@ -108,7 +108,7 @@ import Optics ((%~), (^.))
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
-import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, extractComputedFieldNames)
+import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -133,6 +133,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = emptyMixfixRegistry
     , computedFields = Map.empty
+    , cyclicSynonyms = Set.empty
     , moduleUri
     , sectionStack = []
     }
@@ -162,7 +163,15 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
         ]
-      checkEnv' = checkEnv { computedFields = extractComputedFieldNames program }
+        ++
+        [ MkCheckErrorWithContext (CyclicTypeSynonyms cyc) (WhileCheckingDeclare synName None)
+        | cyc@(synName : _) <- synonymCycles
+        ]
+      synonymCycles = detectTypeSynonymCycles program
+      checkEnv' = checkEnv
+        { computedFields = extractComputedFieldNames program
+        , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
+        }
   in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
     (w, s) ->
       let
@@ -214,8 +223,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -834,11 +843,20 @@ inferTypeNameAndSynonym rappForm Nothing = do
     kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) Nothing
   pure $ makeKnownMany rs kt
 inferTypeNameAndSynonym rappForm (Just t) = do
+  cyclic <- asks (.cyclicSynonyms)
   let
     rs = appFormHeads rappForm
-    kt = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) . Just
+    -- A synonym that is a member of a declaration-time cycle gets NO
+    -- body: it has no finite expansion, and letting the expansion
+    -- machinery at it can blow up exponentially even under fuel. The
+    -- cycle itself is reported as CyclicTypeSynonyms; the body is still
+    -- checked below so its other errors surface.
+    quarantined = case rs of
+      (r : _) -> rawName (getOriginal r) `Set.member` cyclic
+      []      -> False
+    kt body = KnownType (kindOfAppForm rappForm) (view appFormArgs rappForm) body
   rt <- inferType t
-  pure $ makeKnownMany rs (kt rt)
+  pure $ makeKnownMany rs (kt (if quarantined then Nothing else Just rt))
 
 inferConDecl :: AppForm Resolved -> ConDecl Name -> Check (ConDecl Resolved, [CheckInfo])
 inferConDecl rappForm (MkConDecl ann n tns) = do
@@ -1932,48 +1950,60 @@ inferLit (StringLit _ _) =
 matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
 matchFunTy _isProjection _r t []   =
   pure ([], t)
-matchFunTy  isProjection r t args =
-  case t of
-    InfVar _ann _pre i -> do
-      subst <- use #substitution
-      case Map.lookup i subst of
-        Nothing -> do
-          -- We know nothing about the type of the thing we're applying.
-          -- So we construct a new function type of the right shape by
-          -- generating variables and bind the variable to that type.
-          --
-          -- Then we can proceed to checking the arguments.
-          argts <- traverse (const (fresh (NormalName "arg"))) args
-          rt <- fresh (NormalName "res")
-          let tf = fun_ argts rt
-          assign #substitution (Map.insert i tf subst)
-
-          rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
-          pure (rargs, rt)
-
-        Just t' -> matchFunTy isProjection r t' args
-    Fun _ann onts rt
-      -- We know already that the type of the thing we're applying
-      -- is a function, good. So we can check the number of arguments
-      -- and then check the arguments against their expected result
-      -- types.
-      | nonts == nargs -> do
-        rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
-        pure (rargs, rt)
-
-      | otherwise -> do
-        addError (IncorrectArgsNumberApp r nonts nargs)
-        rargs <- fst . unzip <$> traverse inferExpr args
-        pure (rargs, rt)
-      where
-        nonts = length onts
-        nargs = length args
-    TyApp _ann n ts -> do
-      mt' <- tryExpandTypeSynonym n ts
-      maybe illegalAppError (\ t' -> matchFunTy isProjection r t' args) mt'
-    _ -> illegalAppError
+matchFunTy  isProjection r t0 args =
+  -- The fuel bounds the synonym-expansion chain so that a cyclic type
+  -- synonym (which evades declaration-time detection when it arrives via
+  -- imports) cannot make us loop; when it runs out, we report the current
+  -- type as non-applicable. Substitution-chase steps do NOT consume fuel:
+  -- the substitution is acyclic (see 'bind' in L4.TypeCheck.Unify), so
+  -- chasing terminates on its own, and long chains arise from legitimate
+  -- alias definitions.
+  go synonymExpansionFuel t0
   where
-    illegalAppError = do
+    go :: Int -> Type' Resolved -> Check ([Expr Resolved], Type' Resolved)
+    go fuel t
+      | fuel <= 0 = illegalAppError t
+      | otherwise =
+        case t of
+          InfVar _ann _pre i -> do
+            subst <- use #substitution
+            case Map.lookup i subst of
+              Nothing -> do
+                -- We know nothing about the type of the thing we're applying.
+                -- So we construct a new function type of the right shape by
+                -- generating variables and bind the variable to that type.
+                --
+                -- Then we can proceed to checking the arguments.
+                argts <- traverse (const (fresh (NormalName "arg"))) args
+                rt <- fresh (NormalName "res")
+                let tf = fun_ argts rt
+                assign #substitution (Map.insert i tf subst)
+
+                rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
+                pure (rargs, rt)
+
+              Just t' -> go fuel t'
+          Fun _ann onts rt
+            -- We know already that the type of the thing we're applying
+            -- is a function, good. So we can check the number of arguments
+            -- and then check the arguments against their expected result
+            -- types.
+            | nonts == nargs -> do
+              rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+              pure (rargs, rt)
+
+            | otherwise -> do
+              addError (IncorrectArgsNumberApp r nonts nargs)
+              rargs <- fst . unzip <$> traverse inferExpr args
+              pure (rargs, rt)
+            where
+              nonts = length onts
+              nargs = length args
+          TyApp _ann n ts -> do
+            mt' <- tryExpandTypeSynonym n ts
+            maybe (illegalAppError t) (go (fuel - 1)) mt'
+          _ -> illegalAppError t
+    illegalAppError t = do
       -- We are trying to apply a non-function.
       addError (IllegalApp r t (length args))
       rargs <- fst . unzip <$> traverse inferExpr args
@@ -3219,6 +3249,14 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (CyclicTypeSynonyms cycleSyns) =
+  [ "Circular dependency detected between type synonyms:"
+  , ""
+  ] ++ map (\ n -> "  " <> quotedName n) cycleSyns ++
+  [ ""
+  , "A type synonym must not refer to itself, directly or via other"
+  , "synonyms, because it could then never be fully expanded."
+  ]
 prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   [ "Circular dependency detected between computed fields:"
   , ""

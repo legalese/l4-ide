@@ -8,6 +8,9 @@ module L4.Desugar (
   desugarComputedFields,
   detectComputedFieldCycles,
   extractComputedFieldNames,
+  -- * Type Synonyms
+  --
+  detectTypeSynonymCycles,
   ) where
 
 
@@ -432,6 +435,69 @@ detectCFCDeclare _ = []
 exprFieldRefs :: Set RawName -> Expr Name -> Set RawName
 exprFieldRefs fieldNames expr =
   Set.fromList [rawName n | n <- toList expr, rawName n `Set.member` fieldNames]
+
+-- ----------------------------------------------------------------------------
+-- Cycle Detection for Type Synonyms
+-- ----------------------------------------------------------------------------
+
+-- | Detect cycles among the type synonym declarations of a module.
+-- Returns the members of each cyclic strongly-connected component.
+--
+-- A recursive synonym has no finite expansion, so it would otherwise send
+-- the type checker's synonym-expanding loops into infinite regress (those
+-- loops carry fuel as a backstop, since a cycle can also arrive via
+-- imports — see 'L4.TypeCheck.Unify').
+--
+-- Like 'detectComputedFieldCycles' this matches names textually, which
+-- over-approximates references (it is blind to arity and to whether a
+-- name would actually resolve to the sibling synonym); a synonym's own
+-- type parameters are excluded from its dependencies so that a parameter
+-- shadowing a sibling synonym's name cannot manufacture a spurious cycle.
+-- A synonym is referenceable through its AKA aliases as well as its
+-- primary name, so aliases participate on both sides of the graph.
+detectTypeSynonymCycles :: Module Name -> [[Name]]
+detectTypeSynonymCycles (MkModule _ _ section) =
+  let
+    synonyms = synonymsInSection section
+    -- alias or primary raw name -> primary raw name. Primary names must
+    -- win over aliases (left-biased union): an alias that collides with a
+    -- sibling synonym's primary name would otherwise capture that
+    -- sibling's references and manufacture a false, declaration-order-
+    -- dependent cycle. Name resolution disambiguates such collisions by
+    -- arity/kind, which this textual pass cannot see; when it cannot,
+    -- the program is ambiguous and rejected anyway, and the expansion
+    -- fuel in L4.TypeCheck.Unify remains the termination guarantee.
+    primaryName =
+      Map.fromList
+        [ (rawName n, rawName n) | (n, _, _, _) <- synonyms ]
+      `Map.union`
+      Map.fromList
+        [ (alias, rawName n) | (n, aliases, _, _) <- synonyms, alias <- aliases ]
+    graphData =
+      [ (n, rawName n, Set.toList deps)
+      | (n, _aliases, params, ty) <- synonyms
+      , let deps = Set.fromList
+              [ primary
+              | r <- toList ty
+              , not (rawName r `Set.member` params)
+              , Just primary <- [Map.lookup (rawName r) primaryName]
+              ]
+      ]
+  in
+    [ cyc | CyclicSCC cyc <- stronglyConnComp graphData ]
+
+-- | All type synonym declarations in a section (recursively):
+-- name, AKA aliases, type parameters, body.
+synonymsInSection :: Section Name -> [(Name, [RawName], Set RawName, Type' Name)]
+synonymsInSection (MkSection _ _ _ topDecls) = concatMap go topDecls
+  where
+    go (Declare _ (MkDeclare _ _ (MkAppForm _ n args mAka) (SynonymDecl _ ty))) =
+      [(n, akaNames mAka, Set.fromList (rawName <$> args), ty)]
+    go (Section _ s) = synonymsInSection s
+    go _ = []
+
+    akaNames Nothing              = []
+    akaNames (Just (MkAka _ ns))  = rawName <$> ns
 
 -- ----------------------------------------------------------------------------
 -- Extract Computed Field Names
