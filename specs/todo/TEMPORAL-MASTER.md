@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** PARTIAL — the multi-axis runtime landed; the commit/git axis and the prelude macro layer did not.
+>
 > - Shipped: `L4.TemporalContext` (record + `applyEvalClauses`), `withEvalClauses` threading in `EvaluateLazy.hs`, EVER/ALWAYS BETWEEN + WHEN LAST/NEXT + VALUE AT as real builtins, DATE promoted to a core builtin family, `TemporalContextSpec.hs` + `temporal-acceptance.l4` goldens. EVAL clauses shipped: AS OF SYSTEM TIME, UNDER VALID TIME, UNDER RULES EFFECTIVE AT, UNDER RULES ENCODED AT.
 > - Remaining: `EVAL UNDER COMMIT` / `EVAL RETROACTIVE TO` builtins are NOT in the tree (this tracker's WIP log overstates them); no git checkout / `getRulesAtCommit` / audit wiring; `temporal-prelude.l4` was deleted rather than refactored (no mixfix macros). Live artifact is `jl4/examples/ok/temporal-acceptance.l4`.
 

@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** PARTIAL — the context-switching core landed; the git/commit axis and surface syntax did not.
+>
 > - Shipped: `withEvalClauses` (the spec's `withEvalContext`, `EvaluateLazy.hs:85-90`) plus builtins EVAL AS OF SYSTEM TIME / UNDER VALID TIME / UNDER RULES EFFECTIVE AT / UNDER RULES ENCODED AT (`Environment.hs:76-79`).
 > - Remaining: `UNDER COMMIT` and `RETROACTIVE TO` clauses; commit→ruleset resolution / worktree checkout / `getRulesAtCommit`; the `AuditEval` variant; the `EVAL … DO …` block syntax and mixfix wrappers.
 > - Body correction: the implemented helper is `withEvalClauses :: [EvalClause] -> Eval a -> Eval a` (no `L4Temporal`/`MonadTemporal` monad exists).

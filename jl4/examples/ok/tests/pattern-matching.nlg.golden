@@ -1,0 +1,14 @@
+`factorial` with 0
+`factorial` with 5
+`fib` with 10
+`list length` with `EMPTY`
+`list length` with list of 10, 20 and 30
+`from maybe` with 99 and `NOTHING`
+`from maybe` with 99 and `JUST` with 42
+`parking cost` with `TRUE` and Monday
+`parking cost` with `FALSE` and Saturday
+`parking cost` with `FALSE` and Sunday
+`parking cost` with `FALSE` and Monday
+`deep unwrap` with `NOTHING`
+`deep unwrap` with `JUST` with `NOTHING`
+`deep unwrap` with `JUST` with `JUST` with 7

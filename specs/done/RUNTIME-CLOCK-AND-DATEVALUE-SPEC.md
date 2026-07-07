@@ -1,4 +1,5 @@
 > **Status (audited 2026-07-03):** RESOLVED & superseded — all four builtins shipped plus a fuller DATE/DATETIME/TIMEZONE family. Moved to `specs/done/`.
+>
 > - `TODAY`/`NOW`/`DATEVALUE`/`TIMEVALUE` (+`CURRENTTIME`) registered in `jl4-core/src/L4/TypeCheck/Environment.hs:60-70`; clock threaded via `EvalConfig.evalTime` + `JL4_FIXED_NOW` env + `--fixed-now` CLI flag.
 > - Divergences from this spec: `NOW` returns **DATETIME** (not a serial NUMBER); `TODAY` requires a `TIMEZONE IS "<IANA>"` declaration; `ClockSource` sum type was realized as `Maybe UTCTime`. Excel-serial conversion, if wanted, belongs in `excel-date.l4`.
 

@@ -23,6 +23,7 @@ import System.Directory
   ( createDirectoryIfMissing
   , doesFileExist
   , getTemporaryDirectory
+  , removeFile
   , removePathForcibly
   )
 import System.Environment (lookupEnv)
@@ -147,6 +148,24 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert the CLI exits 0 and its stdout exactly matches a committed golden
+-- file. Used for the OpenFisca backend, whose emit is fully deterministic.
+expectGolden :: FilePath -> [String] -> FilePath -> IO ()
+expectGolden bin args goldenPath = do
+  Output code sout serr <- runL4 bin args
+  goldenBytes <- BS.readFile goldenPath
+  let golden = T.unpack (TE.decodeUtf8Lenient goldenBytes)
+  case code of
+    ExitSuccess ->
+      unless (sout == golden) $
+        expectationFailure $
+          "Generated output does not match golden " ++ goldenPath
+          ++ "\n(to update: l4 " ++ unwords args ++ " -o " ++ goldenPath ++ ")"
+          ++ "\n--- got ---\n" ++ sout
+          ++ "\n--- golden ---\n" ++ golden
+    ExitFailure n -> expectationFailure $
+      "Expected success but exited " ++ show n ++ "\n--- stderr ---\n" ++ serr
+
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
@@ -174,6 +193,38 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+breachTraceFixture, breachInputsFixture :: FilePath
+breachTraceFixture  = fixtureDir </> "breach-trace.l4"
+breachInputsFixture = fixtureDir </> "breach-inputs.json"
+
+batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
+batchEligFixture = fixtureDir </> "batch-elig.l4"
+batchDataJson    = fixtureDir </> "batch-data.json"
+batchDataCsv     = fixtureDir </> "batch-data.csv"
+batchMixedJson   = fixtureDir </> "batch-mixed.json"
+
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+batchCodeFixture  = fixtureDir </> "batch-code.l4"
+batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
+batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
+batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+
+-- | Decode stdout as a single JSON array (for @l4 batch --format json@).
+decodeArray :: String -> IO [Value]
+decodeArray sout =
+  case eitherDecode (BSL8.pack sout) of
+    Right (Array v)  -> pure (foldr (:) [] v)
+    Right other      -> do
+      expectationFailure ("Expected a JSON array, got: " ++ show other)
+      error "unreachable"
+    Left err         -> do
+      expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
+      error "unreachable"
+
+-- | Count non-blank lines (each NDJSON row is one line).
+nonBlankLines :: String -> Int
+nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
+
 batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
@@ -197,6 +248,9 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , breachTraceFixture, breachInputsFixture
+       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
+       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry ] \fp -> do
     ok <- doesFileExist fp
@@ -221,6 +275,7 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+      sout `shouldSatisfy` ("openfisca" `isInfixOf`)
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -315,8 +370,130 @@ spec bin = do
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
 
-  -- Regression tests for target T11 (CLI injection / corruption).
   describe "l4 batch" $ do
+    it "serializes a #TRACE breach with correctly-labeled fields" $ do
+      -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
+      -- re-prints the module and re-parses it once per input row.
+      Output code sout serr <- runL4 bin
+        ["batch", breachTraceFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      -- DeadlineMissed labels must follow the constructor slots:
+      --   event party/action/timestamp, obligated party, obligation action,
+      --   deadline (see L4.Evaluate.ValueLazyJSON).
+      let expectedFragments =
+            [ "\"type\":\"deadline_missed\""
+            , "\"eventParty\":\"Bob\""
+            , "\"eventAction\":\"ping\""
+            , "\"timestamp\":15"
+            , "\"obligatedParty\":\"Alice\""
+            , "\"obligationAction\":\"MUST pay 100\""
+            , "\"deadline\":10"
+            ]
+      for_ expectedFragments \frag ->
+        unless (frag `isInfixOf` sout) $
+          expectationFailure $
+            "Expected batch stdout to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+            ++ "\n--- stderr ---\n" ++ serr
+      -- The old mislabeled fields and the derived-Show AST blob must be gone.
+      let forbiddenFragments = ["\"now\":", "\"elapsed\":", "\"limit\":", "MkAction"]
+      for_ forbiddenFragments \frag ->
+        unless (not (frag `isInfixOf` sout)) $
+          expectationFailure $
+            "Expected batch stdout NOT to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+
+    it "streams one NDJSON row per input (default format)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "infers CSV cell types so numeric params typecheck" $ do
+      -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
+      -- the rows would come back status=error; success proves inference works.
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+      let statuses = [ s | Object o <- rows
+                         , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
+      statuses `shouldBe` ["success", "success"]
+
+    it "emits a single JSON array with --format json" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      length rows `shouldBe` 2
+
+    it "emits a CSV table with flattened input_* columns via --format csv" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input_age" `isInfixOf`)
+      sout `shouldSatisfy` ("status" `isInfixOf`)
+
+    it "writes results to a file with --output" $ do
+      tmp <- getTemporaryDirectory
+      let outFile = tmp </> "l4-batch-out.json"
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
+                  , "--format", "json", "--output", outFile ]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null                    -- nothing on stdout
+      exists <- doesFileExist outFile
+      exists `shouldBe` True
+      contents <- readFile outFile
+      rows <- decodeArray contents
+      length rows `shouldBe` 2
+      removeFile outFile
+
+    it "stops at the first failing row by default (and exits non-zero)" $ do
+      -- Row 2 has a non-numeric income; row 3 must NOT be processed.
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 2
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+
+    it "processes every row with --continue-on-error (still exits non-zero)" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchMixedJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      nonBlankLines sout `shouldBe` 3
+
+    it "validate-only reports schema mismatches without evaluating" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchEligFixture, "--inputs", batchMixedJson
+                  , "--validate-only", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
+
+    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+      -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
+      -- but must survive as the string "1E5" against a STRING param rather
+      -- than being coerced to 100000.
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    it "validate-only type-checks MAYBE primitive params" $ do
+      -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
+      -- as a type mismatch. Before unwrapping MAYBE on the AST this silently
+      -- passed as valid.
+      Output code sout _ <-
+        runL4 bin [ "batch", batchMaybeFixture, "--inputs", batchMaybeBadJson
+                  , "--validate-only" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Type mismatch for field 'premium'" `isInfixOf`)
+      sout `shouldSatisfy` ("expected NUMBER" `isInfixOf`)
+
+    -- Regression tests for target T11 (CLI injection / corruption).
     it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
       -- The input row's payload contains backslashes (Windows path), embedded
       -- quotes, newline/tab, and shell metacharacters. A naive quote-only
@@ -380,3 +557,61 @@ spec bin = do
       -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
       -- rule must NOT over-fire on a legitimate clean import.
       expectOk bin ["check", cleanImportEntry] "Check succeeded."
+
+  describe "l4 openfisca" $ do
+    it "compiles the flat-tax example to its golden OpenFisca module" $
+      expectGolden bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+                       "examples/openfisca/expected/flat-tax.py"
+
+    it "compiles the means-tested benefit example to its golden module" $
+      expectGolden bin ["openfisca", "examples/openfisca/benefit.l4"]
+                       "examples/openfisca/expected/benefit.py"
+
+    it "compiles a group entity with LIST OF aggregation (household)" $
+      expectGolden bin ["openfisca", "examples/openfisca/household.l4"]
+                       "examples/openfisca/expected/household.py"
+
+    it "compiles a time-varying marginal-rate scale + parameter store (scale)" $
+      expectGolden bin ["openfisca", "examples/openfisca/scale.l4"]
+                       "examples/openfisca/expected/scale.py"
+
+    it "compiles roles + count/any/all aggregation (roles)" $
+      expectGolden bin ["openfisca", "examples/openfisca/roles.l4"]
+                       "examples/openfisca/expected/roles.py"
+
+    it "compiles an enum + CONSIDER (housing)" $
+      expectGolden bin ["openfisca", "examples/openfisca/housing.l4"]
+                       "examples/openfisca/expected/housing.py"
+
+    it "compiles dated formulas (BRANCH IF period reaches → formula_YYYY_MM)" $
+      expectGolden bin ["openfisca", "examples/openfisca/dated.l4"]
+                       "examples/openfisca/expected/dated.py"
+
+    it "compiles a member decision-call inside an aggregation (agecheck)" $
+      expectGolden bin ["openfisca", "examples/openfisca/agecheck.l4"]
+                       "examples/openfisca/expected/agecheck.py"
+
+    it "compiles a scalar legislation-parameter store (incometax)" $
+      expectGolden bin ["openfisca", "examples/openfisca/incometax.l4"]
+                       "examples/openfisca/expected/incometax.py"
+
+    it "compiles the country-template basic_income (dated formulas + scalar params)" $
+      expectGolden bin ["openfisca", "examples/openfisca/basic-income.l4"]
+                       "examples/openfisca/expected/basic-income.py"
+
+    it "rejects a name collision (distinct L4 names → same Python identifier)" $
+      expectFail bin ["openfisca", "examples/openfisca/not-ok/name-collision.l4"]
+
+    it "rejects a mis-ordered dated BRANCH (ascending arms)" $
+      expectFail bin ["openfisca", "examples/openfisca/not-ok/branch-misordered.l4"]
+
+    it "emits a Variable subclass and a TaxBenefitSystem" $ do
+      Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("class flat_tax_on_salary(Variable):" `isInfixOf`)
+      sout `shouldSatisfy` ("class L4TaxBenefitSystem(TaxBenefitSystem):" `isInfixOf`)
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["openfisca", errorFixture]
+  where
+    for_ xs f = mapM_ f xs

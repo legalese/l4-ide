@@ -2,12 +2,20 @@ name: PR Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, unstable]
+  push:
+    branches: [main, unstable]
+  # Required so these checks report against the merge queue's speculative
+  # commit. Without a merge_group trigger, queued PRs sit in AWAITING_CHECKS
+  # forever because the required contexts never run for the merge group.
+  merge_group:
 
-# Only run one check per PR to save resources
+# Only run one check per PR to save resources. Key the group on a per-run
+# identifier for merge_group (the speculative head SHA) so queue entries never
+# cancel each other, and only cancel superseded runs for pull_request pushes.
 concurrency:
-  group: pr-checks-${{ github.ref }}
-  cancel-in-progress: true
+  group: pr-checks-${{ github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ============================================
@@ -23,6 +31,16 @@ jobs:
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
+      # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
+      # so the repo must be checked out with history. Without this, push events
+      # error at the paths-filter step, all downstream jobs skip, and the Haskell
+      # job never runs on a push to unstable — which is what warms the shared
+      # base-branch cache (see the cache-maintenance note in the haskell job).
+      # (pull_request uses the GitHub API and needs no checkout.)
+      - uses: actions/checkout@v5
+        if: github.event_name == 'merge_group' || github.event_name == 'push'
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -86,6 +104,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.haskell == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
+    # actions: write lets the push-only "Prune superseded Haskell caches" step
+    # delete stale cache entries so the repo stays under GitHub's 10 GB cache cap.
+    permissions:
+      contents: read
+      actions: write
     container:
       image: ubuntu:24.04
     env:
@@ -158,22 +181,8 @@ jobs:
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
 
-      - name: Save cached dependencies
-        uses: actions/cache/save@v5
-        if: steps.deps-cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
-
       - name: Build
         run: cabal build all
-
-      - name: Save cached build artifacts
-        uses: actions/cache/save@v5
-        if: success() && steps.build-cache.outputs.cache-hit != 'true'
-        with:
-          path: dist-newstyle
-          key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
       - name: Run tests
         run: cabal test all
@@ -182,6 +191,71 @@ jobs:
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh
+
+      # ---- Cache maintenance (base-branch push only) --------------------------
+      # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base
+      # cache (steps above) but never SAVE. Only a push to a base branch
+      # (unstable/main) refreshes the shared cache. This is what keeps the repo
+      # under GitHub's 10 GB cache cap: previously every PR/queue run wrote a
+      # fresh ~330 MB dist + ~150 MB cabal cache under a per-commit key, and that
+      # churn LRU-evicted the base cache that PRs need — so PRs cold-built (~40
+      # min). GitHub also scopes cache reads to {own ref, base, default}, so only
+      # a cache saved here on refs/heads/unstable is inheritable by PRs into it.
+      #
+      # The prune runs AFTER build+test (invisible to them) and deletes the
+      # superseded entries of each family so the fresh save below is the sole
+      # survivor — the dist/cabal cache families self-limit to one entry each.
+      - name: Prune superseded Haskell caches
+        if: github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const os = '${{ runner.os }}';
+            const ghc = '${{ steps.setup.outputs.ghc-version }}';
+            const prefixes = [
+              `pr-checks-${os}-ghc-${ghc}-dist-`,
+              `pr-checks-${os}-ghc-${ghc}-cabal-`,
+            ];
+            // Never delete THIS run's primary keys: on an exact cache-hit the
+            // Save step is skipped, so pruning them would lose a good cache.
+            const keep = new Set([
+              '${{ steps.build-cache.outputs.cache-primary-key }}',
+              '${{ steps.deps-cache.outputs.cache-primary-key }}',
+            ]);
+            const caches = await github.paginate(
+              github.rest.actions.getActionsCacheList,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 },
+            );
+            let freed = 0;
+            for (const c of caches) {
+              if (prefixes.some((p) => c.key.startsWith(p)) && !keep.has(c.key)) {
+                core.info(`Deleting superseded cache ${c.key} (${Math.round(c.size_in_bytes / 1048576)} MB, ref ${c.ref})`);
+                try {
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner, repo: context.repo.repo, cache_id: c.id,
+                  });
+                  freed += c.size_in_bytes;
+                } catch (e) {
+                  core.warning(`  failed to delete ${c.key}: ${e.message}`);
+                }
+              }
+            }
+            core.info(`Freed ${Math.round(freed / 1048576)} MB before saving the fresh base cache.`);
+
+      - name: Save cached dependencies
+        uses: actions/cache/save@v5
+        if: github.event_name == 'push' && steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Save cached build artifacts
+        uses: actions/cache/save@v5
+        if: github.event_name == 'push' && steps.build-cache.outputs.cache-hit != 'true'
+        with:
+          path: dist-newstyle
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
   # ============================================
   # WASM Build & Test (only when Haskell changes)

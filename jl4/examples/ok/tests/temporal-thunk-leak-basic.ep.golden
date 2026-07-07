@@ -1,0 +1,83 @@
+-- T6 regression: temporal-context leakage through thunk memoization (basic).
+--
+-- A shared module-level binding whose force reads the temporal context
+-- (TODAY/NOW) must be re-evaluated when served under a DIFFERENT context.
+-- Pre-fix, the first force's value was memoized unconditionally and served
+-- stale in BOTH directions (forced inside an `EVAL AS OF SYSTEM TIME` scope
+-- and read outside, and vice versa), through nested scopes, and through
+-- transitive dependencies.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
+-- so ambient TODAY = DATE OF 31, 1, 2025.
+--
+-- (The tz-axis analogue — a thunk forced before a TIMEZONE IS decl being
+-- invalidated after it — is not observable in a batch run because all
+-- directives evaluate after all module decls; it is covered by the
+-- validFor unit tests in TemporalContextSpec.)
+
+"Etc/UTC"
+
+----------------------------------------------------------------------------
+-- Case 1: inside-to-outside (forced under the override first)
+----------------------------------------------------------------------------
+
+`today snapshot` MEANS TODAY
+
+-- expected: DATE OF 1, 1, 2020 (forced under the override; correct)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot`
+
+-- expected: DATE OF 31, 1, 2025 (ambient; pre-fix leaked DATE OF 1, 1, 2020)
+#EVAL `today snapshot`
+
+----------------------------------------------------------------------------
+-- Case 2: outside-to-inside (forced ambiently first)
+----------------------------------------------------------------------------
+
+`today snapshot 2` MEANS TODAY
+
+-- expected: DATE OF 31, 1, 2025 (ambient force; memoized)
+#EVAL `today snapshot 2`
+
+-- expected: DATE OF 1, 1, 2020 (pre-fix leaked the ambient DATE OF 31, 1, 2025)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot 2`
+
+----------------------------------------------------------------------------
+-- Case 3: nested overrides (2020 wrapping 2010; forced innermost first)
+----------------------------------------------------------------------------
+
+`today snapshot 3` MEANS TODAY
+
+-- expected: DATE OF 1, 1, 2010 (innermost override wins)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2010)) `today snapshot 3`)
+
+-- expected: DATE OF 1, 1, 2020 (pre-fix leaked DATE OF 1, 1, 2010 one level up)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot 3`
+
+-- expected: DATE OF 31, 1, 2025 (pre-fix leaked DATE OF 1, 1, 2010 to ambient)
+#EVAL `today snapshot 3`
+
+----------------------------------------------------------------------------
+-- Case 4: transitive dependency (the thunk's head is not a nullary builtin;
+-- context-dependence must be detected dynamically during the force)
+----------------------------------------------------------------------------
+
+`day after today` MEANS DATE_FROM_SERIAL (DATE_SERIAL TODAY PLUS 1)
+
+-- expected: DATE OF 2, 1, 2020 (day after overridden today)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `day after today`
+
+-- expected: DATE OF 1, 2, 2025 (pre-fix leaked DATE OF 2, 1, 2020)
+#EVAL `day after today`
+
+----------------------------------------------------------------------------
+-- Case 5: NOW / DATETIME (sub-day precision of tcSystemTime, plus the
+-- tcDocumentTimezone axis in the fingerprint)
+----------------------------------------------------------------------------
+
+`now snapshot` MEANS NOW
+
+-- expected: 2020-01-01T00:00:00+0000 (midnight UTC of the override serial)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `now snapshot`
+
+-- expected: 2025-01-31T15:45:30+0000 (pre-fix leaked the 2020 instant)
+#EVAL `now snapshot`

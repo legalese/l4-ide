@@ -149,6 +149,7 @@ import UnliftIO (MonadUnliftIO (withRunInIO))
 import qualified "list-t" ListT
 import L4.Parser.SrcSpan
 import L4.Syntax
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import qualified Base.Text as Text
 import qualified Data.Text.Mixed.Rope as Rope
 import Base.Text (Text)
@@ -332,11 +333,36 @@ addPersistentRule k getVal = do
 
 class Typeable a => IsIdeGlobal a where
 
+-- | Embedded libraries, keyed by the exact VFS URI under which import
+-- resolution registers them (see 'LSP.L4.Rules'). Used as a fallback in
+-- 'getVirtualFile' so that these built-in modules are always visible, even
+-- before import resolution has explicitly 'addVirtualFile'd them. Without
+-- this, a candidate URI can be probed (and memoized as "missing") before the
+-- embedded library is registered under the same URI, permanently poisoning
+-- that module's contents for the rest of the build. This bites transitively
+-- imported embedded libraries whose importer is itself an embedded library:
+-- the relative candidate URI then coincides with the embedded registration
+-- URI. Seeding here is ordering-independent and keyed by the precise URI, so
+-- it can never shadow a genuine on-disk or user-edited file (whose URI never
+-- has this bare @file://<name>.l4@ form).
+embeddedLibraryVfs :: Map.Map NormalizedUri VirtualFile
+embeddedLibraryVfs =
+  Map.fromList
+    [ ( normalizedFilePathToUri (toNormalizedFilePath ("./" <> Text.unpack name <.> "l4"))
+      , VirtualFile 0 0 (Rope.fromText content)
+      )
+    | (name, content) <- Map.toList EmbeddedLibraries.embeddedLibraries
+    ]
+
 -- | Read a virtual file from the current snapshot
 getVirtualFile :: NormalizedUri -> Action (Maybe VirtualFile)
 getVirtualFile nf = do
   vfs <- fmap _vfsMap . liftIO . readTVarIO . vfsVar =<< getShakeExtras
-  pure $! Map.lookup nf vfs -- Don't leak a reference to the entire map
+  -- Prefer the live VFS (real / user-edited files win); fall back to the
+  -- embedded library seed so built-ins are visible regardless of probe order.
+  pure $! case Map.lookup nf vfs of -- Don't leak a reference to the entire map
+    Just vf -> Just vf
+    Nothing -> Map.lookup nf embeddedLibraryVfs
 
 addVirtualFile :: NormalizedFilePath -> Text -> Action Rope.Rope
 addVirtualFile nfp t = do

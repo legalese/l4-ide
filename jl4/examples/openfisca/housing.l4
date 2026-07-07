@@ -1,0 +1,39 @@
+IMPORT prelude
+
+DECLARE `Occupancy Status` IS ONE OF
+    Owner
+    Tenant
+    `Free Lodger`
+    Homeless
+
+DECLARE Household HAS
+    `accommodation size` IS A NUMBER
+    `occupancy status`   IS AN `Occupancy Status`
+
+@export Whether the household owns or rents its home
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A BOOLEAN
+`owns or rents` h period MEANS
+    CONSIDER h's `occupancy status`
+    WHEN Owner  THEN TRUE
+    WHEN Tenant THEN TRUE
+    OTHERWISE FALSE
+
+@export Monthly housing tax (size-based; owners and tenants only)
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`housing tax` h period MEANS
+    IF `owns or rents` h period
+    THEN max 200 (h's `accommodation size` TIMES 10)
+    ELSE 0
+
+`flat40 tenant`  MEANS Household WITH `accommodation size` IS 40,  `occupancy status` IS Tenant
+`flat40 lodger`  MEANS Household WITH `accommodation size` IS 40,  `occupancy status` IS `Free Lodger`
+`flat100 owner`  MEANS Household WITH `accommodation size` IS 100, `occupancy status` IS Owner
+
+#ASSERT (`housing tax`   OF `flat40 tenant`,  "2026-01") EQUALS 400
+#ASSERT (`housing tax`   OF `flat40 lodger`,  "2026-01") EQUALS 0
+#ASSERT (`housing tax`   OF `flat100 owner`,  "2026-01") EQUALS 1000
+#ASSERT (`owns or rents` OF `flat40 lodger`,  "2026-01") EQUALS FALSE
