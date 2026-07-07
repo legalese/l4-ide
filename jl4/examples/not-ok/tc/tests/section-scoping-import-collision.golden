@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: math from section-scoping-import-collision.l4Debug | [Import Resolution] Checking VFS URIs: project:/math.l4, math.l4, math.l4Debug | [Import Resolution] VFS MISS: project:/math.l4Debug | [Import Resolution] VFS MISS: math.l4Debug | [Import Resolution] VFS MISS: math.l4Info | [Import Resolution] Found in embedded libraries: mathInfo | [Import Resolution] Resolving import: prelude from math.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found in embedded libraries: preludeInfo | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: section-scoping-import-collision.l4
+  Hidden: no
+  Range: 16:7-16:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      EULER
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      EULER (defined at section-scoping-import-collision.l4:14:1-6) of type NUMBER
+      EULER (defined at math.l4:12:1-6) of type NUMBER

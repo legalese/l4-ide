@@ -120,6 +120,7 @@ mkInitialCheckState substitution =
     , scopeMap     = IV.empty
     , descMap      = IV.empty
     , constBodies  = Map.empty
+    , sectionPaths = Map.empty
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -137,6 +138,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , cyclicSynonyms = Set.empty
     , moduleUri
     , sectionStack = []
+    , localBindings = Set.empty
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -212,7 +214,7 @@ checkProgram module' = do
 
 withDecides :: [FunTypeSig] -> Check a -> Check a
 withDecides rdecides =
-  extendKnownMany topDecides . local \s -> s
+  extendKnownGlobalMany topDecides . local \s -> s
     { functionTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdecides
     , mixfixRegistry = unionMixfixRegistry (buildMixfixRegistry rdecides) s.mixfixRegistry
     }
@@ -224,8 +226,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs h i lb) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs h i lb
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -269,7 +271,7 @@ withDeclares rdecls =
     go (MkDeclChecked (Left  a) cis) = Left  . (, MkDeclChecked a cis) <$> rangeOf a
     go (MkDeclChecked (Right a) cis) = Right . (, MkDeclChecked a cis) <$> rangeOf a
   in
-    extendKnownMany topDeclares . local \s -> s
+    extendKnownGlobalMany topDeclares . local \s -> s
       { declareDeclarations = Map.fromList rdeclares
       , assumeDeclarations = Map.fromList rassumes
       }
@@ -278,7 +280,7 @@ withDeclares rdecls =
 
 withDeclareTypeSigs :: [DeclTypeSig] -> Check a -> Check a
 withDeclareTypeSigs rdeclares =
-  extendKnownMany topDeclares . local \s -> s
+  extendKnownGlobalMany topDeclares . local \s -> s
     { declTypeSigs = Map.fromList $ mapMaybe (\d -> (,d) <$> rangeOf d.anno) rdeclares
     }
   where
@@ -493,7 +495,10 @@ inferSection (MkSection ann mn maka topdecls) = do
       Nothing -> pure Nothing -- we do not support anonymous sections with AKAs
       Just rn -> traverse (inferAka rn) maka
 
-  (rtopdecls, topDeclExtends) <- unzip <$> traverse inferTopDecl topdecls
+  -- Push this section while inferring its bodies so that unqualified references
+  -- resolve to the nearest enclosing section (lexical scoping).
+  (rtopdecls, topDeclExtends) <- withSectionStack mn maka $
+    unzip <$> traverse inferTopDecl topdecls
 
   pure (MkSection ann rmn rmaka rtopdecls, concat topDeclExtends)
 
@@ -971,7 +976,20 @@ checkKind kind xs
 resolveType :: Name -> Check (Resolved, Kind)
 resolveType n = do
   options <- lookupRawNameInEnvironment (rawName n)
-  case mapMaybe proc options of
+  -- Lexical scoping for type names: same nearest-enclosing-section preference
+  -- as 'resolveTerm''. Types and terms scope identically.
+  current <- asks (.sectionStack)
+  curUri  <- asks (.moduleUri)
+  locals  <- asks (.localBindings)
+  paths <- use #sectionPaths
+  let viable = mapMaybe proc options
+      -- In-scope local type variables take absolute priority over section /
+      -- top-level / imported type bindings of the same name (see 'resolveTerm'').
+      candidates =
+        case [ c | c@(_, u, _) <- viable, u `Set.member` locals ] of
+          []            -> viable
+          localsInScope -> localsInScope
+  case selectByProximityPerType curUri current paths candidates of
     [] -> do
       let kind = 0
       n' <- setAnnResolvedKind kind n
@@ -985,14 +1003,16 @@ resolveType n = do
       rn <- ambiguousType n' xs'
       pure (rn, kind)
   where
-    proc :: (Unique, Name, CheckEntity) -> Maybe (Check (Resolved, Kind))
+    -- Group by kind so that same-kinded type bindings shadow lexically while
+    -- differently-kinded ones remain available for resolution.
+    proc :: (Unique, Name, CheckEntity) -> Maybe (Kind, Unique, Check (Resolved, Kind))
     proc (u, o, KnownTypeVariable)       =
       let
         kind = 0
-      in Just do
+      in Just . (kind, u,) $ do
         n' <- setAnnResolvedKind kind n
         pure (Ref n' u o, kind)
-    proc (u, o, KnownType kind _ _)      = Just do
+    proc (u, o, KnownType kind _ _)      = Just . (kind, u,) $ do
       n' <- setAnnResolvedKind kind n
       pure (Ref n' u o, kind)
     proc _                               = Nothing
@@ -2350,6 +2370,11 @@ withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
 withQualified :: [Resolved] -> CheckEntity -> Check CheckInfo
 withQualified rs ce = do
   sects <- asks (.sectionStack)
+  -- Remember the section path of each definition so that unqualified references
+  -- can later be resolved to the nearest enclosing section. Qualified-name
+  -- variants share the same 'Unique' as the original, so recording the original
+  -- 'Unique's suffices. (A no-op at top level, where 'sects' is empty.)
+  recordSectionPath sects (getUnique <$> rs)
   case nonEmpty sects of
     Nothing -> pure $ makeKnownMany rs ce
     Just (neSects :: NonEmpty (NonEmpty Text)) -> do
@@ -2383,8 +2408,11 @@ inferTyDeclModule (MkModule _ _ sects) =
   inferTyDeclSection sects
 
 inferTyDeclSection :: Section Name -> Check [DeclChecked DeclareOrAssume]
-inferTyDeclSection (MkSection _ _ _ topDecls) =
-  concat <$> traverse inferTyDeclTopLevel topDecls
+inferTyDeclSection (MkSection _ name maka topDecls) =
+  -- Keep the section stack accurate while inferring type-declaration bodies so
+  -- that type references resolve with the correct nearest-enclosing-section
+  -- preference.
+  withSectionStack name maka $ concat <$> traverse inferTyDeclTopLevel topDecls
 
 inferTyDeclLocalDecl :: LocalDecl Name -> Check (Maybe (DeclChecked DeclareOrAssume))
 inferTyDeclLocalDecl = \ case
@@ -2441,8 +2469,13 @@ scanTyDeclModule (MkModule _ _ sects) =
   scanTyDeclSection sects
 
 scanTyDeclSection :: Section Name -> Check [DeclTypeSig]
-scanTyDeclSection (MkSection _ _ _ topDecls) =
-  concat <$> traverse scanTyDeclTopLevel topDecls
+scanTyDeclSection (MkSection _ name maka topDecls) =
+  -- NOTE: previously this phase did NOT push the section, so DECLARE/type-ASSUME
+  -- names defined inside sections received neither qualified-name variants nor a
+  -- recorded section path (unlike DECIDE/term-ASSUME, handled in
+  -- 'scanFunSigSection'). Pushing here fixes that asymmetry so that types and
+  -- terms scope identically.
+  withSectionStack name maka $ concat <$> traverse scanTyDeclTopLevel topDecls
 
 scanTyDeclTopLevel :: TopDecl Name -> Check [DeclTypeSig]
 scanTyDeclTopLevel = \ case
@@ -3003,20 +3036,26 @@ tryMatchParamPositions args (sig:sigs) =
         Just result -> Just (canonicalMixfixName info, result)
         Nothing -> tryMatchParamPositions args sigs
 
+-- | Push a section's name (and any AKA aliases) onto the 'sectionStack' for the
+-- duration of the action. Anonymous sections (no name) leave the stack
+-- unchanged. Used by every phase that recurses into sections so that both the
+-- qualified-name generation ('withQualified') and the lexical resolution
+-- ('resolveTerm''/'resolveType') see a consistent section path.
+withSectionStack :: Maybe Name -> Maybe (Aka Name) -> Check a -> Check a
+withSectionStack mname maka = case mname of
+  Nothing -> id
+  Just n  -> pushSection (rawNameToText <$> (rawName n :| maybe [] akaToRawNames maka))
+  where
+    akaToRawNames :: Aka Name -> [RawName]
+    akaToRawNames (MkAka _ ns) = fmap rawName ns
+
 scanFunSigModule :: Module Name -> Check [FunTypeSig]
 scanFunSigModule (MkModule _ _ sects) =
   scanFunSigSection sects
 
 scanFunSigSection :: Section Name -> Check [FunTypeSig]
 scanFunSigSection (MkSection _ name maka topDecls) =
-  concat <$> traverse (extendSectionStack . scanFunSigTopLevel) topDecls
-  where
-    extendSectionStack = case name of
-      Nothing -> id
-      Just n -> pushSection (fmap rawNameToText $ (rawName n) :| maybe [] akaToRawNames maka )
-
-    akaToRawNames :: Aka Name -> [RawName]
-    akaToRawNames (MkAka _ ns) = fmap rawName ns
+  withSectionStack name maka $ concat <$> traverse scanFunSigTopLevel topDecls
 
 scanFunSigTopLevel :: TopDecl Name -> Check [FunTypeSig]
 scanFunSigTopLevel = \ case

@@ -619,3 +619,47 @@ lexical binding.
   `resolveTerm'`, `resolveType`, `pushSection`), `jl4-core/src/L4/TypeCheck/Types.hs`
   (`CheckEnv`, `Environment`, `sectionStack`)
 - Existing test: `jl4/examples/ok/nested-sections.l4`
+
+---
+
+## 12. Hardening fixes (2026-07) and residual notes
+
+Three defects in the initial resolve-time proximity filter were fixed; see the
+regression examples for each.
+
+- **FIX A — locals beat sections (`jl4/examples/ok/section-scoping-param-not-shadowed.l4`).**
+  Function parameters, `WHERE`/`LET` bindings and pattern variables are lexical LOCALs and
+  are absent from `sectionPaths`, which formerly conflated them with top-level and imported
+  bindings (all at path `[]`). They are now tracked explicitly in a `Set Unique`
+  (`CheckEnv.localBindings`, populated by `extendKnownMany`; section/top-level bindings use
+  the non-marking `extendKnownGlobalMany`) and are given ABSOLUTE priority in `resolveTerm'`
+  / `resolveType` before any section-proximity ranking.
+
+- **FIX B — proximity before type-grouping (`jl4/examples/ok/section-scoping-forward-ref.l4`).**
+  A forward reference to a not-yet-inferred un-annotated `DECIDE` has a wildcard (`InfVar`)
+  type, so per-type grouping would never compare it by proximity against a same-named
+  concrete ancestor. `resolveTerm'` now, before grouping, lets the nearest current-module
+  wildcard VALUE-binding ancestor lexically shadow every strictly-farther same-name
+  VALUE-binding ancestor regardless of type. This is restricted to VALUE bindings
+  (`Computable`/`Local`/`Assumed`) on both ends so that record selectors and data
+  constructors — reached through projection/pattern syntax — are neither shadowed by, nor
+  act as, a same-named value forward reference (a `WHERE` binding named like a field it
+  projects previously broke this).
+
+- **FIX C — imports stay ambiguous (`jl4/examples/not-ok/tc/section-scoping-import-collision.l4`).**
+  Imported candidates (identified by a differing module URI on the `Unique`) are never
+  ranked or eliminated by section proximity: they remain co-equal viable candidates. So an
+  import and a local section binding of the same name and type stay a genuine
+  `AmbiguousTermError` (spec §5.5), while a nearer current-module section binding still
+  correctly shadows a farther current-module (non-import) binding.
+
+  **Residual:** FIX C keys "is this an import?" purely on the candidate's module URI, not on
+  a merged import section-path (the reviewer's `combineOne` in `Import/Resolution.hs` still
+  does not merge `r.sectionPaths`). This is correct for the current design — a wildcard can
+  only ever be a current-module forward reference, and imported bindings are already fully
+  type-checked/concrete — but it means imports are treated as a single flat namespace with
+  no notion of *their* internal section structure when viewed from an importer. Qualified
+  access across modules is unaffected; only the (rare) case of proximity ranking *among
+  bindings imported from different sections of another module* is not modelled. Left as-is
+  to avoid regressing the standard-library overload resolution that depends on cross-module
+  candidates remaining co-equal.
