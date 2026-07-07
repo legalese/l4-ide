@@ -115,16 +115,33 @@ main = do
 l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> IO (Golden String)
 l4Golden evalConfig isOk dir inputFile = do
   (output, _) <- capture (checkFile evalConfig isOk inputFile)
+  scrubLibPath <- mkLibraryPathScrubber
+  let normalize = scrubLibPath . normalizeWhitespaceString . stripAnsiCodesString
   pure
     Golden
-      { output = normalizeWhitespaceString $ stripAnsiCodesString output
+      { output = normalize output
       , encodePretty = show
       , writeToFile = writeFile
-      , readFromFile = fmap (normalizeWhitespaceString . stripAnsiCodesString) . readFile
+      , readFromFile = fmap normalize . readFile
       , goldenFile = dir </> (takeFileName inputFile -<.> "golden")
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "actual"))
       , failFirstTime = True
       }
+
+-- | Build a scrubber that replaces the (absolute, machine-specific)
+-- @JL4_LIBRARY_PATH@ prefix with a stable @$JL4_LIBRARY_PATH@ token, so goldens
+-- that capture import-resolution logs like @Found on filesystem: <abspath>@ are
+-- portable across machines and CI. In jl4-test @JL4_LIBRARY_PATH@ is always set
+-- (see 'main'), so a library import is always resolved from the filesystem at
+-- that path; the only environment-dependent part of the log is the prefix.
+-- No-op when the variable is unset or empty.
+mkLibraryPathScrubber :: IO (String -> String)
+mkLibraryPathScrubber = do
+  mp <- lookupEnv "JL4_LIBRARY_PATH"
+  pure $ case mp of
+    Just p | not (null p) ->
+      Text.unpack . Text.replace (Text.pack p) "$JL4_LIBRARY_PATH" . Text.pack
+    _ -> id
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do

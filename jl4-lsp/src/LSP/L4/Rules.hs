@@ -531,6 +531,7 @@ jl4Rules evalConfig rootDirectory recorder = do
           , scopeMap = IV.empty
           , descMap = IV.empty
           , constBodies = cState.constBodies
+          , sectionPaths = cState.sectionPaths
           }
         unionCheckEnv cEnv tcRes =
           TypeCheck.MkCheckEnv
@@ -550,6 +551,7 @@ jl4Rules evalConfig rootDirectory recorder = do
             , computedFields = Map.empty
             , cyclicSynonyms = mempty
             , sectionStack = []
+            , localBindings = mempty
             }
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies

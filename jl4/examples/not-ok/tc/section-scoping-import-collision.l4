@@ -1,0 +1,16 @@
+-- Regression test for lexical section scoping — FIX C (spec §5.5).
+--
+-- An IMPORTED binding and a local section binding that share a name AND a type
+-- must remain a genuine ambiguity: the local section binding must NOT silently
+-- shadow the import. `math` exports `EULER : NUMBER`; the local section here
+-- also defines `EULER : NUMBER`. An unqualified reference to `EULER` is
+-- therefore ambiguous and must raise an AmbiguousTermError, exactly as it did
+-- before section-proximity scoping was introduced.
+
+IMPORT math
+
+§ `Local Section`
+GIVETH A NUMBER
+EULER MEANS 3
+
+#EVAL EULER    -- AmbiguousTermError: local EULER vs math's EULER

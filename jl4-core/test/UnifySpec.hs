@@ -279,10 +279,14 @@ spec = describe "Unification" $ do
       ok `shouldBe` True
 
     it "does not report a cycle when a synonym's parameter matches a sibling's name" $ do
-      -- Name resolution rejects the shadowed reference as ambiguous, which
-      -- is fine — but the cycle detector must not pile on with a spurious
-      -- cycle: a synonym's own type parameters do not count as references
-      -- to a like-named sibling synonym.
+      -- With lexical scoping (PR #50), a synonym's own type parameter takes
+      -- priority over a like-named sibling synonym, so the reference to `Score`
+      -- on the RHS resolves unambiguously to the PARAMETER (not the sibling
+      -- `Score` synonym): `Tagged a = LIST OF a`, and `Tagged OF NUMBER` is a
+      -- well-typed `LIST OF NUMBER`. The point this test guards is orthogonal to
+      -- whether the program checks: the cycle detector must NOT report a spurious
+      -- cycle — a synonym's own type parameters are not references to a
+      -- like-named sibling synonym.
       let result = checkWithImports emptyVFS $ Text.unlines
             [ "DECLARE Score IS A NUMBER"
             , "DECLARE Tagged Score IS A LIST OF Score"
@@ -293,7 +297,7 @@ spec = describe "Unification" $ do
       case result of
         Left errs -> fail ("unexpected pipeline failure: " <> show errs)
         Right r -> do
-          r.tcdSuccess `shouldBe` False
+          r.tcdSuccess `shouldBe` True
           [e | MkCheckErrorWithContext e@(CyclicTypeSynonyms _) _ <- r.tcdErrors]
             `shouldBe` []
 

@@ -18,6 +18,7 @@ import L4.Mixfix (MixfixInfo(..))
 import qualified Base.Set as Set
 
 import Control.Applicative
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Generics.SOP as SOP
 import Optics.Core (gplate, traverseOf, (%), (?~))
@@ -60,6 +61,12 @@ data CheckState =
       -- ^ Bodies of top-level nullary @DECIDE@/@MEANS@ constants, captured as
       -- they are checked. Used by the rung-3 value-level actor-agreement check
       -- to recover an action constant's actor field from its definition.
+    , sectionPaths :: !(Map Unique [NonEmpty Text])
+    -- ^ For each defined 'Unique', the section stack (path from the module root
+    -- down to the innermost enclosing section) at the point it was registered.
+    -- Absence means the binding is top-level (empty section path). Used by
+    -- 'resolveTerm'' and 'resolveType' to prefer the nearest enclosing section
+    -- when resolving unqualified names (lexical scoping / shadowing).
     }
   deriving stock (Generic)
 
@@ -384,6 +391,16 @@ data CheckEnv =
     -- blow up exponentially before the expansion fuel runs out.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
+    , localBindings        :: !(Set Unique)
+    -- ^ Uniques of the lexical LOCAL bindings currently in scope: function
+    -- parameters, WHERE\/LET bindings, pattern variables, and type variables.
+    -- These are introduced during body inference (via 'extendKnownMany') as
+    -- opposed to section- or top-level module bindings (introduced via
+    -- 'extendKnownGlobalMany'). Locals take ABSOLUTE priority over any
+    -- section\/top-level\/imported binding of the same name during resolution
+    -- (lexical shadowing), so we must track them explicitly: they are absent
+    -- from 'sectionPaths', which otherwise conflates them with top-level and
+    -- imported bindings.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -611,6 +628,182 @@ lookupRawNameInEnvironment rn = do
 
   pure candidates
 
+-- | Record, for each given 'Unique', the section path (the current
+-- 'sectionStack') at which it was registered. This is what enables
+-- lexical (nearest-enclosing-section) resolution of unqualified names.
+--
+-- Top-level bindings (empty section path) are not recorded: their absence
+-- from the map is interpreted as the empty path by 'sectionProximity'.
+recordSectionPath :: [NonEmpty Text] -> [Unique] -> Check ()
+recordSectionPath []    _  = pure ()
+recordSectionPath path us =
+  modifying' #sectionPaths $ \m ->
+    foldl' (\acc u -> Map.insert u path acc) m us
+
+-- | How "close" a candidate binding's section path is to the section in which
+-- an unqualified reference occurs.
+--
+-- Returns @Just 0@ when the candidate is defined in the very same section,
+-- @Just 1@ for the immediately enclosing parent section, and so on. Top-level
+-- bindings (empty candidate path) are ancestors of every section, at a distance
+-- equal to the current nesting depth.
+--
+-- Returns 'Nothing' when the candidate is not on the current section's ancestry
+-- chain (e.g. a sibling section, a cousin, or an imported binding). Such
+-- candidates are not brought into lexical scope by this proximity mechanism.
+sectionProximity :: [NonEmpty Text] -> [NonEmpty Text] -> Maybe Int
+sectionProximity current candidate
+  | candidate `List.isPrefixOf` current = Just (length current - length candidate)
+  | otherwise                           = Nothing
+
+-- | Filter a set of viable resolution candidates down to those in the nearest
+-- enclosing section, implementing lexical scoping with shadowing.
+--
+-- Given the current module URI, the current section stack, a map of each
+-- candidate's defining section path, and the viable candidates (each tagged
+-- with its 'Unique'):
+--
+--   * IMPORTED candidates (whose 'Unique' belongs to another module) are never
+--     ranked by proximity and are never eliminated: they remain co-equal
+--     viable candidates. This preserves spec §5.5 — a same-typed collision
+--     between an import and a local section binding stays ambiguous rather than
+--     being silently shadowed — and keeps cross-module overloads (e.g. the
+--     builtin comparison operators) available for type-directed resolution.
+--   * Among the CURRENT module's candidates: if any lie on the current
+--     section's ancestry (same section, parent, ..., top level), keep only
+--     those at the /minimum/ proximity (the nearest enclosing section), and
+--     drop farther ancestors and off-ancestry siblings. Ties at the same
+--     proximity are left for the caller to disambiguate (type-directed
+--     'choose', else ambiguity error). Imported candidates are always retained
+--     alongside the nearest ancestors.
+--   * If no current-module candidate lies on the ancestry, fall back to /all/
+--     viable candidates, preserving the pre-existing flat-scope behaviour.
+--
+-- The 'Unique' of each kept candidate is returned alongside it so that callers
+-- can de-duplicate (the same candidate can be surfaced from several type
+-- groups; see 'selectByProximityPerType').
+selectByProximity
+  :: forall a
+   . NormalizedUri
+  -> [NonEmpty Text]
+  -> Map Unique [NonEmpty Text]
+  -> [(Unique, a)]
+  -> [(Unique, a)]
+selectByProximity curUri current paths viable =
+  case ancestors of
+    [] -> viable
+    _  ->
+      let nearest = minimum (fmap (\(_, _, d) -> d) ancestors)
+      in [ (u, a) | (u, a, d) <- ancestors, d == nearest ] ++ imports
+  where
+    isImport :: Unique -> Bool
+    isImport u = u.moduleUri /= curUri
+
+    -- Candidates from other modules: never filtered out by proximity.
+    imports :: [(Unique, a)]
+    imports = [ (u, a) | (u, a) <- viable, isImport u ]
+
+    -- Current-module candidates that sit on the current section's ancestry,
+    -- tagged with their proximity distance.
+    ancestors :: [(Unique, a, Int)]
+    ancestors =
+      [ (u, a, d)
+      | (u, a) <- viable
+      , not (isImport u)
+      , Just d <- [sectionProximity current (Map.findWithDefault [] u paths)]
+      ]
+
+-- | An annotation-insensitive skeleton of a 'Type'' Resolved', used purely as a
+-- grouping key when deciding which resolution candidates are "the same type".
+--
+-- Structural equality on 'Type'' Resolved' cannot be used directly because it
+-- includes source annotations, so e.g. two @NUMBER@ occurrences at different
+-- locations would compare unequal. This skeleton keys type constructors by the
+-- 'Unique' of their head and drops all annotations, so it treats two @NUMBER@s
+-- as equal while keeping genuinely different types (@STRING@, @MAYBE NUMBER@,
+-- ...) distinct — exactly what overload-preserving shadowing needs.
+data TypeKey
+  = TyKType
+  | TyKApp Unique [TypeKey]
+  | TyKFun [TypeKey] TypeKey
+  | TyKForall Int TypeKey
+  | TyKInfVar Int
+  deriving stock (Eq, Show)
+
+typeKey :: Type' Resolved -> TypeKey
+typeKey = \ case
+  Type _        -> TyKType
+  TyApp _ r ts  -> TyKApp (getUnique r) (typeKey <$> ts)
+  Fun _ onts t  -> TyKFun (typeKey . optionallyNamedTypeType <$> onts) (typeKey t)
+  Forall _ ns t -> TyKForall (length ns) (typeKey t)
+  InfVar _ _ i  -> TyKInfVar i
+
+-- | Whether a 'TypeKey' is an unresolved inference variable (a wildcard for
+-- the purpose of proximity-first resolution; see 'selectByProximityPerType').
+isInfVarKey :: TypeKey -> Bool
+isInfVarKey (TyKInfVar _) = True
+isInfVarKey _             = False
+
+-- | Stable grouping by an equality key (first-seen order preserved, both for
+-- the groups and within each group). Small candidate lists, so the quadratic
+-- cost is irrelevant.
+groupByKey :: forall k a. Eq k => (a -> k) -> [a] -> [(k, [a])]
+groupByKey key = foldl' insertItem []
+  where
+    insertItem :: [(k, [a])] -> a -> [(k, [a])]
+    insertItem acc x =
+      let k = key x
+      in case List.lookup k acc of
+           Just _  -> [ (k', if k' == k then xs <> [x] else xs) | (k', xs) <- acc ]
+           Nothing -> acc <> [(k, [x])]
+
+-- | Apply 'selectByProximity' within each group of candidates that share the
+-- same type (or, for types, the same kind), then take the union (de-duplicated
+-- by 'Unique').
+--
+-- Grouping by type is what lets genuinely distinct overloads coexist across
+-- sections: a concrete-typed binding only ever shadows another binding of the
+-- /same/ type. Type-directed resolution ('choose') therefore still ranges over
+-- every concrete overload regardless of where it is defined, while same-typed
+-- bindings obey lexical scoping and resolve to the nearest enclosing section.
+-- This is required by the standard library, whose comparison operators have
+-- NUMBER\/STRING\/BOOLEAN\/MAYBE overloads spread across sibling subsections.
+--
+-- The cross-type proximity interaction needed by forward references (spec §5.3;
+-- see 'resolveTerm'') is handled by the caller BEFORE this function, so this is
+-- deliberately a straightforward per-type-group application of
+-- 'selectByProximity'.
+selectByProximityPerType
+  :: forall k a. Eq k
+  => NormalizedUri
+  -> [NonEmpty Text]
+  -> Map Unique [NonEmpty Text]
+  -> [(k, Unique, a)]
+  -> [a]
+selectByProximityPerType curUri current paths cands =
+  dedupByUnique kept
+  where
+    kept :: [(Unique, a)]
+    kept =
+      concatMap (\(_, g) -> selectByProximity curUri current paths [ (u, a) | (_, u, a) <- g ])
+                (groupByKey (\(k, _, _) -> k) cands)
+
+    dedupByUnique :: [(Unique, a)] -> [a]
+    dedupByUnique = go Set.empty
+      where
+        go _    []            = []
+        go seen ((u, a) : xs)
+          | u `Set.member` seen = go seen xs
+          | otherwise           = a : go (Set.insert u seen) xs
+
+-- | Section proximity of a CURRENT-MODULE ancestor 'Unique'; 'Nothing' for
+-- imports (a different module URI) and for off-ancestry (sibling\/cousin)
+-- same-module candidates.
+ancestorProximity :: NormalizedUri -> [NonEmpty Text] -> Map Unique [NonEmpty Text] -> Unique -> Maybe Int
+ancestorProximity curUri current paths u
+  | u.moduleUri /= curUri = Nothing
+  | otherwise             = sectionProximity current (Map.findWithDefault [] u paths)
+
 isTopLevelBindingInSection :: Unique -> Section Resolved -> Bool
 isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map getUnique . relevantResolveds) decls
   where
@@ -628,7 +821,52 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
 resolveTerm' p n = do
   options <- lookupRawNameInEnvironment (rawName n)
-  case mapMaybe proc options of
+  -- Lexical scoping: among the viable candidates, prefer those defined in the
+  -- nearest enclosing section (see 'selectByProximity'). Only fall through to
+  -- type-directed 'choose'/ambiguity once proximity can no longer discriminate.
+  current <- asks (.sectionStack)
+  curUri  <- asks (.moduleUri)
+  locals  <- asks (.localBindings)
+  paths <- use #sectionPaths
+  viable <- catMaybes <$> traverse proc options
+  -- In-scope lexical LOCAL bindings (function parameters, WHERE\/LET bindings,
+  -- pattern variables) take ABSOLUTE priority over any section-, top-level- or
+  -- import-defined binding of the same name. Without this, a parameter would be
+  -- silently shadowed by an enclosing section binding (section proximity 0 wins
+  -- over a local, which carries no section path). If any candidate is a local,
+  -- restrict resolution to the locals before section-proximity ranking.
+  let localCandidates = [ c | c@(_, _, u, _) <- viable, u `Set.member` locals ]
+      candidates0 = if null localCandidates then viable else localCandidates
+      -- FIX B (spec §5.3: proximity dominates type-direction). A same-module
+      -- value binding whose type is still an unresolved 'InfVar' is a forward
+      -- reference to a not-yet-inferred un-annotated DECIDE. Because it lands in
+      -- a different 'typeKey' group than a same-named concrete ancestor, per-type
+      -- grouping alone would never compare the two by proximity, yielding a
+      -- spurious order-dependent ambiguity. So, up front: if the nearest
+      -- current-module VALUE-binding ancestor is such a wildcard, it lexically
+      -- shadows every strictly-farther current-module VALUE-binding ancestor of
+      -- the same name, regardless of type.
+      --
+      -- We restrict this to VALUE bindings (Computable\/Local\/Assumed) on BOTH
+      -- ends: record selectors and data constructors live in a separate
+      -- (projection\/pattern) namespace and must never be shadowed by, nor act
+      -- as, a same-named value forward reference — e.g. a @WHERE@ binding named
+      -- like a field it projects. Imports (no ancestry proximity) are never
+      -- shadowed here, preserving import\/local ambiguity (spec §5.5). A wildcard
+      -- can only be a current-module forward reference (imports are already
+      -- fully typed), so this never perturbs cross-module overloads.
+      prox u = ancestorProximity curUri current paths u
+      wildValueAncestorProx =
+        case [ d | (k, isVal, u, _) <- candidates0
+                 , isVal, isInfVarKey k, Just d <- [prox u] ] of
+          [] -> Nothing
+          ds -> Just (minimum ds)
+      keepCand (_, isVal, u, _) =
+        case (wildValueAncestorProx, prox u) of
+          (Just w, Just d) | isVal -> d <= w
+          _                        -> True
+      candidates = [ (k, u, a) | (k, _isVal, u, a) <- filter keepCand candidates0 ]
+  case selectByProximityPerType curUri current paths candidates of
     [] -> do
       v <- fresh (rawName n)
       n' <- setAnnResolvedType v Nothing n
@@ -642,11 +880,33 @@ resolveTerm' p n = do
       rn <- ambiguousTerm n' xs'
       pure (rn, v)
   where
-    proc :: (Unique, Name, CheckEntity) -> Maybe (Check (Resolved, Type' Resolved))
-    proc (u, o, KnownTerm t tk) | p tk = Just $ do
-      n' <-  setAnnResolvedType t (Just tk) n
-      pure (Ref n' u o, t)
-    proc _                             = Nothing
+    -- Group by the declared type (via its annotation-insensitive 'typeKey') so
+    -- that same-typed bindings shadow lexically while distinct overloads remain
+    -- visible for type-directed resolution. We apply the current substitution
+    -- first so that inference variables introduced during signature scanning are
+    -- resolved to concrete types before we compare them. The 'Bool' records
+    -- whether this is a value binding (as opposed to a selector\/constructor),
+    -- which governs forward-reference shadowing (see above).
+    proc :: (Unique, Name, CheckEntity) -> Check (Maybe (TypeKey, Bool, Unique, Check (Resolved, Type' Resolved)))
+    proc (u, o, KnownTerm t tk) | p tk = do
+      t' <- applySubst t
+      pure $ Just . (typeKey t', isValueBinding tk, u,) $ do
+        n' <-  setAnnResolvedType t (Just tk) n
+        pure (Ref n' u o, t)
+    proc _                             = pure Nothing
+
+-- | Whether a 'TermKind' names a value in the ordinary term namespace (as
+-- opposed to a record selector or data constructor, which are reached through
+-- projection\/pattern syntax). Only value bindings participate in
+-- forward-reference lexical shadowing (see 'resolveTerm'').
+isValueBinding :: TermKind -> Bool
+isValueBinding = \ case
+  Computable       -> True
+  Local            -> True
+  Assumed          -> True
+  Selector         -> False
+  ComputedSelector -> False
+  Constructor      -> False
 
 resolveTerm :: Name -> Check (Resolved, Type' Resolved)
 resolveTerm = resolveTerm' (const True)
@@ -901,10 +1161,31 @@ extendKnown :: CheckInfo -> Check a -> Check a
 extendKnown ci =
   extendKnownMany [ci]
 
--- | Make many 'CheckInfo's known for the given scope.
+-- | Make many 'CheckInfo's known for the given scope, marking them as lexical
+-- LOCAL bindings (parameters, WHERE\/LET, pattern variables, type variables).
+-- Locals take absolute priority over section\/top-level\/imported bindings of
+-- the same name during resolution. Use 'extendKnownGlobalMany' instead for
+-- section- and module-level bindings (which must obey section proximity rather
+-- than shadow unconditionally).
 extendKnownMany :: [CheckInfo] -> Check a -> Check a
 extendKnownMany cis = do
+  local (markLocalBindings cis . extendEnv cis)
+
+-- | Like 'extendKnownMany', but does NOT mark the bindings as locals. Used for
+-- section- and top-level module bindings, whose relative precedence is governed
+-- by section proximity ('selectByProximity'), not by unconditional lexical
+-- shadowing.
+extendKnownGlobalMany :: [CheckInfo] -> Check a -> Check a
+extendKnownGlobalMany cis = do
   local (extendEnv cis)
+
+-- | Record the 'Unique's of the given 'CheckInfo's as in-scope lexical locals.
+markLocalBindings :: [CheckInfo] -> CheckEnv -> CheckEnv
+markLocalBindings cis env =
+  env { localBindings = foldl' insertCi env.localBindings cis }
+  where
+    insertCi :: Set Unique -> CheckInfo -> Set Unique
+    insertCi acc ci = foldl' (\s r -> Set.insert (getUnique r) s) acc ci.names
 
 -- | Extend the scope of the 'CheckEnv' with all '[CheckInfo]'.
 extendEnv :: [CheckInfo] -> CheckEnv -> CheckEnv
@@ -929,6 +1210,7 @@ extendEnv cis env =
     , computedFields = e.computedFields
     , cyclicSynonyms = e.cyclicSynonyms
     , sectionStack = e.sectionStack
+    , localBindings = e.localBindings
     }
     where
       u :: Unique
