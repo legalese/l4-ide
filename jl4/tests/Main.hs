@@ -73,10 +73,10 @@ main = do
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
   -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
-  -- empty.l4 genuinely fails typecheck (exhaustiveness/redundancy diagnostics);
-  -- the export-*.l4 files typecheck fine but assert (via their schema golden)
+  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
   -- that an @export in an unsupported position yields no default export.
-  notOkRootTcFiles     <- sort <$> globDir1 (compile "not-ok/empty.l4")     examplesRoot
+  -- (empty.l4 used to live here while warnings still failed typecheck; now
+  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
   exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
@@ -88,10 +88,9 @@ main = do
       corpusNonEmpty "nlg-fails"       nlgFailsFiles
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
-      corpusNonEmpty "not-ok-root-tc"  notOkRootTcFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
-    describe "tc fails" $ tests evalConfig (False, True) (tcFailsFiles <> notOkRootTcFiles) examplesRoot
+    describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
       tests evalConfig (True, True) exportPlacementFiles examplesRoot
