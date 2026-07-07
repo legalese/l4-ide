@@ -1,9 +1,19 @@
+> **Status: DONE** — verified 2026-07 against `origin/unstable`. Implemented and merged
+> via PR [smucclaw/l4-ide#50](https://github.com/smucclaw/l4-ide/pull/50) (commits
+> `29ace1c8`, `a6ac3e7a`), CI green (Haskell Build & Test: SUCCESS). `resolveTerm'` /
+> `resolveType` (`jl4-core/src/L4/TypeCheck/Types.hs`) implement lexical section-proximity
+> resolution exactly as specified in §3-§4, and all three §12 hardening fixes (FIX A/B/C)
+> are present verbatim with matching regression tests (`jl4/examples/ok/section-scoping-
+> param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
+> `jl4/examples/not-ok/tc/section-scoping-import-collision.l4`). Resolves
+> [smucclaw/l4-ide#85](https://github.com/smucclaw/l4-ide/issues/85).
+
 # Section Lexical Scoping Specification
 
-**Status:** Draft
+**Status:** Implemented (2026-07, PR #50)
 **Author:** Meng Wong, with analysis from Claude
 **Date:** 2026-03-02
-**Branch:** TBD
+**Branch:** `tier1/section-lexical-scoping` (merged)
 
 ---
 
