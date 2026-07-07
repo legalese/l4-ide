@@ -183,6 +183,7 @@ test-suite jl4-core-test
     EdgeCrashSpec
     PrintRoundtripSpec
     LedgerSubstrateSpec
+    LedgerThunkCacheSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec

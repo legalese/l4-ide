@@ -335,7 +335,23 @@ raiseException e = do
 --   * 'UpdateThunk' frames must close their read span (mirroring the
 --     success path in 'backward') and return the thunk to a re-forcible
 --     state — otherwise the blackhole mark left by the aborted force makes
---     every later force of the thunk report a bogus infinite loop.
+--     every later force of the thunk report a bogus infinite loop;
+--
+--   * 'RestoreCurrentParty' frames must restore the acting party (mirroring
+--     the success path in 'backward') — otherwise an exception raised inside
+--     a HENCE\/LEST body leaves 'currentParty' pointing at that body's party,
+--     and any later ledger write against the same 'EvalState' is attributed
+--     to the wrong party. (Today every 'EvalException' aborts its whole
+--     directive and 'withFreshLedger' hands the next directive a fresh
+--     'currentParty' ref, so this is defense in depth; it becomes load-
+--     bearing the moment anything catches an 'EvalException' and resumes
+--     evaluation mid-directive.)
+--
+-- The remaining frames are pure control flow. They are enumerated explicitly
+-- (no wildcard) so that adding a state-restoring 'Frame' constructor without
+-- deciding its unwind behavior is a compile-time error
+-- (@-Wincomplete-patterns@ + @-Werror@), not a silent state leak — the
+-- missing 'RestoreCurrentParty' arm was exactly such a leak.
 unwindFrame :: Frame -> Eval ()
 unwindFrame = \ case
   EvalAsOfSystemTime2 originalCtx        -> putTemporalContext originalCtx
@@ -347,6 +363,7 @@ unwindFrame = \ case
   WhenLastFrame originalCtx _ _          -> putTemporalContext originalCtx
   WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
   ValueAtFrame originalCtx               -> putTemporalContext originalCtx
+  RestoreCurrentParty mOriginal          -> putCurrentParty mOriginal
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -354,7 +371,54 @@ unwindFrame = \ case
     mine <- swapCtxReads noReads
     noteCtxRead (saved <> mine)
     restoreThunkOnUnwind rf displaced
-  _ -> pure ()
+  -- pure control flow from here on: nothing to restore
+  BinOp1 {}                     -> pure ()
+  BinOp2 {}                     -> pure ()
+  Post1 {}                      -> pure ()
+  Post2 {}                      -> pure ()
+  Post3 {}                      -> pure ()
+  Record0 {}                    -> pure ()
+  Record1 {}                    -> pure ()
+  Record2 {}                    -> pure ()
+  ReadCell1 {}                  -> pure ()
+  ReadCell2 {}                  -> pure ()
+  App1 {}                       -> pure ()
+  IfThenElse1 {}                -> pure ()
+  ConsiderWhen1 {}              -> pure ()
+  PatNil0 {}                    -> pure ()
+  PatCons0 {}                   -> pure ()
+  PatCons1 {}                   -> pure ()
+  PatCons2 {}                   -> pure ()
+  PatLit0 {}                    -> pure ()
+  PatLit1 {}                    -> pure ()
+  PatLit2 {}                    -> pure ()
+  PatApp0 {}                    -> pure ()
+  PatApp1 {}                    -> pure ()
+  EqConstructor1 {}             -> pure ()
+  EqConstructor2 {}             -> pure ()
+  EqConstructor3 {}             -> pure ()
+  UnaryBuiltin0 {}              -> pure ()
+  BinBuiltin1 {}                -> pure ()
+  BinBuiltin2 {}                -> pure ()
+  TernaryBuiltin1 {}            -> pure ()
+  TernaryBuiltin2 {}            -> pure ()
+  TernaryBuiltin3 {}            -> pure ()
+  EvalAsOfSystemTime1 {}        -> pure ()
+  EvalUnderValidTime1 {}        -> pure ()
+  EvalUnderRulesEffectiveAt1 {} -> pure ()
+  EvalUnderRulesEncodedAt1 {}   -> pure ()
+  -- ContractFrame sub-frames (Contract1..11, RBinOp1/2, ResolveParty) carry
+  -- only continuation data (WHNFs/envs/refs), never saved global state; the
+  -- party set around a followup is restored by 'RestoreCurrentParty' above.
+  ContractFrame {}              -> pure ()
+  ConcatFrame {}                -> pure ()
+  AsStringFrame {}              -> pure ()
+  ToStringDate1 {}              -> pure ()
+  ToStringDate2 {}              -> pure ()
+  ToStringDate3 {}              -> pure ()
+  JsonEncodeListFrame {}        -> pure ()
+  JsonEncodeNestedFrame {}      -> pure ()
+  JsonEncodeConstructorFrame {} -> pure ()
 
 -- | Return an aborted force's thunk to a re-forcible state. If the force had
 -- displaced a stale 'WHNFWhen' cache, put the cache back: it is still
@@ -487,6 +551,7 @@ writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
 -- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
 tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
 tellEventRouted route ev = do
+  noteLedgerOp -- a write is a ledger op: poison the current force span (T6+ledger)
   store <- asks (.envLedger)
   case route of
     RouteOfficial ->
@@ -504,16 +569,21 @@ tellEventRouted route ev = do
 -- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
 currentLedgerEval :: Eval Ledger
 currentLedgerEval = do
+  noteLedgerOp -- a RECALL is a ledger op: poison the current force span (T6+ledger)
   party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
   storeOwnLedger party <$> readEvalRef (.envLedger)
 
 -- | Read a NAMED party's own ledger (M4.5 cross-party @RECALL@).
 partyLedgerEval :: Text -> Eval Ledger
-partyLedgerEval key = storeOwnLedger key <$> readEvalRef (.envLedger)
+partyLedgerEval key = do
+  noteLedgerOp -- see 'currentLedgerEval'
+  storeOwnLedger key <$> readEvalRef (.envLedger)
 
 -- | Read the shared official record (M4.5 @RECALL OFFICIAL's@).
 officialLedgerEval :: Eval Ledger
-officialLedgerEval = (.officialLedger) <$> readEvalRef (.envLedger)
+officialLedgerEval = do
+  noteLedgerOp -- see 'currentLedgerEval'
+  (.officialLedger) <$> readEvalRef (.envLedger)
 
 -- | The party whose HENCE/LEST we are currently inside (M4).
 getCurrentParty :: Eval (Maybe Text)
@@ -536,6 +606,17 @@ noteCtxRead :: CtxReads -> Eval ()
 noteCtxRead r = do
   accRef <- asks (.ctxReads)
   liftIO (modifyIORef' accRef (<> r))
+
+-- | STATE-AS-LEDGER poison bit (see 'crLedgerOps'): record that the current
+-- force span performed a ledger operation (a RECORD\/COMMIT\/ATTEST\/NOTIFY
+-- append or a RECALL read). A force so marked must never be cached as a
+-- 'WHNFWhen' — a re-force would replay the write (double-append) or re-read
+-- a ledger the fingerprint does not track — so the @UpdateThunk@ arm of
+-- 'backward' caches it as a plain 'WHNF' (snapshot at first force) instead.
+-- Rides the 'ctxReads' accumulator so it inherits the span save\/merge
+-- discipline (including exceptional unwind) for free.
+noteLedgerOp :: Eval ()
+noteLedgerOp = noteCtxRead noReads { crLedgerOps = True }
 
 -- | Install a new accumulator, returning the previous one. Used to open a
 -- fresh span at the start of a thunk force (and to reset residue at
@@ -1290,9 +1371,18 @@ backward val = withPoppedFrame $ \ case
     -- consuming thunk inherits the dependency.
     mine <- swapCtxReads noReads
     noteCtxRead (saved <> mine)
-    if hasReads mine
-      then updateThunkToWHNFWhen rf mine val
-      else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
+    if mine.crLedgerOps
+      -- STATE-AS-LEDGER poison (see 'noteLedgerOp'): this force performed a
+      -- ledger op, so re-forcing is NOT a deterministic replay — it would
+      -- append any RECORD again (double-write) and re-read a ledger the
+      -- temporal fingerprint does not track. Cache as a plain 'WHNF'
+      -- (snapshot at first force): the write fires exactly once and every
+      -- later use shares the first-force value — precisely the semantics a
+      -- ledger-touching thunk WITHOUT temporal reads already has here.
+      then updateThunkToWHNF rf val
+      else if hasReads mine
+        then updateThunkToWHNFWhen rf mine val
+        else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 

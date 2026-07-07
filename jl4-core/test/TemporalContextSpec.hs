@@ -91,12 +91,21 @@ ctxReadsSpec = describe "CtxReads pointwise Monoid" $ do
       `shouldBe` MkCtxReads
         { crSystemTime = ReadEq t1
         , crDocumentTimezone = ReadEq (Just "Etc/UTC")
+        , crLedgerOps = False
         }
 
   it "hasReads distinguishes empty from non-empty" $ do
     hasReads noReads `shouldBe` False
     hasReads sysOnly `shouldBe` True
     hasReads tzOnly `shouldBe` True
+
+  it "crLedgerOps merges as OR (a ledger op anywhere in the span poisons the whole span)" $ do
+    let ledgerOnly = noReads { crLedgerOps = True }
+    (ledgerOnly <> noReads).crLedgerOps `shouldBe` True
+    (noReads <> ledgerOnly).crLedgerOps `shouldBe` True
+    (ledgerOnly <> sysOnly).crLedgerOps `shouldBe` True
+    (sysOnly <> ledgerOnly) `shouldBe` sysOnly { crLedgerOps = True }
+    (noReads <> noReads).crLedgerOps `shouldBe` False
 
 validForSpec :: Spec
 validForSpec = describe "validFor" $ do
@@ -116,11 +125,17 @@ validForSpec = describe "validFor" $ do
     validFor ambient fp `shouldBe` False
     validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
 
+  it "a fingerprint carrying crLedgerOps never validates (defensive; never installed)" $ do
+    let fp = noReads { crLedgerOps = True }
+    validFor ambient fp `shouldBe` False
+    validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
+
   it "all read axes must match (mixed-axis combinations)" $ do
     let fp =
           MkCtxReads
             { crSystemTime = ReadEq t1
             , crDocumentTimezone = ReadEq (Just "Etc/UTC")
+            , crLedgerOps = False
             }
         withTz = ambient { tcDocumentTimezone = Just "Etc/UTC" }
     validFor withTz fp `shouldBe` True
