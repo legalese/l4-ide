@@ -126,8 +126,8 @@ data TypeCheckResult = TypeCheckResult
   , success :: Bool
   , environment :: TypeCheck.Environment
   , entityInfo :: TypeCheck.EntityInfo
-  , infos :: [TypeCheck.CheckErrorWithContext]
-  , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
+  , infos :: [TypeCheck.CheckErrorWithContext]  -- ^ Non-fatal diagnostics ('SInfo' and 'SWarn'); don't block 'success'
+  , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   }
@@ -557,7 +557,11 @@ jl4Rules evalConfig rootDirectory recorder = do
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
         initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
         result = TypeCheck.doCheckProgramWithDependencies initCheckState initCheckEnv parsedAndAnnotated
-        (infos, errors) = partition ((== TypeCheck.SInfo) . TypeCheck.severity) result.errors
+        -- NOTE: only 'SError' diagnostics count against 'success'; 'SInfo' and
+        -- 'SWarn' (e.g. exhaustiveness/redundancy warnings) are non-fatal.
+        -- All diagnostics are still published to the editor below regardless
+        -- of this partition — it only decides what blocks 'SuccessfulTypeCheck'.
+        (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
     pure
       ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
