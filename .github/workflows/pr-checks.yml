@@ -31,11 +31,14 @@ jobs:
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
-      # For merge_group, paths-filter diffs base_sha..head_sha via git, so the
-      # repo must be checked out with history. (pull_request uses the API and
-      # needs no checkout.)
+      # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
+      # so the repo must be checked out with history. Without this, push events
+      # error at the paths-filter step, all downstream jobs skip, and the Haskell
+      # job never runs on a push to unstable — which is what warms the shared
+      # base-branch cache (see the cache-maintenance note in the haskell job).
+      # (pull_request uses the GitHub API and needs no checkout.)
       - uses: actions/checkout@v5
-        if: github.event_name == 'merge_group'
+        if: github.event_name == 'merge_group' || github.event_name == 'push'
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v4
