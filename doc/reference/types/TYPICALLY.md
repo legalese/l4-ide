@@ -30,6 +30,10 @@ The default value is **metadata only**:
 - It must be a literal: a number, a string, or a nullary constructor such as
   `TRUE`, `FALSE`, or `NOTHING` (`x IS A BOOLEAN TYPICALLY (a AND b)` is an
   error).
+- It requires an explicit type: the binder must carry an `IS A Type` annotation
+  so the default can be checked (`GIVEN x TYPICALLY 5` with no type is an error).
+- It cannot appear on a **type** binder: a type variable or a `TYPE` assumption
+  holds no value, so `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
 - It does **not** change evaluation. Nothing is substituted at runtime;
   downstream consumers (form generators, decision services, question-ordering
   policies) decide how to use the stored default. Exported function schemas

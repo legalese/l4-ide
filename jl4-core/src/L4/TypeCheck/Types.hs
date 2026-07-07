@@ -119,6 +119,12 @@ data CheckError =
   | TypicallyValueNotALiteral Name
     -- ^ The TYPICALLY default value must be a literal (a compile-time
     -- constant): a number or string literal, or a nullary constructor.
+  | TypicallyRequiresType Name
+    -- ^ A TYPICALLY default was written on a binder with no explicit type, so
+    -- the default cannot be type-checked. Require an explicit type annotation.
+  | TypicallyOnTypeVariable Name
+    -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
+    -- a default value is meaningless.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

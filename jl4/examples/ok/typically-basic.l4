@@ -35,7 +35,8 @@ DECLARE Buyer
   HAS `of age`         IS A BOOLEAN TYPICALLY TRUE
       `is emancipated` IS A BOOLEAN TYPICALLY FALSE
 
--- TYPICALLY in GIVEN parameters, exported so the schema shows the defaults
+-- TYPICALLY in GIVEN parameters on an exported decision
+-- (boolean parameter defaults plus nested Buyer field defaults)
 @export Decide whether a buyer may purchase alcohol
 GIVEN
   b                       IS A Buyer
@@ -49,11 +50,14 @@ DECIDE `may purchase alcohol` IF
           OR  `has parental approval`
           OR  `has spousal approval` )
 
--- an untyped GIVEN parameter with a TYPICALLY default
+-- GIVEN parameters with TYPICALLY defaults (each with an explicit type).
+-- Marked as the default export so the generated schema surfaces both
+-- boolean and numeric TYPICALLY defaults (see `age` and `bonus`).
+@export default Decide whether a person can vote
 GIVEN
   married IS A BOOLEAN TYPICALLY FALSE
   age     IS A NUMBER TYPICALLY 18
-  bonus   TYPICALLY 5
+  bonus   IS A NUMBER TYPICALLY 5
 GIVETH A BOOLEAN
 DECIDE `can vote` IF age >= 18
 

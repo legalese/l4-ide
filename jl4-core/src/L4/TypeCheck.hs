@@ -751,7 +751,7 @@ ensureNameConsistency [] [] = pure ([], [], [])
 ensureNameConsistency ns (MkOptionallyTypedName ann n (Just (Type tann)) mTypically : otns) = do
   rn <- def n
   extendKnown (makeKnown rn KnownTypeVariable) do
-    rTypically <- checkTypicallyOpt n Nothing mTypically
+    rTypically <- rejectTypicallyOnType n mTypically
     (rns, rotns, extends) <- ensureNameConsistency ns otns
     pure (rns, MkOptionallyTypedName ann rn (Just (Type tann)) rTypically : rotns, makeKnown rn KnownTypeVariable : extends)
 ensureNameConsistency (n : ns) (otn : otns)
@@ -791,14 +791,14 @@ ensureTypeNameConsistency (n : ns) (MkOptionallyTypedName ann n' (Just (Type tan
   | rawName n == rawName n' = do
   rn <- def n
   rn' <- ref n' rn
-  rTypically <- checkTypicallyOpt n' Nothing mTypically
+  rTypically <- rejectTypicallyOnType n' mTypically
   (rns, rotns, extends) <- ensureTypeNameConsistency ns otns
   pure (rn : rns, MkOptionallyTypedName ann rn' (Just (Type tann)) rTypically : rotns, extends)
 ensureTypeNameConsistency (n : ns) (MkOptionallyTypedName ann n' Nothing mTypically : otns)
   | rawName n == rawName n' = do
   rn <- def n
   rn' <- ref n' rn
-  rTypically <- checkTypicallyOpt n' Nothing mTypically
+  rTypically <- rejectTypicallyOnType n' mTypically
   (rns, rotns, extends) <- ensureTypeNameConsistency ns otns
   pure (rn : rns, MkOptionallyTypedName ann rn' Nothing rTypically : rotns, extends)
 ensureTypeNameConsistency (n : ns) (otn : otns) = do
@@ -952,19 +952,26 @@ isTypicallyLiteral = \ case
       _ -> False
   _ -> pure False
 
--- | As 'checkTypically', but for binders whose type may be absent (or be the
--- TYPE kind marker): in that case we check the default against a fresh
--- inference variable rather than dropping it silently.
+-- | As 'checkTypically', but for binders whose declared type may be absent
+-- (or be the TYPE kind marker). A default can only be soundly checked against
+-- a concrete declared type; when none is available we reject the default with
+-- 'TypicallyRequiresType' rather than checking it against a throwaway variable
+-- disconnected from the binder's real (later-inferred) type.
 checkTypicallyOpt :: Name -> Maybe (Type' Resolved) -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 checkTypicallyOpt _ _ Nothing = pure Nothing
-checkTypicallyOpt n mty mTypically = do
-  ty <- case mty of
-    Just ty | not (isKindMarker ty) -> pure ty
-    _ -> fresh (rawName n)
-  checkTypically n ty mTypically
+checkTypicallyOpt n mty mTypically =
+  case mty of
+    Just ty | not (isKindMarker ty) -> checkTypically n ty mTypically
+    _ -> Nothing <$ addError (TypicallyRequiresType n)
   where
     isKindMarker (Type _) = True
     isKindMarker _        = False
+
+-- | TYPICALLY defaults are meaningless on a TYPE variable / type binder. We
+-- always drop the value, and additionally report an error if one was written.
+rejectTypicallyOnType :: Name -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
+rejectTypicallyOnType _ Nothing  = pure Nothing
+rejectTypicallyOnType n (Just _) = Nothing <$ addError (TypicallyOnTypeVariable n)
 
 inferSelector :: AppForm Resolved -> TypedName Name -> Check (TypedName Resolved, [CheckInfo])
 inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
@@ -2552,9 +2559,11 @@ inferTyDeclDeclare (MkDeclare ann _tysig appForm t) = prune $
             }
 
 inferTyDeclAssume :: Assume Name -> Check (Maybe (DeclChecked (Assume Resolved)))
-inferTyDeclAssume (MkAssume ann _tysig appForm (Just (Type tann)) _mTypically) =
+inferTyDeclAssume (MkAssume ann _tysig appForm (Just (Type tann)) mTypically) =
   -- declaration of a type
   errorContext (WhileCheckingAssume (getName appForm)) do
+    -- TYPICALLY defaults are meaningless on a TYPE assumption.
+    for_ mTypically $ \_ -> addError (TypicallyOnTypeVariable (getName appForm))
     lookupDeclTypeSigByAnno ann >>= \ declHead -> do
         assume <- extendKnownMany (declHead.name:declHead.tyVars) do
           traverse resolvedType (MkAssume ann declHead.rtysig declHead.rappForm (Just (Type tann)) Nothing)
@@ -3658,6 +3667,14 @@ prettyCheckError (SuppliedComputedField fieldName) =
 prettyCheckError (TypicallyValueNotALiteral n) =
   [ "The TYPICALLY value for " <> quotedName n <> " must be a literal:"
   , "a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
+  ]
+prettyCheckError (TypicallyRequiresType n) =
+  [ quotedName n <> " has a TYPICALLY default but no explicit type."
+  , "Add a type annotation (for example IS A NUMBER) so the default can be type-checked."
+  ]
+prettyCheckError (TypicallyOnTypeVariable n) =
+  [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."
+  , "TYPICALLY defaults apply to term-level fields, parameters and assumptions."
   ]
 prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   [ "Function type inputs are not supported for @export."

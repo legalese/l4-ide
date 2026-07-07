@@ -1,52 +1,25 @@
 {
-    "$defs": {
-        "Buyer": {
-            "properties": {
-                "is emancipated": {
-                    "$ref": "#/$defs/BOOLEAN",
-                    "default": false
-                },
-                "of age": {
-                    "$ref": "#/$defs/BOOLEAN",
-                    "default": true
-                }
-            },
-            "required": [
-                "of age",
-                "is emancipated"
-            ],
-            "type": "object"
-        }
-    },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "Decide whether a buyer may purchase alcohol",
+    "description": "Decide whether a person can vote",
     "properties": {
-        "b": {
-            "$ref": "#/$defs/Buyer"
+        "age": {
+            "$ref": "#/$defs/NUMBER",
+            "default": 18
         },
-        "beer only": {
-            "$ref": "#/$defs/BOOLEAN"
+        "bonus": {
+            "$ref": "#/$defs/NUMBER",
+            "default": 5
         },
-        "has parental approval": {
+        "married": {
             "$ref": "#/$defs/BOOLEAN",
             "default": false
-        },
-        "has spousal approval": {
-            "$ref": "#/$defs/BOOLEAN",
-            "default": false
-        },
-        "person has capacity": {
-            "$ref": "#/$defs/BOOLEAN",
-            "default": true
         }
     },
     "required": [
-        "b",
-        "has spousal approval",
-        "beer only",
-        "has parental approval",
-        "person has capacity"
+        "married",
+        "age",
+        "bonus"
     ],
-    "title": "may purchase alcohol",
+    "title": "can vote",
     "type": "object"
 }
