@@ -658,8 +658,8 @@ regression examples for each.
   does not merge `r.sectionPaths`). This is correct for the current design — a wildcard can
   only ever be a current-module forward reference, and imported bindings are already fully
   type-checked/concrete — but it means imports are treated as a single flat namespace with
-  no notion of *their* internal section structure when viewed from an importer. Qualified
-  access across modules is unaffected; only the (rare) case of proximity ranking *among
-  bindings imported from different sections of another module* is not modelled. Left as-is
+  no notion of _their_ internal section structure when viewed from an importer. Qualified
+  access across modules is unaffected; only the (rare) case of proximity ranking _among
+  bindings imported from different sections of another module_ is not modelled. Left as-is
   to avoid regressing the standard-library overload resolution that depends on cross-module
   candidates remaining co-equal.
