@@ -60,7 +60,7 @@ runOptionsParser = RunOptions
 runCmd :: RunOptions -> IO ()
 runCmd opts = do
   evalConfig <- makeEvalConfig opts.runFixedNow
-  (errs, (mTc, mEval)) <- runOneshot evalConfig opts.runFile \nfp -> do
+  (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     mtc   <- Shake.use Rules.SuccessfulTypeCheck uri
@@ -73,12 +73,15 @@ runCmd opts = do
       evalResults = case mEval of
         Just rs -> rs
         Nothing -> []
-      -- Exit code is based on Shake rule results, NOT on the log stream.
-      -- The LSP rule publishes #EVAL results as Information-severity
-      -- diagnostics via the logger, so a file with passing `#EVAL`s still
-      -- produces non-empty `errs` — treating that as failure would be a
-      -- false positive.
-      overallOk = typecheckOk
+      -- Exit code is based on Shake rule results and structural diagnostics,
+      -- NOT on the raw log stream. #EVAL directive outcomes are published as
+      -- source="eval" diagnostics (Information for values, Error for a failed
+      -- assertion / eval exception); 'hasBlockingError' excludes source="eval"
+      -- so passing OR failing #EVALs never by themselves change the exit code.
+      -- Non-#EVAL Error diagnostics (parse/type errors, failed imports, an
+      -- import cycle) do fail the run — including cycles whose diagnostic the
+      -- engine attaches to a transitively-imported file rather than the entry.
+      overallOk = typecheckOk && not (hasBlockingError diags)
 
   if opts.runJsonOut
     then do
