@@ -1,0 +1,24 @@
+IMPORT prelude
+-- State as a Ledger demo. See specs/todo/STATE-AS-LEDGER-SPEC.md
+
+§ `Writes return the value recorded`
+#EVAL RECORD `freezing point of water` IS 273.15
+#EVAL COMMIT `official rate` IS 4.25
+#EVAL ATTEST `official rate` IS 4.25
+
+§ `Write then read within one directive`
+#EVAL LIST (RECORD `freezing point of water` IS 273.15), (fromMaybe 0 (RECALL `freezing point of water`))
+
+§ `Per directive isolation`
+#EVAL RECALL `freezing point of water`
+#ASSERT isNothing (RECALL `freezing point of water`)
+
+§ `Presumption and resolve by composition`
+-- A never-written cell is NOTHING; fromMaybe supplies the presumption.
+-- fromMaybe FALSE = the prelude `holds` (closed world); fromMaybe TRUE = `presumed`.
+#EVAL fromMaybe 99 (RECALL `temperature`)
+#ASSERT (fromMaybe 99 (RECALL `temperature`)) EQUALS 99
+#EVAL fromMaybe FALSE (RECALL `consent given`)
+#ASSERT NOT (fromMaybe FALSE (RECALL `consent given`))
+#EVAL fromMaybe TRUE (RECALL `contract still valid`)
+#ASSERT fromMaybe TRUE (RECALL `contract still valid`)
