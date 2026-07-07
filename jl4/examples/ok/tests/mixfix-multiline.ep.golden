@@ -18,6 +18,7 @@ GIVEN payer IS A NUMBER
 payer `remits` payee `to settle` ledger MEANS payer + payee + ledger
 
 DECIDE demo_multiline_postfix radius IS
+  radius
   `squared`
 
 DECIDE demo_multiline_mixfix base exponent IS

@@ -1556,7 +1556,7 @@ mixfixPostfixOp exprLineInfo = hidden $ try $ do
   notFollowedBy (sameLineExpr exprLineInfo.exprEndLine)
   let funcName = eN.payload
       op = mkSimpleEpaAnno eN
-  pure $ \l -> App (fixAnnoSrcRange $ mkHoleAnnoFor l <> op) funcName [l]
+  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
   where
     -- A parser that only succeeds if there's a base expression on the same line
     sameLineExpr line = do

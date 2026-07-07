@@ -124,13 +124,13 @@ testQuinaryMixfix MEANS `op1` `op2` `op3` `op4` 1 2 `op2` 3 `op3` 4 `op4` 5
 -- ============================================================================
 
 -- Postfix with backticks
-#EVAL `percent`
-#EVAL `percent`
-#EVAL `percent`
-#EVAL `percent`
+#EVAL 50 `percent`
+#EVAL 75 `percent`
+#EVAL (`plus` 33 22) `percent`
+#EVAL (10 + 5) `percent`
 
 -- Postfix without backticks (single-word operators can omit backticks)
-#EVAL percent
-#EVAL percent
-#EVAL percent
-#EVAL percent
+#EVAL 50 percent
+#EVAL 75 percent
+#EVAL (plus 33 22) percent
+#EVAL (10 + 5) percent
