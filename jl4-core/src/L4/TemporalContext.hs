@@ -145,18 +145,30 @@ data CtxReads = MkCtxReads
   , crDocumentTimezone :: !(ReadObs (Maybe Text.Text))
     -- ^ observations of 'tcDocumentTimezone' (recorded pre-defaulting:
     -- a NOW under a missing TIMEZONE records @ReadEq Nothing@)
+  , crLedgerOps :: !Bool
+    -- ^ STATE-AS-LEDGER poison bit: did the force perform ANY ledger
+    -- operation — a RECORD\/COMMIT\/ATTEST\/NOTIFY append or a RECALL read?
+    -- Ledger ops break the deterministic-replay premise of 'WHNFWhen'
+    -- caching in BOTH directions: a re-force would APPEND the write again
+    -- (a double-write visible to @RECALL ALL@\/provenance), and a cached
+    -- read could be served under a DIFFERENT ledger than it observed (the
+    -- fingerprint tracks only temporal axes). A force with this bit set is
+    -- therefore cached as a plain 'WHNF' (snapshot at first force — exactly
+    -- the semantics a ledger-touching thunk WITHOUT temporal reads already
+    -- has), never as a 'WHNFWhen'. See the cache-install decision in the
+    -- @UpdateThunk@ arm of 'L4.EvaluateLazy.Machine.backward'.
   }
   deriving stock (Eq, Show)
 
 instance Semigroup CtxReads where
-  MkCtxReads a b <> MkCtxReads a' b' = MkCtxReads (a <> a') (b <> b')
+  MkCtxReads a b l <> MkCtxReads a' b' l' = MkCtxReads (a <> a') (b <> b') (l || l')
 
 instance Monoid CtxReads where
   mempty = noReads
 
 -- | The empty fingerprint: no axis was read.
 noReads :: CtxReads
-noReads = MkCtxReads NotRead NotRead
+noReads = MkCtxReads NotRead NotRead False
 
 -- | Did this force observe the temporal context at all?
 hasReads :: CtxReads -> Bool
@@ -167,9 +179,15 @@ hasReads r = r /= noReads
 -- current value exactly; 'ReadMixed' never validates. Soundness: if every
 -- recorded read reproduces under the current context, re-forcing would
 -- deterministically replay to the identical value.
+--
+-- A fingerprint carrying 'crLedgerOps' never validates: re-forcing such a
+-- force is NOT a deterministic replay (it would re-append writes and re-read
+-- a possibly-changed ledger). The evaluator never installs such a cache in
+-- the first place (it installs a plain WHNF instead); this arm is defensive.
 validFor :: TemporalContext -> CtxReads -> Bool
 validFor tc r =
-  axisValid tc.tcSystemTime r.crSystemTime
+  not r.crLedgerOps
+    && axisValid tc.tcSystemTime r.crSystemTime
     && axisValid tc.tcDocumentTimezone r.crDocumentTimezone
   where
     axisValid :: Eq a => a -> ReadObs a -> Bool

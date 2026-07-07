@@ -41,16 +41,28 @@ import L4.Evaluate.Ledger
   , LedgerEvent (..)
   , LedgerStore (..)
   , Provenance (..)
+  , anonymousParty
   )
 import L4.Evaluate.ValueLazy (NF (..), Value (..))
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
+  , currentStore
+  , evalExprForLedgerWithEnv
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
+  , runEvalAction
   )
-import L4.EvaluateLazy.Machine (emptyEnvironment)
+import L4.EvaluateLazy.Machine
+  ( EvalDirective (..)
+  , EvalState (..)
+  , emptyEnvironment
+  , evalModule
+  , initialEnvironment
+  , readEvalRef
+  , tryEval
+  )
 import L4.TracePolicy (apiDefaultPolicy)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
@@ -163,6 +175,38 @@ isBreachedNF :: NF -> Bool
 isBreachedNF (MkNF (ValBreached _)) = True
 isBreachedNF _                      = False
 
+-- | A LEST reparation whose body RAISES (division by zero while forcing the
+-- RECORD's value): the deadline-miss sets @currentParty = Alice@ around the
+-- followup, then the exception unwinds the stack. 'unwindFrame' must restore
+-- the acting party exactly as the 'backward' success path would ('backward''s
+-- @RestoreCurrentParty@ arm) — otherwise a later RECORD against the SAME
+-- 'EvalState' is misattributed to Alice. The second directive is that later
+-- RECORD, driven through the shared-state test seam (no 'withFreshLedger'
+-- between them, unlike real directives — which is also why this leak is
+-- latent end-to-end today).
+lestUnwindSrc :: Text.Text
+lestUnwindSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Alice, Bob"
+  , "DECLARE Action IS ONE OF"
+  , "  report"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "`boom deontic` MEANS IF 1 DIVIDED BY 0 GREATER THAN 0 THEN FULFILLED ELSE FULFILLED"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "lestExplodes MEANS"
+  , "  PARTY Alice"
+  , "  MUST report"
+  , "  WITHIN 5"
+  , "  LEST"
+  , "    RECORD `penalty` IS `boom deontic`"
+  , ""
+  , "#TRACE lestExplodes AT 0 WITH"
+  , "  (`WAIT UNTIL` 100)"
+  , ""
+  , "#EVAL RECORD `after` IS 1"
+  ]
+
 spec :: Spec
 spec = describe "STATE-AS-LEDGER M4: per-party ledgers + official record (R1)" $ do
 
@@ -217,3 +261,40 @@ spec = describe "STATE-AS-LEDGER M4: per-party ledgers + official record (R1)" $
       Map.keys store.ownLedgers `shouldBe` ["Alice"]
       cellParties (store.ownLedgers Map.! "Alice")
         `shouldBe` [(["penalty recorded"], "Alice")]
+
+  describe "(d) exceptional unwind restores the acting party ('unwindFrame' / RestoreCurrentParty)" $ do
+    it "after an exception inside a LEST body, currentParty is restored and a later RECORD stays anonymous" $ do
+      cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+      case checkWithImports (vfsFromList []) lestUnwindSrc of
+        Left errs -> expectationFailure ("typecheck failed: " <> show errs)
+        Right r -> do
+          -- Drive BOTH directives inside ONE 'runEvalAction' (one shared
+          -- 'EvalState', no 'withFreshLedger' between them), catching the
+          -- LEST exception mid-action — the shape any future mid-directive
+          -- exception recovery would have.
+          out <- runEvalAction cfg $ do
+            ienv <- initialEnvironment
+            (_menv, dirs) <- evalModule ienv r.tcdModule
+            case dirs of
+              [d1, d2] -> do
+                r1 <- tryEval (evalExprForLedgerWithEnv d1.env d1.expr)
+                partyAfterUnwind <- readEvalRef (.currentParty)
+                _ <- evalExprForLedgerWithEnv d2.env d2.expr
+                store <- currentStore
+                pure (Just (either (const True) (const False) r1, partyAfterUnwind, store))
+              _ -> pure Nothing
+          case out of
+            Left e -> expectationFailure ("unexpected top-level Eval exception: " <> show e)
+            Right Nothing -> expectationFailure "expected exactly two directives in lestUnwindSrc"
+            Right (Just (raised, partyAfterUnwind, store)) -> do
+              -- sanity: the LEST body really raised (division by zero)
+              raised `shouldBe` True
+              -- THE guard: the unwind restored the enclosing party (Nothing).
+              -- Pre-fix, 'unwindFrame' skipped the RestoreCurrentParty frame
+              -- and this was Just "Alice".
+              partyAfterUnwind `shouldBe` Nothing
+              -- ... so the later RECORD must land in the ANONYMOUS own
+              -- ledger, not Alice's. (Pre-fix it was misattributed to Alice.)
+              Map.keys store.ownLedgers `shouldBe` [anonymousParty]
+              cellParties (store.ownLedgers Map.! anonymousParty)
+                `shouldBe` [(["after"], "")]
