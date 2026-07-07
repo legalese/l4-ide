@@ -1,0 +1,53 @@
+-- T6 regression: a failed re-force of a demoted WHNFWhen cache must not
+-- permanently poison the thunk.
+--
+-- 'evalRef' demotes a stale WHNFWhen cache to a blackholed Unevaluated
+-- before re-forcing it under the current context. Pre-fix, when that
+-- re-force raised an exception the unwind dropped the UpdateThunk frame
+-- without restoring the thunk, leaving it blackholed forever: every later
+-- force — including under the ORIGINAL, still-valid context — reported
+-- "Infinite loop detected". Fixed by restoring the displaced cache during
+-- exceptional unwinding ('restoreThunkOnUnwind' in Machine.hs); directive 3
+-- then serves the still-fingerprint-valid cache produced by directive 1.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
+-- so the ambient serial difference below is 1857 days (and 0 days under
+-- AS OF SYSTEM TIME 2020-01-01).
+
+TIMEZONE IS "Etc/UTC"
+
+x MEANS 1 DIVIDED BY (DATE_SERIAL TODAY MINUS DATE_SERIAL (DATE_FROM_DMY 1 1 2020))
+
+-- expected: 0.0005385029617662897 (= 1/1857; cached as WHNFWhen)
+#EVAL x
+
+-- expected: Division by zero (the demoted cache's re-force fails under the
+-- override)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) x
+
+-- expected: 0.0005385029617662897 again, served from the restored cache
+-- (pre-fix: "Infinite loop detected")
+#EVAL x
+
+----------------------------------------------------------------------------
+-- A fresh (never-cached) thunk whose first force fails must also stay
+-- re-forcible: the aborted force clears its blackhole mark on unwind.
+----------------------------------------------------------------------------
+
+y MEANS 1 DIVIDED BY (DATE_SERIAL TODAY MINUS DATE_SERIAL (DATE_FROM_DMY 1 1 2020))
+
+-- expected: Division by zero, twice (pre-fix the second directive reported
+-- "Infinite loop detected" off the leftover blackhole mark)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) y
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) y
+
+----------------------------------------------------------------------------
+-- Genuine self-reference must STILL be detected as an infinite loop: the
+-- unwind-time restore must not defeat same-thread blackhole detection.
+----------------------------------------------------------------------------
+
+r MEANS DATE_SERIAL TODAY PLUS r
+
+-- expected: Infinite loop detected (in both directives)
+#EVAL r
+#EVAL r

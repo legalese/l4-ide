@@ -6,6 +6,7 @@ import Data.Time (Day, UTCTime)
 import Data.Time.LocalTime (TimeOfDay)
 import L4.Syntax
 import L4.Evaluate.Operators (BinOp)
+import L4.TemporalContext (CtxReads)
 
 -- | Public addresses. These must be globally unique, therefore
 -- we for now include the URI.
@@ -30,6 +31,13 @@ instance Show Reference where
 data Thunk =
     Unevaluated !(Set ThreadId) (Expr Resolved) !Environment
   | WHNF WHNF
+    -- ^ context-independent result: final and monotone (never overwritten)
+  | WHNFWhen !CtxReads WHNF (Expr Resolved) !Environment
+    -- ^ context-DEPENDENT cached result (T6): the force that produced the
+    -- value read the temporal context as recorded in the 'CtxReads'
+    -- fingerprint. Served only while 'L4.TemporalContext.validFor' holds for
+    -- the current context; the expr\/env are retained so the thunk can be
+    -- re-forced under a different context.
   deriving stock Show
 
 type Environment = Map Unique Reference

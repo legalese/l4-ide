@@ -56,7 +56,7 @@ import L4.Annotation
 import L4.Print
 import L4.Syntax
 import L4.TypeCheck.Types (EntityInfo)
-import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
+import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
 
 import Control.Exception (throwIO, try, evaluate, ErrorCall)
@@ -197,6 +197,18 @@ runConfig = \ case
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
 nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
+  -- T6: open a fresh, directive-local context-read span. (Exceptional
+  -- unwinding closes spans as it pops UpdateThunk frames — see
+  -- 'unwindFrame' — but a successful directive legitimately leaves its own
+  -- reads in the root accumulator; spans are directive-local, so clear it.)
+  _ <- swapCtxReads noReads
+  -- Snapshot the ambient temporal context and restore it unconditionally
+  -- after the directive. 'unwindFrame' already restores saved contexts
+  -- frame by frame during exceptional unwinding; this directive boundary is
+  -- the belt-and-braces layer guaranteeing that no temporal override active
+  -- during THIS directive can leak into subsequent directives, whatever the
+  -- unwind path.
+  ambientCtx <- getTemporalContext
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -206,6 +218,9 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = withFreshLedger $ do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nf whnf
+  -- T6: restore the ambient temporal context unconditionally after the
+  -- directive (belt-and-braces; independent of the ledger/trace snapshots below).
+  putTemporalContext ambientCtx
   finalTrace <- case mt of
     Nothing      -> pure Nothing
     Just actions -> Just <$> liftIO (safePostprocessTrace actions)
@@ -489,11 +504,12 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   actualTime <- resolveEvalTime evalConfig
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
+  ctxReads <- newIORef noReads
   let evalTrace = Nothing
   reofferedEvents <- newIORef mempty
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
 -- evaluation exceptions at the boundary.

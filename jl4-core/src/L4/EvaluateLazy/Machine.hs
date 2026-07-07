@@ -19,6 +19,7 @@ module L4.EvaluateLazy.Machine
 , newUnique
 , getTemporalContext
 , putTemporalContext
+, swapCtxReads
 , getEvalTime
 , getModuleUri
 , getSafeMode
@@ -88,7 +89,7 @@ import L4.Evaluate.Ledger
   )
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
-import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
+import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
@@ -195,7 +196,12 @@ data Frame =
   | WhenLastFrame TemporalContext WHNF Time.Day
   | WhenNextFrame TemporalContext WHNF Time.Day Time.Day
   | ValueAtFrame TemporalContext
-  | UpdateThunk Reference
+  | UpdateThunk Reference !CtxReads !(Maybe (CtxReads, WHNF))
+    -- ^ write-back frame for a thunk force; carries the ENCLOSING span's
+    -- saved read accumulator, merged back in 'backward' (T6), plus the
+    -- displaced 'WHNFWhen' cache (fingerprint, value) when this force
+    -- re-forces a stale context-dependent cache — so an aborted force can
+    -- put the still-fingerprint-guarded cache back ('unwindFrame')
   | ContractFrame ContractFrame
   | ConcatFrame [WHNF] {- -} [Expr Resolved] Environment -- accumulated values, remaining exprs, env
   | AsStringFrame -- AsString frame
@@ -238,6 +244,11 @@ data EvalState =
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
+    , ctxReads   :: !(IORef CtxReads)
+      -- ^ temporal-context observations made since entering the innermost
+      -- in-flight thunk-force span (T6). Single-threaded within a run
+      -- (EvalState is constructed per run); cross-run sharing is handled at
+      -- cache-serve time via 'validFor'.
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
     , reofferedEvents :: !(IORef (Set Address))
@@ -302,14 +313,67 @@ traceEval ta = do
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
 
 -- | Throw an evaluation exception: unwind the stack frame by frame (so an
--- active trace records the pops, mirroring the historical behaviour) and
--- then throw an IO exception.
+-- active trace records the pops, mirroring the historical behaviour),
+-- interpreting the state-restoring frames along the way ('unwindFrame'),
+-- and then throw an IO exception.
 raiseException :: EvalException -> Eval a
 raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just _f -> raiseException e
+    Just f  -> unwindFrame f >> raiseException e
+
+-- | Interpret the state-restoring effects of a frame while unwinding on an
+-- exception. Most frames are pure control flow and need nothing, but:
+--
+--   * frames that saved a 'TemporalContext' to restore in 'backward' must
+--     restore it during unwinding too — otherwise an exception raised inside
+--     an @EVAL AS OF SYSTEM TIME@ \/ @EVAL UNDER VALID TIME@ \/ iterator
+--     scope leaves the override in the ambient context (and, post-T6, lets
+--     subsequent forces cache values under the leaked context);
+--
+--   * 'UpdateThunk' frames must close their read span (mirroring the
+--     success path in 'backward') and return the thunk to a re-forcible
+--     state — otherwise the blackhole mark left by the aborted force makes
+--     every later force of the thunk report a bogus infinite loop.
+unwindFrame :: Frame -> Eval ()
+unwindFrame = \ case
+  EvalAsOfSystemTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderValidTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderRulesEffectiveAt2 originalCtx -> putTemporalContext originalCtx
+  EvalUnderRulesEncodedAt2 originalCtx   -> putTemporalContext originalCtx
+  EverBetweenFrame originalCtx _ _ _ _   -> putTemporalContext originalCtx
+  AlwaysBetweenFrame originalCtx _ _ _ _ -> putTemporalContext originalCtx
+  WhenLastFrame originalCtx _ _          -> putTemporalContext originalCtx
+  WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
+  ValueAtFrame originalCtx               -> putTemporalContext originalCtx
+  UpdateThunk rf saved displaced         -> do
+    -- Close this force's read span exactly as the success path does (the
+    -- reads made before the abort soundly over-approximate the enclosing
+    -- span's dependencies), then undo the blackhole.
+    mine <- swapCtxReads noReads
+    noteCtxRead (saved <> mine)
+    restoreThunkOnUnwind rf displaced
+  _ -> pure ()
+
+-- | Return an aborted force's thunk to a re-forcible state. If the force had
+-- displaced a stale 'WHNFWhen' cache, put the cache back: it is still
+-- fingerprint-guarded, so it can only ever be served under contexts it is
+-- valid for (and a later force under the original context then correctly
+-- serves the cached value). Otherwise just clear our blackhole mark.
+-- Mirrors the keep-theirs policy of 'updateThunkToWHNFWhen': if the thunk is
+-- no longer 'Unevaluated' (another thread completed it) or our mark is gone,
+-- keep what is there.
+restoreThunkOnUnwind :: Reference -> Maybe (CtxReads, WHNF) -> Eval ()
+restoreThunkOnUnwind rf displaced =
+  pokeThunk rf \tid -> \ case
+    thunk@(Unevaluated tids e env)
+      | tid `Set.member` tids ->
+          case displaced of
+            Just (fp, v) -> (WHNFWhen fp v e env, ())
+            Nothing      -> (Unevaluated (Set.delete tid tids) e env, ())
+      | otherwise -> (thunk, ())
+    other -> (other, ())
 
 internalException :: InternalEvalException -> Eval a
 internalException = raiseException . InternalEvalException
@@ -362,6 +426,15 @@ getEntityInfo = asks (.entityInfo)
 getModuleUri :: Eval NormalizedUri
 getModuleUri = asks (.moduleUri)
 
+-- | Raw access to the temporal context — reserved for frame save\/restore
+-- plumbing and cache validation. READER CONTRACT (T6): any code that lets an
+-- axis's value influence a computed RESULT must instead go through the
+-- @readTc*@ helpers below so the observation is recorded into the current
+-- force span; a raw read that affects a result silently reintroduces the
+-- stale-thunk bug. When adding a reader for a currently-latent axis
+-- (tcValidTime etc.), add the corresponding field to 'CtxReads', an
+-- instrumented reader, and flip the @temporal-under-valid-time-latent@
+-- golden.
 getTemporalContext :: Eval TemporalContext
 getTemporalContext = do
   r <- asks (.temporalContext)
@@ -449,6 +522,47 @@ getCurrentParty = readEvalRef (.currentParty)
 -- | Set the current acting party (M4); restored via a 'RestoreCurrentParty' frame.
 putCurrentParty :: Maybe Text -> Eval ()
 putCurrentParty = writeEvalRef (.currentParty)
+
+-- ----------------------------------------------------------------------------
+-- Per-force context-read tracking (T6).
+--
+-- Value-affecting reads of the temporal context MUST go through the readTc*
+-- helpers below so the observation lands in the current force span's
+-- accumulator (see the READER CONTRACT on 'TemporalContext').
+-- ----------------------------------------------------------------------------
+
+-- | Merge an observation into the current force span's accumulator.
+noteCtxRead :: CtxReads -> Eval ()
+noteCtxRead r = do
+  accRef <- asks (.ctxReads)
+  liftIO (modifyIORef' accRef (<> r))
+
+-- | Install a new accumulator, returning the previous one. Used to open a
+-- fresh span at the start of a thunk force (and to reset residue at
+-- directive boundaries).
+swapCtxReads :: CtxReads -> Eval CtxReads
+swapCtxReads new = do
+  accRef <- asks (.ctxReads)
+  liftIO do
+    old <- readIORef accRef
+    writeIORef accRef $! new
+    pure old
+
+-- | Instrumented reader for 'tcSystemTime' (see READER CONTRACT).
+readTcSystemTime :: Eval UTCTime
+readTcSystemTime = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crSystemTime = ReadEq tc.tcSystemTime }
+  pure tc.tcSystemTime
+
+-- | Instrumented reader for 'tcDocumentTimezone' (see READER CONTRACT).
+-- Records the raw 'Maybe' (pre-defaulting): a read that falls back to
+-- @\"Etc\/UTC\"@ is still an observation of the axis being 'Nothing'.
+readTcDocumentTimezone :: Eval (Maybe Text)
+readTcDocumentTimezone = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crDocumentTimezone = ReadEq tc.tcDocumentTimezone }
+  pure tc.tcDocumentTimezone
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -849,6 +963,7 @@ backward val = withPoppedFrame $ \ case
   -- Evaluate thunk under overridden system time (serial number)
   Just (EvalAsOfSystemTime1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [AsOfSystemTime (serialToUTCTime serial)] originalCtx
     putTemporalContext newCtx
@@ -856,6 +971,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderValidTime1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [UnderValidTime (Time.utctDay (serialToUTCTime serial))] originalCtx
     putTemporalContext newCtx
@@ -863,6 +979,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderRulesEffectiveAt1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let retroDay = Time.utctDay (serialToUTCTime serial)
         newCtx = applyEvalClauses [UnderRulesEffectiveAt retroDay] originalCtx
@@ -871,6 +988,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderRulesEncodedAt1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [UnderRulesEncodedAt (serialToUTCTime serial)] originalCtx
     putTemporalContext newCtx
@@ -990,7 +1108,9 @@ backward val = withPoppedFrame $ \ case
   -- Ternary builtin handling: got all 3 args
   Just (TernaryBuiltin3 fn val1 val2) -> do
     runTernaryBuiltin fn val1 val2 val
-  -- Temporal context scoping: restore original context after thunk evaluation
+  -- Temporal context scoping: restore original context after thunk evaluation.
+  -- These (and the iterator frames below) are frame plumbing — context
+  -- writers, not context observations (see T6).
   Just (EvalAsOfSystemTime2 originalCtx) -> do
     putTemporalContext originalCtx
     continueBackward val
@@ -1162,8 +1282,17 @@ backward val = withPoppedFrame $ \ case
       _ ->
         -- Should not happen - field encoding should return ValString
         internalException $ RuntimeTypeError "Expected ValString from field encoding"
-  Just (UpdateThunk rf) -> do
-    updateThunkToWHNF rf val
+  Just (UpdateThunk rf saved _displaced) -> do
+    -- Close this force's read span. LIFO frame discipline guarantees any
+    -- scope/iterator frames pushed during the force were popped (restoring
+    -- the temporal context) before this frame, so 'mine' reflects exactly
+    -- this force's observations. Reads propagate to the enclosing span so a
+    -- consuming thunk inherits the dependency.
+    mine <- swapCtxReads noReads
+    noteCtxRead (saved <> mine)
+    if hasReads mine
+      then updateThunkToWHNFWhen rf mine val
+      else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
@@ -1881,8 +2010,9 @@ jsonValueToWHNFTyped jsonValue ty = do
             Aeson.String s -> do
               case parseDatetimeText s of
                 Just utc -> do
-                  tc <- getTemporalContext
-                  let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
+                  -- instrumented read: the tz affects the result value (T6)
+                  mTzName <- readTcDocumentTimezone
+                  let tzName = fromMaybe "Etc/UTC" mTzName
                   pure $ ValDateTime utc tzName
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
@@ -2385,8 +2515,9 @@ runBuiltin es op mTy = do
       case parseDatetimeText str of
         Just utc -> do
           -- Use document timezone as default for the stored tz name
-          tc <- getTemporalContext
-          let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
+          -- (instrumented read: the tz affects the result value, T6)
+          mTzName <- readTcDocumentTimezone
+          let tzName = fromMaybe "Etc/UTC" mTzName
           dtRef <- allocateValue (ValDateTime utc tzName)
           continueBackward $ ValConstructor TypeCheck.justRef [dtRef]
         Nothing ->
@@ -2611,6 +2742,10 @@ applyDatePredicate predicate day = do
   pushFrame (App1 [argRef] Nothing)
   continueBackward predicate
 
+-- NOTE (T6): the getTemporalContext calls in the iterator starters below are
+-- frame plumbing (save/override), not context observations. The per-day
+-- contexts override only the currently-latent tcValidTime/tcRule* axes, so
+-- fingerprinted caches deliberately remain valid across iteration days.
 startEverBetween :: WHNF -> WHNF -> WHNF -> Machine Config
 startEverBetween startVal endVal predicate = do
   startDay <- expectDateValue startVal
@@ -2737,6 +2872,18 @@ updateThunkToWHNF :: Reference -> WHNF -> Machine ()
 updateThunkToWHNF rf v =
   updateThunk rf (WHNF v)
 
+-- | Write back a context-DEPENDENT force result (T6), tagged with the reads
+-- made during the force. The expr\/env are recovered from the blackholed
+-- thunk itself so it can be re-forced when the fingerprint no longer matches
+-- the current temporal context. If another thread\/session already completed
+-- the thunk, keep theirs: a plain 'WHNF' implies a read-free
+-- (context-independent) force, and a 'WHNFWhen' revalidates at serve time.
+updateThunkToWHNFWhen :: Reference -> CtxReads -> WHNF -> Machine ()
+updateThunkToWHNFWhen rf fp v =
+  pokeThunk rf \_tid -> \ case
+    Unevaluated _tids e env -> (WHNFWhen fp v e env, ())
+    other                   -> (other, ())
+
 -- NOTE: Once we start evaluating a thunk, we store the (Haskell) thread
 -- that does so. If we encounter a thunk with such an entry created by
 -- ourselves, we treat it as a blackhole: we tried to evaluate the thunk
@@ -2747,31 +2894,64 @@ updateThunkToWHNF rf v =
 -- well, which should be benign.
 evalRef :: Reference -> Machine Config
 evalRef rf = do
-  -- Fast path: thunk updates are monotonic (Unevaluated -> Unevaluated with
-  -- more blackhole marks, or Unevaluated -> WHNF, never back), so a thunk
-  -- observed in WHNF is final and can be returned from a plain read, without
-  -- the atomic read-modify-write and the 'myThreadId' call. Only genuinely
-  -- unevaluated thunks take the atomic path below (once each).
+  -- Fast path: plain-WHNF thunk updates are monotonic (Unevaluated ->
+  -- Unevaluated with more blackhole marks, or Unevaluated -> WHNF, never
+  -- back), so a thunk observed in WHNF is final and can be returned from a
+  -- plain read, without the atomic read-modify-write and the 'myThreadId'
+  -- call. Context-dependent caches ('WHNFWhen', T6) are validated against
+  -- the current temporal context before being served; genuinely unevaluated
+  -- (or stale) thunks take the atomic path below.
   thunk0 <- readThunk rf
   case thunk0 of
     WHNF val -> whnfConfig val
-    Unevaluated{} ->
+    WHNFWhen fp val _ _ -> do
+      -- Lock-free serve: the fingerprint and the context are both
+      -- effectively thread-local reads; a mismatch merely routes through
+      -- the atomic path. Serving records the fingerprint into the current
+      -- span, so a consuming thunk INHERITS the dependency.
+      tc <- getTemporalContext
+      if validFor tc fp
+        then noteCtxRead fp >> whnfConfig val
+        else forceIt
+    Unevaluated{} -> forceIt
+  where
+    forceIt :: Machine Config
+    forceIt = do
+      -- Read the context BEFORE the atomic poke (the poke fn must stay pure).
+      tc <- getTemporalContext
       join $ pokeThunk rf \tid -> \ case
         thunk@(WHNF val) ->
           -- Another thread finished it between our read and the atomic poke.
           (thunk, whnfConfig val)
+        thunk@(WHNFWhen fp val e env)
+          | validFor tc fp -> (thunk, noteCtxRead fp >> whnfConfig val)
+          | otherwise ->
+              -- Stale for the current temporal context: re-force under it.
+              -- The displaced cache travels on the UpdateThunk frame so an
+              -- aborted force can put it back ('restoreThunkOnUnwind').
+              (Unevaluated (Set.singleton tid) e env, beginForce (Just (fp, val)) e env)
         thunk@(Unevaluated tids e env)
           | tid `Set.member` tids ->  (thunk, userException (BlackholeForced e))
-          | otherwise -> (Unevaluated (Set.insert tid tids) e env, pushFrame (UpdateThunk rf) *> continueExpr env e)
-  where
+          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce Nothing e env)
+    beginForce :: Maybe (CtxReads, WHNF) -> Expr Resolved -> Environment -> Machine Config
+    beginForce displaced e env = do
+      -- Open a fresh read span for this force; the enclosing span's
+      -- accumulator travels on the UpdateThunk frame and is merged back
+      -- (together with this force's reads) in 'backward'.
+      saved <- swapCtxReads noReads
+      pushFrame (UpdateThunk rf saved displaced)
+      continueExpr env e
     whnfConfig :: WHNF -> Machine Config
     whnfConfig val =
       case val of
         ValNullaryBuiltinFun fn -> do
-          -- Don't cache nullary builtins (e.g. TIMEZONE, TODAY, NOW) because
-          -- their results depend on mutable state (TemporalContext) that can
-          -- change between evaluations while the thunk IORef persists in
-          -- cached import environments.
+          -- Nullary builtins (TIMEZONE, TODAY, NOW, CURRENTTIME) are stored
+          -- as function values and (re-)evaluated on every serve because
+          -- their results depend on the mutable TemporalContext. Evaluation
+          -- routes through the instrumented readTc* readers, recording the
+          -- observation into the CURRENT force span — which is exactly how
+          -- an ordinary thunk whose body mentions TODAY ends up carrying a
+          -- 'CtxReads' fingerprint (see 'UpdateThunk' / 'WHNFWhen').
           evaluated <- evalNullaryBuiltin fn
           continueBackward evaluated
         _ ->
@@ -2890,6 +3070,10 @@ evalTopDecl env (Timezone _ann expr) = do
   mTzName <- extractTimezoneString env expr
   case mTzName of
     Just tzName -> do
+      -- Persistent context WRITE, not an observation (see T6). No ambient
+      -- mirror is needed: fingerprinted caches revalidate against whatever
+      -- the context is at serve time, so thunks forced before a mid-module
+      -- TIMEZONE IS are correctly invalidated after it.
       tc <- getTemporalContext
       putTemporalContext tc { tcDocumentTimezone = Just tzName }
     Nothing ->
@@ -2989,6 +3173,8 @@ evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _) = do
   -- because we do not have Assumed as an expression, and we also cannot embed values into expressions.
   updateTerm env n (WHNF (ValAssumed n))
 
+-- NOTE (T6): writes module-eval-time closures/ValAssumed/Unevaluated bodies,
+-- not force results — deliberately unfingerprinted.
 updateTerm :: Environment -> Resolved -> Thunk -> Machine ()
 updateTerm env n thunk = do
   rf <- expectTerm env n
@@ -3339,16 +3525,22 @@ builtinBinOps =
 -- Clock & parsing utilities
 ----------------------------------------------------------------------------
 
+-- NOTE (T6): all temporal-context access here goes through the instrumented
+-- readTc* readers so the observation is recorded into the current force
+-- span (see the READER CONTRACT on 'TemporalContext'). The error branches
+-- (missing TIMEZONE) throw before any thunk write-back, so their reads are
+-- moot but harmless.
 evalNullaryBuiltin :: NullaryBuiltinFun -> Machine WHNF
 evalNullaryBuiltin = \case
   NullaryTodaySerial -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> do
         mTz <- liftIO $ tryLoadTZ (Text.unpack tzName)
         case mTz of
           Just tz -> do
-            let localTime = TZ.utcToLocalTimeTZ tz tc.tcSystemTime
+            let localTime = TZ.utcToLocalTimeTZ tz sysTime
                 todayDay = localDay localTime
             pure $ ValDate todayDay
           Nothing ->
@@ -3358,24 +3550,26 @@ evalNullaryBuiltin = \case
         userException $ UserError
           "TIMEZONE is not declared. TODAY requires 'TIMEZONE IS \"<IANA timezone>\"' in your document."
   NullaryNowSerial -> do
-    tc <- getTemporalContext
-    let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
-    pure $ ValDateTime tc.tcSystemTime tzName
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    let tzName = fromMaybe "Etc/UTC" mTzName
+    pure $ ValDateTime sysTime tzName
   NullaryTimezone -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> pure $ ValString tzName
       Nothing ->
         userException $ UserError
           "TIMEZONE is not declared. Add 'TIMEZONE IS \"<IANA timezone>\"' to your document."
   NullaryCurrentTime -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> do
         mTz <- liftIO $ tryLoadTZ (Text.unpack tzName)
         case mTz of
           Just tz -> do
-            let localTime = TZ.utcToLocalTimeTZ tz tc.tcSystemTime
+            let localTime = TZ.utcToLocalTimeTZ tz sysTime
                 tod = localTimeOfDay localTime
             pure $ ValTime tod
           Nothing ->
@@ -3609,6 +3803,9 @@ extractTimezoneString env (App _ nameRef []) = do
     Just refId ->
       pokeThunk refId $ \_ thunk -> case thunk of
         WHNF (ValString s) -> (thunk, Just s)
+        -- peek only (no read recorded): matches baseline behaviour of
+        -- accepting a previously-forced cached string (see T6)
+        WHNFWhen _ (ValString s) _ _ -> (thunk, Just s)
         Unevaluated _ (Lit _ (StringLit _ s)) _ -> (thunk, Just s)
         _ -> (thunk, Nothing)
     Nothing -> pure Nothing
@@ -3792,7 +3989,9 @@ writeJSONToReferences json env = case json of
           case Map.lookup unique env of
             Nothing -> pure ()  -- No Reference found (shouldn't happen after preAllocate)
             Just existingRef -> do
-              -- Convert JSON to WHNF and write into the existing Reference
+              -- Convert JSON to WHNF and write into the existing Reference.
+              -- NOTE (T6): deliberately a plain WHNF — externally injected
+              -- batch input is a per-run constant, not a force result.
               whnf <- jsonValueToWHNFTyped val ty
               updateThunkToWHNF existingRef whnf
   _ -> pure ()

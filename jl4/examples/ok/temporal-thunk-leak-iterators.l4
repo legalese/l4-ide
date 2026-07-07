@@ -1,0 +1,86 @@
+-- T6 regression: temporal-context leakage seeded through the WHEN LAST /
+-- WHEN NEXT day-iterators, plus the sharing-preservation property.
+--
+-- The iterators run their predicate once per day under a per-day context
+-- ([UnderValidTime d, UnderRulesEffectiveAt d] layered on the enclosing
+-- context). Those per-day axes currently have NO readers, so fingerprinted
+-- caches must remain VALID across iteration days (sharing preserved), while
+-- values seeded during iteration steps under an enclosing `EVAL AS OF
+-- SYSTEM TIME` override must NOT leak to ambient reads (and vice versa).
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z; ambient
+-- TODAY = DATE OF 31, 1, 2025 = serial 739646.
+-- serial(2020-06-15) = 737955.
+
+TIMEZONE IS "Etc/UTC"
+
+----------------------------------------------------------------------------
+-- Case 1: seeding during WHEN LAST inside AS OF (probe 05)
+----------------------------------------------------------------------------
+
+`today snapshot` MEANS TODAY
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`is today` d MEANS d EQUALS `today snapshot`
+
+-- expected: JUST OF (DATE OF 1, 1, 2020) — steps 5,4,3,2 Jan are FALSE, the
+-- snapshot is forced on the first step under the override (= 1 Jan 2020)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`WHEN LAST` (DATE_FROM_DMY 5 1 2020) `is today`)
+
+-- expected: DATE OF 31, 1, 2025 (pre-fix: leaked DATE OF 1, 1, 2020)
+#EVAL `today snapshot`
+
+----------------------------------------------------------------------------
+-- Case 2 (route1-A): iterator ALONE — per-day frames override only unread
+-- axes, so the shared cache stays valid across days AND at ambient.
+----------------------------------------------------------------------------
+
+`shared today A` MEANS DATE_SERIAL TODAY
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`on or before shared A` d MEANS DATE_SERIAL d <= `shared today A`
+
+-- expected: JUST OF (DATE OF 10, 1, 2025) (predicate TRUE at the start day)
+#EVAL `WHEN NEXT` (DATE_FROM_DMY 10 1 2025) `on or before shared A`
+
+-- expected: 739646 (correct at baseline too; guards against over-invalidation)
+#EVAL `shared today A`
+
+----------------------------------------------------------------------------
+-- Case 3 (route1-B): inside-out THROUGH the iterator — shared binding first
+-- forced during a WHEN LAST step inside an AS OF scope.
+----------------------------------------------------------------------------
+
+`shared today B` MEANS DATE_SERIAL TODAY
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`on or before shared B` d MEANS DATE_SERIAL d <= `shared today B`
+
+-- expected: JUST OF (DATE OF 15, 6, 2020)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 15 6 2020)) (`WHEN LAST` (DATE_FROM_DMY 15 6 2020) `on or before shared B`)
+
+-- expected: 739646 (pre-fix: leaked 737955, the override-scope serial)
+#EVAL `shared today B`
+
+----------------------------------------------------------------------------
+-- Case 4 (route1-C): outside-in through the iterator — CONTROL FLOW, not
+-- just a printed value: the stale ambient cache changed which day WHEN NEXT
+-- terminated on (pre-fix it ran ~1697 extra days to 31 Jan 2025).
+----------------------------------------------------------------------------
+
+`shared today C` MEANS DATE_SERIAL TODAY
+
+-- expected: 739646 (ambient force; caches the ambient serial)
+#EVAL `shared today C`
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`equals shared C` d MEANS DATE_SERIAL d EQUALS `shared today C`
+
+-- expected: JUST OF (DATE OF 15, 6, 2020) — under the override the shared
+-- binding re-forces to serial(2020-06-15), so the iterator stops after 6
+-- steps (pre-fix: JUST OF (DATE OF 31, 1, 2025))
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 15 6 2020)) (`WHEN NEXT` (DATE_FROM_DMY 10 6 2020) `equals shared C`)
