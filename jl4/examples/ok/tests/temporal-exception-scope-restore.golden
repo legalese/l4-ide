@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+temporal-exception-scope-restore.l4:21:1-24:
+  739646
+temporal-exception-scope-restore.l4:24:1-53:
+  Division by zero in the operation:
+  DIVIDED
+temporal-exception-scope-restore.l4:28:1-24:
+  739646
+temporal-exception-scope-restore.l4:34:1-12:
+  739646
