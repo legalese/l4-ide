@@ -332,7 +332,7 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
         -- TODO: I imagine there will be functionality for this kind of thing in a more central place soon;
         -- this can be replaced with that when that happens.
         getResolved :: OptionallyTypedName Resolved -> Resolved
-        getResolved (MkOptionallyTypedName _ paramName _) = paramName
+        getResolved (MkOptionallyTypedName _ paramName _ _) = paramName
 
 -- | Context for translating expressions - tracks whether we're inside And or Or
 data TranslateContext = CtxAnd | CtxOr | CtxNone

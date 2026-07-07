@@ -353,7 +353,7 @@ instance Linearize (GivenSig Resolved) where
 
 instance Linearize (OptionallyTypedName Resolved) where
   linearize = \ case
-    MkOptionallyTypedName _ name _mty -> hcat
+    MkOptionallyTypedName _ name _mty _mTypically -> hcat
       [ linearize name
       ]
 

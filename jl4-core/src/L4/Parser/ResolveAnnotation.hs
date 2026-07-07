@@ -229,10 +229,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
-    MkAssume ann tySig appFormAka order -> do
+    MkAssume ann tySig appFormAka order mTypically -> do
       tySig' <- addNlg tySig
       appFormAka' <- addNlg appFormAka
-      pure $ MkAssume ann tySig' appFormAka' order
+      mTypically' <- traverse addNlg mTypically
+      pure $ MkAssume ann tySig' appFormAka' order mTypically'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
   addNlg a = extendNlgA a $ case a of
@@ -282,10 +283,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
   addNlg a = extendNlgA a $ case a of
-    MkTypedName ann n ty mExpr -> do
+    MkTypedName ann n ty mTypically mExpr -> do
       n' <- addNlg n
       ty' <- addNlg ty
-      pure $ MkTypedName ann n' ty' mExpr
+      mTypically' <- traverse addNlg mTypically
+      pure $ MkTypedName ann n' ty' mTypically' mExpr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (ConDecl n) where
   addNlg a = extendNlgA a $ case a of
@@ -309,10 +311,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
   addNlg a = extendNlgA a $ case a of
-    MkOptionallyTypedName ann n mty -> do
+    MkOptionallyTypedName ann n mty mTypically -> do
       n' <- addNlg n
       tys' <- traverse addNlg mty
-      pure $ MkOptionallyTypedName ann n' tys'
+      mTypically' <- traverse addNlg mTypically
+      pure $ MkOptionallyTypedName ann n' tys' mTypically'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
@@ -629,12 +632,13 @@ instance HasDesc (Decide n) where
     pure $ MkDecide ann' tySig' app' expr'
 
 instance HasDesc (Assume n) where
-  addDesc asm@(MkAssume ann tySig appForm mType) = do
+  addDesc asm@(MkAssume ann tySig appForm mType mTypically) = do
     ann' <- attachLeadingDesc asm ann
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     mType' <- traverse addDesc mType
-    pure $ MkAssume ann' tySig' app' mType'
+    mTypically' <- traverse addDesc mTypically
+    pure $ MkAssume ann' tySig' app' mType' mTypically'
 
 instance HasDesc (Directive n) where
   addDesc = \ case
@@ -656,10 +660,11 @@ instance HasDesc (GivenSig n) where
     MkGivenSig ann <$> traverse addDesc names
 
 instance HasDesc (OptionallyTypedName n) where
-  addDesc name@(MkOptionallyTypedName ann n mType) = do
+  addDesc name@(MkOptionallyTypedName ann n mType mTypically) = do
     mType' <- traverse addDesc mType
+    mTypically' <- traverse addDesc mTypically
     ann' <- attachLeadingOrInlineDesc name ann
-    pure $ MkOptionallyTypedName ann' n mType'
+    pure $ MkOptionallyTypedName ann' n mType' mTypically'
 
 instance HasDesc (GivethSig n) where
   addDesc (MkGivethSig ann ty) = do
@@ -680,10 +685,11 @@ instance HasDesc (ConDecl n) where
     MkConDecl ann name <$> traverse addDesc names
 
 instance HasDesc (TypedName n) where
-  addDesc name@(MkTypedName ann n ty mExpr) = do
+  addDesc name@(MkTypedName ann n ty mTypically mExpr) = do
     ty' <- addDesc ty
+    mTypically' <- traverse addDesc mTypically
     ann' <- attachLeadingOrInlineDesc name ann
-    pure $ MkTypedName ann' n ty' mExpr
+    pure $ MkTypedName ann' n ty' mTypically' mExpr
 
 instance HasDesc (Type' n) where
   addDesc = pure

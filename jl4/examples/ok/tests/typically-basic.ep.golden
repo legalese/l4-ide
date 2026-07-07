@@ -1,0 +1,62 @@
+-- Test file for the TYPICALLY keyword: metadata-only default values.
+-- TYPICALLY stores a default on DECLARE fields, GIVEN parameters and
+-- ASSUME declarations; the value is type-checked against the annotated
+-- type but has no runtime behaviour.
+
+IMPORT prelude
+
+-- TYPICALLY with BOOLEAN in DECLARE fields
+DECLARE Person HAS
+  name IS A STRING
+  has_capacity IS A BOOLEAN TYPICALLY TRUE
+  is_under_duress IS A BOOLEAN TYPICALLY FALSE
+
+-- TYPICALLY with NUMBER in DECLARE fields
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  max_retries IS A NUMBER TYPICALLY 3
+
+-- TYPICALLY with STRING in DECLARE fields
+DECLARE Contract HAS
+  governing_law IS A STRING TYPICALLY "Singapore"
+
+-- TYPICALLY combined with MEANS on a computed field:
+-- the MEANS clause defines the field; the TYPICALLY default is inert metadata.
+DECLARE Widget HAS
+  price IS A NUMBER TYPICALLY 10
+  taxed IS A NUMBER TYPICALLY 11
+    MEANS price * 1.09
+
+-- TYPICALLY on ASSUME declarations
+ASSUME jurisdiction IS A STRING TYPICALLY "SG"
+ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+DECLARE Buyer
+  HAS `of age`         IS A BOOLEAN TYPICALLY TRUE
+      `is emancipated` IS A BOOLEAN TYPICALLY FALSE
+
+-- TYPICALLY in GIVEN parameters, exported so the schema shows the defaults
+@export Decide whether a buyer may purchase alcohol
+GIVEN
+  b                       IS A Buyer
+  `has spousal approval`  IS A BOOLEAN TYPICALLY FALSE
+  `beer only`             IS A BOOLEAN
+  `has parental approval` IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+DECIDE `may purchase alcohol` IF
+      `person has capacity`
+  AND (       b's `of age`
+          OR  `has parental approval`
+          OR  `has spousal approval` )
+
+-- an untyped GIVEN parameter with a TYPICALLY default
+GIVEN
+  married IS A BOOLEAN TYPICALLY FALSE
+  age     IS A NUMBER TYPICALLY 18
+  bonus   TYPICALLY 5
+GIVETH A BOOLEAN
+DECIDE `can vote` IF age >= 18
+
+alice MEANS Buyer WITH `of age` IS TRUE, `is emancipated` IS FALSE
+
+#EVAL `can vote` FALSE 21 0

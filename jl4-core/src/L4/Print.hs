@@ -248,17 +248,27 @@ instance LayoutPrinterWithName a => LayoutPrinter (OptionallyNamedType a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (OptionallyTypedName a) where
   printWithLayout = \ case
-    MkOptionallyTypedName _ a ty ->
+    MkOptionallyTypedName _ a ty typically ->
       printWithLayout a <> case ty of
         Nothing -> mempty
         Just ty' -> space <> "IS" <+> printWithLayout ty'
+      <> case typically of
+        Nothing -> mempty
+        Just e -> space <> "TYPICALLY" <+> printWithLayout e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypedName a) where
   printWithLayout = \ case
-    MkTypedName _ a ty Nothing -> printWithLayout a <+> "IS" <+> printWithLayout ty
-    MkTypedName _ a ty (Just meansExpr) ->
-      printWithLayout a <+> "IS" <+> printWithLayout ty <> line <>
+    MkTypedName _ a ty mTypically Nothing ->
+      printWithLayout a <+> "IS" <+> printWithLayout ty
+        <> printTypically mTypically
+    MkTypedName _ a ty mTypically (Just meansExpr) ->
+      printWithLayout a <+> "IS" <+> printWithLayout ty
+        <> printTypically mTypically <> line <>
       indent 4 ("MEANS" <+> printWithLayout meansExpr)
+    where
+      printTypically = \ case
+        Nothing -> mempty
+        Just e -> space <> "TYPICALLY" <+> printWithLayout e
 
 instance LayoutPrinterWithName a => LayoutPrinter (TypeSig a) where
   printWithLayout = \ case
@@ -337,7 +347,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
   printWithLayout = \ case
-    MkAssume _ tySig appForm ty ->
+    MkAssume _ tySig appForm ty typically ->
       -- `vcat` (not `fillCat`): see the Declare note above — `fillCat` jams a
       -- non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
       vcat
@@ -345,6 +355,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
         , "ASSUME" <+> printWithLayout appForm <> case ty of
             Nothing -> mempty
             Just ty' -> space <> "IS" <+> printWithLayout ty'
+          <> case typically of
+            Nothing -> mempty
+            Just e -> space <> "TYPICALLY" <+> printWithLayout e
         ]
 
 instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where

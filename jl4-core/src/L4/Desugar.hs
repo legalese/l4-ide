@@ -236,14 +236,14 @@ desugarCFDeclare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon tns
     let
       -- Extract type parameters from the DECLARE's GIVEN (e.g., GIVEN a IS A TYPE)
       MkTypeSig _ (MkGivenSig _ typeParams) _ = tysig
-      storedFields = [tn | tn@(MkTypedName _ _ _ Nothing) <- tns]
+      storedFields = [tn | tn@(MkTypedName _ _ _ _mTypically Nothing) <- tns]
       syntheticDecides = mapMaybe (makeComputedDecide appForm typeParams tns) tns
       newDeclare = Declare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon storedFields))
     in newDeclare : map (uncurry Decide) syntheticDecides
 desugarCFDeclare dAnn decl = [Declare dAnn decl]
 
 isComputed :: TypedName n -> Bool
-isComputed (MkTypedName _ _ _ (Just _)) = True
+isComputed (MkTypedName _ _ _ _mTypically (Just _)) = True
 isComputed _ = False
 
 -- | Generate a synthetic Decide for a computed field.
@@ -261,7 +261,7 @@ isComputed _ = False
 -- duplicate names in scope (the selector and the LET local), which causes
 -- ambiguity errors with polymorphic operators like @=@.
 makeComputedDecide :: AppForm Name -> [OptionallyTypedName Name] -> [TypedName Name] -> TypedName Name -> Maybe (Anno, Decide Name)
-makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName fieldType (Just meansExpr)) =
+makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName fieldType _mTypically (Just meansExpr)) =
   let
     -- Extract record name and type args from the DECLARE's AppForm
     MkAppForm _ recordName typeArgs _ = appForm
@@ -272,7 +272,7 @@ makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName 
     -- Type signature: GIVEN <typeParams>, _self IS A <RecordType> GIVETH A <FieldType>
     -- Prepend type parameters from the DECLARE so parameterized types work.
     -- Use the field's annotation to preserve source range info.
-    selfParam = MkOptionallyTypedName emptyAnno selfName (Just recordType)
+    selfParam = MkOptionallyTypedName emptyAnno selfName (Just recordType) Nothing
     decideTypeSig = MkTypeSig fieldAnn
       (MkGivenSig emptyAnno (typeParams ++ [selfParam]))
       (Just (MkGivethSig emptyAnno fieldType))
@@ -281,7 +281,7 @@ makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName 
     -- Sibling field names (excluding the field being defined)
     siblingNames = Set.fromList
       [ rawName sibName
-      | MkTypedName _ sibName _ _ <- allFields
+      | MkTypedName _ sibName _ _ _ <- allFields
       , rawName sibName /= rawName fieldName
       ]
     -- Rewrite bare field references to _self's field projections
@@ -421,11 +421,11 @@ detectCFCDeclare (MkDeclare _ _ appForm (RecordDecl _ _ tns))
     let
       MkAppForm _ recordName _ _ = appForm
       -- All field names in this record (for filtering references)
-      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ <- tns]
+      allFieldRawNames = Set.fromList [rawName fn | MkTypedName _ fn _ _ _ <- tns]
       -- Build SCC graph: (node=Name, key=RawName, deps=[RawName])
       graphData =
         [ (fn, rawName fn, Set.toList (exprFieldRefs allFieldRawNames e))
-        | MkTypedName _ fn _ (Just e) <- tns
+        | MkTypedName _ fn _ _mTypically (Just e) <- tns
         ]
     in [ (recordName, cyc) | CyclicSCC cyc <- stronglyConnComp graphData ]
 detectCFCDeclare _ = []
@@ -518,7 +518,7 @@ extractCFNSection (MkSection _ _ _ topDecls) =
 extractCFNTopDecl :: TopDecl Name -> Map.Map RawName (Set RawName)
 extractCFNTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDecl _ _ tns)))
   | any isComputed tns =
-    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ (Just _) <- tns]
+    let cfNames = Set.fromList [rawName fn | MkTypedName _ fn _ _mTypically (Just _) <- tns]
     in Map.singleton (rawName recName) cfNames
 extractCFNTopDecl (Section _ section) = extractCFNSection section
 extractCFNTopDecl _ = Map.empty

@@ -47,16 +47,30 @@ spec = do
               , parameterItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Just "Child Order"
+              , parameterDefault = Nothing
               }
         case Aeson.toJSON p of
           Aeson.Object o ->
             Aeson.KeyMap.lookup "x-l4-type" o `shouldBe` Just (Aeson.String "Child Order")
           v -> expectationFailure ("Expected JSON object, got: " <> show v)
       it "omits x-l4-type when parameterL4Type is Nothing" do
-        let p = Parameter "string" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+        let p = Parameter "string" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing
         case Aeson.toJSON p of
           Aeson.Object o ->
             Aeson.KeyMap.member "x-l4-type" o `shouldBe` False
+          v -> expectationFailure ("Expected JSON object, got: " <> show v)
+      it "serialises parameterDefault as \"default\" only when set" do
+        let p = (Parameter "boolean" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  { parameterDefault = Just (Aeson.Bool True) }
+        case Aeson.toJSON p of
+          Aeson.Object o ->
+            Aeson.KeyMap.lookup "default" o `shouldBe` Just (Aeson.Bool True)
+          v -> expectationFailure ("Expected JSON object, got: " <> show v)
+      it "omits default when parameterDefault is Nothing" do
+        let p = Parameter "boolean" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing
+        case Aeson.toJSON p of
+          Aeson.Object o ->
+            Aeson.KeyMap.member "default" o `shouldBe` False
           v -> expectationFailure ("Expected JSON object, got: " <> show v)
       Hspec.prop "round-trips through JSON" $ \p ->
         Aeson.fromJSON (Aeson.toJSON (p :: Parameter)) === Aeson.Success p
@@ -122,7 +136,7 @@ instance Arbitrary Parameters where
 instance Arbitrary Parameter where
   arbitrary = Q.sized $ \n ->
     if n <= 0
-      then Parameter <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing
+      then Parameter <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing
       else
         Parameter
           <$> arbitrary
@@ -135,6 +149,7 @@ instance Arbitrary Parameter where
           <*> Q.resize (n `div` 4) arbitrary
           <*> Q.resize (n `div` 4) arbitrary
           <*> arbitrary
+          <*> pure Nothing
 
 instance Arbitrary Function where
   arbitrary = Types.Function <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
