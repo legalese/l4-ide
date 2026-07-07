@@ -673,9 +673,6 @@ forwardExpr env = \ case
   Modulo _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpModulo e2 env)
     continueExpr env e1
-  Exponent _ann e1 e2 -> do
-    pushFrame (BinOp1 BinOpExponent e2 env)
-    continueExpr env e1
   Leq _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpLeq e2 env)
     continueExpr env e1

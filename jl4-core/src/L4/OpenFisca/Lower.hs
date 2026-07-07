@@ -400,7 +400,6 @@ constructorName = \case
   List{}       -> "list literal (collections are a later milestone)"
   Cons{}       -> "list cons (collections are a later milestone)"
   Concat{}     -> "string concat"; AsString{} -> "string coercion"
-  Exponent{}   -> "exponent (^)"
   AppNamed{}   -> "named-argument application"
   Inert{}      -> "inert scaffolding"
   _            -> "expression"

@@ -672,7 +672,6 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Times _ a b      -> Set.union (go bound a) (go bound b)
       DividedBy _ a b  -> Set.union (go bound a) (go bound b)
       Modulo _ a b     -> Set.union (go bound a) (go bound b)
-      Exponent _ a b   -> Set.union (go bound a) (go bound b)
       Cons _ a b       -> Set.union (go bound a) (go bound b)
       Leq _ a b        -> Set.union (go bound a) (go bound b)
       Geq _ a b        -> Set.union (go bound a) (go bound b)
@@ -1063,7 +1062,6 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
         DividedBy{} -> 0
         Modulo{}    -> 0
         Percent{}   -> 0
-        Exponent{}  -> 0
         Equals{}    -> 1
         Lt{}        -> 1
         Gt{}        -> 1
@@ -1349,7 +1347,6 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Times      _ a' b   -> chain2 k n a r a' b
       DividedBy  _ a' b   -> chain2 k n a r a' b
       Modulo     _ a' b   -> chain2 k n a r a' b
-      Exponent   _ a' b   -> chain2 k n a r a' b
       Cons       _ a' b   -> chain2 k n a r a' b
       Leq        _ a' b   -> chain2 k n a r a' b
       Geq        _ a' b   -> chain2 k n a r a' b
@@ -1599,7 +1596,6 @@ exprDisambiguator = \case
   Times{}      -> Just "Times"
   DividedBy{}  -> Just "DividedBy"
   Modulo{}     -> Just "Modulo"
-  Exponent{}   -> Just "Exponent"
   Cons{}       -> Just "Cons"
   Leq{}        -> Just "Leq"
   Geq{}        -> Just "Geq"
