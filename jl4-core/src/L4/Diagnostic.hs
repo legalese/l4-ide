@@ -117,7 +117,7 @@ parseErrorToDiagnostic err = SimpleDiagnostic
 --
 -- Failed assertions get Error severity, successful evaluations get Info.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
-evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace) = SimpleDiagnostic
+evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
   , sdSeverity = case res of
       EL.Assertion False -> DSError

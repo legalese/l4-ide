@@ -103,6 +103,7 @@ library
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
+    L4.Evaluate.Ledger
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
@@ -181,6 +182,13 @@ test-suite jl4-core-test
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    LedgerSubstrateSpec
+    RecordLedgerSpec
+    LedgerRenderingSpec
+    M4PartyLedgerSpec
+    M45ReadSpec
+    M5DeonticSequencingSpec
+    TraceOrderingSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

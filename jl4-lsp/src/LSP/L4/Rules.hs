@@ -775,7 +775,7 @@ jl4Rules evalConfig rootDirectory recorder = do
         }
 
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
-    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace) = do
+    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger) = do
       Diagnostic
         { _range = srcRangeToLspRange range
         , _severity =

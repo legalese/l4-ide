@@ -335,7 +335,7 @@ processRow opts evalConfig filteredSource exportFn params schema idx input
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
-resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
+resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
   Reduction (Left exc) -> prettyEvalException exc
   _                    -> []
 

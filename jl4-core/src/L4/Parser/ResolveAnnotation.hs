@@ -510,6 +510,16 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e2' <- addNlg e2
       e3' <- addNlg e3
       pure $ Post ann e1' e2' e3'
+    Record ann mParty cell val isOfficial mHence -> do
+      mParty' <- traverse addNlg mParty
+      cell' <- addNlg cell
+      val' <- addNlg val
+      mHence' <- traverse addNlg mHence
+      pure $ Record ann mParty' cell' val' isOfficial mHence'
+    ReadCell ann mParty isOfficial mode cell -> do
+      mParty' <- traverse addNlg mParty
+      cell' <- addNlg cell
+      pure $ ReadCell ann mParty' isOfficial mode cell'
     Concat ann es -> do
       es' <- traverse addNlg es
       pure $ Concat ann es'
@@ -1113,6 +1123,16 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       e' <- addRef e
       branches' <- traverse addRef branches
       pure $ Consider ann' e' branches'
+    Record ann mParty cell val isOfficial mHence -> attachRef expr ann >>= \ann' -> do
+      mParty' <- traverse addRef mParty
+      cell' <- addRef cell
+      val' <- addRef val
+      mHence' <- traverse addRef mHence
+      pure $ Record ann' mParty' cell' val' isOfficial mHence'
+    ReadCell ann mParty isOfficial mode cell -> attachRef expr ann >>= \ann' -> do
+      mParty' <- traverse addRef mParty
+      cell' <- addRef cell
+      pure $ ReadCell ann' mParty' isOfficial mode cell'
     Lit ann lit -> attachRef expr ann >>= \ann' -> pure (Lit ann' lit)
     Percent ann e -> attachRef expr ann >>= \ann' -> Percent ann' <$> addRef e
     List ann es -> attachRef expr ann >>= \ann' -> List ann' <$> traverse addRef es
