@@ -418,9 +418,10 @@ tools/
 
 ## 14. Status board (where are we)
 
-*As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, ~20 commits; merged
+*As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, 22 commits; merged
 `origin/unstable` on 2026-07-08 (conflict-free — all work is in new paths), so
-**caught up with unstable** (ahead 20 / behind 0). Not yet pushed / PR'd.*
+**caught up with unstable**. **Pushed + PR'd → [#96](https://github.com/legalese/l4-ide/pull/96)**
+into `unstable` (purely additive; ladder-core is standalone, not in the root workspace).*
 
 **✅ P0 — Kernel (DONE).** Pure `IRExpr × TextMetrics × ViewSpec → Scene IR → SVG`,
 no DOM (`ts-shared/ladder-core/`, `7136ec92`). Centering thesis proven on the s415
