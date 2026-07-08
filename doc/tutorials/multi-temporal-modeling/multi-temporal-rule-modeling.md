@@ -19,7 +19,7 @@ time** (when the system recorded it) and a **valid time** (when the fact
 it describes actually held true in the world). A bank might enter a
 correction on 15 March for a transfer that happened on 2 March — the
 system learned about it on the 15th, but the money moved on the 2nd.
-Modeling both is called *bitemporal* data.
+Modeling both is called _bitemporal_ data.
 
 Legal rules need a third axis. A rule isn't just a fact with a valid
 time — it's itself a moving target. The GST rate that applied to a sale
@@ -27,11 +27,11 @@ depends on **which version of the law was in force**, and that can be
 different again from both "when am I asking" and "when did the sale
 happen." A tax office auditing a 2019 transaction in 2026 needs:
 
-| Question | L4 calls this | Reader | Override |
-| --- | --- | --- | --- |
-| When is this evaluation actually running? | **system time** | `TODAY` / `NOW` | `EVAL AS OF SYSTEM TIME` |
-| When did/does the fact hold in the world? | **valid time** | (falls through to `RULES EFFECTIVE DATE`, see below) | `EVAL UNDER VALID TIME` |
-| Which version of the law applies? | **rule-effective time** | `RULES EFFECTIVE DATE` | `EVAL UNDER RULES EFFECTIVE AT` |
+| Question                                  | L4 calls this           | Reader                                               | Override                        |
+| ----------------------------------------- | ----------------------- | ---------------------------------------------------- | ------------------------------- |
+| When is this evaluation actually running? | **system time**         | `TODAY` / `NOW`                                      | `EVAL AS OF SYSTEM TIME`        |
+| When did/does the fact hold in the world? | **valid time**          | (falls through to `RULES EFFECTIVE DATE`, see below) | `EVAL UNDER VALID TIME`         |
+| Which version of the law applies?         | **rule-effective time** | `RULES EFFECTIVE DATE`                               | `EVAL UNDER RULES EFFECTIVE AT` |
 
 Each axis is tracked independently and defaults sensibly when you don't
 pin it. The rest of this tutorial builds up the GST example file above
@@ -60,7 +60,7 @@ today, so:
 evaluates to `9` any time after the 2024-01-01 cutover — which is every
 time you'll actually run this file. That's the point: the same
 predicate, `GST rate`, means different things depending on what time
-axis you evaluate it under. Nothing about its *definition* changes.
+axis you evaluate it under. Nothing about its _definition_ changes.
 
 ---
 
@@ -95,7 +95,7 @@ syntax: one predicate, two rule-versions, two answers.
 
 ## Step 3: The default — law-time tracks fact-time
 
-What if you *don't* pin a rule-version, but you do pin the facts to a
+What if you _don't_ pin a rule-version, but you do pin the facts to a
 particular date?
 
 ```l4
@@ -106,7 +106,7 @@ particular date?
 `RULES EFFECTIVE DATE`'s fallback chain is: **(1)** an explicit
 `EVAL UNDER RULES EFFECTIVE AT` pin, if present; else **(2)** the
 valid-time axis, if pinned; else **(3)** today. With no rule-version pin
-but the facts pinned to 2019, step (2) kicks in: the *old* law applies.
+but the facts pinned to 2019, step (2) kicks in: the _old_ law applies.
 
 This is the **presumption against retroactivity**, built into the
 default: absent an explicit statement otherwise, the law that governs a
@@ -123,7 +123,7 @@ regime instead, and the new rate follows automatically:
 
 ## Step 4: An explicit rule-version pin overrides fact-time
 
-Sometimes you *do* want to decouple the two — a transitional provision, a
+Sometimes you _do_ want to decouple the two — a transitional provision, a
 savings clause, or an audit that asks "what would the old ruling have
 said, restated in today's code, about a fact from the new regime?" Nest
 the two overrides and the explicit, inner pin wins:
@@ -171,7 +171,7 @@ have computed if this had been run back then?" That's the tool for audit
 trails and regression snapshots.
 
 There's a subtlety worth internalizing here. `RULES EFFECTIVE DATE`'s
-own fallback bottoms out at *today* when neither the rule-version nor
+own fallback bottoms out at _today_ when neither the rule-version nor
 the valid-time axis is pinned — and "today" is computed the same way
 `TODAY` computes it, from system time. So if you override system time
 **without** pinning either of the other two axes, that override flows
@@ -184,7 +184,7 @@ through to `RULES EFFECTIVE DATE` as well:
 
 No rule-version or valid-time is pinned here, so the fallback resolves
 via the (overridden) system clock — 2020-06-01, pre-cutover, hence `7`.
-The moment you *do* pin rule-version or valid-time explicitly (Steps 2–4),
+The moment you _do_ pin rule-version or valid-time explicitly (Steps 2–4),
 that pin takes priority and the system-time override no longer reaches
 `RULES EFFECTIVE DATE` at all. System time only leaks into "which law
 applies" through the unpinned fallback path — never past an explicit
@@ -225,11 +225,11 @@ a bounded search can fail to find a match and return `NOTHING`.
 
 ## Mental Model Cheat Sheet
 
-| Axis | Answers | Reads via | Override | Independent of |
-| --- | --- | --- | --- | --- |
-| System time | "When is this evaluation running?" | `TODAY` / `NOW` | `EVAL AS OF SYSTEM TIME` | Valid time, rule-effective time |
-| Valid time | "When did the facts hold?" | (via `RULES EFFECTIVE DATE` fallback) | `EVAL UNDER VALID TIME` | System time |
-| Rule-effective time | "Which version of the law applies?" | `RULES EFFECTIVE DATE` | `EVAL UNDER RULES EFFECTIVE AT` | — (top of the fallback chain) |
+| Axis                | Answers                             | Reads via                             | Override                        | Independent of                  |
+| ------------------- | ----------------------------------- | ------------------------------------- | ------------------------------- | ------------------------------- |
+| System time         | "When is this evaluation running?"  | `TODAY` / `NOW`                       | `EVAL AS OF SYSTEM TIME`        | Valid time, rule-effective time |
+| Valid time          | "When did the facts hold?"          | (via `RULES EFFECTIVE DATE` fallback) | `EVAL UNDER VALID TIME`         | System time                     |
+| Rule-effective time | "Which version of the law applies?" | `RULES EFFECTIVE DATE`                | `EVAL UNDER RULES EFFECTIVE AT` | — (top of the fallback chain)   |
 
 Fallback order for `RULES EFFECTIVE DATE`, most specific first: **explicit
 rule-version pin → valid-time pin → today (via system time)**.
@@ -274,7 +274,7 @@ rule-version pin → valid-time pin → today (via system time)**.
   facts' valid time, falling back further to today.
 - `EVAL UNDER RULES EFFECTIVE AT`, `EVAL UNDER VALID TIME`, and
   `EVAL AS OF SYSTEM TIME` are ordinary composable overrides (`DATE SERIAL
-  -> a -> a`), and an explicit inner pin always wins over an outer or
+-> a -> a`), and an explicit inner pin always wins over an outer or
   ambient default.
 - `TODAY` is pinned to system time only — it's the one thing an
   unpinned-fallback system-time override can still reach, but an
@@ -291,7 +291,7 @@ This tutorial covers what's implemented and demonstrated today. A few
 related ideas are still design-stage, not shipped:
 
 - A fourth axis, **rules-encoded time** (`EVAL UNDER RULES ENCODED AT`,
-  tracking when the *L4 encoding itself* was drafted, as distinct from
+  tracking when the _L4 encoding itself_ was drafted, as distinct from
   when the law it encodes took legal effect), exists as a builtin but
   has no worked examples yet.
 - Git-commit-based retroactive tooling (checking out the rule text as it
@@ -302,7 +302,7 @@ related ideas are still design-stage, not shipped:
   separate `l4 diff-eval` driver-level tool instead.
 - `@effective` / `@repealed` decorator syntax for declaring an amendment
   directly on a rule (rather than composing `EVAL UNDER RULES EFFECTIVE
-  AT` by hand) is planned but not yet implemented.
+AT` by hand) is planned but not yet implemented.
 
 ---
 
