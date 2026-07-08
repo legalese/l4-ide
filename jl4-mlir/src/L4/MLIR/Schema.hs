@@ -558,7 +558,7 @@ collectAllDecidesWithArity (MkModule _ _ section) = goSection topNames section
       any optionallyTypedParamIsFun ps
 
     optionallyTypedParamIsFun :: OptionallyTypedName Resolved -> Bool
-    optionallyTypedParamIsFun (MkOptionallyTypedName _ _ mty) =
+    optionallyTypedParamIsFun (MkOptionallyTypedName _ _ mty _) =
       case mty of
         Just ty -> isFunctionType ty
         Nothing -> False
@@ -695,7 +695,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Concat _ xs   -> Set.unions (map (go bound) xs)
       AsString _ a  -> go bound a
       Lam _ (MkGivenSig _ lamParams) b ->
-        go (bound <> Set.fromList [rawNameToText (rawName (getActual p)) | MkOptionallyTypedName _ p _ <- lamParams]) b
+        go (bound <> Set.fromList [rawNameToText (rawName (getActual p)) | MkOptionallyTypedName _ p _ _ <- lamParams]) b
       _ -> Set.empty
 
     stepLocal (bnd, frees) (LocalDecide _ (MkDecide _ _ af bdy)) =
@@ -937,13 +937,13 @@ buildTraceMetaFromDecide infoMap declares fnReturnTypes unannotatedFns paramHint
         let MkTypeSig _ (MkGivenSig _ ps) _ = typeSig
         in Map.fromList
              [ (rawNameToText (rawName (getActual n)), ty)
-             | MkOptionallyTypedName _ n (Just ty) <- ps
+             | MkOptionallyTypedName _ n (Just ty) _ <- ps
              ]
       unannotatedParamSet =
         let MkTypeSig _ (MkGivenSig _ ps) _ = typeSig
         in Set.fromList
              [ rawNameToText (rawName (getActual n))
-             | MkOptionallyTypedName _ n Nothing <- ps
+             | MkOptionallyTypedName _ n Nothing _ <- ps
              ]
       (bodyNodes, _rangeMap) = collectTraceNodes infoMap declares paramTypeMap fnReturnTypes unannotatedParamSet unannotatedFns body
       fnValueId   = length bodyNodes
@@ -1152,7 +1152,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       case td of
         RecordDecl _ _ fields ->
           let fname = rawNameToText (rawName (getActual fieldRes))
-          in case [ ty | MkTypedName _ fn ty _ <- fields
+          in case [ ty | MkTypedName _ fn ty _ _ <- fields
                        , rawNameToText (rawName (getActual fn)) == fname
                        ] of
                (ty:_) -> Just (kindFromL4Type ty)
@@ -1295,13 +1295,13 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
     recordFieldNames typeName =
       case Map.lookup typeName declares of
         Just (MkDeclare _ _ _ (RecordDecl _ _ fields)) ->
-          [ Print.prettyLayout n | MkTypedName _ n _ _ <- fields ]
+          [ Print.prettyLayout n | MkTypedName _ n _ _ _ <- fields ]
         Just (MkDeclare _ _ _ (EnumDecl _ cons)) ->
           case [ fields
                | MkConDecl _ conName fields <- cons
                , rawNameToText (rawName (getActual conName)) == typeName
                ] of
-            (fields:_) -> [ Print.prettyLayout n | MkTypedName _ n _ _ <- fields ]
+            (fields:_) -> [ Print.prettyLayout n | MkTypedName _ n _ _ _ <- fields ]
             []         -> []
         _ -> []
 
@@ -1544,7 +1544,7 @@ typeToRetSchema declares visited ty = case ty of
               Just (MkDeclare _ _ _ (RecordDecl _ _ fields)) ->
                 buildRecord nameText
                   [ (rawNameToText (rawName (getActual fieldName)), fieldTy)
-                  | MkTypedName _ fieldName fieldTy _ <- fields
+                  | MkTypedName _ fieldName fieldTy _ _ <- fields
                   ]
               Just (MkDeclare _ _ _ (EnumDecl _ cons)) ->
                 let conNames = [ rawNameToText (rawName (getActual conName))
@@ -1707,6 +1707,7 @@ emptyParam t = Parameter
   , parameterItems         = Nothing
   , parameterRequired      = Nothing
   , parameterL4Type        = Nothing
+  , parameterDefault       = Nothing
   }
 
 

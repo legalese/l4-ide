@@ -116,6 +116,15 @@ data CheckError =
     -- @DEONTIC PartyT ActionT@ contract, an action's actor is the field of its
     -- record whose value is a constructor of @PartyT@. Arguments: the
     -- obligated/acting party, the action's own actor, the action name.
+  | TypicallyValueNotALiteral Name
+    -- ^ The TYPICALLY default value must be a literal (a compile-time
+    -- constant): a number or string literal, or a nullary constructor.
+  | TypicallyRequiresType Name
+    -- ^ A TYPICALLY default was written on a binder with no explicit type, so
+    -- the default cannot be type-checked. Require an explicit type annotation.
+  | TypicallyOnTypeVariable Name
+    -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
+    -- a default value is meaningless.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -173,6 +182,7 @@ data ExpectationContext =
   | ExpectPostBodyContext -- body argument of POST
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
+  | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   deriving stock (Eq, Generic, Show)
@@ -811,7 +821,7 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
     Decide _ (MkDecide _ _ af _) -> appFormHeads af
-    Assume _ (MkAssume _ _ af _) -> appFormHeads af
+    Assume _ (MkAssume _ _ af _ _) -> appFormHeads af
     Directive _ _ -> []
     Import _ _ -> []
     Timezone _ _ -> []

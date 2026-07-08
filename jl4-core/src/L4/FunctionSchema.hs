@@ -8,6 +8,7 @@ module L4.FunctionSchema (
   typeToParameter,
   parametersFromDecide,
   parametersFromDecideWithErrors,
+  typicallyToJson,
 ) where
 
 import Base
@@ -15,12 +16,13 @@ import Data.Aeson (FromJSON, ToJSON, (.:), (.:?), (.=), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Scientific as Scientific
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 
-import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
+import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (falseUnique, maybeUnique, trueUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -41,6 +43,7 @@ data Parameter = Parameter
   , parameterItems :: !(Maybe Parameter) -- Array items schema for array types
   , parameterRequired :: !(Maybe [Text]) -- Required field names for nested object types
   , parameterL4Type :: !(Maybe Text) -- L4 user-declared type name (record/enum) when this node came from a DECLARE; serialised as "x-l4-type"
+  , parameterDefault :: !(Maybe Aeson.Value) -- TYPICALLY default value, when one was declared and is representable in JSON
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
 
@@ -88,6 +91,9 @@ instance ToJSON Parameter where
         ++ case p.parameterL4Type of
           Nothing -> []
           Just l4ty -> ["x-l4-type" .= l4ty]
+        ++ case p.parameterDefault of
+          Nothing -> []
+          Just def -> ["default" .= def]
 
 instance FromJSON Parameter where
   parseJSON = Aeson.withObject "Parameter" $ \p ->
@@ -102,6 +108,7 @@ instance FromJSON Parameter where
       <*> p .:? "items"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
+      <*> p .:? "default"
 
 declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
 declaresFromModule (MkModule _ _ section) =
@@ -159,6 +166,7 @@ typeToParameter declares visited ty =
       , parameterItems = Nothing
       , parameterRequired = Nothing
       , parameterL4Type = Nothing
+      , parameterDefault = Nothing
       }
 
   typeNameToParameter :: Resolved -> Parameter
@@ -197,16 +205,16 @@ typeToParameter declares visited ty =
           RecordDecl _ _ fields ->
             let
               visited' = Set.insert typeName visited
-              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ <- fields]
+              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ _ <- fields]
               props =
                 Map.fromList
-                  [ (resolvedNameText fieldName, addDesc fieldDesc (typeToParameter declares visited' fieldTy))
-                  | MkTypedName fieldAnn fieldName fieldTy _ <- fields
+                  [ (resolvedNameText fieldName, addDefault mTypically (addDesc fieldDesc (typeToParameter declares visited' fieldTy)))
+                  | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy _ <- fields
+                | MkTypedName _ fieldName fieldTy _ _ <- fields
                 , not (isMaybeFieldType fieldTy)
                 ]
              in
@@ -230,6 +238,11 @@ typeToParameter declares visited ty =
     addDesc Nothing p = p
     addDesc (Just d) p = p {parameterDescription = d}
 
+    addDefault :: Maybe (Expr Resolved) -> Parameter -> Parameter
+    addDefault mTypically p = case typicallyToJson =<< mTypically of
+      Nothing -> p
+      Just v -> p {parameterDefault = Just v}
+
 parametersFromDecide :: Module Resolved -> Decide Resolved -> Parameters
 parametersFromDecide resolvedModule decide =
   parametersFromDecideWithErrors resolvedModule decide []
@@ -247,33 +260,33 @@ parametersFromDecideWithErrors
 parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) _ _) errors =
   let
     declares = declaresFromModule resolvedModule
-    mkOne (MkOptionallyTypedName ann resolved mType) =
+    mkOne (MkOptionallyTypedName ann resolved mType mTypically) =
       let
         base =
           Maybe.fromMaybe (emptyParam "object") (typeToParameter declares Set.empty <$> mType)
         desc = Maybe.fromMaybe "" (fmap getDesc (ann Optics.^. annDesc))
        in
-        (resolvedNameText resolved, base {parameterDescription = desc, parameterAlias = Nothing})
+        (resolvedNameText resolved, base {parameterDescription = desc, parameterAlias = Nothing, parameterDefault = typicallyToJson =<< mTypically})
 
     -- Extract explicit ASSUME params that this function references
-    assumeParams = extractAssumeParamTypes resolvedModule decide
+    assumeParams = extractAssumeParamsWithDefaults resolvedModule decide
 
     -- Extract implicit ASSUME params from OutOfScopeError with resolved types
     implicitParams = extractImplicitAssumeParams errors
 
-    mkAssumeParam (name, ty) =
+    mkAssumeParam (name, ty, mTypically) =
       let base = typeToParameter declares Set.empty ty
-      in (name, base {parameterDescription = "", parameterAlias = Nothing})
+      in (name, base {parameterDescription = "", parameterAlias = Nothing, parameterDefault = typicallyToJson =<< mTypically})
 
     givenParamList = map mkOne names
     -- Track which GIVEN params have MAYBE/Optional types (these are not required)
     requiredGivenParams =
       [ resolvedNameText resolved
-      | MkOptionallyTypedName _ resolved mType <- names
+      | MkOptionallyTypedName _ resolved mType _ <- names
       , not (isMaybeType mType)
       ]
     assumeParamList = map mkAssumeParam assumeParams
-    implicitParamList = map mkAssumeParam implicitParams
+    implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing)) implicitParams
 
     -- Combine all params, avoiding duplicates (explicit ASSUMEs take precedence)
     allAssumeParams = assumeParamList <> filter (\(n, _) -> n `notElem` map fst assumeParamList) implicitParamList
@@ -296,7 +309,23 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       , parameterItems = Nothing
       , parameterRequired = Nothing
       , parameterL4Type = Nothing
+      , parameterDefault = Nothing
       }
+
+-- | Convert a TYPICALLY default value to a JSON value for the function schema.
+-- Only simple literals (numbers, strings) and the TRUE/FALSE constructors are
+-- representable; anything else yields Nothing (no "default" key emitted).
+typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
+typicallyToJson = \case
+  Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
+  Lit _ (StringLit _ t) -> Just (Aeson.String t)
+  App _ r [] -> nullaryToJson r
+  _ -> Nothing
+ where
+  nullaryToJson r
+    | getUnique r == trueUnique = Just (Aeson.Bool True)
+    | getUnique r == falseUnique = Just (Aeson.Bool False)
+    | otherwise = Nothing
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool
