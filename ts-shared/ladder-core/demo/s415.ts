@@ -27,6 +27,8 @@ import type {
   ScenePrim,
   Scene,
   NodeId,
+  UBoolValue,
+  Provenance,
 } from '../src/index.js'
 
 let counter = 0
@@ -44,7 +46,8 @@ const concealment = leaf('dishonest concealment')
 const deception = or([inert('there is a deception (Expl. 1)', 'InertOr'), byDeceiving, inert('or', 'InertOr'), concealment])
 const intentionally = leaf('intentionally')
 const causesHarm = leaf('causes harm')
-const harm = or([leaf('body'), leaf('mind'), leaf('reputation'), inert('or', 'InertOr'), leaf('property')])
+const mind = leaf('mind')
+const harm = or([leaf('body'), mind, leaf('reputation'), inert('or', 'InertOr'), leaf('property')])
 // inert nodes in the series ride the wire; "to any person in" lands to the LEFT of
 // the harm stack (the `text … (stack)` pattern) — no heading needed on `harm`.
 const second = and([
@@ -70,8 +73,24 @@ const courtStates = new Map(allLive) // every rung live
 const applicantStates = new Map(allLive)
 applicantStates.set(concealment.id, 'eliminable') // the otiose rung
 
+// defaults (DESIGN §22): every atom TRUE so the leader closes the whole circuit,
+// but two atoms ride a TYPICALLY presumption — their boxes render tentative
+// (fine-dashed + "typically") and the current through them caps at streamer weight
+// (a provisional, rebuttable closure) instead of full leader black.
+const allTrue = new Map<NodeId, UBoolValue>(leafIds(second).map((id) => [id, 'TrueV']))
+const presumed = new Map<NodeId, Provenance>([
+  [intentionally.id, 'default'], // a series atom — its two links drop to streamer
+  [mind.id, 'default'], // one rung of the harm OR — "defaults used vs not" within a
+  //                       group: mind's fan curves go streamer, its given siblings stay closed
+])
+
 const tm = estimateMetrics
 const sceneCourt = layout(fn, defaultViewSpec({ states: courtStates }), tm)
+const sceneDefaults = layout(
+  fn,
+  defaultViewSpec({ valuation: allTrue, provenance: presumed, showCurrent: true }),
+  tm
+)
 const sceneCourtAbove = layout(fn, defaultViewSpec({ states: courtStates, connectiveStyle: 'above-wire' }), tm)
 const sceneCourtStraddle = layout(fn, defaultViewSpec({ states: courtStates, connectiveStyle: 'straddle-wire' }), tm)
 const sceneCourtBelow = layout(fn, defaultViewSpec({ states: courtStates, connectiveStyle: 'below-wire' }), tm)
@@ -128,3 +147,4 @@ write('s415-court-belowwire.svg', sceneCourtBelow)
 write('s415-applicants.svg', sceneAppl)
 write('s415-diff.svg', diff(sceneCourt, sceneAppl))
 write('s415-folded.svg', sceneFolded)
+write('s415-defaults.svg', sceneDefaults)

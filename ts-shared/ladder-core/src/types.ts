@@ -17,6 +17,16 @@ export type NodeId = number
 /** Mirror of viz-expr's UBoolValue. */
 export type UBoolValue = 'TrueV' | 'FalseV' | 'UnknownV'
 
+/**
+ * Provenance of a leaf's value (DESIGN §22) — orthogonal to the T/F/U value AND to
+ * the render State. `given` = user-/data-supplied (grounded); `default` = riding a
+ * TYPICALLY presumption the user hasn't confirmed (rebuttable, tentative). Models
+ * the `Left`/`Right` of `Either (Maybe Bool) (Maybe Bool)`: Left (a default) ⇒
+ * `default`, Right (user-given) ⇒ `given`. Absent ⇒ `given`. Only meaningful on
+ * leaves (a group's value derives; it is never "presumed").
+ */
+export type Provenance = 'given' | 'default'
+
 /** Operative atom — carries current; renders as a BOX. */
 export interface Leaf {
   readonly $type: 'UBoolVar' | 'App' | 'TrueE' | 'FalseE'
@@ -114,6 +124,14 @@ export interface ViewSpec {
   /** Manual render-state override (static demos / eliminable). Wins over the value-
    *  derived state when set. */
   readonly states: ReadonlyMap<NodeId, State>
+  /**
+   * Per-leaf provenance (DESIGN §22), keyed by node `id` (POSITIONAL, like `states`
+   * / `valuation`). A node mapped to `default` is riding a TYPICALLY presumption:
+   * its box renders TENTATIVE (fine-dashed + a `typically` tag) and any current it
+   * carries is capped at streamer weight (a rebuttable, not-yet-confirmed closure).
+   * Absent ⇒ `given`. Injected data (like `states`); populated upstream from the L4
+   * TYPICALLY field once the wire IR carries it. */
+  readonly provenance: ReadonlyMap<NodeId, Provenance>
   readonly scale: Scale
   readonly orient: Orient
   readonly theme: Theme
@@ -128,6 +146,7 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     foldSet: partial.foldSet ?? new Set(),
     valuation: partial.valuation ?? new Map(),
     states: partial.states ?? new Map(),
+    provenance: partial.provenance ?? new Map(),
     scale: partial.scale ?? 'full',
     orient: partial.orient ?? 'LR',
     theme: partial.theme ?? 'screen',
@@ -171,6 +190,8 @@ export type ScenePrim =
       role: 'leaf' | 'placeholder'
       state: State
       folded?: boolean
+      /** riding a TYPICALLY presumption (DESIGN §22) — render fine-dashed/tentative. */
+      tentative?: boolean
       act?: ClickAct
     }
   | { kind: 'wire'; path: Pt[]; role: 'rail' | 'rung' | 'stub'; state: State; act?: ClickAct; flow?: Flow }
@@ -187,7 +208,7 @@ export type ScenePrim =
       text: string
       anchor: 'start' | 'middle'
       state: State
-      tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective' | 'caret'
+      tag?: 'otiose' | 'title' | 'note' | 'heading' | 'connective' | 'caret' | 'typically'
       size?: number
       /** node id this text belongs to (heading -> its group; label -> its box) —
        *  used by renderers for click targets and FLIP matching. */

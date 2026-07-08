@@ -434,12 +434,16 @@ FLIP animation. `npm run standalone`. *(Not yet driven/screenshot-verified live.
 **✅ Visual language (DONE, beyond the original plan).** §15 ELIMINABLE don't-care
 rung; §16 folding + subtree labels; §17 unboxed inert elements (headings /
 connectives / disjunctive-medial / straddle-wire); §18 Bézier fan connectors;
-§21 NOT (scope frame + inverter bubble).
+§21 NOT (scope frame + inverter bubble); §22 TYPICALLY defaulted-vs-given
+(tentative box + streamer-cap).
 
 **◐ P1 — Semantics (PARTIAL).** ✅ T/F/U valuation + per-node override pins (§19,
 `04a8eb47`); ✅ current-flow rendering — leader + streamer "lightning model" (§20,
-`3b911701`/`f9d5ffd1`). ❌ Still open: **Full/Small/Tiny scales + minimap** (§7);
-`Either (Maybe Bool)` defaulted-vs-given distinction; group sub-ordering (§13.3).
+`3b911701`/`f9d5ffd1`); ✅ **`Either (Maybe Bool)` defaulted-vs-given / TYPICALLY**
+(§22 — provenance axis, tentative box, streamer-weight presumption; injected data,
+awaiting the viz-expr field once PR #92 lands). ❌ Still open: **Full/Small/Tiny
+scales + minimap** (§7); group sub-ordering (§13.3); **predicate leaves / typed
+values** (§23 — designed, not built: the membrane, `App`-drawn-open).
 
 **☐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
 statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). Not started.
@@ -760,6 +764,122 @@ to the inner bubble, thin between the bubbles, thick past the outer one.
 a sub-circuit driving a normally-closed contact (relay-accurate, more layout); **De
 Morgan push-down** — rewrite NOT to the leaves (changes displayed structure; better as
 an optional "normalize negation" view).*
+
+---
+
+## 22. Defaulted vs given — TYPICALLY presumptions
+
+A leaf's value has a **provenance** the ladder should show: did it come from the user
+(or real data), or is it riding a **rebuttable presumption** the user hasn't confirmed?
+This is L4's **TYPICALLY** — `x IS A BOOLEAN TYPICALLY TRUE` — and the box-model.pdf's
+default model `type Default = Either (Maybe Bool) (Maybe Bool)`, where **`Left` = a
+default (system-supplied, no user input)** and **`Right` = user-given**. The four cells
+map straight onto render:
+
+| `Default` value | provenance · value | reads as |
+|---|---|---|
+| `Left (Just b)` | `default` · b | **presumed** b — tentative box, riding TYPICALLY |
+| `Left Nothing` | — · unknown | never asked, no default — plain grey (today's UNKNOWN) |
+| `Right (Just b)` | `given` · b | user answered b — solid box |
+| `Right Nothing` | `given` · unknown | user said *don't-know* — a **confirmed** unknown |
+
+**Provenance is a third axis** — orthogonal to the T/F/U value (§6) *and* to the render
+`State` (live/eliminable, §15). A leaf can be TRUE-and-presumed, TRUE-and-given,
+FALSE-and-presumed… `ViewSpec.provenance: Map<NodeId, Provenance>` (`'given' | 'default'`,
+absent ⇒ `given`) carries it — **injected data, keyed by node `id`**, exactly like the
+`eliminable`/`states` maps (§15.2) and respecting the same pure-core boundary.
+
+**The visual grammar (three moves, all shipped):**
+
+- **Tentative box.** A `default` leaf renders **fine-dashed** (`1.5 3`, distinct from
+  eliminable's coarser `5 4`) with **normal ink** — a presumption, not a ghost — plus a
+  small amber **`typically`** tag. Solid box = grounded/given.
+- **Streamer-weight closure.** Current flowing *through* a presumed-true contact is
+  capped at **streamer** weight (§20), never full leader-black: `flowFor(…, tentative)`
+  degrades a would-be `closed` to `streamer`. A rebuttable presumption closes the circuit
+  only **provisionally**. This *reuses* the lightning model — streamer already means
+  "closed, but not (yet) confirmed": by locality (a ground streamer) **or** by provenance
+  (a presumption). Both are tentative closure; one channel, two reasons.
+- **Defaults-used-vs-not, at a glance.** The box-model.pdf asked to show "defaults being
+  used or not." The dashed/amber marks *are* that view: they highlight exactly the inputs
+  still resting on a presumption. Fold to the verdict (§16) and the tentative marks that
+  survive answer **"how much of this outcome rests on presumptions?"** When every input is
+  `given`, no tentative mark remains — the verdict is fully grounded. Inside one group the
+  contrast is legible too (fixture: `mind` presumed → its OR-fan curves go streamer while
+  `body`/`reputation`/`property` stay closed-black).
+
+**Wizard tie-in** ([[question-ordering-wizard]]). A presumed-TRUE atom has ≈0 information
+gain, so the greedy planner sinks it to the bottom of the ask-order — "don't ask, allow
+override" falls out with no special-casing. The ladder is the *picture* of that: the
+tentative leaves are precisely the questions the wizard didn't need to ask. TYPICALLY is
+the priors mechanism and the provenance mark at once.
+
+**IR-independence.** `@repo/viz-expr` does **not** carry TYPICALLY yet (the metadata-only
+salvage is PR #92, not in `unstable`; the 5th `MkTypedName` field on the Haskell side).
+So the core takes `provenance` as injected data today; when #92 lands and the wire IR
+grows the field, populate it from the L4 TYPICALLY — no core change. Same staging as §15.
+
+*Future: (a) **propagate** tentativeness along the leader so a segment *downstream* of a
+presumed contact also reads provisional (today only the presumed leaf's own adjacent
+connectors cap — local, like §20's streamer); (b) distinguish `Left Nothing` (never
+asked) from `Right Nothing` (a confirmed don't-know) — both grey today, but the latter is
+a settled fact the wizard should not re-ask.*
+
+**Shipped:** `types.ts` (`Provenance`, `ViewSpec.provenance`, box `tentative?`, text tag
+`typically`), `layout.ts` (`presumedConducts`, `flowFor(tentative)` cap, tentative
+`leafBox`), `svg.ts` (fine-dash box, amber tag). Verified: `demo/out/s415-defaults.svg`.
+
+---
+
+## 23. Predicate leaves — the membrane between circuit and data
+
+A ladder is a **Boolean** circuit; its atoms conduct or don't. But a boolean atom is
+usually a **predicate applied to a typed value** — `age ≥ 18` is `(≥ 18)` applied to
+`age : Number = 21`. The **predicate is the membrane** between two worlds: **outside** it,
+the boolean circuit (everything opens/closes); **inside** it, typed data (everything is a
+value). This generalizes the default model of §22 from `Bool` to any `a` —
+`type Default a = Either (Maybe a) (Maybe a)` — because the value under the predicate can
+itself be defaulted (`age TYPICALLY 18`) or given.
+
+**Rendering — a leaf with an interior.** A predicate leaf draws as an outer **predicate
+band** carrying the leaf's T/F/U (the part that conducts) wrapping an inner **value chip**
+— a small typed datum, e.g. `age = 21` set in a quoted/monospace pill. The contact state
+(closed/open) *is* the predicate's verdict on the value; the chip is just data. Sketch:
+
+```
+┌── age ≥ 18? ───────┐        the band booleanizes …
+│    ┌─────────┐     │        … the chip it wraps
+│    │ age = 21│     │        chip = typed value (Default a, §22)
+│    └─────────┘     │        band = predicate (the membrane)
+└────────────────────┘        band's border colour = T/F/U as usual
+```
+
+**The dual of folding.** Folding (§16) *collapses upward*: it hides a subtree of the
+circuit behind one boolean placeholder — zoom out to the verdict. A predicate leaf
+*expands downward*: it reveals the typed value **below the boolean floor** that feeds the
+atom — zoom in to the datum. Same pivot (the leaf = the boolean floor), opposite
+direction. "Why is `age ≥ 18` true? → open it → because `age = 21`."
+
+**Not a new node — it's `App`, drawn open.** `@repo/viz-expr` already models these atoms
+as **`App { fnName, args }`** — `App(">=", [Var "age", Lit 18])`. Today the core draws an
+`App` leaf as one opaque box; a predicate leaf is just *looking inside* that `App`:
+`fnName` → the predicate band, the literal `arg` → the value chip. So §23 is largely a
+**rendering** over structure the IR already has, plus value/type metadata (and, for a
+defaulted chip, the §22 provenance) on the leaf.
+
+**Why this explains the wizard's Boolean-only wrinkle.** [[question-ordering-wizard]]
+notes the trap that `age TYPICALLY 18` is **not** `P(age ≥ 18)` — only a *boolean*
+TYPICALLY is an atom prior. The membrane says why: that presumption lives on the value
+chip **below** the membrane, while the wizard needs a prior on the boolean atom **above**
+it. They're on opposite sides; to turn a value default into an atom prior you'd have to
+push the distribution *through* the predicate (`P(≥18 | age∼18)`). The picture makes the
+category error visible.
+
+**Scope.** v1 is a **static sketch** — the chip is display-only, rendered from injected
+value/type metadata; live typed-value *editing* (a real input widget) is a P3 web
+affordance. Keep the boolean circuit the load-bearing layer; the membrane is a
+progressive-disclosure detail on individual leaves. **Not built** (design captured here;
+the `App`-open rendering + a `age = 21 / ≥ 18?` fixture are the next increment).
 
 ---
 

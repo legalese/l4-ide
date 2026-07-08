@@ -45,7 +45,10 @@ function prim(p: ScenePrim, pal: Palette): string {
       if (p.state === 'eliminable')
         return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="#f6f7f8" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`
       const fill = p.role === 'placeholder' ? '#eef1f6' : '#ffffff'
-      return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"/>`
+      // tentative (DESIGN §22): fine dots + normal ink — a presumption, not a ghost.
+      // Finer dash (1.5 3) distinguishes it from eliminable's coarser dashes (5 4).
+      const tent = p.tentative ? ' stroke-dasharray="1.5 3"' : ''
+      return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${tent}/>`
     }
     case 'wire': {
       const d = p.path.map((pt) => `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ')
@@ -85,11 +88,12 @@ function prim(p: ScenePrim, pal: Palette): string {
     case 'text': {
       const size = p.size ?? 14
       const isCaret = p.tag === 'caret'
-      const inert = !isCaret && (p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' || p.tag === 'connective')
+      const inert = !isCaret && (p.tag === 'otiose' || p.tag === 'heading' || p.tag === 'note' || p.tag === 'connective' || p.tag === 'typically')
       const dy = inert ? 0 : 5 // vertical-center body/caret text
       const italic = inert ? ' font-style="italic"' : ''
       const weight = p.tag === 'title' ? ' font-weight="700"' : ''
-      const fill = isCaret ? '#7a7f85' : p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
+      // 'typically' (DESIGN §22) reads muted-amber to mark a rebuttable presumption.
+      const fill = isCaret ? '#7a7f85' : p.tag === 'typically' ? '#9a7b34' : p.tag === 'otiose' ? pal.ghost : p.state === 'live' ? pal.ink : p.tag ? '#555' : pal.ink
       const a = `${p.id != null ? ` data-fnid="${p.id}"` : ''}${actAttr(p.act)}${p.act ? ' class="lad-clickable"' : ''}`
       return `<text${a} x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`
     }

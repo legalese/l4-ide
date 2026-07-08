@@ -128,11 +128,19 @@ function energize(e: IRExpr, inE: boolean, values: Map<NodeId, UBoolValue>, em: 
 const trueConducts = (vals: Map<NodeId, UBoolValue>, n: IRExpr): boolean =>
   n.$type !== 'InertE' && vals.get(n.id) === 'TrueV'
 
+/** Is a node a *presumed* closed contact (DESIGN §22)? — conducting on a TYPICALLY
+ *  default the user hasn't confirmed. Its adjacent connectors cap at streamer. */
+const presumedConducts = (ctx: Ctx, n: IRExpr): boolean =>
+  trueConducts(ctx.values, n) && ctx.vs.provenance.get(n.id) === 'default'
+
 /** Connector flow (DESIGN §20): reached by the leader -> 'closed'; else local closure
- *  nearby -> 'streamer'; else 'open'. Returns undefined when current flow is off. */
-function flowFor(em: Map<NodeId, Energ> | null, leader: boolean, local: boolean): Flow | undefined {
+ *  nearby -> 'streamer'; else 'open'. `tentative` (DESIGN §22) caps a would-be
+ *  'closed' at 'streamer' — a rebuttable presumption closes the circuit only
+ *  provisionally. Returns undefined when current flow is off. */
+function flowFor(em: Map<NodeId, Energ> | null, leader: boolean, local: boolean, tentative = false): Flow | undefined {
   if (!em) return undefined
-  return leader ? 'closed' : local ? 'streamer' : 'open'
+  if (leader) return tentative ? 'streamer' : 'closed'
+  return local ? 'streamer' : 'open'
 }
 
 /** Leading run of inert text = the group's Pre / heading. */
@@ -162,7 +170,8 @@ function leafBox(
   label: string,
   state: State,
   role: 'leaf' | 'placeholder',
-  tm: TextMetrics
+  tm: TextMetrics,
+  tentative = false
 ): Measured {
   const caretW = role === 'placeholder' ? tm.width('▸', FONT) + 8 : 0
   const w = caretW + tm.width(label, FONT) + 2 * PAD_X
@@ -173,12 +182,14 @@ function leafBox(
     state,
     emit(ox, oy, out) {
       const cy = oy + h / 2
-      out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state, act: { t: 'value', id } })
+      out.push({ kind: 'box', id, rect: { x: ox, y: oy, w, h }, role, state, tentative: tentative || undefined, act: { t: 'value', id } })
       if (role === 'placeholder')
         out.push({ kind: 'text', at: { x: ox + PAD_X, y: cy }, text: '▸', anchor: 'middle', state, tag: 'caret', act: { t: 'fold', id } })
       out.push({ kind: 'text', at: { x: ox + caretW + (w - caretW) / 2, y: cy }, text: label, anchor: 'middle', state, id })
       if (state === 'eliminable')
         out.push({ kind: 'text', at: { x: ox + w / 2, y: oy - 9 }, text: 'otiose — always open', anchor: 'middle', state, tag: 'otiose', size: 11 })
+      else if (tentative) // riding a TYPICALLY presumption (DESIGN §22)
+        out.push({ kind: 'text', at: { x: ox + w / 2, y: oy - 9 }, text: 'typically', anchor: 'middle', state, tag: 'typically', size: 10 })
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } }
     },
   }
@@ -328,7 +339,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
   }
 
   if (e.$type !== 'And' && e.$type !== 'Or') {
-    return leafBox(e.id, e.label, renderState(ctx, e.id), 'leaf', tm)
+    return leafBox(e.id, e.label, renderState(ctx, e.id), 'leaf', tm, vs.provenance.get(e.id) === 'default')
   }
 
   if (vs.foldSet.has(e.id)) {
@@ -358,11 +369,13 @@ function measureAnd(e: And, ctx: Ctx): Measured {
       })
       const fold = { t: 'fold', id: e.id } as const
       const tc = (n: IRExpr | undefined) => (n ? trueConducts(ctx.values, n) : false)
+      const pc = (n: IRExpr | undefined) => (n ? presumedConducts(ctx, n) : false)
       // connectors between consecutive children
       for (let i = 0; i < ports.length - 1; i++) {
         const leader = !!ctx.em?.get(e.args[i].id)?.outE
         const local = tc(e.args[i]) || tc(e.args[i + 1])
-        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local) })
+        const tentative = pc(e.args[i]) || pc(e.args[i + 1]) // adjacent presumption (§22)
+        out.push({ kind: 'wire', path: [ports[i].outPort, ports[i + 1].inPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local, tentative) })
       }
       // spine UNDER each inert connective (a pass-through) — same current as its
       // surroundings, so it matches (DESIGN §20). Skipped for 'on-wire' (a real gap).
@@ -371,7 +384,8 @@ function measureAnd(e: And, ctx: Ctx): Measured {
           if (a.$type !== 'InertE') return
           const leader = !!ctx.em?.get(a.id)?.inE
           const local = tc(e.args[i - 1]) || tc(e.args[i + 1])
-          out.push({ kind: 'wire', path: [ports[i].inPort, ports[i].outPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local) })
+          const tentative = pc(e.args[i - 1]) || pc(e.args[i + 1])
+          out.push({ kind: 'wire', path: [ports[i].inPort, ports[i].outPort], role: 'rung', state: 'inert', act: fold, flow: flowFor(ctx.em, leader, local, tentative) })
         })
       return { inPort: ports[0].inPort, outPort: ports[ports.length - 1].outPort }
     },
@@ -445,14 +459,15 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         // Clicking a fan curve folds this OR (DESIGN §19).
         const fold = { t: 'fold', id: e.id } as const
         const local = trueConducts(ctx.values, node) // this branch is a closed contact
+        const tentative = presumedConducts(ctx, node) // …on a rebuttable presumption (§22)
         const leaderOut = !!ctx.em?.get(node.id)?.outE
         const inCurve = hCurve(groupIn, p.inPort, m.state)
         inCurve.act = fold
-        inCurve.flow = flowFor(ctx.em, leaderIn, local)
+        inCurve.flow = flowFor(ctx.em, leaderIn, local, tentative)
         out.push(inCurve)
         const outCurve = hCurve(p.outPort, groupOut, m.state)
         outCurve.act = fold
-        outCurve.flow = flowFor(ctx.em, leaderOut, local)
+        outCurve.flow = flowFor(ctx.em, leaderOut, local, tentative)
         out.push(outCurve)
         if (m.state === 'eliminable' || m.state === 'dead') {
           const mid = cubicMid(inCurve)
@@ -477,8 +492,9 @@ export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
   const oy = MARGIN
   const { inPort, outPort } = m.emit(ox, oy, prims)
 
+  const ctx: Ctx = { vs, tm, values, em }
   prims.push({ kind: 'wire', path: [{ x: MARGIN, y: inPort.y }, inPort], role: 'rail', state: 'inert', flow: em ? 'closed' : undefined })
-  prims.push({ kind: 'wire', path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }], role: 'rail', state: 'inert', flow: flowFor(em, !!em?.get(fn.body.id)?.outE, trueConducts(values, fn.body)) })
+  prims.push({ kind: 'wire', path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }], role: 'rail', state: 'inert', flow: flowFor(em, !!em?.get(fn.body.id)?.outE, trueConducts(values, fn.body), presumedConducts(ctx, fn.body)) })
   prims.push({ kind: 'glyph', at: { x: MARGIN, y: inPort.y }, role: 'power-terminal' })
   prims.push({ kind: 'glyph', at: { x: ox + m.w + LEAD, y: outPort.y }, role: 'power-terminal' })
 
