@@ -40,7 +40,9 @@ data TemporalContext = TemporalContext
   , tcRuleVersionTime :: !(Maybe Day)
     -- ^ LATENT axis: no reader exists yet (see READER CONTRACT).
   , tcRuleValidTime :: !(Maybe Day)
-    -- ^ LATENT axis: no reader exists yet (see READER CONTRACT).
+    -- ^ Read by RULES EFFECTIVE DATE. Value-affecting access must go
+    -- through @readTcRuleValidTime@ (see READER CONTRACT). Stamped by
+    -- EVAL UNDER RULES EFFECTIVE AT and the per-day interval iterators.
   , tcRuleEncodingTime :: !(Maybe UTCTime)
     -- ^ LATENT axis: no reader exists yet (see READER CONTRACT).
   , tcRuleCommit :: !(Maybe Text.Text)
@@ -145,6 +147,15 @@ data CtxReads = MkCtxReads
   , crDocumentTimezone :: !(ReadObs (Maybe Text.Text))
     -- ^ observations of 'tcDocumentTimezone' (recorded pre-defaulting:
     -- a NOW under a missing TIMEZONE records @ReadEq Nothing@)
+  , crValidTime :: !(ReadObs (Maybe Day))
+    -- ^ observations of 'tcValidTime' (the fact/valid-time axis). Read by
+    -- RULES EFFECTIVE DATE as its first fallback when the rule-version axis
+    -- is unset (option (b): law-time tracks fact-time). Recorded raw.
+  , crRuleValidTime :: !(ReadObs (Maybe Day))
+    -- ^ observations of 'tcRuleValidTime' (recorded pre-fallback: a
+    -- RULES EFFECTIVE DATE under an unset axis records @ReadEq Nothing@
+    -- and additionally records the fact-time read and the
+    -- system-time/timezone reads its fallback chain performs)
   , crLedgerOps :: !Bool
     -- ^ STATE-AS-LEDGER poison bit: did the force perform ANY ledger
     -- operation — a RECORD\/COMMIT\/ATTEST\/NOTIFY append or a RECALL read?
@@ -161,14 +172,14 @@ data CtxReads = MkCtxReads
   deriving stock (Eq, Show)
 
 instance Semigroup CtxReads where
-  MkCtxReads a b l <> MkCtxReads a' b' l' = MkCtxReads (a <> a') (b <> b') (l || l')
+  MkCtxReads a b v rv l <> MkCtxReads a' b' v' rv' l' = MkCtxReads (a <> a') (b <> b') (v <> v') (rv <> rv') (l || l')
 
 instance Monoid CtxReads where
   mempty = noReads
 
 -- | The empty fingerprint: no axis was read.
 noReads :: CtxReads
-noReads = MkCtxReads NotRead NotRead False
+noReads = MkCtxReads NotRead NotRead NotRead NotRead False
 
 -- | Did this force observe the temporal context at all?
 hasReads :: CtxReads -> Bool
@@ -189,6 +200,8 @@ validFor tc r =
   not r.crLedgerOps
     && axisValid tc.tcSystemTime r.crSystemTime
     && axisValid tc.tcDocumentTimezone r.crDocumentTimezone
+    && axisValid tc.tcValidTime r.crValidTime
+    && axisValid tc.tcRuleValidTime r.crRuleValidTime
   where
     axisValid :: Eq a => a -> ReadObs a -> Bool
     axisValid _   NotRead    = True

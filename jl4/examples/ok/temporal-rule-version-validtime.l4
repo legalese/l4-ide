@@ -1,0 +1,36 @@
+-- Option (b), decided in TEMPORAL-RULE-VERSION-DESIGN.md §6 Q1:
+-- when NO rule-version is pinned, `RULES EFFECTIVE DATE` falls back to the
+-- fact/valid-time axis (tcValidTime) before falling back to "today". So
+-- law-time tracks fact-time by default — the presumption against
+-- retroactivity: apply the law in force at the time of the facts. This is
+-- also consistent with the interval builtins, which stamp valid-time and
+-- rule-effective-time together per stepped day.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31 (post-2024 regime).
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+-- GST rose from 7 to 9 effective 2024-01-01.
+`GST rate` MEANS
+  IF DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 1 1 2024)
+  THEN 9
+  ELSE 7
+
+-- expected: 7 — facts pinned to 2019, no rule-version: law-time TRACKS
+-- fact-time, so the OLD regime applies. (Under option (a) this would be 9.)
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) `GST rate`
+
+-- expected: 9 — facts pinned to 2024: NEW regime. (Same shared thunk as
+-- above; the crValidTime fingerprint invalidates the 2019-regime cache.)
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+
+-- expected: 7 — the rule-version axis WINS over fact-time: even with facts
+-- in 2024, an explicit EVAL UNDER RULES EFFECTIVE AT forces the 2019 law.
+-- Decoupling fact-time from law-time is the explicit (inner) act.
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) (`EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) `GST rate`)
+
+-- expected: 9 — both axes unset: falls back to "today" (2025-01-31), new regime
+#EVAL `GST rate`
