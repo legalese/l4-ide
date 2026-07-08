@@ -60,8 +60,12 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+            # specs/** must trigger doc checks too: a spec-only PR that skips
+            # both this filter and 'haskell' never runs test-docs.sh or
+            # prettier, so a broken link or unformatted file merges silently.
             docs:
               - 'doc/**'
+              - 'specs/**'
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
