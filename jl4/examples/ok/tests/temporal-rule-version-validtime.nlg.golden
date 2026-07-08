@@ -1,0 +1,4 @@
+`EVAL UNDER VALID TIME` with `DATE_SERIAL` with `Date` with 1, 6 and 2019 and `GST rate`
+`EVAL UNDER VALID TIME` with `DATE_SERIAL` with `Date` with 1, 7 and 2024 and `GST rate`
+`EVAL UNDER VALID TIME` with `DATE_SERIAL` with `Date` with 1, 7 and 2024 and `EVAL UNDER RULES EFFECTIVE AT` with `DATE_SERIAL` with `Date` with 1, 6 and 2019 and `GST rate`
+`GST rate`
