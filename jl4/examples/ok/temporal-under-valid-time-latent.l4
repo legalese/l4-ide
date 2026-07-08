@@ -1,10 +1,12 @@
--- T6 sentinel: the VALID TIME axis is LATENT — no builtin reads tcValidTime
--- yet, so `EVAL UNDER VALID TIME` must be value-transparent and must NOT
--- perturb thunk caching (TODAY reads tcSystemTime, not tcValidTime).
+-- T6 sentinel: TODAY is INDEPENDENT of the valid-time axis.
 --
--- This golden LOCKS the latent semantics: when a tcValidTime reader ships,
--- add a crValidTime field to CtxReads, an instrumented reader (see the
--- READER CONTRACT on TemporalContext), and consciously flip this golden.
+-- Update (option (b), 2026-07-08): tcValidTime is no longer fully latent —
+-- `RULES EFFECTIVE DATE` now reads it as a fallback (crValidTime is a real
+-- CtxReads field with an instrumented reader). But TODAY still reads only
+-- tcSystemTime, so `EVAL UNDER VALID TIME` remains value-transparent for the
+-- TODAY-based thunks below and must NOT perturb their caching. This golden
+-- now LOCKS that independence (the valid-time→law-version flow is exercised
+-- by temporal-rule-version-validtime.l4 instead). Values are unchanged.
 --
 -- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z;
 -- serial(2025-01-31) = 739646.
