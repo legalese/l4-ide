@@ -91,6 +91,8 @@ ctxReadsSpec = describe "CtxReads pointwise Monoid" $ do
       `shouldBe` MkCtxReads
         { crSystemTime = ReadEq t1
         , crDocumentTimezone = ReadEq (Just "Etc/UTC")
+        , crValidTime = NotRead
+        , crRuleValidTime = NotRead
         , crLedgerOps = False
         }
 
@@ -135,6 +137,8 @@ validForSpec = describe "validFor" $ do
           MkCtxReads
             { crSystemTime = ReadEq t1
             , crDocumentTimezone = ReadEq (Just "Etc/UTC")
+            , crValidTime = NotRead
+            , crRuleValidTime = NotRead
             , crLedgerOps = False
             }
         withTz = ambient { tcDocumentTimezone = Just "Etc/UTC" }

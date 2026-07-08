@@ -90,6 +90,7 @@ data NullaryBuiltinFun
   | NullaryNowSerial
   | NullaryTimezone          -- ^ Returns document IANA timezone name from TemporalContext
   | NullaryCurrentTime       -- ^ Returns current local TIME (requires TIMEZONE IS)
+  | NullaryRulesEffectiveDate -- ^ Returns tcRuleValidTime (rule-version axis); falls back to localized today
   deriving stock (Show)
 
 data UnaryBuiltinFun
@@ -192,6 +193,7 @@ instance NFData NullaryBuiltinFun where
   rnf NullaryNowSerial = ()
   rnf NullaryTimezone = ()
   rnf NullaryCurrentTime = ()
+  rnf NullaryRulesEffectiveDate = ()
 
 instance NFData UnaryBuiltinFun where
   rnf :: UnaryBuiltinFun -> ()
