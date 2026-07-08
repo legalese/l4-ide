@@ -416,13 +416,45 @@ tools/
 
 ---
 
-## 14. Phased plan (proposed, post-approval)
+## 14. Status board (where are we)
 
-- **P0 — Prototype the kernel.** Standalone page (target C) rendering hand-fed AND/OR trees through `ladder-core` → `ladder-svg`, driven by a `ViewSpec`. Nail centering, ports, connectors, LR/TB. **Build folding (§16) and print-a-ViewSpec in from day one** — folding stresses re-layout/re-centering on every toggle (the best proof of the centering thesis), and a `ViewSpec`→SVG-string path makes the print seam real immediately. No LSP, no IDE. *Validates the headline fix visually.*
-- **P1 — Ladder semantics.** TRUE/FALSE/UNKNOWN circuit states; Full/Small/Tiny scales; minimap.
-- **P2 — Wire to live data.** Decode real `RenderAsLadderInfo` from the LSP; render real statutes/contracts.
-- **P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`; restore interactivity (toggle/eval/inline) on the SVG; ship to jl4-web + VS Code.
-- **P4 — Print pipeline.** `ladder-print` CLI; A3+ PDF; a real poster.
+*As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, ~20 commits; merged
+`origin/unstable` on 2026-07-08 (conflict-free — all work is in new paths), so
+**caught up with unstable** (ahead 20 / behind 0). Not yet pushed / PR'd.*
+
+**✅ P0 — Kernel (DONE).** Pure `IRExpr × TextMetrics × ViewSpec → Scene IR → SVG`,
+no DOM (`ts-shared/ladder-core/`, `7136ec92`). Centering thesis proven on the s415
+fixture — the Dagre right-alignment is gone. Scene IR (§4.2) + ViewSpec (§4.3)
+contracts in place.
+
+**✅ Target C — Standalone interactive page (DONE).** `standalone/` (`a43f8dc0`):
+click-to-fold/expand, click-to-cycle T/F/U, reading + connective-style controls,
+FLIP animation. `npm run standalone`. *(Not yet driven/screenshot-verified live.)*
+
+**✅ Visual language (DONE, beyond the original plan).** §15 ELIMINABLE don't-care
+rung; §16 folding + subtree labels; §17 unboxed inert elements (headings /
+connectives / disjunctive-medial / straddle-wire); §18 Bézier fan connectors;
+§21 NOT (scope frame + inverter bubble).
+
+**◐ P1 — Semantics (PARTIAL).** ✅ T/F/U valuation + per-node override pins (§19,
+`04a8eb47`); ✅ current-flow rendering — leader + streamer "lightning model" (§20,
+`3b911701`/`f9d5ffd1`). ❌ Still open: **Full/Small/Tiny scales + minimap** (§7);
+`Either (Maybe Bool)` defaulted-vs-given distinction; group sub-ordering (§13.3).
+
+**☐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
+statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). Not started.
+
+**☐ P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`;
+restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
+
+**☐ P4 — Print pipeline.** `ladder-print` Node CLI; A3+ PDF; a poster. The
+`ViewSpec`→SVG-string seam exists; no CLI/PDF yet. Not started.
+
+**Cross-cutting open** (see also §13): `ladder-svg` package split still deferred
+(§13.1); N-line straddle + trailing `Post` (§17); font parity for real metrics (§4.4,
+P0 uses an estimator); `NamedExpr` wrapper for subtree labels (§13.4). **Landing:**
+eventually push the branch and PR into `unstable`; re-merge unstable periodically to
+avoid drift.
 
 ---
 
@@ -516,6 +548,19 @@ This also supplies the §5.6 PrePost heading text. **P0 already proves it:** the
 core honours an optional `label?` on a group, so the `harm` fold renders
 "▸ harm to…" not "▸ ANY of 4". Promoting that to the wire IR (`NamedExpr`) is the
 durable step — tracked in §13.
+
+**Relation to upstream #630 ("visualizer expansion could use some improvement").**
+#630 is the *current-codebase symptom* this section supersedes. Today expansion is
+gated by an ad-hoc `canInline`: it fires only for a boolean `UBoolVar` that resolves
+to a **same-file top-level `DECIDE`** (`jl4-core/src/L4/Viz/Ladder.hs:169-173,
+380-392`); functions-with-arguments are unsupported (`App appAnno _fn args`,
+`Ladder.hs:350`), imported / `WHERE`-bound refs don't expand, and the inlined name
+is lost at the Haskell boundary. The 2026 model dissolves all four: fold/expand is a
+first-class **core input** (`ViewSpec.foldSet`, §4.3), so *any* subtree is
+expandable without a special-case predicate; **Tier-2 `NamedExpr`** (§16.1) recovers
+the lost inline name; and broadening to functions-with-args / imported / `WHERE`-bound
+falls out for free. So #630's fix is **"adopt the §16 fold model"**, not another
+patch to `canInline` — and #630 is an *enhancement*, not a bug.
 
 ---
 
