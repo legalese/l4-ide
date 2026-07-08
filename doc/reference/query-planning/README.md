@@ -28,21 +28,21 @@ unknown), the planner answers two questions:
 
 1. **Is the outcome already determined?** If every remaining assignment of the
    unknown atoms produces the same result, the answer is fixed and no further
-   questions are needed. This is *partial evaluation*: fixing the known atoms
+   questions are needed. This is _partial evaluation_: fixing the known atoms
    with [`restrict`](robdd.md#core-operations) may collapse the ROBDD to a
    terminal.
-2. **If not, what should we ask next?** Of the atoms still unknown *and still
-   relevant*, which one should the wizard put to the user next.
+2. **If not, what should we ask next?** Of the atoms still unknown _and still
+   relevant_, which one should the wizard put to the user next.
 
 Atoms that no longer affect the outcome — because earlier answers pruned the part
-of the decision that depended on them — drop out of the diagram's *support* and
+of the decision that depended on them — drop out of the diagram's _support_ and
 are never asked. This is the first and biggest usability win: the wizard asks
 only questions that can still change the answer.
 
 ## Question ordering
 
 Among the atoms that remain relevant, the planner ranks them. The **current**
-policy is *determinability-first*: prefer the atom that, once answered, settles
+policy is _determinability-first_: prefer the atom that, once answered, settles
 the most of the decision, using the atom's position in the ROBDD as a tiebreak.
 Concretely the ranking key is `[-determinableCount, level]` — ask the most
 decisive question first, and break ties by diagram level.
@@ -51,11 +51,11 @@ This is a purely structural policy: it treats every unknown atom as equally
 likely to be `TRUE` or `FALSE`. It is a good default, but it leaves two things on
 the table:
 
-- It has no notion that some facts are *usually* one way. A contract party is
+- It has no notion that some facts are _usually_ one way. A contract party is
   typically not under duress; a transaction is typically at arm's length. A
   structural policy will still ask about the unusual case as eagerly as the
   decisive one.
-- It measures "how much does this settle" combinatorially, not by *expected*
+- It measures "how much does this settle" combinatorially, not by _expected_
   progress once likelihoods are taken into account.
 
 ### Information gain and priors (roadmap)
@@ -63,7 +63,7 @@ the table:
 The designed evolution is an **information-gain** policy. Using
 [model counting](robdd.md#model-counting) over the ROBDD, estimate the
 probability the outcome is `TRUE`, and score each candidate atom by how much
-answering it is *expected* to reduce uncertainty:
+answering it is _expected_ to reduce uncertainty:
 
 ```
 gain(X) = H(before) − [ w_X · H(after X = TRUE) + (1 − w_X) · H(after X = FALSE) ]

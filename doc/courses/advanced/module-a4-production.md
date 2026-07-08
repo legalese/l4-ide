@@ -291,8 +291,8 @@ flat form into a guided interview. The planner is built on a
 #### Default values with TYPICALLY
 
 Many facts have a usual answer. Rather than make the user confirm every one, mark
-it with [`TYPICALLY`](../../reference/types/TYPICALLY.md) — a *rebuttable
-presumption* attached to a field or parameter:
+it with [`TYPICALLY`](../../reference/types/TYPICALLY.md) — a _rebuttable
+presumption_ attached to a field or parameter:
 
 ```l4
 DECLARE Party

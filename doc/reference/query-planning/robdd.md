@@ -45,17 +45,17 @@ pointer comparisons or a single walk of the DAG.
 
 L4's implementation exposes the standard ROBDD toolkit:
 
-| Operation    | Meaning                                                             |
-| ------------ | ------------------------------------------------------------------- |
-| `mk`         | construct a node, applying the two reductions (hash-consed)         |
-| `var` / `neg`| an atom, and negation                                               |
-| `apply`      | combine two ROBDDs under a connective (`AND`, `OR`, `IMPLIES`, …)    |
-| `restrict`   | fix one variable to `TRUE`/`FALSE` — the *cofactor* (see below)      |
-| `support`    | the set of variables the function actually depends on               |
-| `nodeCount`  | the size of the DAG                                                  |
+| Operation     | Meaning                                                           |
+| ------------- | ----------------------------------------------------------------- |
+| `mk`          | construct a node, applying the two reductions (hash-consed)       |
+| `var` / `neg` | an atom, and negation                                             |
+| `apply`       | combine two ROBDDs under a connective (`AND`, `OR`, `IMPLIES`, …) |
+| `restrict`    | fix one variable to `TRUE`/`FALSE` — the _cofactor_ (see below)   |
+| `support`     | the set of variables the function actually depends on             |
+| `nodeCount`   | the size of the DAG                                               |
 
 `restrict` is the operation that powers query planning: fixing an atom to a known
-value yields the ROBDD of the *remaining* decision. When a `restrict` collapses
+value yields the ROBDD of the _remaining_ decision. When a `restrict` collapses
 the graph to a terminal, the outcome is **determined** — no further questions
 are needed.
 
@@ -72,7 +72,7 @@ is built on, and the point at which a per-atom prior from
 
 The variable **order** fixes the shape of the diagram. A good order can keep an
 ROBDD small; a bad order can make it exponentially large. But the order never
-changes *which* function the ROBDD represents — it is a size/performance concern,
+changes _which_ function the ROBDD represents — it is a size/performance concern,
 internal to the data structure.
 
 This is distinct from the **question order** a wizard asks a user, which is a
@@ -97,4 +97,4 @@ keeps the two runtimes in step.
 - [TYPICALLY](../types/TYPICALLY.md) — per-atom priors that feed the ordering
   policy
 - R. E. Bryant, "Graph-Based Algorithms for Boolean Function Manipulation,"
-  *IEEE Transactions on Computers*, 1986 — the canonical-form result
+  _IEEE Transactions on Computers_, 1986 — the canonical-form result
