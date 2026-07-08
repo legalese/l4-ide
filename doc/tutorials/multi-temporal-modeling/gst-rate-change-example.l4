@@ -1,0 +1,127 @@
+-- Complete example for the "Multi-Temporal Rule Modeling" tutorial.
+--
+-- Scenario: a GST/VAT-style tax rate rose from 7% to 9%, effective on
+-- rules dated 2024-01-01 or later. We model the rate as a function of
+-- "which version of the law applies" (RULES EFFECTIVE DATE), and explore
+-- how that axis interacts with the other two time axes L4 tracks:
+-- system time (the evaluation clock) and valid time (when the facts held).
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+§ `The rule`
+
+-- GST rose from 7% to 9% for rules effective on/after 2024-01-01.
+`GST rate` MEANS
+  IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (Date 1 1 2024))
+  THEN 9
+  ELSE 7
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`GST payable on` amount MEANS amount TIMES `GST rate` DIVIDED BY 100
+
+§ `Step 1 -- ambient: no axis pinned, so law-time falls back to today`
+
+-- Whatever "today" is when you run this file, it's well after the
+-- 2024-01-01 cutover, so the ambient rate is the new one.
+#EVAL `GST rate`
+
+§ `Step 2 -- pin the rule-version explicitly`
+
+-- expected: 7 -- old law, regardless of when this is run or what the
+-- facts say
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) `GST rate`
+
+-- expected: 9 -- new law
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+
+-- expected: 70 -- composes through a dependent rule, old version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`GST payable on` 1000)
+
+-- expected: 90 -- dependent rule, new version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) (`GST payable on` 1000)
+
+§ `Step 3 -- the default: law-time tracks fact-time`
+
+-- No rule-version pinned here -- only the *facts* are pinned, to 2019.
+-- RULES EFFECTIVE DATE falls back to the valid-time axis, so the OLD
+-- law applies: this models the presumption against retroactivity
+-- (apply the law that was in force when the facts occurred).
+--
+-- expected: 7
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) `GST rate`
+
+-- expected: 9 -- facts pinned to 2024 instead: new regime
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+
+§ `Step 4 -- an explicit rule-version pin overrides fact-time`
+
+-- Facts are in 2024 (new regime by default), but we explicitly ask for
+-- the 2019 law anyway. The explicit, inner override wins: this is how
+-- you deliberately decouple "when the facts happened" from "which law
+-- to apply" -- e.g. a savings clause, a transitional provision, or an
+-- audit of what an old ruling would look like restated in code.
+--
+-- expected: 7
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) (`EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) `GST rate`)
+
+§ `Step 5 -- TODAY is independent of valid time and rule-effective time`
+
+-- TODAY only ever reads the SYSTEM TIME axis. Overriding valid time (or
+-- the rule-version) must never perturb it -- otherwise a limitations
+-- countdown or "days since filing" calculation would silently shift
+-- whenever you evaluated a rule about a past fact.
+--
+-- Same result with or without a valid-time override: TODAY doesn't care.
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) (DATE_SERIAL TODAY)
+#EVAL DATE_SERIAL TODAY
+
+§ `Step 6 -- auditing a past evaluation clock with system time`
+
+-- EVAL AS OF SYSTEM TIME overrides yet another axis: the evaluation
+-- clock itself. It answers "what would the system have computed if
+-- this had been run back then?" -- useful for audit trails and
+-- regression snapshots.
+--
+-- Careful: RULES EFFECTIVE DATE's own fallback chain bottoms out at
+-- "today" (same computation as the TODAY builtin) when NEITHER the
+-- rule-version nor the valid-time axis is pinned. Since TODAY reads
+-- system time, overriding system time alone flows through to that
+-- fallback -- it's only inert when an explicit rule-version or
+-- valid-time pin is already present to take priority over it.
+--
+-- expected: 7 -- no rule-version or valid-time pinned, so the fallback
+-- resolves via the (overridden) system clock: 2020-06-01 is pre-cutover
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (Date 1 6 2020)) `GST rate`
+
+§ `Step 7 -- scanning a range of dates`
+
+-- VALUE AT stamps BOTH valid-time and rule-effective-time to the given
+-- day, then evaluates the expression -- handy for building a
+-- day-indexed table of what a rule would say across a changeover.
+--
+-- expected: 7 -- VALUE AT's per-day stamp is load-bearing
+#EVAL `VALUE AT` (Date 1 6 2023) (GIVEN d YIELD `GST rate`)
+
+-- expected: 9
+#EVAL `VALUE AT` (Date 1 7 2024) (GIVEN d YIELD `GST rate`)
+
+-- EVER/ALWAYS BETWEEN and WHEN LAST/NEXT scan a date range for a
+-- predicate of DATE, independently of the rule-version machinery above --
+-- they're general date-search builtins, shown here on `is weekend`.
+`weekend?` d MEANS `is weekend` (DATE_SERIAL d)
+
+-- expected: TRUE -- Jan 6-7 2024 includes a Saturday/Sunday
+#EVAL `EVER BETWEEN` (Date 5 1 2024) (Date 7 1 2024) `weekend?`
+
+-- expected: TRUE -- Jan 6-7 2024 is a Sat/Sun weekend throughout
+#EVAL `ALWAYS BETWEEN` (Date 6 1 2024) (Date 7 1 2024) `weekend?`
+
+-- expected: the most recent weekend day on/before 2024-01-10
+#EVAL `WHEN LAST` (Date 10 1 2024) `weekend?`
+
+-- expected: the next weekend day on/after 2024-01-10
+#EVAL `WHEN NEXT` (Date 10 1 2024) `weekend?`

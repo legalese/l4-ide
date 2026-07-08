@@ -20,6 +20,14 @@ Write functions that read like legal prose:
 
 **Prerequisites:** Basic function syntax
 
+## Multi-Temporal Modeling
+
+Model rules that change over time:
+
+- **[Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)** - System time, valid time, and rule-effective time: the three axes L4 tracks, and how amendments/effective dates fall out of them
+
+**Prerequisites:** Basic L4 knowledge, familiarity with dates
+
 ## Deployment and Legalese Cloud
 
 Export your L4 rules as live REST API endpoints:
