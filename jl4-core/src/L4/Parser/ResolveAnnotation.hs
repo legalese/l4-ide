@@ -947,12 +947,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (Decide n) where
     pure $ MkDecide ann' tySig' appForm' expr'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Assume n) where
-  addRef a@(MkAssume ann tySig appForm order) = do
+  addRef a@(MkAssume ann tySig appForm order typically) = do
     ann' <- attachRef a ann
     tySig' <- addRef tySig
     appForm' <- addRef appForm
     order' <- traverse addRef order
-    pure $ MkAssume ann' tySig' appForm' order'
+    typically' <- traverse addRef typically
+    pure $ MkAssume ann' tySig' appForm' order' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
   addRef a = case a of
@@ -987,12 +988,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
       SynonymDecl ann' <$> addRef ty
 
 instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
-  addRef a@(MkTypedName ann n ty mExpr) = do
+  addRef a@(MkTypedName ann n ty mExpr typically) = do
     ann' <- attachRef a ann
     n' <- addRef n
     ty' <- addRef ty
     mExpr' <- traverse addRef mExpr
-    pure $ MkTypedName ann' n' ty' mExpr'
+    typically' <- traverse addRef typically
+    pure $ MkTypedName ann' n' ty' mExpr' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (ConDecl n) where
   addRef a@(MkConDecl ann n typedNames) = do
@@ -1015,11 +1017,12 @@ instance (HasSrcRange n, HasRef n) => HasRef (GivenSig n) where
     pure $ MkGivenSig ann' tys'
 
 instance (HasSrcRange n, HasRef n) => HasRef (OptionallyTypedName n) where
-  addRef a@(MkOptionallyTypedName ann n mty) = do
+  addRef a@(MkOptionallyTypedName ann n mty typically) = do
     ann' <- attachRef a ann
     n' <- addRef n
     mty' <- traverse addRef mty
-    pure $ MkOptionallyTypedName ann' n' mty'
+    typically' <- traverse addRef typically
+    pure $ MkOptionallyTypedName ann' n' mty' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (GivethSig n) where
   addRef a@(MkGivethSig ann mty) = do

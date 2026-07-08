@@ -839,7 +839,7 @@ isDistinguishablePat = \ case
 -- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
 givenTermNames :: TypeSig Name -> [Name]
 givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
-  [ n | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+  [ n | MkOptionallyTypedName _ n mt _ <- otns, notTypeParam mt ]
   where
     notTypeParam (Just (Type _)) = False
     notTypeParam _               = True
