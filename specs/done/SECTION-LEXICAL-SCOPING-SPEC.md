@@ -4,7 +4,7 @@
 > `resolveType` (`jl4-core/src/L4/TypeCheck/Types.hs`) implement lexical section-proximity
 > resolution exactly as specified in §3-§4, and all three §12 hardening fixes (FIX A/B/C)
 > are present verbatim with matching regression tests (`jl4/examples/ok/section-scoping-
-> param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
+param-not-shadowed.l4`, `section-scoping-forward-ref.l4`,
 > `jl4/examples/not-ok/tc/section-scoping-import-collision.l4`). Resolves
 > [smucclaw/l4-ide#85](https://github.com/smucclaw/l4-ide/issues/85).
 
