@@ -643,7 +643,7 @@ formatResults :: [EvalDirectiveResult] -> Text
 formatResults results = Text.unlines $ map formatResult results
 
 formatResult :: EvalDirectiveResult -> Text
-formatResult (MkEvalDirectiveResult _range res _trace) = case res of
+formatResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
   Assertion True  -> "True (assertion passed)"
   Assertion False -> "False (assertion failed)"
   Reduction (Right nf) -> Print.prettyLayout nf
@@ -752,7 +752,7 @@ formatAsciiTraceResults :: [EvalDirectiveResult] -> Text
 formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult results
 
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
-formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace) =
+formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger) =
   let resultText = case res of
         Assertion True  -> "Result: True (assertion passed)"
         Assertion False -> "Result: False (assertion failed)"
@@ -773,12 +773,12 @@ formatTraceResults st exprText actualExpr mModule results = do
       pure $ Text.unlines messages
 
 formatTraceResult :: Module Resolved -> EvalDirectiveResult -> Text
-formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace) = case mtrace of
+formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace _ledger) = case mtrace of
   Nothing -> "(no trace available)"
   Just tr -> GraphViz.traceToGraphViz GraphViz.defaultGraphVizOptions (Just mModule) tr
 
 saveTraceResult :: ReplState -> Text -> Text -> Module Resolved -> TraceSink -> EvalDirectiveResult -> IO Text
-saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace) =
+saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace _ledger) =
   case mtrace of
     Nothing -> pure "(no trace available)"
     Just tr -> do
@@ -828,7 +828,7 @@ inlineSingleLine txt =
        else Text.intercalate " " nonEmpty
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
-summarizeEvalResult (MkEvalDirectiveResult _range res _trace) = case res of
+summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
   Assertion True  -> "True (assertion passed)"
   Assertion False -> "False (assertion failed)"
   Reduction (Right nf) -> Print.prettyLayout nf

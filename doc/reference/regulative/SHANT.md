@@ -54,6 +54,10 @@ limitedGambling MEANS
 - Prohibition is **breached** when the party performs the forbidden action
 - LEST consequences trigger on breach
 
+## Performer Rule
+
+When using the **value-actor encoding**, `PARTY p SHANT a` requires that `p` is the **performer** of action `a`, just as with MUST and MAY. The check fires at compile time. See **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** for the full rules.
+
 ## Related Keywords
 
 - **[PARTY](PARTY.md)** - Identifies who has the prohibition

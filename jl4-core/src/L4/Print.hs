@@ -4,6 +4,7 @@ import Base
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
+import L4.Print.Columnar (Cell, Grid, DittoOpts, defaultDittoOpts, renderDittoGrid)
 import L4.Syntax
 import qualified L4.TypeCheck.Types as TC
 
@@ -69,6 +70,87 @@ docLines = fmap pretty . Text.lines . docText
 
 prettyLayout' :: LayoutPrinter a => a -> String
 prettyLayout' = Text.unpack . prettyLayout
+
+-- | Ditto-aware printer for 'MultiWayIf' (BUILD-SPEC §5.2, preferred minimal
+-- wiring). Renders the @BRANCH@ header structurally and delegates the arm block
+-- to 'renderDittoGrid' so that repeated guard tokens collapse to column-aligned
+-- carets (@^@). For any other expression it falls back to the canonical
+-- 'prettyLayout', leaving the default printer untouched.
+--
+-- This adds NO AST node: ditto is an emission-layer concern only. The guard of
+-- each arm is decomposed into per-field @[field, operator, value]@ slots with an
+-- @AND@ connector between present conjuncts; @IF@, @THEN@ and the result
+-- expression are kept spelled out on every arm (only the guard cells ditto). The
+-- shared field ordering across arms is what makes column @j@ a stable logical
+-- slot — the precondition 'renderDittoGrid' needs to align carets correctly.
+prettyLayoutDitto :: LayoutPrinterWithName a => DittoOpts -> Expr a -> Text
+prettyLayoutDitto opts = \ case
+  MultiWayIf _ conds o ->
+    let grid      = multiWayIfGrid conds
+        gridText  = renderDittoGrid opts grid
+        gridLines = if null conds then [] else Text.splitOn "\n" gridText
+        results   = map (\ (MkGuardedExpr _ _ r) -> prettyLayout r) conds
+        armLines  = zipWith (\ g r -> "  IF " <> g <> " THEN " <> r) gridLines results
+        otherLine = "  OTHERWISE " <> prettyLayout o
+    in Text.intercalate "\n" (["BRANCH"] <> armLines <> [otherLine])
+  e -> prettyLayout e
+
+-- | 'prettyLayoutDitto' with 'defaultDittoOpts'.
+prettyLayoutDitto' :: LayoutPrinterWithName a => Expr a -> Text
+prettyLayoutDitto' = prettyLayoutDitto defaultDittoOpts
+
+-- | Build the guard 'Grid' for a list of BRANCH arms. Each arm's guard is split
+-- into conjuncts (an @AND@-chain), each conjunct into @[field, op, value]@; the
+-- conjuncts are then placed into columns keyed by field text, using first-
+-- appearance order across all arms so identical fields share a column.
+multiWayIfGrid :: LayoutPrinterWithName a => [GuardedExpr a] -> Grid
+multiWayIfGrid conds = map row armConjs
+  where
+    guardOf :: GuardedExpr a -> Expr a
+    guardOf (MkGuardedExpr _ g _) = g
+
+    -- per arm: the list of (field-key, [fieldCell, opCell, valCell]) conjuncts
+    armConjs :: [[(Text, [Cell])]]
+    armConjs = map (map conjunctCells . scanAnd . guardOf) conds
+
+    -- global column order: every distinct field, first-appearance order
+    fieldOrder :: [Text]
+    fieldOrder = nub [ k | arm <- armConjs, (k, _) <- arm ]
+
+    row :: [(Text, [Cell])] -> [Cell]
+    row arm = concat (zipWith fieldBlock [0 ..] fieldOrder)
+      where
+        present :: Text -> Bool
+        present k = isJust (lookup k arm)
+
+        anyEarlier :: Int -> Bool
+        anyEarlier idx = any present (take idx fieldOrder)
+
+        fieldBlock :: Int -> Text -> [Cell]
+        fieldBlock idx k =
+          let conn = if idx > (0 :: Int)
+                       then [ if present k && anyEarlier idx then Just "AND" else Nothing ]
+                       else []
+              body = fromMaybe [Nothing, Nothing, Nothing] (lookup k arm)
+          in conn <> body
+
+-- | Decompose one guard conjunct into a field key plus its @[field, op, value]@
+-- cells. Recognised comparison operators get a three-cell decomposition;
+-- anything else becomes a single spelled-out cell (keyed by its own text) with
+-- empty operator/value slots.
+conjunctCells :: LayoutPrinterWithName a => Expr a -> (Text, [Cell])
+conjunctCells e = case e of
+  Equals _ l r -> cmp l "EQUALS"        r
+  Leq    _ l r -> cmp l "AT MOST"       r
+  Geq    _ l r -> cmp l "AT LEAST"      r
+  Lt     _ l r -> cmp l "LESS THAN"     r
+  Gt     _ l r -> cmp l "GREATER THAN"  r
+  _            -> let t = prettyLayout e in (t, [Just t, Nothing, Nothing])
+  where
+    cmp :: LayoutPrinterWithName a => Expr a -> Text -> Expr a -> (Text, [Cell])
+    cmp l op r =
+      let lt = prettyLayout l
+      in (lt, [Just lt, Just op, Just (prettyLayout r)])
 
 quotedName :: Name -> Text
 quotedName n =
@@ -203,12 +285,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (GivethSig a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
   printWithLayout = \ case
     MkDeclare _ tySig appForm tyDecl  ->
-      fillCat
-        [ printWithLayout tySig
-        ]
-      <>
+      -- `vcat` (not `fillCat`): under the Unbounded layout `fillCat`'s
+      -- separators render empty, jamming a non-empty GIVEN signature straight
+      -- onto `DECLARE` (`... IS TYPEDECLARE ...`), which does not re-parse.
+      -- Mirrors the Decide instance below.
       vcat
-        [ "DECLARE" <+> printWithLayout appForm
+        [ printWithLayout tySig
+        , "DECLARE" <+> printWithLayout appForm
         , indent 2 (printWithLayout tyDecl)
         ]
 
@@ -255,7 +338,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (ConDecl a) where
 instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
   printWithLayout = \ case
     MkAssume _ tySig appForm ty ->
-      fillCat
+      -- `vcat` (not `fillCat`): see the Declare note above — `fillCat` jams a
+      -- non-empty GIVEN signature onto `ASSUME` under the Unbounded layout.
+      vcat
         [ printWithLayout tySig
         , "ASSUME" <+> printWithLayout appForm <> case ty of
             Nothing -> mempty
@@ -279,9 +364,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       "#EVALTRACE" <+> printWithLayout e
     Check _ e ->
       "#CHECK" <+> printWithLayout e
-    Contract _ e t stmts -> hsep $
-      "#TRACE" <+> printWithLayout e <+> printWithLayout t :
-      map printWithLayout stmts
+    -- NOTE: AT and WITH are mandatory in the #TRACE grammar, and the events
+    -- are parsed with layout ('lmany'), so they must each go on their own
+    -- (indented) line for the printed directive to round-trip through the
+    -- parser (e.g. for @l4 batch@'s print-and-reparse of the module).
+    Contract _ e t stmts -> vcat $
+      ("#TRACE" <+> printWithLayout e <+> "AT" <+> printWithLayout t <+> "WITH") :
+      map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
 
@@ -319,7 +408,7 @@ instance (LayoutPrinterWithName a, n ~ Int) => LayoutPrinter (n, TopDecl a) wher
     (_, Directive _ t) -> printWithLayout t
     (_, Import    _ t) -> printWithLayout t
     (i, Section   _ t) -> printWithLayout (i, t)
-    (_, Timezone  _ _) -> mempty  -- TIMEZONE IS declarations are not pretty-printed
+    (_, Timezone  _ e) -> "TIMEZONE IS" <+> printWithLayout e
 
 instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
   printWithLayout :: LayoutPrinter a => Expr a -> Doc ann
@@ -357,11 +446,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Times      _ e1 e2 ->
       parensIfNeeded e1 <+> "TIMES" <+> parensIfNeeded e2
     DividedBy  _ e1 e2 ->
-      parensIfNeeded e1 <+> "DIVIDED" <+> parensIfNeeded e2
+      parensIfNeeded e1 <+> "DIVIDED BY" <+> parensIfNeeded e2
     Modulo     _ e1 e2 ->
       parensIfNeeded e1 <+> "MODULO" <+> parensIfNeeded e2
-    Exponent   _ e1 e2 ->
-      parensIfNeeded e1 <+> "TO THE POWER OF" <+> parensIfNeeded e2
     Cons       _ e1 e2 ->
       parensIfNeeded e1 <+> "FOLLOWED BY" <+> parensIfNeeded e2
     Leq        _ e1 e2 ->
@@ -428,6 +515,17 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "ENV" <+> printWithLayout e
     Post _ e1 e2 e3 ->
       "POST" <+> printWithLayout e1 <+> printWithLayout e2 <+> printWithLayout e3
+    Record _ mParty cell val isOfficial mHence ->
+      (if isOfficial then "COMMIT" else "RECORD")
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <+> printWithLayout cell <+> "IS" <+> printWithLayout val
+        <> maybe mempty (\k -> " HENCE" <+> printWithLayout k) mHence
+    ReadCell _ mParty isOfficial mode cell ->
+      "RECALL"
+        <> (case mode of RecallAll -> " ALL"; RecallLast -> mempty)
+        <> (if isOfficial then " OFFICIAL'S" else mempty)
+        <> maybe mempty (\p -> space <> printWithLayout p <> "'S") mParty
+        <+> printWithLayout cell
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AsString _ e ->
@@ -656,7 +754,7 @@ instance LayoutPrinter BinOp where
     BinOpPlus -> "PLUS"
     BinOpMinus -> "MINUS"
     BinOpTimes -> "TIMES"
-    BinOpDividedBy -> "DIVIDED"
+    BinOpDividedBy -> "DIVIDED BY"
     BinOpModulo -> "MODULO"
     BinOpExponent -> "TO THE POWER OF"
     BinOpTrunc -> "TRUNC"

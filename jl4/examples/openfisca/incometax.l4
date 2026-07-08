@@ -1,0 +1,29 @@
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER, `capital returns` IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.income_tax_rate
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`income tax rate` MEANS
+    BRANCH
+        IF y AT LEAST 2015 THEN 0.15
+        IF y AT LEAST 2014 THEN 0.14
+        IF y AT LEAST 2013 THEN 0.13
+        IF y AT LEAST 2012 THEN 0.16
+        OTHERWISE 0
+
+@export Income tax payable by a person for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`income tax` p period MEANS
+    (p's salary PLUS p's `capital returns`) TIMES (`income tax rate` OF period's year)
+
+`earner` MEANS Person WITH salary IS 2000, `capital returns` IS 0
+`y2013` MEANS Period WITH year IS 2013, month IS 1
+`y2015` MEANS Period WITH year IS 2015, month IS 1
+
+#ASSERT (`income tax` OF `earner`, `y2013`) EQUALS 260
+#ASSERT (`income tax` OF `earner`, `y2015`) EQUALS 300

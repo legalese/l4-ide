@@ -17,12 +17,13 @@ module L4.Cli.Trace
 import Base (for_, forM_)
 import qualified Base.Text as Text
 import qualified Data.Text.IO as TIO
+import Control.Exception (try, IOException)
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (ExitCode(..), exitFailure, exitSuccess)
 import System.FilePath (takeBaseName, (</>))
-import System.IO (hPutStrLn, stderr)
-import System.Process (callCommand)
+import System.IO (hPutStrLn, stderr, withBinaryFile, IOMode(WriteMode))
+import System.Process (CreateProcess(..), StdStream(..), createProcess, proc, waitForProcess)
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
@@ -130,17 +131,48 @@ traceCmd opts = do
                   DotFormat -> hPutStrLn stderr ("Generated: " <> dotFile)
                   PngFormat -> do
                     let pngFile = outDir </> baseName <> "-eval" <> show idx <> ".png"
-                    callCommand ("dot -Tpng " <> dotFile <> " > " <> pngFile)
-                    hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> pngFile)
+                    ok <- renderWithDot "png" dotFile pngFile
+                    if ok
+                      then hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> pngFile)
+                      else exitFailure
                   SvgFormat -> do
                     let svgFile = outDir </> baseName <> "-eval" <> show idx <> ".svg"
-                    callCommand ("dot -Tsvg " <> dotFile <> " > " <> svgFile)
-                    hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> svgFile)
+                    ok <- renderWithDot "svg" dotFile svgFile
+                    if ok
+                      then hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> svgFile)
+                      else exitFailure
               Nothing -> pure ()
           exitSuccess
 
         -- (Nothing, PngFormat | SvgFormat) was rejected up top already.
         (Nothing, _) -> exitFailure
+
+-- | Render a @.dot@ file to @outFile@ via Graphviz's @dot@, capturing its
+-- stdout into the file directly.
+--
+-- Runs @dot@ as a bare process with an explicit argument list (no shell), so
+-- paths containing spaces or shell metacharacters — @foo bar/@, @$(...)@,
+-- @;rm -rf@ — are passed through verbatim instead of being word-split or
+-- executed. Returns 'True' on success; on a missing @dot@ executable or a
+-- non-zero exit it prints a diagnostic and returns 'False'.
+renderWithDot :: String -> FilePath -> FilePath -> IO Bool
+renderWithDot formatFlag dotFile outFile = do
+  result <-
+    try (withBinaryFile outFile WriteMode \hOut -> do
+          (_, _, _, ph) <- createProcess
+            (proc "dot" ["-T" <> formatFlag, dotFile]) { std_out = UseHandle hOut }
+          waitForProcess ph)
+      :: IO (Either IOException ExitCode)
+  case result of
+    Left err -> do
+      hPutStrLn stderr
+        ("Error: could not run 'dot' (is Graphviz installed and on PATH?): " <> show err)
+      pure False
+    Right ExitSuccess -> pure True
+    Right (ExitFailure n) -> do
+      hPutStrLn stderr
+        ("Error: dot exited with code " <> show n <> " while rendering " <> dotFile)
+      pure False
 
 -- `l4 trace` uses its own EvalConfig with tracing switched on.
 makeTraceEvalConfig :: TraceOptions -> IO EvalConfig

@@ -5,6 +5,7 @@ This directory contains the standard libraries for L4, providing common function
 ## Available Libraries
 
 - **prelude.l4** - Core functions and types (lists, maybe, either, basic operations)
+- **negation-as-failure.l4** - Negation-as-failure combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
 - **daydate.l4** - Date arithmetic and calendar functions
 - **date-compat.l4** - Backwards compatibility layer for legacy DATE syntax
 - **excel-date.l4** - Excel-compatible date functions

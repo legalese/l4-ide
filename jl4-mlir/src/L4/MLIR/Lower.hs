@@ -1844,12 +1844,8 @@ lowerExprCases expr expectedTy = case expr of
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
   Env{}        -> markUnsupported "ENV not supported by the WASM backend"
-
-  -- Exponent
-  Exponent _ base exp_ -> do
-    baseVal <- lowerExpr base l4NumberType
-    expVal <- lowerExpr exp_ l4NumberType
-    emitVal $ \vid -> (funcCall [vid] "__l4_pow" [baseVal, expVal] [l4NumberType, l4NumberType] [l4NumberType])
+  Record{}     -> markUnsupported "RECORD/COMMIT (ledger write) not supported by the WASM backend"
+  ReadCell{}   -> markUnsupported "RECALL (ledger read) not supported by the WASM backend"
 
   -- RAnd/ROr (regulative and/or — same as boolean for compiled code)
   RAnd _ lhs rhs -> lowerBoolop arithAndi lhs rhs
@@ -1939,7 +1935,6 @@ isNumberExprShape = \case
   DividedBy{} -> True
   Modulo{}    -> True
   Percent{}   -> True
-  Exponent{}  -> True
   App _ n _ -> case resolvedName n of
     "__PLUS__"    -> True
     "__MINUS__"   -> True
@@ -2548,7 +2543,6 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Times _ a b      -> Set.union (go bound a) (go bound b)
       DividedBy _ a b  -> Set.union (go bound a) (go bound b)
       Modulo _ a b     -> Set.union (go bound a) (go bound b)
-      Exponent _ a b   -> Set.union (go bound a) (go bound b)
       Cons _ a b       -> Set.union (go bound a) (go bound b)
       Leq _ a b        -> Set.union (go bound a) (go bound b)
       Geq _ a b        -> Set.union (go bound a) (go bound b)
@@ -2580,6 +2574,8 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Fetch _ a -> go bound a
       Env _ a -> go bound a
       Post _ a b c -> Set.unions [go bound a, go bound b, go bound c]
+      Record _ mParty cell val _ mHence -> Set.unions ([go bound cell, go bound val] <> maybe [] (\p -> [go bound p]) mParty <> maybe [] (\k -> [go bound k]) mHence)
+      ReadCell _ mParty _ _ cell -> Set.unions ([go bound cell] <> maybe [] (\p -> [go bound p]) mParty)
       Breach _ ma mb -> Set.unions (maybe Set.empty (go bound) ma : [maybe Set.empty (go bound) mb])
 
     stepLocal (bnd, frees) (LocalDecide _ (MkDecide _ _ af bdy)) =

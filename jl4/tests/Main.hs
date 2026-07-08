@@ -29,6 +29,7 @@ import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
 import Optics
+import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
@@ -46,6 +47,16 @@ main :: IO ()
 main = do
   dataDir <- Paths_jl4.getDataDir
   dataDirCore <- Paths_jl4_core.getDataDir
+  -- Make the golden suite self-sufficient under a bare `cabal test`: point
+  -- library resolution at the bundled core libraries unless the caller has
+  -- already chosen a store. Without this, examples that IMPORT a library (e.g.
+  -- actus-library-test) fail locally because embedded transitive resolution is
+  -- incomplete. CI already exports JL4_LIBRARY_PATH, so this only restores
+  -- local/CI parity; an explicit setting is respected.
+  mLibEnv <- lookupEnv "JL4_LIBRARY_PATH"
+  case mLibEnv of
+    Just _  -> pure ()
+    Nothing -> setEnv "JL4_LIBRARY_PATH" (dataDirCore </> "libraries")
   envFixed <- JL4Lazy.readFixedNowEnv
   let fallbackNow =
         fromMaybe (error "Internal: invalid fallback timestamp for JL4 tests")
@@ -61,10 +72,28 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
+  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
+  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
+  -- that an @export in an unsupported position yields no default export.
+  -- (empty.l4 used to live here while warnings still failed typecheck; now
+  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
+  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
+    describe "corpus sanity (every glob matched something)" $ do
+      let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
+      corpusNonEmpty "ok"              okFiles
+      corpusNonEmpty "libraries"       librariesFiles
+      corpusNonEmpty "legal"           legalFiles
+      corpusNonEmpty "tc-fails"        tcFailsFiles
+      corpusNonEmpty "nlg-fails"       nlgFailsFiles
+      corpusNonEmpty "semantic-tokens" semanticTokenFiles
+      corpusNonEmpty "hover"           hoverFiles
+      corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+    describe "export placement (typechecks; no default export)" $
+      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
   where
@@ -85,16 +114,33 @@ main = do
 l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> IO (Golden String)
 l4Golden evalConfig isOk dir inputFile = do
   (output, _) <- capture (checkFile evalConfig isOk inputFile)
+  scrubLibPath <- mkLibraryPathScrubber
+  let normalize = scrubLibPath . normalizeWhitespaceString . stripAnsiCodesString
   pure
     Golden
-      { output = normalizeWhitespaceString $ stripAnsiCodesString output
+      { output = normalize output
       , encodePretty = show
       , writeToFile = writeFile
-      , readFromFile = fmap (normalizeWhitespaceString . stripAnsiCodesString) . readFile
+      , readFromFile = fmap normalize . readFile
       , goldenFile = dir </> (takeFileName inputFile -<.> "golden")
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "actual"))
       , failFirstTime = True
       }
+
+-- | Build a scrubber that replaces the (absolute, machine-specific)
+-- @JL4_LIBRARY_PATH@ prefix with a stable @$JL4_LIBRARY_PATH@ token, so goldens
+-- that capture import-resolution logs like @Found on filesystem: <abspath>@ are
+-- portable across machines and CI. In jl4-test @JL4_LIBRARY_PATH@ is always set
+-- (see 'main'), so a library import is always resolved from the filesystem at
+-- that path; the only environment-dependent part of the log is the prefix.
+-- No-op when the variable is unset or empty.
+mkLibraryPathScrubber :: IO (String -> String)
+mkLibraryPathScrubber = do
+  mp <- lookupEnv "JL4_LIBRARY_PATH"
+  pure $ case mp of
+    Just p | not (null p) ->
+      Text.unpack . Text.replace (Text.pack p) "$JL4_LIBRARY_PATH" . Text.pack
+    _ -> id
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do
@@ -293,7 +339,7 @@ checkFile evalConfig isOk file = do
 
  where
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
-  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _) =
+  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 

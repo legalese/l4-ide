@@ -19,9 +19,15 @@ module L4.EvaluateLazy.Machine
 , newUnique
 , getTemporalContext
 , putTemporalContext
+, swapCtxReads
 , getEvalTime
 , getModuleUri
 , getSafeMode
+-- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
+-- driver in 'L4.EvaluateLazy'; not part of the stable public API.
+, tellEventRouted
+, currentLedgerEval
+, readEvalRef
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -68,9 +74,22 @@ import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
+import L4.Evaluate.Ledger
+  ( EventRoute (..)
+  , Ledger
+  , LedgerEvent (..)
+  , LedgerStore (..)
+  , Provenance (..)
+  , anonymousParty
+  , readCell
+  , readCellAll
+  , storeAppendOfficial
+  , storeAppendOwn
+  , storeOwnLedger
+  )
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
-import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
+import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
@@ -94,6 +113,49 @@ data Frame =
   | Post1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | Post2 WHNF {- -} (Expr Resolved) Environment
   | Post3 WHNF WHNF {- -}
+  -- STATE-AS-LEDGER: RECORD/COMMIT/ATTEST (+ NOTIFY-v1 recipient). When a
+  -- @RECORD q's <cell> IS <v>@ carries a recipient qualifier, we evaluate the
+  -- recipient FIRST (mirroring 'ReadCell2'): 'Record0' holds the still-unevaluated
+  -- cell + value exprs, the env, isOfficial, and the M5 HENCE while the recipient
+  -- party expr evaluates; on its WHNF we key via 'partyKeyWHNF' and thread that
+  -- recipient key through the rest of the write.
+  --
+  -- 'Record1' waits for the cell to evaluate (holds the still-unevaluated value
+  -- expr, its env, isOfficial, the M5 HENCE, and the resolved recipient key —
+  -- 'Nothing' for a bare own write, @Just rk@ for a NOTIFY write); 'Record2'
+  -- waits for the value (holds the evaluated cell WHNF, isOfficial, the HENCE,
+  -- the env, and the recipient key). The 'Maybe (Expr Resolved)' is the M5 HENCE:
+  -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
+  -- the write an event-free deontic step (after 'tellEvent', forward
+  -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
+  -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
+  -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
+  -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
+  -- Once the cell is in hand we branch on the qualifier:
+  --   * isOfficial          -> read the OFFICIAL ledger, finish.
+  --   * Just partyExpr       -> push 'ReadCell2' (holding the cell WHNF) and
+  --                             forward-eval the party expr; on its value we key
+  --                             via 'partyKeyWHNF' and read that party's ledger.
+  --   * Nothing (default)    -> read the CURRENT party's own ledger, finish.
+  -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
+  -- through to 'finishRead' so the read folds the chosen ledger into either a
+  -- MAYBE (last) or a LIST (all).
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
+  -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
+  -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
+  -- the read against the named party's own ledger. The mode MUST be threaded here
+  -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
+  -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
+  | ReadCell2 WHNF RecallMode {- -}
+  -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
+  -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
+  -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
+  -- mirroring the 'EvalAsOfSystemTime2' save/restore-frame idiom. Carries the
+  -- party to restore TO (the enclosing party, or Nothing at the outer level).
+  | RestoreCurrentParty (Maybe Text)
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -134,7 +196,12 @@ data Frame =
   | WhenLastFrame TemporalContext WHNF Time.Day
   | WhenNextFrame TemporalContext WHNF Time.Day Time.Day
   | ValueAtFrame TemporalContext
-  | UpdateThunk Reference
+  | UpdateThunk Reference !CtxReads !(Maybe (CtxReads, WHNF))
+    -- ^ write-back frame for a thunk force; carries the ENCLOSING span's
+    -- saved read accumulator, merged back in 'backward' (T6), plus the
+    -- displaced 'WHNFWhen' cache (fingerprint, value) when this force
+    -- re-forces a stale context-dependent cache — so an aborted force can
+    -- put the still-fingerprint-guarded cache back ('unwindFrame')
   | ContractFrame ContractFrame
   | ConcatFrame [WHNF] {- -} [Expr Resolved] Environment -- accumulated values, remaining exprs, env
   | AsStringFrame -- AsString frame
@@ -165,11 +232,32 @@ data EvalState =
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
+    , envLedger  :: !(IORef LedgerStore) -- append-only event store (M0 substrate, M4
+                                         -- per-party + official record); always collected
+                                         -- (non-optional, unlike evalTrace)
+    , currentParty :: !(IORef (Maybe Text))
+                                     -- ^ M4: the party whose deontic HENCE/LEST we are
+                                     -- currently inside, so a RECORD fired there routes to
+                                     -- that party's own ledger. 'Nothing' = no enclosing
+                                     -- party (a top-level RECORD), routed to the anonymous
+                                     -- own ledger. Set/restored around 'continueWithFollowup'.
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
+    , ctxReads   :: !(IORef CtxReads)
+      -- ^ temporal-context observations made since entering the innermost
+      -- in-flight thunk-force span (T6). Single-threaded within a run
+      -- (EvalState is constructed per run); cross-run sharing is handled at
+      -- cache-serve time via 'validFor'.
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
+    , reofferedEvents :: !(IORef (Set Address))
+      -- ^ addresses of EVENT values that an expiring obligation has re-offered
+      -- to its HENCE/LEST continuation (see the Contract5 expiry NOTE in
+      -- 'backwardContractFrame'). Membership enforces the at-most-once
+      -- re-offer rule: a marked event that reveals a second expiry is
+      -- consumed rather than re-offered again, which bounds evaluation for
+      -- recursive continuations with non-positive deadlines.
     }
 
 data Stack =
@@ -225,14 +313,131 @@ traceEval ta = do
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
 
 -- | Throw an evaluation exception: unwind the stack frame by frame (so an
--- active trace records the pops, mirroring the historical behaviour) and
--- then throw an IO exception.
+-- active trace records the pops, mirroring the historical behaviour),
+-- interpreting the state-restoring frames along the way ('unwindFrame'),
+-- and then throw an IO exception.
 raiseException :: EvalException -> Eval a
 raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just _f -> raiseException e
+    Just f  -> unwindFrame f >> raiseException e
+
+-- | Interpret the state-restoring effects of a frame while unwinding on an
+-- exception. Most frames are pure control flow and need nothing, but:
+--
+--   * frames that saved a 'TemporalContext' to restore in 'backward' must
+--     restore it during unwinding too — otherwise an exception raised inside
+--     an @EVAL AS OF SYSTEM TIME@ \/ @EVAL UNDER VALID TIME@ \/ iterator
+--     scope leaves the override in the ambient context (and, post-T6, lets
+--     subsequent forces cache values under the leaked context);
+--
+--   * 'UpdateThunk' frames must close their read span (mirroring the
+--     success path in 'backward') and return the thunk to a re-forcible
+--     state — otherwise the blackhole mark left by the aborted force makes
+--     every later force of the thunk report a bogus infinite loop;
+--
+--   * 'RestoreCurrentParty' frames must restore the acting party (mirroring
+--     the success path in 'backward') — otherwise an exception raised inside
+--     a HENCE\/LEST body leaves 'currentParty' pointing at that body's party,
+--     and any later ledger write against the same 'EvalState' is attributed
+--     to the wrong party. (Today every 'EvalException' aborts its whole
+--     directive and 'withFreshLedger' hands the next directive a fresh
+--     'currentParty' ref, so this is defense in depth; it becomes load-
+--     bearing the moment anything catches an 'EvalException' and resumes
+--     evaluation mid-directive.)
+--
+-- The remaining frames are pure control flow. They are enumerated explicitly
+-- (no wildcard) so that adding a state-restoring 'Frame' constructor without
+-- deciding its unwind behavior is a compile-time error
+-- (@-Wincomplete-patterns@ + @-Werror@), not a silent state leak — the
+-- missing 'RestoreCurrentParty' arm was exactly such a leak.
+unwindFrame :: Frame -> Eval ()
+unwindFrame = \ case
+  EvalAsOfSystemTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderValidTime2 originalCtx        -> putTemporalContext originalCtx
+  EvalUnderRulesEffectiveAt2 originalCtx -> putTemporalContext originalCtx
+  EvalUnderRulesEncodedAt2 originalCtx   -> putTemporalContext originalCtx
+  EverBetweenFrame originalCtx _ _ _ _   -> putTemporalContext originalCtx
+  AlwaysBetweenFrame originalCtx _ _ _ _ -> putTemporalContext originalCtx
+  WhenLastFrame originalCtx _ _          -> putTemporalContext originalCtx
+  WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
+  ValueAtFrame originalCtx               -> putTemporalContext originalCtx
+  RestoreCurrentParty mOriginal          -> putCurrentParty mOriginal
+  UpdateThunk rf saved displaced         -> do
+    -- Close this force's read span exactly as the success path does (the
+    -- reads made before the abort soundly over-approximate the enclosing
+    -- span's dependencies), then undo the blackhole.
+    mine <- swapCtxReads noReads
+    noteCtxRead (saved <> mine)
+    restoreThunkOnUnwind rf displaced
+  -- pure control flow from here on: nothing to restore
+  BinOp1 {}                     -> pure ()
+  BinOp2 {}                     -> pure ()
+  Post1 {}                      -> pure ()
+  Post2 {}                      -> pure ()
+  Post3 {}                      -> pure ()
+  Record0 {}                    -> pure ()
+  Record1 {}                    -> pure ()
+  Record2 {}                    -> pure ()
+  ReadCell1 {}                  -> pure ()
+  ReadCell2 {}                  -> pure ()
+  App1 {}                       -> pure ()
+  IfThenElse1 {}                -> pure ()
+  ConsiderWhen1 {}              -> pure ()
+  PatNil0 {}                    -> pure ()
+  PatCons0 {}                   -> pure ()
+  PatCons1 {}                   -> pure ()
+  PatCons2 {}                   -> pure ()
+  PatLit0 {}                    -> pure ()
+  PatLit1 {}                    -> pure ()
+  PatLit2 {}                    -> pure ()
+  PatApp0 {}                    -> pure ()
+  PatApp1 {}                    -> pure ()
+  EqConstructor1 {}             -> pure ()
+  EqConstructor2 {}             -> pure ()
+  EqConstructor3 {}             -> pure ()
+  UnaryBuiltin0 {}              -> pure ()
+  BinBuiltin1 {}                -> pure ()
+  BinBuiltin2 {}                -> pure ()
+  TernaryBuiltin1 {}            -> pure ()
+  TernaryBuiltin2 {}            -> pure ()
+  TernaryBuiltin3 {}            -> pure ()
+  EvalAsOfSystemTime1 {}        -> pure ()
+  EvalUnderValidTime1 {}        -> pure ()
+  EvalUnderRulesEffectiveAt1 {} -> pure ()
+  EvalUnderRulesEncodedAt1 {}   -> pure ()
+  -- ContractFrame sub-frames (Contract1..11, RBinOp1/2, ResolveParty) carry
+  -- only continuation data (WHNFs/envs/refs), never saved global state; the
+  -- party set around a followup is restored by 'RestoreCurrentParty' above.
+  ContractFrame {}              -> pure ()
+  ConcatFrame {}                -> pure ()
+  AsStringFrame {}              -> pure ()
+  ToStringDate1 {}              -> pure ()
+  ToStringDate2 {}              -> pure ()
+  ToStringDate3 {}              -> pure ()
+  JsonEncodeListFrame {}        -> pure ()
+  JsonEncodeNestedFrame {}      -> pure ()
+  JsonEncodeConstructorFrame {} -> pure ()
+
+-- | Return an aborted force's thunk to a re-forcible state. If the force had
+-- displaced a stale 'WHNFWhen' cache, put the cache back: it is still
+-- fingerprint-guarded, so it can only ever be served under contexts it is
+-- valid for (and a later force under the original context then correctly
+-- serves the cached value). Otherwise just clear our blackhole mark.
+-- Mirrors the keep-theirs policy of 'updateThunkToWHNFWhen': if the thunk is
+-- no longer 'Unevaluated' (another thread completed it) or our mark is gone,
+-- keep what is there.
+restoreThunkOnUnwind :: Reference -> Maybe (CtxReads, WHNF) -> Eval ()
+restoreThunkOnUnwind rf displaced =
+  pokeThunk rf \tid -> \ case
+    thunk@(Unevaluated tids e env)
+      | tid `Set.member` tids ->
+          case displaced of
+            Just (fp, v) -> (WHNFWhen fp v e env, ())
+            Nothing      -> (Unevaluated (Set.delete tid tids) e env, ())
+      | otherwise -> (thunk, ())
+    other -> (other, ())
 
 internalException :: InternalEvalException -> Eval a
 internalException = raiseException . InternalEvalException
@@ -245,12 +450,17 @@ stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
-  traceEval Push
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   if s.size >= maximumFrameDepth
     then userException StackOverflow
-    else liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
+    else do
+      -- Emit the trace `Push` only once the frame is actually pushed. If we
+      -- recorded it before the overflow check, a StackOverflow would leave a
+      -- dangling Push (M Pushes / M+1 Pops) that later unbalances trace
+      -- post-processing and crashes it (see T7).
+      traceEval Push
+      liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
 -- | Pops a stack frame (if any are left) and calls the continuation on it.
 withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
@@ -280,6 +490,15 @@ getEntityInfo = asks (.entityInfo)
 getModuleUri :: Eval NormalizedUri
 getModuleUri = asks (.moduleUri)
 
+-- | Raw access to the temporal context — reserved for frame save\/restore
+-- plumbing and cache validation. READER CONTRACT (T6): any code that lets an
+-- axis's value influence a computed RESULT must instead go through the
+-- @readTc*@ helpers below so the observation is recorded into the current
+-- force span; a raw read that affects a result silently reintroduces the
+-- stale-thunk bug. When adding a reader for a currently-latent axis
+-- (tcValidTime etc.), add the corresponding field to 'CtxReads', an
+-- instrumented reader, and flip the @temporal-under-valid-time-latent@
+-- golden.
 getTemporalContext :: Eval TemporalContext
 getTemporalContext = do
   r <- asks (.temporalContext)
@@ -289,6 +508,142 @@ putTemporalContext :: TemporalContext -> Eval ()
 putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
+
+-- | Record that an EVENT value (identified by its store address) has been
+-- re-offered to a HENCE/LEST continuation after revealing a deadline expiry.
+-- See the Contract5 expiry NOTE in 'backwardContractFrame'.
+markReoffered :: Reference -> Eval ()
+markReoffered rf = do
+  r <- asks (.reofferedEvents)
+  liftIO (modifyIORef' r (Set.insert rf.address))
+
+-- | Has this EVENT value already been re-offered once? (see 'markReoffered')
+isReoffered :: Reference -> Eval Bool
+isReoffered rf = do
+  r <- asks (.reofferedEvents)
+  liftIO (Set.member rf.address <$> readIORef r)
+
+-----------------------------------------------------------------------------
+-- STATE-AS-LEDGER: the ledger operations as direct 'Eval' actions.
+--
+-- These used to be 'Machine' GADT constructors (TellEvent, CurrentLedger,
+-- PartyLedger, OfficialLedger, GetCurrentParty, PutCurrentParty) dispatched by
+-- 'interpMachine'. On the direct-Eval evaluator they are plain functions that
+-- read/write the two 'EvalState' IORef fields ('envLedger', 'currentParty').
+-- They live here (not in EvaluateLazy.hs) so 'runRecord'/'finishRead'/the
+-- backward frame arms can call them without an import cycle.
+-----------------------------------------------------------------------------
+
+-- | Read an IORef-typed 'EvalState' field. (origin/main has no generic
+-- readRef/writeRef helper, so we provide small local ones.)
+readEvalRef :: (EvalState -> IORef a) -> Eval a
+readEvalRef f = asks f >>= liftIO . readIORef
+
+-- | Write an IORef-typed 'EvalState' field.
+writeEvalRef :: (EvalState -> IORef a) -> a -> Eval ()
+writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
+
+-- | Append an event to the appropriate ledger (M4 routing).
+--
+-- A @RECORD@ ('RouteOwn') lands in the /current acting party's/ own ledger
+-- (keyed by 'currentParty', defaulting to 'anonymousParty' at top level). A
+-- @COMMIT@/@ATTEST@ ('RouteOfficial') lands in the shared official record.
+-- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
+tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
+tellEventRouted route ev = do
+  noteLedgerOp -- a write is a ledger op: poison the current force span (T6+ledger)
+  store <- asks (.envLedger)
+  case route of
+    RouteOfficial ->
+      liftIO (modifyIORef' store (storeAppendOfficial ev))
+    RouteOwn -> do
+      party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
+      liftIO (modifyIORef' store (storeAppendOwn party ev))
+    -- NOTIFY v1: the acting party performs the write, but the event lands in the
+    -- NAMED recipient's own ledger (keyed by 'partyKeyWHNF', the same key a
+    -- cross-party @RECALL@ reads). 'storeAppendOwn' already takes a 'Text' key —
+    -- we simply pass the recipient key instead of the acting party.
+    RouteNotify recipientKey ->
+      liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
+
+-- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
+currentLedgerEval :: Eval Ledger
+currentLedgerEval = do
+  noteLedgerOp -- a RECALL is a ledger op: poison the current force span (T6+ledger)
+  party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
+  storeOwnLedger party <$> readEvalRef (.envLedger)
+
+-- | Read a NAMED party's own ledger (M4.5 cross-party @RECALL@).
+partyLedgerEval :: Text -> Eval Ledger
+partyLedgerEval key = do
+  noteLedgerOp -- see 'currentLedgerEval'
+  storeOwnLedger key <$> readEvalRef (.envLedger)
+
+-- | Read the shared official record (M4.5 @RECALL OFFICIAL's@).
+officialLedgerEval :: Eval Ledger
+officialLedgerEval = do
+  noteLedgerOp -- see 'currentLedgerEval'
+  (.officialLedger) <$> readEvalRef (.envLedger)
+
+-- | The party whose HENCE/LEST we are currently inside (M4).
+getCurrentParty :: Eval (Maybe Text)
+getCurrentParty = readEvalRef (.currentParty)
+
+-- | Set the current acting party (M4); restored via a 'RestoreCurrentParty' frame.
+putCurrentParty :: Maybe Text -> Eval ()
+putCurrentParty = writeEvalRef (.currentParty)
+
+-- ----------------------------------------------------------------------------
+-- Per-force context-read tracking (T6).
+--
+-- Value-affecting reads of the temporal context MUST go through the readTc*
+-- helpers below so the observation lands in the current force span's
+-- accumulator (see the READER CONTRACT on 'TemporalContext').
+-- ----------------------------------------------------------------------------
+
+-- | Merge an observation into the current force span's accumulator.
+noteCtxRead :: CtxReads -> Eval ()
+noteCtxRead r = do
+  accRef <- asks (.ctxReads)
+  liftIO (modifyIORef' accRef (<> r))
+
+-- | STATE-AS-LEDGER poison bit (see 'crLedgerOps'): record that the current
+-- force span performed a ledger operation (a RECORD\/COMMIT\/ATTEST\/NOTIFY
+-- append or a RECALL read). A force so marked must never be cached as a
+-- 'WHNFWhen' — a re-force would replay the write (double-append) or re-read
+-- a ledger the fingerprint does not track — so the @UpdateThunk@ arm of
+-- 'backward' caches it as a plain 'WHNF' (snapshot at first force) instead.
+-- Rides the 'ctxReads' accumulator so it inherits the span save\/merge
+-- discipline (including exceptional unwind) for free.
+noteLedgerOp :: Eval ()
+noteLedgerOp = noteCtxRead noReads { crLedgerOps = True }
+
+-- | Install a new accumulator, returning the previous one. Used to open a
+-- fresh span at the start of a thunk force (and to reset residue at
+-- directive boundaries).
+swapCtxReads :: CtxReads -> Eval CtxReads
+swapCtxReads new = do
+  accRef <- asks (.ctxReads)
+  liftIO do
+    old <- readIORef accRef
+    writeIORef accRef $! new
+    pure old
+
+-- | Instrumented reader for 'tcSystemTime' (see READER CONTRACT).
+readTcSystemTime :: Eval UTCTime
+readTcSystemTime = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crSystemTime = ReadEq tc.tcSystemTime }
+  pure tc.tcSystemTime
+
+-- | Instrumented reader for 'tcDocumentTimezone' (see READER CONTRACT).
+-- Records the raw 'Maybe' (pre-defaulting): a read that falls back to
+-- @\"Etc\/UTC\"@ is still an observation of the axis being 'Nothing'.
+readTcDocumentTimezone :: Eval (Maybe Text)
+readTcDocumentTimezone = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crDocumentTimezone = ReadEq tc.tcDocumentTimezone }
+  pure tc.tcDocumentTimezone
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -399,9 +754,6 @@ forwardExpr env = \ case
   Modulo _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpModulo e2 env)
     continueExpr env e1
-  Exponent _ann e1 e2 -> do
-    pushFrame (BinOp1 BinOpExponent e2 env)
-    continueExpr env e1
   Leq _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpLeq e2 env)
     continueExpr env e1
@@ -510,6 +862,33 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
+  Record _ann mParty cell val isOfficial mHence -> do
+    -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
+    -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
+    -- continuation is present, forward [time, events] to it (event-free deontic
+    -- step); otherwise return the written value (M1 expression use). The 'env' is
+    -- carried so the HENCE can be forwarded in the RECORD's lexical environment.
+    --
+    -- NOTIFY v1: if a recipient qualifier is present (@RECORD q's <cell> IS v@),
+    -- evaluate the RECIPIENT first (push 'Record0', mirroring 'ReadCell2'); on its
+    -- WHNF we key it via 'partyKeyWHNF' and route the write to that recipient's
+    -- own ledger. A bare @RECORD@ (no qualifier) carries 'Nothing' and routes to
+    -- the acting party's own ledger exactly as before.
+    case mParty of
+      Just partyExpr -> do
+        pushFrame (Record0 cell val env isOfficial mHence)
+        continueExpr env partyExpr
+      Nothing -> do
+        pushFrame (Record1 val env isOfficial mHence Nothing)
+        continueExpr env cell
+  ReadCell _ann mParty isOfficial mode cell -> do
+    -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
+    -- carrying the optional party qualifier (still unevaluated), the isOfficial
+    -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
+    -- routes to the right ledger (own / cross-party / official) and reads it,
+    -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
+    pushFrame (ReadCell1 mParty isOfficial mode env)
+    continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
   Concat _ann (e : es) -> do
@@ -547,6 +926,57 @@ backward val = withPoppedFrame $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
+  Just (Record0 cell valExpr env isOfficial mHence) -> do
+    -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
+    -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
+    -- write-key matches the recipient's read-key by construction. Carry that key
+    -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
+    -- cell exactly as a bare RECORD does.
+    let recipientKey = partyKeyWHNF val
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    continueExpr env cell
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
+    -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
+    -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
+    -- route the write and forward to the continuation.
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
+    continueExpr env valExpr
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
+    -- both the cell ('cellVal') and the value ('val') are evaluated: append the
+    -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
+    -- continuation (forward [time, events] to it); without, return the value (M1).
+    runRecord cellVal val isOfficial env mHence mRecipientKey
+  Just (ReadCell1 mParty isOfficial mode env) -> do
+    -- the cell has evaluated to 'val' (a String path). Route to the right
+    -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
+    --   * isOfficial   -> read the shared OFFICIAL record.
+    --   * Just party    -> evaluate the party qualifier (push ReadCell2 holding
+    --                      the cell AND the mode), then key it and read that
+    --                      party's ledger.
+    --   * Nothing       -> read the CURRENT acting party's own ledger (M1.5).
+    if isOfficial
+      then do
+        ledger <- officialLedgerEval
+        finishRead mode val ledger
+      else case mParty of
+        Just partyExpr -> do
+          pushFrame (ReadCell2 val mode)
+          continueExpr env partyExpr
+        Nothing -> do
+          ledger <- currentLedgerEval
+          finishRead mode val ledger
+  Just (ReadCell2 cellVal mode) -> do
+    -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
+    -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
+    -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
+    let key = partyKeyWHNF val
+    ledger <- partyLedgerEval key
+    finishRead mode cellVal ledger
+  Just (RestoreCurrentParty mOriginal) -> do
+    -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
+    -- restore the enclosing acting party and pass the value on unchanged (M4).
+    putCurrentParty mOriginal
+    continueBackward val
   Just (BinBuiltin1 binOp r) -> do
     pushFrame (BinBuiltin2 binOp val)
     continueRef r
@@ -611,6 +1041,7 @@ backward val = withPoppedFrame $ \ case
   -- Evaluate thunk under overridden system time (serial number)
   Just (EvalAsOfSystemTime1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [AsOfSystemTime (serialToUTCTime serial)] originalCtx
     putTemporalContext newCtx
@@ -618,6 +1049,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderValidTime1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [UnderValidTime (Time.utctDay (serialToUTCTime serial))] originalCtx
     putTemporalContext newCtx
@@ -625,6 +1057,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderRulesEffectiveAt1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let retroDay = Time.utctDay (serialToUTCTime serial)
         newCtx = applyEvalClauses [UnderRulesEffectiveAt retroDay] originalCtx
@@ -633,6 +1066,7 @@ backward val = withPoppedFrame $ \ case
     continueRef thunkRef
   Just (EvalUnderRulesEncodedAt1 thunkRef _env) -> do
     serial <- expectNumber val
+    -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
     let newCtx = applyEvalClauses [UnderRulesEncodedAt (serialToUTCTime serial)] originalCtx
     putTemporalContext newCtx
@@ -752,7 +1186,9 @@ backward val = withPoppedFrame $ \ case
   -- Ternary builtin handling: got all 3 args
   Just (TernaryBuiltin3 fn val1 val2) -> do
     runTernaryBuiltin fn val1 val2 val
-  -- Temporal context scoping: restore original context after thunk evaluation
+  -- Temporal context scoping: restore original context after thunk evaluation.
+  -- These (and the iterator frames below) are frame plumbing — context
+  -- writers, not context observations (see T6).
   Just (EvalAsOfSystemTime2 originalCtx) -> do
     putTemporalContext originalCtx
     continueBackward val
@@ -924,8 +1360,26 @@ backward val = withPoppedFrame $ \ case
       _ ->
         -- Should not happen - field encoding should return ValString
         internalException $ RuntimeTypeError "Expected ValString from field encoding"
-  Just (UpdateThunk rf) -> do
-    updateThunkToWHNF rf val
+  Just (UpdateThunk rf saved _displaced) -> do
+    -- Close this force's read span. LIFO frame discipline guarantees any
+    -- scope/iterator frames pushed during the force were popped (restoring
+    -- the temporal context) before this frame, so 'mine' reflects exactly
+    -- this force's observations. Reads propagate to the enclosing span so a
+    -- consuming thunk inherits the dependency.
+    mine <- swapCtxReads noReads
+    noteCtxRead (saved <> mine)
+    if mine.crLedgerOps
+      -- STATE-AS-LEDGER poison (see 'noteLedgerOp'): this force performed a
+      -- ledger op, so re-forcing is NOT a deterministic replay — it would
+      -- append any RECORD again (double-write) and re-read a ledger the
+      -- temporal fingerprint does not track. Cache as a plain 'WHNF'
+      -- (snapshot at first force): the write fires exactly once and every
+      -- later use shares the first-force value — precisely the semantics a
+      -- ledger-touching thunk WITHOUT temporal reads already has here.
+      then updateThunkToWHNF rf val
+      else if hasReads mine
+        then updateThunkToWHNFWhen rf mine val
+        else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
@@ -934,6 +1388,7 @@ backwardContractFrame val = \ case
   Contract1 ScrutinizeEvents {..} -> do
     case val of
       ValCons e es -> do
+        ev'reoffered <- isReoffered e
         pushCFrame (Contract2 ScrutinizeEvent {events = es, ..})
         continueRef e
       ValNil -> continueBackward (ValObligation env party act due followup lest)
@@ -974,27 +1429,80 @@ backwardContractFrame val = \ case
       -- the current time is advances to 3 but the due is
       -- now earlier, it is  due within 2, i.e. 3 - (3 - 2)
       newDue = due' - (stamp - time')
+    -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
+    -- the deadline instant is timely; expiry requires stamp strictly greater.
+    -- The spec (doc/reference/regulative/README.md) speaks of the deadline
+    -- "passing", which at the boundary instant it has not yet done.
     if stamp > deadline
       -- NOTE: the deadline has passed. What happens depends on the deontic modal:
       -- MUST/DO: deadline passed without action = BREACH (or LEST if specified)
       -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
-      -- MAY: deadline passed without exercising permission = FULFILLED (or HENCE if specified)
-      then case act.modal of
-        DMustNot ->
-          -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
-          -- Continue with HENCE (followup), which defaults to FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
-        DMay ->
-          -- Permission was NOT EXERCISED: that's fine, continue with HENCE/FULFILLED
-          allocateValue ev'time >>= continueWithFollowup env followup events
-        _ -> -- DMust, DDo: deadline passed = failure
-          case lest of
-            Nothing -> do
-              -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
-              partyR <- either (`allocate_` env) allocateValue party
-              continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
-            Just lestFollowup -> allocateValue ev'time
-              >>= continueWithFollowup env lestFollowup events
+      -- MAY: deadline passed without exercising permission = FULFILLED (or LEST if specified)
+      --
+      -- NOTE: the event whose timestamp reveals that the deadline has passed
+      -- is only a WITNESS that time advanced; it is not consumed by the
+      -- expired obligation (CSL residuation: the obligation reduces to its
+      -- continuation, which then processes the event). So we re-offer the
+      -- revealing event to the HENCE/LEST continuation — e.g. a payment
+      -- arriving after the deadline must still be able to discharge the LEST
+      -- reparation it was authored for. The continuation's clock is anchored
+      -- at the revealing event's stamp (the README is silent on the anchor;
+      -- this is the historical behavior), so the re-offered event decrements
+      -- the continuation's WITHIN by zero.
+      --
+      -- Termination: an event is re-offered AT MOST ONCE. Peeling one
+      -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
+      -- because a continuation may recursively reference the enclosing
+      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): the
+      -- continuation re-anchors at the revealing stamp, so a non-positive
+      -- computed WITHIN makes its deadline already expired for the very same
+      -- event, and unconditional re-offering would loop forever. Hence each
+      -- re-offered event is marked (by store address, 'markReoffered'); when
+      -- a marked event reveals yet another expiry, the continuation consumes
+      -- it — the pre-re-offer behavior — instead of re-offering it again
+      -- ('ev'reoffered', computed at Contract1). Each real event thus funds
+      -- at most one extra scrutiny, and the event list strictly shrinks on
+      -- every other step, so evaluation terminates.
+      --
+      -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
+      -- directly (as the re-offer logic did before the ledger landed),
+      -- 'reofferResolve' pushes a 'ResolveParty' frame and forces the obligation
+      -- party first, so a RECORD in the followup/reparation is attributed to the
+      -- real acting party rather than the anonymous ledger. The (possibly
+      -- re-offered) event stream and anchored time are carried in the frame and
+      -- handed to 'continueWithFollowup' once the party has been keyed.
+      then do
+        let reofferResolve followup'
+              | ev'reoffered = do
+                  -- this event was already re-offered once and has now
+                  -- revealed a second expiry: consume it (see NOTE above)
+                  t <- allocateValue ev'time
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t})
+                  maybeEvaluate env party
+              | otherwise = do
+                  ev'timeR <- allocateValue ev'time
+                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+                  markReoffered evR
+                  eventsR <- allocateValue (ValCons evR events)
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR})
+                  maybeEvaluate env party
+        case act.modal of
+          DMustNot ->
+            -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
+            -- Continue with HENCE (followup), which defaults to FULFILLED
+            reofferResolve followup
+          DMay ->
+            -- Permission was NOT EXERCISED: per the README default-consequence
+            -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
+            -- HENCE fires only when the permitted action is taken.
+            reofferResolve (fromMaybe fulfilExpr lest)
+          _ -> -- DMust, DDo: deadline passed = failure
+            case lest of
+              Nothing -> do
+                -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                partyR <- either (`allocate_` env) allocateValue party
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
+              Just lestFollowup -> reofferResolve lestFollowup
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -1038,7 +1546,7 @@ backwardContractFrame val = \ case
           DMustNot -> case lest of
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> allocateValue time
-              >>= continueWithFollowup (env `Map.union` henceEnv) lestFollowup events
+              >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) lestFollowup events
             -- No LEST clause: immediate breach
             Nothing -> do
               -- Extract timestamp from time (which has been updated to event time)
@@ -1047,16 +1555,28 @@ backwardContractFrame val = \ case
               ev'partyRef <- allocateValue ev'party
               partyRef <- allocateValue party
               -- For prohibition breach, we use the action time as "deadline"
-              -- since the action should never have happened
+              -- since the action should never have happened. This sentinel
+              -- (deadline == event timestamp) is deliberate and reaches the
+              -- wire: a violated prohibition serializes with equal
+              -- "timestamp" and "deadline" fields (see the ReasonForBreach
+              -- ToJSON instance in L4.Evaluate.ValueLazyJSON). The README
+              -- matrix only mandates SHANT+action => LEST/breach and does not
+              -- prescribe the breach record's deadline field, so this does
+              -- not contradict the spec.
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
           -- MUST, MAY, DO: action done = success
           _ -> allocateValue time
-            >>= continueWithFollowup (env `Map.union` henceEnv) followup events
+            >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) followup events
       ValBool False -> do
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
+  ResolveParty ResolvePartyFrame {..} ->
+    -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
+    -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
+    -- does, so a RECORD in the followup/reparation attributes to the real party.
+    continueWithFollowup (Just (partyKeyWHNF val)) env followup events time
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -1075,10 +1595,12 @@ backwardContractFrame val = \ case
     maybeEvaluate env rexpr2
 
   RBinOp2 MkRBinOp2 {..}
-    -- if both obligations have been
-    -- breached, then we can return breached
-    | b1@(ValBreached (DeadlineMissed _ _ vt _ _ _)) <- rval1
-    , b2@(ValBreached (DeadlineMissed _ _ vt' _ _ _)) <- val
+    -- if both obligations have been breached — with ANY mix of breach kinds
+    -- (DeadlineMissed / ExplicitBreach) — then the compound is breached:
+    -- for RAND because all components must be fulfilled, for ROR because
+    -- every alternative has been definitively lost.
+    | ValBreached r1 <- rval1
+    , ValBreached r2 <- val
     -> do
       -- NOTE: depending on the operation, we return
       -- the first breach, if the operation was and,
@@ -1086,15 +1608,24 @@ backwardContractFrame val = \ case
       -- the second breach, if the operation was or,
       -- because they "missed their chance"
       -- If both happen at the same time, we return
-      -- an arbitrary one (consistently with CSL)
-      continueBackward
-        if vt <= vt'
-        then case op of
-           ValRAnd -> b1
-           ValROr -> b2
-        else case op of
-           ValROr -> b1
-           ValRAnd -> b2
+      -- an arbitrary one (consistently with CSL):
+      -- the left operand for RAND, the right for ROR.
+      -- ExplicitBreach carries no timestamp (adding one would ripple through
+      -- the constructor arity and the jl4-service wire — known limitation),
+      -- so a pair involving one is treated as simultaneous and resolved by
+      -- the same tie-break.
+      continueBackward $ ValBreached $
+        case (breachTime r1, breachTime r2) of
+          (Just vt, Just vt')
+            | vt <= vt' -> case op of
+                ValRAnd -> r1
+                ValROr -> r2
+            | otherwise -> case op of
+                ValROr -> r1
+                ValRAnd -> r2
+          _ -> case op of
+            ValRAnd -> r1
+            ValROr -> r2
 
   RBinOp2 MkRBinOp2 {..}
     | ValFulfilled <- val
@@ -1144,8 +1675,29 @@ backwardContractFrame val = \ case
 
     pushCFrame = pushFrame . ContractFrame
 
-    continueWithFollowup :: Environment -> RExpr -> Reference -> Reference -> Machine Config
-    continueWithFollowup env followup events time = do
+    -- | The time at which a breach materialized, if it carries one.
+    -- ExplicitBreach is untimestamped (see NOTE at the both-breached clause).
+    breachTime :: ReasonForBreach a -> Maybe Rational
+    breachTime (DeadlineMissed _ _ stamp _ _ _) = Just stamp
+    breachTime (ExplicitBreach _ _) = Nothing
+
+    -- M4 party-threading hinge: set the acting party for the DURATION of the
+    -- HENCE/LEST body, so a RECORD fired inside it routes to that party's own
+    -- ledger and stamps its provenance. Because the CEK machine is trampolined
+    -- (the followup is forced later by 'runConfig', not inline here), a plain
+    -- monadic bracket would restore the party BEFORE the followup runs. So we
+    -- use the SAME save/restore-FRAME idiom as 'EvalAsOfSystemTime': capture the
+    -- enclosing party, set the new one, and push 'RestoreCurrentParty' FIRST (so
+    -- it is processed LAST — after the followup and its App1 continuation have
+    -- fully evaluated). The party is rendered to a 'Text' key by 'partyKey…'; an
+    -- unevaluated/unkeyable party yields 'Nothing' (the RECORD then falls back to
+    -- the anonymous own ledger), and a nested obligation's own followup re-sets
+    -- and re-restores the party around its body.
+    continueWithFollowup :: Maybe Text -> Environment -> RExpr -> Reference -> Reference -> Machine Config
+    continueWithFollowup mParty env followup events time = do
+      mOriginal <- getCurrentParty
+      putCurrentParty mParty
+      pushFrame (RestoreCurrentParty mOriginal)
       pushFrame (App1 [time, events] Nothing)
       continueExpr env followup
 
@@ -1156,6 +1708,108 @@ backwardContractFrame val = \ case
 
 maybeEvaluate :: Environment -> MaybeEvaluated -> Machine Config
 maybeEvaluate env = either (continueExpr env) continueBackward
+
+-- | STATE-AS-LEDGER: render a forced party WHNF to the 'Text' key that names its
+-- own ledger. A 'ValString' is its own key; anything else falls back to its
+-- pretty layout. This is the SINGLE keying function used both by a RECORD write
+-- (via 'continueWithFollowup' / 'currentParty') and a cross-party RECALL read
+-- (via 'ReadCell2'), so read-key ≡ write-key by construction.
+partyKeyWHNF :: WHNF -> Text
+partyKeyWHNF = \ case
+  ValString t -> t
+  v           -> prettyLayout v
+
+-- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (typed nested schemas are deferred).
+-- We append an 'Assign' event to the ledger (D2 / Rung 3 — an APPEND, not a
+-- store) and return the written value so it can chain in a HENCE continuation.
+--
+-- M4: own ('RECORD') writes route to the acting party's own ledger, official
+-- ('COMMIT'/'ATTEST') writes route to the shared official record. The acting
+-- party is read from 'getCurrentParty' (set by 'continueWithFollowup' around the
+-- HENCE/LEST body) and recorded in the provenance @party@. A top-level
+-- @#EVAL RECORD@ has no enclosing party, so @party@ is "" and it routes to the
+-- anonymous own ledger.
+--
+-- M5: 'runRecord' fires the write EXACTLY ONCE per forward-eval of the 'Record'
+-- node — it is reached precisely when the 'Record2' frame is popped (once). It
+-- then branches on the optional HENCE continuation @mHence@:
+--
+--   * 'Nothing' (M1, expression position): 'continueBackward' the written value.
+--   * @Just hence@ (M5, deontic step): 'continueExpr' the continuation in the
+--     RECORD's lexical @env@. The 'App1 [time, events]' that the ENCLOSING
+--     'continueWithFollowup' already pushed is still on the stack, so once
+--     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
+--     @[time, events]@ — the next step scrutinizes the SAME event stream.
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey = do
+  cell <- expectString cellVal
+  -- M2 provenance enrichment: stamp the write with the directive's evaluation
+  -- time ('getEvalTime', the same clock the deontic state machine and
+  -- @EVAL AS OF SYSTEM TIME@ already use) and the real write kind in 'source'.
+  evalNow <- getEvalTime
+  mParty  <- getCurrentParty
+  let prov = MkProvenance
+        { party    = fromMaybe "" mParty
+        , source   = if isOfficial then "COMMIT"
+                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
+        , position = Just (formatUTCTimeIso evalNow)
+        }
+      -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
+      -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes
+      -- to the acting party's own ledger ('RouteOwn'); COMMIT/ATTEST stays
+      -- official. The recipient key was computed via 'partyKeyWHNF' (Record0), the
+      -- same key a cross-party RECALL reads — so write-key ≡ read-key.
+      route = if isOfficial
+              then RouteOfficial
+              else maybe RouteOwn RouteNotify mRecipientKey
+  tellEventRouted route (Assign [cell] val prov)
+  case mHence of
+    Nothing    -> continueBackward val          -- M1: terminal / expression use
+    Just hence -> continueExpr env hence        -- M5: become the deontic continuation
+
+-- | STATE-AS-LEDGER M1.5 / M4.5 (+ approach B): finish a RECALL (cell read)
+-- against a given ledger, in the requested 'RecallMode'.
+--
+-- The cell has already evaluated to a 'WHNF' that must be a 'ValString'; we
+-- lower it to a single-segment 'Path' (mirroring 'runRecord'). The @ledger@ is
+-- chosen by the caller — the current party's own ledger (M1.5, the default), a
+-- named party's own ledger (M4.5 cross-party), or the shared official record
+-- (M4.5 @official's@).
+--
+--   * 'RecallLast' (@RECALL …@): read the LATEST projection via 'readCell'
+--     (D2: a fold over the append log, last-write-wins). Result @MAYBE a@:
+--     @JUST v@ when the cell has been written there, @NOTHING@ otherwise.
+--   * 'RecallAll' (@RECALL ALL …@, approach B): fold EVERY 'Assign' to the
+--     cell into a @LIST OF a@ via 'readCellAll' (oldest->newest, append order),
+--     building it right-to-left as 'ValCons'/'ValNil'. Result @[]@ (ValNil)
+--     when the cell has never been written there — NOT @NOTHING@.
+finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
+finishRead mode cellVal ledger = do
+  cell <- expectString cellVal
+  case mode of
+    RecallLast ->
+      case readCell [cell] ledger of
+        Just storedVal -> do
+          valueRef <- allocateValue storedVal
+          continueBackward (ValConstructor TypeCheck.justRef [valueRef])
+        Nothing ->
+          continueBackward (ValConstructor TypeCheck.nothingRef [])
+    RecallAll -> do
+      -- oldest->newest list of every assignment to this cell. Build the spine
+      -- right-to-left as ValCons cells terminating in ValNil (ValueLazy list
+      -- representation): the resulting WHNF has the oldest value at the head.
+      let storedVals = readCellAll [cell] ledger
+      listVal <- foldrM
+        (\v tailWHNF -> do
+            headRef <- allocateValue v
+            tailRef <- allocateValue tailWHNF
+            pure (ValCons headRef tailRef))
+        ValNil
+        storedVals
+      continueBackward listVal
 
 matchGivens :: GivenSig Resolved -> Frame -> [Reference] -> Machine Environment
 matchGivens (MkGivenSig _ann otns) f es = do
@@ -1443,8 +2097,9 @@ jsonValueToWHNFTyped jsonValue ty = do
             Aeson.String s -> do
               case parseDatetimeText s of
                 Just utc -> do
-                  tc <- getTemporalContext
-                  let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
+                  -- instrumented read: the tz affects the result value (T6)
+                  mTzName <- readTcDocumentTimezone
+                  let tzName = fromMaybe "Etc/UTC" mTzName
                   pure $ ValDateTime utc tzName
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
@@ -1947,8 +2602,9 @@ runBuiltin es op mTy = do
       case parseDatetimeText str of
         Just utc -> do
           -- Use document timezone as default for the stored tz name
-          tc <- getTemporalContext
-          let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
+          -- (instrumented read: the tz affects the result value, T6)
+          mTzName <- readTcDocumentTimezone
+          let tzName = fromMaybe "Etc/UTC" mTzName
           dtRef <- allocateValue (ValDateTime utc tzName)
           continueBackward $ ValConstructor TypeCheck.justRef [dtRef]
         Nothing ->
@@ -1988,7 +2644,10 @@ runBuiltin es op mTy = do
         UnaryCeiling -> continueBackward $ valInt $ ceiling val
         UnaryFloor -> continueBackward $ valInt $ floor val
         UnaryPercent -> continueBackward $ ValNumber (val / 100)
-        UnarySqrt -> continueBackward $ ValNumber (toRational (sqrt valDouble))
+        UnarySqrt ->
+          if val < 0
+            then userException $ UserError "SQRT expects input greater than or equal to 0"
+            else continueBackward $ ValNumber (toRational (sqrt valDouble))
   where
     valInt :: Integer -> WHNF
     valInt = ValNumber . toRational
@@ -2062,7 +2721,11 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
   if n2 /= 0
     then continueBackward $ ValNumber (toRational $ n1 `mod` n2)
     else userException (DivisionByZero BinOpModulo)
-runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   = continueBackward $ ValNumber (toRational ((fromRational base :: Double) ** (fromRational exp_ :: Double)))
+runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   =
+  let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
+  in if isNaN result || isInfinite result
+       then userException $ UserError "TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)"
+       else continueBackward $ ValNumber (toRational result)
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k
@@ -2166,6 +2829,10 @@ applyDatePredicate predicate day = do
   pushFrame (App1 [argRef] Nothing)
   continueBackward predicate
 
+-- NOTE (T6): the getTemporalContext calls in the iterator starters below are
+-- frame plumbing (save/override), not context observations. The per-day
+-- contexts override only the currently-latent tcValidTime/tcRule* axes, so
+-- fingerprinted caches deliberately remain valid across iteration days.
 startEverBetween :: WHNF -> WHNF -> WHNF -> Machine Config
 startEverBetween startVal endVal predicate = do
   startDay <- expectDateValue startVal
@@ -2292,6 +2959,18 @@ updateThunkToWHNF :: Reference -> WHNF -> Machine ()
 updateThunkToWHNF rf v =
   updateThunk rf (WHNF v)
 
+-- | Write back a context-DEPENDENT force result (T6), tagged with the reads
+-- made during the force. The expr\/env are recovered from the blackholed
+-- thunk itself so it can be re-forced when the fingerprint no longer matches
+-- the current temporal context. If another thread\/session already completed
+-- the thunk, keep theirs: a plain 'WHNF' implies a read-free
+-- (context-independent) force, and a 'WHNFWhen' revalidates at serve time.
+updateThunkToWHNFWhen :: Reference -> CtxReads -> WHNF -> Machine ()
+updateThunkToWHNFWhen rf fp v =
+  pokeThunk rf \_tid -> \ case
+    Unevaluated _tids e env -> (WHNFWhen fp v e env, ())
+    other                   -> (other, ())
+
 -- NOTE: Once we start evaluating a thunk, we store the (Haskell) thread
 -- that does so. If we encounter a thunk with such an entry created by
 -- ourselves, we treat it as a blackhole: we tried to evaluate the thunk
@@ -2302,31 +2981,64 @@ updateThunkToWHNF rf v =
 -- well, which should be benign.
 evalRef :: Reference -> Machine Config
 evalRef rf = do
-  -- Fast path: thunk updates are monotonic (Unevaluated -> Unevaluated with
-  -- more blackhole marks, or Unevaluated -> WHNF, never back), so a thunk
-  -- observed in WHNF is final and can be returned from a plain read, without
-  -- the atomic read-modify-write and the 'myThreadId' call. Only genuinely
-  -- unevaluated thunks take the atomic path below (once each).
+  -- Fast path: plain-WHNF thunk updates are monotonic (Unevaluated ->
+  -- Unevaluated with more blackhole marks, or Unevaluated -> WHNF, never
+  -- back), so a thunk observed in WHNF is final and can be returned from a
+  -- plain read, without the atomic read-modify-write and the 'myThreadId'
+  -- call. Context-dependent caches ('WHNFWhen', T6) are validated against
+  -- the current temporal context before being served; genuinely unevaluated
+  -- (or stale) thunks take the atomic path below.
   thunk0 <- readThunk rf
   case thunk0 of
     WHNF val -> whnfConfig val
-    Unevaluated{} ->
+    WHNFWhen fp val _ _ -> do
+      -- Lock-free serve: the fingerprint and the context are both
+      -- effectively thread-local reads; a mismatch merely routes through
+      -- the atomic path. Serving records the fingerprint into the current
+      -- span, so a consuming thunk INHERITS the dependency.
+      tc <- getTemporalContext
+      if validFor tc fp
+        then noteCtxRead fp >> whnfConfig val
+        else forceIt
+    Unevaluated{} -> forceIt
+  where
+    forceIt :: Machine Config
+    forceIt = do
+      -- Read the context BEFORE the atomic poke (the poke fn must stay pure).
+      tc <- getTemporalContext
       join $ pokeThunk rf \tid -> \ case
         thunk@(WHNF val) ->
           -- Another thread finished it between our read and the atomic poke.
           (thunk, whnfConfig val)
+        thunk@(WHNFWhen fp val e env)
+          | validFor tc fp -> (thunk, noteCtxRead fp >> whnfConfig val)
+          | otherwise ->
+              -- Stale for the current temporal context: re-force under it.
+              -- The displaced cache travels on the UpdateThunk frame so an
+              -- aborted force can put it back ('restoreThunkOnUnwind').
+              (Unevaluated (Set.singleton tid) e env, beginForce (Just (fp, val)) e env)
         thunk@(Unevaluated tids e env)
           | tid `Set.member` tids ->  (thunk, userException (BlackholeForced e))
-          | otherwise -> (Unevaluated (Set.insert tid tids) e env, pushFrame (UpdateThunk rf) *> continueExpr env e)
-  where
+          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce Nothing e env)
+    beginForce :: Maybe (CtxReads, WHNF) -> Expr Resolved -> Environment -> Machine Config
+    beginForce displaced e env = do
+      -- Open a fresh read span for this force; the enclosing span's
+      -- accumulator travels on the UpdateThunk frame and is merged back
+      -- (together with this force's reads) in 'backward'.
+      saved <- swapCtxReads noReads
+      pushFrame (UpdateThunk rf saved displaced)
+      continueExpr env e
     whnfConfig :: WHNF -> Machine Config
     whnfConfig val =
       case val of
         ValNullaryBuiltinFun fn -> do
-          -- Don't cache nullary builtins (e.g. TIMEZONE, TODAY, NOW) because
-          -- their results depend on mutable state (TemporalContext) that can
-          -- change between evaluations while the thunk IORef persists in
-          -- cached import environments.
+          -- Nullary builtins (TIMEZONE, TODAY, NOW, CURRENTTIME) are stored
+          -- as function values and (re-)evaluated on every serve because
+          -- their results depend on the mutable TemporalContext. Evaluation
+          -- routes through the instrumented readTc* readers, recording the
+          -- observation into the CURRENT force span — which is exactly how
+          -- an ordinary thunk whose body mentions TODAY ends up carrying a
+          -- 'CtxReads' fingerprint (see 'UpdateThunk' / 'WHNFWhen').
           evaluated <- evalNullaryBuiltin fn
           continueBackward evaluated
         _ ->
@@ -2445,6 +3157,10 @@ evalTopDecl env (Timezone _ann expr) = do
   mTzName <- extractTimezoneString env expr
   case mTzName of
     Just tzName -> do
+      -- Persistent context WRITE, not an observation (see T6). No ambient
+      -- mirror is needed: fingerprinted caches revalidate against whatever
+      -- the context is at serve time, so thunks forced before a mid-module
+      -- TIMEZONE IS are correctly invalidated after it.
       tc <- getTemporalContext
       putTemporalContext tc { tcDocumentTimezone = Just tzName }
     Nothing ->
@@ -2480,7 +3196,47 @@ contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> 
 contractToEvalDirective contract t evs = do
   pure $ App emptyAnno TypeCheck.evalContractRef [contract, t, evListExpr]
   where
-  evListExpr = List emptyAnno $ map eventExpr evs
+  -- A trace is a SET of timestamped facts that must be processed in time order.
+  -- STABLE-sort the authored #TRACE/EVALTRACE WITH event list by AT (nondecreasing),
+  -- preserving authored order for equal timestamps. This is the single point where the
+  -- event stream is built and handed to residuation, so it uniformly governs all
+  -- RAND/ROR strands. A stable sort of an already-monotonic trace is the identity, and
+  -- we do NOT touch the deadline/blame logic: sorting makes its "earlier events already
+  -- seen" assumption hold.
+  --
+  -- We only reorder genuine literal-AT 'Event' nodes relative to one another. Entries
+  -- whose AT is not a literal at parse time (e.g. @`WAIT UNTIL` 100@, which is a runtime
+  -- @Number -> Event@ application, or an already-desugared event) carry no extractable
+  -- key and stay PINNED in their authored positions -- 'sortByStablePinned' never moves
+  -- an unkeyed element. This is why we use a comparison that only orders when both keys
+  -- are present, rather than a plain @sortOn@ (which would float unkeyed entries to one
+  -- end and scramble positional markers like WAIT UNTIL).
+  evListExpr = List emptyAnno $ map eventExpr (sortByStablePinned eventAtKey evs)
+
+-- | Sort key for an authored event: the literal AT timestamp as a 'Rational'.
+-- Non-literal or already-desugared events yield 'Nothing'.
+eventAtKey :: Expr Resolved -> Maybe Rational
+eventAtKey (Event _ann (MkEvent _ _ _ (Lit _ (NumericLit _ r)) _)) = Just r
+eventAtKey _ = Nothing
+
+-- | A stable sort by a partial key that leaves every element whose key is 'Nothing'
+-- pinned at its original index. Keyed elements ('Just') are stably sorted by their key
+-- among themselves and then poured back into the non-pinned slots in that sorted order;
+-- equal keys preserve authored order. Unkeyed elements (e.g. @`WAIT UNTIL` 100@, whose
+-- AT is not a parse-time literal) never move, so positional markers are preserved.
+-- For an all-keyed, already-monotonic list this is the identity.
+sortByStablePinned :: Ord k => (a -> Maybe k) -> [a] -> [a]
+sortByStablePinned key xs =
+  let keyed  = [ (k, x) | x <- xs, Just k <- [key x] ]
+      sorted = map snd (sortOn fst keyed)   -- stable sort of just the keyed elements
+  in  refill sorted xs
+  where
+    refill _      []       = []
+    refill sorted (x : rest) = case key x of
+      Nothing -> x : refill sorted rest                       -- pinned slot
+      Just _  -> case sorted of
+        (s : ss) -> s : refill ss rest
+        []       -> x : refill [] rest                        -- unreachable
 
 eventExpr :: Expr Resolved -> Expr Resolved
 eventExpr (Event _ann ev) = desugarEvent ev
@@ -2504,6 +3260,8 @@ evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _) = do
   -- because we do not have Assumed as an expression, and we also cannot embed values into expressions.
   updateTerm env n (WHNF (ValAssumed n))
 
+-- NOTE (T6): writes module-eval-time closures/ValAssumed/Unevaluated bodies,
+-- not force results — deliberately unfingerprinted.
 updateTerm :: Environment -> Resolved -> Thunk -> Machine ()
 updateTerm env n thunk = do
   rf <- expectTerm env n
@@ -2854,16 +3612,22 @@ builtinBinOps =
 -- Clock & parsing utilities
 ----------------------------------------------------------------------------
 
+-- NOTE (T6): all temporal-context access here goes through the instrumented
+-- readTc* readers so the observation is recorded into the current force
+-- span (see the READER CONTRACT on 'TemporalContext'). The error branches
+-- (missing TIMEZONE) throw before any thunk write-back, so their reads are
+-- moot but harmless.
 evalNullaryBuiltin :: NullaryBuiltinFun -> Machine WHNF
 evalNullaryBuiltin = \case
   NullaryTodaySerial -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> do
         mTz <- liftIO $ tryLoadTZ (Text.unpack tzName)
         case mTz of
           Just tz -> do
-            let localTime = TZ.utcToLocalTimeTZ tz tc.tcSystemTime
+            let localTime = TZ.utcToLocalTimeTZ tz sysTime
                 todayDay = localDay localTime
             pure $ ValDate todayDay
           Nothing ->
@@ -2873,24 +3637,26 @@ evalNullaryBuiltin = \case
         userException $ UserError
           "TIMEZONE is not declared. TODAY requires 'TIMEZONE IS \"<IANA timezone>\"' in your document."
   NullaryNowSerial -> do
-    tc <- getTemporalContext
-    let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
-    pure $ ValDateTime tc.tcSystemTime tzName
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    let tzName = fromMaybe "Etc/UTC" mTzName
+    pure $ ValDateTime sysTime tzName
   NullaryTimezone -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> pure $ ValString tzName
       Nothing ->
         userException $ UserError
           "TIMEZONE is not declared. Add 'TIMEZONE IS \"<IANA timezone>\"' to your document."
   NullaryCurrentTime -> do
-    tc <- getTemporalContext
-    case tc.tcDocumentTimezone of
+    sysTime <- readTcSystemTime
+    mTzName <- readTcDocumentTimezone
+    case mTzName of
       Just tzName -> do
         mTz <- liftIO $ tryLoadTZ (Text.unpack tzName)
         case mTz of
           Just tz -> do
-            let localTime = TZ.utcToLocalTimeTZ tz tc.tcSystemTime
+            let localTime = TZ.utcToLocalTimeTZ tz sysTime
                 tod = localTimeOfDay localTime
             pure $ ValTime tod
           Nothing ->
@@ -2923,7 +3689,13 @@ secondsPerDay = 86400
 
 serialToUTCTime :: Rational -> Time.UTCTime
 serialToUTCTime serial =
-  let (wholeDays, fraction) = properFraction serial :: (Integer, Rational)
+  -- `floor` (not `properFraction`/`truncate`) so the fractional part is always
+  -- in [0,1): `properFraction` truncates toward zero, which for a negative
+  -- serial yields a negative `fraction`, hence a negative DiffTime and an
+  -- invalid UTCTime. `floor` == `truncate` for all non-negative serials, so
+  -- this is behaviour-preserving on every real (all non-negative) input.
+  let wholeDays = floor serial :: Integer
+      fraction  = serial - fromInteger wholeDays
       day = Time.addDays (wholeDays + 1) l4EpochDay
       seconds :: Pico
       seconds = realToFrac (fraction * secondsPerDay)
@@ -3118,6 +3890,9 @@ extractTimezoneString env (App _ nameRef []) = do
     Just refId ->
       pokeThunk refId $ \_ thunk -> case thunk of
         WHNF (ValString s) -> (thunk, Just s)
+        -- peek only (no read recorded): matches baseline behaviour of
+        -- accepting a previously-forced cached string (see T6)
+        WHNFWhen _ (ValString s) _ _ -> (thunk, Just s)
         Unevaluated _ (Lit _ (StringLit _ s)) _ -> (thunk, Just s)
         _ -> (thunk, Nothing)
     Nothing -> pure Nothing
@@ -3158,6 +3933,13 @@ parseDatetimeText raw =
 formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
+
+-- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
+-- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
+-- only have the evaluation clock and no tz context.
+formatUTCTimeIso :: UTCTime -> Text
+formatUTCTimeIso utc =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text
@@ -3294,7 +4076,9 @@ writeJSONToReferences json env = case json of
           case Map.lookup unique env of
             Nothing -> pure ()  -- No Reference found (shouldn't happen after preAllocate)
             Just existingRef -> do
-              -- Convert JSON to WHNF and write into the existing Reference
+              -- Convert JSON to WHNF and write into the existing Reference.
+              -- NOTE (T6): deliberately a plain WHNF — externally injected
+              -- batch input is a per-run constant, not a force result.
               whnf <- jsonValueToWHNFTyped val ty
               updateThunkToWHNF existingRef whnf
   _ -> pure ()

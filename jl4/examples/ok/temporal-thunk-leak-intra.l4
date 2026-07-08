@@ -1,0 +1,55 @@
+-- T6 regression, INTRA-directive: temporal-context leakage through thunk
+-- memoization within a SINGLE #EVAL.
+--
+-- The cross-directive temporal-thunk-leak-basic/-iterators fixtures are
+-- MASKED by the per-directive heap rebuild ('forEachDirectiveFreshHeap'
+-- re-thunks top-level CAFs between directives), so they pass with or without
+-- the WHNFWhen fingerprint machinery. Here BOTH the override force and the
+-- ambient read of ONE shared binding happen inside ONE directive, over one
+-- heap: only the fingerprint-guarded re-force keeps them apart. If the T6
+-- machinery regresses to unconditional memoization, every MINUS below
+-- collapses to 0 while the cross-directive goldens stay green.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
+-- so ambient DATE_SERIAL TODAY is the serial of 2025-01-31.
+
+TIMEZONE IS "Etc/UTC"
+
+----------------------------------------------------------------------------
+-- Case 1: forced under the override first, read ambient second
+----------------------------------------------------------------------------
+
+`serial snapshot 1` MEANS DATE_SERIAL TODAY
+
+-- expected: serial(2020-01-01) MINUS serial(2025-01-31) = -1857
+-- (a T6 regression leaks the override value into the ambient read: 0)
+#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `serial snapshot 1`) MINUS `serial snapshot 1`
+
+----------------------------------------------------------------------------
+-- Case 2: forced ambiently first, read under the override second
+----------------------------------------------------------------------------
+
+`serial snapshot 2` MEANS DATE_SERIAL TODAY
+
+-- expected: serial(2025-01-31) MINUS serial(2020-01-01) = 1857
+-- (a T6 regression leaks the ambient value into the override read: 0)
+#EVAL `serial snapshot 2` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `serial snapshot 2`)
+
+----------------------------------------------------------------------------
+-- Case 3: nested overrides within one directive
+----------------------------------------------------------------------------
+
+`serial snapshot 3` MEANS DATE_SERIAL TODAY
+
+-- expected: serial(2020-01-01) MINUS serial(2010-01-01) = 3652
+-- (a T6 regression collapses this to 0 too)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`serial snapshot 3` MINUS (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2010)) `serial snapshot 3`))
+
+----------------------------------------------------------------------------
+-- Case 4 (sharing sanity): two reads under ONE context still share
+----------------------------------------------------------------------------
+
+`serial snapshot 4` MEANS DATE_SERIAL TODAY
+
+-- expected: 0 — matching contexts serve the cache; no spurious re-forcing
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`serial snapshot 4` MINUS `serial snapshot 4`)

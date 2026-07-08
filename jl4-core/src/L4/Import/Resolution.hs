@@ -345,6 +345,8 @@ combineResolvedImports uri imports =
         , TypeCheck.nlgMap = finalState.nlgMap
         , TypeCheck.scopeMap = finalState.scopeMap
         , TypeCheck.descMap = finalState.descMap
+        , TypeCheck.constBodies = finalState.constBodies
+        , TypeCheck.sectionPaths = finalState.sectionPaths
         }
     , finalEnv
     )
@@ -367,6 +369,8 @@ combineResolvedImports uri imports =
              , TypeCheck.nlgMap = IV.empty
              , TypeCheck.scopeMap = IV.empty
              , TypeCheck.descMap = IV.empty
+             , TypeCheck.constBodies = accState.constBodies
+             , TypeCheck.sectionPaths = accState.sectionPaths
              }
          , TypeCheck.MkCheckEnv
              { TypeCheck.moduleUri = accEnv.moduleUri
@@ -378,8 +382,10 @@ combineResolvedImports uri imports =
              , TypeCheck.assumeDeclarations = Map.empty
              , TypeCheck.mixfixRegistry = TypeCheck.unionMixfixRegistry accEnv.mixfixRegistry r.mixfixRegistry
              , TypeCheck.computedFields = Map.empty
+             , TypeCheck.cyclicSynonyms = mempty
              , TypeCheck.errorContext = TypeCheck.None
              , TypeCheck.sectionStack = []
+             , TypeCheck.localBindings = Set.empty
              }
          )
 

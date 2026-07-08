@@ -1,0 +1,28 @@
+-- T6 sentinel: the VALID TIME axis is LATENT — no builtin reads tcValidTime
+-- yet, so `EVAL UNDER VALID TIME` must be value-transparent and must NOT
+-- perturb thunk caching (TODAY reads tcSystemTime, not tcValidTime).
+--
+-- This golden LOCKS the latent semantics: when a tcValidTime reader ships,
+-- add a crValidTime field to CtxReads, an instrumented reader (see the
+-- READER CONTRACT on TemporalContext), and consciously flip this golden.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z;
+-- serial(2025-01-31) = 739646.
+
+TIMEZONE IS "Etc/UTC"
+
+-- expected: 5 (override transparent for context-free values)
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2000)) (2 PLUS 3)
+
+`shared today V` MEANS DATE_SERIAL TODAY
+
+-- expected: 739646 — the shared thunk is forced (and cached) while
+-- tcValidTime is overridden to 2000-01-01; TODAY correctly ignores it
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2000)) `shared today V`
+
+-- expected: 739646 — the cache remains valid at ambient (no read axis
+-- differs), so this also guards against over-invalidation
+#EVAL `shared today V`
+
+-- expected: 739646 (control)
+#EVAL DATE_SERIAL (DATE_FROM_DMY 31 1 2025)

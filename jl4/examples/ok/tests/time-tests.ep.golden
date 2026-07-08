@@ -29,13 +29,13 @@ DECIDE `noon shorthand` IS Time 12 pm
 #EVAL `the second of` `morning time`
 
 -- Time serial conversion
-#EVAL `Time to serial`
-#EVAL `Serial to time`
+#EVAL (Time 12 0 0) `Time to serial`
+#EVAL 0.5 `Serial to time`
 
 -- Time predicates
 #ASSERT `morning time` `is morning`
 #ASSERT `afternoon time` `is afternoon`
-#ASSERT `is evening`
+#ASSERT (Time 20 0 0) `is evening`
 #ASSERT `morning time` `is before noon`
 #ASSERT `afternoon time` `is after noon`
 

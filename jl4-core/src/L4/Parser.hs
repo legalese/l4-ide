@@ -457,7 +457,7 @@ topdecl =
         (Timezone  emptyAnno <$> annoHole (try timezone'))
   <|> withTypeSig (\ sig -> attachAnno $
         Declare   emptyAnno <$> annoHole (declare sig)
-    <|> Decide    emptyAnno <$> annoHole (decide sig)
+    <|> Decide    emptyAnno <$> annoHole (try (decidePatternMatch sig) <|> decide sig)
     <|> Assume    emptyAnno <$> annoHole (assume sig)
   ) <|> attachAnno
         (Directive emptyAnno <$> annoHole directive)
@@ -690,6 +690,298 @@ decide sig = do
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKMeans)
           <*> annoHole (indentedExpr current)
+
+-- ----------------------------------------------------------------------------
+-- Pattern matching in function definitions (Phase 1)
+--
+-- Haskell-style multi-clause function definitions with literal and constructor
+-- patterns on the DECIDE/MEANS left-hand side, desugared here (in the parser) to
+-- the existing CONSIDER/WHEN machinery. See
+-- specs/todo/PATTERN-MATCHING-SPEC.md, "Approach 1: Desugar to CONSIDER/WHEN".
+--
+-- Note: the anonymous wildcard @_@ from the spec is not currently accepted by
+-- the lexer; per the spec's own guidance, an ignored argument reuses its GIVEN
+-- name instead (which desugars to nothing).
+--
+-- Example:
+--
+-- > GIVEN n IS A NUMBER
+-- > GIVETH A NUMBER
+-- > DECIDE factorial 0 IS 1
+-- > DECIDE factorial n IS n * factorial (n - 1)
+--
+-- is lowered to a single 'MkDecide' whose body is:
+--
+-- > CONSIDER n
+-- > WHEN 0 THEN 1
+-- > OTHERWISE n * factorial (n - 1)
+--
+-- The clauses share a single GIVEN/GIVETH signature (as in Haskell, the type
+-- signature precedes the clauses), so an entire pattern-matching function is
+-- one 'TopDecl'.
+-- ----------------------------------------------------------------------------
+
+-- | A single parsed clause of a (potentially) multi-clause pattern-matching
+-- function. This is an internal parser artifact only; it never enters the AST.
+-- (Positional rather than record fields because this module uses
+-- @NoFieldSelectors@.)
+data PMClause = PMClause Name [Pattern Name] (Maybe (Aka Name)) (Expr Name)
+
+pmHead :: PMClause -> Name
+pmHead (PMClause h _ _ _) = h
+
+pmPats :: PMClause -> [Pattern Name]
+pmPats (PMClause _ ps _ _) = ps
+
+pmAka :: PMClause -> Maybe (Aka Name)
+pmAka (PMClause _ _ ak _) = ak
+
+pmBody :: PMClause -> Expr Name
+pmBody (PMClause _ _ _ b) = b
+
+-- | Parse a group of one-or-more DECIDE/MEANS clauses that share a head name
+-- and arity (and the enclosing GIVEN/GIVETH signature), and lower them to a
+-- single 'MkDecide'. Fails (so the caller falls back to the ordinary 'decide'
+-- parser) unless at least one clause carries a /distinguishable/ pattern (a
+-- literal, an applied constructor, a cons, or an EXACTLY expression). This keeps
+-- ordinary single-clause definitions (including mixfix and @OF@ forms), as well
+-- as type-overloaded definitions that share a name but only bind plain
+-- variables, on the existing code path.
+decidePatternMatch :: TypeSig Name -> Parser (Decide Name)
+decidePatternMatch sig = do
+  clauseCol <- Lexer.indentLevel
+  firstClause <- pmClause clauseCol
+  let firstHead  = pmHead firstClause
+      firstArity = length (pmPats firstClause)
+  rest <- many (try (withIndent EQ clauseCol (\ _ -> sameHeadClause clauseCol firstHead firstArity)))
+  let clauses = firstClause : rest
+  -- Treat this as pattern matching when either:
+  --
+  --  * at least one clause carries a clearly /distinguishable/ pattern (a
+  --    literal, an applied constructor, a cons, or an EXACTLY expression); or
+  --
+  --  * it is a genuine multi-clause group (>= 2 clauses) discriminated only by
+  --    differing nullary columns, e.g. @DECIDE f TRUE IS 1 / DECIDE f FALSE IS
+  --    0@ or an enum decision table. A bare @PatApp n []@ is ambiguous at parse
+  --    time between a variable and a nullary constructor (@TRUE@ / @EMPTY@), so
+  --    we require >= 2 clauses AND at least one column whose bare names actually
+  --    differ across the group before committing.
+  --
+  -- This is safe against mis-grouping (type-)overloaded definitions (such as the
+  -- two @`is leap year`@ overloads in daydate.l4): overloads each carry their own
+  -- GIVEN/GIVETH signature, and an intervening GIVEN makes 'sameHeadClause' fail,
+  -- so the parser never gathers overloads into a single group. Every group we see
+  -- here already shares the one signature threaded in as @sig@. A lone bare-name
+  -- clause still falls through to the ordinary 'decide' path.
+  guard (any clauseIsPatternMatching clauses || nullaryOnlyDiscriminatingGroup clauses)
+  pure (desugarPatternClauses sig firstClause rest)
+  where
+    sameHeadClause clauseCol h ar = do
+      c <- pmClause clauseCol
+      guard (rawName (pmHead c) == rawName h && length (pmPats c) == ar)
+      pure c
+    clauseIsPatternMatching c = any isDistinguishablePat (pmPats c)
+    -- A >= 2-clause group in which every argument column is a bare name and at
+    -- least one column's bare names differ across clauses (the hallmark of
+    -- discrimination by nullary constructors / booleans / enums).
+    nullaryOnlyDiscriminatingGroup cs =
+         length cs >= 2
+      && all (all isBareNullaryPat . pmPats) cs
+      && any columnDiffers (List.transpose (map pmPats cs))
+    isBareNullaryPat (PatApp _ _ []) = True
+    isBareNullaryPat _               = False
+    columnDiffers col =
+      length (List.nub [ rawName n | PatApp _ n [] <- col ]) > 1
+
+-- | Parse a single clause, in either the @DECIDE head pats IS body@ form or the
+-- @head pats MEANS body@ form. Argument patterns are parsed with
+-- 'atomicPattern', so applied constructors must be parenthesised (as in
+-- Haskell), e.g. @(JUST n)@ or @(x FOLLOWED BY xs)@.
+pmClause :: Pos -> Parser PMClause
+pmClause clauseCol =
+      pmDecideForm
+  <|> pmMeansForm
+  where
+    pmArgs = many (indented atomicPattern clauseCol)
+    pmDecideForm = do
+      _  <- spacedKeyword_ TKDecide
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKIs <|> spacedKeyword_ TKIf
+      b  <- indentedExpr clauseCol
+      pure (PMClause hd ps ak b)
+    pmMeansForm = do
+      hd <- name
+      ps <- pmArgs
+      ak <- optional aka
+      _  <- spacedKeyword_ TKMeans
+      b  <- indentedExpr clauseCol
+      pure (PMClause hd ps ak b)
+
+-- | Is this pattern /distinguishable/, i.e. clearly a pattern rather than a
+-- plain parameter name? True for literals, applied constructors (@JUST x@),
+-- cons (@x FOLLOWED BY xs@) and EXACTLY expressions. False for a bare
+-- @PatApp n []@, which at parse time (before scope-checking) is ambiguous
+-- between a variable binder and a nullary constructor such as @EMPTY@ / @TRUE@.
+-- Grouping into a pattern match is only triggered when a clause carries at
+-- least one distinguishable pattern.
+isDistinguishablePat :: Pattern Name -> Bool
+isDistinguishablePat = \ case
+  PatLit {}     -> True
+  PatCons {}    -> True
+  PatExpr {}    -> True
+  PatApp _ _ ps -> not (null ps)
+  PatVar {}     -> False
+
+-- | Extract the term (value) parameter names from a GIVEN signature, skipping
+-- type parameters (@x IS A TYPE@). These are used as the CONSIDER scrutinees.
+givenTermNames :: TypeSig Name -> [Name]
+givenTermNames (MkTypeSig _ (MkGivenSig _ otns) _) =
+  [ n | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+  where
+    notTypeParam (Just (Type _)) = False
+    notTypeParam _               = True
+
+-- | Lower a non-empty list of same-head clauses to a single 'MkDecide' whose
+-- body is a (possibly nested) CONSIDER. Clauses are tried top-to-bottom,
+-- first match wins (Haskell semantics). If no clause matches at runtime, the
+-- generated CONSIDER falls through with no OTHERWISE, which the evaluator turns
+-- into a 'NonExhaustivePatterns' error (Haskell's non-exhaustive-match error).
+desugarPatternClauses :: TypeSig Name -> PMClause -> [PMClause] -> Decide Name
+desugarPatternClauses sig firstC restCs =
+  MkDecide decideAnno sig theAppForm body
+  where
+    clauses  = firstC : restCs
+    headName = pmHead firstC
+    mAka     = listToMaybe (mapMaybe pmAka clauses)
+    arity    = length (pmPats firstC)
+    givenNs  = givenTermNames sig
+    appFormAnno = mkHoleAnnoFor headName
+    (theAppForm, scrutinees)
+      | length givenNs == arity && arity > 0 =
+          (MkAppForm appFormAnno headName [] mAka, givenNs)
+      | otherwise =
+          let synth = [ MkName emptyAnno (NormalName ("_pm_arg_" <> Text.pack (show i)))
+                      | i <- [1 .. arity] ]
+          in (MkAppForm appFormAnno headName synth mAka, synth)
+    body = matchClauses scrutinees clauses
+    decideAnno =
+      fixAnnoSrcRange (mkHoleAnnoFor sig <> mkHoleAnnoFor theAppForm <> mkHoleAnnoFor body)
+
+-- | Build a decision list from the clauses. The last clause is compiled without
+-- an OTHERWISE fallthrough so that a non-match becomes a runtime
+-- non-exhaustive-pattern error.
+--
+-- To keep the emitted tree /linear/ in (clauses x columns) rather than
+-- exponential, we never duplicate the desugaring of the remaining clauses.
+-- 'matchOne' references the fall-through in every WHEN and OTHERWISE position,
+-- so if we inlined it we would copy the whole clause tail once per
+-- distinguishable column, compounding multiplicatively. Instead, at each
+-- non-final clause boundary we bind the remaining-clauses expression to a single
+-- fresh local (a nullary @LET ... IN@) and let 'matchOne' refer to it by name.
+-- The fresh name (@__pm_fallthrough_<k>@) is hygienic: the double-underscore
+-- prefix keeps it clear of user names and GIVEN params, and @k@ (the nesting
+-- level) makes it unique per boundary.
+matchClauses :: [Name] -> [PMClause] -> Expr Name
+matchClauses scrutinees = go 0
+  where
+    go :: Int -> [PMClause] -> Expr Name
+    go _ []  = error "L4.Parser.matchClauses: empty clause list (impossible)"
+    go _ [c] = matchLast scrutinees (pmPats c) (pmBody c)
+    go k (c : cs)
+      | clauseUsesFallthrough (pmPats c) =
+          -- Bind the desugaring of the remaining clauses ONCE, then reference it
+          -- by name from every WHEN/OTHERWISE that 'matchOne' emits.
+          let ftName = fallthroughName k
+              ftExpr = go (k + 1) cs
+              tree   = matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno ftName)
+          in bindFallthrough ftName (clausesSrcAnno cs) ftExpr tree
+      | otherwise =
+          -- Every column of this clause matches unconditionally, so it always
+          -- fires and the remaining clauses are unreachable. 'matchOne' returns
+          -- the body without ever referencing the fall-through, so we neither
+          -- emit a binding nor desugar @cs@ (matching the previous behaviour).
+          matchOne scrutinees (pmPats c) (pmBody c) (Var emptyAnno (fallthroughName k))
+    -- Does compiling this clause reference the fall-through? It does iff at least
+    -- one column needs a runtime WHEN test (i.e. does not always match). This
+    -- must mirror 'matchOne' / 'patAlwaysMatchesAs'.
+    clauseUsesFallthrough pats =
+      or (zipWith (\ s p -> not (patAlwaysMatchesAs s p)) scrutinees pats)
+
+-- | A hygienic fresh name for the once-bound fall-through at nesting level @k@.
+fallthroughName :: Int -> Name
+fallthroughName k =
+  MkName emptyAnno (NormalName ("__pm_fallthrough_" <> Text.pack (show k)))
+
+-- | A synthetic source range spanning the remaining clauses' bodies. The
+-- synthesized fall-through 'MkDecide' needs a present, distinct src range because
+-- the type checker keys each function's 'FunTypeSig' by its Decide annotation's
+-- range (see 'scanFunSigDecide' / 'inferDecide'). The clause bodies carry real
+-- source ranges, and each fall-through level covers a strictly different suffix
+-- of the clause tail, so these ranges are non-empty and mutually distinct.
+-- Note: @cs@ is always non-empty here (the singleton clause list is handled by
+-- the @[c]@ case of 'matchClauses', so a fall-through is only bound when at least
+-- one further clause remains).
+clausesSrcAnno :: [PMClause] -> Anno
+clausesSrcAnno []       = emptyAnno
+clausesSrcAnno (c : cs) =
+  fixAnnoSrcRange (foldl' (\ a b -> a <> mkHoleAnnoFor (pmBody b)) (mkHoleAnnoFor (pmBody c)) cs)
+
+-- | Bind @ftExpr@ to @ftName@ via a nullary @LET ... IN@, so the fall-through is
+-- emitted exactly once and referenced by name from the CONSIDER tree. Evaluates
+-- identically to inlining @ftExpr@ at each reference (it is a pure, argument-less
+-- binding), but keeps the emitted AST linear. @ftAnno@ supplies the Decide's
+-- source range (see 'clausesSrcAnno').
+bindFallthrough :: Name -> Anno -> Expr Name -> Expr Name -> Expr Name
+bindFallthrough ftName ftAnno ftExpr body =
+  LetIn emptyAnno
+    [ LocalDecide emptyAnno
+        (MkDecide ftAnno emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
+    ]
+    body
+  where
+    emptyTypeSig = MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing
+
+-- | Compile one non-final clause: match every column against its scrutinee; on
+-- any mismatch, fall through to @ft@ (the desugaring of the remaining clauses).
+matchOne :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name -> Expr Name
+matchOne _        []       body _  = body
+matchOne (s : ss) (p : ps) body ft
+  -- A variable pattern that reuses the scrutinee's name (as the spec mandates),
+  -- or the anonymous wildcard, always matches and needs no (re)binding.
+  | patAlwaysMatchesAs s p = matchOne ss ps body ft
+  -- Everything else gets a WHEN plus an OTHERWISE fall-through. We must emit the
+  -- OTHERWISE even for a bare @PatApp n []@ because, at desugar time (pre
+  -- scope-check), we cannot tell a fresh variable (always matches) from a
+  -- nullary constructor such as @TRUE@ / @EMPTY@ / @NOTHING@ (can fail). Emitting
+  -- the fall-through is correct for both: a variable simply leaves it dead.
+  | otherwise =
+      Consider emptyAnno (App emptyAnno s [])
+        [ MkBranch emptyAnno (When emptyAnno p) (matchOne ss ps body ft)
+        , MkBranch emptyAnno (Otherwise emptyAnno) ft
+        ]
+matchOne []       (_ : _)  body _  = body -- more patterns than scrutinees: ignore extras
+
+-- | Compile the final clause without an OTHERWISE branch (so a non-match is a
+-- runtime non-exhaustive error, matching Haskell semantics).
+matchLast :: [Name] -> [Pattern Name] -> Expr Name -> Expr Name
+matchLast _        []       body = body
+matchLast (s : ss) (p : ps) body
+  | patAlwaysMatchesAs s p = matchLast ss ps body
+  | otherwise =
+      Consider emptyAnno (App emptyAnno s [])
+        [ MkBranch emptyAnno (When emptyAnno p) (matchLast ss ps body) ]
+matchLast []       (_ : _)  body = body -- more patterns than scrutinees: ignore extras
+
+-- | Does this pattern always match its scrutinee /without introducing a new
+-- binding/? True for the anonymous wildcard @_@ and for a variable pattern that
+-- reuses the scrutinee's own name (so the binding is already in scope). Named
+-- wildcards (@_foo@) and differently-named variables still bind, via a WHEN.
+patAlwaysMatchesAs :: Name -> Pattern Name -> Bool
+patAlwaysMatchesAs s (PatApp _ n []) =
+  nameToText n == "_" || rawName n == rawName s
+patAlwaysMatchesAs _ _ = False
 
 appForm :: Parser (AppForm Name)
 appForm = do
@@ -1264,7 +1556,7 @@ mixfixPostfixOp exprLineInfo = hidden $ try $ do
   notFollowedBy (sameLineExpr exprLineInfo.exprEndLine)
   let funcName = eN.payload
       op = mkSimpleEpaAnno eN
-  pure $ \l -> App (fixAnnoSrcRange $ mkHoleAnnoFor l <> op) funcName [l]
+  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
   where
     -- A parser that only succeeds if there's a base expression on the same line
     sameLineExpr line = do
@@ -1437,6 +1729,8 @@ baseExpr' =
   <|> fetchExpr
   <|> envExpr
   <|> postExpr
+  <|> recordOrCommitExpr
+  <|> recallExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -1690,6 +1984,182 @@ postExpr = do
       <*> annoHole (indentedExpr current)
       <*> annoHole (indentedExpr current)
 
+-- | @RECORD <cell> IS <expr>@ (own ledger) and
+-- @COMMIT|ATTEST <cell> IS <expr>@ (official record) — STATE-AS-LEDGER M1,
+-- with an optional trailing @HENCE <expr>@ continuation (M5).
+-- Both lower to the same 'Record' node; the keyword choice sets the
+-- @isOfficial@ flag ('False' for @RECORD@, 'True' for @COMMIT@/@ATTEST@).
+--
+-- M5: the value is parsed with 'indentedExpr current', which STOPS at the
+-- reserved @HENCE@ keyword (the deontic-followup parser relies on the same
+-- property) and may not dedent past the RECORD, so the value never swallows
+-- @HENCE k@. When a @HENCE@ follows, it is parsed into the 'Record' node's
+-- optional continuation, making the write an event-free deontic step.
+--
+-- The HENCE *continuation* is parsed at the lenient block threshold @mkPos 1@
+-- (exactly as top-level 'expr' is), NOT at @current@: in the idiomatic flat
+-- chain the chained @HENCE@ sits to the LEFT of @RECORD@ (aligned with the
+-- enclosing obligation's @HENCE@s), so anchoring to the RECORD's own column
+-- would wrongly reject it. @mkPos 1@ still halts cleanly at the next col-1 token
+-- (e.g. a following @#TRACE@ or top-level declaration).
+-- NOTE on exactprint hole-ordering: the generic ToConcreteNodes traversal
+-- (L4.Annotation) renders ONE holeFit per 'Record' constructor field, in
+-- field-declaration order — mParty, cell, val, isOfficial, mHence
+-- (Syntax.hs ~240) — and 'flattenConcreteNodes' pops one holeFit per
+-- 'AnnoHole' in this node's surface-ordered anno payload. Correct round-trip
+-- therefore REQUIRES exactly one 'annoHole' per field, emitted in
+-- field-declaration order. 'isOfficial :: Bool' renders to an empty surface
+-- (Syntax.hs ~817) but STILL consumes a holeFit slot, so it gets a placeholder
+-- 'annoHole (pure …)'. Keyword tokens (RECORD/COMMIT/ATTEST, IS) are
+-- 'AnnoCsn' and do NOT consume holeFits, so they may be interleaved freely to
+-- match the surface order. If anyone reorders the 'Record' fields in Syntax.hs,
+-- the hole order below MUST move in lockstep (the ledger ep.goldens guard this).
+recordOrCommitExpr :: Parser (Expr Name)
+recordOrCommitExpr = do
+  current <- Lexer.indentLevel
+  attachAnno $ do
+    -- mParty hole (field 1). Only RECORD takes the optional <party>'s recipient
+    -- (the symmetric WRITE to RECALL <party>'s). COMMIT/ATTEST write the OFFICIAL
+    -- record, which has no recipient: their mParty placeholder hole is forced to
+    -- 'Nothing' WITHOUT calling recordRecipient, so the Record invariant
+    -- (isOfficial ==> mParty == Nothing) stays genuinely parser-enforced,
+    -- mirroring recallOfficialKw's OFFICIAL-vs-<party>'s split.
+    (isOfficial, mParty) <-
+          ((\mp -> (False, mp)) <$> (annoLexeme (spacedKeyword_ TKRecord) *> recordRecipient))
+      <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKCommit) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
+      <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKAttest) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
+    cell  <- annoHole cellExpr                                -- cell hole (field 2)
+    _     <- annoLexeme (spacedKeyword_ TKIs)
+    val   <- annoHole (indentedExpr current)                  -- val hole (field 3)
+    _     <- annoHole (pure isOfficial)                       -- isOfficial placeholder hole (field 4)
+    mHence <- optionalWithHole (hence (mkPos 1) <|> implicitSeq current)  -- mHence hole (field 5)
+    pure (Record emptyAnno mParty cell val isOfficial mHence)
+
+-- | The optional NOTIFY-v1 /recipient/ qualifier of a @RECORD@ — the symmetric
+-- WRITE to 'recallPartyAtom'\'s cross-party READ. @RECORD q's <cell> IS <v>@
+-- writes into party @q@'s OWN ledger. We reuse the EXACT party atom ('partyAtom',
+-- a bare 'name' wrapped as a @Var@ / @App … []@ so it is name-resolved as a
+-- PARTY), with @try (… <* lookAhead genitive)@ so that — absent a following @'s@
+-- — it backtracks and the token falls through to 'cellExpr'. No new keyword.
+-- Only @RECORD@ takes this qualifier (see 'recordOrCommitExpr'); @COMMIT@/@ATTEST@
+-- write the official record, which has no recipient, so they reject a
+-- @<party>'s@ qualifier at parse time. That makes the 'Record' invariant
+-- @isOfficial ==> mParty == Nothing@ genuinely parser-enforced (mirroring
+-- 'recallOfficialKw'\'s @OFFICIAL's@-vs-@<party>'s@ split).
+-- The fallthrough (absent recipient) must STILL emit exactly one (empty)
+-- mParty hole so the unqualified RECORD slots its mParty field correctly under
+-- the generic exactprint traversal (same fix shape as 'optionalWithHole').
+recordRecipient :: AnnoParser (Maybe (Expr Name))
+recordRecipient =
+      (Just <$> (annoHole (try (partyAtom <* lookAhead genitive))
+                  <* annoLexeme genitive))
+  <|> annoHole (pure Nothing)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
+
+-- | A bare party reference (a @Var@ / @App … []@) used by the @<party>'s@
+-- qualifier of RECORD and RECALL. Built via 'attachAnno' so the name token is
+-- captured into the 'App' node's OWN anno (a hole) — WITHOUT this the App
+-- renders empty and exactprint drops the party on round-trip. The party is
+-- name-resolved exactly like any other reference.
+partyAtom :: Parser (Expr Name)
+partyAtom =
+  attachAnno $
+    (\fname -> App emptyAnno fname []) <$> annoHole name
+
+-- | @RECALL [<party>'s | OFFICIAL's] <cell>@ — STATE-AS-LEDGER M1.5 + M4.5.
+-- Reads a cell back from a ledger, yielding @MAYBE a@. The cell uses the SAME
+-- 'cellExpr' surface as RECORD/COMMIT/ATTEST (a backtick ident or a string
+-- literal), so a read and a write name a cell the same way.
+--
+-- After @RECALL@ we parse an OPTIONAL qualifier (M4.5), then the cell:
+--
+--   * @OFFICIAL's@      => @(Nothing, True)@  — read the shared OFFICIAL record.
+--   * @<party>'s@       => @(Just party, False)@ — read another party's OWN ledger.
+--     The party is a minimal name atom (NOT a full expression), wrapped as a
+--     @Var@ ('App' with no args), so it is name-resolved exactly like a PARTY.
+--   * (no qualifier)    => @(Nothing, False)@ — read the CURRENT party's own ledger.
+--
+-- Disambiguation: @OFFICIAL@ is a reserved, case-sensitive keyword (@TKOfficial@),
+-- tried first.
+-- The party branch uses @try (name <* TGenitive)@ so that, absent a following
+-- @'s@, it backtracks and the token is parsed as the cell instead (a backtick
+-- 'cellExpr' name and a backtick party 'name' otherwise overlap). 'cellExpr'
+-- being restrictive (backtick/string) keeps it from colliding with the cell.
+-- NOTE on exactprint hole-ordering: 'ReadCell' fields are mParty, isOfficial,
+-- mode, cell (Syntax.hs ~266); the generic traversal renders one holeFit per
+-- field in THAT order, so we must emit exactly one 'annoHole' per field in field
+-- order — even though the SURFACE order is @RECALL [ALL] [OFFICIAL's|q's] cell@.
+-- 'isOfficial :: Bool' and 'mode :: RecallMode' render to empty surface
+-- (Syntax.hs ~814/~817) but STILL consume a holeFit each, so they get
+-- placeholder holes. The ALL / OFFICIAL's / q's keyword tokens are 'AnnoCsn'
+-- (do NOT consume holeFits) and are emitted in their surface positions. We
+-- therefore emit the field holes in field order while keeping the ALL /
+-- OFFICIAL's / q's keyword tokens in their surface positions. The try/back-
+-- tracking of the OFFICIAL's-vs-q's-vs-none split and ALL-vs-none is preserved
+-- by 'recallModeKw' / 'recallPartyAtom' / 'recallOfficialKw'.
+recallExpr :: Parser (Expr Name)
+recallExpr =
+  attachAnno $ do
+    _    <- annoLexeme (spacedKeyword_ TKRecall)
+    -- SURFACE order is @RECALL [ALL] [OFFICIAL's|q's] cell@; FIELD order is
+    -- mParty, isOfficial, mode, cell. Keyword tokens (ALL, OFFICIAL, 's) are
+    -- 'AnnoCsn' and do NOT consume holeFits, so we emit ALL first (its surface
+    -- position) while keeping the four field holes in field order. The party-atom
+    -- 'q' is itself the mParty hole; its 's genitive is an adjacent token. The
+    -- 'OFFICIAL' keyword + 's render adjacent to the (empty) isOfficial hole.
+    mode <- recallModeKw                        -- emits the ALL keyword token (no hole)
+    -- mParty hole (field 1): the q's party atom, or empty when OFFICIAL's/none.
+    mParty <- recallPartyAtom
+    -- isOfficial hole (field 2): empty placeholder; the OFFICIAL's tokens render here.
+    isOff  <- recallOfficialKw
+    _    <- annoHole (pure mode)                -- mode placeholder hole (field 3)
+    cell <- annoHole cellExpr                   -- cell hole (field 4)
+    pure (ReadCell emptyAnno mParty isOff mode cell)
+
+-- | The optional @ALL@ collect-all marker — emits ONLY the ALL keyword token
+-- (no hole). Mode field hole is emitted in field order by 'recallExpr'.
+recallModeKw :: AnnoParser RecallMode
+recallModeKw =
+      (RecallAll <$ annoLexeme (spacedKeyword_ TKAll))
+  <|> pure RecallLast
+
+-- | The optional @q's@ party atom of a RECALL: emits the mParty field hole
+-- (field 1) holding the party atom, with the 's genitive as an adjacent token.
+-- Absent a following @'s@ it backtracks (the token falls through to the cell)
+-- and emits an empty mParty hole. OFFICIAL's is handled separately by
+-- 'recallOfficialKw', so this only matches a bare @<party>'s@.
+recallPartyAtom :: AnnoParser (Maybe (Expr Name))
+recallPartyAtom =
+      (Just <$> (annoHole (try (partyAtom <* lookAhead genitive))
+                  <* annoLexeme genitive))
+  <|> annoHole (pure Nothing)
+  where
+    genitive = spacedToken_ (TIdentifiers TGenitive)
+
+-- | The optional @OFFICIAL's@ qualifier of a RECALL: emits the isOfficial field
+-- hole (field 2, empty surface) with the OFFICIAL keyword + 's genitive rendered
+-- adjacent as tokens. Tried with backtracking; @OFFICIAL@ is a reserved keyword.
+recallOfficialKw :: AnnoParser Bool
+recallOfficialKw =
+      tryParser (annoLexeme (spacedKeyword_ TKOfficial)
+                  *> annoLexeme (spacedToken_ (TIdentifiers TGenitive))
+                  *> annoHole (pure True))
+  <|> annoHole (pure False)
+
+-- | The cell (path) of a RECORD/COMMIT/ATTEST. For M1 it is a string-keyed
+-- path, so we accept either a backtick-quoted identifier (e.g. @`x`@) or a
+-- plain string literal, lowering BOTH to a 'StringLit'. This keeps the cell
+-- out of name resolution: it is data (a key), not a variable reference.
+cellExpr :: Parser (Expr Name)
+cellExpr =
+  attachAnno (Lit emptyAnno <$> annoHole cellLit)
+
+cellLit :: Parser Lit
+cellLit =
+      attachAnno (StringLit emptyAnno <$> annoEpa (spacedToken (#_TIdentifiers % #_TQuoted) "quoted cell name"))
+  <|> stringLit
+
 negation :: Parser (Expr Name)
 negation = do
   current <- Lexer.indentLevel
@@ -1808,6 +2278,50 @@ hence current =
 lest :: Pos -> AnnoParser (Expr Name)
 lest current =
   annoLexeme (spacedKeyword_ TKLest) *> annoHole (indentedExpr current)
+
+-- | The /block/ (layout) sugar for a RECORD/COMMIT/ATTEST continuation: a second
+-- way into the 'Record' node's @mHence@ slot besides the explicit @HENCE@
+-- keyword. When the line immediately following @RECORD <cell> IS <val>@ begins
+-- EXACTLY at the RECORD's own column (@current@), that aligned same-column
+-- sibling is parsed as the continuation provision — yielding the IDENTICAL
+-- right-nested AST as if an explicit @HENCE@ had separated them:
+--
+-- @
+--   HENCE RECORD "a" IS "x"        ===   HENCE RECORD "a" IS "x"
+--         RECORD "b" IS "y"              HENCE RECORD "b" IS "y"
+--         PARTY p MUST serve            HENCE PARTY p MUST serve
+-- @
+--
+-- This is anchored ONLY on the 'Record' continuation slot (see
+-- 'recordOrCommitExpr'), reached identically whether the first RECORD arrived
+-- via @HENCE RECORD@ or @LEST RECORD@. @hence@ is tried FIRST, so the explicit
+-- flat chain and flat/block mixing are unchanged. The continuation parser body
+-- is the SAME as 'indentedExpr' EXCEPT the leading guard demands EQ-@current@
+-- (the sibling must start EXACTLY at the RECORD column) rather than GT-@current@.
+--
+-- Crucially the OPERATOR/where continuations inside the body keep the standard
+-- GT-@current@ discipline (via 'expressionCont'/'whereExpr'), so a RAND/ROR
+-- operand sitting on an aligned next line (col == @current@) does NOT attach —
+-- it dedents to @current@, not GT — which is exactly the block-boundary the spec
+-- (R4) requires. The terminal non-RECORD provision (PARTY…MUST…, BREACH BY…, a
+-- RAND/ROR expr) is parsed by the LAST sibling's value/continuation path through
+-- the SAME @current@ and the SAME operator machinery the flat HENCE chain uses,
+-- so it lowers to the identical AST.
+--
+-- 'withIndent EQ' fails WITHOUT consuming on a column mismatch (it is a peek at
+-- the indent level), so when no aligned sibling follows, the surrounding
+-- 'optionalWithHole' cleanly falls through to its @Nothing@ arm (empty
+-- continuation). A column-aligned sibling whose body is then malformed is a
+-- genuine hard parse error (acceptable — the input is malformed).
+implicitSeq :: Pos -> AnnoParser (Expr Name)
+implicitSeq current =
+  annoHole $
+    withIndent EQ current $ \ _ -> do
+      l   <- currentLine
+      e   <- mixfixChainExpr
+      efs <- many (expressionCont current)
+      mw  <- optional (whereExpr current)
+      pure ((maybe id id mw) (combine End l e efs))
 
 consider :: Parser (Expr Name)
 consider = do
@@ -2123,28 +2637,30 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
-        (annotatedA, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withDesc
+        refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, nlgS.warnings, pstate)
+        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -2208,7 +2724,7 @@ execProgramParserWithHintPass uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

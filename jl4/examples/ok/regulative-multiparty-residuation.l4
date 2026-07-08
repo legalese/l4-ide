@@ -1,0 +1,31 @@
+-- Companion to the deontic action-type-check fix: a multi-party contract with a
+-- *union* action type still residuates freely across all parties.
+--
+-- The contract has type `DEONTIC Party Action`, where `Party` is a sum of all
+-- actors and `Action` a sum of all actions. By subject reduction every residual
+-- (HENCE / LEST continuation) keeps that type, so control passes Renter ->
+-- Landlord -> Court without any narrowing. The action-type-check fix is a no-op
+-- here: every action name is a constructor of the shared `Action` type.
+--
+-- This pins the property that deepening the action-type check did NOT commit
+-- contracts to a single party/action — it only enforces an action *index* when
+-- one is actually declared (see deontic-action-type-mismatch.l4 for that case).
+
+DECLARE Party  IS ONE OF Renter, Landlord, Court
+DECLARE Action IS ONE OF payRent, evict, adjudicate
+
+GIVETH A DEONTIC Party Action
+`tenancy` MEANS
+  PARTY Renter
+  MUST payRent
+  WITHIN 30
+  HENCE FULFILLED
+  LEST PARTY Landlord
+       MUST evict
+       WITHIN 10
+       HENCE PARTY Court
+             MUST adjudicate
+             WITHIN 5
+             HENCE FULFILLED
+             LEST FULFILLED
+       LEST FULFILLED

@@ -1,3 +1,9 @@
+> **Status (audited 2026-07-03):** PARTIAL — only Stage 1 (§4 versioning + breaking-change refusal) partly landed; all stateful machinery (Stages 0, 2-8) is OPEN. Service is still a stateless replay-per-request DEONTIC calculator (`DataPlane.hs:508`, `Backend/Jl4.hs:563`).
+>
+> - Stage 1 shipped, different mechanism: interface-diff classifier `Compatibility.hs` (`detectBreakingChanges`) + deployment version `MAJOR.BREAKING.RUNNING` (`ControlPlane.hs:445,528`; `Version.hs`; persisted `Types.hs:114`). Redeploy refuses breaking changes.
+> - Stage 1 NOT as specified: no content-address `version_hash` (§4.2), no `rule_versions`/`instances` tables (§4.5), no `@on_redeploy`/migration fn.
+> - OPEN: Postgres/RDS, instances/events/webhook_deliveries schema (§8), webhooks (§7), projection & simulation endpoints (§6), deadline scheduler (§8.5), wall-clock auto-tick (§5.2), resumable-residual EVALTRACE + duration units (§3.1-3.2).
+
 # Stateful Contract Deployment for jl4-service
 
 Architecture spec for turning jl4-service from a stateless DEONTIC calculator into a stateful contract execution platform with auto-deployed projection APIs, webhooks, and live wall-clock semantics.

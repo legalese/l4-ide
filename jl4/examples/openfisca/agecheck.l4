@@ -1,0 +1,30 @@
+IMPORT prelude
+
+DECLARE Person HAS `birth year` IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+DECLARE Household HAS members IS A LIST OF Person
+
+@export Age in whole years
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`age` p period MEANS period's year MINUS p's `birth year`
+
+@export Whether the household has any child under 8
+GIVEN h      IS A Household
+      period IS A Period
+GIVETH A BOOLEAN
+`has young child` h period MEANS
+    any (GIVEN c YIELD (`age` OF c, period) LESS THAN 8) (h's members)
+
+`baby` MEANS Person WITH `birth year` IS 2020
+`teen` MEANS Person WITH `birth year` IS 2010
+`twoKids` MEANS LIST `baby`, `teen`
+`oneTeen` MEANS LIST `teen`
+`hh1`  MEANS Household WITH members IS `twoKids`
+`hh2`  MEANS Household WITH members IS `oneTeen`
+`y2026` MEANS Period WITH year IS 2026, month IS 1
+
+#ASSERT (`age` OF `baby`, `y2026`) EQUALS 6
+#ASSERT (`has young child` OF `hh1`, `y2026`) EQUALS TRUE
+#ASSERT (`has young child` OF `hh2`, `y2026`) EQUALS FALSE
