@@ -51,19 +51,19 @@ Implementation started: 2025-11-29
 
 This document tracks both specification writing and implementation progress for Issue #635.
 
-| Item | Description                            | Spec Status   | Spec File                             | Implementation Status         | Notes                                           |
-| ---- | -------------------------------------- | ------------- | ------------------------------------- | ----------------------------- | ----------------------------------------------- |
-| 1    | Conditional Decision Trace Returns     | ✅ Complete   | `CONDITIONAL-TRACE-SPEC.md`           | ✅ **Done** (commit 131dd4a0) | X-L4-Trace header and ?trace= param implemented |
-| 2    | IDE Directive Filtering                | ✅ Complete   | `DECISION-SERVICE-JSONDECODE-SPEC.md` | ✅ **Done** (commit fc320987) | JSONDECODE-based approach, all 18 tests pass    |
-| 3    | Enhanced YAML Support (nested objects) | ✅ Complete   | `DECISION-SERVICE-JSONDECODE-SPEC.md` | ✅ **Done** (commit fc320987) | Included in JSONDECODE implementation           |
-| 4    | Boolean Minimization                   | ✅ Complete   | `BOOLEAN-MINIMIZATION-SPEC.md`        | ⏳ Todo                       | Larger feature - see Issue #638                 |
-| 5    | Dynamic File Management                | ✅ Complete   | See `jl4-websessions/README.md`       | ✅ **Done** (PR #664)         | Auto-push from websessions to decision service  |
-| 6    | EXPORT API Syntax                      | ✅ Complete   | `EXPORT-SYNTAX-SPEC.md`               | ✅ **Done** (May 2025)        | All 4 phases implemented                        |
-| 7    | Import/Export Coordination             | 📋 Needs spec | -                                     | ✅ **Done** (commits 4e1c7cd1, cb05e57d) | Transitive-import export/DECLARE collection in jl4-service + jl4-lsp |
-| 8    | Performance Optimization               | ✅ Complete   | `PERFORMANCE-OPTIMIZATION-SPEC.md`    | ✅ **Done**                   | Precompiled modules cached at load time; see also issue #636 (control/data-plane split, incremental query-plan endpoint) |
-| 9    | ASSUME Parameter Requirements          | 📋 Needs spec | -                                     | ✅ **Done** (PR #893/#780)    | ASSUMEs referenced by `@export` DECIDEs promoted to required params (simpler than TYPICALLY route) |
-| 10   | TYPICALLY Defaults                     | ✅ Complete   | `TYPICALLY-DEFAULTS-SPEC.md`          | ⚠️ **Reverted**               | Initial impl had heisenbug - needs fresh start  |
-| 11   | Runtime Input State                    | ✅ Complete   | `RUNTIME-INPUT-STATE-SPEC.md`         | ⚠️ **Blocked**                | Depends on Item 10 (TYPICALLY)                  |
+| Item | Description                            | Spec Status   | Spec File                             | Implementation Status                    | Notes                                                                                                                    |
+| ---- | -------------------------------------- | ------------- | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1    | Conditional Decision Trace Returns     | ✅ Complete   | `CONDITIONAL-TRACE-SPEC.md`           | ✅ **Done** (commit 131dd4a0)            | X-L4-Trace header and ?trace= param implemented                                                                          |
+| 2    | IDE Directive Filtering                | ✅ Complete   | `DECISION-SERVICE-JSONDECODE-SPEC.md` | ✅ **Done** (commit fc320987)            | JSONDECODE-based approach, all 18 tests pass                                                                             |
+| 3    | Enhanced YAML Support (nested objects) | ✅ Complete   | `DECISION-SERVICE-JSONDECODE-SPEC.md` | ✅ **Done** (commit fc320987)            | Included in JSONDECODE implementation                                                                                    |
+| 4    | Boolean Minimization                   | ✅ Complete   | `BOOLEAN-MINIMIZATION-SPEC.md`        | ⏳ Todo                                  | Larger feature - see Issue #638                                                                                          |
+| 5    | Dynamic File Management                | ✅ Complete   | See `jl4-websessions/README.md`       | ✅ **Done** (PR #664)                    | Auto-push from websessions to decision service                                                                           |
+| 6    | EXPORT API Syntax                      | ✅ Complete   | `EXPORT-SYNTAX-SPEC.md`               | ✅ **Done** (May 2025)                   | All 4 phases implemented                                                                                                 |
+| 7    | Import/Export Coordination             | 📋 Needs spec | -                                     | ✅ **Done** (commits 4e1c7cd1, cb05e57d) | Transitive-import export/DECLARE collection in jl4-service + jl4-lsp                                                     |
+| 8    | Performance Optimization               | ✅ Complete   | `PERFORMANCE-OPTIMIZATION-SPEC.md`    | ✅ **Done**                              | Precompiled modules cached at load time; see also issue #636 (control/data-plane split, incremental query-plan endpoint) |
+| 9    | ASSUME Parameter Requirements          | 📋 Needs spec | -                                     | ✅ **Done** (PR #893/#780)               | ASSUMEs referenced by `@export` DECIDEs promoted to required params (simpler than TYPICALLY route)                       |
+| 10   | TYPICALLY Defaults                     | ✅ Complete   | `TYPICALLY-DEFAULTS-SPEC.md`          | ⚠️ **Reverted**                          | Initial impl had heisenbug - needs fresh start                                                                           |
+| 11   | Runtime Input State                    | ✅ Complete   | `RUNTIME-INPUT-STATE-SPEC.md`         | ⚠️ **Blocked**                           | Depends on Item 10 (TYPICALLY)                                                                                           |
 
 **Legend:**
 
