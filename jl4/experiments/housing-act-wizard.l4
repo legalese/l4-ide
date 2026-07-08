@@ -1,0 +1,252 @@
+IMPORT prelude
+IMPORT `housing-act-ground-8`
+IMPORT `housing-act-ground-10`
+IMPORT `housing-act-ground-11`
+
+§ `Housing Act 1988 — Schedule 2 — Citizen wizard façade (rent-arrears journey)`
+
+-- ===========================================================================
+-- CITIZEN WIZARD FAÇADE — the deployable, form-friendly entry point for the
+-- "can I be evicted for rent arrears?" journey.
+--
+-- This module re-implements NO law. It is a THIN PRESENTATION LAYER over the
+-- authoritative ground modules:
+--   * Ground 8  (Part I, MANDATORY)     — serious rent arrears  (housing-act-ground-8)
+--   * Ground 10 (Part II, DISCRETIONARY) — some rent arrears     (housing-act-ground-10)
+--   * Ground 11 (Part II, DISCRETIONARY) — persistent late payment (housing-act-ground-11)
+-- Each ground's real `Ground N made out` predicate is the single source of truth;
+-- this file only (a) ROUTES a flat, plain-English citizen input into each ground's
+-- own Claim record, and (b) PRESENTS the combined result as a citizen-friendly
+-- record carrying the mandatory-vs-discretionary distinction and statutory
+-- citations.
+--
+-- WHY A FAÇADE (rather than exposing the top-level aggregator directly): the
+-- aggregator `court possession decision` takes a deeply nested `CaseFile`
+-- (records-of-records) and returns a `DEONTIC` value — neither renders as a clean
+-- citizen form or a yes/no answer. The façade exposes ONE flat input record
+-- (`Situation`) and returns ONE flat answer record (`PossessionAssessment`), so the
+-- form auto-generates from the `Situation` schema and the answer serialises as JSON.
+-- The same single `@export` also makes this a free MCP tool later.
+--
+-- INTERPRETATION CALLS for the citizen journey (kept deliberately simple; flagged
+-- for the reviewer, in the spirit of the corpus's own interpretation notes):
+--   * Ground 10 limb (a) "some rent unpaid on the date proceedings are begun" is
+--     derived from `arrears expected at the hearing > 0` (if you are behind at the
+--     hearing, some rent was unpaid when proceedings began). Limb (b) "in arrears
+--     at service of the s.8 notice" is derived from `arrears when the notice was
+--     served > 0`.
+--   * The s.8(1)(b) notice-dispensation carve-out is assumed NOT to apply (the
+--     ordinary case: a section 8 notice was served). It is therefore not a citizen
+--     question; it is fixed FALSE in the routing below. Exposing it is a Phase-3
+--     refinement.
+-- ===========================================================================
+
+§§ `Citizen inputs — one flat record, plain-English @desc on every field`
+
+DECLARE Situation HAS
+  `how often rent is due`              IS A RentPeriod @desc `How often is your rent due?`
+  `rent amount each time`              IS A NUMBER     @desc `How much rent do you pay each time it is due (in pounds)?`
+  `arrears when the notice was served` IS A NUMBER     @desc `When your landlord served the formal Section 8 notice, how much unpaid rent had built up (in pounds)?`
+  `arrears expected at the hearing`    IS A NUMBER     @desc `By the date of the court hearing, how much unpaid rent will there be (in pounds)?`
+  `has persistently paid rent late`    IS A BOOLEAN    @desc `Have you frequently paid your rent late — even if you are now up to date?`
+
+§§ `The citizen answer — one presentation-friendly record`
+
+DECLARE PossessionAssessment HAS
+  `possession can be ordered`  IS A BOOLEAN        @desc `Is at least one rent-arrears ground for possession made out?`
+  `it is mandatory`            IS A BOOLEAN        @desc `Is a Part I (mandatory) ground made out, so the court MUST order possession?`
+  `grounds made out`           IS A LIST OF STRING @desc `Which rent-arrears grounds are made out`
+  `reasons`                    IS A LIST OF STRING @desc `Why, in plain English, with statutory citations`
+  `what this means`            IS A STRING         @desc `A one-line summary for the tenant`
+
+§§ `Routing the flat inputs into each ground's real Claim`
+
+GIVEN s IS A Situation
+GIVETH A Ground8Claim
+`ground 8 claim from` s MEANS
+  Ground8Claim WITH
+    `rent period`                                                IS s's `how often rent is due`
+    `rent for one period`                                        IS s's `rent amount each time`
+    `rent unpaid at the date of service of the section 8 notice` IS s's `arrears when the notice was served`
+    `rent unpaid at the date of the hearing`                     IS s's `arrears expected at the hearing`
+
+GIVEN s IS A Situation
+GIVETH A Ground10Claim
+`ground 10 claim from` s MEANS
+  Ground10Claim WITH
+    `some rent lawfully due is unpaid on the date proceedings for possession are begun`     IS (s's `arrears expected at the hearing` GREATER THAN 0)
+    `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`            IS FALSE
+    `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS (s's `arrears when the notice was served` GREATER THAN 0)
+
+GIVEN s IS A Situation
+GIVETH A Ground11Claim
+`ground 11 claim from` s MEANS
+  Ground11Claim WITH
+    `the tenant has persistently delayed paying rent which has become lawfully due` IS s's `has persistently paid rent late`
+
+§§ `Made-out — each ground's REAL predicate over the routed claim`
+
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`ground 8 is made out` s MEANS `Ground 8 made out` (`ground 8 claim from` s)
+
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`ground 10 is made out` s MEANS `Ground 10 made out` (`ground 10 claim from` s)
+
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`ground 11 is made out` s MEANS `Ground 11 made out` (`ground 11 claim from` s)
+
+§§ `Tier roll-ups — mandatory (Part I) vs discretionary (Part II)`
+
+-- Ground 8 is the only Part I (mandatory) ground in this journey: if it is made
+-- out the court MUST order possession.
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`a mandatory ground applies` s MEANS `ground 8 is made out` s
+
+-- Grounds 10 and 11 are Part II (discretionary): if either is made out the court
+-- MAY order possession, if it considers it reasonable.
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`a discretionary ground applies` s MEANS
+  (`ground 10 is made out` s) OR (`ground 11 is made out` s)
+
+GIVEN s IS A Situation
+GIVETH A BOOLEAN
+`possession can be ordered for arrears` s MEANS
+  (`a mandatory ground applies` s) OR (`a discretionary ground applies` s)
+
+§§ `Provenance — the grounds made out, and the plain-English reasons`
+
+-- A fixed (label, made-out) list, walked with mapMaybe to keep only the labels
+-- whose ground is made out — the same proven pattern as the aggregator's
+-- `satisfied grounds`.
+GIVEN s IS A Situation
+GIVETH A LIST OF PAIR STRING BOOLEAN
+`pleaded arrears grounds` s MEANS
+  LIST (PAIR "Ground 8 — serious rent arrears"     (`ground 8 is made out` s))
+     , (PAIR "Ground 10 — some rent arrears"       (`ground 10 is made out` s))
+     , (PAIR "Ground 11 — persistent late payment" (`ground 11 is made out` s))
+
+GIVEN s IS A Situation
+GIVETH A LIST OF STRING
+`grounds made out list` s MEANS
+  mapMaybe `label if made out` (`pleaded arrears grounds` s)
+  WHERE
+    `label if made out` pg MEANS
+      IF pg's snd THEN JUST (pg's fst) ELSE NOTHING
+
+-- The same shape, but the label is a full plain-English reason carrying the
+-- statutory citation. (Authored here, faithful to each ground's inert prose; a
+-- Phase-3 refinement could surface the inert statute text directly.)
+GIVEN s IS A Situation
+GIVETH A LIST OF PAIR STRING BOOLEAN
+`pleaded arrears reasons` s MEANS
+  LIST (PAIR "Ground 8 (Housing Act 1988, Sch. 2, Part I — mandatory): at least 13 weeks' (weekly/fortnightly) or 3 months' (monthly) rent was unpaid both when the Section 8 notice was served and at the hearing, so the court MUST order possession. (The 13-week threshold was raised from 8 by the Renters' Rights Act 2025.)"  (`ground 8 is made out` s))
+     , (PAIR "Ground 10 (Housing Act 1988, Sch. 2, Part II — discretionary): some rent lawfully due was unpaid when proceedings began and in arrears when the Section 8 notice was served, so the court MAY order possession if it considers it reasonable." (`ground 10 is made out` s))
+     , (PAIR "Ground 11 (Housing Act 1988, Sch. 2, Part II — discretionary): the tenant has persistently delayed paying rent (whether or not currently in arrears), so the court MAY order possession if it considers it reasonable." (`ground 11 is made out` s))
+
+GIVEN s IS A Situation
+GIVETH A LIST OF STRING
+`reasons list` s MEANS
+  mapMaybe `reason if made out` (`pleaded arrears reasons` s)
+  WHERE
+    `reason if made out` pg MEANS
+      IF pg's snd THEN JUST (pg's fst) ELSE NOTHING
+
+§§ `One-line summary for the tenant`
+
+GIVEN s IS A Situation
+GIVETH A STRING
+`arrears summary` s MEANS
+  IF `a mandatory ground applies` s
+  THEN "A mandatory ground (Ground 8 — serious rent arrears) is made out, so the court must order possession."
+  ELSE IF `a discretionary ground applies` s
+       THEN "A discretionary rent-arrears ground is made out. The court may order possession if it considers it reasonable to do so."
+       ELSE "On the information given, no rent-arrears ground for possession is made out."
+
+§§ `The exported entry point — what the wizard form and the MCP tool call`
+
+@export default Assess whether a tenant can be evicted for rent arrears under the Housing Act 1988 (Grounds 8, 10 and 11), distinguishing the mandatory ground (the court must order possession) from the discretionary grounds (the court may).
+GIVEN situation IS A Situation @desc The tenant's rent and payment situation
+GIVETH A PossessionAssessment
+DECIDE `assess possession for rent arrears` IS
+  PossessionAssessment WITH
+    `possession can be ordered`  IS `possession can be ordered for arrears` situation
+    `it is mandatory`            IS `a mandatory ground applies` situation
+    `grounds made out`           IS `grounds made out list` situation
+    `reasons`                    IS `reasons list` situation
+    `what this means`            IS `arrears summary` situation
+
+§ `Tests`
+
+§§ `Fixtures — four representative tenant situations`
+
+-- CASE 1 — serious arrears: weekly rent 100, 13 weeks' (1300) unpaid at notice and
+-- 14 weeks' (1400) at the hearing. Ground 8 (mandatory) made out; Ground 10 also
+-- made out (some arrears at both dates). NOT persistently late.
+`situation — serious arrears (mandatory)` MEANS Situation WITH
+  `how often rent is due`              IS `weekly or fortnightly`
+  `rent amount each time`              IS 100
+  `arrears when the notice was served` IS 1300
+  `arrears expected at the hearing`    IS 1400
+  `has persistently paid rent late`    IS FALSE
+
+-- CASE 2 — some arrears only: weekly rent 100, 3 weeks' (300) at notice, 5 weeks'
+-- (500) at the hearing — below Ground 8's 13-week threshold, so NOT mandatory; but
+-- Ground 10 (discretionary) is made out (some arrears at both dates).
+`situation — some arrears only (discretionary)` MEANS Situation WITH
+  `how often rent is due`              IS `weekly or fortnightly`
+  `rent amount each time`              IS 100
+  `arrears when the notice was served` IS 300
+  `arrears expected at the hearing`    IS 500
+  `has persistently paid rent late`    IS FALSE
+
+-- CASE 3 — persistently late but caught up: no arrears at either date, but the
+-- tenant has persistently paid late. Only Ground 11 (discretionary) is made out.
+`situation — persistently late, caught up` MEANS Situation WITH
+  `how often rent is due`              IS `weekly or fortnightly`
+  `rent amount each time`              IS 100
+  `arrears when the notice was served` IS 0
+  `arrears expected at the hearing`    IS 0
+  `has persistently paid rent late`    IS TRUE
+
+-- CASE 4 — all clear: no arrears, never late. No ground made out.
+`situation — all clear` MEANS Situation WITH
+  `how often rent is due`              IS `weekly or fortnightly`
+  `rent amount each time`              IS 100
+  `arrears when the notice was served` IS 0
+  `arrears expected at the hearing`    IS 0
+  `has persistently paid rent late`    IS FALSE
+
+§§ `#ASSERT — the tier roll-ups behave`
+
+#ASSERT     `a mandatory ground applies`           `situation — serious arrears (mandatory)`
+#ASSERT     `a discretionary ground applies`       `situation — serious arrears (mandatory)`
+
+#ASSERT NOT `a mandatory ground applies`           `situation — some arrears only (discretionary)`
+#ASSERT     `a discretionary ground applies`       `situation — some arrears only (discretionary)`
+
+#ASSERT NOT `a mandatory ground applies`           `situation — persistently late, caught up`
+#ASSERT     `a discretionary ground applies`       `situation — persistently late, caught up`
+
+#ASSERT NOT `possession can be ordered for arrears` `situation — all clear`
+
+§§ `#ASSERT — the grounds-made-out provenance list`
+
+#ASSERT (`grounds made out list` `situation — serious arrears (mandatory)`) EQUALS (LIST "Ground 8 — serious rent arrears", "Ground 10 — some rent arrears")
+
+#ASSERT (`grounds made out list` `situation — some arrears only (discretionary)`) EQUALS (LIST "Ground 10 — some rent arrears")
+
+#ASSERT (`grounds made out list` `situation — persistently late, caught up`) EQUALS (LIST "Ground 11 — persistent late payment")
+
+#ASSERT (`grounds made out list` `situation — all clear`) EQUALS EMPTY
+
+§§ `#EVAL — the full assessment record for each situation (visual check / schema sample)`
+
+#EVAL `assess possession for rent arrears` `situation — serious arrears (mandatory)`
+#EVAL `assess possession for rent arrears` `situation — some arrears only (discretionary)`
+#EVAL `assess possession for rent arrears` `situation — persistently late, caught up`
+#EVAL `assess possession for rent arrears` `situation — all clear`
