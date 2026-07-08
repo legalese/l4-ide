@@ -10,7 +10,7 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Data.List (isInfixOf)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -26,7 +26,7 @@ import System.Directory
   , removeFile
   , removePathForcibly
   )
-import System.Environment (lookupEnv)
+import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
 import System.IO (hClose, hSetBinaryMode)
@@ -105,11 +105,21 @@ data Output = Output
 -- is the @hGetContents: cannot decode byte sequence starting from 194@
 -- failure we saw on the first Windows build.
 runL4 :: FilePath -> [String] -> IO Output
-runL4 bin args = do
+runL4 = runL4WithEnv Nothing
+
+-- | Like 'runL4', but run the child process with an explicit environment.
+--
+-- @Nothing@ inherits the parent environment (the default). @Just env@ replaces
+-- it wholesale, which lets a test force a particular library-resolution regime
+-- (e.g. dropping @JL4_LIBRARY_PATH@ to exercise the embedded-library fallback)
+-- regardless of what CI happens to export into the parent process.
+runL4WithEnv :: Maybe [(String, String)] -> FilePath -> [String] -> IO Output
+runL4WithEnv mEnv bin args = do
   let cp = (proc bin args)
         { std_in  = CreatePipe
         , std_out = CreatePipe
         , std_err = CreatePipe
+        , env     = mEnv
         }
   (Just hin, Just hout, Just herr, ph) <- createProcess cp
   hClose hin
@@ -123,6 +133,26 @@ runL4 bin args = do
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Run l4 with library resolution forced onto the embedded-library fallback.
+--
+-- We drop @JL4_LIBRARY_PATH@ (so 'resolveLibraryFromFilesystem' reports
+-- @hasExplicitPath = False@ and the resolver is *allowed* to fall back to the
+-- built-in embedded libraries) and point @XDG_DATA_HOME@ at a fresh empty
+-- directory (so no user-level @~/.local/share/jl4/libraries@ store on the
+-- runner masks the embedded path). This is the exact regime issue #906 is
+-- about — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
+runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
+runL4EmbeddedOnly bin args = do
+  parentEnv <- getEnvironment
+  tmp <- getTemporaryDirectory
+  let emptyXdg = tmp </> "l4-embedded-only-xdg"
+  createDirectoryIfMissing True emptyXdg
+  let childEnv =
+        ("XDG_DATA_HOME", emptyXdg)
+          : filter (\(k, _) -> k /= "JL4_LIBRARY_PATH" && k /= "XDG_DATA_HOME")
+                   parentEnv
+  runL4WithEnv (Just childEnv) bin args
 
 -- | Assert the CLI exited 0 with a given substring on stdout.
 expectOk :: FilePath -> [String] -> String -> IO ()
@@ -238,6 +268,11 @@ cycle2Entry      = fixtureDir </> "cycle2"     </> "dua.l4"
 selfImportEntry  = fixtureDir </> "selfimport" </> "solo.l4"
 cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 
+-- Diamond over the embedded-library fallback (issue #906): main imports two
+-- embedded siblings that share the embedded 'daydate' bottom.
+embeddedDiamondEntry :: FilePath
+embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -252,7 +287,8 @@ main = do
        , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
        , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
-       , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry ] \fp -> do
+       , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
+       , embeddedDiamondEntry ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -557,6 +593,32 @@ spec bin = do
       -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
       -- rule must NOT over-fire on a legitimate clean import.
       expectOk bin ["check", cleanImportEntry] "Check succeeded."
+
+  -- Regression test for smucclaw/l4-ide#906: a diamond import over the
+  -- embedded-library fallback used to starve the second sibling of the shared
+  -- bottom's environment. `main.l4` imports two embedded siblings
+  -- (actus-daycount, actus-schedule) that both IMPORT the embedded `daydate`;
+  -- `actus-schedule` uses `Days in month`, defined in `daydate`. Run under the
+  -- embedded-only regime (no JL4_LIBRARY_PATH, empty XDG) so the whole closure
+  -- is served by the LSP/Shake embedded fallback — exactly the path CI's
+  -- JL4_LIBRARY_PATH normally hides. Before the fix this exited non-zero with
+  -- "I could not find a definition for the identifier `Days in month`".
+  describe "l4 embedded-library diamond imports (#906)" $ do
+    it "threads a transitive re-export into both diamond siblings" $ do
+      Output code sout serr <- runL4EmbeddedOnly bin ["check", embeddedDiamondEntry]
+      let combined = sout ++ "\n" ++ serr
+      -- The starvation surfaces as an out-of-scope error on daydate's exports.
+      when ("could not find a definition" `isInfixOf` combined) $
+        expectationFailure $
+          "Diamond sibling was starved of the embedded `daydate` environment:\n"
+          ++ "--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded-fallback diamond to check clean, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $
