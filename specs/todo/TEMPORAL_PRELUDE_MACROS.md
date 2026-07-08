@@ -1,5 +1,7 @@
 > **Status (audited 2026-07-03):** PARTIAL / SUPERSEDED — the interval primitives shipped as builtins, but this spec's macro module and monad plan were abandoned.
 >
+> **See [`TEMPORAL-RULE-VERSION-DESIGN.md`](TEMPORAL-RULE-VERSION-DESIGN.md) (2026-07-08)** for the current direction. The `MonadTemporal` layer and `temporal-prelude.l4` mixfix macros here were never adopted; `temporal-prelude.l4` was deleted, not refactored. Rule versioning is now expressed as ordinary L4 dispatching on the `RULES EFFECTIVE DATE` builtin, with `@effective`/`@repealed` decorators as the eventual authoring surface (not a prelude macro module).
+>
 > - Shipped: `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST/NEXT`, `VALUE AT` as runtime builtins (`Environment.hs:71-75`); date arithmetic via `DATE_SERIAL`/`DATE_FROM_SERIAL`. Demonstrated in `jl4/examples/ok/temporal-acceptance.l4`.
 > - Not shipped: no `temporal-prelude.l4`; no `within…days after…ever` / `strictly after…ever` / `retroactive to…evaluate` combinators; no `MonadTemporal`/`withinDaysAfter`/`lookupEncoding` bindings. The "desugar to a temporal monad" architecture was dropped in favour of direct builtins; there is no `docs/L4_TEMPORAL_MONAD_SPEC.md`.
 

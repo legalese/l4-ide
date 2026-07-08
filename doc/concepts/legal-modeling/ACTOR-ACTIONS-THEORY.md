@@ -1,7 +1,7 @@
 # Actors, Actions, and Agency in L4 — Theory & Bibliography
 
 A research-facing companion to the implementation spec
-([DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md](../../../specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)).
+([DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md](../../../specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)).
 It records the theoretical threads that surfaced while building value-level
 actor agreement, so a paper can be extracted later. Citations are collected as
 BibTeX in [`actor-actions.bib`](actor-actions.bib); keys are given inline as
