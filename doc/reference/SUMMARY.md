@@ -17,6 +17,11 @@
 - [Regulative](regulative/README.md)
 - [Built-ins](builtins/README.md)
 
+## Query Planning
+
+- [Query Planning](query-planning/README.md)
+- [Binary Decision Diagrams (ROBDD)](query-planning/robdd.md)
+
 ## Libraries
 
 - [Libraries Overview](libraries/README.md)
