@@ -449,11 +449,6 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       parensIfNeeded e1 <+> "DIVIDED BY" <+> parensIfNeeded e2
     Modulo     _ e1 e2 ->
       parensIfNeeded e1 <+> "MODULO" <+> parensIfNeeded e2
-    -- Power has no infix surface syntax; it is the prefix builtin
-    -- `EXPONENT base exp` (`^` is copy/ditto, not power). Printing the old
-    -- `<e1> TO THE POWER OF <e2>` produced unparseable output.
-    Exponent   _ e1 e2 ->
-      "EXPONENT" <+> parensIfNeeded e1 <+> parensIfNeeded e2
     Cons       _ e1 e2 ->
       parensIfNeeded e1 <+> "FOLLOWED BY" <+> parensIfNeeded e2
     Leq        _ e1 e2 ->

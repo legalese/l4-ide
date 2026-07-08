@@ -1,6 +1,6 @@
 # Specification: State as an Event-Sourced Ledger
 
-**Status:** 🎨 Design exploration / pre-implementation (June 2026)
+> Status: DONE (core M0–M5) — RECORD/COMMIT/ATTEST/RECALL, per-party + official ledgers, and deontic sequencing shipped via PR #31 (merged 2026-07-07). Deferred refinements: R2 typed EnvironmentState schema (flat-ledger soundness gap, documented, not a crash risk); M4.5(b) local-write quarantine (blocked on the Reader-local mechanism in IMPLICIT-PROPS-DESIGN.md); typed party keys.
 **Audience:** A Claude Code agent (or human contributor) who will turn this into a frozen spec and an implementation plan.
 **Companion docs:**
 
