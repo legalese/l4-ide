@@ -31,13 +31,24 @@ DECIDE exprItems IS
 #EVAL exprItems                   -- LIST 3, 12  (each item is a full expression)
 
 -- '•' children nest under `item` to arbitrary depth — no LIST, no parens.
--- (Grandchildren indent past the parent item's text, which the "• " prefix
--- shifts to the right.)
+-- A child '•' lines up directly under its parent's `item` (the "• " marker
+-- sits two columns to the left of it); any deeper indent works too.
 `nested` MEANS
+  item "Parent"
+    • item "a"
+    • item "Sub"
+      • item "b"
+      • item "c"
+    • item "d"
+#EVAL `render outline` `body scheme` `nested`       -- Parent / a / b Sub / b.i b / b.ii c / c d
+
+-- Grandchildren may also indent further past the parent's text; both styles
+-- coexist because '•' arguments are admitted at any column >= the parent's.
+`deeperNested` MEANS
   item "Parent"
     • item "a"
     • item "Sub"
         • item "b"
         • item "c"
     • item "d"
-#EVAL `render outline` `body scheme` `nested`       -- Parent / a / b Sub / b.i b / b.ii c / c d
+#EVAL `render outline` `body scheme` `deeperNested` -- Parent / a / b Sub / b.i b / b.ii c / c d

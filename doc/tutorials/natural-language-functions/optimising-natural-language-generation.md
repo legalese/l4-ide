@@ -269,9 +269,9 @@ IMPORT hierarchy
     • item "the Company is engaged in the business of software development;"
     • item "the Consultant has expertise in legal engineering; and"
     • item "the parties wish to record the terms of their engagement, namely"
-        • item "the scope of services;"
-        • item "the fees payable; and"
-        • item "the term and termination."
+      • item "the scope of services;"
+      • item "the fees payable; and"
+      • item "the term and termination."
 
 #EVAL `render outline` `recital scheme` `recitals`
 ```
@@ -320,6 +320,18 @@ position**. That is what lets bullet children nest under a constructor with no
 constructor), to any depth. The element itself is any expression, so every
 outline constructor — `item`, `labeled`, `numbered`, `restartAt` — works per
 line.
+
+**Indentation.** A child bullet lines up directly under its parent's content —
+the `item` word, which the `• ` marker sits two columns to the left of:
+
+```l4
+item "Parent"
+  • item "Sub"
+    • item "child"     -- the child '•' sits under the parent's `item`
+```
+
+Any deeper indent works too; under the parent's text is the natural choice (and
+matches how a sub-list reads in Markdown).
 
 (Yes, `•` is awkward to type; bind it to a snippet or keyboard shortcut in your
 editor. The unambiguity is worth it.)

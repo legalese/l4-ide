@@ -84,7 +84,8 @@ xs IS                 -- a plain list
 item "Parent"         -- bullet children nest under a constructor, no LIST/parens
   • item "a"
   • item "Sub"
-      • item "b"      -- to arbitrary depth
+    • item "b"        -- child '•' lines up under the parent's `item`; any
+    • item "c"        --   deeper indent works too, to arbitrary depth
 ```
 
 ---

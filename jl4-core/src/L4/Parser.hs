@@ -365,6 +365,18 @@ indented parser pos =
 indented' :: AnnoParser b -> Pos -> AnnoParser b
 indented' parser pos = wrapAnnoParser $ indented (unwrapAnnoParser parser) pos
 
+-- | Like 'indented', but admits the parser at a column greater than OR EQUAL to
+-- @pos@. Used only for a @•@ bullet block in argument position, so a child
+-- bullet can line up directly under the parent's head word (e.g. the @item@ of
+-- @• item "Sub"@) — which the "• " marker shifts two columns right of the
+-- bullet — rather than being forced strictly past it.
+indentedGE :: Parser b -> Pos -> Parser b
+indentedGE parser pos = do
+  actual <- Lexer.indentLevel
+  if actual >= pos
+    then parser
+    else fancyFailure . Set.singleton $ ErrorIndentation GT pos actual
+
 module' :: NormalizedUri -> Parser (Module Name)
 module' uri = do
   attachAnno $
@@ -1974,8 +1986,11 @@ parseAppArgs current fname = go True
     parseOne allowBreak = do
       when allowBreak $ guardMixfixKeyword funcLine
       -- '•' is collision-free, so a '•' bullet block may be a function
-      -- argument (feeding e.g. an arity-overloaded list constructor).
-      indented (try bulletBlock <|> atomicExpr') current
+      -- argument (feeding e.g. an arity-overloaded list constructor). It is
+      -- admitted at >= the function column (indentedGE) so a child bullet can
+      -- align under the parent's head word; ordinary arguments keep the strict
+      -- '> column' rule.
+      try (indentedGE bulletBlock current) <|> indented atomicExpr' current
 
 guardMixfixKeyword :: Maybe Int -> Parser ()
 guardMixfixKeyword Nothing = pure ()

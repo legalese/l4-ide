@@ -11,3 +11,5 @@ bullet-list-dot.l4:31:1-16:
   LIST 3, 12
 bullet-list-dot.l4:43:1-46:
   LIST "Parent", "a	a", "b	Sub", "b.i	b", "b.ii	c", "c	d"
+bullet-list-dot.l4:54:1-52:
+  LIST "Parent", "a	a", "b	Sub", "b.i	b", "b.ii	c", "c	d"
