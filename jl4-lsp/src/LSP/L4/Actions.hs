@@ -225,15 +225,6 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
             , Ladder.prettyPrintVizError vizError
             ]
   where
-    {- | Make a new VizConfig by combining (i) old config (e.g. whether to simplify) from the RecentlyVisualized (which itself contains a VizConfig)
-    with (ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes) -}
-    updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
-    updateVizConfig verTxtDocId tcRes recentlyVisualised =
-      Ladder.getVizConfig recentlyVisualised.vizState
-        & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
-        & set #moduleUri (toNormalizedUri verTxtDocId._uri)
-        & set #substitution tcRes.substitution
-
     -- TODO: in the future we want to be a bit more clever wrt. which
     -- DECIDE/MEANS we snap to. We can use the type of the 'Decide' here
     -- (by requiring extra = Just ty) or the name of the 'Decide' by the means
@@ -247,6 +238,24 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
         -- only succeed if there's exactly one match
 
       pure decide
+
+{- | Make a new 'Ladder.VizConfig' by combining (i) old config (e.g. whether to
+simplify) from the 'RecentlyVisualised' (which itself contains a VizConfig) with
+(ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes).
+
+Crucially this refreshes @module'@ from the current typecheck result too. @module'@
+is what 'Ladder.collectDefsForInlining' reads to decide @canInline@ (the +/unfold
+affordance); if it stayed frozen at the snapshot taken by the last *manual* Visualize,
+auto-refresh would recompute the ladder structure but keep a stale @canInline@ — so a
+newly-added DECIDE would not surface its inline affordance until a manual re-visualize.
+See smucclaw/l4-ide#557. -}
+updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
+updateVizConfig verTxtDocId tcRes recentlyVisualised =
+  Ladder.getVizConfig recentlyVisualised.vizState
+    & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
+    & set #moduleUri (toNormalizedUri verTxtDocId._uri)
+    & set #substitution tcRes.substitution
+    & set #module' tcRes.module'
 
 -- | the 'Monoid' 'Maybe' that returns the only occurrence of 'Just'
 newtype One a = One {getOne :: Maybe a}
