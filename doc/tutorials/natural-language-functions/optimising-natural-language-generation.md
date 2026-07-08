@@ -276,8 +276,8 @@ IMPORT hierarchy
 #EVAL `render outline` `recital scheme` `recitals`
 ```
 
-renders the heading verbatim and numbers the rest by depth — `(A)`, `(B)`,
-`(C)`, then `(C)(1)`, `(C)(2)`, …:
+renders the heading verbatim and numbers the rest by depth — `A`, `B`,
+`C`, then `C.1`, `C.2`, …:
 
 ```
 RECITALS
@@ -302,8 +302,10 @@ around them.
 
 ### Bullet lists
 
-A `•` at the start of a line opens a list element; an aligned block desugars to
-an ordinary `LIST`:
+A `•` followed by a space and a same-line body opens a list element; a block
+of `•` items aligned at a common column desugars to an ordinary `LIST`
+(conventionally written at the start of a line, though that's a style
+convention, not an enforced rule):
 
 ```l4
 DECIDE xs IS

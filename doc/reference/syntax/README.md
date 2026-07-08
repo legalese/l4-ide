@@ -70,10 +70,12 @@ LIST                  -- vertical block (layout replaces the commas)
   3
 ```
 
-**Bullet lists.** A `•` at the offside (start) of a line — followed by a space
-and a same-line body — opens a list element; an aligned block desugars to the
-same list. `•` was chosen because, unlike `-` (which is subtraction), it has no
-arithmetic meaning, so it is unambiguous even in **argument position**:
+**Bullet lists.** A `•` followed by a space and a same-line body opens a list
+element; a block of `•` items aligned at a common column desugars to the same
+list (conventionally written at the start of a line, though that's a style
+convention, not an enforced rule). `•` was chosen because, unlike `-` (which
+is subtraction), it has no arithmetic meaning, so it is unambiguous even in
+**argument position**:
 
 ```l4
 xs IS                 -- a plain list

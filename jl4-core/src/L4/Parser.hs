@@ -375,7 +375,12 @@ indentedGE parser pos = do
   actual <- Lexer.indentLevel
   if actual >= pos
     then parser
-    else fancyFailure . Set.singleton $ ErrorIndentation GT pos actual
+    else
+      -- Megaparsec's 'ErrorIndentation' only has LT/EQ/GT variants, so a
+      -- failed >= check is reported as "greater than" — imprecise (it should
+      -- say "greater than or equal to"), but the failing case (actual < pos)
+      -- is identical for both orderings, so the reported column is correct.
+      fancyFailure . Set.singleton $ ErrorIndentation GT pos actual
 
 module' :: NormalizedUri -> Parser (Module Name)
 module' uri = do
@@ -1860,16 +1865,6 @@ listItemThreshold tk = do
              then keywordCol
              else mkPos (max 1 (unPos firstItemCol - 1))
 
--- | Lookahead guard: are we positioned at an offside @-@ bullet marker?
--- A bullet is a @-@ ('TMinus') followed by at least one space and then a
--- body token on the SAME line. Consumes nothing.
---
--- This never collides with existing syntax: line comments lex as comment
--- tokens (never 'TMinus'); a negative literal @-5@ fuses into a single
--- @TIntLit@ in the lexer; binary subtraction @a - b@ is parsed as an
--- operator continuation /after/ a left operand, never at the head of an
--- expression; and a bare head @-@ is otherwise a parse error, so bullets
--- claim unused territory.
 -- | The bullet marker. @•@ (U+2022) has no arithmetic meaning, so it is
 -- unambiguous everywhere — including as a function argument, which is what lets
 -- bullet children nest under a constructor. (An earlier @-@ marker was dropped:
@@ -1889,11 +1884,11 @@ bulletAhead = void $ lookAhead $ do
   bodyLine <- currentLine
   guard (not (null sp) && bodyLine == markLine)
 
--- | A block of offside @-@ bullets aligned at a common column, desugaring to
+-- | A block of offside @•@ bullets aligned at a common column, desugaring to
 -- the same 'List' node as a @LIST@ literal:
 --
--- >   - a
--- >   - b
+-- >   • a
+-- >   • b
 --
 -- is @LIST a, b@.
 bulletBlock :: Parser (Expr Name)
@@ -1904,12 +1899,12 @@ bulletBlock = do
     List emptyAnno
       <$> annoHole (someLinesPos blockCol bulletItem)
 
--- | A single bullet: a line-leading @-@ marker, then a full expression as the
--- body. The body threshold is the dash column, so 'indentedExpr' admits the
--- same-line body and any deeper continuation. The @-@ marker token is
+-- | A single bullet: a line-leading @•@ marker, then a full expression as the
+-- body. The body threshold is the marker's column, so 'indentedExpr' admits
+-- the same-line body and any deeper continuation. The @•@ marker token is
 -- prepended to the item's annotation (mirroring how 'lsepBy' folds a
 -- separator into an item) so that exact-printing round-trips the bullet
--- syntax rather than dropping the dashes.
+-- syntax rather than dropping the marker.
 bulletItem :: Pos -> Parser (Expr Name)
 bulletItem markCol = do
   bulletAhead
