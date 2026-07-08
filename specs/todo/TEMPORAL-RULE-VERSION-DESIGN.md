@@ -20,7 +20,7 @@ comparison tooling**, never as an in-heap `EVAL UNDER COMMIT`.
 
 ## 1. Reality reconciliation: what is actually on `unstable`
 
-The three stale specs describe the dropped *temporals-2* vision (git-backed
+The three stale specs describe the dropped _temporals-2_ vision (git-backed
 `EVAL UNDER COMMIT`, a `MonadTemporal` layer, `temporal-prelude.l4` macros).
 None of that shipped. What DID ship — and what the three design critiques
 partially missed, because they were written against a pre-T6/pre-PR#80 mental
@@ -28,19 +28,19 @@ model — is the following.
 
 ### 1.1 Shipped and working
 
-| Thing | Where | Notes |
-|---|---|---|
-| 8-axis `TemporalContext` | `jl4-core/src/L4/TemporalContext.hs:33-56` | `tcValidTime, tcSystemTime, tcRuleVersionTime, tcRuleValidTime, tcRuleEncodingTime, tcRuleCommit, tcDecisionTime, tcDocumentTimezone` |
-| 4 `EvalClause` variants | `TemporalContext.hs:59-64` | `UnderValidTime, AsOfSystemTime, UnderRulesEffectiveAt, UnderRulesEncodedAt`; `applyEvalClauses` (83-105) is pure |
-| 4 EVAL mixfix builtins | registered `TypeCheck/Environment.hs:76-79`, types 303-324; intercepted `Machine.hs:781-804`; frame-1 handlers `Machine.hs:1042-1075`; frame-2 restores `Machine.hs:1192-1203` | `EVAL AS OF SYSTEM TIME / UNDER VALID TIME / UNDER RULES EFFECTIVE AT / UNDER RULES ENCODED AT`, all `NUMBER(serial) -> a -> a` |
-| Interval builtins | per-day stamps at `Machine.hs:1213,1228,1245,1262` (WHEN LAST/NEXT, EVER/ALWAYS iterate) and `2845-2886` (entry; `VALUE AT` at 2886) | each stepped day re-applies `[UnderValidTime d, UnderRulesEffectiveAt d]` |
-| **T6 fingerprint cache** | `TemporalContext.hs:107-196` (`ReadObs`, `CtxReads`, `validFor`); `Machine.hs:605-646` (`noteCtxRead`, `swapCtxReads`, `readTcSystemTime`, `readTcDocumentTimezone`); `Machine.hs:2968-2971` (`updateThunkToWHNFWhen`); `Machine.hs:2982-3046` (`evalRef` serve/validate/re-force) | a thunk whose force READS a temporal axis is cached as `WHNFWhen fingerprint value` and served only while `validFor` holds; re-forced (with displaced-cache restore) otherwise. Goldens: `jl4/examples/ok/temporal-thunk-leak-*.l4`, `temporal-thunk-sharing-shapes.l4` |
-| **Unwind hardening (PR#80)** | `unwindFrame`, `Machine.hs:356-377`: all four `EvalXxx2` frames + all five iterator frames restore the saved `TemporalContext` on exception; `UpdateThunk` unwind closes the read span and `restoreThunkOnUnwind` (431-448) reinstates displaced caches | Goldens: `temporal-exception-scope-restore.l4`, `temporal-whnfwhen-exception-recovery.l4` |
-| READER CONTRACT | `TemporalContext.hs:25-32`, `Machine.hs:595-601` | any value-affecting axis read MUST go through an instrumented `readTc*` reader; adding a reader for a latent axis requires a new `CtxReads` field |
-| Latent-axis sentinel golden | `jl4/examples/ok/temporal-under-valid-time-latent.l4` | LOCKS that `tcValidTime` has no reader; flipping it is a conscious act |
-| Nullary builtin no-cache path | `Machine.hs:3035-3045` (`whnfConfig`), `evalNullaryBuiltin` at 3620-3667 | TODAY/NOW/CURRENTTIME/TIMEZONE re-evaluate per serve, reads recorded into the current span |
-| Acceptance fixture | `jl4/examples/ok/temporal-acceptance.l4` + goldens | interval builtins over `daydate` |
-| Test harness | `jl4/tests/Main.hs` | pins `JL4_FIXED_NOW` (fallback `2025-01-31T15:45:30Z`), self-sets `JL4_LIBRARY_PATH`; golden suite = `cabal test jl4-test` |
+| Thing                         | Where                                                                                                                                                                                                                                                                              | Notes                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8-axis `TemporalContext`      | `jl4-core/src/L4/TemporalContext.hs:33-56`                                                                                                                                                                                                                                         | `tcValidTime, tcSystemTime, tcRuleVersionTime, tcRuleValidTime, tcRuleEncodingTime, tcRuleCommit, tcDecisionTime, tcDocumentTimezone`                                                                                                                                   |
+| 4 `EvalClause` variants       | `TemporalContext.hs:59-64`                                                                                                                                                                                                                                                         | `UnderValidTime, AsOfSystemTime, UnderRulesEffectiveAt, UnderRulesEncodedAt`; `applyEvalClauses` (83-105) is pure                                                                                                                                                       |
+| 4 EVAL mixfix builtins        | registered `TypeCheck/Environment.hs:76-79`, types 303-324; intercepted `Machine.hs:781-804`; frame-1 handlers `Machine.hs:1042-1075`; frame-2 restores `Machine.hs:1192-1203`                                                                                                     | `EVAL AS OF SYSTEM TIME / UNDER VALID TIME / UNDER RULES EFFECTIVE AT / UNDER RULES ENCODED AT`, all `NUMBER(serial) -> a -> a`                                                                                                                                         |
+| Interval builtins             | per-day stamps at `Machine.hs:1213,1228,1245,1262` (WHEN LAST/NEXT, EVER/ALWAYS iterate) and `2845-2886` (entry; `VALUE AT` at 2886)                                                                                                                                               | each stepped day re-applies `[UnderValidTime d, UnderRulesEffectiveAt d]`                                                                                                                                                                                               |
+| **T6 fingerprint cache**      | `TemporalContext.hs:107-196` (`ReadObs`, `CtxReads`, `validFor`); `Machine.hs:605-646` (`noteCtxRead`, `swapCtxReads`, `readTcSystemTime`, `readTcDocumentTimezone`); `Machine.hs:2968-2971` (`updateThunkToWHNFWhen`); `Machine.hs:2982-3046` (`evalRef` serve/validate/re-force) | a thunk whose force READS a temporal axis is cached as `WHNFWhen fingerprint value` and served only while `validFor` holds; re-forced (with displaced-cache restore) otherwise. Goldens: `jl4/examples/ok/temporal-thunk-leak-*.l4`, `temporal-thunk-sharing-shapes.l4` |
+| **Unwind hardening (PR#80)**  | `unwindFrame`, `Machine.hs:356-377`: all four `EvalXxx2` frames + all five iterator frames restore the saved `TemporalContext` on exception; `UpdateThunk` unwind closes the read span and `restoreThunkOnUnwind` (431-448) reinstates displaced caches                            | Goldens: `temporal-exception-scope-restore.l4`, `temporal-whnfwhen-exception-recovery.l4`                                                                                                                                                                               |
+| READER CONTRACT               | `TemporalContext.hs:25-32`, `Machine.hs:595-601`                                                                                                                                                                                                                                   | any value-affecting axis read MUST go through an instrumented `readTc*` reader; adding a reader for a latent axis requires a new `CtxReads` field                                                                                                                       |
+| Latent-axis sentinel golden   | `jl4/examples/ok/temporal-under-valid-time-latent.l4`                                                                                                                                                                                                                              | LOCKS that `tcValidTime` has no reader; flipping it is a conscious act                                                                                                                                                                                                  |
+| Nullary builtin no-cache path | `Machine.hs:3035-3045` (`whnfConfig`), `evalNullaryBuiltin` at 3620-3667                                                                                                                                                                                                           | TODAY/NOW/CURRENTTIME/TIMEZONE re-evaluate per serve, reads recorded into the current span                                                                                                                                                                              |
+| Acceptance fixture            | `jl4/examples/ok/temporal-acceptance.l4` + goldens                                                                                                                                                                                                                                 | interval builtins over `daydate`                                                                                                                                                                                                                                        |
+| Test harness                  | `jl4/tests/Main.hs`                                                                                                                                                                                                                                                                | pins `JL4_FIXED_NOW` (fallback `2025-01-31T15:45:30Z`), self-sets `JL4_LIBRARY_PATH`; golden suite = `cabal test jl4-test`                                                                                                                                              |
 
 ### 1.2 The gap (unchanged)
 
@@ -52,7 +52,7 @@ is only ever `Nothing`. `EVAL UNDER RULES EFFECTIVE AT` is bookkeeping. There
 is no versioned-rule-set store, no git resolution, no selection mechanism.
 
 Known latent bug carried in the stamp: `UnderRulesEffectiveAt` coerces
-`tcRuleEncodingTime` to the *target rule day* when unset
+`tcRuleEncodingTime` to the _target rule day_ when unset
 (`TemporalContext.hs:96-103`) — i.e. it fabricates "the encoding existed on
 day D". Unobservable today (no reader); must be deleted before any encoding
 axis reader ships. **Do not replicate this pattern.**
@@ -62,19 +62,19 @@ axis reader ships. **Do not replicate this pattern.**
 Several kill-shots in the three critiques were written against pre-T6 /
 pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
 
-1. *"Taint analysis is unsound / degrades to call-by-name"* (in-language KS#2,
+1. _"Taint analysis is unsound / degrades to call-by-name"_ (in-language KS#2,
    hybrid KS#2): superseded. The demanded "context-keyed cache in the Thunk
    type" **is** `WHNFWhen` + `CtxReads` + `validFor`, shipped with goldens.
    No whole-program taint analysis is needed: context-dependence is detected
    **dynamically per force** and fingerprinted per axis. Sharing is preserved
    for everything that does not read the axis (`NotRead` axes never constrain
    reuse).
-2. *"Exception unwind leaks the overridden context into subsequent
-   directives"* (hybrid KS#1): fixed by PR#80 — `unwindFrame`
+2. _"Exception unwind leaks the overridden context into subsequent
+   directives"_ (hybrid KS#1): fixed by PR#80 — `unwindFrame`
    (`Machine.hs:356-377`) restores the context for every temporal frame, and
    the frame enumeration is exhaustive-by-construction (no wildcard), so a new
    state-restoring frame without an unwind arm is a compile error.
-3. *"Cross-module dispatch table stranded in per-module EvalState"*
+3. _"Cross-module dispatch table stranded in per-module EvalState"_
    (in-language KS#3): mooted by this design — we adopt no runtime dispatch
    table at all (see §3). The dispatcher is ordinary compiled L4 riding the
    `Environment`, which both import paths already thread
@@ -85,10 +85,10 @@ pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
 1. **WHNF-scope boundary** (in-language KS#1): EVAL frames restore the context
    when the wrapped thunk reaches WHNF (`Machine.hs:1192-1203`), so lazy
    substructure (list elements, record fields) escaping the frame is forced
-   later under the *ambient* context. This is a pre-existing property of all
+   later under the _ambient_ context. This is a pre-existing property of all
    four shipped builtins (TODAY inside `EVAL AS OF SYSTEM TIME` behaves
-   identically today); T6 guarantees the caches stay *sound* either way — the
-   question is scoping *intent*, not cache corruption. Position: document it;
+   identically today); T6 guarantees the caches stay _sound_ either way — the
+   question is scoping _intent_, not cache corruption. Position: document it;
    scalar results (NUMBER/BOOLEAN/DATE/STRING) are exact because WHNF = NF for
    them; a lint for EVAL-wrapping-non-scalar-typed expressions is Phase 1
    optional work; a deep-forcing EVAL variant is deferred.
@@ -105,7 +105,7 @@ pre-PR#80 assumptions and are **already fixed** on `55bd0452`:
    candidates without dependent-typing-adjacent machinery.
 4. **Unique instability across compiles / entityInfo singleton / `project:/`
    URI collisions in `Import/Resolution.hs`** (git-backed KS#1, KS#2; hybrid
-   KS#4): fatal to any design that splices a *separately compiled* rule set
+   KS#4): fatal to any design that splices a _separately compiled_ rule set
    into a live heap. This is the core reason `EVAL UNDER COMMIT` (in-heap) is
    rejected outright, see §2 and §4.
 5. **Fallback/default coupling** (hybrid KS#8): what `RULES EFFECTIVE DATE`
@@ -142,7 +142,7 @@ REJECTED as the axis mechanism. Fatal, code-verified:
   claim; **opm2l4 cannot emit it**; **anti-isomorphic for lawyers** (the
   document no longer contains its own semantics).
 
-Salvaged: git snapshot *loading* survives as Phase 3 driver tooling — two
+Salvaged: git snapshot _loading_ survives as Phase 3 driver tooling — two
 fully separate evaluator runs compared at the JSON boundary. Nothing crosses
 a heap.
 
@@ -151,16 +151,16 @@ a heap.
 SKELETON ACCEPTED, mechanism corrected. The critique's fatal findings and
 their resolutions:
 
-- *Laziness escapes the WHNF-scoped frame* → true but pre-existing and
+- _Laziness escapes the WHNF-scoped frame_ → true but pre-existing and
   cache-sound under T6; documented boundary (§1.4.1).
-- *Taint analysis contradiction* → dissolved by T6 (§1.3.1).
-- *`ruleVersions` table stranded in per-module EvalState; both import paths
-  thread only `Environment`* → resolved by **not having a runtime table**:
+- _Taint analysis contradiction_ → dissolved by T6 (§1.3.1).
+- _`ruleVersions` table stranded in per-module EvalState; both import paths
+  thread only `Environment`_ → resolved by **not having a runtime table**:
   desugar to ordinary L4 at check time (§3 Phase 2). The dispatcher travels
   in the Environment like any other compiled code.
-- *`NoRuleVersionInForce` poisons interval scans* → total-dispatch requirement
+- _`NoRuleVersionInForce` poisons interval scans_ → total-dispatch requirement
   (§1.4.2).
-- *Append-only discipline is unenforceable in-compiler* → accepted: source
+- _Append-only discipline is unenforceable in-compiler_ → accepted: source
   history lives in ordinary git on the `.l4` file like all other source; the
   trace cites arm labels + source ranges; tamper-evidence beyond that is
   Phase 3's job (deployment-version pinning), not the evaluator's.
@@ -170,12 +170,12 @@ their resolutions:
 **Part A adopted** — it is the same recommendation as 2.2's salvage, and its
 two "must exist first" mechanisms (context-keyed cache, unwind restore)
 already exist on this base (§1.3). **Part B rejected as designed**: cross-
-version constructor values *silently select wrong CONSIDER branches*
+version constructor values _silently select wrong CONSIDER branches_
 (`sameResolved` mismatch falls through to the next branch — worse than
 error); the current-compiler confound makes "audit-grade replay" a false
 claim for any commit predating a semantics change; shared store races with
 per-request contexts in jl4-service; git SHAs are the wrong key for a service
-that already versions deployments (`2b28074e`). Part B's *goal* ("decision
+that already versions deployments (`2b28074e`). Part B's _goal_ ("decision
 changed since version X") is served by Phase 3 tooling instead.
 
 ---
@@ -198,17 +198,17 @@ Concretely:
    fallback (§6 Q1), delete the `tcRuleEncodingTime` coercion bug, add
    `RETROACTIVE TO` sugar, provenance/trace polish, docs + l4-skill note.
 3. **Phase 2 (~2-3 weeks)** — authoring ergonomics: `@effective` /
-   `@repealed` decorators on *same-named* DECIDEs, desugared at check time
+   `@repealed` decorators on _same-named_ DECIDEs, desugared at check time
    into one visible dispatcher over `RULES EFFECTIVE DATE` whose arms are the
    original, individually-addressable, individually-cited DECIDEs. No runtime
    dispatch value, no EvalState table, no hidden name mangling in the
    evaluator.
-4. **Phase 3 (~1-2 weeks)** — encoding history *outside* the evaluator:
+4. **Phase 3 (~1-2 weeks)** — encoding history _outside_ the evaluator:
    `l4 diff-eval` (CLI) and a jl4-service compare endpoint that compile and
    run two corpus versions as two independent evaluations and diff
    JSON-marshalled results of exported entry points. Keyed on jl4-service
    deployment versions, with git refs as one optional backing resolver.
-   Honest framing: *source-level counterfactual under today's toolchain*.
+   Honest framing: _source-level counterfactual under today's toolchain_.
 5. **Rejected permanently (recorded)**: in-heap `EVAL UNDER COMMIT` — i.e.
    any mechanism that splices a separately-compiled module's References,
    constructors, or entityInfo into a live evaluation.
@@ -240,16 +240,16 @@ Concretely:
   form — keeps both regimes visible, reviewable, diffable, and citable in the
   artifact under review. The trace cites the arm (label + source range) that
   fired and why.
-- **The interval builtins work *for free*, correctly.** They already stamp
+- **The interval builtins work _for free_, correctly.** They already stamp
   `UnderRulesEffectiveAt d` per stepped day; with a reader, `VALUE AT` /
   `EVER BETWEEN` / `WHEN LAST` naturally compute the point-in-time reading
   ("under the rules in force each day") — the canonical rate-changed-
-  mid-period case the git design had to pin to a no-op. Regime *pinning* is
+  mid-period case the git design had to pin to a no-op. Regime _pinning_ is
   already expressible compositionally, because nested EVAL wins innermost:
   `EVER BETWEEN a b (GIVEN d YIELD EVAL UNDER RULES EFFECTIVE AT <pin> OF pred d)`.
 - **opm2l4 can target it.** OPM-style temporal rule versions are in-source
   attributes; only in-language dispatch is emittable by a code generator.
-  (Caveat recorded: OPM *temporal attribute values* are valid-time facts and
+  (Caveat recorded: OPM _temporal attribute values_ are valid-time facts and
   must map to `tcValidTime`/interval machinery, NOT to rule regimes — the
   hybrid critique's category-error warning stands as a codegen review item.)
 - **What it honestly does not do** (and where that lives instead): belief
@@ -266,25 +266,25 @@ Concretely:
 
 See §5 for the full spike spec. Summary of touch points:
 
-| # | File | Point | Change |
-|---|---|---|---|
-| 1 | `jl4-core/src/L4/Evaluate/ValueLazy.hs` | :88-92 | add `NullaryRulesEffectiveDate` to `NullaryBuiltinFun` |
-| 2 | `jl4-core/src/L4/Evaluate/ValueLazy.hs` | :189-194 | `rnf NullaryRulesEffectiveDate = ()` |
-| 3 | `jl4-core/src/L4/TemporalContext.hs` | :142-161 | add `crRuleValidTime :: !(ReadObs (Maybe Day))` to `CtxReads` |
-| 4 | `jl4-core/src/L4/TemporalContext.hs` | :163-171 | extend `Semigroup`, `noReads` |
-| 5 | `jl4-core/src/L4/TemporalContext.hs` | :187-196 | `validFor`: `&& axisValid tc.tcRuleValidTime r.crRuleValidTime` |
-| 6 | `jl4-core/src/L4/TemporalContext.hs` | :40-43, :114-117 | comments: `tcRuleValidTime` no longer latent; iterator-sharing note now qualified |
-| 7 | `jl4-core/src/L4/EvaluateLazy/Machine.hs` | after :646 | `readTcRuleValidTime` instrumented reader (mirrors `readTcDocumentTimezone`, records the raw `Maybe` pre-fallback) |
-| 8 | `jl4-core/src/L4/EvaluateLazy/Machine.hs` | :3620-3667 | `evalNullaryBuiltin` case: `Just d -> ValDate d`; `Nothing ->` localized-today fallback (reuses `readTcSystemTime` + `readTcDocumentTimezone`, so the fallback is itself correctly fingerprinted) |
-| 9 | `jl4-core/src/L4/EvaluateLazy/Machine.hs` | :3463-3465 | `rulesEffectiveDateRef <- allocateValue (ValNullaryBuiltinFun NullaryRulesEffectiveDate)` |
-| 10 | `jl4-core/src/L4/EvaluateLazy/Machine.hs` | :3527-3529 | `, (TypeCheck.rulesEffectiveDateUnique, rulesEffectiveDateRef)` |
-| 11 | `jl4-core/src/L4/TypeCheck/Environment.hs` | mkBuiltins list (:19-…) | append `"rulesEffectiveDate" \`rename\` "RULES EFFECTIVE DATE"` **at the end of the list** (mkBuiltins mints uniques positionally; appending keeps existing unique ints stable) |
-| 12 | `jl4-core/src/L4/TypeCheck/Environment.hs` | :257-258 | `rulesEffectiveDateBuiltin = date` (clone of `todayBuiltin`) |
-| 13 | `jl4-core/src/L4/TypeCheck/Environment.hs` | :659-663 | `rulesEffectiveDateInfo = KnownTerm rulesEffectiveDateBuiltin Computable` |
-| 14 | `jl4-core/src/L4/TypeCheck/Environment.hs` | :938-939 | `, (rawName rulesEffectiveDateName, [rulesEffectiveDateUnique])` |
-| 15 | `jl4-core/src/L4/TypeCheck/Environment.hs` | :1054-1055 | `, (rulesEffectiveDateUnique, (rulesEffectiveDateName, rulesEffectiveDateInfo))` |
-| 16 | `jl4/examples/ok/temporal-rule-version-spike.l4` | new | fixture (§5.3) |
-| 17 | `jl4/examples/ok/tests/temporal-rule-version-spike*.golden` | auto | created by first `cabal test jl4-test` run (hspec-golden); inspect before committing |
+| #   | File                                                        | Point                   | Change                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `jl4-core/src/L4/Evaluate/ValueLazy.hs`                     | :88-92                  | add `NullaryRulesEffectiveDate` to `NullaryBuiltinFun`                                                                                                                                            |
+| 2   | `jl4-core/src/L4/Evaluate/ValueLazy.hs`                     | :189-194                | `rnf NullaryRulesEffectiveDate = ()`                                                                                                                                                              |
+| 3   | `jl4-core/src/L4/TemporalContext.hs`                        | :142-161                | add `crRuleValidTime :: !(ReadObs (Maybe Day))` to `CtxReads`                                                                                                                                     |
+| 4   | `jl4-core/src/L4/TemporalContext.hs`                        | :163-171                | extend `Semigroup`, `noReads`                                                                                                                                                                     |
+| 5   | `jl4-core/src/L4/TemporalContext.hs`                        | :187-196                | `validFor`: `&& axisValid tc.tcRuleValidTime r.crRuleValidTime`                                                                                                                                   |
+| 6   | `jl4-core/src/L4/TemporalContext.hs`                        | :40-43, :114-117        | comments: `tcRuleValidTime` no longer latent; iterator-sharing note now qualified                                                                                                                 |
+| 7   | `jl4-core/src/L4/EvaluateLazy/Machine.hs`                   | after :646              | `readTcRuleValidTime` instrumented reader (mirrors `readTcDocumentTimezone`, records the raw `Maybe` pre-fallback)                                                                                |
+| 8   | `jl4-core/src/L4/EvaluateLazy/Machine.hs`                   | :3620-3667              | `evalNullaryBuiltin` case: `Just d -> ValDate d`; `Nothing ->` localized-today fallback (reuses `readTcSystemTime` + `readTcDocumentTimezone`, so the fallback is itself correctly fingerprinted) |
+| 9   | `jl4-core/src/L4/EvaluateLazy/Machine.hs`                   | :3463-3465              | `rulesEffectiveDateRef <- allocateValue (ValNullaryBuiltinFun NullaryRulesEffectiveDate)`                                                                                                         |
+| 10  | `jl4-core/src/L4/EvaluateLazy/Machine.hs`                   | :3527-3529              | `, (TypeCheck.rulesEffectiveDateUnique, rulesEffectiveDateRef)`                                                                                                                                   |
+| 11  | `jl4-core/src/L4/TypeCheck/Environment.hs`                  | mkBuiltins list (:19-…) | append `"rulesEffectiveDate" \`rename\` "RULES EFFECTIVE DATE"` **at the end of the list** (mkBuiltins mints uniques positionally; appending keeps existing unique ints stable)                   |
+| 12  | `jl4-core/src/L4/TypeCheck/Environment.hs`                  | :257-258                | `rulesEffectiveDateBuiltin = date` (clone of `todayBuiltin`)                                                                                                                                      |
+| 13  | `jl4-core/src/L4/TypeCheck/Environment.hs`                  | :659-663                | `rulesEffectiveDateInfo = KnownTerm rulesEffectiveDateBuiltin Computable`                                                                                                                         |
+| 14  | `jl4-core/src/L4/TypeCheck/Environment.hs`                  | :938-939                | `, (rawName rulesEffectiveDateName, [rulesEffectiveDateUnique])`                                                                                                                                  |
+| 15  | `jl4-core/src/L4/TypeCheck/Environment.hs`                  | :1054-1055              | `, (rulesEffectiveDateUnique, (rulesEffectiveDateName, rulesEffectiveDateInfo))`                                                                                                                  |
+| 16  | `jl4/examples/ok/temporal-rule-version-spike.l4`            | new                     | fixture (§5.3)                                                                                                                                                                                    |
+| 17  | `jl4/examples/ok/tests/temporal-rule-version-spike*.golden` | auto                    | created by first `cabal test jl4-test` run (hspec-golden); inspect before committing                                                                                                              |
 
 Explicit non-changes: `EvalClause` untouched (4 variants); `applyEvalClauses`
 untouched; EVAL frame handlers untouched; interval-builtin stamps untouched;
@@ -325,7 +325,7 @@ reuse.
 
 ### Phase 2 — `@effective` authoring surface (~2-3 weeks)
 
-Goal: the legislative authoring style — *same-named* DECIDEs, each carrying
+Goal: the legislative authoring style — _same-named_ DECIDEs, each carrying
 its amendment identity — without runtime machinery.
 
 1. **Decorators**: extend the annotation recognizer
@@ -346,9 +346,9 @@ its amendment identity — without runtime machinery.
    generated final arm raising a curated user error ("`<name>` not in force
    on <day>"); lint: warn on gaps/overlaps in effective spans; error on
    overlapping identical spans. Pre-commencement interval scans then fail
-   loudly *only* if the scan actually reaches an uncovered day and the author
+   loudly _only_ if the scan actually reaches an uncovered day and the author
    provided no base arm — and the fix (add a base arm) is in-language.
-4. **Round-trip**: TNR/NLG anchors attach to the *arm* DECIDEs (each keeps
+4. **Round-trip**: TNR/NLG anchors attach to the _arm_ DECIDEs (each keeps
    its own SrcRange and `@label` with the amending instrument), so amendment
    identity, citations, and diffability survive — this answers the
    hand-rolled-IF-chain ergonomics objection (hybrid KS#9) without hidden
@@ -360,7 +360,7 @@ its amendment identity — without runtime machinery.
    versioned family (T6 note: `WHNFWhen` is a single-entry cache, so a
    version-reading thunk re-forces per regime change — bounded by regimes ×
    dependent cone, not days, because the fingerprint records `ReadEq (Just d)`
-   per *day*… see §6 Q3 for the cache-granularity refinement if this golden
+   per _day_… see §6 Q3 for the cache-granularity refinement if this golden
    is slow).
 
 ### Phase 3 — encoding-history counterfactuals as driver tooling (~1-2 weeks)
@@ -376,7 +376,7 @@ its amendment identity — without runtime machinery.
    invoke the entry point through the existing JSON function-invocation
    marshalling (as used by jl4-service), diff the JSON results. Two heaps,
    two entityInfos, zero cross-version values.
-2. jl4-service endpoint comparing two *deployment versions* (the service
+2. jl4-service endpoint comparing two _deployment versions_ (the service
    already persists these — `2b28074e`); git refs are one optional resolver
    behind the same interface, not the identity scheme.
 3. Output framing is contractual: "source-level counterfactual under the
@@ -424,7 +424,7 @@ backticks like any spaced identifier):
   `EVAL UNDER RULES EFFECTIVE AT` alternative). The unset observation is
   recorded as `crRuleValidTime = ReadEq Nothing` **pre-fallback** (the
   `crDocumentTimezone` pre-defaulting precedent, `TemporalContext.hs:145-147`)
-  so a later force under a *set* axis correctly invalidates the cache.
+  so a later force under a _set_ axis correctly invalidates the cache.
 
 Cache-correctness is inherited, not built: the reader routes through
 `noteCtxRead`, the force span records it, `updateThunkToWHNFWhen` tags the
@@ -548,7 +548,7 @@ JL4_FIXED_NOW=2025-01-31T15:45:30Z cabal run l4 -- run jl4/examples/ok/temporal-
 First `cabal test jl4-test` run auto-creates
 `jl4/examples/ok/tests/temporal-rule-version-spike.golden` (plus `.nlg` /
 `.ep` / `.schema` siblings); inspect them against §5.5 before committing.
-Every *other* golden must be bit-identical.
+Every _other_ golden must be bit-identical.
 
 ### 5.5 Expected before/after
 
@@ -556,7 +556,7 @@ Every *other* golden must be bit-identical.
 `` `RULES EFFECTIVE DATE` `` is an unknown identifier. The axis is
 demonstrably write-only: any predicate wrapped in
 `EVAL UNDER RULES EFFECTIVE AT (…2023…)` vs `(…2024…)` evaluates
-*identically* (e.g. a TODAY-based dispatch yields 9 under both clauses with
+_identically_ (e.g. a TODAY-based dispatch yields 9 under both clauses with
 the pinned clock), because nothing reads `tcRuleValidTime`.
 
 **After**: the eight directives evaluate, in order, to
@@ -595,17 +595,17 @@ by an interval builtin.
 
 - **Q1 — unset-axis fallback** (Phase 1 gate). Options: (a) localized
   system-day ("the rules in force now" — spike's provisional choice; couples
-  `AS OF SYSTEM TIME` to regime, which is arguably the *right* replay
+  `AS OF SYSTEM TIME` to regime, which is arguably the _right_ replay
   intuition: knowledge frozen at t ⇒ regime of t); (b) `tcValidTime` first,
-  then system-day (bitemporally orthodox, and *consistent with the interval
-  builtins*, which hard-code regime = fact-day; requires `crValidTime`
+  then system-day (bitemporally orthodox, and _consistent with the interval
+  builtins_, which hard-code regime = fact-day; requires `crValidTime`
   instrumentation + consciously flipping the latent-axis golden); (c) hard
   error (maximally explicit; hostile to the common "evaluate current law"
   case). **DECIDED (2026-07-08): (b).** Rationale: it is the only option
   consistent with the interval builtins (which already stamp
   `[UnderValidTime d, UnderRulesEffectiveAt d]` together per day), and it
   encodes the presumption against retroactivity (apply the law in force at
-  the time of the facts); it couples the *right* pair of axes (fact-time ↔
+  the time of the facts); it couples the _right_ pair of axes (fact-time ↔
   law-time, overridable), leaving system/knowledge time independent, whereas
   (a) couples system-time to regime. **Implemented**: `crValidTime` axis in
   `CtxReads` + instrumented `readTcValidTime`; `RULES EFFECTIVE DATE` falls
@@ -619,11 +619,11 @@ by an interval builtin.
   effectivity) in Phase 2. Leaning: collapse; resurrect only with a concrete
   reader.
 - **Q3 — cache granularity under day-stepping**: `WHNFWhen` records
-  `crRuleValidTime = ReadEq (Just d)` per *day*, so a version-reading thunk
+  `crRuleValidTime = ReadEq (Just d)` per _day_, so a version-reading thunk
   re-forces every stepped day even within one regime. Correct but
   potentially slow for multi-decade scans over heavy rules. If the Phase 2
-  perf golden hurts, refine the observation to the *selected regime boundary
-  interval* rather than the raw day (an `ReadObs` variant recording
+  perf golden hurts, refine the observation to the _selected regime boundary
+  interval_ rather than the raw day (an `ReadObs` variant recording
   "in [from,until)") — a contained `TemporalContext.hs` + reader change.
 - **Q4 — WHNF-scope boundary surfacing**: lint when an EVAL temporal builtin
   wraps an expression whose type is not scalar? (Cheap, high-signal;
