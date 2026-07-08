@@ -1502,9 +1502,6 @@ inferExpr' g =
     Modulo ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName moduloName) g ann e1 e2
       inferExpr' dsFun
-    Exponent ann e1 e2 -> do
-      dsFun <- desugarBinOpToFunction (rawName exponentName) g ann e1 e2
-      inferExpr' dsFun
     Cons ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName consName) g ann e1 e2
       inferExpr' dsFun
@@ -3278,7 +3275,6 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Times ann e1 e2 -> Times ann (go False ctx e1) (go False ctx e2)
       DividedBy ann e1 e2 -> DividedBy ann (go False ctx e1) (go False ctx e2)
       Modulo ann e1 e2 -> Modulo ann (go False ctx e1) (go False ctx e2)
-      Exponent ann e1 e2 -> Exponent ann (go False ctx e1) (go False ctx e2)
       Cons ann e1 e2 -> Cons ann (go False ctx e1) (go False ctx e2)
       Leq ann e1 e2 -> Leq ann (go False ctx e1) (go False ctx e2)
       Geq ann e1 e2 -> Geq ann (go False ctx e1) (go False ctx e2)

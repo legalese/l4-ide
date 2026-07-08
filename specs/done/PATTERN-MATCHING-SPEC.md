@@ -1,7 +1,6 @@
-# Specification: Pattern Matching in Function Definitions
+> Status: DONE (core) — Phase 1 (function-clause pattern matching desugared to CONSIDER/WHEN, PMClause in Parser.hs) is shipped and tested on unstable. Deferred/optional: static compile-time non-exhaustive/redundant-pattern warnings (currently only a runtime NonExhaustivePatterns exception); guard patterns (WHEN/WHERE on arms); tabular |...|...| sugar; Approach-2 decision-tree optimization.
 
-**Status:** 📋 Draft  
-**Issue:** TBD
+# Specification: Pattern Matching in Function Definitions
 
 ## Executive Summary
 

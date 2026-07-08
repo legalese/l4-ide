@@ -1,8 +1,4 @@
-> **Status (audited 2026-07-03):** OPEN — `@ref` is still collected but never attached to AST nodes.
->
-> - No `HasRef`, `addRefCommentsToAst`, or `annRef`; `Extension` (`jl4-core/src/L4/Syntax.hs:424`) has no `ref` field. Phases 1-3 unimplemented.
-> - `@ref` is instead consumed for IDE citation hyperlinks via an interval map in `jl4-core/src/L4/Citations.hs` (not the proposed AST attachment). `@ref-src` CSV/regex behavior was removed, but the `TRefSrc` token still lexes and is silently discarded (`refAdditionalP`, `Parser.hs:231-237`).
-> - Body corrections: `Ref` is `data Ref = MkRef Anno Text` at `Syntax.hs:682` (not `:639`); `PState.refs` at `Parser.hs:73`; the parser TODO is now at `Parser.hs:228-230`.
+> Status: DONE — @ref annotations are attached to AST nodes as of PR #48 (merged 2026-07-06). The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
 
 # Specification: @ref Annotation Attachment
 

@@ -23,6 +23,7 @@
 > **Origin:** synthesized from a multi-agent design workflow (5-subsystem map +
 > LiquidHaskell/Dependent-Haskell/GADT/Idris/F\* lessons + 4 scored proposals, two
 > of which were prototyped and verified against the golden suite).
+> (one open design question — bounding the fresh actor index to a declared union — deliberately deferred pending a use case).
 
 ## Implementation notes (what shipped vs the design)
 

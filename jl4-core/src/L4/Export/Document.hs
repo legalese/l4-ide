@@ -1170,7 +1170,7 @@ formulaText e
  where
   arithTop = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True
-    DividedBy{} -> True; Modulo{} -> True; Exponent{} -> True
+    DividedBy{} -> True; Modulo{} -> True
     _ -> False
   go :: Expr Resolved -> Maybe (Int, Text)
   go expr = case carameliseNode expr of
@@ -1179,7 +1179,6 @@ formulaText e
     Times _ a b     -> bin 2 " × " a b
     DividedBy _ a b -> bin 2 " ÷ " a b
     Modulo _ a b    -> bin 2 " mod " a b
-    Exponent _ a b  -> bin 3 " ^ " a b
     Lit _ (NumericLit _ r) -> Just (4, numText r)
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)

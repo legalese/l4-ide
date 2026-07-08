@@ -425,10 +425,6 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e1' <- addNlg e1
       e2' <- addNlg e2
       pure $ Modulo ann e1' e2'
-    Exponent ann e1 e2 -> do
-      e1' <- addNlg e1
-      e2' <- addNlg e2
-      pure $ Exponent ann e1' e2'
     Cons ann e1 e2 -> do
       e1' <- addNlg e1
       e2' <- addNlg e2
@@ -1081,7 +1077,6 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
     Times ann e1 e2 -> bin Times ann e1 e2
     DividedBy ann e1 e2 -> bin DividedBy ann e1 e2
     Modulo ann e1 e2 -> bin Modulo ann e1 e2
-    Exponent ann e1 e2 -> bin Exponent ann e1 e2
     Cons ann e1 e2 -> bin Cons ann e1 e2
     Leq ann e1 e2 -> bin Leq ann e1 e2
     Lt ann e1 e2 -> bin Lt ann e1 e2
