@@ -1,5 +1,7 @@
 > **Status (audited 2026-07-03):** PARTIAL — the context-switching core landed; the git/commit axis and surface syntax did not.
 >
+> **SUPERSEDED as design authority (2026-07-08)** by [`TEMPORAL-RULE-VERSION-DESIGN.md`](TEMPORAL-RULE-VERSION-DESIGN.md). The git-backed `EVAL UNDER COMMIT` / `RETROACTIVE TO` vision described below is **permanently rejected**: splicing a separately-compiled module's `References`/constructors/`entityInfo` into a live heap collides Uniques via `project:/` URIs, cannot marshal cross-version values through the single `entityInfo`, silently mis-selects `CONSIDER` branches, and forks a published construct's meaning per deployment. The chosen replacement is in-language rule-validity dispatch + driver-level `l4 diff-eval`. Kept here for archaeology and for the jurisprudential appendix (still valuable).
+>
 > - Shipped: `withEvalClauses` (the spec's `withEvalContext`, `EvaluateLazy.hs:85-90`) plus builtins EVAL AS OF SYSTEM TIME / UNDER VALID TIME / UNDER RULES EFFECTIVE AT / UNDER RULES ENCODED AT (`Environment.hs:76-79`).
 > - Remaining: `UNDER COMMIT` and `RETROACTIVE TO` clauses; commit→ruleset resolution / worktree checkout / `getRulesAtCommit`; the `AuditEval` variant; the `EVAL … DO …` block syntax and mixfix wrappers.
 > - Body correction: the implemented helper is `withEvalClauses :: [EvalClause] -> Eval a -> Eval a` (no `L4Temporal`/`MonadTemporal` monad exists).
