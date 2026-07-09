@@ -57,6 +57,48 @@ Names for variables, functions, and types.
 
 ---
 
+### Lists
+
+A list literal is written with `LIST`, either inline or as an indented block:
+
+```l4
+LIST 1, 2, 3          -- inline, comma-separated
+
+LIST                  -- vertical block (layout replaces the commas)
+  1
+  2
+  3
+```
+
+**Bullet lists.** A `•` followed by a space and a same-line body opens a list
+element; a block of `•` items aligned at a common column desugars to the same
+list (conventionally written at the start of a line, though that's a style
+convention, not an enforced rule). `•` was chosen because, unlike `-` (which
+is subtraction), it has no arithmetic meaning, so it is unambiguous even in
+**argument position**:
+
+```l4
+xs IS                 -- a plain list
+  • 1
+  • 2
+  • 3                 -- == LIST 1, 2, 3
+
+item "Parent"         -- bullet children nest under a constructor, no LIST/parens
+  • item "a"
+  • item "Sub"
+    • item "b"        -- child '•' lines up under the parent's `item`; any
+    • item "c"        --   deeper indent works too, to arbitrary depth
+```
+
+**Corner case.** Inside a vertical `LIST` block, a bare name is itself one of
+the list's items, at the same column as its siblings. If a `•` block follows
+immediately at that column, it binds to the name as an _argument_ rather than
+becoming the next sibling item — this only matters for a name that is
+arity-overloaded across a 0-arg and a list-taking definition. Wrap the name in
+parens, e.g. `(reverse)`, to force it back into a standalone list item.
+
+---
+
 ## Annotations
 
 Metadata attached to declarations.

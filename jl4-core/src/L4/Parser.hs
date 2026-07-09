@@ -365,6 +365,23 @@ indented parser pos =
 indented' :: AnnoParser b -> Pos -> AnnoParser b
 indented' parser pos = wrapAnnoParser $ indented (unwrapAnnoParser parser) pos
 
+-- | Like 'indented', but admits the parser at a column greater than OR EQUAL to
+-- @pos@. Used only for a @•@ bullet block in argument position, so a child
+-- bullet can line up directly under the parent's head word (e.g. the @item@ of
+-- @• item "Sub"@) — which the "• " marker shifts two columns right of the
+-- bullet — rather than being forced strictly past it.
+indentedGE :: Parser b -> Pos -> Parser b
+indentedGE parser pos = do
+  actual <- Lexer.indentLevel
+  if actual >= pos
+    then parser
+    else
+      -- Megaparsec's 'ErrorIndentation' only has LT/EQ/GT variants, so a
+      -- failed >= check is reported as "greater than" — imprecise (it should
+      -- say "greater than or equal to"), but the failing case (actual < pos)
+      -- is identical for both orderings, so the reported column is correct.
+      fancyFailure . Set.singleton $ ErrorIndentation GT pos actual
+
 module' :: NormalizedUri -> Parser (Module Name)
 module' uri = do
   attachAnno $
@@ -1745,6 +1762,7 @@ baseExpr' =
   <|> try namedApp -- This is not nice
   <|> app
   <|> lit
+  <|> try bulletBlock   -- offside '•' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
   <|> paren expr
@@ -1847,6 +1865,53 @@ listItemThreshold tk = do
              then keywordCol
              else mkPos (max 1 (unPos firstItemCol - 1))
 
+-- | The bullet marker. @•@ (U+2022) has no arithmetic meaning, so it is
+-- unambiguous everywhere — including as a function argument, which is what lets
+-- bullet children nest under a constructor. (An earlier @-@ marker was dropped:
+-- @-@ doubles as binary subtraction, so an indented @- x@ collides with a
+-- wrapped subtraction continuation and could not be used in argument position.
+-- Rather than ship two markers with different reach, @•@ is the only bullet.)
+bulletMarker :: TokenType
+bulletMarker = TSymbols TBullet
+
+-- | Lookahead guard: are we at an offside @•@ bullet marker — a @•@ followed
+-- by at least one space and a body token on the SAME line? Consumes nothing.
+bulletAhead :: Parser ()
+bulletAhead = void $ lookAhead $ do
+  markLine <- currentLine
+  _        <- plainToken bulletMarker
+  sp       <- spaces
+  bodyLine <- currentLine
+  guard (not (null sp) && bodyLine == markLine)
+
+-- | A block of offside @•@ bullets aligned at a common column, desugaring to
+-- the same 'List' node as a @LIST@ literal:
+--
+-- >   • a
+-- >   • b
+--
+-- is @LIST a, b@.
+bulletBlock :: Parser (Expr Name)
+bulletBlock = do
+  bulletAhead
+  blockCol <- Lexer.indentLevel
+  attachAnno $
+    List emptyAnno
+      <$> annoHole (someLinesPos blockCol bulletItem)
+
+-- | A single bullet: a line-leading @•@ marker, then a full expression as the
+-- body. The body threshold is the marker's column, so 'indentedExpr' admits
+-- the same-line body and any deeper continuation. The @•@ marker token is
+-- prepended to the item's annotation (mirroring how 'lsepBy' folds a
+-- separator into an item) so that exact-printing round-trips the bullet
+-- syntax rather than dropping the marker.
+bulletItem :: Pos -> Parser (Expr Name)
+bulletItem markCol = do
+  bulletAhead
+  mark <- spacedToken_ bulletMarker
+  e    <- indentedExpr markCol
+  pure $ setAnno (fixAnnoSrcRange $ mkSimpleEpaAnno (lexToEpa mark) <> getAnno e) e
+
 intLit :: Parser Lit
 intLit =
   attachAnno $
@@ -1915,7 +1980,12 @@ parseAppArgs current fname = go True
 
     parseOne allowBreak = do
       when allowBreak $ guardMixfixKeyword funcLine
-      indented atomicExpr' current
+      -- '•' is collision-free, so a '•' bullet block may be a function
+      -- argument (feeding e.g. an arity-overloaded list constructor). It is
+      -- admitted at >= the function column (indentedGE) so a child bullet can
+      -- align under the parent's head word; ordinary arguments keep the strict
+      -- '> column' rule.
+      try (indentedGE bulletBlock current) <|> indented atomicExpr' current
 
 guardMixfixKeyword :: Maybe Int -> Parser ()
 guardMixfixKeyword Nothing = pure ()
