@@ -305,7 +305,7 @@ ASSUME isCompany IS BOOLEAN
 Not every part of a legal document is a rule. Recitals, preambles, "WHEREAS"
 clauses, purpose statements, statements of principle — the throat-clearing at
 the start of a chapter — gate no decision and compute nothing. But an
-*isomorphic* encoding (one that mirrors the source, so a lawyer can check it
+_isomorphic_ encoding (one that mirrors the source, so a lawyer can check it
 line-by-line) still has to carry them, verbatim and correctly numbered.
 
 Reach for the `hierarchy` library. An outline is a tree of **strings**
@@ -331,7 +331,7 @@ IMPORT hierarchy
 ```
 
 The heading is carried verbatim; the rest is numbered by depth — you pick the
-*style* per level (`recital scheme` is upper-alpha, then decimal, then
+_style_ per level (`recital scheme` is upper-alpha, then decimal, then
 lower-roman) and the renderer assigns the actual markers:
 
 ```
@@ -344,8 +344,8 @@ C.2    the fees payable; and
 C.3    the term and termination.
 ```
 
-**The rule of thumb.** Ask of each passage: *does it gate any decision, or
-compute any value?* If no — it's inert. Don't force it into a `DECIDE` or an
+**The rule of thumb.** Ask of each passage: _does it gate any decision, or
+compute any value?_ If no — it's inert. Don't force it into a `DECIDE` or an
 `ASSUME` (there's no proposition to decide, no fact to assume); don't drop it
 either (you'd lose fidelity). Capture it as a `hierarchy` outline instead. The
 `•` bullet nests children under a parent to any depth with no `LIST` literal
@@ -353,8 +353,8 @@ and no parentheses; when drafting needs an irregular sequence — an inserted
 "2A", a restart — `labeled`, `numbered`, and `restartAt` pin or reset a marker
 without disturbing its neighbours. See
 [Optimising Natural-Language Generation](../natural-language-functions/optimising-natural-language-generation.md#literal-recitals--carrying-prose-that-isnt-computed)
-for the contrast with `@nlg` (which renders prose *from* logic; recitals are
-prose that simply *is*).
+for the contrast with `@nlg` (which renders prose _from_ logic; recitals are
+prose that simply _is_).
 
 ### 3. Handle "And/Or" Carefully
 

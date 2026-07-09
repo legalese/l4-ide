@@ -249,7 +249,7 @@ which is eligible holds"_ instead of exposing the recursion.
 
 ## Literal recitals — carrying prose that isn't computed
 
-The levers above get *computed* logic to read as prose. But parts of a legal
+The levers above get _computed_ logic to read as prose. But parts of a legal
 document aren't logic at all — recitals, the preamble, the WHEREAS clauses.
 Their job is to be carried verbatim and numbered, not evaluated. For these,
 reach for the `hierarchy` library: a recital outline is a tree of **strings**
@@ -289,14 +289,14 @@ C.2    the fees payable; and
 C.3    the term and termination.
 ```
 
-You pick the numbering *style* per depth (`recital scheme` above is upper-alpha,
+You pick the numbering _style_ per depth (`recital scheme` above is upper-alpha,
 then decimal, then lower-roman); the renderer assigns the actual markers. When
 drafting needs an irregular sequence — an inserted "2A", a restart — `labeled`,
 `numbered`, and `restartAt` pin or reset a marker without disturbing its
 neighbours.
 
 The contrast with the rest of this guide is the point: `@nlg` renders prose
-*from* logic; recitals are prose that simply *is*. Use names + shape + `@nlg`
+_from_ logic; recitals are prose that simply _is_. Use names + shape + `@nlg`
 for the operative clauses, and `hierarchy` outlines for the narrative scaffolding
 around them.
 
@@ -318,7 +318,7 @@ DECIDE xs IS
 subtraction), so it is unambiguous everywhere — including in **argument
 position**. That is what lets bullet children nest under a constructor with no
 `LIST` and no parentheses: `• item "a"` under `item "Parent"` makes `"a"` a
-*child* of the parent (feeding the arity-overloaded `item txt kids`
+_child_ of the parent (feeding the arity-overloaded `item txt kids`
 constructor), to any depth. The element itself is any expression, so every
 outline constructor — `item`, `labeled`, `numbered`, `restartAt` — works per
 line.

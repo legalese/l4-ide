@@ -57,7 +57,7 @@ Break legislation into manageable chunks. Each chunk should be:
 - Referenced by section/article number
 - Small enough for LLM context
 
-Segment inert passages — recitals, preambles, purpose clauses — *separately*
+Segment inert passages — recitals, preambles, purpose clauses — _separately_
 from operative rules, and flag them as such. They gate no decision and compute
 nothing, so they're encoded as a `hierarchy` outline rather than a `DECIDE` or
 `ASSUME`. See
