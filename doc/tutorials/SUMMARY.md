@@ -10,6 +10,10 @@
 - [Wedding Vows](getting-started/wedding-vows.md)
 - [Common Patterns](getting-started/common-patterns.md)
 
+## Multi-Temporal Modeling
+
+- [Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)
+
 ## Deployment
 
 - [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)

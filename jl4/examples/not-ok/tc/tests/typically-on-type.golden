@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-on-type.l4
+  Hidden: no
+  Range: 6:8-6:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `some type` is a type, which cannot carry a TYPICALLY default value.
+    TYPICALLY defaults apply to term-level fields, parameters and assumptions.
+
+File: typically-on-type.l4
+  Hidden: no
+  Range: 11:8-11:24
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `a` is a type, which cannot carry a TYPICALLY default value.
+    TYPICALLY defaults apply to term-level fields, parameters and assumptions.

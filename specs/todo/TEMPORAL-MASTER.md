@@ -1,5 +1,7 @@
 > **Status (audited 2026-07-03):** PARTIAL — the multi-axis runtime landed; the commit/git axis and the prelude macro layer did not.
 >
+> **➡ Design authority is now [`TEMPORAL-RULE-VERSION-DESIGN.md`](TEMPORAL-RULE-VERSION-DESIGN.md)** (reconciled decision, 2026-07-08). **Decision:** make the rule-version axis load-bearing **in-language** via a `RULES EFFECTIVE DATE` reader of `tcRuleValidTime` (Phase-0 spike landed on branch `mengwong/temporal-rule-version`: same predicate yields 7 under rules effective 2023, 9 under 2024); add `@effective`/`@repealed` decorators later (Phase 2). In-heap `EVAL UNDER COMMIT` is **permanently rejected** (URI/Unique collisions, `entityInfo` singleton, config-gated semantic fork); encoding-history counterfactuals become driver-level `l4 diff-eval` tooling (Phase 3). This tracker is kept for history; the "Promising Direction" / "Next Steps" sections below describe the _old, superseded_ git-backed plan.
+>
 > - Shipped: `L4.TemporalContext` (record + `applyEvalClauses`), `withEvalClauses` threading in `EvaluateLazy.hs`, EVER/ALWAYS BETWEEN + WHEN LAST/NEXT + VALUE AT as real builtins, DATE promoted to a core builtin family, `TemporalContextSpec.hs` + `temporal-acceptance.l4` goldens. EVAL clauses shipped: AS OF SYSTEM TIME, UNDER VALID TIME, UNDER RULES EFFECTIVE AT, UNDER RULES ENCODED AT.
 > - Remaining: `EVAL UNDER COMMIT` / `EVAL RETROACTIVE TO` builtins are NOT in the tree (this tracker's WIP log overstates them); no git checkout / `getRulesAtCommit` / audit wiring; `temporal-prelude.l4` was deleted rather than refactored (no mixfix macros). Live artifact is `jl4/examples/ok/temporal-acceptance.l4`.
 
@@ -19,7 +21,7 @@ This note summarizes the current state of temporal support across l4-ide and opm
 - Continuing to extend the pure-L4 shim as the semantics would diverge from the desired multi-temporal monad. Treat it as scaffolding only.
 - Relying on Prolog experiments or doc-only examples as implementation guidance; they do not connect to the L4 evaluator.
 
-## Promising Direction (to pursue)
+## Promising Direction (to pursue) — SUPERSEDED (see `TEMPORAL-RULE-VERSION-DESIGN.md`)
 
 - Implement the runtime as specified in `TEMPORAL_EVAL_SPEC.md`: keep `EvalClause`/`withEvalContext` and the multi-axis `TemporalContext`; expose uppercase builtins for `EVAL`, `AS OF RULES …`, `EVER/ALWAYS BETWEEN`, `VALUE AT`, `WHEN LAST/NEXT`.
 - Rework `temporal-prelude.l4` so mixfix forms delegate to these builtins (no manual day iteration, no fake retroactivity), keeping helper date arithmetic where needed.

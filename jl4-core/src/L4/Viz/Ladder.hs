@@ -307,7 +307,7 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
       in Map.elems $ Map.fromList [(p.unique, p) | p <- fromGivens <> fromAppArgs]
 
     getResolved :: OptionallyTypedName Resolved -> Resolved
-    getResolved (MkOptionallyTypedName _ paramName _) = paramName
+    getResolved (MkOptionallyTypedName _ paramName _ _) = paramName
 
 translateExpr :: Bool -> Expr Resolved -> Viz IRExpr
 translateExpr True = translateExpr False . Transform.simplify

@@ -19,6 +19,8 @@ export interface DecisionQueryResult {
   support: Unique[]
   ranked: Unique[]
   impact: Map<Unique, VarImpact>
+  /** Information gain (bits) per support variable; higher = ask sooner. */
+  scores: Map<Unique, number>
   stats: { nodes: number; support: number }
 }
 
@@ -64,13 +66,31 @@ function uniqSorted(nums: Iterable<number>): number[] {
   return Array.from(new Set(nums)).sort((a, b) => a - b)
 }
 
+/** Binary entropy in bits; 0 at the deterministic ends. */
+function binaryEntropy(p: number): number {
+  if (p <= 0 || p >= 1) return 0
+  return -p * Math.log2(p) - (1 - p) * Math.log2(1 - p)
+}
+
 export function compileDecisionQuery(
   expr: IRExpr,
-  varOrder: Unique[] = collectVarOrder(expr)
+  varOrder: Unique[] = collectVarOrder(expr),
+  weights?: ReadonlyMap<Unique, number>
 ): CompiledDecisionQuery {
   const bdd = new ROBDD()
   const uniqueToVarIndex = new Map<Unique, number>()
   varOrder.forEach((u, i) => uniqueToVarIndex.set(u, i))
+
+  // Per-atom priors for the information-gain ordering, keyed by BDD index.
+  // Absent weights default to 0.5 (prior-free v1). v2 populates this from
+  // TYPICALLY defaults.
+  const weightByIndex = new Map<number, number>()
+  if (weights) {
+    for (const [u, w] of weights.entries()) {
+      const idx = uniqueToVarIndex.get(u)
+      if (idx !== undefined) weightByIndex.set(idx, w)
+    }
+  }
 
   const compile = (e: IRExpr): number => {
     return match(e)
@@ -120,23 +140,19 @@ export function compileDecisionQuery(
     support: supportFromRestricted(restricted),
   })
 
-  const rank = (
-    support: Unique[],
-    impact: Map<Unique, VarImpact>
-  ): Unique[] => {
-    const score = (u: Unique): [number, number] => {
-      const imp = impact.get(u)
-      const determinableCount =
-        (imp?.ifTrue.determined !== null ? 1 : 0) +
-        (imp?.ifFalse.determined !== null ? 1 : 0)
-      const level = uniqueToVarIndex.get(u) ?? 1_000_000
-      return [-determinableCount, level]
-    }
+  // Rank by information gain about the outcome (higher = ask sooner). This
+  // subsumes the old "does answering it settle the result?" heuristic — a
+  // variable that determines the outcome yields maximal gain — while also
+  // crediting a variable that merely shrinks the remaining possibility space.
+  // Ties break by variable order for determinism.
+  const rank = (support: Unique[], scores: Map<Unique, number>): Unique[] => {
     return support.slice().sort((a, b) => {
-      const [a0, a1] = score(a)
-      const [b0, b1] = score(b)
-      if (a0 !== b0) return a0 - b0
-      return a1 - b1
+      const sa = scores.get(a) ?? 0
+      const sb = scores.get(b) ?? 0
+      if (sb !== sa) return sb - sa
+      const la = uniqueToVarIndex.get(a) ?? 1_000_000
+      const lb = uniqueToVarIndex.get(b) ?? 1_000_000
+      return la - lb
     })
   }
 
@@ -153,7 +169,11 @@ export function compileDecisionQuery(
       const support = supportFromRestricted(restricted)
       const determined = isDeterminedId(restricted)
 
+      // Current uncertainty about the outcome, in bits.
+      const priorEntropy = binaryEntropy(bdd.prob(restricted, weightByIndex))
+
       const impact = new Map<Unique, VarImpact>()
+      const scores = new Map<Unique, number>()
       for (const u of support) {
         const idx = uniqueToVarIndex.get(u)
         if (idx === undefined) continue
@@ -163,13 +183,22 @@ export function compileDecisionQuery(
           ifTrue: outcomeFromRestricted(withTrue),
           ifFalse: outcomeFromRestricted(withFalse),
         })
+
+        // Expected posterior entropy after asking this variable, weighted by
+        // how likely each answer is; info gain = prior − expected posterior.
+        const w = weightByIndex.get(idx) ?? 0.5
+        const expectedPosterior =
+          w * binaryEntropy(bdd.prob(withTrue, weightByIndex)) +
+          (1 - w) * binaryEntropy(bdd.prob(withFalse, weightByIndex))
+        scores.set(u, priorEntropy - expectedPosterior)
       }
 
       return {
         determined,
         support,
-        ranked: rank(support, impact),
+        ranked: rank(support, scores),
         impact,
+        scores,
         stats: { nodes: bdd.nodeCount(), support: support.length },
       }
     },

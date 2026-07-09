@@ -103,7 +103,7 @@ This document tracks ideas for new tutorials to serve different audiences and us
   - Topics: Default logic, rebuttable presumptions, annotations
   - Estimated time: 2 hours
 
-- [ ] **Multi-Temporal Rule Modeling**
+- [x] **Multi-Temporal Rule Modeling** — see [multi-temporal-modeling/multi-temporal-rule-modeling.md](multi-temporal-modeling/multi-temporal-rule-modeling.md)
 
   - Audience: Advanced legal engineers
   - Goal: Model rules that change over time
