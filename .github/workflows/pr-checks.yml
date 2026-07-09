@@ -200,31 +200,19 @@ jobs:
       - name: Run documentation tests
         run: ./doc/test-docs.sh
 
-      # ---- Cache maintenance (push and merge_group save; PRs only restore) ----
-      # Plain PR runs are pure cache CONSUMERS: they RESTORE the base cache
-      # (steps above) but never SAVE, to avoid the original churn problem —
-      # previously every PR/queue run wrote a fresh ~330 MB dist + ~150 MB
-      # cabal cache under a per-commit key, and that churn LRU-evicted the
-      # base cache that PRs need — so PRs cold-built (~40 min).
+      # ---- Cache maintenance (base-branch push only) --------------------------
+      # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base
+      # cache (steps above) but never SAVE. Only a push to a base branch
+      # (unstable/main) refreshes the shared cache. This is what keeps the repo
+      # under GitHub's 10 GB cache cap: previously every PR/queue run wrote a
+      # fresh ~330 MB dist + ~150 MB cabal cache under a per-commit key, and that
+      # churn LRU-evicted the base cache that PRs need — so PRs cold-built (~40
+      # min). GitHub also scopes cache reads to {own ref, base, default}, so only
+      # a cache saved here on refs/heads/unstable is inheritable by PRs into it.
       #
-      # push and merge_group DO save: a push refreshes the shared cache for
-      # refs/heads/unstable|main directly. merge_group also saves because the
-      # merge queue processes entries serially, back-to-back, faster than a
-      # push's own post-merge workflow run can finish saving — so without
-      # this, every entry after the first in a queue batch restores a cache
-      # that's still mid-refresh from the entry before it, and pays a full
-      # ~15-25 min dependency reinstall it didn't need to. Saving from
-      # merge_group closes that race: the next queued entry can pick up the
-      # cache the previous entry just built, without waiting on the slower
-      # push-triggered path.
-      #
-      # The prune step stays push-only deliberately: it deletes cache entries
-      # by key prefix WITHOUT filtering by ref, so running it from merge_group
-      # (which fires much more often, serially, mid-queue) risks deleting a
-      # good cache moments before a save that then fails for any reason,
-      # leaving the family empty. Left push-only, prune still runs shortly
-      # after every queue entry merges (each merge triggers its own push), so
-      # any extra merge_group-saved entries are swept up within minutes.
+      # The prune runs AFTER build+test (invisible to them) and deletes the
+      # superseded entries of each family so the fresh save below is the sole
+      # survivor — the dist/cabal cache families self-limit to one entry each.
       - name: Prune superseded Haskell caches
         if: github.event_name == 'push'
         continue-on-error: true
@@ -265,14 +253,14 @@ jobs:
 
       - name: Save cached dependencies
         uses: actions/cache/save@v5
-        if: (github.event_name == 'push' || github.event_name == 'merge_group') && steps.deps-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && steps.deps-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
       - name: Save cached build artifacts
         uses: actions/cache/save@v5
-        if: (github.event_name == 'push' || github.event_name == 'merge_group') && steps.build-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && steps.build-cache.outputs.cache-hit != 'true'
         with:
           path: dist-newstyle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
