@@ -11,15 +11,15 @@
 
 We have been through three iterations of the AND/OR ("ladder logic") visualizer:
 
-| # | Stack | Layout method | Centers? |
-|---|---|---|---|
-| 1. Haskell `ladder-diagram` (`insert-ladder-diagram` branch) | Svelte + npm `ladder-diagram`, fed `RuleNode`/`AndOr` JSON | the library's relay-circuit renderer | n/a — dead IR |
-| 2. **layman** (`~/src/legalese/sandbox/mengwong/layman`) | Next.js + React Flow | hand-rolled **two-pass recursive**: lay children naively → measure bbox → `pos = (bbox − child)/2` on the cross-axis | ✅ intrinsic |
-| 3. **current** (`ts-shared/l4-ladder-visualizer`) | SvelteFlow (xyflow) + **Dagre** | general DAG layout; OR-branches sandwiched with invisible source/sink "bundling" nodes | ❌ right-aligns |
+| #                                                            | Stack                                                      | Layout method                                                                                                        | Centers?        |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 1. Haskell `ladder-diagram` (`insert-ladder-diagram` branch) | Svelte + npm `ladder-diagram`, fed `RuleNode`/`AndOr` JSON | the library's relay-circuit renderer                                                                                 | n/a — dead IR   |
+| 2. **layman** (`~/src/legalese/sandbox/mengwong/layman`)     | Next.js + React Flow                                       | hand-rolled **two-pass recursive**: lay children naively → measure bbox → `pos = (bbox − child)/2` on the cross-axis | ✅ intrinsic    |
+| 3. **current** (`ts-shared/l4-ladder-visualizer`)            | SvelteFlow (xyflow) + **Dagre**                            | general DAG layout; OR-branches sandwiched with invisible source/sink "bundling" nodes                               | ❌ right-aligns |
 
 **Root cause of the right-alignment infelicity (iteration 3):** Dagre is a general layered-graph drawer with no notion of "center this AND/OR nest under its parent." Nesting is faked with invisible bundling nodes. On top of that, `displayers/flow/layout.ts` converts Dagre's center-anchor to SvelteFlow's top-left anchor by subtracting `w/2, h/2` for normal nodes **but skips that shift for bundling nodes** — so group containers sit half a box off from their contents. The code comment already concedes "the anchor positions for the grouping nodes were indeed not being set correctly."
 
-layman does not have this problem because centering is *intrinsic* to its recursion. The design in `tmp/box model.pdf` is the fully-principled version of layman's idea, and is the north star for 2026.
+layman does not have this problem because centering is _intrinsic_ to its recursion. The design in `tmp/box model.pdf` is the fully-principled version of layman's idea, and is the north star for 2026.
 
 **What we keep:** the Haskell side (`L4.Viz.Ladder` → `VizExpr.IRExpr`) is **topology-only** — n-ary `And`/`Or`/`Not`/`UBoolVar`/`App`/`InertE` with stable `id` and `atomId`, no geometry. That boundary is correct and stays.
 
@@ -28,6 +28,7 @@ layman does not have this problem because centering is *intrinsic* to its recurs
 ## 1. Goals & non-goals
 
 ### Goals
+
 - A single layout/render engine that serves **four consumers** (§2) from one source of truth.
 - **Natural centering** of nested AND/OR groups down the z-axis (fix the headline infelicity).
 - **Print-grade** output: A3 and larger, resolution-independent, Tufte-approved line work.
@@ -35,9 +36,10 @@ layman does not have this problem because centering is *intrinsic* to its recurs
 - Preserve the existing interactive features the IDE relies on (toggle leaf T/F/U, hover, inline-expr expansion, eval).
 
 ### Non-goals (for v1)
-- Replacing the Haskell `IRExpr` topology IR. (Boundary stays; we may *extend* it — §11.)
+
+- Replacing the Haskell `IRExpr` topology IR. (Boundary stays; we may _extend_ it — §11.)
 - Re-deriving the LSP/eval protocol (`l4/evalApp`, `l4/inlineExprs`, `l4/queryPlan`). We consume it.
-- General graph layout. This engine is *purpose-built* for AND/OR trees, not arbitrary DAGs.
+- General graph layout. This engine is _purpose-built_ for AND/OR trees, not arbitrary DAGs.
 
 ---
 
@@ -45,14 +47,14 @@ layman does not have this problem because centering is *intrinsic* to its recurs
 
 The choice of technology is driven by the consumers, not vice-versa.
 
-| Target | Context | Demands |
-|---|---|---|
-| **A. jl4-web** | SvelteKit web app | embed in a Svelte component; interactivity; pan/zoom |
-| **B. VS Code extension** | webview (HTML/JS iframe) | same as A, constrained viewport sizing |
-| **C. Standalone** | its own web page; embeddable widget | self-contained; no IDE deps; framework-light |
-| **D. Print artwork** | A3+ poster, PDF | vector, resolution-independent; precise typography & hairlines; **headless** (no browser) |
+| Target                   | Context                             | Demands                                                                                   |
+| ------------------------ | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| **A. jl4-web**           | SvelteKit web app                   | embed in a Svelte component; interactivity; pan/zoom                                      |
+| **B. VS Code extension** | webview (HTML/JS iframe)            | same as A, constrained viewport sizing                                                    |
+| **C. Standalone**        | its own web page; embeddable widget | self-contained; no IDE deps; framework-light                                              |
+| **D. Print artwork**     | A3+ poster, PDF                     | vector, resolution-independent; precise typography & hairlines; **headless** (no browser) |
 
-A, B, C are all *browsers* → same substrate. **D is the discriminator.**
+A, B, C are all _browsers_ → same substrate. **D is the discriminator.**
 
 ---
 
@@ -62,18 +64,18 @@ A, B, C are all *browsers* → same substrate. **D is the discriminator.**
 
 Print (target D) forces the choice. SVG is resolution-independent vector, native to all three browser targets, serializes to press-ready PDF at any size, and is the natural medium for Tufte-grade hairline rules and high data-ink ratio.
 
-| Substrate | A/B/C (browser) | D (print A3+) | Connectors/ports | Verdict |
-|---|---|---|---|---|
-| **SVG** | native | vector → PDF, any size | first-class paths | ✅ chosen |
-| HTML/CSS flex | auto-centers | poor print, page-break fiddly | needs SVG overlay anyway | ✗ |
-| Canvas / WebGL | fast, interactive | **raster — wrong for print** | manual | ✗ |
-| SvelteFlow + Dagre | DOM-bound | not printable, headless-hostile | the current bug source | ✗ |
+| Substrate          | A/B/C (browser)   | D (print A3+)                   | Connectors/ports         | Verdict   |
+| ------------------ | ----------------- | ------------------------------- | ------------------------ | --------- |
+| **SVG**            | native            | vector → PDF, any size          | first-class paths        | ✅ chosen |
+| HTML/CSS flex      | auto-centers      | poor print, page-break fiddly   | needs SVG overlay anyway | ✗         |
+| Canvas / WebGL     | fast, interactive | **raster — wrong for print**    | manual                   | ✗         |
+| SvelteFlow + Dagre | DOM-bound         | not printable, headless-hostile | the current bug source   | ✗         |
 
 ### 3.2 The decisive call: a pure, substrate-independent layout core
 
 > **Layout must not depend on DOM/browser text measurement.**
 
-Every prior iteration bound layout to the browser (`node.measured.width`, React Flow measured nodes). That is *exactly* why none can render headless for print. We invert it:
+Every prior iteration bound layout to the browser (`node.measured.width`, React Flow measured nodes). That is _exactly_ why none can render headless for print. We invert it:
 
 ```
 LayoutCore :  IRExpr  ×  TextMetrics  ×  ViewSpec   →   Scene IR
@@ -84,13 +86,14 @@ LayoutCore :  IRExpr  ×  TextMetrics  ×  ViewSpec   →   Scene IR
 ```
 
 `TextMetrics` is **injected** as a strategy:
+
 - **Browser** (A/B/C): Canvas 2D `measureText` (no DOM reflow needed) — or a cached metrics table.
-- **Headless/Node** (D): a font-metrics library (`fontkit` / `opentype.js`) loading the *same* webfont, so screen and print agree to the pixel.
+- **Headless/Node** (D): a font-metrics library (`fontkit` / `opentype.js`) loading the _same_ webfont, so screen and print agree to the pixel.
 - **Small / Tiny scales**: measurement is constant → no font metrics required at all.
 
 Because the geometry tree is computed analytically (sizes from intrinsic element size + margins, never from reflow), the same core feeds every renderer. This is the "write once, render everywhere" payoff, and it is what box-model.pdf's algebra was designed to enable.
 
-The BBE tree (§5) is the core's *internal* layout mechanism; what it *emits* is a **Scene IR** (§4.2) — a flat, resolved, tagged drawing model that both renderers consume without re-deriving geometry. The single config both web and print accept is the **ViewSpec** (§4.3). These two contracts are what keep the renderer overlays thin (§4.1).
+The BBE tree (§5) is the core's _internal_ layout mechanism; what it _emits_ is a **Scene IR** (§4.2) — a flat, resolved, tagged drawing model that both renderers consume without re-deriving geometry. The single config both web and print accept is the **ViewSpec** (§4.3). These two contracts are what keep the renderer overlays thin (§4.1).
 
 ### 3.3 Where the core lives: TypeScript
 
@@ -100,8 +103,8 @@ All four consumers are JS-reachable (browsers + Node for headless print). A sing
 
 ## 4. Architecture overview
 
-One shared base with two thin, *additive* renderer overlays — the **90 / 10 / 10**
-split. The overlays sum past 100% on purpose: they *add* behaviour to a base that
+One shared base with two thin, _additive_ renderer overlays — the **90 / 10 / 10**
+split. The overlays sum past 100% on purpose: they _add_ behaviour to a base that
 never forks (§4.1).
 
 ```
@@ -134,6 +137,7 @@ never forks (§4.1).
 ```
 
 Packages (names provisional, §12):
+
 - **`ladder-core`** — IRExpr → BBE → Scene IR. Pure; no DOM, no Svelte. (~75%)
 - **`ladder-svg`** — Scene IR → SVG primitives; DOM-node sink (browser) + string sink (headless). Shared by both overlays. (~15%)
 - **`ladder-web`** (or fold into `l4-ladder-visualizer`) — Svelte interactive overlay. (~10%)
@@ -141,11 +145,11 @@ Packages (names provisional, §12):
 
 ### 4.1 Why it sums to 110% — the factoring discipline
 
-The two renderer overlays are not *slices* of a pie that must total 100; they are
+The two renderer overlays are not _slices_ of a pie that must total 100; they are
 **additive** behaviour on a base that never branches. `ladder-core` and the shared
-SVG emit (~90%) are byte-identical for every target. Each overlay then *adds* a
+SVG emit (~90%) are byte-identical for every target. Each overlay then _adds_ a
 little — events/animation for web, page-setup/PDF for print. Summing past 100% is
-the signature of clean layering; if the overlays summed to *exactly* 100% it would
+the signature of clean layering; if the overlays summed to _exactly_ 100% it would
 mean the core had been forked per target. The two contracts below (Scene IR,
 ViewSpec) are what hold the line.
 
@@ -158,41 +162,59 @@ re-derives geometry:
 
 ```ts
 type ScenePrim =
-  | { kind: 'box';   id: NodeId; atomId?: AtomId; rect: Rect;
-      role: 'leaf' | 'group' | 'placeholder';
-      state: 'live' | 'inert' | 'dead' | 'eliminable';
-      folded?: boolean; label?: TextRef }
-  | { kind: 'wire';  from: Port; to: Port; path: PathSeg[];
-      role: 'rail' | 'rung' | 'stub'; state: ScenePrim['state'] }
-  | { kind: 'glyph'; at: Pt; role: 'open-contact' | 'power-terminal' }
-  | { kind: 'text';  id: NodeId; lines: TextLine[]; bbox: Rect;  // pre-broken
-      anchor: 'start' | 'middle'; style: TextStyleRef }
-type Scene = { size: Size; prims: ScenePrim[]; viewSpec: ViewSpec }
+  | {
+      kind: "box";
+      id: NodeId;
+      atomId?: AtomId;
+      rect: Rect;
+      role: "leaf" | "group" | "placeholder";
+      state: "live" | "inert" | "dead" | "eliminable";
+      folded?: boolean;
+      label?: TextRef;
+    }
+  | {
+      kind: "wire";
+      from: Port;
+      to: Port;
+      path: PathSeg[];
+      role: "rail" | "rung" | "stub";
+      state: ScenePrim["state"];
+    }
+  | { kind: "glyph"; at: Pt; role: "open-contact" | "power-terminal" }
+  | {
+      kind: "text";
+      id: NodeId;
+      lines: TextLine[];
+      bbox: Rect; // pre-broken
+      anchor: "start" | "middle";
+      style: TextStyleRef;
+    };
+type Scene = { size: Size; prims: ScenePrim[]; viewSpec: ViewSpec };
 ```
 
 Key points: coordinates are absolute (no nesting to resolve at paint time);
 **text is already line-broken** by the core via `TextMetrics`; `id` is positional
 (fold state, animation tracking — and the `eliminable` key, §15.2), `atomId` keys
-leaf *values*. The Scene IR is the seam that keeps both overlays ~10%.
+leaf _values_. The Scene IR is the seam that keeps both overlays ~10%.
 
 ### 4.3 ViewSpec — the shared "what to draw"
 
-Interactivity is dynamic on web; print needs a *frozen* configuration. One
+Interactivity is dynamic on web; print needs a _frozen_ configuration. One
 serializable record is the input to the core for **both**:
 
 ```ts
 type ViewSpec = {
-  foldSet:   Set<NodeId>                 // which interior nodes are collapsed
-  eval:      Record<AtomId, UBoolValue>  // leaf assignment(s); [] = no eval
-  overlay?:  ViewSpec[]                   // multi-panel diff (e.g. two readings)
-  scale:     'full' | 'small' | 'tiny'
-  orient:    'LR' | 'TB'
-  page?:     { size: 'A4'|'A3'|'A2'|'A1'; tile?: boolean }  // print only
-  theme:     'screen' | 'ink'
-}
+  foldSet: Set<NodeId>; // which interior nodes are collapsed
+  eval: Record<AtomId, UBoolValue>; // leaf assignment(s); [] = no eval
+  overlay?: ViewSpec[]; // multi-panel diff (e.g. two readings)
+  scale: "full" | "small" | "tiny";
+  orient: "LR" | "TB";
+  page?: { size: "A4" | "A3" | "A2" | "A1"; tile?: boolean }; // print only
+  theme: "screen" | "ink";
+};
 ```
 
-Payoff: the live web view's state *is* a ViewSpec — serialize it and hand it to
+Payoff: the live web view's state _is_ a ViewSpec — serialize it and hand it to
 the print path to **"print exactly what I'm looking at,"** including the two-panel
 s 415 diff (`overlay`, §15.3). Print stops being an afterthought; it is "render
 this ViewSpec to paper."
@@ -202,9 +224,9 @@ this ViewSpec to paper."
 To keep print first-class, the **canonical** text path is SVG `<text>/<tspan>` —
 the core pre-breaks lines (§4.2) so screen and paper lay text identically.
 `foreignObject` (HTML text: wrapping, a11y, rich inline markup) is a **web-only
-progressive enhancement layered over** the tspan path — never the *only* way text
+progressive enhancement layered over** the tspan path — never the _only_ way text
 renders, or print breaks. Corollary: **font parity** — the injected `TextMetrics`
-must be backed by the *same* font file in browser (`measureText`) and Node
+must be backed by the _same_ font file in browser (`measureText`) and Node
 (`fontkit`), or line breaks diverge between screen and page. One font asset, two
 agreeing metric providers. Colour→ink is a `theme` parameter in the SVG-emit step,
 not a second layout.
@@ -230,43 +252,44 @@ BBox = {
 Element = drawn content (leaf box, or a compound of child BBEs)
 ```
 
-**Parked-origin invariant:** the bounding box's top-left is always at local `(0,0)`. The *visible* element may depart from the origin (pushed in by left/top margins); the bbox never does. This is what makes composition associative.
+**Parked-origin invariant:** the bounding box's top-left is always at local `(0,0)`. The _visible_ element may depart from the origin (pushed in by left/top margins); the bbox never does. This is what makes composition associative.
 
 ### 5.2 Margin operators
 
-| op | meaning |
-|---|---|
-| `>>>` | move element **right**, add left margin, grow bbox |
-| `<<<` | add **right** margin (element does not move), grow bbox |
-| `\|/` | move element **down**, add top margin, grow bbox |
+| op     | meaning                                                  |
+| ------ | -------------------------------------------------------- |
+| `>>>`  | move element **right**, add left margin, grow bbox       |
+| `<<<`  | add **right** margin (element does not move), grow bbox  |
+| `\|/`  | move element **down**, add top margin, grow bbox         |
 | `/\|\` | add **bottom** margin (element does not move), grow bbox |
 
 ### 5.3 Combine = **align, then stack**
 
 To combine sibling BBEs along an axis:
 
-1. **Align.** Find the max extent on the cross-axis (e.g. widest child `bbw=60`). Widen *every* child's bbox to that max and **re-margin** to locate its element within — for centering, split the slack evenly into left/right (or top/bottom) margins. Centering falls out of the re-margining; no engine fights us.
+1. **Align.** Find the max extent on the cross-axis (e.g. widest child `bbw=60`). Widen _every_ child's bbox to that max and **re-margin** to locate its element within — for centering, split the slack evenly into left/right (or top/bottom) margins. Centering falls out of the re-margining; no engine fights us.
 2. **Stack.** Lay children along the main axis with a fixed gap (e.g. 8). The result is a new BBE whose single bbox contains the compound element.
 
 ### 5.4 The compound-nesting invariant (the elegant bit)
 
 When stacking produces a new parent BBE:
-- center it by moving its visible elements right by `leftMargin` and expand `bbw` by *both* left and right margins, **but**
+
+- center it by moving its visible elements right by `leftMargin` and expand `bbw` by _both_ left and right margins, **but**
 - **set the new BBE's `bblm` and `bbrm` to 0.**
 
-Why: so that when this BBE later nests into a *grandparent*, its ports are computed at the very edges of its bounding box and land in the right place. This is the invariant layman and the Dagre version both lack, and it is what lets nesting compose cleanly down the z-axis.
+Why: so that when this BBE later nests into a _grandparent_, its ports are computed at the very edges of its bounding box and land in the right place. This is the invariant layman and the Dagre version both lack, and it is what lets nesting compose cleanly down the z-axis.
 
 ### 5.5 AND vs OR; orientation
 
-| | LR (default) | TB |
-|---|---|---|
-| **AND (`All`)** = series | stack **horizontally**, center vertically | stack vertically (series) |
+|                           | LR (default)                              | TB                            |
+| ------------------------- | ----------------------------------------- | ----------------------------- |
+| **AND (`All`)** = series  | stack **horizontally**, center vertically | stack vertically (series)     |
 | **OR (`Any`)** = parallel | stack **vertically**, center horizontally | stack horizontally (parallel) |
-| leaf | upright | rotated 90° CW |
-| "true" line | on top | on the right |
-| "false" line | on the left | on top |
-| parent margins | left/right | top/bottom |
-| ports default | top, horizontal-center | vertically centered |
+| leaf                      | upright                                   | rotated 90° CW                |
+| "true" line               | on top                                    | on the right                  |
+| "false" line              | on the left                               | on top                        |
+| parent margins            | left/right                                | top/bottom                    |
+| ports default             | top, horizontal-center                    | vertically centered           |
 
 ### 5.6 PrePost labels
 
@@ -277,7 +300,7 @@ A disjunctive OR is often surrounded by prose ("if any of the following are true
 - Every BBE has **input/output ports**. Default in LR = "top" (offset from `bbtm` by a default amount) and horizontal "center". Ports may be restyled top/bottom/left/right/middle.
 - Explicit port locations are relative to the **element origin** (go right by `bblm`, down by `bbtm`, then adjust by `pl/pt/pr/pb`).
 - **Ports sit against the inner element, not the bounding box** — internal margins (`bblm/bbtm/bbrm/bbbm`) are accounted for when drawing connections.
-- **Connectors** are drawn at *compound* time (parent → each child's in/out port), because the child BBEs are absorbed into the parent and would otherwise have no one to draw them. The parent's own connectors sit at the very edges of its bbox — see §5.4 for why `bblm/bbrm=0` matters here.
+- **Connectors** are drawn at _compound_ time (parent → each child's in/out port), because the child BBEs are absorbed into the parent and would otherwise have no one to draw them. The parent's own connectors sit at the very edges of its bbox — see §5.4 for why `bblm/bbrm=0` matters here.
 
 ---
 
@@ -293,15 +316,16 @@ type Default = Either (Maybe Bool) (Maybe Bool)
 ```
 
 Leaf rendering as a relay contact:
+
 - **known true** → raised bump / closed contact (current flows through)
 - **known false** → gap / open contact (current stopped)
 - **unknown** → plain pass-through box (grey)
 
-Combinator highlighting: when one branch of an OR is true while siblings are unknown/false, show the circuit **closed over** the true element and **stopped** by false ones. True/false lines are drawn against the *inner* element (margins-aware), per §5.7.
+Combinator highlighting: when one branch of an OR is true while siblings are unknown/false, show the circuit **closed over** the true element and **stopped** by false ones. True/false lines are drawn against the _inner_ element (margins-aware), per §5.7.
 
 Combinators: **Leaf, Not, All, Any.** `All [A,B,C]` = series; `Any [A,B,C]` = parallel.
 
-**Sub-ordering within groups (nice-to-have):** the sketch orders children for short-circuit legibility — for `All`, false → true → unknown; for `Any`, true → unknown → false; within a group, by selectivity then source order. This is a *presentation* reorder, not a tree change. Flag as optional (§13) since it interacts with stable IDs and user expectations about source order.
+**Sub-ordering within groups (nice-to-have):** the sketch orders children for short-circuit legibility — for `All`, false → true → unknown; for `Any`, true → unknown → false; within a group, by selectivity then source order. This is a _presentation_ reorder, not a tree change. Flag as optional (§13) since it interacts with stable IDs and user expectations about source order.
 
 ---
 
@@ -309,11 +333,11 @@ Combinators: **Leaf, Not, All, Any.** `All [A,B,C]` = series; `Any [A,B,C]` = pa
 
 A single `AAVScale` config drives box sizing; same layout logic, different leaf chrome:
 
-| Scale | Leaf content | Use |
-|---|---|---|
-| **Full** | boxes grow/shrink to fit free text | primary reading view |
-| **Small** | uniform-size boxes, paragraph numbers ("§12.a.1") | dense overview |
-| **Tiny** | no labels — just the leaf's `Either (Maybe Bool)` value | **minimap**; mouseover auto-recenters the main view |
+| Scale     | Leaf content                                            | Use                                                 |
+| --------- | ------------------------------------------------------- | --------------------------------------------------- |
+| **Full**  | boxes grow/shrink to fit free text                      | primary reading view                                |
+| **Small** | uniform-size boxes, paragraph numbers ("§12.a.1")       | dense overview                                      |
+| **Tiny**  | no labels — just the leaf's `Either (Maybe Bool)` value | **minimap**; mouseover auto-recenters the main view |
 
 Because Small/Tiny are uniform/constant-size, they need **no font metrics** — which also makes them the trivial case for headless print.
 
@@ -328,7 +352,7 @@ interface TextMetrics {
 ```
 
 - **Browser**: Canvas 2D `measureText` against the loaded webfont. No DOM reflow → works before mount, works in a worker.
-- **Headless/Node (print)**: `fontkit`/`opentype.js` loading the *same* font file → identical metrics to the browser.
+- **Headless/Node (print)**: `fontkit`/`opentype.js` loading the _same_ font file → identical metrics to the browser.
 - **Small/Tiny**: constant metrics; the interface is satisfied by a stub.
 
 This single injection point is the difference between "web-only, like every prior version" and "one engine, four targets including print."
@@ -338,16 +362,19 @@ This single injection point is the difference between "web-only, like every prio
 ## 9. Rendering & interactivity
 
 ### SVG renderer (`ladder-svg`)
+
 - Pure function `Geometry → SvgNode` (a small VDOM-ish AST), with two sinks: build real SVG DOM (browser) or serialize to a string (Node).
 - Tufte defaults: hairline strokes, restrained palette (green = evaluated leaf, grey = unknown, per the sketch), generous whitespace, no chartjunk, labels typeset not boxed where possible.
 
 ### Interactive wrapper (`ladder-svelte`, IDE targets)
+
 - Pan/zoom by manipulating the SVG `viewBox` (no SvelteFlow needed) — or `svg-pan-zoom`.
 - Event handlers on leaf `<g>` elements: click to toggle T/F/U; hover tooltip; right-click context menu.
 - Wires the existing LSP calls: `l4/evalApp`, `l4/inlineExprs`, `l4/queryPlan`. The `atomId` from `IRExpr` remains the stable handle for binding values back.
 - Minimap = a second `ladder-svg` render at Tiny scale sharing the same geometry tree; mouseover recenters the main `viewBox`.
 
 ### Memory note
+
 The current code leaks `LirNode`s into a long-lived `LirContext` if not disposed. The pure-core design sidesteps this: geometry trees are plain data, recomputed per render, GC'd normally. The interactive wrapper holds only the current tree + view state.
 
 ---
@@ -370,19 +397,23 @@ IRExpr (fixture or live export)
 ## 11. Relationship to existing code
 
 ### Keep
+
 - `jl4-core/src/L4/Viz/{Ladder,VizExpr}.hs` — the `IRExpr` topology IR and its JSON.
 - The LSP custom protocol (`l4/evalApp`, `l4/inlineExprs`, `l4/queryPlan`) and `atomId` identity.
 - The TS `viz-expr` schema package (decode `RenderAsLadderInfo`).
 
 ### Replace
+
 - `ts-shared/l4-ladder-visualizer/src/lib/displayers/flow/**` (Dagre + SvelteFlow layout, the bundling-node sandwiching, the anchor hack) → `ladder-core` + `ladder-svg`.
 - The `LIR` + algebraic-graphs machinery → the BBE geometry tree (simpler, purpose-built).
 
 ### Possibly extend `IRExpr` (decide in §13)
+
 - The current IR carries enough topology, but box-model features may want hints: PrePost label text (for §5.6), explicit leaf default (`Either (Maybe Bool) (Maybe Bool)` vs a bare three-valued `UBoolValue`), and possibly NLG labels. Prefer to derive in TS where possible; extend Haskell only when the data isn't recoverable frontend-side.
 
 ### Salvage from prior work
-- **layman**: the two-pass measure→center recursion is the proven kernel of §5.3. Port the *idea*, formalized via BBE.
+
+- **layman**: the two-pass measure→center recursion is the proven kernel of §5.3. Port the _idea_, formalized via BBE.
 - **`enhance/ladder-expressions` branch**: its use of `L4.ExactPrint` to render `App` nodes with their arguments as leaf text — applicable when we render `App ID Name [IRExpr]` leaves. (The branch's IR is dead; the technique is not.)
 - **`insert-ladder-diagram` branch**: nothing structural (dead `RuleNode` IR), but the standalone-app build setup (SvelteKit + Vite, fetch-or-inline JSON polymorphism) is a useful reference for target C.
 
@@ -411,17 +442,17 @@ tools/
 3. **Sub-ordering within groups** (§6) — implement the selectivity reorder, or preserve strict source order? Interacts with stable `atomId` and user mental model.
 4. **`IRExpr` extensions** (§11) — what, if anything, must move into Haskell vs be derived in TS. **Leading candidate: a `NamedExpr` wrapper for subtree labels** (§16.1) — the wire IR currently can't name an interior node, which folding wants; `@repo/viz-expr` already stubs it out. Decide whether Haskell populates it from the inlined DECIDE/`Where` name, NLG fills it, or both.
 5. **Pan/zoom** — `viewBox` hand-roll vs `svg-pan-zoom` dependency.
-6. **SVG→PDF tool** — resvg (fast, Rust, no browser) vs headless Chrome (best CSS/font fidelity) vs Inkscape (designer-grade). *(P0 uses `rsvg-convert` for PNG previews.)*
+6. **SVG→PDF tool** — resvg (fast, Rust, no browser) vs headless Chrome (best CSS/font fidelity) vs Inkscape (designer-grade). _(P0 uses `rsvg-convert` for PNG previews.)_
 7. **Interactivity in print?** — none, presumably; but confirm whether an "annotated" print mode (showing a worked T/F/U evaluation) is wanted.
 
 ---
 
 ## 14. Status board (where are we)
 
-*As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, 22 commits; merged
+_As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, 22 commits; merged
 `origin/unstable` on 2026-07-08 (conflict-free — all work is in new paths), so
 **caught up with unstable**. **Pushed + PR'd → [#96](https://github.com/legalese/l4-ide/pull/96)**
-into `unstable` (purely additive; ladder-core is standalone, not in the root workspace).*
+into `unstable` (purely additive; ladder-core is standalone, not in the root workspace)._
 
 **✅ P0 — Kernel (DONE).** Pure `IRExpr × TextMetrics × ViewSpec → Scene IR → SVG`,
 no DOM (`ts-shared/ladder-core/`, `7136ec92`). Centering thesis proven on the s415
@@ -430,7 +461,7 @@ contracts in place.
 
 **✅ Target C — Standalone interactive page (DONE).** `standalone/` (`a43f8dc0`):
 click-to-fold/expand, click-to-cycle T/F/U, reading + connective-style controls,
-FLIP animation. `npm run standalone`. *(Not yet driven/screenshot-verified live.)*
+FLIP animation. `npm run standalone`. _(Not yet driven/screenshot-verified live.)_
 
 **✅ Visual language (DONE, beyond the original plan).** §15 ELIMINABLE don't-care
 rung; §16 folding + subtree labels; §17 unboxed inert elements (headings /
@@ -465,24 +496,24 @@ avoid drift.
 
 ## 15. Proposed (added this session): rendering ELIMINABILITY — the don't-care rung
 
-**Motivation.** A worked example — Penal Code s 415, *Poh Yuan Nie v PP* [2022] SGCA 74 — produces a ladder in which one rung is provably *otiose*: under a given reading/fact-context it can **never carry current**. That is the legal doctrine of **surplusage** and the CS notion of **dead code / a don't-care variable** — the same thing. The §6 leaf model (true / false / unknown) cannot express it, yet it is the single most legible thing a ladder can show a lawyer.
+**Motivation.** A worked example — Penal Code s 415, _Poh Yuan Nie v PP_ [2022] SGCA 74 — produces a ladder in which one rung is provably _otiose_: under a given reading/fact-context it can **never carry current**. That is the legal doctrine of **surplusage** and the CS notion of **dead code / a don't-care variable** — the same thing. The §6 leaf model (true / false / unknown) cannot express it, yet it is the single most legible thing a ladder can show a lawyer.
 
 ### 15.1 A fourth leaf state: ELIMINABLE (don't-care)
 
 Orthogonal to T/F/U:
 
-| state | contact | meaning |
-|---|---|---|
-| known-true | closed bump | current flows |
-| known-false | open gap | current stopped *here, now* |
-| unknown | grey passthrough | value not yet supplied — **may still matter** |
-| **eliminable** *(new)* | ghosted/dashed box, broken rail | value **cannot matter**: flipping it never changes the output over the region in view |
+| state                  | contact                         | meaning                                                                               |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
+| known-true             | closed bump                     | current flows                                                                         |
+| known-false            | open gap                        | current stopped _here, now_                                                           |
+| unknown                | grey passthrough                | value not yet supplied — **may still matter**                                         |
+| **eliminable** _(new)_ | ghosted/dashed box, broken rail | value **cannot matter**: flipping it never changes the output over the region in view |
 
 `eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
-- **Annotated** — `ladder-core` takes an `eliminable` map **keyed by node `id`** (positional, *not* `atomId`: a repeated atom can be live in one rung and otiose in another, and interior `And`/`Or` rungs carry no `atomId`), computed upstream by a minimiser / don't-care prover (Quine–McCluskey / Espresso / a BDD don't-care pass / the Z3 region proof below — cf. the planned boolean-minimization spec, GH issue #638). Just more injected data, like `TextMetrics`. (Leaf **values** stay keyed by `atomId` — toggling a leaf sets it everywhere; only **eliminability** is positional.)
+- **Annotated** — `ladder-core` takes an `eliminable` map **keyed by node `id`** (positional, _not_ `atomId`: a repeated atom can be live in one rung and otiose in another, and interior `And`/`Or` rungs carry no `atomId`), computed upstream by a minimiser / don't-care prover (Quine–McCluskey / Espresso / a BDD don't-care pass / the Z3 region proof below — cf. the planned boolean-minimization spec, GH issue #638). Just more injected data, like `TextMetrics`. (Leaf **values** stay keyed by `atomId` — toggling a leaf sets it everywhere; only **eliminability** is positional.)
 - **Intrinsic** — for small trees, compute it in-core from topology + a partial assignment (cofactor equality per leaf). O(leaves × cases); fine at Small/Tiny.
 
 ### 15.3 Minimisation / diff overlay (extends §13.7's "annotated print mode")
@@ -493,7 +524,7 @@ Worked SVG + generator (hand-rolled, pre-`ladder-core`): `~/src/legalese/sandbox
 
 ### 15.4 A real fixture for P0 / P2
 
-s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 *and* 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — **now vendored in this branch** (cherry-picked from `poh-yuan-nie` `21b62316`, so the patch is identical and will merge to `unstable` without conflict). Canonical home stays the *Poh Yuan Nie* work; if it diverges, reconcile on `unstable`. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` (in `~/src/legalese/sandbox/mengwong/layman/`) is exactly the upstream minimiser that would emit the `eliminable` map.
+s 415's second limb is a clean, legally-meaningful AND/OR tree — `And[ Or[by-deceiving, dishonest-concealment], intentionally, causes-harm, Or[body, mind, reputation, property] ]` — exercising centering, parallel groups of 2 _and_ 4, and the new eliminable state. Better than a toy. Source of truth: `jl4/ok/inert/cheating-415-poh-yuan-nie.l4` — **now vendored in this branch** (cherry-picked from `poh-yuan-nie` `21b62316`, so the patch is identical and will merge to `unstable` without conflict). Canonical home stays the _Poh Yuan Nie_ work; if it diverges, reconcile on `unstable`. Its Z3 surplusage proof `cheating-415-surplusage.z3.py` (in `~/src/legalese/sandbox/mengwong/layman/`) is exactly the upstream minimiser that would emit the `eliminable` map.
 
 ---
 
@@ -503,12 +534,12 @@ Collapsing an interior `And`/`Or` (or any subtree) into a placeholder, and
 expanding it back, is a first-class interaction — and the single best stress test
 of the layout core, so P0 builds it in.
 
-- **A fold is a core *input*, not a renderer trick.** A collapsed node lives in
+- **A fold is a core _input_, not a renderer trick.** A collapsed node lives in
   `ViewSpec.foldSet` (§4.3); the core treats it as a leaf-shaped placeholder and
   re-runs align-then-stack, so everything re-centers with no renderer special-casing.
   That folding "just works" is itself evidence the BBE architecture is right.
 - **The placeholder keeps the verdict.** A folded subtree still carries its
-  evaluation state — fold the *detail*, keep the *answer*: a collapsed satisfied OR
+  evaluation state — fold the _detail_, keep the _answer_: a collapsed satisfied OR
   renders live ("▸ ANY OF 4 ✓"); collapsed-unknown stays grey; collapsed-eliminable
   shows the ghost (§15). Scene IR marks it `role: 'placeholder'` with the rolled-up
   `state`.
@@ -519,7 +550,7 @@ of the layout core, so P0 builds it in.
 - **Eliminable ↔ fold are partners.** Surplusage = collapse-by-default: a dead
   subtree folds to a ghosted "otiose — collapsed" placeholder; expand to inspect.
 - **Explainability payoff.** Fold to the top-level verdict, then expand only the
-  branch that *did the work* (the live path). "Why TRUE? → expand the satisfied
+  branch that _did the work_ (the live path). "Why TRUE? → expand the satisfied
   OR." Auto-expand-the-deciding-path is a headline feature.
 - **Heuristics & persistence.** Auto-fold beyond depth N for large statutes;
   "focus mode" folds siblings; the Tiny minimap (§7) stays fully expanded while the
@@ -537,15 +568,15 @@ A folded interior node needs a **name** to show. Three tiers, all worth supporti
   available, no IR change, uninformative. The P0 fallback.
 - **Tier 1 — synthesize from children (NLG-lite).** Join child labels: "deceiving
   OR concealment". Fine when shallow; degrades with depth. No IR change.
-- **Tier 2 — an explicit subtree label on the IR.** The only way to get a *legible*
+- **Tier 2 — an explicit subtree label on the IR.** The only way to get a _legible_
   fold like "there is a deception" or "harm to…". **The current wire IR cannot do
   this** — `And`/`Or` carry only `id` + `args`; interior nodes are anonymous, and
-  the name is *lost* at the Haskell boundary when a named DECIDE/`Where` body is
+  the name is _lost_ at the Haskell boundary when a named DECIDE/`Where` body is
   inlined.
 
 Recommendation: support all three, precedence Tier 2 → 1 → 0. For Tier 2, **do not
 fatten `And`/`Or`** (keep them clean n-ary monoids); add an optional **`NamedExpr`
-wrapper** `{ name, expr }` — which `@repo/viz-expr` *already stubs out* (commented,
+wrapper** `{ name, expr }` — which `@repo/viz-expr` _already stubs out_ (commented,
 `viz-expr.ts` ~L198–211, alongside `AppNamed`). Populate it on the Haskell side
 from the L4 name the subtree was inlined from, and/or via NLG (cf. the NLG
 round-trip work). The core takes a label resolver; absent name → fall to Tier 1/0.
@@ -555,17 +586,17 @@ core honours an optional `label?` on a group, so the `harm` fold renders
 durable step — tracked in §13.
 
 **Relation to upstream #630 ("visualizer expansion could use some improvement").**
-#630 is the *current-codebase symptom* this section supersedes. Today expansion is
+#630 is the _current-codebase symptom_ this section supersedes. Today expansion is
 gated by an ad-hoc `canInline`: it fires only for a boolean `UBoolVar` that resolves
 to a **same-file top-level `DECIDE`** (`jl4-core/src/L4/Viz/Ladder.hs:169-173,
 380-392`); functions-with-arguments are unsupported (`App appAnno _fn args`,
 `Ladder.hs:350`), imported / `WHERE`-bound refs don't expand, and the inlined name
 is lost at the Haskell boundary. The 2026 model dissolves all four: fold/expand is a
-first-class **core input** (`ViewSpec.foldSet`, §4.3), so *any* subtree is
+first-class **core input** (`ViewSpec.foldSet`, §4.3), so _any_ subtree is
 expandable without a special-case predicate; **Tier-2 `NamedExpr`** (§16.1) recovers
 the lost inline name; and broadening to functions-with-args / imported / `WHERE`-bound
 falls out for free. So #630's fix is **"adopt the §16 fold model"**, not another
-patch to `canInline` — and #630 is an *enhancement*, not a bug.
+patch to `canInline` — and #630 is an _enhancement_, not a bug.
 
 ---
 
@@ -573,12 +604,12 @@ patch to `canInline` — and #630 is an *enhancement*, not a bug.
 
 **The unification.** Four things we treated separately are one primitive:
 
-| surface form | was |
-|---|---|
-| "all of:" / "any of the following" group heading | PrePost `Pre` on a group |
-| "either … or …" connective between rungs | inert string between atoms |
+| surface form                                                   | was                             |
+| -------------------------------------------------------------- | ------------------------------- |
+| "all of:" / "any of the following" group heading               | PrePost `Pre` on a group        |
+| "either … or …" connective between rungs                       | inert string between atoms      |
 | inert-style verbatim prose ("as such an officer or employee,") | `InertE` node, context-identity |
-| the decoration the box model wanted to "park" | §5.6 protrude band |
+| the decoration the box model wanted to "park"                  | §5.6 protrude band              |
 
 All four are **inert text**: the identity of their context (TRUE under AND, FALSE
 under OR), so they carry **no current**. A thing that carries no current must not
@@ -586,7 +617,7 @@ be a **box** (boxes are operative atoms that open/close the circuit) — it rend
 **unboxed**. That is the whole idea.
 
 **PrePost is subsumed into positional `InertE`.** Inert style already places
-headings and connectives by *position in the args list*, so we don't carry a
+headings and connectives by _position in the args list_, so we don't carry a
 separate PrePost field on the wire IR; "PrePost" survives only as vocabulary:
 
 - **leading** inert run → the group's `Pre` (heading)
@@ -594,7 +625,7 @@ separate PrePost field on the wire IR; "PrePost" survives only as vocabulary:
 - **trailing** inert → `Post`
 
 The current IR already has `InertE` (with `InertAnd`/`InertOr` context); we were
-about to *box* it, which was the bug. (`Leaf` no longer includes `InertE`; it is
+about to _box_ it, which was the bug. (`Leaf` no longer includes `InertE`; it is
 its own node.)
 
 **Placement (locked, except as noted).**
@@ -605,23 +636,23 @@ its own node.)
   `inert … (stack)`. In LR a series puts the leading inert to the left for free.
   So no dedicated "left heading" placement is needed.
 - **Conjunctive (series) inerts → an unbroken wire, prose above** — the wire stays
-  *continuous* (inert = identity = always conducts, so the line must not break for
+  _continuous_ (inert = identity = always conducts, so the line must not break for
   it). This makes inert placement uniform: **all inert text lives above what it
   annotates** — headings above stacks, connectives above wires — one reading rule.
 - **Long connectives straddle the wire** (default `connectiveStyle: 'straddle-wire'`,
-  *adaptive*): prose wider than ~a box (`STRADDLE_MIN_WIDTH`) word-wraps to two
+  _adaptive_): prose wider than ~a box (`STRADDLE_MIN_WIDTH`) word-wraps to two
   width-balanced lines, half above / half below, the wire threading between —
   ~halving the horizontal footprint (which long verbatim inert prose otherwise
   wastes) at the cost of vertical space (which a series has to spare). Short prose
   stays a single line above, so `'straddle-wire'` is a strict superset of
   `'above-wire'`. `'below-wire'` and `'on-wire'` remain toggles; `'on-wire'` is
   discouraged (its gap reads like a contact, which inert never is).
-- **Disjunctive medial inert → centered in the inter-rung gap.** An inert *between*
+- **Disjunctive medial inert → centered in the inter-rung gap.** An inert _between_
   two OR rungs (e.g. "or") sits unboxed, centered in the gap between the boxes,
   connected to nothing (it carries no current). The gap widens only if the text
   needs the room (`max(GAP_PARALLEL, lineHeight + 8)`) — minimal margin.
-- *(Open: N-line straddle for very long statutory clauses; trailing inert as a
-  `Post` below a group.)*
+- _(Open: N-line straddle for very long statutory clauses; trailing inert as a
+  `Post` below a group.)_
 
 **Scene IR / layout.** The `text` prim gains roles `heading` and `connective`
 (unboxed, italic, inert ink — no rect, no ports). `measureOr` extracts the leading
@@ -630,11 +661,11 @@ gives them left/right ports so the wire connects through). Folding prefers the
 explicit label, then the leading inert (the Pre), then synthesizes — so folding the
 deception group yields "▸ there is a deception (Expl. 1)".
 
-**The payoff — the diagram *becomes* the statute.** Boxed = operative predicates;
+**The payoff — the diagram _becomes_ the statute.** Boxed = operative predicates;
 unboxed = verbatim inert prose. Read together, the rung reads as the section:
-*"there is a deception (Expl. 1)" [by deceiving / dishonest concealment] →
+_"there is a deception (Expl. 1)" [by deceiving / dishonest concealment] →
 intentionally → induces an act or omission that → causes harm → to any person in →
-[body / mind / reputation / property]*. The visual form of inert style; the
+[body / mind / reputation / property]_. The visual form of inert style; the
 isomorphism (source ↔ logic ↔ picture) made legible at once. **Proven in P0** —
 `demo/s415.ts`, `demo/out/s415-court.svg`.
 
@@ -661,29 +692,29 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
 
 ## 19. Valuation, override & the gesture split
 
-**Valuation.** `ViewSpec.valuation: Map<NodeId, UBoolValue>` — a *positional* (by node
+**Valuation.** `ViewSpec.valuation: Map<NodeId, UBoolValue>` — a _positional_ (by node
 id) T/F/U. For a **leaf** it's the atom's value; for a **group** it's an **override /
 pin**: the node is treated opaquely with that value and **its children are not
 consulted**. Absent ⇒ groups derive from operative children (`nodeValue`, three-valued),
 leaves are unknown / constant. Box render state = `vs.states.get(id)` (manual override,
 e.g. eliminable) ?? `valueToState(value)`.
 
-**Override, without a witness.** Pinning a group lets you assert *"deception is made
-out"* without committing to which child decides it — the parent is more determined than
+**Override, without a witness.** Pinning a group lets you assert _"deception is made
+out"_ without committing to which child decides it — the parent is more determined than
 its children. (Stance: **override** — the assertion wins; conflicting child values are
-subsumed. The consistency-checking alternative is the essay's *contradiction-detector*,
+subsumed. The consistency-checking alternative is the essay's _contradiction-detector_,
 deferred to a later layer.)
 
 **The gesture split.** Every drawable carries an optional `ClickAct` the renderer turns
 into a `data-value` / `data-fold` attribute (host-wired):
 
 - **box** (leaf or folded placeholder) → `value`: click cycles U → T → F → U. A folded
-  placeholder cycles the *parent's* override.
+  placeholder cycles the _parent's_ override.
 - **heading**, **fan connector**, **▸ caret** → `fold`: click folds / expands that group.
   (Clicking a connector folds the group it belongs to; the caret expands a placeholder.)
 
 This makes "value the parent" need no new concept — it's just "click a box," because a
-folded subtree *is* a box. Proven live in `standalone/` and the `s415-interactive`
+folded subtree _is_ a box. Proven live in `standalone/` and the `s415-interactive`
 snapshot: `harm` folded and pinned true renders a green `▸ ANY of 4` while its children
 stay unknown.
 
@@ -698,17 +729,17 @@ box-model spec.
 ## 20. Current flow — leader + streamer (the lightning model)
 
 Cycling values closes the circuit, drawn by **darkening + thickening** the connectors
-(box-model.pdf: *closed over true, stopped by false*). `ViewSpec.showCurrent` gates it
+(box-model.pdf: _closed over true, stopped by false_). `ViewSpec.showCurrent` gates it
 (off ⇒ static/print demos keep state-coloured connectors). Three levels per connector:
 
-| level | weight·ink | meaning |
-|---|---|---|
-| **closed** | thick, near-black | reached by the **leader** — a closed run *from the source* |
-| **streamer** | medium, mid-grey | **local closure** — a conducting element lights its own connectors even with no path to the source yet |
-| **open** | thin, light | neither |
+| level        | weight·ink        | meaning                                                                                                |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| **closed**   | thick, near-black | reached by the **leader** — a closed run _from the source_                                             |
+| **streamer** | medium, mid-grey  | **local closure** — a conducting element lights its own connectors even with no path to the source yet |
+| **open**     | thin, light       | neither                                                                                                |
 
 **Why the streamer (Meng).** A purely source-driven model only shows the leader
-descending — it can't reveal that a TRUE leaf nested deep in `harm` is *locally*
+descending — it can't reveal that a TRUE leaf nested deep in `harm` is _locally_
 closed. The metaphor is lightning: the bolt (leader) reaches down from the cloud while
 **ground streamers rise to meet it** — they join in the middle. Showing local regions
 of closure lets a reader piece a path across the circuit **without** imposing a
@@ -716,8 +747,9 @@ top-down / left-to-right direction of flow. As more atoms go true, streamers gro
 snap to `closed` when the leader arrives.
 
 **Computation** (pure, DESIGN §3.2):
+
 - `nodeValue` → three-valued value; `conducts(n) = value===TRUE` (inert conducts
-  trivially; only a TRUE *atom/group* — `trueConducts` — raises a streamer).
+  trivially; only a TRUE _atom/group_ — `trueConducts` — raises a streamer).
 - `energize()` — forward (leader) reachability from the source: a series stops at the
   first non-conductor; an OR's output closes iff some branch conducts. Fills `inE/outE`.
 - per connector: `flowFor(leader, local)` → leader ? `closed` : local ? `streamer` :
@@ -726,8 +758,8 @@ snap to `closed` when the leader arrives.
   `outE`; local = the branch conducts.
 
 Verified: `s415-streamer` — leader stops at `causes harm`, `body` TRUE streamers its
-fan connectors. *(Future: a backward pass from the sink would let streamer + leader
-distinguish a genuinely **complete** source-to-sink path from a merely partial one.)*
+fan connectors. _(Future: a backward pass from the sink would let streamer + leader
+distinguish a genuinely **complete** source-to-sink path from a merely partial one.)_
 
 ---
 
@@ -735,16 +767,16 @@ distinguish a genuinely **complete** source-to-sink path from a merely partial o
 
 `not(complex)` poses two problems a bare `¬` can't: **scope** (is it `not(A and B)`
 or `(not A) and B`?) and **inversion in the flow** (a negated region conducts when
-its insides are *open*). The grammar:
+its insides are _open_). The grammar:
 
 - **Inverter bubble** — a small open circle on the negated element's **output port**
-  (digital-logic convention). The *universal* NOT mark: identical for leaf and
+  (digital-logic convention). The _universal_ NOT mark: identical for leaf and
   complex, so the leaf case stops being special.
-- **Scope frame** — for a *complex* negand, a light dashed rounded enclosure tagged
+- **Scope frame** — for a _complex_ negand, a light dashed rounded enclosure tagged
   **NOT**. It draws the bracket the algebra implies. (A leaf negand gets just a small
   `NOT` tag + the bubble — no frame.)
 - **Flip at the bubble.** The negand renders its **own** internal flow (its leaves'
-  values, its leader/streamers). The wire *past* the bubble is energized iff the
+  values, its leader/streamers). The wire _past_ the bubble is energized iff the
   inside is **open**: `not.outE = inE && !conducts(negand)`. You see the current flip
   at the mark.
 
@@ -761,10 +793,10 @@ flow), the bubble, and the bubble→output segment (inverted flow). Scene IR gai
 Verified: `not-nested` — `not(And[registered, not(Or[sat, submitted])])`, leader thick
 to the inner bubble, thin between the bubbles, thick past the outer one.
 
-*Alternatives (not chosen): **evaluate-aside** — pull the negand off the main rung as
+_Alternatives (not chosen): **evaluate-aside** — pull the negand off the main rung as
 a sub-circuit driving a normally-closed contact (relay-accurate, more layout); **De
 Morgan push-down** — rewrite NOT to the leaves (changes displayed structure; better as
-an optional "normalize negation" view).*
+an optional "normalize negation" view)._
 
 ---
 
@@ -777,14 +809,14 @@ default model `type Default = Either (Maybe Bool) (Maybe Bool)`, where **`Left` 
 default (system-supplied, no user input)** and **`Right` = user-given**. The four cells
 map straight onto render:
 
-| `Default` value | provenance · value | reads as |
-|---|---|---|
-| `Left (Just b)` | `default` · b | **presumed** b — tentative box, riding TYPICALLY |
-| `Left Nothing` | — · unknown | never asked, no default — plain grey (today's UNKNOWN) |
-| `Right (Just b)` | `given` · b | user answered b — solid box |
-| `Right Nothing` | `given` · unknown | user said *don't-know* — a **confirmed** unknown |
+| `Default` value  | provenance · value | reads as                                               |
+| ---------------- | ------------------ | ------------------------------------------------------ |
+| `Left (Just b)`  | `default` · b      | **presumed** b — tentative box, riding TYPICALLY       |
+| `Left Nothing`   | — · unknown        | never asked, no default — plain grey (today's UNKNOWN) |
+| `Right (Just b)` | `given` · b        | user answered b — solid box                            |
+| `Right Nothing`  | `given` · unknown  | user said _don't-know_ — a **confirmed** unknown       |
 
-**Provenance is a third axis** — orthogonal to the T/F/U value (§6) *and* to the render
+**Provenance is a third axis** — orthogonal to the T/F/U value (§6) _and_ to the render
 `State` (live/eliminable, §15). A leaf can be TRUE-and-presumed, TRUE-and-given,
 FALSE-and-presumed… `ViewSpec.provenance: Map<NodeId, Provenance>` (`'given' | 'default'`,
 absent ⇒ `given`) carries it — **injected data, keyed by node `id`**, exactly like the
@@ -795,14 +827,14 @@ absent ⇒ `given`) carries it — **injected data, keyed by node `id`**, exactl
 - **Tentative box.** A `default` leaf renders **fine-dashed** (`1.5 3`, distinct from
   eliminable's coarser `5 4`) with **normal ink** — a presumption, not a ghost — plus a
   small amber **`typically`** tag. Solid box = grounded/given.
-- **Streamer-weight closure.** Current flowing *through* a presumed-true contact is
+- **Streamer-weight closure.** Current flowing _through_ a presumed-true contact is
   capped at **streamer** weight (§20), never full leader-black: `flowFor(…, tentative)`
   degrades a would-be `closed` to `streamer`. A rebuttable presumption closes the circuit
-  only **provisionally**. This *reuses* the lightning model — streamer already means
+  only **provisionally**. This _reuses_ the lightning model — streamer already means
   "closed, but not (yet) confirmed": by locality (a ground streamer) **or** by provenance
   (a presumption). Both are tentative closure; one channel, two reasons.
 - **Defaults-used-vs-not, at a glance.** The box-model.pdf asked to show "defaults being
-  used or not." The dashed/amber marks *are* that view: they highlight exactly the inputs
+  used or not." The dashed/amber marks _are_ that view: they highlight exactly the inputs
   still resting on a presumption. Fold to the verdict (§16) and the tentative marks that
   survive answer **"how much of this outcome rests on presumptions?"** When every input is
   `given`, no tentative mark remains — the verdict is fully grounded. Inside one group the
@@ -811,7 +843,7 @@ absent ⇒ `given`) carries it — **injected data, keyed by node `id`**, exactl
 
 **Wizard tie-in** ([[question-ordering-wizard]]). A presumed-TRUE atom has ≈0 information
 gain, so the greedy planner sinks it to the bottom of the ask-order — "don't ask, allow
-override" falls out with no special-casing. The ladder is the *picture* of that: the
+override" falls out with no special-casing. The ladder is the _picture_ of that: the
 tentative leaves are precisely the questions the wizard didn't need to ask. TYPICALLY is
 the priors mechanism and the provenance mark at once.
 
@@ -845,7 +877,7 @@ itself be defaulted (`age TYPICALLY 18`) or given.
 **Rendering — a leaf with an interior.** A predicate leaf draws as an outer **predicate
 band** carrying the leaf's T/F/U (the part that conducts) wrapping an inner **value chip**
 — a small typed datum, e.g. `age = 21` set in a quoted/monospace pill. The contact state
-(closed/open) *is* the predicate's verdict on the value; the chip is just data. Sketch:
+(closed/open) _is_ the predicate's verdict on the value; the chip is just data. Sketch:
 
 ```
 ┌── age ≥ 18? ───────┐        the band booleanizes …
@@ -855,29 +887,29 @@ band** carrying the leaf's T/F/U (the part that conducts) wrapping an inner **va
 └────────────────────┘        band's border colour = T/F/U as usual
 ```
 
-**The dual of folding.** Folding (§16) *collapses upward*: it hides a subtree of the
+**The dual of folding.** Folding (§16) _collapses upward_: it hides a subtree of the
 circuit behind one boolean placeholder — zoom out to the verdict. A predicate leaf
-*expands downward*: it reveals the typed value **below the boolean floor** that feeds the
+_expands downward_: it reveals the typed value **below the boolean floor** that feeds the
 atom — zoom in to the datum. Same pivot (the leaf = the boolean floor), opposite
 direction. "Why is `age ≥ 18` true? → open it → because `age = 21`."
 
 **Not a new node — it's `App`, drawn open.** `@repo/viz-expr` already models these atoms
 as **`App { fnName, args }`** — `App(">=", [Var "age", Lit 18])`. Today the core draws an
-`App` leaf as one opaque box; a predicate leaf is just *looking inside* that `App`:
+`App` leaf as one opaque box; a predicate leaf is just _looking inside_ that `App`:
 `fnName` → the predicate band, the literal `arg` → the value chip. So §23 is largely a
 **rendering** over structure the IR already has, plus value/type metadata (and, for a
 defaulted chip, the §22 provenance) on the leaf.
 
 **Why this explains the wizard's Boolean-only wrinkle.** [[question-ordering-wizard]]
-notes the trap that `age TYPICALLY 18` is **not** `P(age ≥ 18)` — only a *boolean*
+notes the trap that `age TYPICALLY 18` is **not** `P(age ≥ 18)` — only a _boolean_
 TYPICALLY is an atom prior. The membrane says why: that presumption lives on the value
 chip **below** the membrane, while the wizard needs a prior on the boolean atom **above**
 it. They're on opposite sides; to turn a value default into an atom prior you'd have to
-push the distribution *through* the predicate (`P(≥18 | age∼18)`). The picture makes the
+push the distribution _through_ the predicate (`P(≥18 | age∼18)`). The picture makes the
 category error visible.
 
 **Scope.** v1 is a **static sketch** — the chip is display-only, rendered from injected
-value/type metadata; live typed-value *editing* (a real input widget) is a P3 web
+value/type metadata; live typed-value _editing_ (a real input widget) is a P3 web
 affordance. Keep the boolean circuit the load-bearing layer; the membrane is a
 progressive-disclosure detail on individual leaves. **Not built** (design captured here;
 the `App`-open rendering + a `age = 21 / ≥ 18?` fixture are the next increment).

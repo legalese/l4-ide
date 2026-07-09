@@ -5,25 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>L4 Ladder — s 415 (interactive)</title>
     <style>
-      body { font-family: Georgia, 'Times New Roman', serif; margin: 0; color: #222; background: #fff; }
-      header { padding: 20px 28px 8px; }
-      header h1 { font-size: 19px; margin: 0; font-weight: 700; }
-      header p { font-size: 13px; color: #666; margin: 5px 0 0; max-width: 70ch; }
-      .controls { display: flex; gap: 26px; align-items: center; flex-wrap: wrap;
-        padding: 11px 28px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;
-        font-size: 13px; color: #444; }
-      .controls fieldset { border: none; padding: 0; margin: 0; display: flex; gap: 9px; align-items: center; }
-      .controls label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
-      .grp { font-style: italic; color: #999; letter-spacing: .02em; }
-      select { font-family: inherit; font-size: 13px; padding: 2px 4px; }
-      button { font-family: inherit; font-size: 13px; padding: 2px 10px; cursor: pointer;
-        border: 1px solid #ccc; border-radius: 5px; background: #fafafa; }
-      button:hover { background: #f0f0f0; }
-      #ladder { padding: 26px 28px; overflow-x: auto; }
-      #ladder svg { display: block; }
-      #ladder .lad-clickable { cursor: pointer; }
-      #ladder .lad-box.lad-clickable:hover { filter: brightness(0.97); }
-      .hint { padding: 0 28px 22px; font-size: 12px; color: #999; font-style: italic; max-width: 80ch; }
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0;
+        color: #222;
+        background: #fff;
+      }
+      header {
+        padding: 20px 28px 8px;
+      }
+      header h1 {
+        font-size: 19px;
+        margin: 0;
+        font-weight: 700;
+      }
+      header p {
+        font-size: 13px;
+        color: #666;
+        margin: 5px 0 0;
+        max-width: 70ch;
+      }
+      .controls {
+        display: flex;
+        gap: 26px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 11px 28px;
+        border-top: 1px solid #eee;
+        border-bottom: 1px solid #eee;
+        font-size: 13px;
+        color: #444;
+      }
+      .controls fieldset {
+        border: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
+        cursor: pointer;
+      }
+      .grp {
+        font-style: italic;
+        color: #999;
+        letter-spacing: 0.02em;
+      }
+      select {
+        font-family: inherit;
+        font-size: 13px;
+        padding: 2px 4px;
+      }
+      button {
+        font-family: inherit;
+        font-size: 13px;
+        padding: 2px 10px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: #fafafa;
+      }
+      button:hover {
+        background: #f0f0f0;
+      }
+      #ladder {
+        padding: 26px 28px;
+        overflow-x: auto;
+      }
+      #ladder svg {
+        display: block;
+      }
+      #ladder .lad-clickable {
+        cursor: pointer;
+      }
+      #ladder .lad-box.lad-clickable:hover {
+        filter: brightness(0.97);
+      }
+      .hint {
+        padding: 0 28px 22px;
+        font-size: 12px;
+        color: #999;
+        font-style: italic;
+        max-width: 80ch;
+      }
     </style>
   </head>
   <body>
@@ -32,8 +100,9 @@
       <p>
         Boxed atoms carry current; unboxed italic prose is inert scaffolding.
         <b>Click a box</b> to cycle its value (unknown → true → false). A
-        <b>folded</b> box takes an <b>override</b> — assign the parent without naming which
-        child decides it. <b>Click a heading, a connector, or a ▸ caret</b> to fold / expand.
+        <b>folded</b> box takes an <b>override</b> — assign the parent without
+        naming which child decides it.
+        <b>Click a heading, a connector, or a ▸ caret</b> to fold / expand.
       </p>
     </header>
     <div class="controls">
@@ -59,9 +128,9 @@
     </div>
     <div id="ladder"></div>
     <div class="hint">
-      Green = true, grey = unknown. Fold <i>deception</i>, then click the placeholder to assert it
-      true — the override stands in for whichever limb is satisfied. Click a fan connector to fold
-      the group it belongs to.
+      Green = true, grey = unknown. Fold <i>deception</i>, then click the
+      placeholder to assert it true — the override stands in for whichever limb
+      is satisfied. Click a fan connector to fold the group it belongs to.
     </div>
     <script src="./app.js"></script>
   </body>
