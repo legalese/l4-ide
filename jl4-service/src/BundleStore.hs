@@ -41,6 +41,7 @@ import System.Directory
   , listDirectory
   , removeDirectoryRecursive
   , removeFile
+  , removePathForcibly
   , renameDirectory
   , renameFile
   )
@@ -126,6 +127,15 @@ saveBundle (BundleStore root) deployId sources meta = do
   let did = Text.unpack deployId
       targetDir = root </> did
       tmpDir = root </> (did <> ".tmp")
+
+  -- Clean any leftover staging dir before writing. The tmp dir name is
+  -- deterministic (@<id>.tmp@), so a previously interrupted deploy (e.g. one
+  -- cut short by the nginx restart cascade during @nixos-rebuild switch@) can
+  -- leave a stale @<id>.tmp/sources@ behind. Writing the new sources on top of
+  -- it would merge old + new and the atomic swap below would install that
+  -- merged result — the stale-bundle root cause of smucclaw/l4-ide#850.
+  -- 'removePathForcibly' is a no-op when the path is absent.
+  removePathForcibly tmpDir
 
   -- Write to a temp directory first
   createDirectoryIfMissing True (tmpDir </> "sources")

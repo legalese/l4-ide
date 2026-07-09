@@ -105,13 +105,15 @@ data Type' n =
 type Kind = Int
 
 data TypedName n =
-  MkTypedName Anno n (Type' n) (Maybe (Expr n))
-  -- ^ Nothing = stored field, Just expr = computed field (MEANS clause)
+  MkTypedName Anno n (Type' n) (Maybe (Expr n)) (Maybe (Expr n))
+  -- ^ 4th field: TYPICALLY default value (Nothing = no default);
+  --   5th field: Nothing = stored field, Just expr = computed field (MEANS clause)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 data OptionallyTypedName n =
-  MkOptionallyTypedName Anno n (Maybe (Type' n))
+  MkOptionallyTypedName Anno n (Maybe (Type' n)) (Maybe (Expr n))
+  -- ^ 4th field: TYPICALLY default value (Nothing = no default)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -156,7 +158,8 @@ data Declare n =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 data Assume n =
-  MkAssume Anno (TypeSig n) (AppForm n) (Maybe (Type' n))
+  MkAssume Anno (TypeSig n) (AppForm n) (Maybe (Type' n)) (Maybe (Expr n))
+  -- ^ 5th field: TYPICALLY default value (Nothing = no default)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

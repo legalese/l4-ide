@@ -421,7 +421,7 @@ collectRecords enums (MkModule _ _ section) = Map.fromList (goSection section)
               , riPy     = pyType nm
               , riFields =
                   [ fieldInfo enums fRes fTy mMeans
-                  | MkTypedName _ fRes fTy mMeans <- fields
+                  | MkTypedName _ fRes fTy mMeans _ <- fields
                   ]
               })]
     Section _ sub -> goSection sub
@@ -693,10 +693,10 @@ singularize t = case Text.unsnoc t of
 -- ---------------------------------------------------------------------------
 
 givenName :: OptionallyTypedName Resolved -> Resolved
-givenName (MkOptionallyTypedName _ r _) = r
+givenName (MkOptionallyTypedName _ r _ _) = r
 
 givenType :: OptionallyTypedName Resolved -> Maybe (Type' Resolved)
-givenType (MkOptionallyTypedName _ _ ty) = ty
+givenType (MkOptionallyTypedName _ _ ty _) = ty
 
 givenText :: OptionallyTypedName Resolved -> Text
 givenText = resolvedToText . givenName

@@ -137,6 +137,9 @@ mkBuiltins
   , "toDatetime" `rename` "TODATETIME"
   -- TIMEZONE (nullary → STRING)
   , "timezone" `rename` "TIMEZONE"
+  -- Rule-version axis (nullary → DATE); NOTE: keep at END so existing
+  -- builtin uniques stay stable
+  , "rulesEffectiveDate" `rename` "RULES EFFECTIVE DATE"
   ]
 
 boolean :: Type' Resolved
@@ -256,6 +259,9 @@ jsonDecodeBuiltin = forall' [aDef] $ fun_ [string] (eitherType string a)
 
 todayBuiltin :: Type' Resolved
 todayBuiltin = date
+
+rulesEffectiveDateBuiltin :: Type' Resolved
+rulesEffectiveDateBuiltin = date
 
 nowBuiltin :: Type' Resolved
 nowBuiltin = datetime
@@ -659,6 +665,9 @@ jsonDecodeInfo =
 todayInfo :: CheckEntity
 todayInfo = KnownTerm todayBuiltin Computable
 
+rulesEffectiveDateInfo :: CheckEntity
+rulesEffectiveDateInfo = KnownTerm rulesEffectiveDateBuiltin Computable
+
 nowInfo :: CheckEntity
 nowInfo = KnownTerm nowBuiltin Computable
 
@@ -938,6 +947,7 @@ initialEnvironment =
     , (rawName todaySerialName,  [todaySerialUnique])
     , (rawName nowSerialName,    [nowSerialUnique])
     , (rawName currentTimeName,   [currentTimeUnique])
+    , (rawName rulesEffectiveDateName, [rulesEffectiveDateUnique])
     , (rawName dateFromTextName, [dateFromTextUnique])
     , (rawName dateSerialName,   [dateSerialUnique])
     , (rawName dateFromSerialName, [dateFromSerialUnique])
@@ -1054,6 +1064,7 @@ initialEntityInfo =
     , (todaySerialUnique,  (todaySerialName,  todayInfo       ))
     , (nowSerialUnique,    (nowSerialName,    nowInfo         ))
     , (currentTimeUnique,   (currentTimeName,   currentTimeInfo   ))
+    , (rulesEffectiveDateUnique, (rulesEffectiveDateName, rulesEffectiveDateInfo))
     , (dateFromTextUnique, (dateFromTextName, dateFromTextInfo))
     , (dateSerialUnique,   (dateSerialName,   dateSerialInfo  ))
     , (dateFromSerialUnique, (dateFromSerialName, dateFromSerialInfo))

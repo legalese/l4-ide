@@ -665,7 +665,7 @@ collectLocalNames (MkModule _ _ section) = goSection section
     goDecl = \case
       Decide _ (MkDecide _ _ appForm _) ->
         Set.singleton (sanitizeName (resolvedName (appFormHead' appForm)))
-      Assume _ (MkAssume _ _ appForm _) ->
+      Assume _ (MkAssume _ _ appForm _ _) ->
         Set.singleton (sanitizeName (resolvedName (appFormHead' appForm)))
       Section _ s -> goSection s
       _ -> Set.empty
@@ -722,7 +722,7 @@ registerDependencyModule skipLocal (MkModule _ _ section) = go section
         }
 
     registerExternAssume :: Assume Resolved -> LowerM ()
-    registerExternAssume (MkAssume _ typeSig appForm _) = do
+    registerExternAssume (MkAssume _ typeSig appForm _ _) = do
       env <- gets (.typeEnv)
       let name = sanitizeName (resolvedName (appFormHead' appForm))
           (_, retType) = sigToTypesEnv env typeSig
@@ -813,7 +813,7 @@ listElementsFromSig :: TypeEnv -> TypeSig Resolved -> [Maybe MLIRType]
 listElementsFromSig env (MkTypeSig _ (MkGivenSig _ params) _) =
   map paramListElem params
   where
-    paramListElem (MkOptionallyTypedName _ _ (Just ty)) = listOfElem env ty
+    paramListElem (MkOptionallyTypedName _ _ (Just ty) _) = listOfElem env ty
     paramListElem _ = Nothing
 
 -- | If a type is LIST OF T, return Just (MLIR type of T).
@@ -865,7 +865,7 @@ lowerTimezoneDirective expr = do
 -- this name in the compiled module resolve to a valid WASM import
 -- that the runtime host can satisfy.
 lowerAssume :: Assume Resolved -> LowerM ()
-lowerAssume (MkAssume _ typeSig appForm mType) = do
+lowerAssume (MkAssume _ typeSig appForm mType _mTypically) = do
   env <- gets (.typeEnv)
   let name = sanitizeName (resolvedName (appFormHead' appForm))
       -- An ASSUME may have arity, either via its GIVEN sig or its
@@ -909,10 +909,10 @@ lowerDeclare (MkDeclare _ _ appForm typeDecl) = do
     SynonymDecl _ _ -> pure ()  -- Type synonyms are erased
   where
     fieldName :: TypedName Resolved -> Text
-    fieldName (MkTypedName _ n _ _) = resolvedName n
+    fieldName (MkTypedName _ n _ _ _) = resolvedName n
 
     fieldType :: TypedName Resolved -> Type' Resolved
-    fieldType (MkTypedName _ _ ty _) = ty
+    fieldType (MkTypedName _ _ ty _ _) = ty
 
 -- ---------------------------------------------------------------------------
 -- Function/decision lowering
@@ -1033,7 +1033,7 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
 
   let paramL4Tys =
         [ case oParam of
-            MkOptionallyTypedName _ _ (Just ty) -> Just ty
+            MkOptionallyTypedName _ _ (Just ty) _ -> Just ty
             _ -> Nothing
         | oParam <- givenSigParams typeSig
         ]
@@ -1242,8 +1242,8 @@ sigToTypesEnv env (MkTypeSig _ givenSig mGiveth) =
         Nothing -> l4BoolType  -- L4 DECIDE ... IF has implicit boolean return
   in (argTypes, retType)
   where
-    paramToMLIR (MkOptionallyTypedName _ _ (Just ty)) = l4TypeToMLIR env ty
-    paramToMLIR (MkOptionallyTypedName _ _ Nothing) = l4NumberType  -- default
+    paramToMLIR (MkOptionallyTypedName _ _ (Just ty) _) = l4TypeToMLIR env ty
+    paramToMLIR (MkOptionallyTypedName _ _ Nothing _) = l4NumberType  -- default
 
 hasGiveth :: TypeSig Resolved -> Bool
 hasGiveth (MkTypeSig _ _ (Just _)) = True
@@ -1256,7 +1256,7 @@ sigHasFunctionParam :: TypeSig Resolved -> Bool
 sigHasFunctionParam (MkTypeSig _ (MkGivenSig _ params) _) =
   any hasFunTy params
   where
-    hasFunTy (MkOptionallyTypedName _ _ (Just ty)) = isFunType ty
+    hasFunTy (MkOptionallyTypedName _ _ (Just ty) _) = isFunType ty
     hasFunTy _ = False
     isFunType (Fun {})       = True
     isFunType (Forall _ _ t) = isFunType t
@@ -2453,6 +2453,7 @@ lowerLocalDecl _scope (LocalDecide _anno decide@(MkDecide dAnno ts appForm body)
           mkParam c = MkOptionallyTypedName emptyAnno
                         (renameResolved c headRes)
                         (Map.lookup c l4TyMap)
+                        Nothing
           extraParams = case givenSigParams ts of
             (template:_) -> [synthParam c template | c <- captured]
             -- Zero-arg WHERE/LET bindings have no GIVEN clause, so we
@@ -2566,7 +2567,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Concat _ xs   -> Set.unions (map (go bound) xs)
       AsString _ a  -> go bound a
       Lam _ (MkGivenSig _ lamParams) b ->
-        go (bound <> Set.fromList [resolvedName p | MkOptionallyTypedName _ p _ <- lamParams]) b
+        go (bound <> Set.fromList [resolvedName p | MkOptionallyTypedName _ p _ _ <- lamParams]) b
       Lit{} -> Set.empty
       Inert{} -> Set.empty
       Regulative{} -> Set.empty
@@ -2582,7 +2583,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       let nm = resolvedName (appFormHead' af)
           inner = go (bnd <> Set.fromList (map resolvedName (appFormParams af))) bdy
       in (Set.insert nm bnd, frees <> inner)
-    stepLocal (bnd, frees) (LocalAssume _ (MkAssume _ _ af _)) =
+    stepLocal (bnd, frees) (LocalAssume _ (MkAssume _ _ af _ _)) =
       (Set.insert (resolvedName (appFormHead' af)) bnd, frees)
 
     patternBinds :: Pattern Resolved -> Set.Set Text
@@ -2600,11 +2601,11 @@ givenSigParams :: TypeSig Resolved -> [OptionallyTypedName Resolved]
 givenSigParams (MkTypeSig _ (MkGivenSig _ ps) _) = ps
 
 synthParam :: Text -> OptionallyTypedName Resolved -> OptionallyTypedName Resolved
-synthParam newName (MkOptionallyTypedName ann templateName mTy) =
+synthParam newName (MkOptionallyTypedName ann templateName mTy _mTypically) =
   -- Clone the template's Resolved structure but substitute the raw name.
   -- (The Resolved unique is reused; two bindings with the same unique is
   -- fine because MLIR doesn't see L4 uniques — only our sanitized names.)
-  MkOptionallyTypedName ann (renameResolved newName templateName) mTy
+  MkOptionallyTypedName ann (renameResolved newName templateName) mTy Nothing
 
 renameResolved :: Text -> Resolved -> Resolved
 renameResolved newName r = case r of

@@ -81,6 +81,7 @@ test-suite jl4-test
   other-modules:
     Hover
     SemanticTokens
+    VizAutoRefresh
     Paths_jl4
   autogen-modules:
     Paths_jl4

@@ -533,7 +533,7 @@ handlers evalConfig recorder =
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
 
-              Assume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy) ->
+              Assume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy _) ->
                 case rangeOfNode assume of
                   Just rng ->
                     let lspRange = srcRangeToLspRange (Just rng)
@@ -608,7 +608,7 @@ handlers evalConfig recorder =
               in mkSymbol variantName Nothing SymbolKind_EnumMember parentRange selRange
 
             givenParamToSymbol :: LSP.Range -> OptionallyTypedName Resolved -> DocumentSymbol
-            givenParamToSymbol parentRange (MkOptionallyTypedName _ n mTy) =
+            givenParamToSymbol parentRange (MkOptionallyTypedName _ n mTy _) =
               let paramName = nameToText (getOriginal n)
                   selRange = nameSelRange n
                   (detail, kind) = case mTy of
@@ -652,7 +652,7 @@ handlers evalConfig recorder =
                         nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals localBody)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind parentRange selRange (paramChildren <> nestedLocals) ]
                   Nothing -> []
-              LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy) ->
+              LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy _) ->
                 case rangeOfNode assume of
                   Just _ ->
                     let selRange = nameSelRange n
@@ -1019,6 +1019,7 @@ outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext o
                   (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
                   (MkAppForm emptyAnno name [] Nothing)
                   (Just $ fmap getActual ty)
+                  Nothing
                 )
 
             topDecls = foldTopDecls (: []) typeCheck.module'

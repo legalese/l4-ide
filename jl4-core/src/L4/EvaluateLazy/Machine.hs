@@ -645,6 +645,30 @@ readTcDocumentTimezone = do
   noteCtxRead noReads { crDocumentTimezone = ReadEq tc.tcDocumentTimezone }
   pure tc.tcDocumentTimezone
 
+-- | Instrumented reader for 'tcRuleValidTime' (see READER CONTRACT).
+-- Records the raw 'Maybe' (pre-fallback): a RULES EFFECTIVE DATE that falls
+-- back to the localized current day is still an observation of the axis
+-- being 'Nothing' (and the fallback's own system-time\/timezone reads are
+-- recorded by the instrumented readers it goes through).
+readTcRuleValidTime :: Eval (Maybe Time.Day)
+readTcRuleValidTime = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crRuleValidTime = ReadEq tc.tcRuleValidTime }
+  pure tc.tcRuleValidTime
+
+-- | Instrumented reader for 'tcValidTime' (see READER CONTRACT).
+-- The fact/valid-time axis. Read by RULES EFFECTIVE DATE as its first
+-- fallback when the rule-version axis is unset (option (b): with no
+-- rule-version pinned, law-time tracks fact-time — consistent with the
+-- interval builtins, which stamp @[UnderValidTime d, UnderRulesEffectiveAt d]@
+-- together per stepped day). Recorded raw (pre-fallback) so a later force
+-- under a changed valid-time invalidates the cache.
+readTcValidTime :: Eval (Maybe Time.Day)
+readTcValidTime = do
+  tc <- getTemporalContext
+  noteCtxRead noReads { crValidTime = ReadEq tc.tcValidTime }
+  pure tc.tcValidTime
+
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
 pokeThunk :: Reference -> (ThreadId -> Thunk -> (Thunk, a)) -> Eval a
@@ -3112,7 +3136,7 @@ scanDecide :: Decide Resolved -> Machine [Resolved]
 scanDecide (MkDecide _ann _tysig (MkAppForm _ n _ _) _expr) = pure [n]
 
 scanAssume :: Assume Resolved -> Machine [Resolved]
-scanAssume (MkAssume _ann _tysig (MkAppForm _ n _ _) _t) = pure [n]
+scanAssume (MkAssume _ann _tysig (MkAppForm _ n _ _) _t _mTypically) = pure [n]
 
 -- | The only run-time names a type declaration brings into scope are constructors and selectors.
 scanDeclare :: Declare Resolved -> Machine [Resolved]
@@ -3128,7 +3152,7 @@ scanTypeDecl (SynonymDecl _ann _t) =
 
 scanConDecl :: ConDecl Resolved -> Machine [Resolved]
 scanConDecl (MkConDecl _ann n [])  = pure [n]
-scanConDecl (MkConDecl _ann n tns) = pure (n : ((\ (MkTypedName _ n' _ _) -> n') <$> tns))
+scanConDecl (MkConDecl _ann n tns) = pure (n : ((\ (MkTypedName _ n' _ _ _) -> n') <$> tns))
 
 evalSection :: Environment -> Section Resolved -> Machine [EvalDirective]
 evalSection env (MkSection _ann _mn _maka topdecls) =
@@ -3253,9 +3277,9 @@ evalLocalDecl env (LocalAssume _ann assume) =
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalAssume :: Environment -> Assume Resolved -> Machine ()
-evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) _) =
+evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) _ _) =
   updateTerm env n (WHNF (ValAssumed n))
-evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _) = do
+evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _ _) = do
   -- TODO: we should create a given here yielding an assumed, but we currently cannot do that easily,
   -- because we do not have Assumed as an expression, and we also cannot embed values into expressions.
   updateTerm env n (WHNF (ValAssumed n))
@@ -3273,7 +3297,7 @@ evalDecide env (MkDecide _ann _tysig (MkAppForm _ n []   _maka) expr) =
   updateTerm env n (Unevaluated Set.empty expr env)
 evalDecide env (MkDecide _ann _tysig (MkAppForm _ n args _maka) expr) = do
   let
-    v = ValClosure (MkGivenSig emptyAnno ((\ r -> MkOptionallyTypedName emptyAnno r Nothing) <$> args)) expr env
+    v = ValClosure (MkGivenSig emptyAnno ((\ r -> MkOptionallyTypedName emptyAnno r Nothing Nothing) <$> args)) expr env
   updateTerm env n (WHNF v)
 
 -- We are assuming that the environment already contains an entry with an address for us.
@@ -3297,7 +3321,7 @@ evalConDecl env (MkConDecl _ann n tns) = do
   updateTerm env n (WHNF (ValUnappliedConstructor n))
   conRef <- ref (TypeCheck.getName n) n
   -- selectors (we need to create fresh names for the lambda abstractions so that every binder is unique)
-  traverse_ (\ (i, MkTypedName _ sn _t _) -> do
+  traverse_ (\ (i, MkTypedName _ sn _t _ _) -> do
     arg    <- def (TypeCheck.getName n)
     argRef <- ref (TypeCheck.getName n) arg
     args <- traverse (def . TypeCheck.getName) tns
@@ -3305,7 +3329,7 @@ evalConDecl env (MkConDecl _ann n tns) = do
     let
       sel =
         ValClosure
-          (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno arg Nothing])      -- \ x ->
+          (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno arg Nothing Nothing])      -- \ x ->
           (Consider emptyAnno (App emptyAnno argRef [])                             -- case x of
             [ MkBranch emptyAnno (When emptyAnno (PatApp emptyAnno conRef (PatVar emptyAnno <$> args)))  --   Con y_1 ... y_n ->
                 (App emptyAnno body [])                                             --     y_i
@@ -3348,9 +3372,9 @@ evalContractVal = do
 
   pure $ ValClosure
     (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno ad Nothing
-      , MkOptionallyTypedName emptyAnno bd Nothing
-      , MkOptionallyTypedName emptyAnno cd Nothing
+      [ MkOptionallyTypedName emptyAnno ad Nothing Nothing
+      , MkOptionallyTypedName emptyAnno bd Nothing Nothing
+      , MkOptionallyTypedName emptyAnno cd Nothing Nothing
       ]
     )
     (App emptyAnno ar [App emptyAnno br [], App emptyAnno cr []])
@@ -3362,7 +3386,7 @@ waitUntilVal eventcRef neverMatchesPartyRef neverMatchesActRef = do
   ad <- def an
   ar <- ref an ad
   pure $ ValClosure
-    (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno ad Nothing])
+    (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno ad Nothing Nothing])
     (App emptyAnno TypeCheck.eventCRef [neverMatchesPartyExpr, neverMatchesActExpr, Var emptyAnno ar])
     (Map.fromList
       [ (TypeCheck.eventCUnique, eventcRef)
@@ -3463,6 +3487,7 @@ initialEnvironment = do
   todayRef <- allocateValue (ValNullaryBuiltinFun NullaryTodaySerial)
   nowRef <- allocateValue (ValNullaryBuiltinFun NullaryNowSerial)
   currentTimeRef <- allocateValue (ValNullaryBuiltinFun NullaryCurrentTime)
+  rulesEffectiveDateRef <- allocateValue (ValNullaryBuiltinFun NullaryRulesEffectiveDate)
   dateFromTextRef <- allocateValue (ValUnaryBuiltinFun UnaryDateValue)
   dateSerialRef <- allocateValue (ValUnaryBuiltinFun UnaryDateSerial)
   dateFromSerialRef <- allocateValue (ValUnaryBuiltinFun UnaryDateFromSerial)
@@ -3527,6 +3552,7 @@ initialEnvironment = do
       , (TypeCheck.todaySerialUnique, todayRef)
       , (TypeCheck.nowSerialUnique, nowRef)
       , (TypeCheck.currentTimeUnique, currentTimeRef)
+      , (TypeCheck.rulesEffectiveDateUnique, rulesEffectiveDateRef)
       , (TypeCheck.dateFromTextUnique, dateFromTextRef)
       , (TypeCheck.dateSerialUnique, dateSerialRef)
       , (TypeCheck.dateFromSerialUnique, dateFromSerialRef)
@@ -3665,6 +3691,39 @@ evalNullaryBuiltin = \case
       Nothing ->
         userException $ UserError
           "TIMEZONE is not declared. CURRENTTIME requires 'TIMEZONE IS \"<IANA timezone>\"' in your document."
+  NullaryRulesEffectiveDate -> do
+    -- Resolve which version of the law is in force, reading axes through the
+    -- instrumented readers so every observation (including pre-fallback
+    -- @ReadEq Nothing@) lands in the current force span's fingerprint.
+    -- Fallback order (option (b), see TEMPORAL-RULE-VERSION-DESIGN.md §6 Q1):
+    --   1. tcRuleValidTime  — the rule-version axis, if explicitly pinned;
+    --   2. tcValidTime      — else the fact/valid-time axis (law-time tracks
+    --                         fact-time, matching the interval builtins);
+    --   3. localized today  — else "the rules in force now" (same computation
+    --                         as TODAY, via instrumented readers).
+    mRuleDay <- readTcRuleValidTime
+    case mRuleDay of
+      Just day -> pure $ ValDate day
+      Nothing -> do
+        mValidDay <- readTcValidTime
+        case mValidDay of
+          Just day -> pure $ ValDate day
+          Nothing -> do
+            sysTime <- readTcSystemTime
+            mTzName <- readTcDocumentTimezone
+            case mTzName of
+              Just tzName -> do
+                mTz <- liftIO $ tryLoadTZ (Text.unpack tzName)
+                case mTz of
+                  Just tz -> do
+                    let localTime = TZ.utcToLocalTimeTZ tz sysTime
+                    pure $ ValDate (localDay localTime)
+                  Nothing ->
+                    userException $ UserError $
+                      "Could not load timezone '" <> tzName <> "' for RULES EFFECTIVE DATE."
+              Nothing ->
+                userException $ UserError
+                  "TIMEZONE is not declared. RULES EFFECTIVE DATE (with no EVAL UNDER RULES EFFECTIVE AT or EVAL UNDER VALID TIME in scope) requires 'TIMEZONE IS \"<IANA timezone>\"' in your document."
 
 utcDatestamp :: Time.UTCTime -> Rational
 utcDatestamp time =
@@ -3983,8 +4042,8 @@ boolBinOpClosure true false buildExpr = do
   bRef <- ref nb bDef
   pure $ ValClosure
     (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean)
-      , MkOptionallyTypedName emptyAnno bDef (Just TypeCheck.boolean)
+      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
+      , MkOptionallyTypedName emptyAnno bDef (Just TypeCheck.boolean) Nothing
       ])
     (buildExpr aRef bRef)
     ( Map.fromList
@@ -4002,7 +4061,7 @@ boolUnaryOpClosure true false buildExpr = do
   aRef <- ref na aDef
   pure $ ValClosure
     (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean)
+      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
       ])
     (buildExpr aRef)
     ( Map.fromList
