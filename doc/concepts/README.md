@@ -22,9 +22,10 @@ Unlike reference docs (which tell you **what** things are) or tutorials (which s
 The philosophy and principles behind L4's design
 
 - **[Principles](language-design/principles.md)** - Core design principles of L4
+- **[Flowcharts, Decision Tables, and Real Logic](language-design/logic-not-flowcharts.md)** - Why L4 is a language with derived diagrams, not a flowchart or decision-table builder
 - **[Linguistic Syntax](language-design/linguistic-syntax.md)** - How L4 borrows from natural language linguistics
 
-**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers
+**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers, diagrams as views not substrate
 
 _More topics planned: Layout Sensitivity, Scope_
 
