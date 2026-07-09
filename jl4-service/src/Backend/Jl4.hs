@@ -384,7 +384,7 @@ buildModuleInfo decls = ModuleInfo
     recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ (Just ctor) fields)) =
       Just (getUnique tyName, (ctor, map fieldOf fields))
       where
-        fieldOf (MkTypedName _ fn fty _) = (rawNameToText (rawName (getActual fn)), fty)
+        fieldOf (MkTypedName _ fn fty _ _) = (rawNameToText (rawName (getActual fn)), fty)
     recordFor _ = Nothing
 
     enumFor :: Declare Resolved -> Maybe (Unique, [(Text, Resolved)])
@@ -982,9 +982,9 @@ extractParamTypes :: Decide Resolved -> [(Text, Type' Resolved)]
 extractParamTypes (MkDecide _ (MkTypeSig _ (MkGivenSig _ typedNames) _) _ _) =
   mapMaybe extractTypedName typedNames
   where
-    extractTypedName (MkOptionallyTypedName _ resolved (Just ty)) =
+    extractTypedName (MkOptionallyTypedName _ resolved (Just ty) _) =
       Just (rawNameToText (rawName $ getActual resolved), ty)
-    extractTypedName (MkOptionallyTypedName _ resolved Nothing) =
+    extractTypedName (MkOptionallyTypedName _ resolved Nothing _) =
       -- Try to get type from resolved info
       case getAnno (getName resolved) ^. #extra % #resolvedInfo of
         Just (TypeInfo ty _) -> Just (rawNameToText (rawName $ getActual resolved), ty)

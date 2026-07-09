@@ -68,5 +68,5 @@ buildMixfixHintRegistry =
       maybe mempty registerMixfixInfo (extractMixfixInfo tysig appForm)
 
     gatherAssume :: Assume Name -> MixfixHintRegistry
-    gatherAssume (MkAssume _ tysig appForm _) =
+    gatherAssume (MkAssume _ tysig appForm _ _) =
       maybe mempty registerMixfixInfo (extractMixfixInfo tysig appForm)

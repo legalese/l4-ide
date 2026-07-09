@@ -71,6 +71,7 @@ Keywords are reserved words that form the structure of L4 programs.
 | **ONE OF**     | Used for enum types                                                     | [TYPE-KEYWORDS](types/keywords.md) |
 | **OF**         | Type application or constructor pattern                                 | [TYPE-KEYWORDS](types/keywords.md) |
 | **TYPE**       | The kind of types                                                       | [TYPE-KEYWORDS](types/keywords.md) |
+| **TYPICALLY**  | Default value for a field, parameter, or assumption                     | [TYPICALLY](types/TYPICALLY.md)    |
 | **WITH**       | Record construction with named fields                                   | [TYPE-KEYWORDS](types/keywords.md) |
 | **FOR ALL**    | Universal quantifier for polymorphism                                   | [FOR ALL](types/for-all.md)        |
 

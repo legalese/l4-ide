@@ -54,7 +54,12 @@
     enable = true;
     description = "jl4-service (multi-tenant L4 deployment service)";
     after = [ "network.target" "nginx.service" ];
-    requires = [ "nginx.service" ];
+    # jl4-service is the backend that nginx reverse-proxies to; it does not
+    # depend on nginx to run. Using `wants` (a weak dep) rather than `requires`
+    # (a hard dep) keeps startup ordering via `after` without cascading an
+    # nginx restart into a jl4-service restart. That cascade is what triggered
+    # a stale-bundle recompile on `nixos-rebuild switch` (smucclaw/l4-ide#850).
+    wants = [ "nginx.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       ExecStartPre = pkgs.writeShellScript "jl4-service-preseed" ''

@@ -225,15 +225,6 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
             , Ladder.prettyPrintVizError vizError
             ]
   where
-    {- | Make a new VizConfig by combining (i) old config (e.g. whether to simplify) from the RecentlyVisualized (which itself contains a VizConfig)
-    with (ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes) -}
-    updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
-    updateVizConfig verTxtDocId tcRes recentlyVisualised =
-      Ladder.getVizConfig recentlyVisualised.vizState
-        & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
-        & set #moduleUri (toNormalizedUri verTxtDocId._uri)
-        & set #substitution tcRes.substitution
-
     -- TODO: in the future we want to be a bit more clever wrt. which
     -- DECIDE/MEANS we snap to. We can use the type of the 'Decide' here
     -- (by requiring extra = Just ty) or the name of the 'Decide' by the means
@@ -247,6 +238,24 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
         -- only succeed if there's exactly one match
 
       pure decide
+
+{- | Make a new 'Ladder.VizConfig' by combining (i) old config (e.g. whether to
+simplify) from the 'RecentlyVisualised' (which itself contains a VizConfig) with
+(ii) up-to-date versions of potentially stale info (verTxtDocId, tcRes).
+
+Crucially this refreshes @module'@ from the current typecheck result too. @module'@
+is what 'Ladder.collectDefsForInlining' reads to decide @canInline@ (the +/unfold
+affordance); if it stayed frozen at the snapshot taken by the last *manual* Visualize,
+auto-refresh would recompute the ladder structure but keep a stale @canInline@ — so a
+newly-added DECIDE would not surface its inline affordance until a manual re-visualize.
+See smucclaw/l4-ide#557. -}
+updateVizConfig :: VersionedTextDocumentIdentifier -> TypeCheckResult -> RecentlyVisualised -> Ladder.VizConfig
+updateVizConfig verTxtDocId tcRes recentlyVisualised =
+  Ladder.getVizConfig recentlyVisualised.vizState
+    & set #verDocId (Ladder.fromLspVerDocId verTxtDocId)
+    & set #moduleUri (toNormalizedUri verTxtDocId._uri)
+    & set #substitution tcRes.substitution
+    & set #module' tcRes.module'
 
 -- | the 'Monoid' 'Maybe' that returns the only occurrence of 'Just'
 newtype One a = One {getOne :: Maybe a}
@@ -389,7 +398,12 @@ infoToHover nuri subst r i mNlg mDesc =
     x =
       case i of
         TypeInfo t _ ->
-          mdCodeBlock (prettyLayout (applyFinalSubstitution subst nuri t)) <>
+          -- Render the type via 'prettyTypeForDisplay' (not raw 'prettyLayout') so
+          -- residual inference variables — e.g. an un-annotated lambda parameter,
+          -- whose 'InfVar' prints @rawName <> uniq@ like @x10@ — are normalised to
+          -- stable names (@a@, @b@, …). This also makes hover consistent with the
+          -- deployed schema's @returnType@, which already uses this renderer. See #313.
+          mdCodeBlock (prettyTypeForDisplay (applyFinalSubstitution subst nuri t)) <>
             case mNlg of
               Nothing -> mempty
               Just nlg -> mdSeparator <> mdCodeBlock (simpleLinearizer nlg)

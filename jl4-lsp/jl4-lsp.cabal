@@ -151,3 +151,19 @@ executable jl4-lsp
     LSP.L4.Config
     LSP.L4.Handlers
     LSP.L4.LanguageServer
+
+test-suite jl4-lsp-test
+  import: defaults
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  other-modules:
+    HoverDisplaySpec
+  build-tool-depends:
+    hspec-discover:hspec-discover
+  build-depends:
+    hspec,
+    jl4-core,
+    jl4-lsp,
+    lsp-types,
+    text

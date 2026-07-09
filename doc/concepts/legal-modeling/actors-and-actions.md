@@ -374,7 +374,7 @@ is a complement to, not a replacement for, the type-level
 - [Regulative keyword reference](../../reference/regulative/README.md) —
   `PARTY`, `MUST`, `MAY`, `SHANT`, `WITHIN`, `HENCE`, `LEST`, `PROVIDED`,
   `EXACTLY`
-- [`specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`](../../../specs/todo/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)
+- [`specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md`](../../../specs/done/DEONTIC-PARTY-ACTION-AGREEMENT-SPEC.md)
   — the implementation spec
 - [`ACTOR-ACTIONS-THEORY.md`](ACTOR-ACTIONS-THEORY.md)
   — theory & bibliography (thematic roles, STIT, agency law)
