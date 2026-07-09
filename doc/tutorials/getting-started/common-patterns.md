@@ -163,7 +163,7 @@ GIVETH A MAYBE Item
 ### Check if Element is in List
 
 ```l4
-GIVEN item IS A Item
+GIVEN item IS AN Item
       items IS A LIST OF Item
 GIVETH A BOOLEAN
 `contains item` MEANS elem item items

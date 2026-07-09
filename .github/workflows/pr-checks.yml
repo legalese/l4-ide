@@ -169,6 +169,17 @@ jobs:
           restore-keys: |
             pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-dist-
 
+      # merge_group runs canNOT read the unstable-scoped cache: GitHub scopes
+      # cache reads to {own ref, default branch}, plus the base branch for
+      # pull_request only. A merge_group run's own ref is the ephemeral
+      # gh-readonly-queue/... ref, and unstable is NOT the default branch (main
+      # is) — so the fresh push-to-unstable cache is invisible to it, and it
+      # cold-builds deps (~20 min) every time. The cache-warmup.yml workflow
+      # runs ON main (default branch) and saves unstable's dep set under the
+      # dedicated `mq-warmup-` prefix, which IS in a scope merge_group can read.
+      # We add that prefix as a restore-key ONLY for merge_group, so pull_request
+      # runs into main never match it (they keep restoring pr-checks-* only) —
+      # main PRs are thus completely unaffected by the warm-up cache.
       - name: Restore cached dependencies
         uses: actions/cache/restore@v5
         id: deps-cache
@@ -177,7 +188,9 @@ jobs:
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/*.cabal', 'cabal.project') }}
-          restore-keys: ${{ env.key }}-
+          restore-keys: |
+            ${{ env.key }}-
+            ${{ github.event_name == 'merge_group' && format('mq-warmup-{0}-ghc-{1}-cabal-', runner.os, steps.setup.outputs.ghc-version) || '' }}
 
       - name: Configure the build
         run: |

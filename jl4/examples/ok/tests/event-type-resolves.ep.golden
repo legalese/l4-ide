@@ -1,0 +1,31 @@
+-- Regression test for smucclaw/l4-ide#915: the EVENT type name used to be
+-- shadowed by its own term constructor. The un-renamed `event` builtin surfaces
+-- (uppercased) as "EVENT" -- the very name the `eventC` constructor is renamed
+-- to. initialEnvironment listed the two under the one key as separate
+-- Map.fromList entries, so the constructor entry (listed second) silently won
+-- and the EVENT *type* was dropped. An event-typed signature like
+-- `GIVEN e IS AN EVENT ...` was therefore unresolvable on `unstable`.
+--
+-- The fix merges both uniques into one key `[eventUnique, eventCUnique]`,
+-- relying on the environment's existing multi-candidate resolution: resolveType
+-- keeps only the type candidate, term/constructor resolution keeps only the
+-- constructor candidate. This fixture confirms the EVENT type name now resolves:
+-- the signatures below name it, a CONSIDER destructures an EVENT value via its
+-- constructor, and the #EVAL calls exercise both.
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+GIVEN e IS AN EVENT Party Act
+GIVETH A Party
+whoActed e MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN p
+
+GIVEN e IS AN EVENT Party Act
+GIVETH A NUMBER
+whenActed e MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN n
+
+#EVAL whoActed (EVENT alice ping 5)   -- expect alice
+#EVAL whenActed (EVENT bob pong 42)   -- expect 42

@@ -86,8 +86,8 @@ actions and procurement chains, see
 
 ```l4
 -- Simple deadline: fixed number of days
-GIVEN party IS A Actor
-      action IS A Action
+GIVEN party IS AN Actor
+      action IS AN Action
       deadline IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `obligation within days` MEANS
@@ -104,8 +104,8 @@ Deadlines relative to events:
 
 ```l4
 -- "Within 30 days of receiving notice"
-GIVEN party IS A Actor
-      action IS A Action
+GIVEN party IS AN Actor
+      action IS AN Action
       triggerDate IS A NUMBER  -- Day number when trigger occurred
       dayLimit IS A NUMBER
 GIVETH A DEONTIC Actor Action
@@ -166,11 +166,11 @@ Many regulations follow a notice-and-cure pattern:
 ### Generic Notice-and-Cure
 
 ```l4
-GIVEN regulator IS A Actor
-      regulated IS A Actor
+GIVEN regulator IS AN Actor
+      regulated IS AN Actor
       violation IS A STRING
       curePeriod IS A NUMBER
-      consequenceAction IS A Action
+      consequenceAction IS AN Action
 GIVETH A DEONTIC Actor Action
 `notice and cure` MEANS
     PARTY regulator
@@ -242,7 +242,7 @@ DECLARE AppealOutcome IS ONE OF
     AppealDismissed
     AppealPartiallyAllowed HAS modifications IS A STRING
 
-GIVEN appellant IS A Actor
+GIVEN appellant IS AN Actor
       appealDeadline IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `right to appeal` MEANS
@@ -263,7 +263,7 @@ GIVETH A DEONTIC Actor Action
 ```l4
 -- Appeal suspends the original decision
 GIVEN decision IS A Decision
-      appellant IS A Actor
+      appellant IS AN Actor
       appealDeadline IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `suspensive appeal` MEANS
@@ -316,7 +316,7 @@ Many enforcement regimes have graduated responses:
 ```l4
 -- Escalation: Warning → Fine → Suspension → Removal
 
-GIVEN subject IS A Actor
+GIVEN subject IS AN Actor
 GIVETH A DEONTIC Actor Action
 `escalation chain` MEANS
     -- Level 1: Warning
@@ -358,7 +358,7 @@ Sometimes serious violations skip early steps:
 
 ```l4
 GIVEN violation IS A Violation
-      subject IS A Actor
+      subject IS AN Actor
 GIVETH A DEONTIC Actor Action
 `enforcement response` MEANS
     IF violation's severity EQUALS Critical
@@ -392,7 +392,7 @@ Grace periods delay consequences:
 
 ```l4
 -- Payment with grace period before late fee applies
-GIVEN debtor IS A Actor
+GIVEN debtor IS AN Actor
       amount IS A NUMBER
       dueDate IS A NUMBER
       gracePeriod IS A NUMBER
