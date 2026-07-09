@@ -1,0 +1,236 @@
+-- Poh Yuan Nie v Public Prosecutor [2022] SGCA 74
+-- Singapore Penal Code (Cap 224, 2008 Rev Ed) s 415 — Cheating
+--
+-- A worked example: the Court of Appeal's reasoning, executed.
+--
+-- This file is the human-auditable MODEL — the statute as typed code. It encodes
+-- the *2008 version* of s 415 (the one before the court: two limbs + Explanations
+-- 1-3 only — NOT the current 5-Explanation text in cheating-415.l4) and runs the
+-- court's reasoning on hand-picked scenarios:
+--
+--   1. a CASE SPLIT over the four candidate readings of "dishonest"   (GD [18])
+--   2. a COUNTEREXAMPLE that refutes the applicants' reading          (GD [28])
+--   3. a single-scenario DON'T-CARE check illustrating that their
+--      reading renders Explanation 1 "otiose" — surplusage             (GD [30], [32])
+--
+-- The DETERMINISTIC, EXHAUSTIVE versions of (2) and (3) — proved over the whole
+-- fact space rather than checked at a point — belong in a decision procedure, not
+-- in brute-force enumeration here. See the companion Z3 proof
+-- `cheating-415-surplusage.z3.py`, which PROVES the surplusage theorem (unsat of
+-- its negation) and lets the solver FIND the counterexample class itself. L4 is
+-- the model; the solver is the engine it lowers to.
+
+
+-- ===========================================================================
+-- The statute, verbatim (2008 version, reproduced at GD [5])
+-- ===========================================================================
+--
+-- s 24. Whoever does anything with the intention of causing wrongful gain to
+--       one person, or wrongful loss to another person, is said to do that
+--       thing DISHONESTLY.                      <- "the s 24 requirement": property.
+--
+-- s 415. Whoever, by deceiving any person, whether or not such deception was
+--        the sole or main inducement, fraudulently or dishonestly induces the
+--        person so deceived to deliver any property to any person, or to consent
+--        that any person shall retain any property, or intentionally induces the
+--        person so deceived to do or omit to do anything which he would not do
+--        or omit to do if he were not so deceived, and which act or omission
+--        causes or is likely to cause damage or harm to any person in body,
+--        mind, reputation or property, is said to "cheat".
+--
+--   Explanation 1.  A dishonest concealment of facts is a deception within the
+--                   meaning of this section.
+--
+-- Two alternative limbs (GD [6], following Knight Glenn Jeyasingam):
+--   First  limb: by deceiving + (fraudulently OR s24-dishonestly) + induces
+--                delivery/retention of PROPERTY.
+--   Second limb: by deceiving + INTENTIONALLY induces an act/omission causing
+--                harm in body, mind, reputation OR property.  (No s 24 here.)
+
+
+-- ===========================================================================
+-- The operative atoms of one cheating scenario
+-- ===========================================================================
+
+DECLARE `Cheating Scenario` HAS
+    `by deceiving any person`                            IS A BOOLEAN  -- a positive deception
+    `dishonest concealment of facts`                     IS A BOOLEAN  -- the Explanation 1 route
+    `intent to cause wrongful property gain or loss`     IS A BOOLEAN  -- THE s 24 requirement
+    `fraudulently`                                       IS A BOOLEAN
+    `induces delivery or retention of property`          IS A BOOLEAN  -- first-limb actus reus
+    `intentionally induces act or omission`              IS A BOOLEAN  -- second-limb mens rea
+    `act or omission causes or is likely to cause harm`  IS A BOOLEAN
+    `harm to body`                                       IS A BOOLEAN
+    `harm to mind`                                       IS A BOOLEAN
+    `harm to reputation`                                 IS A BOOLEAN
+    `harm to property`                                   IS A BOOLEAN
+
+
+-- ===========================================================================
+-- The four candidate readings of "dishonest" in Explanation 1  (GD [18])
+-- ===========================================================================
+
+DECLARE Interpretation IS ONE OF
+    `First Interpretation`    -- amicus: s24-concealment is a deception, but other concealments suffice too
+    `Second Interpretation`   -- applicants: ONLY an s24-satisfying concealment is a deception
+    `Third Interpretation`    -- PP / court below: "dishonest" = ordinary character of the act
+    `Fourth Interpretation`   -- the court: "dishonest" = intention to deceive; no extra mens rea
+
+
+-- ===========================================================================
+-- The hinge: when does a "dishonest concealment of facts" count as a deception?
+-- ===========================================================================
+-- The whole appeal turns on this one predicate. On every reading EXCEPT the
+-- applicants', the concealment is a deception in the ordinary sense. On the
+-- applicants' (Second) reading, "dishonest" imports the s 24 property gate.
+
+GIVEN s IS A `Cheating Scenario`
+      i IS AN Interpretation
+GIVETH A BOOLEAN
+`dishonest concealment counts as a deception` s i MEANS
+    CONSIDER i
+    WHEN `Second Interpretation` THEN
+            s's `dishonest concealment of facts`
+        AND `the s 24 requirement is met` s
+    OTHERWISE
+        s's `dishonest concealment of facts`
+
+GIVEN s IS A `Cheating Scenario`
+GIVETH A BOOLEAN
+DECIDE `the s 24 requirement is met` s IF
+    s's `intent to cause wrongful property gain or loss`
+
+
+-- ===========================================================================
+-- s 415, isomorphic (inert style): verbatim text inline, operative atoms lifted
+-- ===========================================================================
+
+GIVEN s IS A `Cheating Scenario`
+      i IS AN Interpretation
+GIVETH A BOOLEAN
+DECIDE `there is a deception` s i IF
+        s's `by deceiving any person`
+    OR  `dishonest concealment counts as a deception` s i      -- Explanation 1
+
+GIVEN s IS A `Cheating Scenario`
+      i IS AN Interpretation
+GIVETH A BOOLEAN
+DECIDE `first limb` s i IF
+         "Whoever, by deceiving any person,"
+    ...  `there is a deception` s i
+    ...  "whether or not such deception was the sole or main inducement,"
+    ...  "fraudulently or dishonestly"
+    ...  (   s's `fraudulently`
+          OR `the s 24 requirement is met` s )
+    ...  "induces the person so deceived to deliver any property to any person,"
+    ...  "or to consent that any person shall retain any property,"
+    ...  s's `induces delivery or retention of property`
+
+GIVEN s IS A `Cheating Scenario`
+      i IS AN Interpretation
+GIVETH A BOOLEAN
+DECIDE `second limb` s i IF
+         `there is a deception` s i
+    ...  "intentionally induces the person so deceived"
+    ...  s's `intentionally induces act or omission`
+    ...  "to do or omit to do anything which he would not do or omit to do if he were not so deceived,"
+    ...  "and which act or omission causes or is likely to cause"
+    ...  s's `act or omission causes or is likely to cause harm`
+    ...  "damage or harm to any person in"
+    ...  (   "body"
+          .. s's `harm to body`
+          .. "mind"
+          .. s's `harm to mind`
+          .. "reputation"
+          .. s's `harm to reputation`
+          .. "or property"
+          .. s's `harm to property` )
+
+GIVEN s IS A `Cheating Scenario`
+      i IS AN Interpretation
+GIVETH A BOOLEAN
+DECIDE `is said to cheat` s i IF
+        `first limb` s i
+    OR  `second limb` s i
+
+
+-- ===========================================================================
+-- GD [28]: the counterexample that refutes the applicants' reading
+-- ===========================================================================
+-- "Consider ... a candidate who submits a forged university degree to support
+--  his successful application for an unpaid internship. There is clearly no
+--  transfer of property involved whatsoever ... However, any reasonable
+--  layperson would agree that that candidate had dishonestly concealed the fact
+--  that he did not graduate ... and had thereby cheated ... the employer."
+
+`forged degree for unpaid internship` MEANS `Cheating Scenario` WITH
+    `by deceiving any person`                            IS FALSE  -- isolate the concealment route
+    `dishonest concealment of facts`                     IS TRUE   -- concealed non-graduation
+    `intent to cause wrongful property gain or loss`     IS FALSE  -- "nothing but experience"
+    `fraudulently`                                       IS FALSE
+    `induces delivery or retention of property`          IS FALSE  -- no property changes hands
+    `intentionally induces act or omission`              IS TRUE   -- induced the employer to take him on
+    `act or omission causes or is likely to cause harm`  IS TRUE
+    `harm to body`                                       IS FALSE
+    `harm to mind`                                       IS FALSE
+    `harm to reputation`                                 IS TRUE   -- deceived the employer
+    `harm to property`                                   IS FALSE
+
+-- The case split, run over the forged-degree facts.
+-- Every reading convicts EXCEPT the applicants' — which acquits the fraudster.
+-- That lone FALSE is the "absurd state of affairs" of GD [28].
+#EVAL `is said to cheat` `forged degree for unpaid internship` `First Interpretation`   -- TRUE
+#EVAL `is said to cheat` `forged degree for unpaid internship` `Second Interpretation`  -- FALSE  <- the absurdity
+#EVAL `is said to cheat` `forged degree for unpaid internship` `Third Interpretation`   -- TRUE
+#EVAL `is said to cheat` `forged degree for unpaid internship` `Fourth Interpretation`  -- TRUE
+
+#ASSERT      `is said to cheat` `forged degree for unpaid internship` `Fourth Interpretation`
+#ASSERT NOT (`is said to cheat` `forged degree for unpaid internship` `Second Interpretation`)
+
+
+-- ===========================================================================
+-- GD [30], [32]: surplusage as a don't-care check (illustrative, single point)
+-- ===========================================================================
+-- The applicants' reading would render Explanation 1 "otiose". In boolean terms:
+-- on the no-property facts, the value of `dishonest concealment of facts` cannot
+-- change the verdict — it is a DON'T-CARE variable, doing no work. We test it by
+-- cofactor: hold the internship facts fixed and flip the concealment bit.
+-- (The EXHAUSTIVE proof over the whole no-property region is in the Z3 companion.)
+
+GIVEN i IS AN Interpretation
+      c IS A BOOLEAN
+GIVETH A BOOLEAN
+`internship second limb, concealment set to` i c MEANS
+    `second limb` `the internship with concealment varied` i
+    WHERE
+        `the internship with concealment varied` MEANS `Cheating Scenario` WITH
+            `by deceiving any person`                            IS FALSE
+            `dishonest concealment of facts`                     IS c       -- <- the varied bit
+            `intent to cause wrongful property gain or loss`     IS FALSE
+            `fraudulently`                                       IS FALSE
+            `induces delivery or retention of property`          IS FALSE
+            `intentionally induces act or omission`              IS TRUE
+            `act or omission causes or is likely to cause harm`  IS TRUE
+            `harm to body`                                       IS FALSE
+            `harm to mind`                                       IS FALSE
+            `harm to reputation`                                 IS TRUE
+            `harm to property`                                   IS FALSE
+
+GIVEN i IS AN Interpretation
+GIVETH A BOOLEAN
+`Explanation 1 is otiose for the second limb without property` i MEANS
+    (`internship second limb, concealment set to` i TRUE)
+        EQUALS
+    (`internship second limb, concealment set to` i FALSE)
+
+-- applicants' reading: FALSE / FALSE -> equal -> concealment is a don't-care -> otiose
+#EVAL `internship second limb, concealment set to` `Second Interpretation` TRUE    -- FALSE
+#EVAL `internship second limb, concealment set to` `Second Interpretation` FALSE   -- FALSE
+-- court's reading:     TRUE  / FALSE -> differ -> concealment is LIVE -> real work
+#EVAL `internship second limb, concealment set to` `Fourth Interpretation` TRUE    -- TRUE
+#EVAL `internship second limb, concealment set to` `Fourth Interpretation` FALSE   -- FALSE
+
+--   under the applicants' (Second) reading, Explanation 1 is otiose (surplusage)
+#ASSERT      `Explanation 1 is otiose for the second limb without property` `Second Interpretation`
+--   under the court's (Fourth) reading, Explanation 1 is live (no surplusage)
+#ASSERT NOT (`Explanation 1 is otiose for the second limb without property` `Fourth Interpretation`)
