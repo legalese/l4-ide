@@ -110,3 +110,42 @@ spec = describe "'•' bullet-list syntax" $ do
 
     it "rejects a bullet block whose items drift to a new column mid-block" $
       shouldFailToParse "DECIDE xs IS\n  \x2022 1\n    \x2022 2"
+
+  describe "known corner case: a bare name at a vertical LIST's item column" $ do
+    -- indentedGE (>=, not just >) is what lets a child bullet line up
+    -- directly under its parent's head word (see the "singleton"/"multiple
+    -- bullet-block arguments" groups above). The same relaxation also
+    -- applies when a bare, unsaturated identifier is itself a vertical
+    -- LIST's item — such a name and a LIST's items share one EQ column, so
+    -- an aligned bullet block that follows is absorbed as the name's
+    -- ARGUMENT rather than treated as the next sibling LIST item. This is
+    -- pinned as the intended behaviour (rather than narrowed) because it
+    -- only bites a bare name that is itself arity-overloaded across a 0-arg
+    -- and a list-taking definition (e.g. `item`, or the month constants in
+    -- daydate.l4) — a combination that, as of this test, no file in the
+    -- repository's corpus hits (see the bullet-list-syntax branch's review
+    -- notes). Wrap the name in parens, e.g. `(reverse)`, to force it back
+    -- into a standalone sibling LIST item instead.
+    it "absorbs an aligned bullet block into a preceding bare LIST item as its argument" $ do
+      expr <- decideExprNamed "xs" $ Text.unlines
+        [ "DECIDE xs IS"
+        , "  LIST"
+        , "    reverse"
+        , "    \x2022 1"
+        , "    \x2022 2"
+        ]
+      case expr of
+        List _ [App _ fn [List _ [_, _]]] -> rawNameText fn `shouldBe` "reverse"
+        _ -> expectationFailure $ "Expected LIST [reverse [1,2]], got: " <> show expr
+
+    it "parens around the bare name keep it a separate sibling LIST item" $ do
+      expr <- decideExprNamed "xs" $ Text.unlines
+        [ "DECIDE xs IS"
+        , "  LIST"
+        , "    (reverse)"
+        , "    \x2022 1"
+        , "    \x2022 2"
+        ]
+      case expr of
+        List _ [App _ fn [], List _ [_, _]] -> rawNameText fn `shouldBe` "reverse"
+        _ -> expectationFailure $ "Expected LIST [reverse, [1,2]], got: " <> show expr

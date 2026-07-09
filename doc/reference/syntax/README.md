@@ -90,6 +90,13 @@ item "Parent"         -- bullet children nest under a constructor, no LIST/paren
     • item "c"        --   deeper indent works too, to arbitrary depth
 ```
 
+**Corner case.** Inside a vertical `LIST` block, a bare name is itself one of
+the list's items, at the same column as its siblings. If a `•` block follows
+immediately at that column, it binds to the name as an *argument* rather than
+becoming the next sibling item — this only matters for a name that is
+arity-overloaded across a 0-arg and a list-taking definition. Wrap the name in
+parens, e.g. `(reverse)`, to force it back into a standalone list item.
+
 ---
 
 ## Annotations
