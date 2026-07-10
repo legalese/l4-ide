@@ -46,6 +46,7 @@ const wire: VizFunDecl = {
             value: "TrueV",
             canInline: true,
             atomId: "atom-deceiving",
+            typically: true, // genuinely-defaulted atom (presence => default)
           },
           {
             $type: "UBoolVar",
@@ -54,6 +55,7 @@ const wire: VizFunDecl = {
             value: "FalseV",
             canInline: true,
             atomId: "atom-concealment",
+            typically: false, // a FALSE default is still a default (presence, not payload)
           },
         ],
       },
@@ -64,6 +66,7 @@ const wire: VizFunDecl = {
         value: "UnknownV", // must NOT land in the valuation map
         canInline: true,
         atomId: "atom-intentionally",
+        typically: null, // v2 schema: non-presumed atom => null, NOT a default
       },
       {
         $type: "App",
@@ -120,6 +123,26 @@ test("valuation lifts inline leaf values, skips UnknownV", () => {
   assert.equal(valuation.size, 3);
 });
 
+test("provenance lifts TYPICALLY presence to default (payload-agnostic)", () => {
+  const { provenance } = fromVizFunDecl(wire);
+  // id 4 carries typically:true, id 5 carries typically:false — both are defaults.
+  assert.equal(provenance.get(4), "default", "true default => default");
+  assert.equal(
+    provenance.get(5),
+    "default",
+    "a FALSE default is still a default (presence decides)",
+  );
+  // leaves with null/absent typically stay unset (=> given per ViewSpec).
+  assert.equal(
+    provenance.has(6),
+    false,
+    "typically:null is NOT a default (v2 nullable schema)",
+  );
+  assert.equal(provenance.has(9), false, "no typically key => no entry");
+  assert.equal(provenance.has(7), false, "App carries no typically");
+  assert.equal(provenance.size, 2, "only the two declared defaults appear");
+});
+
 test("every node kind maps to its ladder counterpart", () => {
   const { fn } = fromVizFunDecl(wire);
   const and = fn.body as And;
@@ -157,9 +180,13 @@ test("And/Or carry no synthesized label (wire has no NamedExpr yet)", () => {
   assert.equal((fn.body as And).label, undefined);
 });
 
-test("decoded tree + valuation flow through layout() without error", () => {
-  const { fn, valuation } = fromVizFunDecl(wire);
-  const scene = layout(fn, defaultViewSpec({ valuation }), estimateMetrics);
+test("decoded tree + valuation + provenance flow through layout() without error", () => {
+  const { fn, valuation, provenance } = fromVizFunDecl(wire);
+  const scene = layout(
+    fn,
+    defaultViewSpec({ valuation, provenance }),
+    estimateMetrics,
+  );
   assert.ok(scene.prims.length > 0, "produces primitives");
   assert.ok(scene.size.w > 0 && scene.size.h > 0, "has positive extent");
   // the two TRUE leaves + FALSE leaves should be drawn as boxes
