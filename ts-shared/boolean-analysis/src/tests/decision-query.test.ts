@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { compileDecisionQuery } from '../decision-query.js'
+import { typicallyBridge } from '@repo/viz-expr'
 import type { IRExpr } from '@repo/viz-expr'
 
-function uboolVar(id: number, unique: number, label: string): IRExpr {
+function uboolVar(
+  id: number,
+  unique: number,
+  label: string,
+  typically?: boolean
+): IRExpr {
   return {
     $type: 'UBoolVar',
     id: { id },
@@ -10,6 +16,7 @@ function uboolVar(id: number, unique: number, label: string): IRExpr {
     value: 'UnknownV',
     canInline: false,
     atomId: `atom-${unique}`,
+    ...(typically === undefined ? {} : { typically }),
   }
 }
 
@@ -107,5 +114,72 @@ describe('information-gain ordering', () => {
 
     expect(res.ranked[0]).toBe(2) // ask b first; a is nearly certain
     expect(res.scores.get(2)!).toBeGreaterThan(res.scores.get(1)!)
+  })
+})
+
+describe('typicallyBridge extraction', () => {
+  it('maps boolean TYPICALLY to soft weights + default provenance; leaves others alone', () => {
+    const t = uboolVar(1, 1, 'presumed true', true)
+    const f = uboolVar(2, 2, 'presumed false', false)
+    const plain = uboolVar(3, 3, 'no default') // no typically
+    const expr = and(10, [t, or(11, [f, plain])])
+
+    const { weights, provenance } = typicallyBridge(expr)
+
+    // weights only for boolean-typically atoms
+    expect(weights.get(1)).toBe(0.9)
+    expect(weights.get(2)).toBe(0.1)
+    expect(weights.has(3)).toBe(false)
+
+    // provenance 'default' (keyed by node id) only for presumed atoms; the
+    // plain atom is implicitly 'given' (absent)
+    expect(provenance.get(1)).toBe('default')
+    expect(provenance.get(2)).toBe('default')
+    expect(provenance.has(3)).toBe(false)
+  })
+})
+
+describe('TYPICALLY priors — cross-runtime parity fixture', () => {
+  // The SAME structure, var order, priors and expected scores are asserted in
+  // the Haskell suite (jl4-service/test/BooleanDecisionQuerySpec.hs,
+  // "TYPICALLY priors — cross-runtime parity fixture"). If the two hand-rolled
+  // ROBDDs ever drift, one of these tests breaks (question-ordering spec §7).
+  //
+  // `may purchase alcohol` IF capacity AND (ofage OR parental OR spousal)
+  const capacity = uboolVar(1, 1, 'person has capacity', true)
+  const ofage = uboolVar(2, 2, 'of age', true)
+  const parental = uboolVar(3, 3, 'has parental approval', false)
+  const spousal = uboolVar(4, 4, 'has spousal approval', false)
+  const expr = and(10, [capacity, or(11, [ofage, parental, spousal])])
+  const order = [1, 2, 3, 4]
+  const approx = (expected: number) => (actual: number | undefined) =>
+    actual !== undefined && Math.abs(actual - expected) < 1e-3
+
+  it('prior-free: OR siblings tie, capacity leads', () => {
+    const res = compileDecisionQuery(expr, order).query(new Map())
+    expect(res.ranked).toEqual([1, 2, 3, 4])
+    expect(res.scores.get(1)).toSatisfy(approx(0.7169))
+    expect(res.scores.get(2)).toSatisfy(approx(0.0115))
+    expect(res.scores.get(3)).toSatisfy(approx(0.0115))
+    expect(res.scores.get(4)).toSatisfy(approx(0.0115))
+  })
+
+  it('v2 priors from typicallyBridge: presumed-FALSE OR atoms sink to the end', () => {
+    // The weights come from the shared bridge reading each UBoolVar.typically,
+    // NOT a hand-built map — this exercises the real extraction path.
+    const { weights } = typicallyBridge(expr)
+    expect(weights.get(1)).toBe(0.9) // capacity TYPICALLY TRUE
+    expect(weights.get(2)).toBe(0.9) // of age TYPICALLY TRUE
+    expect(weights.get(3)).toBe(0.1) // parental TYPICALLY FALSE
+    expect(weights.get(4)).toBe(0.1) // spousal TYPICALLY FALSE
+
+    const res = compileDecisionQuery(expr, order, weights).query(new Map())
+    expect(res.ranked).toEqual([1, 2, 3, 4])
+    expect(res.scores.get(1)).toSatisfy(approx(0.2992))
+    expect(res.scores.get(2)).toSatisfy(approx(0.1762))
+    expect(res.scores.get(3)).toSatisfy(approx(0.0034))
+    expect(res.scores.get(4)).toSatisfy(approx(0.0034))
+    // the informative OR atom outranks its presumed-FALSE siblings
+    expect(res.scores.get(2)!).toBeGreaterThan(res.scores.get(3)!)
   })
 })

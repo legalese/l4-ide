@@ -94,6 +94,10 @@ data CachedDecisionQuery = CachedDecisionQuery
   , varDepsByUnique :: !(IntMap IntSet)
   , varInputRefsByUnique :: !(IntMap (Set InputRef))
   , compiled :: !(BDQ.CompiledDecisionQuery Int)
+  , priorsByUnique :: !(Map Int Double)
+    -- ^ Per-atom prior @P(atom = TRUE)@ from boolean @TYPICALLY@ defaults, keyed
+    -- by atom unique. Absent atoms are prior-free (0.5). Feeds the info-gain
+    -- question ordering; built once from the ladder's @typically@ fields.
   }
 
 data QueryAtom = QueryAtom
@@ -370,7 +374,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
           | (k, b) <- flattenedLabelBindings
           ]
 
-    res = BDQ.queryDecision cached.compiled knownBindings
+    res = BDQ.queryDecision cached.compiled cached.priorsByUnique knownBindings
 
     atomOf :: Int -> QueryAtom
     atomOf u =
@@ -384,28 +388,12 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     atomsOfSet :: Set Int -> [QueryAtom]
     atomsOfSet s = map atomOf (Set.toList s)
 
+    -- Information gain (bits) about the outcome from asking this atom, under the
+    -- TYPICALLY priors. Subsumes the old hand-rolled "+2 if it determines the
+    -- outcome, plus normalized support-shrink" proxy: a determining atom drives a
+    -- branch to a terminal, so its entropy is 0 and its gain is maximal.
     impactScoreFor :: Int -> Double
-    impactScoreFor atomUniq =
-      let
-        byUnique =
-          Maybe.fromMaybe
-            (0, False)
-            ( do
-                vi <- Map.lookup atomUniq res.impact
-                let
-                  impacts =
-                    [ (vi.ifTrue.determined, vi.ifTrue.support)
-                    , (vi.ifFalse.determined, vi.ifFalse.support)
-                    ]
-                  canDetermine = any (\(d, _s) -> d /= Nothing) impacts
-                  shrink =
-                    sum
-                      [ fromIntegral (Set.size res.support - Set.size s)
-                      | (_d, s) <- impacts
-                      ]
-                pure (shrink, canDetermine)
-            )
-       in (if snd byUnique then 2 else 0) + fst byUnique / max 1 (fromIntegral (Set.size res.support))
+    impactScoreFor atomUniq = Map.findWithDefault 0 atomUniq res.scores
 
     impactJson :: Map Int QueryImpact
     impactJson =

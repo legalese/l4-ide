@@ -250,6 +250,15 @@ export const UBoolVar = Schema.Struct({
   canInline: Schema.Boolean,
   /** Stable UUIDv5 derived from function name, atom label, and input refs. */
   atomId: Schema.String,
+  /**
+   * The atom's BOOLEAN `TYPICALLY` default, if it refers to a boolean binder
+   * that declared one (`TRUE`/`FALSE`); otherwise `null`/absent. Populated by
+   * the Haskell ladder builder. A rebuttable presumption (§22): drives both the
+   * tentative rendering and the question-ordering prior. Only boolean binders
+   * contribute — a numeric/string `TYPICALLY` is never a probability over a
+   * derived comparison, so it never appears here. See `typicallyBridge`.
+   */
+  typically: Schema.optional(Schema.NullOr(Schema.Boolean)),
 }).annotations({ identifier: 'UBoolVar' })
 
 /** We have an IRId even for bool lits b/c it's useful to be able to associate IRExprs with the Lir nodes that they get translated to */
@@ -309,6 +318,84 @@ export const RenderAsLadderInfo = Schema.Struct({
 
 export function makeVizInfoDecoder() {
   return Schema.decodeUnknownEither(RenderAsLadderInfo)
+}
+
+/***********************************
+        TYPICALLY bridge
+************************************/
+
+/**
+ * Soft prior weights for a boolean atom's `TYPICALLY` presumption (question-
+ * ordering spec §4 / §6.1): soft (0.9 / 0.1), not hard (1 / 0), so a presumed
+ * atom sinks to the end of the ask-order yet is still asked if it would flip the
+ * outcome — safer for high-stakes rules.
+ */
+export const TYPICALLY_TRUE_WEIGHT = 0.9
+export const TYPICALLY_FALSE_WEIGHT = 0.1
+
+/** Structural mirror of ladder-core's `Provenance` (kept local so `@repo/viz-expr`
+ *  needs no dependency on `@repo/ladder-core`). */
+export type TypicallyProvenance = 'given' | 'default'
+
+export interface TypicallyMaps {
+  /**
+   * Per-atom prior P(atom = TRUE), keyed by `name.unique`. Only atoms whose
+   * binder declared a boolean `TYPICALLY` appear; an absent entry means
+   * prior-free (0.5 downstream). Feed straight into `compileDecisionQuery`'s
+   * `weights` parameter.
+   */
+  readonly weights: ReadonlyMap<Unique, number>
+  /**
+   * Per-node provenance keyed by `id.id` (the positional NodeId). Only nodes
+   * riding a `TYPICALLY` presumption are recorded, as `default` (render
+   * tentative); everything else is implicitly `given` (absent ⇒ given, matching
+   * `ViewSpec.provenance`). Feed into the ladder ViewSpec's `provenance` map.
+   */
+  readonly provenance: ReadonlyMap<number, TypicallyProvenance>
+}
+
+/**
+ * The single shared extraction (question-ordering spec §8, "build once, two
+ * consumers"): ONE walk over the wire IR reads each `UBoolVar.typically` and
+ * produces BOTH the question-ordering weights and the tentative-render
+ * provenance. Do not re-derive either map elsewhere — that is the duplication
+ * the spec forbids.
+ *
+ * Only boolean binders contribute a weight (a numeric/string `TYPICALLY` is not
+ * a probability over a derived comparison, so the Haskell side never sets
+ * `typically` for those — this walk simply trusts that field).
+ */
+export function typicallyBridge(expr: IRExpr): TypicallyMaps {
+  const weights = new Map<Unique, number>()
+  const provenance = new Map<number, TypicallyProvenance>()
+  const go = (e: IRExpr): void => {
+    switch (e.$type) {
+      case 'UBoolVar': {
+        const t = e.typically
+        if (t === true || t === false) {
+          weights.set(
+            e.name.unique,
+            t ? TYPICALLY_TRUE_WEIGHT : TYPICALLY_FALSE_WEIGHT
+          )
+          provenance.set(e.id.id, 'default')
+        }
+        return
+      }
+      case 'Not':
+        go(e.negand)
+        return
+      case 'And':
+      case 'Or':
+        e.args.forEach(go)
+        return
+      // App / TrueE / FalseE / InertE carry no atom prior; App is an opaque
+      // leaf atom (its args are not decision-query variables).
+      default:
+        return
+    }
+  }
+  go(expr)
+  return { weights, provenance }
 }
 
 /***********************************
