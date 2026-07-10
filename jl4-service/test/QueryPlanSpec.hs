@@ -71,6 +71,29 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 |]
 
+-- `presumed` is declared FIRST but is a rebuttable presumption (TYPICALLY FALSE)
+-- inside an OR, so it is the LEAST informative question and must be asked LAST.
+-- Without the TYPICALLY prior it would tie the others and lead by source order.
+presumedOrL4 :: Text
+presumedOrL4 = [i|
+GIVEN presumed IS A BOOLEAN TYPICALLY FALSE
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE d IF presumed OR a OR b
+|]
+
+-- Same structure, no TYPICALLY: the prior-free baseline ranks by source order,
+-- so `presumed` leads.
+plainOrL4 :: Text
+plainOrL4 = [i|
+GIVEN presumed IS A BOOLEAN
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE d IF presumed OR a OR b
+|]
+
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -132,6 +155,40 @@ spec = do
   describe "jl4-service query plan" serviceTests
   describe "LSP query plan" lspTests
   describe "service and LSP paths agree" agreementTests
+  describe "TYPICALLY question ordering (end-to-end)" typicallyOrderingTests
+
+
+-- | End-to-end check that boolean TYPICALLY defaults flow all the way through
+-- the real pipeline (source -> typecheck -> visualize -> query plan) and demote
+-- rebuttable presumptions in the ask-order. Exercises H1 (the viz `typically`
+-- field) + the priors extraction + the info-gain ranking on BOTH the service and
+-- LSP paths.
+typicallyOrderingTests :: Spec
+typicallyOrderingTests = do
+  let rankedLabels r = map (\qa -> qa.label) r.ranked
+
+  describe "presumed OR a OR b" do
+    it "service: TYPICALLY FALSE presumption sinks to the end of the ask-order" do
+      c <- serviceCache "d" presumedOrL4
+      -- presumed (0.1 in an OR) is least informative -> last, despite leading
+      -- the source order.
+      rankedLabels (svcQP c []) `shouldBe` ["a", "b", "presumed"]
+
+    it "service: without TYPICALLY, prior-free order follows source order" do
+      c <- serviceCache "d" plainOrL4
+      rankedLabels (svcQP c []) `shouldBe` ["presumed", "a", "b"]
+
+    it "LSP: TYPICALLY FALSE presumption sinks to the end of the ask-order" do
+      (info, state, params) <- lspCache "d" presumedOrL4
+      map (\qa -> qa.label) (lspQP "d" params info state []).ranked
+        `shouldBe` ["a", "b", "presumed"]
+
+    it "service and LSP agree on the ranked order" do
+      sCache <- serviceCache "d" presumedOrL4
+      (info, state, params) <- lspCache "d" presumedOrL4
+      let sLabels = rankedLabels (svcQP sCache [])
+          lLabels = map (\qa -> qa.label) (lspQP "d" params info state []).ranked
+      sLabels `shouldBe` lLabels
 
 
 serviceTests :: Spec

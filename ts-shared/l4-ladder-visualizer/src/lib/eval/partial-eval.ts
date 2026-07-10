@@ -1,4 +1,5 @@
 import type { IRExpr, IRId, Unique } from '@repo/viz-expr'
+import { typicallyBridge } from '@repo/viz-expr'
 import { match } from 'ts-pattern'
 import type { Assignment } from './assignment.js'
 import type { EvalResult } from './eval.js'
@@ -275,7 +276,11 @@ export class PartialEvalAnalyzer {
       return
     }
 
-    this.#compiled = compileDecisionQuery(expr, varOrder)
+    // v2 question ordering: read per-atom priors from boolean TYPICALLY defaults
+    // (the shared extraction; §8) and hand them to the info-gain ranker. Absent
+    // priors default to 0.5, so this is a no-op for modules without TYPICALLY.
+    const { weights } = typicallyBridge(expr)
+    this.#compiled = compileDecisionQuery(expr, varOrder, weights)
     this.#usedBdd = true
   }
 

@@ -128,7 +128,7 @@ decideType (MkDecide anno _ _ _) =
 firstAtomCanInline :: V.IRExpr -> Maybe Bool
 firstAtomCanInline = go
   where
-    go (V.UBoolVar _ _ _ ci _) = Just ci
+    go (V.UBoolVar _ _ _ ci _ _) = Just ci
     go (V.And _ es) = listToMaybe (mapMaybe go es)
     go (V.Or _ es) = listToMaybe (mapMaybe go es)
     go (V.Not _ e) = go e

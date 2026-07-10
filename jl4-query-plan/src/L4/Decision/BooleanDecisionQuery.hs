@@ -14,6 +14,7 @@ module L4.Decision.BooleanDecisionQuery (
 import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Ord (Down (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -169,6 +170,39 @@ determinedFromRoot 0 = Just False
 determinedFromRoot 1 = Just True
 determinedFromRoot _ = Nothing
 
+-- | Binary entropy in bits; 0 at the deterministic ends. Mirror of
+-- @binaryEntropy@ in @decision-query.ts@.
+binaryEntropy :: Double -> Double
+binaryEntropy p
+  | p <= 0 || p >= 1 = 0
+  | otherwise = negate p * logBase 2 p - (1 - p) * logBase 2 (1 - p)
+
+-- | Probability that the function rooted at @root@ evaluates TRUE under an
+-- independent model where BDD variable @v@ is true with weight @weights[v]@
+-- (default 0.5). A model count in probability space; because it recurses only
+-- on variables that actually appear, it is automatically correct for reduced
+-- diagrams that skip variables. Memoized by node id. Mirror of @prob@ in
+-- @robdd.ts@ (lines 171-186).
+prob :: Bdd -> Map Int Double -> NodeId -> Double
+prob bdd weights root = snd (go Map.empty root)
+ where
+  go :: Map NodeId Double -> NodeId -> (Map NodeId Double, Double)
+  go memo nid
+    | nid == 0 = (memo, 0)
+    | nid == 1 = (memo, 1)
+    | otherwise =
+        case Map.lookup nid memo of
+          Just cached -> (memo, cached)
+          Nothing ->
+            case bdd.nodes Map.! nid of
+              Terminal b -> (memo, if b then 1 else 0)
+              Branch v lo hi ->
+                let (memo1, plo) = go memo lo
+                    (memo2, phi) = go memo1 hi
+                    w = Map.findWithDefault 0.5 v weights
+                    res = (1 - w) * plo + w * phi
+                 in (Map.insert nid res memo2, res)
+
 data QueryOutcome v = QueryOutcome
   { determined :: Maybe Bool
   , support :: Set v
@@ -186,6 +220,9 @@ data DecisionQueryResult v = DecisionQueryResult
   , support :: Set v
   , ranked :: [v]
   , impact :: Map v (VarImpact v)
+  , scores :: Map v Double
+    -- ^ Information gain (bits) about the outcome per support variable; higher =
+    -- ask sooner. Mirror of @scores@ in @decision-query.ts@.
   }
   deriving stock (Eq, Show)
 
@@ -240,8 +277,16 @@ compileDecisionQuery order expr =
           (0, bdd)
           es
 
-queryDecision :: (Ord v) => CompiledDecisionQuery v -> Map v Bool -> DecisionQueryResult v
-queryDecision compiled bindings =
+-- | Rank the still-unknown atoms by information gain about the outcome, given
+-- the current bindings and per-atom priors @P(atom = TRUE)@ (default 0.5 when a
+-- prior is absent). This subsumes the old "does answering it settle the
+-- result?" heuristic — a variable that determines the outcome drives a branch to
+-- a terminal so its entropy is 0, i.e. maximal gain — while also crediting a
+-- variable that merely shrinks the remaining possibility space. Mirror of the
+-- info-gain @rank@ in @decision-query.ts@ (lines 148-206). Ties break by variable
+-- order for determinism.
+queryDecision :: (Ord v) => CompiledDecisionQuery v -> Map v Double -> Map v Bool -> DecisionQueryResult v
+queryDecision compiled priors bindings =
   let idxBindings =
         Map.fromList
           [ (idx, b)
@@ -249,6 +294,15 @@ queryDecision compiled bindings =
           , Just idx <- [Map.lookup v compiled.vToIdx]
           ]
       (restrictedRoot, bdd1) = restrictMany idxBindings compiled.root compiled.bdd
+      -- Priors re-keyed to BDD indices, exactly as robdd.ts's weightByIndex.
+      weightByIndex =
+        Map.fromList
+          [ (idx, w)
+          | (v, w) <- Map.toList priors
+          , Just idx <- [Map.lookup v compiled.vToIdx]
+          ]
+      -- Current uncertainty about the outcome, in bits.
+      priorEntropy = binaryEntropy (prob bdd1 weightByIndex restrictedRoot)
       supportIdx = support restrictedRoot bdd1
       supportVs =
         Set.fromList
@@ -266,36 +320,39 @@ queryDecision compiled bindings =
                 , Just v <- [Map.lookup idx compiled.idxToV]
                 ]
           }
-      impactMap =
-        Map.fromList
-          [ ( v
-            , case Map.lookup v compiled.vToIdx of
-                Nothing -> error "Internal error: var not found in order"
-                Just idx ->
-                  let (ridT, bddT) = restrictVar idx True restrictedRoot bdd1
-                      (ridF, bddF) = restrictVar idx False restrictedRoot bdd1
-                   in VarImpact
-                        { ifTrue = outcomeOf ridT bddT
-                        , ifFalse = outcomeOf ridF bddF
-                        }
-            )
-          | v <- Set.toList supportVs
-          ]
-      determinableCount v =
-        case Map.lookup v impactMap of
-          Nothing -> 0 :: Int
-          Just vi ->
-            fromEnum (vi.ifTrue.determined /= Nothing)
-              + fromEnum (vi.ifFalse.determined /= Nothing)
+      -- Per support variable, compute both its impact and its info-gain score
+      -- from the same restriction (mirrors the single loop in decision-query.ts).
+      perVar v =
+        case Map.lookup v compiled.vToIdx of
+          Nothing -> error "Internal error: var not found in order"
+          Just idx ->
+            let (ridT, bddT) = restrictVar idx True restrictedRoot bdd1
+                (ridF, bddF) = restrictVar idx False restrictedRoot bdd1
+                impactV =
+                  VarImpact
+                    { ifTrue = outcomeOf ridT bddT
+                    , ifFalse = outcomeOf ridF bddF
+                    }
+                w = Map.findWithDefault 0.5 idx weightByIndex
+                -- Expected posterior entropy after asking this variable, weighted
+                -- by how likely each answer is; info gain = prior - expected.
+                expectedPosterior =
+                  w * binaryEntropy (prob bddT weightByIndex ridT)
+                    + (1 - w) * binaryEntropy (prob bddF weightByIndex ridF)
+             in (impactV, priorEntropy - expectedPosterior)
+      perVarMap = Map.fromList [(v, perVar v) | v <- Set.toList supportVs]
+      impactMap = fmap fst perVarMap
+      scoresMap = fmap snd perVarMap
       level v = Map.findWithDefault 1000000 v compiled.vToIdx
       rankedVars =
         sortOn
-          (\v -> (-determinableCount v, level v))
+          (\v -> (Down (Map.findWithDefault 0 v scoresMap), level v))
           (Set.toList supportVs)
    in DecisionQueryResult
         { determined = determinedFromRoot restrictedRoot
         , support = supportVs
         , ranked = rankedVars
         , impact = impactMap
+        , scores = scoresMap
         }
 

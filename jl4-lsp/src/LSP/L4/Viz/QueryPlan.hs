@@ -61,8 +61,8 @@ annotateLadderWithAtomIds ladderInfo vizState =
         VizExpr.TrueE uid nm
       VizExpr.FalseE uid nm ->
         VizExpr.FalseE uid nm
-      VizExpr.UBoolVar uid nm val canInline _oldAtomId ->
-        VizExpr.UBoolVar uid nm val canInline (Map.findWithDefault (Text.pack (show nm.unique)) nm.unique atomIds)
+      VizExpr.UBoolVar uid nm val canInline _oldAtomId typically ->
+        VizExpr.UBoolVar uid nm val canInline (Map.findWithDefault (Text.pack (show nm.unique)) nm.unique atomIds) typically
       VizExpr.App uid nm args _oldAtomId ->
         VizExpr.App uid nm (map annotateExpr args) (Map.findWithDefault (Text.pack (show nm.unique)) nm.unique atomIds)
       VizExpr.InertE uid txt ctx ->
@@ -92,6 +92,7 @@ buildQueryPlanCache ladderInfo vizState =
             (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
             inputRefs
       , compiled
+      , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
       }
 
 queryPlanFromLadder ::
@@ -116,7 +117,7 @@ vizExprToBoolExpr expr =
   go = \case
     VizExpr.TrueE _ _ -> (BDQ.BTrue, mempty, [])
     VizExpr.FalseE _ _ -> (BDQ.BFalse, mempty, [])
-    VizExpr.UBoolVar _ nm _ _ _ ->
+    VizExpr.UBoolVar _ nm _ _ _ _ ->
       let u = nm.unique
        in (BDQ.BVar u, Map.singleton u nm.label, [u])
     VizExpr.App _ nm _args _ ->

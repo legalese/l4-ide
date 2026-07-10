@@ -39,7 +39,7 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
-import L4.Viz.Ladder (InputRef(..), generateAtomId)
+import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
@@ -96,6 +96,8 @@ data VizState = MkVizState
   , defsForInlining :: IntMap (Expr Resolved)
   , atomDeps       :: IntMap IntSet
   , atomInputRefs  :: IntMap (Set InputRef)
+  , typicallyDefaults :: IntMap Bool
+  -- ^ Unique.unique -> the binder's BOOLEAN TYPICALLY default (see 'collectTypicallyDefaults').
   }
   deriving stock (Generic)
 
@@ -119,6 +121,7 @@ mkInitialVizState cfg =
     , defsForInlining = Map.empty
     , atomDeps = Map.empty
     , atomInputRefs = Map.empty
+    , typicallyDefaults = Map.empty
     }
 
 ------------------------------------------------------
@@ -311,6 +314,8 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
     let funName = mkPrettyVizName funResolved
     assign #functionName funName.label
     assign #defsForInlining =<< collectDefsForInlining
+    cfg <- getVizCfg
+    assign #typicallyDefaults (collectTypicallyDefaults givenSig cfg.module')
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
@@ -437,7 +442,9 @@ varLeaf vid vname resolved = do
   recordAtomInputRefs vname.unique refs
   functionName <- use #functionName
   let atomId = generateAtomId functionName vname.label refs
-  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId
+  defaults <- use #typicallyDefaults
+  let mTypically = Map.lookup (getUnique resolved).unique defaults
+  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId mTypically
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
@@ -456,6 +463,7 @@ leafFromExpr expr = do
       defaultUBoolVarValue
       defaultUBoolVarCanInline
       atomId
+      Nothing  -- compound leaf: not a bare boolean binder, so no TYPICALLY prior
 
 ------------------------------------------------------
 -- Name helpers

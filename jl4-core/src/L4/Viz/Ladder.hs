@@ -22,6 +22,7 @@ module L4.Viz.Ladder
   , getAtomInputRefs
     -- * Utilities (shared with LSP)
   , generateAtomId
+  , collectTypicallyDefaults
   ) where
 
 import Base
@@ -32,6 +33,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 
 import qualified Data.Set as Set
+import qualified Data.Map as DMap
 import qualified Data.List.NonEmpty as NE
 import qualified Data.List as List
 import Optics.State.Operators ((<%=), (%=))
@@ -48,6 +50,7 @@ import L4.Syntax
 import L4.Print (prettyLayout)
 import qualified L4.Transform as Transform (simplify)
 import L4.Desugar
+import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 
@@ -89,6 +92,12 @@ data VizState = MkVizState
   , defsForInlining :: IntMap (Expr Resolved)
   , atomDeps       :: IntMap IntSet
   , atomInputRefs  :: IntMap (Set InputRef)
+  , typicallyDefaults :: IntMap Bool
+    -- ^ Unique.unique -> the binder's BOOLEAN @TYPICALLY@ default, for the atoms
+    -- that refer to a GIVEN param or module ASSUME. Numeric/string defaults are
+    -- deliberately excluded (a numeric default is not a probability over a
+    -- derived comparison). Consumed as a per-atom prior for question ordering
+    -- and as tentative-render provenance.
   }
   deriving stock (Generic)
 
@@ -109,6 +118,7 @@ mkInitialState uri mod' subst simp = MkVizState
   , defsForInlining = Map.empty
   , atomDeps = Map.empty
   , atomInputRefs = Map.empty
+  , typicallyDefaults = Map.empty
   }
 
 ------------------------------------------------------
@@ -295,6 +305,8 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
   assign #defsForInlining =<< collectDefsForInlining
+  mod' <- use #module'
+  assign #typicallyDefaults (collectTypicallyDefaults givenSig mod')
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
@@ -308,6 +320,34 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
 
     getResolved :: OptionallyTypedName Resolved -> Resolved
     getResolved (MkOptionallyTypedName _ paramName _ _) = paramName
+
+-- | Collect BOOLEAN @TYPICALLY@ defaults from a DECIDE's GIVEN params and the
+-- module's ASSUME declarations, keyed by @Unique.unique@. Only boolean binders
+-- contribute: a numeric/string default says nothing about the probability of a
+-- derived comparison, so it is intentionally dropped here (question-ordering
+-- spec §4 wrinkle).
+collectTypicallyDefaults :: GivenSig Resolved -> Module Resolved -> IntMap Bool
+collectTypicallyDefaults (MkGivenSig _ names) mod' =
+  Map.fromList $
+    [ ((getUnique r).unique, b)
+    | MkOptionallyTypedName _ r _ (Just tExpr) <- names
+    , Just b <- [typicallyToBool tExpr]
+    ]
+    <>
+    [ (u.unique, b)
+    | (u, MkAssume _ _ _ _ (Just tExpr)) <- DMap.toList (Export.assumesFromModule mod')
+    , Just b <- [typicallyToBool tExpr]
+    ]
+
+-- | Interpret a @TYPICALLY@ default expression as a boolean, iff it is exactly
+-- @TRUE@ or @FALSE@. Anything else (numbers, strings, computed expressions)
+-- yields 'Nothing'. Mirrors the boolean case of 'L4.FunctionSchema.typicallyToJson'.
+typicallyToBool :: Expr Resolved -> Maybe Bool
+typicallyToBool = \case
+  App _ r []
+    | getUnique r == TC.trueUnique  -> Just True
+    | getUnique r == TC.falseUnique -> Just False
+  _ -> Nothing
 
 translateExpr :: Bool -> Expr Resolved -> Viz IRExpr
 translateExpr True = translateExpr False . Transform.simplify
@@ -389,7 +429,9 @@ varLeaf vid vname resolved = do
   recordAtomInputRefs vname.unique refs
   functionName <- use #functionName
   let atomId = generateAtomId functionName vname.label refs
-  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId
+  defaults <- use #typicallyDefaults
+  let mTypically = Map.lookup (getUnique resolved).unique defaults
+  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
@@ -401,7 +443,10 @@ leafFromExpr expr = do
   functionName <- use #functionName
   let label = prettyLayout expr
       atomId = generateAtomId functionName label refs
-  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId
+  -- A compound leaf is not a bare boolean binder, so it carries no TYPICALLY
+  -- prior (question-ordering spec §4: priors come only from boolean binders
+  -- whose atom is the binder itself). Bare-var leaves go through 'varLeaf'.
+  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId Nothing
 
 ------------------------------------------------------
 -- Name helpers

@@ -200,6 +200,7 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
                   (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
                   inputRefs
             , compiled = bddCompiled
+            , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
             }
       , paramSchema = parametersFromDecideWithErrors resolvedModule decide []
       }
