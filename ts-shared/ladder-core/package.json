@@ -15,6 +15,7 @@
     "build": "npm run clean && tsc",
     "check": "tsc --noEmit",
     "demo": "tsx demo/s415.ts",
+    "test": "tsx --test test/*.test.ts",
     "standalone": "bash standalone/build.sh"
   },
   "packageManager": "npm@11.0.0",
@@ -25,5 +26,8 @@
     "@types/node": "^22.10.0",
     "tsx": "^4.22.0",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@repo/viz-expr": "*"
   }
 }
