@@ -5,3 +5,4 @@ export { layout, estimateMetrics } from "./layout.js";
 export { sceneToSvg } from "./svg.js";
 export { fromVizFunDecl, fromVizExpr } from "./viz-adapter.js";
 export type { DecodedViz } from "./viz-adapter.js";
+export { expandSentences } from "./sentences.js";

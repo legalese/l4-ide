@@ -16,7 +16,8 @@
     "check": "tsc --noEmit",
     "demo": "tsx demo/s415.ts",
     "test": "tsx --test test/*.test.ts",
-    "standalone": "bash standalone/build.sh"
+    "standalone": "bash standalone/build.sh",
+    "playground": "node standalone/serve.mjs"
   },
   "packageManager": "npm@11.0.0",
   "engines": {
