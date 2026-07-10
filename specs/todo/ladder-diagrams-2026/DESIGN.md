@@ -477,8 +477,12 @@ awaiting the viz-expr field once PR #92 lands). ❌ Still open: **Full/Small/Tin
 scales + minimap** (§7); group sub-ordering (§13.3); **predicate leaves / typed
 values** (§23 — designed, not built: the membrane, `App`-drawn-open).
 
-**☐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
-statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). Not started.
+**◐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
+statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). **A1 done:**
+`ts-shared/ladder-core/src/viz-adapter.ts` maps the `@repo/viz-expr` wire IR →
+ladder-core `IRExpr` + lifts `valuation` and `provenance` side-channels. ☐ Remaining:
+the live LSP transport (A2 — `l4/evalApp` · `l4/inlineExprs` · `l4/queryPlan`) and real
+browser `measureText` metrics (A4).
 
 **☐ P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`;
 restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
@@ -847,10 +851,13 @@ override" falls out with no special-casing. The ladder is the _picture_ of that:
 tentative leaves are precisely the questions the wizard didn't need to ask. TYPICALLY is
 the priors mechanism and the provenance mark at once.
 
-**IR-independence.** `@repo/viz-expr` does **not** carry TYPICALLY yet (the metadata-only
-salvage is PR #92, not in `unstable`; the 5th `MkTypedName` field on the Haskell side).
-So the core takes `provenance` as injected data today; when #92 lands and the wire IR
-grows the field, populate it from the L4 TYPICALLY — no core change. Same staging as §15.
+**IR-independence.** `@repo/viz-expr` now **does** carry TYPICALLY: `UBoolVar.typically`
+(`optional(NullOr(Boolean))`), threaded end-to-end by the question-ordering v2 work
+(PR #110) — one shared wire field, "build once", feeding both the v2 ordering weights
+(`typicallyBridge`) and this provenance mark. The core still takes `provenance` as
+injected data (no core change); `ts-shared/ladder-core/src/viz-adapter.ts` populates it
+on the P2 decode path — a leaf whose `typically` is a concrete boolean (not `null`) is
+marked `default`. Same staging as §15.
 
 *Future: (a) **propagate** tentativeness along the leader so a segment *downstream* of a
 presumed contact also reads provisional (today only the presumed leaf's own adjacent
