@@ -1,13 +1,16 @@
--- STATE-AS-LEDGER x T6: ledger effects inside a thunk force poison the
--- WHNFWhen (temporal-fingerprint) cache — the force is cached as a plain
--- WHNF (snapshot at first force) instead.
+-- STATE-AS-LEDGER x T6: the split-poison cache design (smucclaw/l4-ide#914).
 --
--- Without the poison, a shared thunk that BOTH writes the ledger and reads
--- the temporal context was cached as WHNFWhen; using it again under a
--- different temporal context RE-FORCED it, so the RECORD fired AGAIN (a
--- double-write: two `RECORD `x`` rows in the directive ledger below), and a
--- RECALL in such a thunk could observe a different ledger on each use of the
--- one shared binding.
+-- WRITES poison the WHNFWhen (temporal-fingerprint) cache: a thunk whose
+-- force APPENDS to the ledger is cached as a plain WHNF (snapshot at first
+-- force), so the RECORD fires exactly once no matter how many temporal
+-- scopes reuse the shared binding. (Without the write-poison, a re-force
+-- under a different scope appended a second `RECORD `x`` row.)
+--
+-- READS snapshot PER TEMPORAL SCOPE: a thunk whose force only RECALLs is
+-- WHNFWhen-cached on the axes the read observed — an unchanged scope
+-- re-serves the first-force value (clause-free programs keep the classic
+-- one-binding-one-value sharing), while a DIFFERENT scope re-forces against
+-- the current ledger and gets its own scope-correct answer (#914 §2B).
 --
 -- Everything here is INTRA-directive on purpose: cross-directive shapes are
 -- masked by the per-directive heap rebuild ('forEachDirectiveFreshHeap').
@@ -29,7 +32,7 @@
 #EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `stamped write`) MINUS `stamped write`
 
 ----------------------------------------------------------------------------
--- Read side: one shared binding observes ONE ledger snapshot
+-- Read side: a shared RECALL thunk snapshots PER TEMPORAL SCOPE (#914 §2B)
 ----------------------------------------------------------------------------
 
 `recall or today` MEANS
@@ -37,15 +40,15 @@
   WHEN JUST v THEN v
   WHEN NOTHING THEN DATE_SERIAL TODAY
 
--- expected: LIST 737789, 7, 737789 — both uses of the shared binding see the
--- FIRST force's ledger snapshot (cell `x` unwritten, so the override serial
--- 737789 = DATE_SERIAL of 2020-01-01), with the explicit RECORD in between.
--- (un-poisoned: LIST 737789, 7, 7 — the third use re-forced under the
--- ambient context and read the meanwhile-written 7: one binding, two values)
+-- expected: LIST 737789, 7, 7 — the first use forces under AS OF 2020 (cell
+-- `x` unwritten, so the override serial 737789 = DATE_SERIAL of 2020-01-01);
+-- the bare third use is a DIFFERENT temporal scope, so the shared thunk
+-- re-forces against the current ledger and reads the meanwhile-written 7.
+-- (pre-#914 this snapshotted per directive: LIST 737789, 7, 737789)
 #EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or today`), (RECORD `x` IS 7), `recall or today`
 
 ----------------------------------------------------------------------------
--- Control: no temporal read — a ledger thunk already snapshots this way
+-- Control (contract #914 §4): clause-free — same scope, snapshot re-served
 ----------------------------------------------------------------------------
 
 `recall or zero` MEANS
@@ -53,8 +56,10 @@
   WHEN JUST v THEN v
   WHEN NOTHING THEN 0
 
--- expected: LIST 0, 7, 0 (identical shape to the poisoned case above —
--- the poison makes ledger thunks with temporal reads behave like ledger
--- thunks without them, and guards against a never-cache "fix" which would
--- yield LIST 0, 7, 7 here)
-#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or zero`), (RECORD `x` IS 7), `recall or zero`
+-- expected: LIST 0, 7, 0 — with NO clause anywhere, both uses of the shared
+-- binding run in the one ambient scope: the fingerprint matches and the
+-- first-force snapshot is re-served, so the meanwhile-written 7 stays
+-- invisible to the shared thunk. Clause-free programs keep the classic
+-- pre-bitemporal sharing semantics (and this guards against a never-cache
+-- "fix", which would yield LIST 0, 7, 7 here).
+#EVAL LIST `recall or zero`, (RECORD `x` IS 7), `recall or zero`

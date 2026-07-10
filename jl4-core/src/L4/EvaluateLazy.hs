@@ -360,11 +360,17 @@ renderPath segs = Text.intercalate "'s " (map (\s -> "`" <> s <> "`") segs)
 
 renderProvenance :: Provenance -> Text
 renderProvenance prov =
-  "[" <> Text.intercalate ", " (catMaybes [partyField, sourceField, atField]) <> "]"
+  "[" <> Text.intercalate ", " (catMaybes [partyField, sourceField, atField, vtField]) <> "]"
   where
     partyField  = if Text.null prov.party then Nothing else Just ("party=" <> prov.party)
     sourceField = Just ("source=" <> prov.source)
-    atField     = ("at=" <>) <$> prov.position
+    -- the transaction stamp, rendered exactly as the pre-bitemporal free-form
+    -- position was (ISO-8601 of the root eval clock) — goldens are stable
+    atField     = Just ("at=" <> formatUTCTimeIso prov.txTime)
+    -- the valid-from stamp appears ONLY when a fact time was explicitly
+    -- asserted at the write (an enclosing EVAL UNDER VALID TIME); a
+    -- contemporaneous write renders as before
+    vtField     = ("vt=" <>) . Text.pack . ISO8601.iso8601Show <$> prov.vtFrom
 
 -- | Prints the results but not the range of an eval directive, including
 -- the trace if present, and the ledger section if the directive wrote anything.

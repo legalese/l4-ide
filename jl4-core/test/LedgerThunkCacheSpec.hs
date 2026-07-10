@@ -1,26 +1,27 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | STATE-AS-LEDGER x T6: ledger effects inside a thunk force must poison the
--- 'WHNFWhen' (context-fingerprinted) cache.
+-- | STATE-AS-LEDGER x T6: ledger effects inside a thunk force and the
+-- 'WHNFWhen' (context-fingerprinted) cache — the split-poison design
+-- (smucclaw\/l4-ide#914).
 --
 -- T6 caches a context-dependent force as @WHNFWhen fp v@ and RE-FORCES the
--- thunk whenever the current temporal context no longer matches @fp@. That
--- deterministic-replay premise breaks when the force also touched the ledger:
+-- thunk whenever the current temporal context no longer matches @fp@. Ledger
+-- effects interact with that premise asymmetrically:
 --
 --   * a re-forced RECORD\/COMMIT\/ATTEST APPENDS its event again — a
---     double-write observable via @RECALL ALL@ and the per-directive ledger;
---   * a re-forced (or fingerprint-served) RECALL can observe a DIFFERENT
---     ledger than the first force did, so two uses of ONE shared binding
---     disagree within one directive (sharing violation).
---
--- The fix: any ledger op during a force sets the 'crLedgerOps' poison bit in
--- the span's 'CtxReads'; the @UpdateThunk@ arm of 'backward' then installs a
--- plain 'WHNF' (snapshot at first force, write fires exactly once) instead of
--- a 'WHNFWhen'. This is precisely the semantics a ledger-touching thunk
--- WITHOUT temporal reads already has (see the control test below), and the
--- within-directive analogue of the cross-directive CAF isolation that
--- 'forEachDirectiveFreshHeap' provides.
+--     double-write observable via @RECALL ALL@ and the per-directive ledger.
+--     WRITES therefore poison the cache ('crLedgerWrite'): a write-containing
+--     force installs a plain 'WHNF' (snapshot at first force, the write
+--     fires exactly once).
+--   * a RECALL's result depends on the ambient temporal axes (#914 §2B), so
+--     READS are 'WHNFWhen'-cached on the axes 'finishRead' observes
+--     ('crLedgerRead'): SNAPSHOT PER TEMPORAL SCOPE. Under an unchanged
+--     context the first-force value is re-served (the fingerprint does not
+--     track the ledger, so later writes stay invisible to the shared thunk
+--     — the pre-bitemporal snapshot semantics, per scope); under a DIFFERENT
+--     context the thunk re-forces against the current ledger, so each scope
+--     gets its own scope-correct answer.
 --
 -- These tests are deliberately INTRA-directive: the cross-directive
 -- @temporal-thunk-leak-*@ goldens are masked by the fresh-heap-per-directive
@@ -89,9 +90,11 @@ doubleWriteSrc = Text.unlines
   , "#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `stamped write`) MINUS `stamped write`"
   ]
 
--- | A shared top-level binding whose force RECALLs a cell and reads the
--- temporal context, used before AND after a RECORD to the same cell in ONE
--- #EVAL (list elements normalize left-to-right).
+-- | A shared top-level binding whose force RECALLs a cell, used first under
+-- an AS OF override and then bare, with a RECORD to the same cell in between
+-- (ONE #EVAL; list elements normalize left-to-right). Post-#914 the two uses
+-- are DIFFERENT temporal scopes, so the second use re-forces and reads the
+-- current ledger.
 recallCoherenceSrc :: Text.Text
 recallCoherenceSrc = Text.unlines
   [ "TIMEZONE IS \"Etc/UTC\""
@@ -104,11 +107,13 @@ recallCoherenceSrc = Text.unlines
   , "#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or today`), (RECORD `x` IS 7), `recall or today`"
   ]
 
--- | CONTROL: the same shape as 'recallCoherenceSrc' but with NO temporal read
--- in the thunk. Pins the baseline semantics the poison bit must match: a
--- ledger-touching force snapshots at first force (plain WHNF). This also
--- guards against "fixing" the double-write by never caching ledger-touching
--- forces at all (which would re-run the RECALL here and yield 7).
+-- | CONTROL (contract #914 §4): the same shape but with NO clause anywhere —
+-- both uses of the shared binding run under the one ambient scope, so the
+-- fingerprint matches and the first-force snapshot is re-served: clause-free
+-- programs keep the exact pre-bitemporal sharing semantics (the meanwhile-
+-- written 7 stays invisible to the shared thunk). This guards against
+-- "fixing" scope-sensitivity by never caching ledger reads at all (which
+-- would re-run the RECALL here and yield 7).
 recallControlSrc :: Text.Text
 recallControlSrc = Text.unlines
   [ "`recall or zero` MEANS"
@@ -116,7 +121,7 @@ recallControlSrc = Text.unlines
   , "  WHEN JUST v THEN v"
   , "  WHEN NOTHING THEN 0"
   , ""
-  , "#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or zero`), (RECORD `x` IS 7), `recall or zero`"
+  , "#EVAL LIST `recall or zero`, (RECORD `x` IS 7), `recall or zero`"
   ]
 
 spec :: Spec
@@ -136,19 +141,22 @@ spec = describe "STATE-AS-LEDGER x T6: ledger ops poison the WHNFWhen cache (int
       -- recomputed-ambient-value, a nonzero clock-dependent number.)
       renderedResult res `shouldBe` "0"
 
-  describe "a RECALL inside a temporally-fingerprinted thunk is coherent within one directive" $ do
-    it "both uses of the shared binding observe the FIRST force's ledger snapshot" $ do
+  describe "a shared RECALL thunk snapshots PER TEMPORAL SCOPE (#914 §2B)" $ do
+    it "a use under a different scope re-forces against the current ledger" $ do
       [res] <- runDirectives recallCoherenceSrc
       -- 737789 = DATE_SERIAL (2020-01-01), the override under which the
-      -- binding was first forced (cell `x` not yet written). Pre-fix the
-      -- third element re-forced under the ambient context and read the
-      -- meanwhile-written 7 — one shared binding, two different values.
-      renderedResult res `shouldBe` "LIST 737789, 7, 737789"
-      -- exactly the one explicit RECORD, no extras
+      -- binding was first forced (cell `x` not yet written -> TODAY under
+      -- the override). The bare third use is a DIFFERENT scope: the axis
+      -- fingerprint mismatches, the thunk re-forces, and the read sees the
+      -- meanwhile-written 7 — the scope-correct answer mandated by #914
+      -- (pre-#914 this snapshotted per directive: LIST 737789, 7, 737789).
+      renderedResult res `shouldBe` "LIST 737789, 7, 7"
+      -- exactly the one explicit RECORD, no extras (re-forcing a READ-only
+      -- thunk appends nothing)
       cellsOf (Map.findWithDefault mempty anonymousParty res.ledger.ownLedgers)
         `shouldBe` [["x"]]
 
-    it "CONTROL (no temporal read): a ledger-touching thunk already snapshots at first force" $ do
+    it "CONTROL (clause-free, contract §4): same scope -> the first-force snapshot is re-served" $ do
       [res] <- runDirectives recallControlSrc
       renderedResult res `shouldBe` "LIST 0, 7, 0"
       cellsOf (Map.findWithDefault mempty anonymousParty res.ledger.ownLedgers)

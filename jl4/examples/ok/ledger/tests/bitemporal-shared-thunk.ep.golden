@@ -1,0 +1,20 @@
+-- Bitemporal RECALL through a SHARED thunk (smucclaw/l4-ide#914 §2B) — the
+-- adversarial-review regression. A named binding containing RECALL is one
+-- shared thunk; used under different temporal scopes it must answer PER
+-- SCOPE (a read-only ledger force is WHNFWhen-cached on the axes it
+-- observed: snapshot per scope), not serve the first scope's answer to all
+-- later uses. Pre-fix this printed LIST 7, 9, 7, 7, 7, 7 — the first
+-- scope's answer (vt-2023 -> 7) leaked into every later use, including the
+-- AS OF 2020 read that should see an empty ledger.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+IMPORT prelude
+
+r MEANS fromMaybe 0 (RECALL `rate`)
+
+-- expected: LIST 7, 9, 7, 9, 0, 9 — same answers as bitemporal-recall.l4's
+-- inline RECALLs, but every read goes through the ONE shared binding r:
+-- writes 7 (vt 2023) and 9 (vt 2024), then r under mid-2023 -> 7, r under
+-- mid-2024 -> 9, r under AS OF 2020 -> 0 (everything tx-hidden), bare r -> 9.
+#EVAL LIST (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2023)) (RECORD `rate` IS 7)), (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2024)) (RECORD `rate` IS 9)), (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 6 2023)) r), (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 6 2024)) r), (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) r), r
