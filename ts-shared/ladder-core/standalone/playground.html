@@ -140,6 +140,24 @@
       #ladder .lad-box.lad-clickable:hover {
         filter: brightness(0.97);
       }
+      /* a leaf that references another DECIDE — click to hydrate it inline */
+      #ladder .lad-ref {
+        cursor: pointer;
+      }
+      #ladder rect.lad-ref {
+        stroke: #4a72b0;
+        stroke-dasharray: 3 2;
+      }
+      #ladder text.lad-ref {
+        fill: #3a5c93;
+      }
+      #ladder text.lad-ref:hover {
+        text-decoration: underline;
+      }
+      /* the heading of a hydrated limb — click to collapse it back */
+      #ladder .lad-hydrated {
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>

@@ -8,7 +8,15 @@
  * Interactions (pure core, same as app.ts): click a BOX to cycle U→T→F→U; click
  * a HEADING / CONNECTOR / ▸ caret to fold; expand-all / collapse-all / reset.
  * A decision picker switches between the DECIDEs the module exposes. TYPICALLY
- * defaults arrive as provenance and render tentative (§22). No framework.
+ * defaults arrive as provenance and render tentative (§22).
+ *
+ * HYDRATION. A leaf that references another DECIDE in the module (e.g.
+ * `first limb OF s, i`) is drawn as a dotted reference; click it to splice that
+ * DECIDE's whole tree in place — recursively, so a limb's own sub-conditions
+ * become hydratable in turn. Click the hydrated heading to collapse it back.
+ * We do this CLIENT-SIDE from the bodies /render already returned (the LSP marks
+ * applied refs canInline:false — an open TODO there), so it needs no backend.
+ * No framework.
  */
 import {
   layout,
@@ -21,6 +29,7 @@ import {
 import type {
   FunDecl,
   IRExpr,
+  And,
   NodeId,
   UBoolValue,
   Provenance,
@@ -41,13 +50,81 @@ const sentCount = $("sent-count");
 type Decoded = { fn: FunDecl; provenance: Map<NodeId, Provenance> };
 let decisions: Decoded[] = [];
 let cur: Decoded | null = null;
+const nameMap = new Map<string, Decoded>(); // cleaned DECIDE name -> its tree
 const foldSet = new Set<NodeId>();
 const valuation = new Map<NodeId, UBoolValue>();
 let connective: ConnectiveStyle = "straddle-wire";
 let lastScene: Scene | null = null;
 const tm = estimateMetrics;
 
-/* structural id walks (mirror app.ts) */
+/* hydration: display ids currently expanded, and a stable id-remap for the
+ * subtrees we splice in (so ids survive re-render for FLIP + click + fold). */
+const hydrated = new Set<NodeId>();
+const remapCache = new Map<string, NodeId>();
+let remapCounter = 1_000_000;
+const rid = (key: string): NodeId => {
+  let v = remapCache.get(key);
+  if (v == null) remapCache.set(key, (v = ++remapCounter));
+  return v;
+};
+
+const clean = (s: string) => s.replace(/`/g, "").trim();
+/** The DECIDE a leaf references, if any: the name before " OF " (applied) or the
+ *  whole label (nullary), matched against the module's decisions. */
+function refNameOf(e: IRExpr): string | null {
+  if (e.$type !== "UBoolVar" && e.$type !== "App") return null;
+  const label = e.$type === "App" ? e.label : e.label;
+  const head = clean(label.split(" OF ")[0]);
+  return nameMap.has(head) ? head : null;
+}
+
+/* per-render scratch, rebuilt by buildDisplay each frame */
+let activeProv = new Map<NodeId, Provenance>();
+let collapsedRefs = new Set<NodeId>(); // display id -> clicking hydrates
+let wrappers = new Map<NodeId, NodeId>(); // wrapper group id -> the ref id it stands for
+
+/** Build the tree actually shown: copy `node` (remapping ids via `remap`), and
+ *  where a hydratable ref is expanded, splice the referenced DECIDE's body
+ *  (recursively) under a labelled group whose heading collapses it again. */
+function buildDisplay(node: IRExpr, remap: (id: NodeId) => NodeId): IRExpr {
+  const id = remap(node.id);
+  switch (node.$type) {
+    case "And":
+    case "Or":
+      return {
+        ...node,
+        id,
+        args: node.args.map((a) => buildDisplay(a, remap)),
+      };
+    case "Not":
+      return { ...node, id, negand: buildDisplay(node.negand, remap) };
+    case "InertE":
+      return { ...node, id };
+    default: {
+      const ref = refNameOf(node);
+      if (ref && hydrated.has(id)) {
+        const target = nameMap.get(ref)!;
+        const sub = (o: NodeId) => rid(`${id}:${o}`);
+        for (const [o, p] of target.provenance) activeProv.set(sub(o), p);
+        const inner = buildDisplay(target.fn.body, sub);
+        const wrapperId = rid(`${id}:__wrap`);
+        wrappers.set(wrapperId, id);
+        const group: And = {
+          $type: "And",
+          id: wrapperId,
+          args: [inner],
+          label: clean(target.fn.name),
+        };
+        return group;
+      }
+      if (ref) collapsedRefs.add(id);
+      return { ...node, id };
+    }
+  }
+}
+
+/* structural id walks over the DISPLAY tree (buttons operate on what's shown) */
+let lastDisplayFn: FunDecl | null = null;
 function walk(e: IRExpr, leaves: NodeId[], groups: NodeId[]): void {
   if (e.$type === "And" || e.$type === "Or") {
     groups.push(e.id);
@@ -55,16 +132,6 @@ function walk(e: IRExpr, leaves: NodeId[], groups: NodeId[]): void {
   } else if (e.$type === "Not") walk(e.negand, leaves, groups);
   else if (e.$type !== "InertE") leaves.push(e.id);
 }
-const leafIds = (fn: FunDecl) => {
-  const l: NodeId[] = [];
-  walk(fn.body, l, []);
-  return l;
-};
-const groupIds = (fn: FunDecl) => {
-  const g: NodeId[] = [];
-  walk(fn.body, [], g);
-  return g;
-};
 
 /* --------------------------------------------------------------- FLIP (app.ts) */
 type Pos = { x: number; y: number };
@@ -80,14 +147,22 @@ function flipIndex(scene: Scene): Map<string, Pos> {
 
 function render(animate: boolean) {
   if (!cur) return;
+  // rebuild the display tree (with hydrations spliced in) and its provenance
+  activeProv = new Map(cur.provenance);
+  collapsedRefs = new Set();
+  wrappers = new Map();
+  const body = buildDisplay(cur.fn.body, (x) => x);
+  const fn: FunDecl = { ...cur.fn, body };
+  lastDisplayFn = fn;
+
   const vs = defaultViewSpec({
     valuation,
     foldSet,
-    provenance: cur.provenance,
+    provenance: activeProv,
     connectiveStyle: connective,
     showCurrent: true,
   });
-  const scene = layout(cur.fn, vs, tm);
+  const scene = layout(fn, vs, tm);
   const old = lastScene && animate ? flipIndex(lastScene) : null;
   container.innerHTML = sceneToSvg(scene);
   const svg = container.querySelector("svg") as SVGSVGElement;
@@ -98,8 +173,8 @@ function render(animate: boolean) {
     const next = flipIndex(scene);
     const play: SVGElement[] = [];
     svg.querySelectorAll<SVGElement>("[data-fnid]").forEach((el) => {
-      const id = el.getAttribute("data-fnid")!;
-      const key = `${el.tagName.toLowerCase() === "rect" ? "box" : "label"}:${id}`;
+      const nid = el.getAttribute("data-fnid")!;
+      const key = `${el.tagName.toLowerCase() === "rect" ? "box" : "label"}:${nid}`;
       const o = old.get(key);
       const n = next.get(key);
       if (o && n && (o.x !== n.x || o.y !== n.y)) {
@@ -135,28 +210,34 @@ function render(animate: boolean) {
   }
   lastScene = scene;
 
-  svg
-    .querySelectorAll<SVGElement>("[data-value]")
-    .forEach((el) =>
-      el.addEventListener("click", () =>
-        cycleValue(Number(el.getAttribute("data-value"))),
-      ),
-    );
-  svg
-    .querySelectorAll<SVGElement>("[data-fold]")
-    .forEach((el) =>
-      el.addEventListener("click", () =>
-        toggleFold(Number(el.getAttribute("data-fold"))),
-      ),
-    );
+  // wire clicks: refs hydrate, hydrated headings collapse, else cycle / fold
+  svg.querySelectorAll<SVGElement>("[data-value]").forEach((el) => {
+    const nid = Number(el.getAttribute("data-value"));
+    if (collapsedRefs.has(nid)) {
+      el.classList.add("lad-ref");
+      el.setAttribute("data-ref", "1");
+      el.addEventListener("click", () => hydrate(nid));
+    } else {
+      el.addEventListener("click", () => cycleValue(nid));
+    }
+  });
+  svg.querySelectorAll<SVGElement>("[data-fold]").forEach((el) => {
+    const nid = Number(el.getAttribute("data-fold"));
+    if (wrappers.has(nid)) {
+      el.classList.add("lad-hydrated");
+      el.addEventListener("click", () => dehydrate(wrappers.get(nid)!));
+    } else {
+      el.addEventListener("click", () => toggleFold(nid));
+    }
+  });
   renderSentences();
 }
 
-/** The layman-style combination view: enumerate every way to satisfy the rule.
- *  Tracks foldSet — folding a disjunction collapses it inline and shrinks the set. */
+/** Combination view: enumerate every way to satisfy the rule (the hydrated
+ *  display tree, so expanding a limb expands its combinations too). */
 function renderSentences() {
-  if (!cur) return;
-  const ss = expandSentences(cur.fn, foldSet);
+  if (!lastDisplayFn) return;
+  const ss = expandSentences(lastDisplayFn, foldSet);
   sentCount.textContent = `(${ss.length})`;
   sentList.innerHTML = "";
   for (const s of ss) {
@@ -181,12 +262,22 @@ function toggleFold(id: NodeId) {
   foldSet.has(id) ? foldSet.delete(id) : foldSet.add(id);
   render(true);
 }
+function hydrate(id: NodeId) {
+  hydrated.add(id);
+  render(true);
+}
+function dehydrate(id: NodeId) {
+  hydrated.delete(id);
+  render(true);
+}
 
 /* ------------------------------------------------------------- load a decision */
 function selectDecision(i: number) {
   cur = decisions[i] ?? null;
   foldSet.clear();
   valuation.clear();
+  hydrated.clear();
+  remapCache.clear();
   lastScene = null;
   render(false);
 }
@@ -207,6 +298,8 @@ async function doRender() {
         const { fn, provenance } = fromVizFunDecl(f.funDecl);
         return { fn, provenance };
       });
+    nameMap.clear();
+    decisions.forEach((d) => nameMap.set(clean(d.fn.name), d));
     picker.innerHTML = "";
     decisions.forEach((d, i) => {
       const o = document.createElement("option");
@@ -238,11 +331,17 @@ $("expand-all").addEventListener("click", () => {
   render(true);
 });
 $("collapse-all").addEventListener("click", () => {
-  if (cur) groupIds(cur.fn).forEach((id) => foldSet.add(id));
+  if (!lastDisplayFn) return;
+  const g: NodeId[] = [];
+  walk(lastDisplayFn.body, [], g);
+  g.forEach((id) => foldSet.add(id));
   render(true);
 });
 $("all-true").addEventListener("click", () => {
-  if (cur) leafIds(cur.fn).forEach((id) => valuation.set(id, "TrueV"));
+  if (!lastDisplayFn) return;
+  const l: NodeId[] = [];
+  walk(lastDisplayFn.body, l, []);
+  l.forEach((id) => valuation.set(id, "TrueV"));
   render(true);
 });
 $("reset").addEventListener("click", () => {
