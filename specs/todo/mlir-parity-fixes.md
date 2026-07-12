@@ -111,22 +111,65 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   26/26 (the exported-collision test still flags `supported:false`); full corpus
   130 byte-identical / 2 differs (factorial), **no regressions**, the
   `is-a-weekday` crash class eliminated.
-  - **Residual: `is-a-weekday` is now `differs`, not `wasm-error`.** With dispatch
-    fixed, `is weekend` reaches `w EQUALS Saturday` where `w MEANS Weekday of d`
-    — a comparison of a **helper-result** NUMBER, the exact case the `lowerCmp`
-    residual above can't classify. As a top-level export it correctly _refuses_
-    (`supported:false`); but here it's inside the **helper** `is weekend`, and a
-    helper's unsupported diagnostic does **not** propagate to its exported caller
-    (`applyDiagnostics` only downgrades functions in `bundleExports`), so
-    `is a weekday` stays `supported:true` and runs the unsound `arith.cmpf` →
-    **silent wrong answer** for weekend dates. Two pre-existing gaps, both
-    independent of overloads: (1) helper-result return-type recovery (the
-    bundle-wide return-type map above), and (2) **diagnostic propagation through
-    the call graph** — an exported function that transitively calls an
-    unsupported helper must itself become `supported:false` (fail-loud). Until
-    (1)/(2) land, `is-a-weekday` is excluded from `datetime-probe.cases.json`
-    (auto-generates to a harmless `both-error`) so it doesn't ship a silent-wrong
-    in any gated path.
+  - **Residual (2) is now DONE — see "Call-graph diagnostic propagation" below.**
+    `is-a-weekday` now correctly **refuses** (`supported:false`) instead of
+    silently answering, so it fails loud and routes to the fallback. Residual (1)
+    (helper-result return-type recovery, the bundle-wide return-type map) is still
+    open — it is what would let `is weekend` compile _natively_ rather than merely
+    refuse.
+- ✅ **Call-graph diagnostic propagation → an unsupported HELPER no longer ships a
+  silent wrong answer through its exported caller** — DONE. `markUnsupported` keys
+  a diagnostic on the **enclosing** function, but `Schema.applyDiagnostics` only
+  downgrades entries in `bundleExports`. A helper is not an export, so its
+  diagnostic was silently **dropped**: the exported caller stayed `supported:true`
+  and ran a WASM module that cannot evaluate it, surfacing the helper's fail-closed
+  `0.0`/FALSE as a **wrong answer** rather than a refusal.
+  **Fix** (`Lower.hs`): `callL4`/`callL4Direct` — the two choke points for an L4→L4
+  `func.call` — record a `callGraph` edge from `currentFunction` to the callee;
+  `propagateDiagnostics` then lifts every diagnostic to all transitive callers
+  (BFS over the reversed graph, so recursion/mutual recursion terminate). The
+  inherited reason names the culprit (`depends on 'X', which the WASM backend
+cannot compile: …`) so the refusal stays diagnosable.
+  **This immediately exposed two real silent-wrong bugs** (below) that the backend
+  had _already detected_ and then thrown away.
+- ✅ **Lambda-lifted local helpers collided by (name, arity) → catastrophic
+  wrong-body dispatch in the PRELUDE** — DONE, and the most severe bug found so
+  far. Local helper names are scoped in L4 but **flat** once lambda-lifted to a
+  top-level `func.func`. `prelude` defines **ten** separate recursive helpers named
+  `go` (inside `sum`, `product`, `count`, `reverse`, `dictSize`, `dictDelete`,
+  `groupPairs`, `foldl`, `foldr`, …). Every arity-2 `go` sanitized to the bare
+  symbol `go` and the arity-only mangle collapsed them into **one body** — `count`'s
+  won. Measured on the pre-fix build:
+
+  | call              | expected |    WASM (before) |
+  | ----------------- | -------: | ---------------: |
+  | `sum [2,3,4]`     |      `9` | `3` (the LENGTH) |
+  | `product [2,3,4]` |     `24` | `4` (length + 1) |
+
+  `supported: true` throughout — a silent wrong answer from the standard library.
+  **Fix** (`Lower.hs`): `localSymbolFor` gives each lifted helper its own numbered
+  symbol (`go__loc0`, `go__loc1`, …), memoized on its `Unique` so the untraced pass,
+  the `$trace` clone, and every call site (which reaches it via `symbolFor`) agree.
+  Also **`emittedBodies` now records WHICH `Unique` claimed a symbol**: a lifted
+  helper legitimately reaches `lowerDecide` twice (untraced + `$trace`), and keying
+  on the symbol alone reported that benign re-emission as an "overload collision"
+  against itself — a false positive that propagation would have turned into
+  spurious refusals.
+  Guarded by `jl4-mlir/test/fixtures/list-probe.{l4,cases.json}` **in the CI Tier-2
+  corpus** (12/12 byte-identical; **7/12 differ on the pre-fix build**). Note
+  `sum [1,1,1] == 3 == count [1,1,1]` is byte-identical even when broken — the cases
+  deliberately use branch-separating values, or trivial-input masking hides it again.
+
+- ✅ **Ordered STRING comparison inside a helper → `britishcitizen5` silently
+  degraded** — surfaced by propagation. `britishcitizen5` holds dates as STRINGs
+  (`"1983-01-01"`) and defines `` `after` d c IF d GREATER THAN c ``. The backend
+  has no string-ordering builtin, so `after` was already `markUnsupported` (→
+  fail-closed FALSE); but as a **helper** that diagnostic never reached the export,
+  and `is British citizen` shipped `supported: true` computing on an always-FALSE
+  `after`. It was `byte-identical` in the matrix only because the single generated
+  input coincidentally expected FALSE. It now correctly **refuses** and routes to
+  the fallback: 2 cells move `byte-identical` → `refused-unsupported`. That is a
+  deliberate, correct trade — a truthful refusal beats a lucky right answer.
 - 🔴 **Untyped scalar param → silent wrong answers** (found by differential
   parity with curated `cases.json`, not the compile-sweep). `desc.l4`'s
   `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers NUMBER, but the

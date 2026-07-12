@@ -160,7 +160,15 @@ data LowerState = LowerState
     -- second body collides on this key we 'markUnsupported' both the
     -- prior and the current definition (keyed by their shared
     -- 'Schema.wasmSymbol') — fail loud instead of silently wrong.
-  , emittedBodies :: !(Map (Text, Int) ())
+    --
+    -- The value records WHICH definition claimed the symbol (its
+    -- 'Unique'), because a repeat is only a collision if it comes from a
+    -- *different* definition. The same DECIDE legitimately reaches
+    -- 'lowerDecide' twice — a lambda-lifted WHERE/LET helper is lowered
+    -- once for its parent's untraced body and again for the parent's
+    -- @$trace@ clone — and keying on the symbol alone reported that
+    -- benign re-emission as an overload collision against itself.
+  , emittedBodies :: !(Map (Text, Int) Unique)
     -- Disambiguated WASM symbols for same-arity overload sets. The
     -- arity-only mangle ('dedupAndSynthExterns') cannot separate two
     -- overloads with the SAME name AND arity but different argument types
@@ -174,6 +182,29 @@ data LowerState = LowerState
     -- @\@export@ member (an exported same-arity collision is API-ambiguous
     -- and stays 'markUnsupported'). Names absent here use their plain symbol.
   , overloadSymbols :: !(Map Unique Text)
+    -- | Static call graph over L4-level functions: caller's WASM symbol ⟶
+    -- the symbols it calls directly. Recorded by 'callL4' / 'callL4Direct'
+    -- (the two choke points for an L4→L4 @func.call@; runtime intrinsics
+    -- are excluded — they can't carry diagnostics). Used by
+    -- 'propagateDiagnostics' to lift a helper's unsupported-construct
+    -- diagnostic up to every exported function that transitively calls it:
+    -- 'markUnsupported' keys a diagnostic on the *enclosing* function, but
+    -- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@,
+    -- so an unsupported HELPER would be silently invoked by a still-
+    -- @supported: true@ export. Fail loud instead: the export inherits the
+    -- diagnostic and routes to the fallback evaluator.
+  , callGraph :: !(Map Text (Set.Set Text))
+    -- | Counter feeding 'localSymbolFor', which hands each lambda-lifted
+    -- WHERE/LET helper its own WASM symbol. Local helper names are not
+    -- globally unique — @prelude@ alone defines ten different recursive
+    -- @go@ helpers (inside @sum@, @product@, @count@, @reverse@,
+    -- @groupPairs@, …). They all sanitized to the bare symbol @go@ and, at
+    -- the same arity, collapsed to ONE body under the arity-only mangle:
+    -- @count@'s @go@ won, so @sum@ returned the list LENGTH and @product@
+    -- returned length+1. Numbering each lifted helper keeps the bodies
+    -- distinct. (The unique is memoized in 'overloadSymbols' so the
+    -- untraced and @$trace@ lowerings of one helper agree on its symbol.)
+  , nextLocalSym :: !Int
   }
 
 type LowerM a = State LowerState a
@@ -206,6 +237,8 @@ initState info = LowerState
   , pendingDecide = Set.empty
   , emittedBodies = Map.empty
   , overloadSymbols = Map.empty
+  , callGraph = Map.empty
+  , nextLocalSym = 0
   }
 
 -- | Look up the ground-truth type for an expression using the typechecker's
@@ -285,8 +318,21 @@ callPreludeL4 funcN args = do
     pure (v, ty)
   callL4 funcN argPairs retTy
 
+-- | Record a @caller ⟶ callee@ edge in the static 'callGraph', so
+-- 'propagateDiagnostics' can lift an unsupported helper's diagnostic up to
+-- the exports that reach it. No-op outside a function body (no caller to
+-- attribute the edge to). The *untraced* symbol is recorded: @fn@ and
+-- @fn$trace@ are the same L4 function and share its diagnostics.
+recordCallEdge :: Text -> LowerM ()
+recordCallEdge callee = do
+  mfn <- gets (.currentFunction)
+  forM_ mfn $ \caller ->
+    modify' $ \s ->
+      s { callGraph = Map.insertWith Set.union caller (Set.singleton callee) s.callGraph }
+
 callL4 :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4 callee args retTy = do
+  recordCallEdge callee
   -- Internal callers of @export functions don't supply the ASSUME-derived
   -- args themselves; synthesise each by calling the ASSUME's own extern,
   -- preserving the pre-@export behaviour (the wasm host satisfies the
@@ -317,6 +363,7 @@ callL4 callee args retTy = do
 -- calling the regular function inside).
 callL4Direct :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4Direct callee args retTy = do
+  recordCallEdge callee
   fullArgs <- appendAssumeExternArgs callee args
   boxed <- forM fullArgs $ \(v, t) -> boxABI t v
   let nArgs = length fullArgs
@@ -499,7 +546,63 @@ lowerProgramWithDiagnostics info mainMod deps =
         lowerModuleDecls mainMod
         ) initial
       rawOps = reverse finalState.globals ++ reverse finalState.functions
-  in (MLIRModule { moduleOps = rawOps }, finalState.diagnostics)
+      diags = propagateDiagnostics finalState.callGraph finalState.diagnostics
+  in (MLIRModule { moduleOps = rawOps }, diags)
+
+-- | Lift each unsupported-construct diagnostic to every function that
+-- transitively calls the function it was raised in.
+--
+-- 'markUnsupported' attributes a diagnostic to the *enclosing* function, but
+-- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@. A
+-- helper is not an export, so without this pass an exported function whose
+-- helper contains an unsupported construct stays @supported: true@ and the
+-- proxy happily runs a WASM module that cannot evaluate it — the helper's
+-- fail-closed 0.0/FALSE surfaces as a silently wrong ANSWER rather than a
+-- refusal. (Concretely: @daydate@'s @is weekend@ compares a helper-result
+-- NUMBER that 'lowerCmp' can't classify, so it raises a diagnostic — but the
+-- exported @is a weekday@ that calls it did not inherit it.)
+--
+-- Fail loud instead: an export that reaches an unsupported helper is itself
+-- unsupported, and routes to the fallback evaluator. The reason names the
+-- helper so the refusal is diagnosable.
+--
+-- Cycles (self- and mutual recursion) are fine — reachability is computed
+-- with a visited set. A function that is its own ancestor doesn't get a
+-- propagated copy of its own reason; its direct one already says it.
+propagateDiagnostics :: Map Text (Set.Set Text) -> Map Text [Text] -> Map Text [Text]
+propagateDiagnostics cg direct = Map.unionWith (++) direct propagated
+  where
+    -- Reverse the call graph: callee ⟶ its direct callers.
+    callers :: Map Text (Set.Set Text)
+    callers = Map.fromListWith Set.union
+      [ (callee, Set.singleton caller)
+      | (caller, callees) <- Map.toList cg
+      , callee <- Set.toList callees
+      ]
+
+    -- Every function that transitively calls @fn@ (BFS over the reverse
+    -- edges; @seen@ terminates on recursion).
+    ancestorsOf :: Text -> Set.Set Text
+    ancestorsOf fn = go Set.empty [fn]
+      where
+        go seen [] = seen
+        go seen (f : rest)
+          | f `Set.member` seen = go seen rest
+          | otherwise =
+              let ups = Map.findWithDefault Set.empty f callers
+              in go (Set.insert f seen) (Set.toList ups ++ rest)
+
+    propagated :: Map Text [Text]
+    propagated = Map.fromListWith (++)
+      [ (caller, [reasonFor helper reasons])
+      | (helper, reasons) <- Map.toList direct
+      , caller <- Set.toList (ancestorsOf helper)
+      , caller /= helper
+      ]
+
+    reasonFor helper reasons =
+      "depends on '" <> helper <> "', which the WASM backend cannot compile: "
+        <> Text.intercalate "; " reasons
 
 -- | For every @\@export@-decorated DECIDE in the main module, collect the
 -- ASSUME declarations it references. These get promoted to function-level
@@ -575,6 +678,36 @@ symbolFor :: Resolved -> LowerM Text
 symbolFor r = do
   ov <- gets (.overloadSymbols)
   pure (Map.findWithDefault (sanitizeName (resolvedName r)) (getUnique r) ov)
+
+-- | The WASM symbol for a lambda-lifted WHERE/LET helper, allocating a fresh
+-- numbered one on first sight and memoizing it under the helper's 'Unique'.
+--
+-- Local helper names are scoped in L4 but FLAT once lifted to a top-level
+-- @func.func@, and they are anything but unique: @prelude@ defines ten
+-- separate recursive @go@ helpers. Lifting them all to the bare symbol @go@
+-- made the arity-only mangle collapse every arity-2 @go@ into one body —
+-- silently giving @sum@, @product@, @reverse@, @dictSize@, @dictDelete@ and
+-- @groupPairs@ whichever body happened to win (@count@'s), so @sum@ returned
+-- the list length. Numbering them keeps each body its own symbol.
+--
+-- Memoizing on the 'Unique' (rather than allocating per call) is what makes
+-- the untraced and @$trace@ lowerings of the same helper — and every call
+-- site, which reaches this through 'symbolFor' because a 'Ref' shares its
+-- 'Def's unique — all agree on one symbol.
+localSymbolFor :: Resolved -> LowerM Text
+localSymbolFor r = do
+  ov <- gets (.overloadSymbols)
+  let u = getUnique r
+  case Map.lookup u ov of
+    Just sym -> pure sym
+    Nothing  -> do
+      n <- gets (.nextLocalSym)
+      let sym = sanitizeName (resolvedName r) <> "__loc" <> Text.pack (show n)
+      modify' $ \s -> s
+        { overloadSymbols = Map.insert u sym s.overloadSymbols
+        , nextLocalSym    = n + 1
+        }
+      pure sym
 
 -- | Final pass run by 'L4.MLIR.Pipeline' once all operations — including
 -- runtime builtins — have been assembled. It handles three consumers
@@ -1187,9 +1320,14 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
   -- @withScope@ body block so 'markUnsupported' still attributes to
   -- @currentFunction@ (= @Just funcName@).
   let bodyArity = length params
-  seenBefore <- gets (Map.member (funcName, bodyArity) . (.emittedBodies))
+      bodyUnique = getUnique (appFormHead' appForm)
+  -- A symbol already claimed by THIS definition is a benign re-emission
+  -- (the untraced pass and the @$trace@ clone both run 'lowerDecide' for a
+  -- lifted local helper); only a *different* definition is a real collision.
+  claimedBy <- gets (Map.lookup (funcName, bodyArity) . (.emittedBodies))
+  let seenBefore = maybe False (/= bodyUnique) claimedBy
   modify' $ \s -> s
-    { emittedBodies = Map.insert (funcName, bodyArity) () s.emittedBodies }
+    { emittedBodies = Map.insert (funcName, bodyArity) bodyUnique s.emittedBodies }
   when seenBefore $ do
     _ <- markUnsupported $
       "ad-hoc overload collision: multiple definitions of " <> funcName
@@ -2763,7 +2901,7 @@ lowerLocalDecl _scope (LocalDecide _anno decide@(MkDecide dAnno ts appForm body)
       shouldLift = isSelfRef || isMutualRec
   case params of
     [] | shouldLift -> do
-      let funcN = sanitizeName name
+      funcN <- localSymbolFor (appFormHead' appForm)
       knownTopLevels <- gets (Set.fromList . Map.keys . (.funcSigs))
       currentBindings <- gets (Map.keysSet . (.bindings))
       l4TyMap <- gets (.bindingL4Types)
@@ -2815,8 +2953,8 @@ lowerLocalDecl _scope (LocalDecide _anno decide@(MkDecide dAnno ts appForm body)
           val <- lowerExpr body bodyTy
           bindTy name val bodyTy
     _ -> do
-      let funcN = sanitizeName name
-          paramSet = Set.fromList (map resolvedName params)
+      funcN <- localSymbolFor (appFormHead' appForm)
+      let paramSet = Set.fromList (map resolvedName params)
       knownTopLevels <- gets (Set.fromList . Map.keys . (.funcSigs))
       currentBindings <- gets (Map.keysSet . (.bindings))
       let freeInBody = freeVarsOfExpr body

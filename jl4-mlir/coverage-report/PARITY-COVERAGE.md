@@ -21,24 +21,36 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 
 | Outcome               | Cells | Meaning                                                        |
 | --------------------- | ----: | -------------------------------------------------------------- |
-| `byte-identical`      |   130 | WASM response == jl4-service, byte-for-byte (across 34 files)  |
+| `byte-identical`      |   128 | WASM response == jl4-service, byte-for-byte                    |
 | `differs`             |     2 | **silent wrong answer** — `desc::factorial` (see below)        |
-| `wasm-error`          |     3 | **WASM crash, svc OK** — `is-a-weekday` overload collision     |
-| `refused-unsupported` |     2 | backend correctly flags `supported:false` → routes to fallback |
-| `skip-no-cases`       |     1 | deontic fn (`ceo-performance-award`); needs event `cases.json` |
+| `wasm-error`          |     0 | (was 3 — the `is-a-weekday` crash class is gone)               |
+| `refused-unsupported` |     6 | backend correctly flags `supported:false` → routes to fallback |
+| `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
-**130 of 132 real comparisons (98.5%) are byte-identical.** "Real comparisons"
-counts only cells where both backends produced a value (`byte-identical` +
-`differs`); the 3 `wasm-error` cells are a separate failure mode (WASM threw,
-jl4-service answered) and the 2 `refused`/1 `skip` are correct/untested-not-failed.
+**128 of 130 real comparisons (98.5%) are byte-identical**, and there are now
+**zero WASM crashes**. "Real comparisons" counts only cells where both backends
+produced a value (`byte-identical` + `differs`); `refused` cells are correct
+behaviour (the backend declines and routes to the fallback), not failures.
 
-The DATE-arithmetic crashes (Finding 2) are now **fixed** — `days-between` and
-`shift-date` are byte-identical, lifting the wasm-error count from 9 to 3; the
-residual 3 are `is-a-weekday`, a _separate_ overload-collision bug (below).
+Movement since the last run, all from the fail-loud work:
 
-The curated cases nearly doubled real branch coverage (76 → 130) — and in doing
-so surfaced a **second** bug class beyond the `factorial` finding (the
-DATE-arithmetic crash, now fixed).
+- `wasm-error` **3 → 0** — `is-a-weekday` no longer crashes (same-arity overload
+  dispatch fixed); it now _refuses_, pending the helper-result return-type map.
+- `refused` **2 → 6** — `is-a-weekday` (+1), `ceo-performance-award` (+1, was
+  `skip-no-cases`), and `britishcitizen5::is-British-citizen` (+2, **was
+  `byte-identical`**).
+- `byte-identical` **130 → 128** — exactly those 2 `britishcitizen5` cells. This is
+  a deliberate, correct trade: that function holds dates as STRINGs and compares
+  them with `GREATER THAN` in a helper the backend genuinely cannot compile (no
+  string-ordering builtin), so it was running on an always-FALSE comparison and was
+  byte-identical only because the one generated input happened to expect FALSE. A
+  truthful refusal beats a lucky right answer.
+
+Four bug classes have now been found by differential parity in files the
+compile-sweep rated `clean`: `factorial` (open), DATE-arithmetic (fixed),
+same-arity overloads (fixed), and — via call-graph diagnostic propagation — a
+**prelude** wrong-body collision that made `sum [2,3,4]` return `3` (fixed;
+Finding 3 below).
 
 ## Finding 1: untyped scalar param → silent wrong answers 🔴
 
@@ -92,14 +104,50 @@ and stays a NUMBER. Comparison was already correct (DATE → `arith.cmpf` on the
 raw serial). Verified byte-identical; full corpus 124 → 130 byte-identical, no
 regressions. `datetime-probe` is now in the **CI Tier-2 corpus** to guard it.
 
-**Residual (separate bug):** `is-a-weekday` still crashes (the 3 remaining
-`wasm-error` cells). Isolation probes show `(DATE_SERIAL d) MOD 7` and
-`(Day d) MOD 7` are byte-identical, but `` `Weekday of` d `` crashes — daydate's
-`Weekday of` has same-arity `NUMBER`/`DATE` overloads that **collide** in
-jl4-mlir, so the wrong body runs on a raw-serial date. That is the
-same-arity-overload-collision issue (see `MLIR-REVIEW.md`), not the date ABI;
-tracked in the spec. It auto-generates to a harmless `both-error` and so isn't in
-`datetime-probe.cases.json` / doesn't gate.
+**Residual:** `is-a-weekday` (which crashed via a _separate_ same-arity overload
+collision, since fixed) now correctly **refuses** — `is weekend` compares a
+helper-result NUMBER that `lowerCmp` can't classify, and that diagnostic now
+reaches the export (Finding 3). Making it compile _natively_ rather than refuse
+needs the bundle-wide return-type map, still open in the spec.
+
+## Finding 3: an unsupported HELPER shipped silent wrong answers ✅ FIXED
+
+`markUnsupported` keys a diagnostic on the **enclosing** function, but
+`Schema.applyDiagnostics` only downgrades entries in `bundleExports`. A helper is
+not an export — so its diagnostic was **dropped on the floor**, the exported caller
+stayed `supported: true`, and the helper's fail-closed `0.0`/FALSE surfaced as a
+**wrong answer** instead of a refusal. The backend had already _detected_ these
+bugs and then thrown the evidence away.
+
+Fixed in `Lower.hs`: `callL4`/`callL4Direct` record a static `callGraph`, and
+`propagateDiagnostics` lifts every diagnostic to all transitive callers (BFS over
+the reversed graph, so recursion terminates). Turning it on immediately exposed two
+real silent-wrong bugs:
+
+**3a — the prelude's `go` collision (severe).** Local helper names are scoped in L4
+but **flat** once lambda-lifted. `prelude` defines ten separate recursive `go`
+helpers (in `sum`, `product`, `count`, `reverse`, `dictSize`, `dictDelete`,
+`groupPairs`, …); every arity-2 one sanitized to the bare symbol `go` and the
+arity-only mangle collapsed them into **one body** — `count`'s won:
+
+| call              | jl4-service | WASM (before) | WASM (after) |
+| ----------------- | ----------: | ------------: | -----------: |
+| `sum [2,3,4]`     |         `9` | `3` (LENGTH!) |       ✅ `9` |
+| `product [2,3,4]` |        `24` | `4` (len + 1) |      ✅ `24` |
+
+A silent wrong answer from the **standard library**, at `supported: true`. Fixed by
+giving each lifted helper its own symbol (`go__loc0`, `go__loc1`, …), keyed on its
+`Unique`. Guarded by `list-probe.{l4,cases.json}` — now **in the CI Tier-2 corpus**
+(12/12 byte-identical; **7/12 differ** on the pre-fix build). Note `sum [1,1,1]` ==
+`count [1,1,1]` == 3 even when broken: the cases use branch-separating values,
+because trivial inputs mask this exactly like `factorial` and the DATE crash.
+
+**3b — `britishcitizen5` ordered-STRING comparison.** It stores dates as STRINGs and
+its helper `` `after` d c IF d GREATER THAN c `` has no string-ordering builtin, so
+`after` was already `markUnsupported` → always FALSE. `is British citizen` shipped
+`supported: true` on top of it, and was `byte-identical` only because the single
+generated input happened to expect FALSE. It now refuses (the 2 cells that moved out
+of `byte-identical`).
 
 ## Curated cases added (`cases.json`)
 
@@ -122,8 +170,13 @@ NUMBER`, nested records. Mirrors the file's own `#ASSERT`ed fixtures
   `IS INTEGER`.
 - `jl4-mlir/test/fixtures/datetime-probe.l4` — date construction (`make-date`/
   `make-datetime`/`make-time`) and, after the Finding 2 fix, date arithmetic
-  (`days-between`, `shift-date`) are byte-identical. _Now in the CI Tier-2 corpus
-  — guards the date-ABI fix._ (`is-a-weekday` excluded: separate overload bug.)
+  (`days-between`, `shift-date`) are byte-identical. _In the CI Tier-2 corpus —
+  guards the date-ABI fix._ (`is-a-weekday` refuses; see Finding 3.)
+- `jl4-mlir/test/fixtures/list-probe.l4` — **12/12 byte-identical**, and **7/12
+  differ on the pre-Finding-3 build**: prelude `sum`/`product`/`count`/`maximum`/
+  `reverse` over inputs chosen so each is distinguishable from the others _and_
+  from the list length. _In the CI Tier-2 corpus — guards the lifted-local-helper
+  symbol collision._
 - `jl4/examples/ok/assume-as-given.l4` + `jl4/examples/implicit-assume-test.l4` —
   **18/18 byte-identical** at threshold-crossing inputs. Confirms `ASSUME` and
   _implicit_-`ASSUME` params bind correctly (schema-typed `number`/`boolean`,
@@ -154,6 +207,7 @@ node jl4-mlir/scripts/parity-harness.mjs --out /tmp/parity \
   $(python3 -c "import json;print(' '.join(r['file'] for r in json.load(open('jl4-mlir/coverage-report/coverage.json'))['perFile'] if r['outcome'] in ('clean','has-unsupported')))")
 ```
 
-(The gate _fails_ on this extended corpus — by design: it caught the two
-divergences. The committed CI gate runs `test.l4` + the 3 deontic fixtures, which
-are green; `datetime-probe`/`intrinsics-probe` are manual-corpus only.)
+(The gate _fails_ on this extended corpus — by design: it still catches the two
+`factorial` divergences. The committed CI Tier-2 gate runs `test.l4` +
+`datetime-probe` + `list-probe` + the 3 deontic fixtures — **61 byte-identical, 1
+refused, exit 0**; `intrinsics-probe` is manual-corpus only.)

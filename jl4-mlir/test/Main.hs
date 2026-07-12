@@ -63,6 +63,8 @@ main = do
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
+    , test "local WHERE helpers → distinct symbols"  testLocalHelperDistinctSymbols
+    , test "unsupported helper → caller unsupported" testDiagnosticPropagatesToCaller
     , test "NUMBER == (InfoMap miss) → __l4_rat_cmp" testNumberCmpInfoMapMiss
     , test "STRING == (InfoMap miss) → __l4_str_eq"  testStringEqInfoMapMiss
     , test "STRING ordered < → supported:false"      testStringOrderedUnsupported
@@ -712,6 +714,102 @@ testOverloadSameArityDispatch = do
       unless' ok $
         putStrLn $ "\n    expected distinct blend__ov0/blend__ov1 symbols. got:\n    "
           <> T.unpack (T.take 700 mlir)
+      pure ok
+  where
+    unless' b act = if b then pure () else act
+
+-- | Two DIFFERENT functions, each with its own recursive WHERE helper that
+-- happens to share the name @go@ AND its arity, must lower to DISTINCT WASM
+-- symbols. Local helper names are scoped in L4 but flat once lambda-lifted,
+-- so before the fix both lifted to the bare symbol @go@ and the arity-only
+-- mangle collapsed them into ONE body — whichever won. This is not
+-- hypothetical: @prelude@ defines ten separate @go@ helpers, and @count@'s
+-- won, so @sum [2,3,4]@ returned 3 (the LENGTH) and @product [2,3,4]@
+-- returned 4. Here @adder@'s @go@ sums and @multiplier@'s @go@ multiplies;
+-- if they collapse, one of the two bodies is silently gone.
+testLocalHelperDistinctSymbols :: IO Bool
+testLocalHelperDistinctSymbols = do
+  let src = T.unlines
+        [ "@export Sum a list"
+        , "GIVEN xs IS A LIST OF NUMBER"
+        , "GIVETH A NUMBER"
+        , "`adder` MEANS go 0 xs"
+        , "  WHERE"
+        , "    go acc l MEANS"
+        , "      CONSIDER l"
+        , "      WHEN EMPTY THEN acc"
+        , "      WHEN x FOLLOWED BY rest THEN go (acc PLUS x) rest"
+        , ""
+        , "@export Multiply a list"
+        , "GIVEN xs IS A LIST OF NUMBER"
+        , "GIVETH A NUMBER"
+        , "`multiplier` MEANS go 1 xs"
+        , "  WHERE"
+        , "    go acc l MEANS"
+        , "      CONSIDER l"
+        , "      WHEN EMPTY THEN acc"
+        , "      WHEN x FOLLOWED BY rest THEN go (acc TIMES x) rest"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck/lower failed: " <> show errs
+      pure False
+    Right mlir -> do
+      -- Each lifted helper gets its own numbered symbol, so BOTH the adding
+      -- body (__l4_rat_add) and the multiplying body (__l4_rat_mul) survive.
+      let ok = T.isInfixOf "go__loc0" mlir
+            && T.isInfixOf "go__loc1" mlir
+            && T.isInfixOf "__l4_rat_add" mlir
+            && T.isInfixOf "__l4_rat_mul" mlir
+      unless' ok $
+        putStrLn $ "\n    expected distinct go__loc0/go__loc1 helpers keeping both\n\
+                   \    the add and the mul body. got:\n    "
+          <> T.unpack (T.take 700 mlir)
+      pure ok
+  where
+    unless' b act = if b then pure () else act
+
+-- | An exported function that transitively calls an unsupported HELPER must
+-- itself be marked @supported: false@ — call-graph diagnostic propagation.
+--
+-- 'markUnsupported' keys a diagnostic on the *enclosing* function, but
+-- 'applyDiagnostics' only downgrades entries in @bundleExports@. A helper is
+-- not an export, so without propagation the export stayed @supported: true@
+-- and the proxy ran a WASM module that cannot evaluate it — the helper's
+-- fail-closed FALSE surfaced as a silently WRONG answer instead of a refusal.
+--
+-- Here @risky@ does an ordered comparison on STRINGs (no string-ordering
+-- builtin ⇒ unsupported), and the exported @gate@ only reaches it through
+-- @middle@, so the diagnostic must travel two hops up the call graph.
+testDiagnosticPropagatesToCaller :: IO Bool
+testDiagnosticPropagatesToCaller = do
+  let src = T.unlines
+        [ "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`risky` MEANS a GREATER THAN b"
+        , ""
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`middle` MEANS `risky` a b"
+        , ""
+        , "@export Gate"
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`gate` MEANS `middle` a b"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "depends on" json
+      unless' ok $
+        putStrLn $ "\n    expected the export to inherit its helper's diagnostic. got:\n    "
+          <> T.unpack (T.take 700 json)
       pure ok
   where
     unless' b act = if b then pure () else act
