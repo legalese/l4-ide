@@ -13,7 +13,7 @@
 
 **Explicitly NOT in scope (and why):**
 
-- **BDD variable reordering / sifting.** The variable order (`collectVarOrder`, `decision-query.ts:32`) only affects diagram _size_, not which question a user is asked. Chase it only if the BDD blows up; it is orthogonal to usability. This is the common conflation to avoid.
+- **BDD variable reordering / sifting.** The variable order (`collectVarOrder`, `decision-query.ts:32`) only affects diagram _size_, not which question a user is asked. This is the common conflation to avoid — and there is a second, better reason to leave it alone: that order is currently **first-occurrence DFS = the statute's own reading order**, so sifting would trade the compiled artifact's isomorphism with the source text for a smaller node count. Chase it only if the BDD actually blows up, and see §9.0 for what you would be selling.
 - **Formal decision-table analysis** (completeness / conflict / redundancy). Deferred per decision on 2026-07-06; tracked separately.
 - **Building `TYPICALLY`.** No longer backed out: `TYPICALLY` shipped as **metadata-only** via PR #92 (parse + store + literal-vs-type check + JSON-schema `default`; the risky PEVAL/PASSERT machinery was dropped). This spec _consumes_ those weights but the policy itself does not depend on the keyword — v1 runs prior-free, v2 reads the weights.
 
@@ -185,9 +185,21 @@ Keep the existing `impact` (`ifTrue`/`ifFalse` outcomes) — it already feeds th
 
 ## 9. Related work — and what we may honestly claim (added 2026-07-14)
 
-### 9.0 Two NP-hardnesses, and why we compile at all
+### 9.0 Three orders, two hardnesses, and why we compile at all
 
-⚠️ **Do not conflate these. They are different problems, and §1 already scopes one of them out.**
+The companion doc (`doc/concepts/language-design/logic-not-flowcharts.md`) distinguishes **three** senses of "order" in a rule. They land in this codebase in three different places, and it is worth writing down where, because two of them are the NP-hard problems below and one of them is the thing we are deliberately _protecting_:
+
+| Order               | What it is                                                             | Where it lives                                                                                 | Do we optimise it?                                                              |
+| ------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Denotational**    | none — `AND`/`OR` commute; the rule is a Boolean function              | the function itself                                                                            | n/a — there is nothing to order                                                 |
+| **Textual**         | the statute's own sequence: `(i) obscure-glazed, and (ii) non-opening` | `collectVarOrder` (first-occurrence DFS ⇒ **source order**); and the ladder's L→R / T→B layout | **NO — and that is a decision, not an omission.** It is the isomorphism anchor. |
+| **Interrogational** | which question to put to the user next                                 | `rank` / the info-gain policy (§3.2)                                                           | **YES. This spec.**                                                             |
+
+**The textual order is load-bearing, and it is sitting inside the ROBDD for free.** `collectVarOrder` is a first-occurrence DFS over the ladder IR, which mirrors the L4, which mirrors the statute — so **the compiled ROBDD's variable order _is_ the statute's reading order**. §2 calls this "purely syntactic" as though it were a defect. It is not: it is the same property the ladder has (§"The right pictures for logic"), obtained at no cost, and it means the compiled artifact can still be read back against the source text.
+
+Which supplies a better reason to decline BDD sifting than the one §1 gives. Sifting does not merely fail to help the user — **it would overwrite the statute's order inside the compiled artifact**, trading isomorphism for node count. Do it only if the diagram actually blows up, and know what is being sold when you do.
+
+⚠️ **The two NP-hardnesses. Do not conflate them — they share the word "ordering" and nothing else.**
 
 |                     | **(a) Variable ordering for SIZE**                                                   | **(b) Question ordering for EXPECTED COST**                                      |
 | ------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
