@@ -1,6 +1,6 @@
 # The parity hunt — session log & reviewer's guide
 
-A narrative companion to the four `mlir-review` commits below. The commit messages
+A narrative companion to the five `mlir-review` commits below. The commit messages
 say _what_ each fix does; this says _why the bugs existed_, _how they were found_,
 _what was tried and rejected_, and _what is still open_. Read this first, then the
 commits.
@@ -11,6 +11,7 @@ commits.
 | `b2ac28f3` | Finding 2 — DATE-operand arithmetic crash (ABI split)      |
 | `692e0f0b` | same-arity overload collision (`Weekday of`)               |
 | `a68195f2` | call-graph diagnostic propagation → prelude `go` collision |
+| `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`) |
 
 Findings + matrices: [`coverage-report/PARITY-COVERAGE.md`](./coverage-report/PARITY-COVERAGE.md).
 Per-item fix tracker: [`../specs/todo/mlir-parity-fixes.md`](../specs/todo/mlir-parity-fixes.md).
