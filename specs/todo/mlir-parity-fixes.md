@@ -370,6 +370,22 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
   'callClaudeWithKey' … POST (IO)`) — the `RIGHT`/`LEFT` enum-tag diagnostics are
   gone (before: 18 present; after: 0). Tier-2 68 → **83 byte-identical, 0 differs,
   0 wasm-error**.
+  - ⚠️ **Post-refutation hardening.** The "caught earlier by `lookupRecordFields`/
+    `lookupEnumTag`" soundness claim above was FALSE for `testPatternTy`/
+    `bindPatternTy`: that lookup-first ordering existed only in the CONSTRUCTION
+    path. A user `DECLARE Rev IS ONE OF RIGHT HAS rv …; LEFT HAS lv …`
+    destructured in a CONSIDER hit the builtin string cases first → read the
+    user's bare-tag value through EITHER's `[tag, payload]` slot layout →
+    **silent wrong at `supported:true`** (`rev-dispatch(5)`: service `1005`,
+    WASM `-995`). Fixed: `isUserConstructor` now gives user records/enums
+    priority over the builtin JUST/NOTHING/LEFT/RIGHT/EMPTY cases in BOTH
+    `testPatternTy` and `bindPatternTy`; and since construction lowers an
+    enum-with-data / record constructor to a bare tag (no payload slot),
+    destructuring an arity ≥ 1 user constructor now **REFUSES** (`supported:
+    false`) rather than compute a garbage/trapping payload bind. Nullary user
+    enums are untouched. Full corpus still **104 byte-identical, 0 differs**.
+    Guard: Haskell `user LEFT/RIGHT enum → supported:false` + committed
+    `either-shadow{,2}.l4` (kept out of the gated corpus — they refuse fully).
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into

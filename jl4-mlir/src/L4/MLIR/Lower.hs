@@ -1952,9 +1952,12 @@ lowerExprCases expr expectedTy = case expr of
             -- RIGHT 1.0 — mirroring NOTHING/JUST's false/true tag — so the
             -- CONSIDER lowering ('testPatternTy'/'bindPatternTy') can
             -- dispatch on the tag and read the payload from slot 1. These
-            -- fire only for the arity-1 builtin: a user-declared
-            -- constructor named LEFT/RIGHT would already have been caught
-            -- above by 'lookupRecordFields' / 'lookupEnumTag'.
+            -- fire only for the builtin: a user-declared constructor named
+            -- LEFT/RIGHT is caught above by 'lookupRecordFields' /
+            -- 'lookupEnumTag' HERE, and — crucially — the matching side
+            -- ('testPatternTy'/'bindPatternTy') applies the SAME lookup-
+            -- first ordering via 'isUserConstructor', so construction and
+            -- matching agree on the representation.
             ("LEFT", [inner]) -> do
               innerVal <- lowerExpr inner l4NumberType
               e <- allocSlots 2
@@ -2763,50 +2766,76 @@ testPatternTy = go
     go _ _ (PatVar _ _) = trueI1
     go scrutF64 _ (PatApp _ con []) = do
       let name = resolvedName con
-      case name of
-        "NOTHING" -> do
-          tag <- loadSlot scrutF64 0
-          tagI1 <- unboxBoolI1 tag
-          trueI1v <- trueI1
-          emitVal $ \vid -> arithXori vid tagI1 trueI1v
-        "EMPTY" -> do
-          zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
-          emitVal $ \vid -> arithCmpf vid OEQ scrutF64 zero
-        _ -> do
-          env <- gets (.typeEnv)
-          case lookupEnumTag name env of
-            Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> unsupportedMatch (unresolvedEnumReason name)
+      env <- gets (.typeEnv)
+      -- User-declared constructors win over the builtin string cases.
+      -- The CONSTRUCTION path ('lowerExpr' App) resolves a constructor by
+      -- consulting 'lookupRecordFields' / 'lookupEnumTag' BEFORE the
+      -- prelude string intrinsics, so a user enum/record whose constructor
+      -- happens to be named NOTHING/EMPTY is built with the user layout.
+      -- We must mirror that ordering here or construction and matching
+      -- would use different representations (see the LEFT/RIGHT shadow
+      -- regression). Only a name that is NOT a user constructor can be the
+      -- prelude builtin, so the string cases are then safe.
+      if isUserConstructor name env
+        then case lookupEnumTag name env of
+          Just tag -> enumTagCmpF64 scrutF64 tag
+          -- A user record constructor (nullary in a CONSIDER position) has
+          -- no enum tag; fail closed rather than guess a tag.
+          Nothing  -> unsupportedMatch (unresolvedEnumReason name)
+        else case name of
+          "NOTHING" -> do
+            tag <- loadSlot scrutF64 0
+            tagI1 <- unboxBoolI1 tag
+            trueI1v <- trueI1
+            emitVal $ \vid -> arithXori vid tagI1 trueI1v
+          "EMPTY" -> do
+            zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+            emitVal $ \vid -> arithCmpf vid OEQ scrutF64 zero
+          _ -> unsupportedMatch (unresolvedEnumReason name)
     go scrutF64 _ (PatApp _ con [_]) = do
       let name = resolvedName con
-      case name of
-        "JUST" -> do
-          tag <- loadSlot scrutF64 0
-          unboxBoolI1 tag
-        -- EITHER RIGHT — matches when the tag slot is 1.0 (see the LEFT/
-        -- RIGHT construction in 'lowerExpr'); binds the payload in
-        -- 'bindPatternTy'. Same [tag, payload] layout as MAYBE's JUST.
-        "RIGHT" -> do
-          tag <- loadSlot scrutF64 0
-          unboxBoolI1 tag
-        -- EITHER LEFT — matches when the tag slot is 0.0 (NOT the tag),
-        -- mirroring the NOTHING test.
-        "LEFT" -> do
-          tag <- loadSlot scrutF64 0
-          tagI1 <- unboxBoolI1 tag
-          trueBit <- trueI1
-          emitVal $ \vid -> arithXori vid tagI1 trueBit
-        _ -> do
-          env <- gets (.typeEnv)
-          case lookupEnumTag name env of
-            Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> unsupportedMatch (unresolvedEnumReason name)
-    go scrutF64 _ (PatApp _ con _) = do
-      let name = resolvedName con
       env <- gets (.typeEnv)
-      case lookupEnumTag name env of
-        Just tag -> enumTagCmpF64 scrutF64 tag
-        Nothing  -> unsupportedMatch (unresolvedEnumReason name)
+      -- User-declared constructors win over the builtin JUST/LEFT/RIGHT
+      -- string cases, mirroring the CONSTRUCTION path's lookup-first
+      -- ordering (see the arity-0 arm and 'lowerExpr'). Only a name absent
+      -- from the user's records/enums can be the prelude builtin, so the
+      -- string cases are safe.
+      --
+      -- A user constructor reaching THIS arm binds a payload (arity 1): it
+      -- is either a record constructor or an @ONE OF … HAS …@ enum-with-
+      -- data variant. The construction path lowers such a constructor to a
+      -- BARE enum tag (see 'lowerExpr': the 'lookupEnumTag' arm discards the
+      -- argument), so there is no payload slot to bind — reading one yields
+      -- a tag-as-handle (garbage / runtime trap). We therefore REFUSE
+      -- (fail-closed → the export is 'supported:false' and the caller routes
+      -- to the reference evaluator) rather than emit a silent wrong answer.
+      if isUserConstructor name env
+        then unsupportedMatch (payloadCtorReason name)
+        else case name of
+          "JUST" -> do
+            tag <- loadSlot scrutF64 0
+            unboxBoolI1 tag
+          -- EITHER RIGHT — matches when the tag slot is 1.0 (see the LEFT/
+          -- RIGHT construction in 'lowerExpr'); binds the payload in
+          -- 'bindPatternTy'. Same [tag, payload] layout as MAYBE's JUST.
+          "RIGHT" -> do
+            tag <- loadSlot scrutF64 0
+            unboxBoolI1 tag
+          -- EITHER LEFT — matches when the tag slot is 0.0 (NOT the tag),
+          -- mirroring the NOTHING test.
+          "LEFT" -> do
+            tag <- loadSlot scrutF64 0
+            tagI1 <- unboxBoolI1 tag
+            trueBit <- trueI1
+            emitVal $ \vid -> arithXori vid tagI1 trueBit
+          _ -> unsupportedMatch (unresolvedEnumReason name)
+    go _ _ (PatApp _ con _) = do
+      -- Arity ≥ 2: necessarily a user constructor carrying multiple fields
+      -- (no builtin has this shape). As in the arity-1 case, the payload is
+      -- lowered as a bare tag with no slots, so destructuring it is unsound
+      -- — refuse rather than compute a silent wrong.
+      let name = resolvedName con
+      unsupportedMatch (payloadCtorReason name)
     go scrutF64 _ (PatLit _ (NumericLit _ r)) = do
       -- The scrutinee is a NUMBER handle; compare for equality via
       -- @__l4_rat_cmp@ against the literal's handle.
@@ -2852,6 +2881,18 @@ testPatternTy = go
       "CONSIDER pattern constructor " <> name
         <> " could not be resolved to an enum tag by the WASM backend"
 
+    -- | Reason for refusing a CONSIDER that destructures a user-declared
+    -- constructor which carries a payload (a record constructor, or an
+    -- @ONE OF … HAS …@ enum-with-data variant). The construction path
+    -- lowers such a constructor to a bare enum tag with no payload slots,
+    -- so binding the payload here would read garbage. Fail closed.
+    payloadCtorReason name =
+      "CONSIDER destructuring the payload-carrying user constructor "
+        <> name
+        <> " is not supported by the WASM backend (enum-with-data / record "
+        <> "constructors are lowered as a bare tag, so the payload cannot be "
+        <> "bound)"
+
 
 -- | Record an unsupported-pattern diagnostic against the enclosing
 -- function (via 'markUnsupported'), then return a FALSE @i1@ so the
@@ -2889,19 +2930,26 @@ bindPatternTy val _ _ (PatCons _ hd tl) = do
   bindPatternTy tlVal l4NumberType l4NumberType tl
 bindPatternTy val _ _ (PatApp _ con [innerPat]) = do
   let name = resolvedName con
-  case name of
-    "JUST" -> do
-      innerVal <- loadSlot val 1
-      bindPatternTy innerVal l4NumberType l4NumberType innerPat
-    -- EITHER LEFT / RIGHT both carry their payload in slot 1 of the
-    -- 2-slot [tag, payload] record (see 'lowerExpr' construction).
-    "LEFT" -> do
-      innerVal <- loadSlot val 1
-      bindPatternTy innerVal l4NumberType l4NumberType innerPat
-    "RIGHT" -> do
-      innerVal <- loadSlot val 1
-      bindPatternTy innerVal l4NumberType l4NumberType innerPat
-    _ -> bindPatternTy val l4NumberType l4NumberType innerPat
+  env <- gets (.typeEnv)
+  -- Mirror the CONSTRUCTION path and 'testPatternTy': a user-declared
+  -- constructor (record/enum) named JUST/LEFT/RIGHT must NOT read slot 1
+  -- of the builtin [tag, payload] layout — its value uses the user layout.
+  -- Fall through to the generic binder, exactly as before ledger #10.
+  if isUserConstructor name env
+    then bindPatternTy val l4NumberType l4NumberType innerPat
+    else case name of
+      "JUST" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      -- EITHER LEFT / RIGHT both carry their payload in slot 1 of the
+      -- 2-slot [tag, payload] record (see 'lowerExpr' construction).
+      "LEFT" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      "RIGHT" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      _ -> bindPatternTy val l4NumberType l4NumberType innerPat
 bindPatternTy val _ _ (PatApp _ _ pats) =
   -- Enum-with-data constructor: slot 0 is the tag, bind args at 1..n.
   forM_ (zip [1..] pats) $ \(i, p) -> do
@@ -3358,6 +3406,23 @@ appFormParams (MkAppForm _ _ ps _) = ps
 -- full discussion of the two-layer sanitization (API name vs symbol).
 sanitizeName :: Text -> Text
 sanitizeName = Schema.sanitizeWasmSymbol
+
+-- | True iff @name@ is a constructor the user DECLAREd in this bundle —
+-- either a record constructor (@lookupRecordFields@) or an @ONE OF@ enum
+-- variant (@lookupEnumTag@). The prelude builtins (JUST/NOTHING/LEFT/RIGHT/
+-- EMPTY) are never registered in the 'TypeEnv', so this is False for them.
+-- The CONSIDER lowering uses this to give user constructors priority over
+-- the builtin string cases, matching the construction path's ordering and
+-- so keeping construction and pattern-matching on the SAME representation
+-- (a user @LEFT/RIGHT@ enum must not be read as the builtin EITHER's
+-- [tag, payload] slot record — that was the ledger #10 shadow regression).
+isUserConstructor :: Text -> TypeEnv -> Bool
+isUserConstructor name env =
+  case lookupRecordFields name env of
+    Just _  -> True
+    Nothing -> case lookupEnumTag name env of
+      Just _  -> True
+      Nothing -> False
 
 lookupEnumTag :: Text -> TypeEnv -> Maybe Integer
 lookupEnumTag name env =

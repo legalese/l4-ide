@@ -106,6 +106,29 @@ good manners to admit to.
   branch-crossing LEFT/RIGHT + payloads distinct from tags; NUMBER/STRING/BOOLEAN/LIST
   payloads + a nested CONSIDER mirroring `extractText`) and the Haskell test
   `EITHER CONSIDER → supported dispatch`.
+- **#10 shadow hardening** (same branch, post-refutation): the original #10
+  claimed the arity-1 `LEFT`/`RIGHT` string dispatch could fire only for the
+  builtin because "a user-declared constructor would be caught earlier by
+  `lookupRecordFields`/`lookupEnumTag`". That lookup-first ordering existed only
+  in the CONSTRUCTION path (`lowerExpr`), **not** in `testPatternTy`/
+  `bindPatternTy`, which checked the string name FIRST. So a user
+  `DECLARE Rev IS ONE OF RIGHT HAS rv …; LEFT HAS lv …` destructured in a
+  CONSIDER read the user's bare-tag value through the builtin `[tag, payload]`
+  slot layout → **silent wrong at `supported:true`** (jl4-service
+  `rev-dispatch(5)=1005`; buggy WASM `-995`). Fix: (1) `isUserConstructor`
+  gives user records/enums priority over the builtin JUST/NOTHING/LEFT/RIGHT/
+  EMPTY string cases in `testPatternTy` **and** `bindPatternTy`, mirroring
+  construction; (2) because construction lowers an enum-with-data / record
+  constructor to a **bare tag with no payload slot** (the `lookupEnumTag` arm
+  discards its argument), destructuring one in a CONSIDER is fundamentally
+  unsound, so any arity ≥ 1 user constructor pattern now **REFUSES**
+  (`supported:false` → routes to the reference evaluator) rather than compute.
+  Nullary user-enum patterns (arity 0) are untouched and still dispatch by tag.
+  No existing fixture uses enum-with-data, so the full corpus is unchanged
+  (**104 byte-identical, 0 differs**). Guarded by the Haskell test
+  `user LEFT/RIGHT enum → supported:false` and the committed adversarial
+  fixtures `either-shadow.l4` / `either-shadow2.l4` (kept out of the gated
+  corpus — they refuse entirely, which is the correct outcome).
 
 ---
 

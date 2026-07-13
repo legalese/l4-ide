@@ -62,6 +62,7 @@ main = do
     , test "bare-head param typed from EntityInfo" testBareHeadParamTyped
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
     , test "EITHER CONSIDER → supported dispatch" testEitherConsiderSupported
+    , test "user LEFT/RIGHT enum → supported:false" testUserEitherShadowUnsupported
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
@@ -830,6 +831,57 @@ testEitherConsiderSupported = do
         putStrLn $ "    noRefuse=" <> show noRefuse <> " supported=" <> show supported
           <> " scf.if=" <> show dispatched <> " __l4_alloc=" <> show constructed
         putStrLn $ "    json: " <> T.unpack (T.take 400 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Regression guard for the ledger #10 shadow refutation. A user DECLAREs
+-- an @ONE OF@ enum whose constructors are named LEFT / RIGHT and CARRY a
+-- payload (@RIGHT HAS rv IS A NUMBER@ / @LEFT HAS lv IS A NUMBER@), then
+-- destructures it in a CONSIDER. The builtin-EITHER lowering must NOT
+-- intercept these by constructor NAME: the user enum is a different type
+-- from the prelude EITHER, its constructor is lowered as a bare tag with no
+-- payload slot, and reading slot 1 as if it were EITHER's [tag, payload]
+-- record yields a SILENT WRONG answer (jl4-service: rev-dispatch(5)=1005;
+-- the buggy WASM returned -995 at supported:true — the cardinal sin).
+--
+-- The fix gives user-declared constructors priority over the builtin string
+-- cases (via 'isUserConstructor'), and — because construction discards the
+-- payload of an enum-with-data / record constructor — REFUSES to destructure
+-- one. So the export must ship @supported:false@ (→ the proxy routes to the
+-- reference evaluator, which returns the correct answer) rather than compute.
+testUserEitherShadowUnsupported :: IO Bool
+testUserEitherShadowUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Rev IS ONE OF"
+        , "  RIGHT HAS rv IS A NUMBER"
+        , "  LEFT  HAS lv IS A NUMBER"
+        , ""
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Rev"
+        , "`mk rev` MEANS"
+        , "  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n"
+        , ""
+        , "@export rev dispatch"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`rev dispatch` MEANS"
+        , "  CONSIDER `mk rev` n"
+        , "    WHEN LEFT  a THEN a MINUS 1000"
+        , "    WHEN RIGHT b THEN b PLUS 1000"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "payload-carrying user constructor" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for the user LEFT/RIGHT enum. got:\n    "
+          <> T.unpack (T.take 700 json)
       pure ok
   where
     unless b act = if b then pure () else act
