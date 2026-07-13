@@ -68,7 +68,7 @@ main = do
     , test "unsupported helper → caller unsupported" testDiagnosticPropagatesToCaller
     , test "NUMBER == (InfoMap miss) → __l4_rat_cmp" testNumberCmpInfoMapMiss
     , test "STRING == (InfoMap miss) → __l4_str_eq"  testStringEqInfoMapMiss
-    , test "STRING ordered < → supported:false"      testStringOrderedUnsupported
+    , test "STRING ordered < → __l4_str_cmp"         testStringOrderedStrCmp
     , test "tyvar-return cmp → supported:false"      testUnresolvableCmpUnsupported
     , test "helper-result NUMBER cmp → __l4_rat_cmp" testHelperResultNumberCmp
     , test "WHERE-local vs constant → __l4_rat_cmp"  testWhereLocalVsConstantCmp
@@ -814,27 +814,30 @@ testLocalHelperDistinctSymbols = do
 -- and the proxy ran a WASM module that cannot evaluate it — the helper's
 -- fail-closed FALSE surfaced as a silently WRONG answer instead of a refusal.
 --
--- Here @risky@ does an ordered comparison on STRINGs (no string-ordering
--- builtin ⇒ unsupported), and the exported @gate@ only reaches it through
--- @middle@, so the diagnostic must travel two hops up the call graph.
+-- Here @risky@ uses an @EXACTLY@ computed pattern (unsupported by the WASM
+-- backend; see 'testPatExprUnsupported'), and the exported @gate@ only
+-- reaches it through @middle@, so the diagnostic must travel two hops up
+-- the call graph. (Ordered STRING comparison used to be the vehicle here,
+-- but it now compiles through @__l4_str_cmp@ — ledger #7 — so this test
+-- switched to a construct that still legitimately refuses.)
 testDiagnosticPropagatesToCaller :: IO Bool
 testDiagnosticPropagatesToCaller = do
   let src = T.unlines
-        [ "GIVEN a IS A STRING"
-        , "      b IS A STRING"
-        , "GIVETH A BOOLEAN"
-        , "`risky` MEANS a GREATER THAN b"
+        [ "GIVEN a IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`risky` MEANS"
+        , "  CONSIDER a"
+        , "    WHEN EXACTLY 3 THEN 6"
+        , "    OTHERWISE 0"
         , ""
-        , "GIVEN a IS A STRING"
-        , "      b IS A STRING"
-        , "GIVETH A BOOLEAN"
-        , "`middle` MEANS `risky` a b"
+        , "GIVEN a IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`middle` MEANS `risky` a"
         , ""
         , "@export Gate"
-        , "GIVEN a IS A STRING"
-        , "      b IS A STRING"
-        , "GIVETH A BOOLEAN"
-        , "`gate` MEANS `middle` a b"
+        , "GIVEN a IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`gate` MEANS `middle` a"
         ]
   case schemaWithDiagnostics src of
     Left errs -> do
@@ -912,13 +915,14 @@ testStringEqInfoMapMiss = do
   where
     unless b act = if b then pure () else act
 
--- | Ordered comparison on STRING (@<@) has no string-ordering runtime
--- builtin (only @__l4_str_eq@ exists), and the raw f64 is a string-pool
--- pointer, so an @arith.cmpf@ would order addresses, not contents. The
--- compiler must refuse: flag the export @supported:false@ rather than ship
--- an unsound ordering.
-testStringOrderedUnsupported :: IO Bool
-testStringOrderedUnsupported = do
+-- | Ordered comparison on STRING (@<@) lowers through @__l4_str_cmp@
+-- (content ordering, lexicographic by Unicode code point to match
+-- jl4-core's Data.Text Ord). The runtime returns -1.0\/0.0\/1.0 and the
+-- source predicate is re-applied against 0.0 — exactly like the NUMBER
+-- path uses @__l4_rat_cmp@. There must be NO bare @arith.cmpf@ on the raw
+-- string-pool pointers (that would order addresses, not contents).
+testStringOrderedStrCmp :: IO Bool
+testStringOrderedStrCmp = do
   let src = T.unlines
         [ "@export Compare"
         , "GIVEN a IS A STRING"
@@ -926,16 +930,16 @@ testStringOrderedUnsupported = do
         , "GIVETH A BOOLEAN"
         , "`g` MEANS a LESS THAN b"
         ]
-  case schemaWithDiagnostics src of
+  case lowerSource src of
     Left errs -> do
       putStrLn $ "\n    typecheck failed: " <> show errs
       pure False
-    Right json -> do
-      let ok = T.isInfixOf "\"supported\":false" json
-            && T.isInfixOf "ordered comparison" json
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_str_cmp" mlir
+            && not (bareCmpf mlir)
       unless ok $
-        putStrLn $ "\n    expected supported:false for ordered STRING comparison. got:\n    "
-          <> T.unpack (T.take 700 json)
+        putStrLn $ "\n    expected __l4_str_cmp (not a raw arith.cmpf on string pointers). got:\n    "
+          <> T.unpack (T.take 700 mlir)
       pure ok
   where
     unless b act = if b then pure () else act
@@ -1083,12 +1087,13 @@ testHelperResultStringEq = do
     unless b act = if b then pure () else act
 
 -- | True when the MLIR contains a raw @arith.cmpf@ that is NOT part of a
--- type-guaranteed comparison path (@__l4_rat_cmp@ / @__l4_str_eq@ both
--- legitimately follow up with an @arith.cmpf@ against a constant to turn
--- their f64 result into an @i1@). Used to assert the rational-handle /
--- string-pointer bug is gone.
+-- type-guaranteed comparison path (@__l4_rat_cmp@, @__l4_str_eq@ and
+-- @__l4_str_cmp@ all legitimately follow up with an @arith.cmpf@ against a
+-- constant to turn their f64 result into an @i1@). Used to assert the
+-- rational-handle / string-pointer bug is gone.
 bareCmpf :: T.Text -> Bool
 bareCmpf mlir =
   T.isInfixOf "arith.cmpf" mlir
     && not (T.isInfixOf "@__l4_rat_cmp" mlir)
     && not (T.isInfixOf "@__l4_str_eq" mlir)
+    && not (T.isInfixOf "@__l4_str_cmp" mlir)

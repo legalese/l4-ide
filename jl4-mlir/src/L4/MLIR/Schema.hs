@@ -1696,11 +1696,45 @@ paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares p =
   let base = case p.paramType of
         Nothing -> emptyParam "object"
-        Just ty -> typeToParameter declares Set.empty ty
+        Just ty -> typeToParameter declares Set.empty (unfoldSynonymType declares ty)
   in base
        { parameterAlias       = Nothing
        , parameterDescription = maybe "" Text.strip p.paramDescription
        }
+
+-- | Resolve a userland type SYNONYM to its underlying type before handing
+-- it to jl4-core's 'typeToParameter'.
+--
+-- 'typeToParameter' matches primitive type NAMES (@date@, @time@,
+-- @number@, …) /before/ consulting the declares table, so a userland
+-- @DECLARE Date IS A STRING@ — whose name collides with the builtin DATE —
+-- is schema'd as @{"type":"string","format":"date"}@ and the runtime's
+-- @marshalArg@ then parses the input into a DATE serial. But jl4-core
+-- evaluates that value as a plain STRING (the synonym is transparent), and
+-- the reference service compares it lexicographically. Before ledger #7
+-- this only manifested as a refusal (ordered STRING comparison was
+-- unsupported); now that such comparisons lower through @__l4_str_cmp@, the
+-- serial-vs-string mismatch would be a silent WRONG answer
+-- (@britishcitizen5@ stores dates as @DECLARE Date IS A STRING@).
+--
+-- Unfolding the synonym here yields the true underlying type (@Date@ →
+-- STRING), so the WASM schema, its @marshalArg@, and the @__l4_str_cmp@
+-- lowering all agree with the reference. The genuine builtin DATE is /not/
+-- a 'SynonymDecl' in the declares map, so it is left untouched and keeps
+-- its @format:date@ serial marshalling. Non-colliding synonyms already
+-- resolve identically through 'typeToParameter''s own 'declareToParameter'
+-- recursion, so this only changes the primitive-name-colliding cases.
+-- Cycle-guarded via a visited set.
+unfoldSynonymType :: Map Text (Declare Resolved) -> Type' Resolved -> Type' Resolved
+unfoldSynonymType declares = go Set.empty
+  where
+    go visited ty = case ty of
+      TyApp _ name []
+        | let nm = rawNameToText (rawName (getActual name))
+        , not (Set.member nm visited)
+        , Just (MkDeclare _ _ _ (SynonymDecl _ inner)) <- Map.lookup nm declares
+        -> go (Set.insert nm visited) inner
+      _ -> ty
 
 emptyParam :: Text -> Parameter
 emptyParam t = Parameter

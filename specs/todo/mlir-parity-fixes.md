@@ -158,16 +158,38 @@ cannot compile: …`) so the refusal stays diagnosable.
   `sum [1,1,1] == 3 == count [1,1,1]` is byte-identical even when broken — the cases
   deliberately use branch-separating values, or trivial-input masking hides it again.
 
-- ✅ **Ordered STRING comparison inside a helper → `britishcitizen5` silently
-  degraded** — surfaced by propagation. `britishcitizen5` holds dates as STRINGs
-  (`"1983-01-01"`) and defines `` `after` d c IF d GREATER THAN c ``. The backend
-  has no string-ordering builtin, so `after` was already `markUnsupported` (→
-  fail-closed FALSE); but as a **helper** that diagnostic never reached the export,
-  and `is British citizen` shipped `supported: true` computing on an always-FALSE
-  `after`. It was `byte-identical` in the matrix only because the single generated
-  input coincidentally expected FALSE. It now correctly **refuses** and routes to
-  the fallback: 2 cells move `byte-identical` → `refused-unsupported`. That is a
-  deliberate, correct trade — a truthful refusal beats a lucky right answer.
+- ✅ **Ordered STRING comparison → `britishcitizen5` now compiles natively**
+  (ledger #7). `britishcitizen5` holds dates as STRINGs (`"1983-01-01"`) and
+  defines `` `after` d c IF d GREATER THAN c ``. Formerly there was no
+  string-ordering builtin, so `after` was `markUnsupported` and (via
+  propagation) the export refused — a safe-but-degraded route to the fallback.
+  **Fix, three parts:**
+  1. **Runtime** `__l4_str_cmp` (`jl4-runtime.mjs`) — returns `-1/0/1`,
+     lexicographic by Unicode **code point** (`codePointAt` iteration, NOT
+     JS-native `<`, which orders UTF-16 code **units** and disagrees for
+     astral-plane chars). Declared in `Runtime/Builtins.hs`.
+  2. **Lowering** `lowerCmp`'s `CmpString` ordered arm routes through
+     `__l4_str_cmp` and re-applies the predicate against `0.0` (mirrors
+     `CmpNumber`/`__l4_rat_cmp`).
+  3. **Two latent bugs this exposed** (masked while the export refused):
+     (a) jl4-core's `typeToParameter` schema'd `DECLARE Date IS A STRING` as
+     `format:date` (primitive **name** match precedes the declares table), so
+     `marshalArg` parsed inputs to DATE serials — fixed WASM-side by
+     `Schema.unfoldSynonymType`, which resolves `SynonymDecl` params to their
+     underlying type before `typeToParameter`, so `Date` → `{"type":"string"}`.
+     (b) the lowering **erases** synonyms, so `classifyOperand` mis-read a
+     `Place`/`Date` operand as `CmpOther` → raw `arith.cmpf` on string pointers
+     (`"Gibraltar" == "Gibraltar"` → FALSE) — fixed by a `typeSynonyms` map on
+     `LowerState` that `classifyOperand` unfolds through (`Place` → STRING →
+     `CmpString` → `__l4_str_eq`).
+  The **reference was pinned empirically**: jl4-service returns
+  `"banana" > "apple" = true` for a `DECLARE Date IS A STRING` param — string
+  comparison, ignoring `format:date`. Genuine builtin DATE is not a
+  `SynonymDecl`, so it keeps serial marshalling (datetime-probe unaffected).
+  Guarded by `britishcitizen5.cases.json` (5 branch-crossing cells: before /
+  **exactly on** / after each date threshold; UK and Gibraltar paths),
+  `str-ordering-probe.{l4,cases.json}` (the unicode trap), Haskell
+  `STRING ordered < → __l4_str_cmp`, and JS `__l4_str_cmp` unit tests.
 - ✅ **Untyped scalar param → silent wrong answers** — DONE (was the last open
   🔴). `desc.l4`'s `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers
   NUMBER, but the jl4-mlir **schema emitter defaulted the param to

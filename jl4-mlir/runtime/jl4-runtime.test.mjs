@@ -101,6 +101,59 @@ eq(
 );
 eq("eq different", env.__l4_str_eq(box("abc"), box("abd")), 0);
 
+// --- __l4_str_cmp (ledger #7: ordered STRING comparison) ---
+// Returns -1/0/1, lexicographic by Unicode CODE POINT (Data.Text Ord),
+// NOT UTF-16 code units. clears britishcitizen5's date-string ordering.
+eq("cmp equal", env.__l4_str_cmp(box("abc"), box("abc")), 0);
+eq("cmp less (last char)", env.__l4_str_cmp(box("abc"), box("abd")), -1);
+eq("cmp greater (last char)", env.__l4_str_cmp(box("abd"), box("abc")), 1);
+// Prefix: shorter sorts first.
+eq("cmp prefix a<ab", env.__l4_str_cmp(box("ab"), box("abc")), -1);
+eq("cmp prefix ab>a", env.__l4_str_cmp(box("abc"), box("ab")), 1);
+// Empty string is the least element.
+eq("cmp empty < nonempty", env.__l4_str_cmp(box(""), box("a")), -1);
+eq("cmp nonempty > empty", env.__l4_str_cmp(box("a"), box("")), 1);
+eq("cmp empty == empty", env.__l4_str_cmp(box(""), box("")), 0);
+// Date-string ordering (britishcitizen5's actual use): YYYY-MM-DD sorts
+// lexicographically == chronologically.
+eq(
+  "cmp date before commencement",
+  env.__l4_str_cmp(box("1980-01-01"), box("1983-01-01")),
+  -1,
+);
+eq(
+  "cmp date equal commencement",
+  env.__l4_str_cmp(box("1983-01-01"), box("1983-01-01")),
+  0,
+);
+eq(
+  "cmp date after commencement",
+  env.__l4_str_cmp(box("1990-06-15"), box("1983-01-01")),
+  1,
+);
+// UNICODE TRAP: astral-plane char vs high-BMP char. "😀" is U+1F600
+// (code point 128512), "" is U+E000 (57344). By CODE POINT, 😀 > .
+// JS-native `<` on the strings would say 😀 <  (UTF-16 high surrogate
+// 0xD83D < 0xE000) — the WRONG answer. str_cmp must return +1.
+eq(
+  "cmp astral > high-BMP (code point, not code unit)",
+  env.__l4_str_cmp(box("😀"), box("")),
+  1,
+);
+eq(
+  "cmp high-BMP < astral (symmetric)",
+  env.__l4_str_cmp(box(""), box("😀")),
+  -1,
+);
+// Sanity: JS native `<` really does disagree here (documents the trap).
+eq("native < disagrees on the trap", "😀" < "", true);
+// Two astral chars compare by code point too.
+eq(
+  "cmp astral vs astral",
+  env.__l4_str_cmp(box("😀"), box("😁")), // U+1F600 < U+1F601
+  -1,
+);
+
 // --- __l4_to_string (M4 slice 2b: NUMBER args are rational handles) ---
 const num = (decimalText) => env.__l4_rat_parse(box(decimalText));
 eq("to_string int", unbox(env.__l4_to_string(num("5"))), "5");

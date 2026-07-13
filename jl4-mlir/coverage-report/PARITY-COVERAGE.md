@@ -27,11 +27,21 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 | `refused-unsupported` |     5 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
+> **Update (ledger #7 fixed — full re-sweep pending):** `britishcitizen5` no
+> longer refuses. With `__l4_str_cmp` + synonym unfolding (see
+> `../PARITY-HUNT-LOG.md` §Still-open item 3), its ordered STRING comparisons
+> compile natively; a curated `britishcitizen5.cases.json` (5 branch-crossing
+> cells) is **5/5 byte-identical**, and a new `str-ordering-probe` fixture pins
+> the code-point-vs-code-unit unicode trap. The two `britishcitizen5` cells move
+> `refused` → `byte-identical`; the headline totals below predate this fix and
+> will be refreshed on the next full extended-corpus sweep.
+
 **133 of 133 real comparisons (100%) are byte-identical — the extended-corpus gate
 passes (`PARITY OK`).** Zero silent divergences, zero WASM crashes; the 5
 `refused` cells are correct behaviour (the backend declines and routes to the
 fallback), not failures: `britishcitizen5::is-British-citizen` ×2 (no
-string-ordering builtin), `ceo-performance-award` (deontic, needs event cases),
+string-ordering builtin — **now fixed, see update above**),
+`ceo-performance-award` (deontic, needs event cases),
 `orchestrator::evaluateClaim` (pre-existing `CONSIDER` ctor gap), and
 `mixfix-garden-path::tax-on` (exported same-arity collision — refuses **by
 design**). The claim is bounded by the corpus and its curated cases — "no known

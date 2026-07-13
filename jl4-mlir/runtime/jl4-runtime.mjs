@@ -2682,6 +2682,31 @@ export function createRuntime(opts) {
         readCString(Number(f64ToU64(aF))) === readCString(Number(f64ToU64(bF)))
           ? 1
           : 0,
+      // Ordered comparison — content, NOT pointer. Returns -1/0/1 as a
+      // plain number (same ABI as __l4_rat_cmp), lexicographic by Unicode
+      // CODE POINT to match jl4-core's Data.Text Ord. We iterate with
+      // codePointAt rather than JS-native `<` because native `<` orders by
+      // UTF-16 code UNIT, which disagrees for astral-plane chars (e.g.
+      // "😀" U+1F600 encodes as 0xD83D 0xDE00; its high surrogate 0xD83D
+      // sorts BELOW a BMP char like U+E000 under code units, but ABOVE it
+      // under code points). str_cmp("😀","") must be +1, not -1.
+      __l4_str_cmp: (aF, bF) => {
+        const a = readCString(Number(f64ToU64(aF)));
+        const b = readCString(Number(f64ToU64(bF)));
+        let i = 0;
+        let j = 0;
+        while (i < a.length && j < b.length) {
+          const ca = a.codePointAt(i);
+          const cb = b.codePointAt(j);
+          if (ca !== cb) return ca < cb ? -1 : 1;
+          i += ca > 0xffff ? 2 : 1;
+          j += cb > 0xffff ? 2 : 1;
+        }
+        // A prefix sorts before the longer string; equal when both end.
+        if (i < a.length) return 1;
+        if (j < b.length) return -1;
+        return 0;
+      },
       __l4_str_len: (sF) => readCString(Number(f64ToU64(sF))).length,
       // NUMBER → STRING. Matches jl4-core: integers print with no decimal
       // point, non-integers print as their correctly-rounded shortest Double.

@@ -96,6 +96,19 @@ data LowerState = LowerState
     -- full of 'InfVar's for MEANS bindings). Empty when the caller has no
     -- typecheck result (the plain 'lowerProgram' entry point).
   , funcL4Types :: !(Map Unique (Type' Resolved))
+    -- | User-declared type SYNONYMS (@DECLARE Foo IS A STRING@), keyed by
+    -- the synonym's name, mapping to its underlying 'Type''. The lowering
+    -- otherwise ERASES synonym decls (see 'lowerModuleDecls'), so a
+    -- comparison operand typed @Foo@ (recovered from 'bindingL4Types' when
+    -- the 'InfoMap' misses) would reach 'classifyL4Type' as an opaque
+    -- 'TyApp' head and be mis-read as 'CmpOther' — a raw @arith.cmpf@ on
+    -- what is actually a string /pointer/. 'classifyOperand' unfolds
+    -- through this map so @Foo@ resolves to STRING → 'CmpString' →
+    -- @__l4_str_eq@/@__l4_str_cmp@. Genuine builtin DATE\/TIME are NOT
+    -- synonyms, so they are absent here and keep their 'CmpOther' serial
+    -- semantics. (@britishcitizen5@: @DECLARE Date IS A STRING@,
+    -- @DECLARE Place IS A STRING@.)
+  , typeSynonyms :: !(Map Text (Type' Resolved))
     -- | Ground-truth type info from the jl4-core typechecker. Every
     -- expression's inferred 'Type'' Resolved' is stored here, keyed by
     -- source range. Use 'typeOfExpr' to look up the type of any
@@ -241,6 +254,7 @@ initState info = LowerState
   , funcSigs = Map.empty
   , funcListElems = Map.empty
   , funcL4Types = Map.empty
+  , typeSynonyms = Map.empty
   , sourceTypeMap = info
   , localCaptures = Map.empty
   , exportAssumeArgs = Map.empty
@@ -559,6 +573,7 @@ lowerProgramWithDiagnostics info entInfo mainMod deps =
         { exportAssumeArgs = exportArgs
         , overloadSymbols  = computeOverloadSymbols (mainMod : deps)
         , funcL4Types      = knownTermTypes entInfo
+        , typeSynonyms     = Map.unions (map collectTypeSynonyms (mainMod : deps))
         }
       finalState = execState (do
         forM_ deps (registerDependencyModule mainNames)
@@ -578,6 +593,23 @@ knownTermTypes :: EntityInfo -> Map Unique (Type' Resolved)
 knownTermTypes = Map.mapMaybe $ \(_, entity) -> case entity of
   KnownTerm ty _ -> Just ty
   _              -> Nothing
+
+-- | Collect user-declared type SYNONYMS (@DECLARE Foo IS A STRING@) from a
+-- module, keyed by the synonym's name. Populates 'LowerState.typeSynonyms'
+-- so 'classifyOperand' can unfold a synonym-typed comparison operand to its
+-- underlying scalar (STRING\/NUMBER\/…) rather than mis-classifying the
+-- opaque 'TyApp' head as 'CmpOther'. Record\/enum declares are not
+-- synonyms and are skipped; genuine builtin DATE\/TIME are not declares at
+-- all, so they never appear here and keep their serial semantics.
+collectTypeSynonyms :: Module Resolved -> Map Text (Type' Resolved)
+collectTypeSynonyms (MkModule _ _ section) = Map.fromList (goSection section)
+  where
+    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goDecl = \case
+      Declare _ (MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ inner)) ->
+        [(resolvedName name, inner)]
+      Section _ sub -> goSection sub
+      _ -> []
 
 -- | Lift each unsupported-construct diagnostic to every function that
 -- transitively calls the function it was raised in.
@@ -2260,8 +2292,9 @@ isNumberExprShape = \case
 --     comparisons MUST go through @__l4_rat_cmp@; the raw f64 is a pool
 --     index, so 'arith.cmpf' on it compares handle bit-patterns.
 --   * 'CmpString' — a string-pool /pointer/. Equality MUST go through
---     @__l4_str_eq@ (content equality); the raw f64 is a pointer, so
---     'arith.cmpf' compares addresses, not contents.
+--     @__l4_str_eq@ (content equality) and ordering through
+--     @__l4_str_cmp@ (code-point lexicographic); the raw f64 is a
+--     pointer, so 'arith.cmpf' compares addresses, not contents.
 --   * 'CmpOther' — a value whose raw f64 /is/ its comparison key:
 --     BOOLEAN (0.0\/1.0), enum tag (small int), DATE\/TIME serial. For
 --     these the legacy 'arith.cmpf' on the f64 is correct.
@@ -2285,8 +2318,25 @@ data CmpClass = CmpNumber | CmpString | CmpOther
 -- Returns 'Nothing' only when the type genuinely cannot be determined by
 -- any of these — the residual case 'lowerCmp' refuses to compile rather
 -- than emit an unsound 'arith.cmpf' on a possible handle\/pointer.
+-- | Unfold a user-declared type SYNONYM chain to its underlying 'Type''.
+-- @DECLARE Date IS A STRING@ resolves @Date@ → STRING so the classifiers
+-- (which match builtin scalar names) see through the alias. Cycle-guarded.
+-- Builtin DATE\/TIME are not in the map, so they are returned unchanged.
+unfoldSynT :: Map Text (Type' Resolved) -> Type' Resolved -> Type' Resolved
+unfoldSynT syns = go Set.empty
+  where
+    go visited ty = case ty of
+      TyApp _ name []
+        | let nm = resolvedName name
+        , not (Set.member nm visited)
+        , Just inner <- Map.lookup nm syns
+        -> go (Set.insert nm visited) inner
+      _ -> ty
+
 classifyOperand :: Expr Resolved -> LowerM (Maybe CmpClass)
 classifyOperand e = do
+  syns <- gets (.typeSynonyms)
+  let classify = classifyL4Type . unfoldSynT syns
   mt <- typeOfExpr e
   -- IMPORTANT: the 'InfoMap' we read is *not* run through the final
   -- substitution (unlike the LSP path), so 'typeOfExpr' frequently
@@ -2298,7 +2348,7 @@ classifyOperand e = do
   -- string pointer). 'classifyL4Type' returns 'Nothing' for any
   -- non-concrete type, so only a fully-resolved @TyApp@ head is trusted
   -- here; everything else falls through.
-  case mt >>= classifyL4Type of
+  case mt >>= classify of
     Just cls -> pure (Just cls)
     Nothing  -> case e of
       -- A bare @Var@ reference (App with no args): the 'InfoMap' often
@@ -2310,7 +2360,7 @@ classifyOperand e = do
       App _ n [] -> do
         let name = resolvedName n
         mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
-        case mL4Ty >>= classifyL4Type of
+        case mL4Ty >>= classify of
           Just cls -> pure (Just cls)
           Nothing  -> entityOrStructural n 0
       -- A call: the operand's type is the callee's RESULT type, which
@@ -2331,9 +2381,10 @@ classifyOperand e = do
 entityResultClass :: Resolved -> Int -> LowerM (Maybe CmpClass)
 entityResultClass n nargs = do
   types <- gets (.funcL4Types)
+  syns  <- gets (.typeSynonyms)
   pure $ Map.lookup (getUnique n) types
            >>= resultTypeAtArity nargs
-           >>= classifyGroundType
+           >>= classifyGroundType . unfoldSynT syns
 
 -- | The type an application results in, given the callee's recorded type
 -- and the number of arguments applied. Conservative: only a SATURATED
@@ -2468,10 +2519,12 @@ nameMatches r names = resolvedName r `elem` names
 --     comparisons.
 --   * STRING ==\/!= → @__l4_str_eq@ returning 0.0\/1.0 (f64-ABI); compare
 --     against 1.0 (or 0.0, for !=) to get @i1@.
---   * STRING ordered (\<, \<=, \>, \>=) → /fail loud/. There is no
---     string-ordering runtime builtin (only @__l4_str_eq@), and the raw
---     f64 is a string-pool /pointer/, so an 'arith.cmpf' would order
---     addresses, not contents — unsound. Refuse the export instead.
+--   * STRING ordered (\<, \<=, \>, \>=) → @__l4_str_cmp@ returning
+--     -1.0\/0.0\/1.0 (f64-ABI); compare against 0.0 with the source
+--     predicate. Comparison is lexicographic by Unicode code point,
+--     matching jl4-core's Data.Text Ord — the raw f64 is a string-pool
+--     /pointer/, so a direct 'arith.cmpf' would order addresses, not
+--     contents; the runtime call reads the pooled contents instead.
 --   * 'CmpOther' (BOOLEAN, enum tag, DATE\/TIME serial) → legacy
 --     @arith.cmpf@ on the raw f64, which /is/ the correct comparison key
 --     for these.
@@ -2503,11 +2556,21 @@ lowerCmp pred_ lhs rhs = do
     Just CmpString -> case pred_ of
       OEQ -> lowerStringEq lhs rhs False
       ONE -> lowerStringEq lhs rhs True
-      _   -> markUnsupported
-        "ordered comparison (<, <=, >, >=) on STRING values is not \
-        \supported by the WASM backend: there is no string-ordering \
-        \runtime builtin, and comparing the raw f64 would order \
-        \string-pool pointers, not contents"
+      _   -> do
+        -- Ordered STRING comparison (<, <=, >, >=). A STRING is a
+        -- string-pool /pointer/: never compare the pointers directly.
+        -- @__l4_str_cmp@ returns -1.0\/0.0\/1.0 (lexicographic by
+        -- Unicode code point, matching jl4-core's Data.Text Ord);
+        -- re-applying the source predicate against 0.0 recovers the
+        -- intended truth value — exactly like the CmpNumber arm does
+        -- with @__l4_rat_cmp@.
+        lhsVal <- lowerExpr lhs l4NumberType
+        rhsVal <- lowerExpr rhs l4NumberType
+        cmpF <- emitVal $ \vid -> funcCall [vid] "__l4_str_cmp"
+          [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
+        zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+        i1Val <- emitVal $ \vid -> arithCmpf vid pred_ cmpF zero
+        boxBoolI1 i1Val
     Just CmpOther -> do
       -- BOOLEAN / enum tag / DATE / TIME serial: the raw f64 is the
       -- comparison key, so the direct arith.cmpf is correct.

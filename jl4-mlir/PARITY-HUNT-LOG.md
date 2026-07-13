@@ -40,7 +40,7 @@ ship; a 🔴 is not.
 | 4   | **`emittedBodies` false self-collision** (untraced + `$trace` re-emit)    | ✅    | `a68195f2`                          | Haskell (would spuriously refuse the corpus)        |
 | 5   | **Unsupported helper never reached its caller** (diagnostics discarded)   | ✅    | `a68195f2` `propagateDiagnostics`   | Haskell `unsupported helper → caller unsupported`   |
 | 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | ✅    | `62f5f909` `funcL4Types`            | `datetime-probe.cases.json` — **CI Tier-2** (+ Haskell) |
-| 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | 🟡    | refuses; no string-ordering builtin | corpus (2 cells now `refused`)                      |
+| 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | ✅    | `__l4_str_cmp` + synonym unfolding  | `britishcitizen5.cases.json` (5 cells) + `str-ordering-probe` — **CI Tier-2 candidate** (+ Haskell + JS) |
 | 8   | **`ceo-performance-award`** — deontic, refuses; never actually tested     | 🟡    | needs event `cases.json`            | — (this is the gap)                                 |
 | 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
 | 10  | **`orchestrator::evaluateClaim`** — `CONSIDER` ctor `RIGHT` unresolved    | 🟡    | pre-existing refusal                | corpus                                              |
@@ -238,9 +238,45 @@ attack.
    130+6 → **133 byte-identical, 5 refused**. Enum/record helper results still refuse
    (conservative) — widen `classifyGroundType` only with a way to tell a tyvar from a
    nullary type constructor.
-3. 🟡 **String-ordering runtime builtin** (clears ledger #7) — would let
-   `britishcitizen5` compile natively and recover the 2 cells that moved out of
-   `byte-identical`.
+3. ~~🟡 **String-ordering runtime builtin** (clears ledger #7)~~ — **✅ FIXED**.
+   `__l4_str_cmp` (runtime, `jl4-runtime.mjs`) compares pooled strings
+   lexicographically by Unicode **code point** — iterating `codePointAt`, NOT
+   JS-native `<` (which orders UTF-16 code **units** and disagrees for
+   astral-plane chars). Declared in `Runtime/Builtins.hs`; `lowerCmp`'s
+   `CmpString` ordered arm now routes through it and re-applies the source
+   predicate against `0.0`, exactly like `CmpNumber`/`__l4_rat_cmp`. The
+   reference was pinned empirically first: jl4-service returns
+   `"banana" > "apple" = true` even for a param typed `DECLARE Date IS A STRING`
+   — i.e. it does **string** comparison and ignores the schema's `format:date`
+   hint. The unicode trap (`"😀"` U+1F600 vs `""` U+E000 → code-point `+1`,
+   code-unit `-1`) is pinned by both JS unit tests and the differential gate
+   (`str-ordering-probe.cases.json`).
+
+   Wiring `str_cmp` **exposed two latent bugs** that had been masked while
+   `britishcitizen5` refused wholesale (a refusal routes to the fallback; a
+   compiled export does not):
+   - **Marshalling.** jl4-core's `typeToParameter` matches primitive type
+     **names** (`date`) before consulting the declares table, so a userland
+     `DECLARE Date IS A STRING` was schema'd `format:date` and the runtime's
+     `marshalArg` parsed the input into a DATE **serial** — which `str_cmp`
+     then read as a garbage pointer. Fixed WASM-side in `Schema.hs`
+     (`unfoldSynonymType`): a `SynonymDecl` param is resolved to its underlying
+     type **before** `typeToParameter` runs, so `Date` → `{"type":"string"}`
+     and `marshalArg` writes a real string. Genuine builtin DATE is not a
+     `SynonymDecl`, so it keeps `format:date` + serial marshalling
+     (datetime-probe stays byte-identical).
+   - **Classification.** The lowering **erases** synonym decls, so a comparison
+     operand recovered from `bindingL4Types` arrived as an opaque `TyApp Place`
+     head and `classifyL4Type` mis-read it as `CmpOther` → a raw `arith.cmpf`
+     on string **pointers** (`"Gibraltar" == "Gibraltar"` → FALSE; also a
+     latent handle-compare bug for NUMBER synonyms). Fixed with a
+     `typeSynonyms` map on `LowerState` (`collectTypeSynonyms`) that
+     `classifyOperand` unfolds through before classifying: `Place`/`Date`
+     → STRING → `CmpString` → `__l4_str_eq`/`__l4_str_cmp`.
+
+   Result: all **5** curated `britishcitizen5::is-British-citizen` cells (born
+   before / **exactly on** / after each of the two date thresholds, UK and
+   Gibraltar qualifying-territory paths) are byte-identical; Tier-2 stays 68+0.
 4. 🟡 **Deontic event `cases.json`** (clears ledger #8) — `ceo-performance-award` refuses
    rather than being _tested_. A test gap, not a code gap.
 
