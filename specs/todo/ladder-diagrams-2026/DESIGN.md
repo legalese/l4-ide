@@ -1257,6 +1257,10 @@ distinguishes them **without drawing a third path**:
 | conducts | conducts    | **in scope, and compliant**  | current runs through both panels; seam closed                                                                |
 | conducts | open        | **in scope, and IN BREACH**  | current reaches the seam and **stops**; the break is drawn AT the seam                                       |
 
+> **Superseded in part by §25.4.** The two-sink form below does this better still: it needs no
+> `N/A` stamp and no greying rule, because **N/A is simply "neither lamp lit"**. Keep §25.3's
+> principle — _vacuity is a state, not a path_ — and take §25.4's mechanism.
+
 **Same truth value, different ink.** `#EVAL` returns `TRUE` for a ground-floor window, and that is
 correct — the conditional is vacuously true and L4 should not pretend otherwise. But a compliance
 report that prints _"✓ complies with A.3"_ for a house with no windows is **telling the truth
@@ -1270,23 +1274,67 @@ exits that real-world rules-as-code projects lose track of whether 'not covered'
 mean pass, fail, or undefined."_ Here it is not an unlabelled exit; it is a labelled bypass that
 says **why** you are compliant: the rule never reached you.
 
-### 25.4 The dual: the breach view (the Bad Man's ladder) — a `ViewSpec` toggle, no new machinery
+### 25.4 Two sinks: the green lamp and the red lamp — **and N/A falls out for free**
 
-`P → Q` is violated exactly when `P ∧ ¬Q`. So the same node can be drawn **inverted**, as a
-liability circuit:
+> **Meng, 2026-07-14:** _"Maybe we can allow a form that treats the coil as a switch in its own
+> right: we have one antecedent source on the left of the ladder but two sinks: if the compliance
+> consequent is connected then we happy path to the green light. Otherwise we switch to the red
+> light."_
+
+This is the right shape, and it **supersedes** the `ViewSpec` polarity toggle the first draft
+proposed. It is also, pleasingly, not an invention: it is a **changeover contact** — SPDT, one
+pole and two throws — which is native relay-ladder vocabulary. The requirement does not merely
+_conduct or not_; it **routes**.
 
 ```
-     ●──[ SCOPE ]────[ NOT: REQUIREMENT ]────( BREACH )
+                                             ╭──▶ ( ✓ GREEN — complies )
+     ●──[ SCOPE ]══MUST══▶──[ REQUIREMENT ]──┤
+                                             ╰──▶ ( ✗ RED — in breach )
 ```
 
-Current reaching the coil **is** the breach. This needs **no new primitives at all** — it is
-`And(P, Not(Q))` plus a coil glyph, i.e. §21a's normally-closed contacts doing exactly the job
-they were built for.
+One source on the left. **Two sinks** on the right. The requirement's verdict throws the blade.
 
-And it is the more natural reading for half our audience. A citizen asks _"am I compliant?"_ and
-wants current = good. A litigator, a regulator, or the white-hat Bad Man asks _"what gets me
-liable?"_ and wants current = **bad**. They are duals; the IR is the same; only the `ViewSpec`
-differs. This connects directly to the FM-in-law "white-hat Bad Man" line of work.
+**And now count the lamps.** Every outcome the rule has is legible from which lamp is lit, with
+no extra ink and — crucially — **no bypass**:
+
+| Scope     | Requirement   | Green   | Red     | Reading                                                          |
+| --------- | ------------- | ------- | ------- | ---------------------------------------------------------------- |
+| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The break is visible IN THE SCOPE. |
+| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                       |
+| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                     |
+| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                    |
+
+This is the whole reason the two-sink form is better than anything above it. §25.3 had to
+_special-case_ vacuity — grey the panel, stamp `N/A`. Here **N/A is simply "no current left the
+scope"**, and the reader sees exactly _where_ it stopped. Nothing has to be drawn to say it, and
+nothing has to be suppressed either. The pedantry problem dissolves rather than being managed.
+
+_(N/A and "undetermined" are both dark lamps, and they are distinguished the same way a lawyer
+distinguishes them: by looking at **where the break is**. A scope that is definitively `✗` shows a
+clean open contact — tested, and it did not bite. A scope that is `?` is grey — not yet asked.)_
+
+**The polarity toggle is no longer needed.** The first draft made the citizen and the Bad Man
+read _different diagrams_. They now read the **same** diagram and simply care about different
+lamps: the citizen asks _"is green lit?"_, the litigator asks _"can red be lit?"_ — which is a
+**reachability query**, and one the verifier can actually discharge. The red lamp is the
+white-hat Bad Man's target, drawn.
+
+**And it completes §25.2.** We noted there that our diagrams have only ever drawn the antecedent
+half of a rung — contacts strung between two power terminals, with the coil quietly omitted.
+Here the coils arrive, and the right-hand side of the ladder finally means something. What was a
+second power terminal becomes **two lamps that report the verdict**.
+
+**Cost check — does the requirement appear twice?** No, and this is the point of the changeover.
+The naïve encoding is `[Q]──(green)` in parallel with `[¬Q]──(red)`, which duplicates `Q` — the
+very sin we charge trees with. The changeover has **one** requirement panel with a **two-way
+exit**: current leaves upward if it conducts, downward if it does not. One `Q`, two throws.
+(§21a's normally-closed contact is the same idea at atom scale; this is it at panel scale.)
+
+**Where LEST attaches.** For regulative rules (§25.5, not in this build) the red lamp is not a
+lamp at all — it is the **doorway**. Breach is where `LEST` hangs: the reparation, the statechart,
+the obligation's afterlife. So the two-sink form gives the §25.5 port a natural anchor, and the
+constitutive and regulative pictures agree on their skeleton even though only one of them is
+ours to draw.
 
 ### 25.5 "Must be" vs "must do" — the seam is where the ladder ENDS
 
@@ -1370,9 +1418,12 @@ state it cannot. Which is exactly the work §25b exists to do in the native rend
       `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
 - [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series whose connector is
       the seam glyph, so BBE is unchanged); the **three-state flow** of §25.3 — vacuous / compliant
-      / **breach-at-the-seam**. The N/A state greys the requirement panel; **no bypass is drawn** (§25.3).
-- [ ] **25c.** `ViewSpec.polarity: 'compliance' | 'breach'` — the §25.4 dual. Reuses §21a's
-      normally-closed contacts; no new primitives.
+      / **breach-at-the-seam**. **No bypass is drawn** (§25.3); N/A is "neither lamp lit" (§25.4).
+- [ ] **25c.** **Two sinks** (§25.4). The requirement panel gets a **changeover** exit — one pole,
+      two throws — feeding a **green** coil (complies) and a **red** coil (in breach). New Scene
+      prims: `coil` (lit / dark, green / red) and the changeover pivot. **No `ViewSpec.polarity`
+      toggle** — it is no longer needed; the citizen and the Bad Man read the same diagram and watch
+      different lamps.
 - [ ] **25d.** Emitters. ASCII: a `══▶` seam. SVG: the two-panel seam. **Mermaid: use §25.6's bottleneck**
       (`sequence(P, MUST, Q)` — the bottleneck) and NEVER `optional()`.
 - [ ] **25e.** The `MUST` / `⇒` glyph choice, from the source's register.
