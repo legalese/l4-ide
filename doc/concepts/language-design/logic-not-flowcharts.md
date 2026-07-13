@@ -151,6 +151,29 @@ So the flowchart is not merely _childish_ (the challenge's own worry); it is
 _category-wrong_. It is a picture of a process, drawn over something that is not a
 process.
 
+### The flowchart vendors agree
+
+This is not special pleading from the language camp. It is conceded by the people
+who sell the industrial-grade flowchart. Camunda — whose business is BPMN — try,
+on their own DMN page, to model a decision (which dish to cook, given the season
+and the number of guests) as a process diagram of gateways and branches. They
+look at the result and write:
+
+> **"The sorrow is obvious: It's way more verbose to express rules in BPMN,
+> especially when there are several conditions to consider."**
+>
+> — Camunda, [DMN](https://camunda.com/dmn/)
+
+_The sorrow is obvious_ deserves to be a term of art, and we adopt it here.
+
+Note, though, exactly how far the confession goes. Camunda diagnose **verbosity**:
+the diagram "becomes complex and hard to maintain." That is the _symptom_. The
+_disease_ is the category error — and it is not cured by making the picture
+smaller. A perfectly compact flowchart of the window rule would still invent an
+evaluation order the statute does not have, and still hide the AND/OR shape it
+does. Verbosity is what you notice first; unfaithfulness is what bites you in
+court.
+
 ---
 
 ## The right pictures for logic
@@ -225,6 +248,9 @@ pretends to be. See [Regulative Rules](../legal-modeling/regulative-rules.md).
 
 ## Decision tables: better than flowcharts, still not the substrate
 
+Camunda's own prescription, having noticed the sorrow, is the decision table —
+and they are right, as far as they go.
+
 Decision tables (as standardised in DMN) are a real improvement over flowcharts
 for classification. They are **order-independent** — a table is a truth table
 with actions — so they avoid the flowchart's invented-sequence sin, and they make
@@ -283,3 +309,4 @@ picture for each.
 - [Linguistic Syntax](linguistic-syntax.md) — why the language reads like legal English
 - [Regulative Rules](../legal-modeling/regulative-rules.md) — the state-transition semantics a flowchart only imitates
 - [Reference: Regulative](../../reference/regulative/README.md) — obligations, deadlines, reparations in L4
+- [Camunda, _DMN_](https://camunda.com/dmn/) — the BPMN vendor's own account of why decision logic does not belong in a process diagram ("the sorrow is obvious")
