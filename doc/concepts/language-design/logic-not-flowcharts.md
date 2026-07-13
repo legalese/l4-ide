@@ -204,11 +204,14 @@ _The sorrow is obvious_ deserves to be a term of art, and we adopt it here.
 
 Note exactly how far the confession goes, though, because it stops short. Camunda
 diagnose **verbosity**: the diagram "becomes complex and hard to maintain." That is
-the _symptom_, and a symptom invites the reply _then draw a smaller one_. But the
-chart above is already as small as A.3 gets, and it is still wrong — it still
-invents an evaluation order the statute does not have, and still hides the AND/OR
-shape it does. Verbosity is what you notice first; unfaithfulness is what bites you
-in court.
+a _symptom_, and a symptom invites the reply _then draw a smaller one_. But the
+chart above is already as small as A.3 gets. It is, as we said, entirely **correct**
+— and it is still the wrong **picture**, because it still invents an evaluation
+order the statute does not have and still hides the AND/OR shape it does.
+
+Those are two different axes, and conflating them is the whole trouble. A diagram
+can compute the rule perfectly and still misrepresent it. Verbosity is what you
+notice first; **unfaithfulness is what bites you in court.**
 
 Camunda's prescription, having noticed the sorrow, is the decision table. That is
 the right move, and a better one than this document used to allow — see
