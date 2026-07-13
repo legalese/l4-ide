@@ -18,6 +18,16 @@ The legislation was a UK planning rule about windows (below). People answered
 with flowcharts — a hand-drawn one, a tidy boxes-and-arrows one. The instinct is
 universal: _turn the law into a flowchart._
 
+<!-- TODO: embed the original thread's napkin sketches here, with a link to the
+     source. Meng has the URL in a slide deck. Two cautions before doing it:
+     (1) x.com now blocks unauthenticated media, so GitHub's camo proxy will most
+         likely 403 and render a broken image — a committed screenshot under
+         doc/concepts/language-design/figures/ plus a link to the thread is the
+         reliable form;
+     (2) the sketches are someone else's work. Reproducing them for critical
+         commentary is the point, but attribute them, and get permission if we
+         ever put this in print. -->
+
 With due respect, a flowchart is the wrong picture here — and not because it is
 too simple. It is wrong because it commits a **category error**: it draws a
 _timeless logical condition_ as if it were a _sequential process_. The law in
@@ -117,6 +127,38 @@ Rendering a predicate as a flowchart therefore does two damaging things:
   lawyer must actually verify — is gone, and shared sub-conditions get duplicated
   across branches.
 
+Here is A.3 drawn the way the challenge asked for. It is a perfectly competent
+flowchart:
+
+```mermaid
+flowchart LR
+  start([a side window]) --> upper{on an upper<br/>floor?}
+  upper -- no --> ok1[permitted]
+  upper -- yes --> wall{in a wall or<br/>roof slope?}
+  wall -- no --> ok2[permitted]
+  wall -- yes --> glazed{obscure-glazed?}
+  glazed -- no --> bad1[BAD!!!]
+  glazed -- yes --> shut{non-opening?}
+  shut -- yes --> ok3[permitted]
+  shut -- no --> high{openable parts<br/>over 1.7m?}
+  high -- yes --> ok4[permitted]
+  high -- no --> bad2[BAD!!!]
+```
+
+Now count the leaves. `permitted` appears **four times** and `BAD!!!` **twice** —
+six terminal boxes for a rule with exactly **two** outcomes. Those duplicates are
+not a drafting slip; they are forced. A tree cannot share a subtree, so every
+distinct path to the same conclusion must re-draw that conclusion. This is the
+"says less" failure made visible: the reader cannot see that all four `permitted`
+boxes are _the same permitted_, and nothing in the picture says so.
+
+And look at the staircase. Every diagonal step is a decision the diagram made and
+the statute did not. Ask why `obscure-glazed?` is tested before `non-opening?` and
+there is no answer in the law — only in the drawing. Permute those two tests and
+you get a differently-shaped flowchart of the identical rule; there is no
+canonical one, and the picture gives you no way to tell which of its lines are
+law and which are the draughtsman's convenience.
+
 So the flowchart is not merely _childish_ (the challenge's own worry); it is
 _category-wrong_. It is a picture of a process, drawn over something that is not a
 process.
@@ -137,10 +179,35 @@ are the ones built for sets and Booleans:
 
 L4's **[ladder diagram](../../reference/README.md)** is exactly the mashup of the
 first two: the Boolean AND/OR circuit structure, nested Venn-style, showing
-`antecedent ⇒ consequent`. It is **order-independent**, it **shares sub-terms**
-(a DAG, not a duplicating tree), and it stays **legible to a lawyer** — the three
-things the flowchart cannot do at once. And because it is _derived from the
-language_, it is a view, not the source.
+`antecedent ⇒ consequent`. It **shares sub-terms** (a DAG, not a duplicating
+tree), it stays **legible to a lawyer**, and its layout **carries no semantic
+order** — the three things the flowchart cannot do at once. And because it is
+_derived from the language_, it is a view, not the source.
+
+That last claim needs care, because a careless version of it is false. The ladder
+plainly _has_ an order: things are drawn left to right and top to bottom. Three
+different things are being confused whenever anyone says a diagram "imposes an
+order", and it is worth separating them:
+
+- **The denotation has no order.** `AND` and `OR` commute. The rule is a Boolean
+  function of the facts, and nothing in it says what is tested first.
+- **The text has an order** — `(i) obscure-glazed, and (ii) non-opening` — chosen
+  by the drafter, and the thing citations point at. **The ladder mirrors it, on
+  purpose.** That is what makes the formalisation _isomorphic_: you can hold the
+  diagram against the statute and check it line for line. Permuting it would
+  change nothing about the meaning, and that is precisely the test — an order you
+  may freely permute is an order that carries no weight.
+- **Asking questions has an order**, and a good one saves the user work. That is a
+  real problem, and L4 solves it explicitly — the question-ordering wizard picks
+  the next question by information gain over a binary decision diagram, which may
+  be nothing like the statute's order.
+
+The flowchart collapses all three. Its order is not the denotation (there isn't
+one), is not the text's (it re-sequences freely), and is not a principled
+interrogation order (it is whatever the drawer happened to pick) — and it presents
+that invented order _as though it were the law_. The ladder keeps the first two
+aligned and hands the third to a wizard, where it can be optimised, inspected, and
+argued about in the open.
 
 Here is A.3, as a ladder — the same rule, the same three definitions, drawn from
 the L4 above:
@@ -178,9 +245,19 @@ inverts what reaches it), or it satisfies the requirement (the lower rung).
 Within each rung, elements in **series** are conjoined and elements **stacked in
 parallel** are disjoined. That is the whole notation.
 
-Notice what the picture does _not_ say. It does not say which contact you test
-first, because a circuit has no first — and neither does A.3. Compare that to any
-flowchart of the same rule, which cannot avoid choosing.
+Now put it beside the flowchart above and count again. The flowchart needed six
+terminal boxes to say a two-valued thing. The ladder has **two terminals** — the
+`●` at each end — because "permitted" is not a place you arrive at, it is simply
+whether current got through. Every atom appears exactly **once**. Nothing is
+duplicated, because nothing needs to be: a circuit shares by construction.
+
+And notice what the picture does _not_ say. It does not say which contact you test
+first, because a circuit has no first. The left-to-right arrangement is the order
+of the **words in the statute**, not an order of operations — which is exactly why
+you can lay the diagram against the text and check it clause by clause. Permute
+two contacts in series and the circuit is unchanged; permute two tests in the
+flowchart and you must redraw it. That is the difference between a picture that
+_records_ the drafter's order and one that _invents_ an evaluator's.
 
 ---
 
