@@ -48,7 +48,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -761,6 +761,37 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- to 'Nothing' for shapes we can't recover, in which case the runtime
       -- uses the display 'returnType' string for primitive unmarshaling.
       returnSchema_ = ef.exportReturnType >>= typeToRetSchema declares Set.empty
+      -- A DEONTIC function whose body we could NOT reduce to a
+      -- 'DeonticContract' tree has no interpretable representation on the
+      -- WASM side: the compiled wasm body is only a @0.0@ placeholder (the
+      -- real evaluation is the JS interpreter walking @deonticContract@),
+      -- so a null tree would make the runtime's null-contract guard throw
+      -- at evaluate time rather than at schema-build time. Worse, if the
+      -- (unrelated) lowering diagnostic that currently downgrades such a
+      -- function were ever fixed, 'applyDiagnostics' would leave it at
+      -- @supported: true@ with a null contract — a silent landmine. Refuse
+      -- loudly and structurally here instead, so the caller is routed to
+      -- the jl4-service fallback (the reference) rather than a wasm module
+      -- that cannot evaluate the contract. Extraction returns 'Nothing'
+      -- for, e.g., IF guards that are helper-call applications
+      -- ('exprToGuard' only handles operators/projections/nullary vars) or
+      -- actions carrying a PROVIDED guard (silently dropped by
+      -- 'deontonToContract') — either of which would make an interpreted
+      -- answer wrong, so refusing is the correct (right-answer-preserving)
+      -- outcome, per the refuse-vs-silent-wrong bias.
+      deonticExtractionFailed = isDeonticFn && isNothing deonticContract_
+      (supported_, unsupportedReason_)
+        | deonticExtractionFailed =
+            ( False
+            , Just "DEONTIC contract could not be extracted to a schema tree the \
+                   \runtime interpreter can walk: the regulative body uses a \
+                   \construct the extractor does not represent (e.g. an IF guard \
+                   \that is a helper-call application, or an action carrying a \
+                   \PROVIDED guard, which would be silently dropped). Interpreting \
+                   \it would risk a wrong answer, so the WASM backend refuses and \
+                   \routes to the jl4-service fallback."
+            )
+        | otherwise = (True, Nothing)
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -770,10 +801,11 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable; 'applyDiagnostics' downgrades functions the
-       -- lowering flagged as unsupported.
-       , supported   = True
-       , unsupportedReason = Nothing
+       -- Assume compilable unless the DEONTIC-extraction guard above
+       -- already refused; 'applyDiagnostics' additionally downgrades
+       -- functions the lowering flagged as unsupported.
+       , supported   = supported_
+       , unsupportedReason = unsupportedReason_
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
@@ -1669,7 +1701,12 @@ applyDiagnostics diags wb =
       Nothing      -> fe
       Just reasons -> fe
         { supported = False
-        , unsupportedReason = Just (Text.intercalate "; " (uniq reasons))
+        -- Preserve any refusal reason already set at schema-build time
+        -- (e.g. the DEONTIC-extraction guard in 'mkFunctionExport'); the
+        -- lowering diagnostics are additional, not a replacement, so the
+        -- caller sees the full picture rather than only the last cause.
+        , unsupportedReason =
+            Just (Text.intercalate "; " (uniq (maybeToList fe.unsupportedReason ++ reasons)))
         }
     -- De-duplicate while preserving first-seen order.
     uniq = go Set.empty

@@ -73,6 +73,7 @@ main = do
     , test "helper-result NUMBER cmp → __l4_rat_cmp" testHelperResultNumberCmp
     , test "WHERE-local vs constant → __l4_rat_cmp"  testWhereLocalVsConstantCmp
     , test "helper-result STRING == → __l4_str_eq"   testHelperResultStringEq
+    , test "deontic unextractable contract → supported:false" testDeonticUnextractableRefused
     ]
   if and results
     then do
@@ -247,6 +248,58 @@ testDeonticSchemaBaked = do
         _  -> do
           putStrLn $ "\n    failing checks: " <> show failures
           putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
+-- | Ledger #8: a DEONTIC function whose regulative body we CANNOT reduce
+-- to a 'deonticContract' tree (here the IF guard is a helper-call
+-- application @`ready` s@, which 'exprToGuard' does not represent) must
+-- refuse LOUDLY at schema-build time: @supported: false@, a reason that
+-- names the DEONTIC-extraction gap, and NO @deonticContract@ key. Without
+-- the guard the export would ship @supported: true@ with a null contract —
+-- the runtime's null-contract guard would then throw at evaluate time, and
+-- if the (separate) lowering diagnostic on the helper were ever fixed the
+-- export would silently claim to be evaluable when it is not. This mirrors
+-- @ceo-performance-award@'s @Eligible Service Requirement@.
+testDeonticUnextractableRefused :: IO Bool
+testDeonticUnextractableRefused = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `alice`"
+        , "DECLARE Action IS ONE OF `pay`"
+        , "DECLARE State HAS `flag` IS A BOOLEAN"
+        , ""
+        , "GIVEN `s` IS A State"
+        , "GIVETH A BOOLEAN"
+        , "`ready` MEANS `s`'s `flag`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVEN `s` IS A State"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    IF   `ready` `s`"
+        , "    THEN PARTY `alice`"
+        , "         MUST `pay`"
+        , "         WITHIN 10"
+        , "         HENCE FULFILLED"
+        , "    ELSE FULFILLED"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("isDeontic",            T.isInfixOf "\"isDeontic\":true" json)
+            , ("supported:false",      T.isInfixOf "\"supported\":false" json)
+            , ("reason names DEONTIC", T.isInfixOf "DEONTIC contract could not be extracted" json)
+            , ("no deonticContract",   not (T.isInfixOf "\"deonticContract\":" json))
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 700 json)
           pure False
 
 -- | A plain decidable function lowers cleanly, so it must stay

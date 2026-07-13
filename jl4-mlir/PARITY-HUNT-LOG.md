@@ -41,7 +41,7 @@ ship; a 🔴 is not.
 | 5   | **Unsupported helper never reached its caller** (diagnostics discarded)   | ✅    | `a68195f2` `propagateDiagnostics`   | Haskell `unsupported helper → caller unsupported`   |
 | 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | ✅    | `62f5f909` `funcL4Types`            | `datetime-probe.cases.json` — **CI Tier-2** (+ Haskell) |
 | 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | ✅    | `__l4_str_cmp` + synonym unfolding  | `britishcitizen5.cases.json` (5 cells) + `str-ordering-probe` — **CI Tier-2 candidate** (+ Haskell + JS) |
-| 8   | **`ceo-performance-award`** — deontic, refuses; never actually tested     | 🟡    | needs event `cases.json`            | — (this is the gap)                                 |
+| 8   | **`ceo-performance-award`** — deontic, refuses; now differentially tested  | 🟡    | refuses honestly (2 real gaps)      | harness (refused-unsupported) + `.cases.json.pending` + Haskell |
 | 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
 | 10  | **`orchestrator::evaluateClaim`** — `CONSIDER` ctor `RIGHT` unresolved    | 🟡    | pre-existing refusal                | corpus                                              |
 | 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
@@ -71,7 +71,20 @@ good manners to admit to.
   scalar heads so a polymorphic return slot (a tyvar is syntactically a nullary `TyApp`)
   can never classify as a raw-f64 comparison key.
 - **A string-ordering runtime builtin** → clears #7.
-- **Event-shaped deontic `cases.json`** → clears #8 (a test gap, not a code gap).
+- **~~Event-shaped deontic `cases.json`~~ → #8 was BOTH a test gap and a code gap.**
+  Investigated (see "Ledger #8 resolved" below): `ceo-performance-award`'s exported
+  `Eligible Service Requirement` refuses for **two** real reasons, not a missing test.
+  (a) call-graph propagation from helper `Musk In Eligible Service` (an enum-EQUALS on a
+  record projection whose type the lowering can't resolve — ledger-#6 family), and,
+  more fundamentally, (b) `extractDeonticContract` returns `Nothing` because
+  `exprToGuard` can't represent an **IF guard that is a helper-call application**
+  (`Forfeiture Applies award state`) and `deontonToContract` **silently drops the
+  action's `PROVIDED` guard**. Interpreting it would risk a wrong answer, so it MUST
+  keep refusing. The lane's fix makes that refusal **loud and structural** at
+  schema-build time (a deontic function with a null contract is now `supported:false`),
+  closing a latent `supported:true`-with-null-contract landmine; curated
+  branch-crossing cases are validated against jl4-service and parked in
+  `jl4/examples/legal/ceo-performance-award.cases.json.pending` to gate the future fix.
 - **`CONSIDER` constructor resolution for `RIGHT`** → clears #10 (pre-existing; predates
   this branch).
 
@@ -277,8 +290,55 @@ attack.
    Result: all **5** curated `britishcitizen5::is-British-citizen` cells (born
    before / **exactly on** / after each of the two date thresholds, UK and
    Gibraltar qualifying-territory paths) are byte-identical; Tier-2 stays 68+0.
-4. 🟡 **Deontic event `cases.json`** (clears ledger #8) — `ceo-performance-award` refuses
-   rather than being _tested_. A test gap, not a code gap.
+4. ✅ **Ledger #8 investigated + honest-refusal fix landed** (see below) —
+   `ceo-performance-award` is now differentially exercised by the harness (it refuses)
+   and by a Haskell regression test; its two real gaps are documented and gated by
+   `ceo-performance-award.cases.json.pending`.
+
+### Ledger #8 resolved — `ceo-performance-award::Eligible Service Requirement`
+
+**It was a code gap, not (only) a test gap.** The extended corpus flagged this export as
+`refused-unsupported`, contradicting the coverage.json "clean". Root cause, established by
+compiling the file and reading the emitted `.schema.json`:
+
+1. **Incidental** — call-graph propagation from helper `Musk In Eligible Service`, which
+   does `award state's Musk Service Status EQUALS Chief Executive Officer` (enum EQUALS on
+   a record projection). `classifyOperand` can't resolve the projection's type, so
+   `lowerCmp` refuses (ledger-#6 family, correct fail-closed). This is what currently
+   downgrades the export.
+2. **Fundamental** — `extractDeonticContract` (`Schema.hs`) returns `Nothing`, so the
+   export has `isDeontic:true` but **no `deonticContract` tree**. Reasons: the top-level
+   `IF` guard is a **helper-call application** (`Forfeiture Applies award state`) that
+   `exprToGuard` doesn't represent (it handles only operators / projections / nullary
+   vars → `Nothing`), and the maintain-service action carries a **`PROVIDED` guard** that
+   `deontonToContract` **silently drops** (it never reads `action.provided`). Either would
+   make an interpreted answer wrong.
+
+Because interpreting this contract would risk a **silent wrong answer** (dropped `PROVIDED`
+guard), the function MUST keep refusing — this is Outcome B under the refuse-vs-silent-wrong
+bias. **The lane's change makes the refusal loud and structural** instead of an incidental,
+maskable side-effect: `mkFunctionExport` now sets `supported:false` with a clear
+DEONTIC-extraction reason whenever `isDeontic && deonticContract == Nothing`, and
+`applyDiagnostics` **preserves** that reason (prepends it) rather than overwriting it with
+the lowering diagnostics. This closes a latent landmine — had someone fixed gap (1) alone,
+the export would otherwise have flipped to `supported:true` with a null contract and thrown
+only at evaluate time.
+
+Verification: `cabal test jl4-mlir` 34/34 (new: `deontic unextractable contract →
+supported:false`). The 3 deontic fixtures (sale/seatbelt/breach) still extract non-null
+contracts and stay `supported:true`. Harness (`--port 9931`) over
+`ceo-performance-award + deontic-sale + deontic-seatbelt + deontic-breach`:
+**8 byte-identical, 1 refused-unsupported, PARITY OK (0 parityFails).** Branch-crossing
+cases (all three top-level branches: MUST-maintain / MAY-vest-immediately / MUST-forfeit)
+were validated live against jl4-service and parked in
+`jl4/examples/legal/ceo-performance-award.cases.json.pending` — **not** a live
+`.cases.json`, because a curated cell for a refusing function would trip the harness's
+partial-corpus-collapse guard. A full future fix (represent helper-call IF guards + carry
+`PROVIDED`/`EXACTLY`) should additionally add fielded-action fulfilled/breach sequences —
+but note those need a jl4-service events-codegen fix too: `CodeGen.hs:431`
+(`fnLiteralToL4ExprWithType`) can't encode a sum-type-with-fields action
+(`maintain eligible service status <Service Status>`), rendering it as the invalid
+`Award Action WITH <ctor> IS …`.
 
 ## What a reviewer should actually check
 

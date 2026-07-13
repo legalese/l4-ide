@@ -82,6 +82,29 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   extraction (Schema.hs:801-810 ignores `action.provided`), regulative
   `AND`/`OR` unsupported. Decision: port from jl4-core `Machine.hs` vs.
   refuse-and-route-to-fallback.
+- ✅ **Ledger #8 — `ceo-performance-award` deontic export: honest, loud refusal.**
+  Investigated `Eligible Service Requirement`: it refuses for two real reasons — (1)
+  call-graph propagation from helper `Musk In Eligible Service` (enum-`EQUALS` on a
+  record projection the lowering can't type; ledger-#6 family), and (2)
+  `extractDeonticContract` returns `Nothing` because `exprToGuard` can't represent an
+  IF guard that is a **helper-call application** (`Forfeiture Applies award state`) and
+  `deontonToContract` **drops the action's `PROVIDED` guard** (the very hazard above).
+  Because interpreting it would risk a silent wrong answer, it MUST keep refusing
+  (Outcome B). Fix (`Schema.hs`): `mkFunctionExport` now marks any
+  `isDeontic && deonticContract == Nothing` export `supported:false` with a clear
+  DEONTIC-extraction reason, and `applyDiagnostics` PRESERVES (prepends) that reason
+  instead of overwriting it — closing the latent `supported:true`+null-contract landmine
+  that would have surfaced only at evaluate time if gap (1) were fixed alone. Regression
+  test `deontic unextractable contract → supported:false` (Haskell 33→34). The 3 deontic
+  fixtures still extract non-null contracts / stay supported. Harness (`--port 9931`) over
+  ceo + sale/seatbelt/breach: **8 byte-identical, 1 refused-unsupported, PARITY OK**.
+  Branch-crossing curated cases (all 3 top-level branches) validated live against
+  jl4-service and parked in `ceo-performance-award.cases.json.pending` (NOT a live
+  `.cases.json` — a curated cell for a refusing fn would trip the harness
+  partial-corpus-collapse guard). Note the full future fix also needs a jl4-service
+  events-codegen fix: `CodeGen.hs:431` can't encode a sum-type-with-fields action
+  (`maintain eligible service status <Service Status>`), so fielded-action
+  fulfilled/breach sequences aren't expressible even against the reference today.
 - ✅ **`lowerCmp` InfoMap-miss fallback** — DONE (commit `65c94608`). Root cause
   was deeper than the review: `tcdInfoMap` isn't run through the typechecker's
   final substitution, so `typeOfExpr` returns `Just (InfVar …)` (not `Nothing`)
