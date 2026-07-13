@@ -802,6 +802,33 @@ a sub-circuit driving a normally-closed contact (relay-accurate, more layout); *
 Morgan push-down** — rewrite NOT to the leaves (changes displayed structure; better as
 an optional "normalize negation" view)._
 
+### 21a. Normally-closed contacts — the idiom we skipped _(proposed; not built)_
+
+The Mermaid exercise (§24.2) forced a re-read of the two alternatives above, and they were
+the right ones. The reasoning, which §21 never made explicit:
+
+**Structural NOT is not needed for expressiveness.** Negation normal form pushes every `¬` down
+to the atoms, and a negated atom needs no gate — only a **polarity**. Ground `¬x` as `¬v(x)` and
+negation vanishes from the circuit's structure entirely, becoming a property of a _contact_
+rather than a thing _between_ contacts. This is not a trick: it is the **normally-closed contact**
+`─┤/├─` of IEC 61131-3, the notation this whole diagram descends from. We inherited a ladder
+language that already had negation, and drew a scope frame instead.
+
+So the two mechanisms do **different jobs**, and we should ship both:
+
+| Negand                | Render                                                      | Why                                                                                          |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| an **atom**           | **normally-closed contact** — the box, with a `/` across it | native, compact, and the reader sees the polarity _on_ the contact                           |
+| a **complex subtree** | the §21 **scope frame + inverter bubble**                   | the reader must see the negation's **extent**; that is explanation, not expressive necessity |
+
+And **"normalize negation" (De Morgan to NNF) becomes a real `ViewSpec` toggle**, not a
+curiosity — it turns `¬(P) ∨ Q` into a flat disjunction of the ways to comply. That is close
+kin to the sentence expander (`sentences.ts`: And = product, Or = union), and answers a
+different question than the isomorphic view does: not _"what does the rule say?"_ but _"how may
+I comply?"_. Keep the isomorphic view primary — NNF re-expresses the statute's own shape and so
+breaks the read-back-against-the-text property that is the ladder's whole point (§0) — but offer
+NNF as the second view.
+
 ---
 
 ## 22. Defaulted vs given — TYPICALLY presumptions
@@ -974,24 +1001,56 @@ railroad renderer already has. A hand-written s415 comes out looking startlingly
 fine-dashes, unboxed inert prose, and even §20 current-flow stroke weights — perhaps 70%
 fidelity, on github.com, today.
 
-**Why it still fails.** Railroad has **no NOT**. The nearest hack, `special("NOT")`, renders as
-a box _in series_ — it reads as a conjunct with no scope. So there is no `¬P ∨ Q`, and
-therefore **no material conditional**: `P → Q`, the document's own headline example, is
-structurally undrawable. Also no text wrapping (statutory prose runs off-screen), no folding, no
-interactivity, no print.
+**The NOT objection was also wrong** (correction #2 — the second draft claimed railroad "has no
+NOT", so `¬P ∨ Q` and hence the material conditional were "structurally undrawable"). Meng:
+_"railroad diagrams basically are ladder diagrams modulo a de Morgan treatment of negation."_ He
+is right, and there are in fact **two** ways through, both rendered and verified:
 
-**The decisive argument is the build-step dilemma**, and it is stronger than "Mermaid can't":
+1. **Negation normal form.** De Morgan pushes negation down to the atoms:
+   `¬(upper ∧ (wall ∨ roof)) ≡ ¬upper ∨ (¬wall ∧ ¬roof)`. Negated atoms are just leaves, which
+   railroad draws fine. A.3 comes out as a clean three-rung `choice`. **This is not even a hack:
+   a negated atom in IEC 61131-3 ladder logic _is_ a primitive — the NORMALLY-CLOSED CONTACT
+   `─┤/├─`.** NNF is the native ladder idiom, and we are the ones not using it (see §21a below).
+2. **Factor and fold.** Railroad is a _grammar_ notation: several named rules. Write
+   `complies = choice(nonterminal("NOT: A3 covers"), nonterminal("A3 requirement met"))` plus the
+   two rules it names, and you get the material conditional at top level, with the antecedent
+   folded — which is _exactly_ the L4 factoring, rule for rule. The cost is that the `NOT` is
+   then only a **word**: nothing in the picture inverts, so the reader must read the negation
+   rather than see it.
+3. **Push it into grounding** (Meng again, and this is the general form of ①). A renderer needs no
+   negation _primitive_ at all if the leaf carries a **polarity**: ground `¬x` as `¬v(x)` at
+   valuation time. Negation then never appears in the circuit's _structure_ — it is a property of
+   a contact, not a gate between contacts. Which is, once more, precisely the normally-closed
+   contact. Any series/parallel notation whatever is then sufficient.
 
-- Mermaid's _only_ prize is **source-in-the-Markdown, zero build step**. Only the **hand-written**
-  ladder collects it — and the hand-written ladder cannot say `→`. Shipping it would mean the
-  document that exists to insist on the material conditional could not draw one: a worse
-  self-refutation than the flowchart one the first draft warned about.
-- The **generated** ladder reaches ~70% — but it concedes a build step. And once you have
-  conceded a build step, **§24.3's option I-a strictly dominates it**: same build step, _zero_
-  fidelity loss, plus print and dark mode.
+The right way to say it: **structural NOT is not needed for EXPRESSIVENESS at all** — NNF plus
+leaf polarity covers every Boolean function. §21's scope frame earns its keep only for
+**EXPLANATION**: showing a reader the _extent_ of a negation over an un-normalised subtree, which
+is a presentation service, not an expressive necessity. Worth knowing which of the two we are
+selling.
 
-So Mermaid spends its single advantage to buy a worse picture. **Don't** — but for that reason,
-not the ones the first draft gave.
+So: **Mermaid CAN draw our ladder.** Capability is no longer the argument, and after being wrong
+twice about capability we should stop making capability arguments.
+
+**What actually decides it is PROVENANCE — and it is the document's own thesis.**
+
+> "a diagram is a good _view_ of legal logic and a bad _substrate_ for it… the language is the
+> source, the picture is derived."
+
+A hand-written Mermaid ladder in the Markdown is a **second, unverified source of truth.** It is
+not derived from the L4; nothing checks it against the L4; it will drift. That is precisely the
+inversion `logic-not-flowcharts.md` exists to condemn — and we would be committing it _inside the
+document that condemns it_. Note that this objection does not depend on any capability claim, and
+so cannot be falsified the way the last two were.
+
+The moment you _generate_ it to prevent drift, you have conceded a build step — whereupon
+**§24.3's option I-a strictly dominates**: same build step, zero fidelity loss, plus folding,
+current flow, print and dark mode. So Mermaid's single prize (source-in-the-Markdown, no build
+step) is collectible only in the form that makes the picture unverifiable.
+
+**Verdict: still don't — but now for a reason about where truth lives, not about what Mermaid can
+draw.** The residual capability gaps (no text wrapping for statutory prose, no folding, no
+interactivity, no print) are supporting, not decisive.
 
 **Two things to salvage.** (a) Mermaid `flowchart` should go **into** `logic-not-flowcharts.md`
 as the exhibit for the _wrong_ picture — GitHub renders it natively, and the rendered GPDO
