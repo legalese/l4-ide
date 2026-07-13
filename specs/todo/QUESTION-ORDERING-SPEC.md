@@ -69,7 +69,7 @@ Properties:
 
 - **Subsumes the old heuristic.** An atom that _determines_ the outcome drives a branch to a terminal → `H = 0` → maximal gain. So "settles it now" is the top of the ranking, as before.
 - **Adds progress credit.** An atom that merely halves the remaining space still scores well — fixing defect (1).
-- **Near-optimal.** Greedy max-info-gain is the standard, cheap policy for minimizing expected question count. Multi-step lookahead is exponential and out of scope.
+- **Near-optimal — and now citably so.** Greedy max-info-gain is the standard, cheap policy for minimizing expected question count; multi-step lookahead is exponential and out of scope. The guarantee this claim was leaning on without attribution is **Golovin & Krause's adaptive submodularity** (JAIR 42, 2011): where the objective is adaptive-submodular and adaptive-monotone, the greedy policy is within a `(ln(1/η) + 1)` factor of the optimal policy. Cite it; do not assert "near-optimal" bare. ⚠️ And note the sobering empirical baseline: **Lamy et al. (2024)** solve exactly this problem for clinical decision support, **prove the question-ordering problem NP-hard**, and then find that a _dumb frequency heuristic_ performs about as well as anything cleverer. We should beat that baseline on the Housing Act corpus, or explain why we need not.
 
 ### 3.3 Explainability (surface, not just rank)
 
@@ -180,3 +180,37 @@ Keep the existing `impact` (`ifTrue`/`ifFalse` outcomes) — it already feeds th
 3. v2 then becomes small: `PartialEvalAnalyzer` reads the field → `weights` → `compileDecisionQuery` (§7 step 1), plus the Haskell mirror/feed (§7 steps 2–3) for backend parity.
 
 **Do NOT** build a v2-private weights path in parallel with #96's provenance — that is the same extraction twice. If #96 ships demo-fed and defers the real extraction, the extraction is still owed; name it as a shared step so it lands once. (Answering the open question from 2026-07-08: yes, this plumbing gets built regardless of sequencing — the only choice is once-shared vs twice-duplicated.)
+
+---
+
+## 9. Related work — and what we may honestly claim (added 2026-07-14)
+
+This spec previously had **no related-work section at all**, and its "near-optimal" claim (§3.2) was uncited. A literature check found that we are working in a well-populated field, that our ingredients are all old, and that our actual contribution is narrower than the spec's tone implied. That is fine — but a reviewer who knows this literature and catches us claiming novelty would be entitled to be annoyed, so it is written down here.
+
+**Every ingredient is old, and the pedigree is an asset, not an embarrassment.**
+
+- **Shwayder (1974)**, "Extending the Information Theory Approach to Converting Limited-Entry Decision Tables to Computer Programs", _CACM_ 17(9):532–537. **Entropy-driven test ordering from a rule base — fifty years ago.** The direct ancestor of §3.2. Cite it _first_; the lineage is the point.
+- **Montalbano (1962)**, "Tables, Flow Charts, and Program Logic", _IBM Systems Journal_ 1(1). His table→flowchart ordering heuristic — "ask those questions first which will make the two differentiated groups of rule identifiers as similar in size as possible" — is an information-gain criterion **24 years before ID3**.
+- **Bryant (1986)**, "Graph-Based Algorithms for Boolean Function Manipulation", _IEEE Trans. Computers_ C-35(8). The ROBDD, and the fact our whole three-orders argument rests on: variable order changes diagram _size_ enormously but has **"no effect on the correctness of the results."**
+- **Ünlüyurt (2004)**, "Sequential testing of complex systems: a review", _Discrete Applied Math_ 142. The survey of the field our next-question policy formally belongs to. We are doing **sequential testing**, and should say so.
+- **Golovin & Krause (2011)**, _JAIR_ 42:427–486. The near-optimality guarantee for greedy (see §3.2).
+- **Hadzic et al. (2004)** / **Andersen, Hadzic & Pisinger (2010)**, _JAIR_ 37. Compile a rule base to a BDD offline, drive a **backtrack-free** interactive configurator off it. Architecturally identical to a legal wizard; commercialised as Configit. Worth reading for the interaction model, not just the theory.
+
+**The closest existing work, and the one to engage with directly:**
+
+- ⭐ **Aucher, Berbinau & Morin (2019)**, "Principles for a Judgement Editor Based on Binary Decision Diagrams", _Journal of Applied Logics — IfCoLog_ 6(5):781–814. Built with the French **Cour de cassation** / IRISA. They compile legal rules to a propositional formula and thence to a **BDD whose nodes _are_ the questions put to the judge** — and add a "Multi-BDD" to reconcile substantive legal reasoning with the _procedural_ order mandated by trial protocol (which is a sharper version of our three-orders distinction, arrived at independently and from the bench). **They do not optimise the question order.** That is precisely, and only, our seam.
+
+**Two verified negatives, both usable in a related-work section:**
+
+- **Nobody has applied BDDs to DMN.** Full-text search of Calvanese et al. (BPM 2016 _and_ the IS 2018 extension) for "binary decision diagram" / "BDD" / "OBDD" returns **zero** occurrences; their method is purely geometric (hyper-rectangles + sweep-line).
+- **AI & Law has essentially never used BDDs.** Full-text search of the journal _Artificial Intelligence and Law_ for "binary decision diagram" returns **zero**. The only three exceptions found anywhere are Aucher et al. (2019), Gasiola (2025, _CLSR_ 58 — the EU AI Act's risk classification as a BDD, conceptual rather than compiled), and Mues & Vanthienen (DEXA 2004, BDDs for rule-base anomaly checking). **Three exceptions, in three different communities, none citing the others.**
+
+### The claim we may defend
+
+> **Model-counting information gain over a compiled ROBDD, as the next-question policy for a legal rules engine, appears to be new. Every ingredient is old.** Entropy-driven test ordering is Shwayder 1974; the ROBDD is Bryant 1986; BDD-driven legal interviewing is Aucher et al. 2019; the greedy near-optimality guarantee is Golovin & Krause 2011. What has not been done, so far as we can find, is to put them together — and the reason is plainly that the three communities that hold the pieces (decision-table verification, BDD/formal methods, AI&Law) do not read each other.
+
+Do **not** claim: that question ordering is a new problem; that nobody checks rule bases across tables; that BDDs are new to law; or that greedy info-gain is our invention.
+
+⚠️ **Baseline to beat.** Lamy et al. (2024), _BMC Med. Inform. Decis. Mak._ 24:326, solve "minimise questions asked given a rule base" end-to-end, prove it **NP-hard**, and then find a **frequency heuristic** good enough. Validation on the Housing Act Sch.2 corpus (§5) should measure against a frequency baseline, not just against the old syntactic `[-determinableCount, level]` policy. If we cannot beat frequency, the honest finding is that we cannot, and the interesting contribution moves to _explainability_ (§3.3) rather than to question count.
+
+_Full annotated bibliography with confidence markers ([V] read at primary source / [P] record verified / [U] unverified — do not cite): the DMN/decision-table literature review carried out 2026-07-14._

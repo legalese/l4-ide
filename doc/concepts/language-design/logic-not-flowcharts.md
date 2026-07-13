@@ -258,14 +258,15 @@ order", and it is worth separating them:
   function of the facts, and nothing in it says what is tested first.
 - **The text has an order** — `(i) obscure-glazed, and (ii) non-opening` — chosen
   by the drafter, and the thing citations point at. **The ladder mirrors it, on
-  purpose.** That is what makes the formalisation _isomorphic_: you can hold the
-  diagram against the statute and check it line for line. Permuting it would
-  change nothing about the meaning, and that is precisely the test — an order you
-  may freely permute is an order that carries no weight.
+  purpose.** That is what makes the formalisation _isomorphic_, in the sense
+  Bench-Capon & Coenen gave that word: you can hold the diagram against the statute
+  and check it line for line. Permuting it would change nothing about the meaning,
+  and that is precisely the test — an order you may freely permute is an order that
+  carries no weight.
 - **Asking questions has an order**, and a good one saves the user work. That is a
-  real problem, and L4 solves it explicitly — the question-ordering wizard picks
-  the next question by information gain over a binary decision diagram, which may
-  be nothing like the statute's order.
+  real problem, and L4 solves it explicitly — the question-ordering wizard picks the
+  next question by information gain over a binary decision diagram, which may be
+  nothing like the statute's order.
 
 The flowchart collapses all three. Its order is not the denotation (there isn't
 one), is not the text's (it re-sequences freely), and is not a principled
@@ -273,6 +274,29 @@ interrogation order (it is whatever the drawer happened to pick) — and it pres
 that invented order _as though it were the law_. The ladder keeps the first two
 aligned and hands the third to a wizard, where it can be optimised, inspected, and
 argued about in the open.
+
+Bryant, who gave us the ordered binary decision diagram, put the underlying fact
+plainly: the variable ordering you pick changes the diagram's _size_ enormously, but
+has **"no effect on the correctness of the results."** Order is a property of the
+evaluation, not of the function. A flowchart is a notation that cannot tell those
+two apart.
+
+And the third of these orders — asking good questions in a good sequence — is not
+new, and we should say so cheerfully. **Shwayder (1974)** was already ordering
+decision-table tests by information theory, in _CACM_; **Montalbano (1962)**, above,
+had the same intuition twelve years before that. In our own field, **Aucher, Berbinau
+& Morin (2019)**, working with the French _Cour de cassation_, compile legal rules to
+a BDD **whose nodes are the questions put to the judge** — and add a second BDD to
+reconcile substantive reasoning with the procedural order of the trial. What none of
+them do is _optimise_ the order, which is the narrow seam L4's wizard works in. The
+ingredients are old. Good.
+
+_(Bench-Capon & Coenen, "Isomorphism and legal knowledge based systems", Artificial
+Intelligence and Law 1(1), 1992; Bryant, "Graph-Based Algorithms for Boolean Function
+Manipulation", IEEE Trans. Computers C-35(8), 1986; Shwayder, CACM 17(9), 1974;
+Aucher, Berbinau & Morin, Journal of Applied Logics 6(5), 2019. See
+[QUESTION-ORDERING-SPEC](../../../specs/todo/QUESTION-ORDERING-SPEC.md) for the full
+related work.)_
 
 Here is A.3, as a ladder — the same rule, the same three definitions, drawn from
 the L4 above:
