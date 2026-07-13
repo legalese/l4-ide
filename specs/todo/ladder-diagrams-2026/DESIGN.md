@@ -1181,6 +1181,13 @@ ship a VS Code extension. Rides on the §13.1 `ladder-svg` split.
 **The question (Meng, 2026-07-14):** _"do we draw implication as a new thing, or as a rung that
 fits into our current formalisms?"_
 
+> **SCOPE — decided 2026-07-14.** Build **"must be"** only: _material_ implication in
+> **constitutive** rules, where the consequent is another **predicate**. **"Must do"** —
+> _regulative_ rules, where the consequent is an obligation with a deadline and reparations — is
+> a **different visualization problem** (Petri nets, Harel statecharts, DFAs), and §25.5 explains
+> why the ladder must stop at its door rather than pretend. The gating conditions of a regulative
+> rule look exactly like the work below and are reusable as-is; **the consequent is not.**
+
 ### 25.1 The status quo is not neutral, and our own document condemns it
 
 Today the viz IR has no implication node (`IRExpr = And | Or | Not | UBoolVar | App | TrueE |
@@ -1205,10 +1212,13 @@ A real IEC 61131-3 rung is **`[contacts] ────( coil )`**: _if_ the conta
 _then_ energize the coil. **A rung IS an implication** — antecedent on the left, consequent on
 the right. It is a Horn clause with a power rail.
 
-Our diagrams have quietly omitted the coil all along: we draw contact networks strung between
-two power terminals, which is only ever the _antecedent half_ of a rung. Adding implication and
-adding the coil are **the same task**, and doing it makes us _more_ faithful to the notation we
-claim descent from, not less.
+Our diagrams have quietly omitted the right-hand half all along: we draw contact networks strung
+between two power terminals, which is only ever the **antecedent**. So implication is not a new
+shape; it is the shape we have been declining to finish.
+
+_(Careful with the coil, though. In a **constitutive** rule — our scope — the right-hand side is
+another **predicate**, so it is a second contact panel, not an output. The coil-as-**action**
+reading belongs to **regulative** rules, and §25.5 explains why we are not drawing those.)_
 
 Note also that Meng drew this correctly in 2021, in the deck that started this: two panels,
 _"Every window which… **⇒** must be…"_, each panel a nested Venn/ladder. That design was right.
@@ -1261,31 +1271,92 @@ wants current = good. A litigator, a regulator, or the white-hat Bad Man asks _"
 liable?"_ and wants current = **bad**. They are duals; the IR is the same; only the `ViewSpec`
 differs. This connects directly to the FM-in-law "white-hat Bad Man" line of work.
 
-### 25.5 Deontic vs material — one wrinkle to keep honest
+### 25.5 "Must be" vs "must do" — the seam is where the ladder ENDS
 
-Two flavours hide under the same arrow:
+Two quite different things hide under the same English word, and the scope decision above turns
+on telling them apart:
 
-- **Material** (`P → Q`, both predicates): A.3 as formalised. The consequent is another contact
-  network. → **two-panel seam** (§25.3).
-- **Deontic** (`P → OBLIGATION`): "PARTY insurer MUST pay WITHIN 30 days". The consequent is an
-  _action_, not a predicate — and _that_ is a **coil** in the truest ladder-logic sense.
+|             | **"must _be_"** — constitutive                           | **"must _do_"** — regulative                                   |
+| ----------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| the MUST is | **characterizing**: it says what a compliant window _is_ | **directive**: it tells a party to _act_, by a deadline        |
+| consequent  | another **predicate**                                    | an **obligation**: deadline, fulfilment, breach, reparation    |
+| formalism   | Boolean function                                         | a **labelled transition system**                               |
+| the picture | a **ladder** (this document)                             | **Harel statechart / Petri net / DFA** (§ the doc's own table) |
+| example     | A.3: obscure-glazed and non-opening                      | `PARTY insurer MUST pay WITHIN 30 days HENCE … LEST …`         |
 
-The statute's own words ("must be obscure-glazed") are deontic; our formalisation is material. The
-seam glyph should therefore read `MUST` when the source said MUST and `⇒` when it did not —
-cheap, and it preserves the drafter's register (§17's whole argument, applied to the connective).
+A.3's "must be obscure-glazed" is the **first** kind. There is no process in it, no deadline, no
+reparation — a window either satisfies the predicate or it does not. Formalising it as
+`covers IMPLIES requirement-met` is therefore not a dodge; it is the honest reading.
 
-### 25.6 Work
+**And this is exactly why the coil metaphor must not be pushed.** For a regulative rule the
+consequent is not an output you energize. Meng: _"the coil is more than a coil: it's a
+whole-ass graph."_ Quite — it is the obligation's entire lifecycle. Drawing that as a coil, or as
+anything else the ladder owns, would be **the flowchart's own category error**, committed by us:
+flattening a transition system into a picture that cannot hold one. `logic-not-flowcharts.md`
+spends two hundred lines saying that decision logic and process are different semantic
+categories. The ladder must therefore **stop at the seam.**
+
+So for regulative rules the seam is **not a coil — it is a PORT**: the ladder renders the
+**guard** (the conditions under which the obligation arises), which looks exactly like everything
+built so far and is **reusable unchanged**, and then hands off. The consequent renders as a
+**folded handle** (§16) that opens into a _different view_.
+
+That gives the two formalism boundaries a pleasing symmetry, and they are the same idea twice:
+
+| Boundary             | Opens         | From → To                | Handle                                       |
+| -------------------- | ------------- | ------------------------ | -------------------------------------------- |
+| **§23 the membrane** | **downward**  | circuit → **typed data** | a predicate leaf opens into its value chip   |
+| **§25 the seam**     | **rightward** | circuit → **process**    | a deontic consequent opens into a statechart |
+
+In both, the honest move is the same: **draw the boundary, render a handle, and let the other
+formalism take over.** Never pretend the ladder can hold what it cannot.
+
+_(One nicety we keep for the constitutive case: the seam glyph should read `MUST` when the source
+said MUST and `⇒` when it did not — §17's argument, applied to the connective. The drafter's
+register survives into the picture.)_
+
+### 25.6 Can we shoehorn the seam into Mermaid? — no, and the failure is instructive
+
+Meng: _"if we just had a convention where we have a `=>` node that looks like a bottleneck
+between condition and coil, could we shoehorn into Mermaid?"_ Four encodings were rendered
+(`specs/research/mermaid-planb/`); the result is a clean negative that **vindicates building the
+real node**.
+
+| Encoding                                   | Reads as                                                        | Verdict                                                                                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `choice(NOT P, Q)` — status quo            | "not covered, or compliant"                                     | **correct, shapeless.** Antecedent inverted; scope/requirement gone.                                                                                                                           |
+| `sequence(P, MUST, Q)` — the bottleneck    | the statute's own sentence                                      | **WRONG.** A railroad `sequence` is concatenation = `P ∧ Q`. Vacuity vanishes: a ground-floor window has **no path** and reads as non-compliant. This is alby's OR→AND bug in a new costume.   |
+| `sequence(P, MUST, optional(Q))` — the arc | scope, then an optional bypass                                  | **THE TRAP.** It draws exactly the picture §25.3 wants and means the opposite: `optional` is an **ungated** bypass, `Q ∨ ⊤`, so it says **the requirement is moot**. Beautiful, and backwards. |
+| `choice(NOT P, sequence(P, MUST, Q))`      | "either A.3 does not reach you, or it does and you MUST comply" | **✅ USE THIS.** Correct _and_ shows the seam. Cost: `P` appears twice.                                                                                                                        |
+
+**The finding.** What Mermaid cannot express is a **bypass gated by the antecedent** — and that
+is precisely what implication _is_. Every ungated encoding is either false (rows 2, 3) or must
+duplicate the antecedent to fake the gate (row 4). A path-grammar has no way to say _"you may
+skip this **only if** that."_
+
+So the bottleneck is a fine **glyph** and a poor **shoehorn**. In the native ladder it is a real
+node with real three-state flow (§25.3) — no inversion, no duplication, vacuity visible. In
+Mermaid we take row 4 and accept the duplicated antecedent, which is at least the way a lawyer
+would _say_ it out loud.
+
+### 25.7 Work — **constitutive ("must be") ONLY**
 
 - [ ] **25a.** Add `Implies` to `VizExpr.IRExpr` (Haskell) + `viz-expr.ts`, and a case in
       `Viz.Ladder.translateExpr` — today it falls through to `leafFromExpr`. **Stop
       `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
-- [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series with a seam
-      connector); the three-state flow above; the vacuity bypass.
-- [ ] **25c.** `ViewSpec.polarity: 'compliance' | 'breach'` — the §25.4 dual. Reuses §21a.
-- [ ] **25d.** The coil glyph, and with it the honest rung. (We have never drawn one.)
-- [ ] **25e.** Emitters: ASCII (a `══▶` seam), Mermaid railroad (**cannot** express the seam — it
-      has no implication; it must fall back to §25.4's breach form or to `NOT P OR Q`, and should
-      say so), SVG.
+- [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series whose connector is
+      the seam glyph, so BBE is unchanged); the **three-state flow** of §25.3 — vacuous / compliant
+      / **breach-at-the-seam**; the gated vacuity bypass.
+- [ ] **25c.** `ViewSpec.polarity: 'compliance' | 'breach'` — the §25.4 dual. Reuses §21a's
+      normally-closed contacts; no new primitives.
+- [ ] **25d.** Emitters. ASCII: a `══▶` seam. SVG: the two-panel seam. **Mermaid: use §25.6 row 4**
+      (`choice(NOT P, sequence(P, MUST, Q))`) and _never_ `optional()`.
+- [ ] **25e.** The `MUST` / `⇒` glyph choice, from the source's register.
+
+**Explicitly NOT in this build** (§25.5): regulative / "must do" rules. The ladder will render
+their **guard** — free, since it is the same machinery — and then **stop**, handing the obligation
+to a statechart view via a folded handle. Drawing a deontic lifecycle as a coil, or as anything
+else the ladder owns, would be the very category error this project exists to name.
 
 ---
 
