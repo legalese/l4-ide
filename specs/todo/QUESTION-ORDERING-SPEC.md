@@ -69,7 +69,7 @@ Properties:
 
 - **Subsumes the old heuristic.** An atom that _determines_ the outcome drives a branch to a terminal → `H = 0` → maximal gain. So "settles it now" is the top of the ranking, as before.
 - **Adds progress credit.** An atom that merely halves the remaining space still scores well — fixing defect (1).
-- **Near-optimal — and now citably so.** Greedy max-info-gain is the standard, cheap policy for minimizing expected question count; multi-step lookahead is exponential and out of scope. The guarantee this claim was leaning on without attribution is **Golovin & Krause's adaptive submodularity** (JAIR 42, 2011): where the objective is adaptive-submodular and adaptive-monotone, the greedy policy is within a `(ln(1/η) + 1)` factor of the optimal policy. Cite it; do not assert "near-optimal" bare. ⚠️ And note the sobering empirical baseline: **Lamy et al. (2024)** solve exactly this problem for clinical decision support, **prove the question-ordering problem NP-hard**, and then find that a _dumb frequency heuristic_ performs about as well as anything cleverer. We should beat that baseline on the Housing Act corpus, or explain why we need not.
+- **Near-optimal — and now citably so.** We are greedy because the exact problem is intractable: **constructing an optimal binary decision tree is NP-complete (Hyafil & Rivest, 1976)**, and that is the problem this policy solves. Greedy max-info-gain is the standard response; multi-step lookahead is exponential and out of scope. The approximation guarantee the "near-optimal" claim was leaning on without attribution is **Golovin & Krause's adaptive submodularity** (JAIR 42, 2011): where the objective is adaptive-submodular and adaptive-monotone, greedy is within a `(ln(1/η) + 1)` factor of the optimal policy. Cite both; do not assert "near-optimal" bare.
 
 ### 3.3 Explainability (surface, not just rank)
 
@@ -185,11 +185,30 @@ Keep the existing `impact` (`ifTrue`/`ifFalse` outcomes) — it already feeds th
 
 ## 9. Related work — and what we may honestly claim (added 2026-07-14)
 
+### 9.0 Two NP-hardnesses, and why we compile at all
+
+⚠️ **Do not conflate these. They are different problems, and §1 already scopes one of them out.**
+
+|                     | **(a) Variable ordering for SIZE**                                                   | **(b) Question ordering for EXPECTED COST**                                      |
+| ------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| minimise            | the ROBDD's node count                                                               | the number of questions a user is actually asked                                 |
+| static or adaptive? | **static** — one order, fixed at compile time                                        | **adaptive** — re-chosen after every answer                                      |
+| hardness            | NP-complete — **Bollig & Wegener (1996)** (precisely: _improving_ a given order is)  | NP-complete — **Hyafil & Rivest (1976)**, optimal binary decision trees          |
+| our stance          | **OUT OF SCOPE** (§1). Affects diagram size only; chase it only if the BDD blows up. | **THIS SPEC.** Greedy info-gain (§3.2), with Golovin & Krause for the guarantee. |
+
+Both are famous, both are old, and they share the word "ordering" and nothing else. The wizard's user never sees (a).
+
+**Why compile to an ROBDD at all, given (a)?** Because the hardness is being _displaced on purpose_. Satisfiability is NP-complete; but on an ROBDD it is **O(1)** — is the root `⊥`? That does not refute anything, because _building_ the diagram can be exponential. The cost has simply been moved from query time to compile time. This is **knowledge compilation** (Darwiche & Marquis, JAIR 17:229–264, 2002): pay once, offline, in the size of the representation; then answer unboundedly many queries cheaply.
+
+That is precisely the wizard's shape — compile the decision once, then serve a next-question query after every keystroke — and it is the reason the design is sound rather than merely convenient. **`prob()` (§3.1) is a model count, and model counting is #P-complete in general; on an ROBDD it is one linear pass.** The whole policy is affordable only because the diagram was built first. Say so; it is the justification, not an implementation detail.
+
 This spec previously had **no related-work section at all**, and its "near-optimal" claim (§3.2) was uncited. A literature check found that we are working in a well-populated field, that our ingredients are all old, and that our actual contribution is narrower than the spec's tone implied. That is fine — but a reviewer who knows this literature and catches us claiming novelty would be entitled to be annoyed, so it is written down here.
 
 **Every ingredient is old, and the pedigree is an asset, not an embarrassment.**
 
+- **Hyafil & Rivest (1976)**, "Constructing Optimal Binary Decision Trees is NP-Complete", _Information Processing Letters_ 5(1):15–17. The hardness result that makes greedy the right answer. (This is the citation for "question ordering is NP-hard" — **not** Lamy 2024, which merely restates it. See §9.0.)
 - **Shwayder (1974)**, "Extending the Information Theory Approach to Converting Limited-Entry Decision Tables to Computer Programs", _CACM_ 17(9):532–537. **Entropy-driven test ordering from a rule base — fifty years ago.** The direct ancestor of §3.2. Cite it _first_; the lineage is the point.
+- **Darwiche & Marquis (2002)**, "A Knowledge Compilation Map", _JAIR_ 17:229–264. The framing that justifies the whole architecture (§9.0): pay at compile time, query cheaply thereafter.
 - **Montalbano (1962)**, "Tables, Flow Charts, and Program Logic", _IBM Systems Journal_ 1(1). His table→flowchart ordering heuristic — "ask those questions first which will make the two differentiated groups of rule identifiers as similar in size as possible" — is an information-gain criterion **24 years before ID3**.
 - **Bryant (1986)**, "Graph-Based Algorithms for Boolean Function Manipulation", _IEEE Trans. Computers_ C-35(8). The ROBDD, and the fact our whole three-orders argument rests on: variable order changes diagram _size_ enormously but has **"no effect on the correctness of the results."**
 - **Ünlüyurt (2004)**, "Sequential testing of complex systems: a review", _Discrete Applied Math_ 142. The survey of the field our next-question policy formally belongs to. We are doing **sequential testing**, and should say so.
@@ -211,6 +230,8 @@ This spec previously had **no related-work section at all**, and its "near-optim
 
 Do **not** claim: that question ordering is a new problem; that nobody checks rule bases across tables; that BDDs are new to law; or that greedy info-gain is our invention.
 
-⚠️ **Baseline to beat.** Lamy et al. (2024), _BMC Med. Inform. Decis. Mak._ 24:326, solve "minimise questions asked given a rule base" end-to-end, prove it **NP-hard**, and then find a **frequency heuristic** good enough. Validation on the Housing Act Sch.2 corpus (§5) should measure against a frequency baseline, not just against the old syntactic `[-determinableCount, level]` policy. If we cannot beat frequency, the honest finding is that we cannot, and the interesting contribution moves to _explainability_ (§3.3) rather than to question count.
+⚠️ **Baseline to beat — and read this one correctly.** Lamy et al. (2024), _BMC Med. Inform. Decis. Mak._ 24:326, solve "minimise questions asked given a rule base" end-to-end for clinical decision support. Their NP-hardness observation is **not news** — that is Hyafil & Rivest 1976, and everyone has always known it (§9.0). What _is_ news, and what should worry us, is **empirical**: they find a **dumb frequency heuristic** performs about as well as anything cleverer.
+
+So the theorem is not the threat; the benchmark is. Validation on the Housing Act Sch.2 corpus (§5) must measure against a **frequency baseline**, not merely against the old syntactic `[-determinableCount, level]` policy — which is the comparison that flatters us. If we cannot beat frequency on mean question count, the honest finding is that we cannot, and the contribution moves to **explainability** (§3.3): a frequency heuristic cannot tell a citizen _why_ it asked, and ours can.
 
 _Full annotated bibliography with confidence markers ([V] read at primary source / [P] record verified / [U] unverified — do not cite): the DMN/decision-table literature review carried out 2026-07-14._
