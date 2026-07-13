@@ -152,79 +152,13 @@ Rendering a predicate as a flowchart therefore does two damaging things:
   lawyer must actually verify — is gone, and shared sub-conditions get duplicated
   across branches.
 
-Crucially, **neither failure is a mistake anyone made.** They survive a flowchart
-drawn perfectly. Here is A.3 as a flowchart with no bugs in it at all:
+Both claims are easy to make and easy to wave away. So look at what happened when
+people actually tried.
 
-```mermaid
-flowchart LR
-  start([a side window]) --> upper{on an upper<br/>floor?}
-  upper -- no --> ok1[permitted]
-  upper -- yes --> wall{in a wall or<br/>roof slope?}
-  wall -- no --> ok2[permitted]
-  wall -- yes --> glazed{obscure-glazed?}
-  glazed -- no --> bad1[BAD!!!]
-  glazed -- yes --> shut{non-opening?}
-  shut -- yes --> ok3[permitted]
-  shut -- no --> high{openable parts<br/>over 1.7m?}
-  high -- yes --> ok4[permitted]
-  high -- no --> bad2[BAD!!!]
-```
+### What people drew
 
-This chart is _correct_. It is also **six terminal boxes for a rule with two
-outcomes**: `permitted` four times, `BAD!!!` twice. That duplication is not
-sloppiness and cannot be tidied away — a tree cannot share a subtree, so every
-distinct path to a conclusion must redraw it. The reader is given no way to see
-that all four `permitted` boxes are _the same permitted_.
-
-And the staircase is not decoration. Ask why `obscure-glazed?` is tested before
-`non-opening?` and there is no answer in the law — only in the drawing. Permute the
-two and you get a differently-shaped picture of the identical rule. There is no
-canonical flowchart for A.3, and nothing in any of them tells you which lines are
-the statute and which are the draughtsman's convenience.
-
-So the flowchart is not merely _childish_ (the challenge's own worry); it is
-_category-wrong_. It is a picture of a process, drawn over something that is not a
-process. **This is the whole argument, and it does not depend on anyone having
-blundered.**
-
-### The flowchart vendors agree
-
-This is not special pleading from the language camp. It is conceded, unprompted, by
-the people who sell the industrial-grade flowchart. Camunda's business is BPMN. On
-their own DMN page they take a decision — which dish to cook, given the season and
-the number of guests — model it as a process diagram of gateways and branches, look
-at what they have drawn, and write:
-
-> **"The sorrow is obvious: It's way more verbose to express rules in BPMN,
-> especially when there are several conditions to consider."**
->
-> — Camunda, [DMN](https://camunda.com/dmn/)
-
-_The sorrow is obvious_ deserves to be a term of art, and we adopt it here.
-
-Note exactly how far the confession goes, though, because it stops short. Camunda
-diagnose **verbosity**: the diagram "becomes complex and hard to maintain." That is
-a _symptom_, and a symptom invites the reply _then draw a smaller one_. But the
-chart above is already as small as A.3 gets. It is, as we said, entirely **correct**
-— and it is still the wrong **picture**, because it still invents an evaluation
-order the statute does not have and still hides the AND/OR shape it does.
-
-Those are two different axes, and conflating them is the whole trouble. A diagram
-can compute the rule perfectly and still misrepresent it. Verbosity is what you
-notice first; **unfaithfulness is what bites you in court.**
-
-Camunda's prescription, having noticed the sorrow, is the decision table. That is
-the right move, and a better one than this document used to allow — see
-[Decision tables](#decision-tables-the-strongest-rival-and-where-it-actually-runs-out),
-below, where we correct ourselves.
-
-### What happens in practice
-
-Having said that: the challenge got two serious public answers, and it is
-instructive that **both of them are wrong** — each in the direction the notation
-pushes. This proves nothing that the previous section has not already established.
-It is worth a look anyway, because the errors are so exactly the ones the structure
-predicts.
+The challenge got two serious public answers, and **both of them are wrong** — each
+in one of the two directions just named.
 
 [alby (@Alby)](https://twitter.com/opensystemslab/status/1410976074822004736)
 replied with a clean, professional, carefully glossed flowchart — plain-English
@@ -257,11 +191,10 @@ the side?" — and on _no_, exits to `END`. An ordinary **wall** window on a sid
 elevation, squarely covered by A.3, therefore acquires **no obligation at all**.
 The disjunction has become a conjunction.
 
-That is precisely the pressure the notation exerts. A chain of yes/no gates is
-natively an **AND**; to say **OR** you must draw two arrows converging on one box,
-which is awkward, and which is why the OR quietly did not get drawn. The flowchart
-makes conjunction cheap and disjunction expensive — and the law does not care which
-is cheap.
+Note _which way_ it slipped. A chain of yes/no gates is natively an **AND**; to say
+**OR** you must draw two arrows converging on one box, which is awkward. The
+flowchart makes conjunction cheap and disjunction expensive — and the law does not
+care which is cheap.
 
 [Riccardo Fabrizio (@ArchRicFabrizio)](https://twitter.com/opensystemslab/status/1410976074822004736)
 answered on a torn sheet of paper — _"I'm not sure whether it would be suitable for
@@ -286,12 +219,92 @@ collapse into a single unanswerable compound, and the 1.7-metre threshold is
 reconstituted as _your taller parents_. `NO PROB.` is written out three times, by
 hand, because a tree cannot share a leaf even when you are the one holding the pen.
 
-Neither author was careless. Both were doing exactly what the picture asked of
-them.
-
 _(Both diagrams above are our own redrawings, for the purpose of criticism; the
 originals are in the [thread](https://twitter.com/opensystemslab/status/1410976074822004736)
 and remain the work of their authors.)_
+
+### "They were careless. Draw it properly."
+
+That is the natural reply, and it is the one that has to be answered, because if it
+is right then nothing here is a problem with flowcharts — it is a problem with two
+people on the internet, and the fix is a more careful draughtsman.
+
+So let us grant it in full. Here is A.3 as a flowchart with **no bugs in it at all**:
+
+```mermaid
+flowchart LR
+  start([a side window]) --> upper{on an upper<br/>floor?}
+  upper -- no --> ok1[permitted]
+  upper -- yes --> wall{in a wall or<br/>roof slope?}
+  wall -- no --> ok2[permitted]
+  wall -- yes --> glazed{obscure-glazed?}
+  glazed -- no --> bad1[BAD!!!]
+  glazed -- yes --> shut{non-opening?}
+  shut -- yes --> ok3[permitted]
+  shut -- no --> high{openable parts<br/>over 1.7m?}
+  high -- yes --> ok4[permitted]
+  high -- no --> bad2[BAD!!!]
+```
+
+This one gets the OR right. It fuses nothing. Given any window, it returns the
+answer A.3 returns. **It is correct** — and both failures are still there.
+
+It **says less than the law**: six terminal boxes for a rule with two outcomes,
+`permitted` four times and `BAD!!!` twice. That duplication is not sloppiness and
+cannot be tidied away — a tree cannot share a subtree, so every distinct path to a
+conclusion must redraw it. Nothing in the picture tells you that all four
+`permitted` boxes are _the same permitted_. Fabrizio wrote `NO PROB.` three times by
+hand for exactly this reason; the perfect chart does the same thing four times, and
+merely looks tidier about it.
+
+And it **says more than the law**: the staircase is not decoration. Ask why
+`obscure-glazed?` is tested before `non-opening?` and there is no answer in the
+statute — only in the drawing. Permute the two and you get a differently-shaped
+picture of the identical rule. There is no canonical flowchart for A.3, and none of
+them tells you which of its lines are the law and which are the draughtsman's
+convenience.
+
+So the objection fails. **Neither author was careless.** They were each doing
+precisely what the picture asked of them, and the picture asks the same of everyone
+— which is why a flowchart drawn with no mistakes in it still misrepresents the
+rule. The flowchart is not merely _childish_ (the challenge's own worry); it is
+_category-wrong_. It is a picture of a process, drawn over something that is not a
+process.
+
+That is the argument, and note what it does **not** rest on: it does not rest on
+anyone having blundered. The blunders are how you _notice_ the problem. The correct
+chart is how you know the problem is not the people.
+
+### The flowchart vendors agree
+
+This is not special pleading from the language camp. It is conceded, unprompted, by
+the people who sell the industrial-grade flowchart. Camunda's business is BPMN. On
+their own DMN page they take a decision — which dish to cook, given the season and
+the number of guests — model it as a process diagram of gateways and branches, look
+at what they have drawn, and write:
+
+> **"The sorrow is obvious: It's way more verbose to express rules in BPMN,
+> especially when there are several conditions to consider."**
+>
+> — Camunda, [DMN](https://camunda.com/dmn/)
+
+_The sorrow is obvious_ deserves to be a term of art, and we adopt it here.
+
+Note exactly how far the confession goes, though, because it stops short. Camunda
+diagnose **verbosity**: the diagram "becomes complex and hard to maintain." That is
+a _symptom_, and a symptom invites the reply _then draw a smaller one_. But the
+chart above is already as small as A.3 gets. It is, as we said, entirely **correct**
+— and it is still the wrong **picture**, because it still invents an evaluation
+order the statute does not have and still hides the AND/OR shape it does.
+
+Those are two different axes, and conflating them is the whole trouble. A diagram
+can compute the rule perfectly and still misrepresent it. Verbosity is what you
+notice first; **unfaithfulness is what bites you in court.**
+
+Camunda's prescription, having noticed the sorrow, is the decision table. That is
+the right move, and a better one than this document used to allow — see
+[Decision tables](#decision-tables-the-strongest-rival-and-where-it-actually-runs-out),
+below, where we correct ourselves.
 
 ---
 
