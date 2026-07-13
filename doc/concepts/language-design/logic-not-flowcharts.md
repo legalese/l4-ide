@@ -546,6 +546,10 @@ picture for each.
 
 ## Further Reading
 
+- [**Related Work**](related-work.md) — the reading behind this document. Decision
+  tables are older, stronger, and far more checkable than most of the rules-as-code
+  world believes; the argument above earns its keep only against the strongest version
+  of them, so the sources are set out to be checked.
 - [Design Principles](principles.md) — the five principles this decision serves
 - [Linguistic Syntax](linguistic-syntax.md) — why the language reads like legal English
 - [Regulative Rules](../legal-modeling/regulative-rules.md) — the state-transition semantics a flowchart only imitates
