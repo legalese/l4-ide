@@ -1223,29 +1223,46 @@ reading belongs to **regulative** rules, and §25.5 explains why we are not draw
 Note also that Meng drew this correctly in 2021, in the deck that started this: two panels,
 _"Every window which… **⇒** must be…"_, each panel a nested Venn/ladder. That design was right.
 
-### 25.3 The drawing: a two-panel seam, with a vacuity bypass
+### 25.3 The drawing: a two-panel seam. **Vacuity is a STATE, not a PATH.**
+
+> **Correction (Meng, 2026-07-14).** The first draft drew the vacuous case as a **bypass rung**
+> around the requirement. That is wrong, and not merely ugly. _"The bypass is true but vacuously
+> obvious … the compliance state is 'your house has no windows' and any human would write **N/A**
+> on the form. If we include the bypass in the circuit we would be accused of pedantry."_
+>
+> He is right, and the error is a **category** one. A bypass rung makes "the rule never reached
+> you" a **co-equal way of complying**, drawn in parallel with actually complying. It is nothing
+> of the kind. It is a way of **not being asked**. No form offers _"my house has no windows"_ as a
+> compliance option; it greys the section and stamps it **N/A**.
+>
+> **So the bypass must never be ink.** It exists in the semantics, not in the drawing.
 
 ```
-                    ┌────────── does not bite: A.3 never reached this window ─────────┐
-                    ┊  (vacuously true)                                               ┊
-     ●──[ SCOPE ]───┤                                                                 ├──●
-        on an upper │                                                                 │
-        floor AND … │  ══MUST══▶  [ REQUIREMENT ]  obscure-glazed AND (…)             │
-                    └─────────────────────────────────────────────────────────────────┘
+     ●──[ SCOPE ]════MUST════▶──[ REQUIREMENT ]──●
+        on an upper floor            obscure-glazed
+        AND (in a wall               AND (non-opening
+        OR in a roof slope)          OR openable parts ≥ 1.7m)
 ```
 
-Two panels — **scope** and **requirement** — joined by a distinguished `⇒` / `MUST` seam. In BBE
-this is nearly free: it is a **series whose connector is a seam glyph rather than a plain wire**,
-so the existing align-then-stack machinery handles it unchanged.
+**One path.** Two panels — **scope** and **requirement** — joined by a distinguished `⇒` / `MUST`
+seam. In BBE this is nearly free: a **series whose connector is a seam glyph rather than a plain
+wire**, so align-then-stack is unchanged.
 
-**Flow (§20) is where it earns its keep.** The implication has _three_ states, not two, and the
-picture should show all three:
+**Flow (§20) is where it earns its keep.** The implication has _three_ outcomes, and the picture
+distinguishes them **without drawing a third path**:
 
-| Scope    | Requirement | Reading                     | Render                                                                           |
-| -------- | ----------- | --------------------------- | -------------------------------------------------------------------------------- |
-| open     | —           | **vacuously true**          | the **bypass lights** (ghosted/dashed); the requirement panel greys out entirely |
-| conducts | conducts    | **in scope, and compliant** | current runs through both panels; seam closed                                    |
-| conducts | open        | **in scope, and IN BREACH** | current reaches the seam and **stops**; the break is drawn AT the seam           |
+| Scope    | Requirement | Reading                      | Render                                                                                                       |
+| -------- | ----------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **open** | —           | **N/A — the rule never bit** | the seam stamps **`N/A`**; the requirement panel **greys out** and is not evaluated. **No bypass is drawn.** |
+| conducts | conducts    | **in scope, and compliant**  | current runs through both panels; seam closed                                                                |
+| conducts | open        | **in scope, and IN BREACH**  | current reaches the seam and **stops**; the break is drawn AT the seam                                       |
+
+**Same truth value, different ink.** `#EVAL` returns `TRUE` for a ground-floor window, and that is
+correct — the conditional is vacuously true and L4 should not pretend otherwise. But a compliance
+report that prints _"✓ complies with A.3"_ for a house with no windows is **telling the truth
+misleadingly.** The renderer therefore distinguishes _true because satisfied_ from _true because
+unreached_, exactly as §22 distinguishes _given_ from _presumed_ — a **provenance of the verdict**,
+orthogonal to its value. The logic is untouched; only the ink changes.
 
 That third row is the whole point: **breach is visible as a break at a named place.** And the
 first row is the case Meng's IMPLIES commit says flowcharts lose — _"it is precisely at such
@@ -1315,29 +1332,36 @@ _(One nicety we keep for the constitutive case: the seam glyph should read `MUST
 said MUST and `⇒` when it did not — §17's argument, applied to the connective. The drafter's
 register survives into the picture.)_
 
-### 25.6 Can we shoehorn the seam into Mermaid? — no, and the failure is instructive
+### 25.6 The seam in Mermaid: **the bottleneck was right.**
 
 Meng: _"if we just had a convention where we have a `=>` node that looks like a bottleneck
 between condition and coil, could we shoehorn into Mermaid?"_ Four encodings were rendered
-(`specs/research/mermaid-planb/`); the result is a clean negative that **vindicates building the
-real node**.
+(`specs/research/mermaid-planb/implies-seam-candidates.mmd`). **Yes — and it is the bottleneck.**
 
-| Encoding                                   | Reads as                                                        | Verdict                                                                                                                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `choice(NOT P, Q)` — status quo            | "not covered, or compliant"                                     | **correct, shapeless.** Antecedent inverted; scope/requirement gone.                                                                                                                           |
-| `sequence(P, MUST, Q)` — the bottleneck    | the statute's own sentence                                      | **WRONG.** A railroad `sequence` is concatenation = `P ∧ Q`. Vacuity vanishes: a ground-floor window has **no path** and reads as non-compliant. This is alby's OR→AND bug in a new costume.   |
-| `sequence(P, MUST, optional(Q))` — the arc | scope, then an optional bypass                                  | **THE TRAP.** It draws exactly the picture §25.3 wants and means the opposite: `optional` is an **ungated** bypass, `Q ∨ ⊤`, so it says **the requirement is moot**. Beautiful, and backwards. |
-| `choice(NOT P, sequence(P, MUST, Q))`      | "either A.3 does not reach you, or it does and you MUST comply" | **✅ USE THIS.** Correct _and_ shows the seam. Cost: `P` appears twice.                                                                                                                        |
+| Encoding                                    | Verdict                                                                                                                                                                                        |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `choice(NOT P, Q)` — status quo             | **Correct, shapeless.** Antecedent inverted; scope/requirement destroyed. What we ship today; §25.1 rejects it.                                                                                |
+| `choice(NOT P, sequence(P, MUST, Q))`       | **Correct, and pedantic.** Draws the vacuous escape as a co-equal rung — the very error §25.3 now forbids — and duplicates `P` to do it. **Rejected.**                                         |
+| `sequence(P, MUST, optional(Q))`            | **THE TRAP.** Draws exactly the picture we want and means the opposite: `optional` is an **ungated** bypass, `Q ∨ ⊤`, so it says **the requirement is moot**. Beautiful, and backwards. Never. |
+| **`sequence(P, MUST, Q)`** — the bottleneck | **✅ USE THIS.** One path, no bypass ink, and it reads as the statute's own sentence: _"A.3 covers this window — **MUST** — A.3 requirement met."_                                             |
 
-**The finding.** What Mermaid cannot express is a **bypass gated by the antecedent** — and that
-is precisely what implication _is_. Every ungated encoding is either false (rows 2, 3) or must
-duplicate the antecedent to fake the gate (row 4). A path-grammar has no way to say _"you may
-skip this **only if** that."_
+**Is that not alby's OR→AND bug in a new costume?** It is the fair objection, and the answer is
+no — for a reason worth being precise about. Under a **strict railroad grammar** a `sequence` is
+concatenation, so a purist (or a machine) reads `P ∧ Q` and would call a ground-floor window
+non-compliant. But alby's bug was **silent**: nothing in his notation signalled the OR he had
+dropped. Here the seam is labelled **`MUST`**, and no English reader parses _"covered — MUST —
+compliant"_ as a conjunction. **The word carries the semantics.** A declared connective is not an
+accident, and a notation is allowed to have conventions — that is what a notation _is_.
 
-So the bottleneck is a fine **glyph** and a poor **shoehorn**. In the native ladder it is a real
-node with real three-state flow (§25.3) — no inversion, no duplication, vacuity visible. In
-Mermaid we take row 4 and accept the duplicated antecedent, which is at least the way a lawyer
-would _say_ it out loud.
+And the vacuous case reads correctly **because the scope is the first thing on the path**: a
+ground-floor reader is stopped at the very first box, `A.3 covers this window`, and knows exactly
+why. That is **N/A**, legibly — which is the form-filling behaviour §25.3 is modelling. The
+residual risk is a machine consuming the figure as a grammar, and the figure is a **view**, not
+the source. The L4 is the source. That is the whole thesis.
+
+**What Mermaid still cannot do is the FLOW.** It has no way to grey out the requirement panel and
+stamp `N/A`, and no way to break the circuit **at the seam** on breach. Structure it can carry;
+state it cannot. Which is exactly the work §25b exists to do in the native renderer.
 
 ### 25.7 Work — **constitutive ("must be") ONLY**
 
@@ -1346,11 +1370,11 @@ would _say_ it out loud.
       `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
 - [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series whose connector is
       the seam glyph, so BBE is unchanged); the **three-state flow** of §25.3 — vacuous / compliant
-      / **breach-at-the-seam**; the gated vacuity bypass.
+      / **breach-at-the-seam**. The N/A state greys the requirement panel; **no bypass is drawn** (§25.3).
 - [ ] **25c.** `ViewSpec.polarity: 'compliance' | 'breach'` — the §25.4 dual. Reuses §21a's
       normally-closed contacts; no new primitives.
-- [ ] **25d.** Emitters. ASCII: a `══▶` seam. SVG: the two-panel seam. **Mermaid: use §25.6 row 4**
-      (`choice(NOT P, sequence(P, MUST, Q))`) and _never_ `optional()`.
+- [ ] **25d.** Emitters. ASCII: a `══▶` seam. SVG: the two-panel seam. **Mermaid: use §25.6's bottleneck**
+      (`sequence(P, MUST, Q)` — the bottleneck) and NEVER `optional()`.
 - [ ] **25e.** The `MUST` / `⇒` glyph choice, from the source's register.
 
 **Explicitly NOT in this build** (§25.5): regulative / "must do" rules. The ladder will render
