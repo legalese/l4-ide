@@ -648,8 +648,18 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
         break;
       }
       // Non-matching within-deadline event: observed, advances time.
+      // jl4-core advances `time` to THIS event's stamp UNCONDITIONALLY, in
+      // submission order (Machine.hs Contract5 pushes Contract6 with
+      // time = ev'time; Contract8/Contract10's non-match path carries that
+      // stamp forward via `newTime <- allocateValue time`). The residual
+      // ValObligation's `due` therefore shrinks to
+      //   absoluteDeadline − (stamp of the LAST observed event in submission
+      //   order),
+      // NOT − MAX(stamps). Tracking a running maximum diverged from the
+      // reference on descending / out-of-order observed events (a byte-
+      // differing supported:true response). So this is last-wins, not max.
       observedAny = true;
-      if (stamp > lastObserved) lastObserved = stamp;
+      lastObserved = stamp;
     }
 
     if (advancedNode) continue;
