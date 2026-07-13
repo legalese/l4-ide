@@ -187,6 +187,34 @@ _category-wrong_. It is a picture of a process, drawn over something that is not
 process. **This is the whole argument, and it does not depend on anyone having
 blundered.**
 
+### The flowchart vendors agree
+
+This is not special pleading from the language camp. It is conceded, unprompted, by
+the people who sell the industrial-grade flowchart. Camunda's business is BPMN. On
+their own DMN page they take a decision — which dish to cook, given the season and
+the number of guests — model it as a process diagram of gateways and branches, look
+at what they have drawn, and write:
+
+> **"The sorrow is obvious: It's way more verbose to express rules in BPMN,
+> especially when there are several conditions to consider."**
+>
+> — Camunda, [DMN](https://camunda.com/dmn/)
+
+_The sorrow is obvious_ deserves to be a term of art, and we adopt it here.
+
+Note exactly how far the confession goes, though, because it stops short. Camunda
+diagnose **verbosity**: the diagram "becomes complex and hard to maintain." That is
+the _symptom_, and a symptom invites the reply _then draw a smaller one_. But the
+chart above is already as small as A.3 gets, and it is still wrong — it still
+invents an evaluation order the statute does not have, and still hides the AND/OR
+shape it does. Verbosity is what you notice first; unfaithfulness is what bites you
+in court.
+
+Camunda's prescription, having noticed the sorrow, is the decision table. That is
+the right move, and a better one than this document used to allow — see
+[Decision tables](#decision-tables-the-strongest-rival-and-where-it-actually-runs-out),
+below, where we correct ourselves.
+
 ### What happens in practice
 
 Having said that: the challenge got two serious public answers, and it is
@@ -640,3 +668,4 @@ picture for each.
 - [Linguistic Syntax](linguistic-syntax.md) — why the language reads like legal English
 - [Regulative Rules](../legal-modeling/regulative-rules.md) — the state-transition semantics a flowchart only imitates
 - [Reference: Regulative](../../reference/regulative/README.md) — obligations, deadlines, reparations in L4
+- [Camunda, _DMN_](https://camunda.com/dmn/) — the BPMN vendor's own account of why decision logic does not belong in a process diagram ("the sorrow is obvious")
