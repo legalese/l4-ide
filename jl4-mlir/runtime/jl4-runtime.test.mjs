@@ -154,6 +154,35 @@ eq(
   -1,
 );
 
+// --- embedded NUL (U+0000) round-trip: str-ordering lane blocker fix ---
+// A STRING may legitimately CONTAIN a 0x00 byte. The wire ABI stores
+// strings NUL-terminated, so a naive C-string reader truncates at the
+// first embedded NUL and would compare truncated prefixes — a silent
+// wrong answer vs jl4-service's Data.Text (which keeps the whole string).
+// writeString records the exact byte length; readCString recovers it.
+const NUL = String.fromCharCode(0); // U+0000, one 0x00 byte in UTF-8
+eq("NUL round-trip len", env.__l4_str_len(box("a" + NUL + "b")), 3);
+eq("NUL round-trip readback", unbox(box("a" + NUL + "b")), "a" + NUL + "b");
+// "a\0" != "a": broken reader truncates both to "a" and reports EQUAL.
+eq("cmp a\\0 vs a not-equal", env.__l4_str_cmp(box("a" + NUL), box("a")), 1);
+eq("eq a\\0 vs a is false", env.__l4_str_eq(box("a" + NUL), box("a")), 0);
+// "a" is a proper prefix of "a\0b": ordered comparison must see it.
+eq("cmp a < a\\0b", env.__l4_str_cmp(box("a"), box("a" + NUL + "b")), -1);
+// differ only AFTER an embedded NUL: truncating reader would call these
+// equal; the length-aware reader compares the full strings.
+eq(
+  "cmp a\\0b < a\\0c",
+  env.__l4_str_cmp(box("a" + NUL + "b"), box("a" + NUL + "c")),
+  -1,
+);
+eq(
+  "eq a\\0b vs a\\0c is false",
+  env.__l4_str_eq(box("a" + NUL + "b"), box("a" + NUL + "c")),
+  0,
+);
+// bare NUL vs empty must not both read as "".
+eq("cmp \\0 > empty", env.__l4_str_cmp(box(NUL), box("")), 1);
+
 // --- __l4_to_string (M4 slice 2b: NUMBER args are rational handles) ---
 const num = (decimalText) => env.__l4_rat_parse(box(decimalText));
 eq("to_string int", unbox(env.__l4_to_string(num("5"))), "5");

@@ -182,6 +182,22 @@ cannot compile: …`) so the refusal stays diagnosable.
      (`"Gibraltar" == "Gibraltar"` → FALSE) — fixed by a `typeSynonyms` map on
      `LowerState` that `classifyOperand` unfolds through (`Place` → STRING →
      `CmpString` → `__l4_str_eq`).
+  4. **Embedded-NUL hardening** (str-ordering lane follow-up). Making ordered
+     STRING `supported:true` newly reached a latent hole: a STRING input may
+     legitimately contain `U+0000`, but the wire ABI stores strings
+     NUL-terminated, so `readCString`'s NUL-scan truncated `"a\0b"` to `"a"` —
+     `str_cmp`/`str_eq` then compared truncated prefixes while jl4-service
+     (`Data.Text`) keeps the whole string (silent wrong answer at
+     `supported:true`, the cardinal sin — and pre-existing for `str_eq`).
+     Fixed WASM-side: `writeString` records each string's exact byte length in
+     a per-eval `strLenByPtr` side table and `readCString` reads exactly that
+     many bytes, embedded NULs included (marshalled inputs + every computed
+     string route through `writeString`, so all are covered). Compiler-emitted
+     string globals have no side-table entry and keep the NUL-scan, so a source
+     `StringLit`/`PatLit` containing `U+0000` is instead **refused** at lowering
+     (`markUnsupported`/`unsupportedMatch` → fallback). Guarded by
+     `str-nul-probe.{l4,cases.json}` (branch-crossing embedded-NUL cells across
+     `strGt/strGe/strLt/strLe/strEq`) and JS runtime `embedded NUL` unit tests.
   The **reference was pinned empirically**: jl4-service returns
   `"banana" > "apple" = true` for a `DECLARE Date IS A STRING` param — string
   comparison, ignoring `format:date`. Genuine builtin DATE is not a

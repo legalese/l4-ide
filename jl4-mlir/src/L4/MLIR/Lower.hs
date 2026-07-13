@@ -2255,6 +2255,17 @@ lowerRatBinop fn lhs rhs = do
 -- | Lower a literal.
 lowerLit :: Lit -> MLIRType -> LowerM Value
 lowerLit (NumericLit _ r) _ = emitNumberLiteral r
+lowerLit (StringLit _ s) _
+  -- A string literal containing an embedded NUL (U+0000) would be emitted
+  -- as a NUL-terminated global and truncated at the embedded NUL by the
+  -- host's C-string reader — a silent wrong answer vs. jl4-service's
+  -- Data.Text. Runtime-produced strings recover their true length from a
+  -- side table, but a compiler global has no such record, so refuse the
+  -- enclosing function instead (routes to the fallback evaluator).
+  | Text.elem '\0' s =
+      markUnsupported
+        "STRING literal contains an embedded NUL (U+0000), which the WASM \
+        \backend's C-string ABI cannot represent faithfully"
 lowerLit (StringLit _ s) _ = do
   -- Intern the string, take its address (@!llvm.ptr@), then box to f64
   -- so it can live as a uniform-ABI SSA value.
@@ -2768,6 +2779,12 @@ testPatternTy = go
         [scrutF64, lit] [l4NumberType, l4NumberType] [l4NumberType]
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       emitVal $ \vid -> arithCmpf vid OEQ cmpF zero
+    go _ _ (PatLit _ (StringLit _ s)) | Text.elem '\0' s =
+      -- A NUL-containing literal pattern would truncate at the embedded
+      -- NUL in the compiler global and mis-match; refuse instead.
+      unsupportedMatch
+        "CONSIDER STRING pattern contains an embedded NUL (U+0000), which \
+        \the WASM backend's C-string ABI cannot represent faithfully"
     go scrutF64 _ (PatLit _ (StringLit _ s)) = do
       -- The scrutinee is a STRING handle (boxed @!llvm.ptr@). Intern the
       -- literal, box its address the same way 'lowerLit' does, then ask

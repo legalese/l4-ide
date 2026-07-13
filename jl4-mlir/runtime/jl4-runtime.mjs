@@ -2217,6 +2217,19 @@ export function createRuntime(opts) {
   // helper-call translation needed (a helper's param shares the
   // caller's pointer, so it shares the JS object too).
   const valueByPtr = new Map();
+  // Per-call exact byte-length of every string produced by `writeString`
+  // (marshalled inputs + all computed strings), keyed by the data pointer.
+  // The wire ABI stores strings as NUL-terminated UTF-8, but a STRING may
+  // legitimately CONTAIN U+0000 (a single 0x00 byte). A NUL-terminated
+  // reader would truncate such a string at the first embedded NUL, so a
+  // string like "a " would compare EQUAL to "a" — a silent wrong
+  // answer that disagrees with jl4-service's Data.Text (which keeps the
+  // whole string). Recording the true length here lets `readCString` read
+  // exactly the bytes that were written, embedded NULs included. Compiler-
+  // emitted string globals are not registered here and fall back to the
+  // NUL scan (unchanged behaviour for the byte-identical corpus); a source
+  // literal containing U+0000 is refused at compile time instead.
+  const strLenByPtr = new Map();
   // Kept for back-compat tests but no longer the primary mechanism.
   const forcedFields = new Set();
   const resetHeap = () => {
@@ -2226,6 +2239,7 @@ export function createRuntime(opts) {
     tracePool.reset();
     forcedFields.clear();
     valueByPtr.clear();
+    strLenByPtr.clear();
   };
   // Surface peak-allocation telemetry so the HTTP wrapper can log it
   // or expose it as a header for monitoring per-eval memory pressure.
@@ -2245,6 +2259,15 @@ export function createRuntime(opts) {
   function readCString(p) {
     const ptr = Number(p);
     if (!ptr) return "";
+    // Prefer the exact recorded length so embedded NUL bytes (U+0000) are
+    // preserved rather than truncating the string at the first one. Only
+    // strings produced by `writeString` are registered; compiler-emitted
+    // globals fall through to the NUL scan (they never contain U+0000 — a
+    // source literal with one is refused at compile time).
+    const known = strLenByPtr.get(ptr);
+    if (known !== undefined) {
+      return Buffer.from(memU8.subarray(ptr, ptr + known)).toString("utf8");
+    }
     let end = ptr;
     while (end < memU8.length && memU8[end] !== 0) end++;
     return Buffer.from(memU8.subarray(ptr, end)).toString("utf8");
@@ -2255,6 +2278,9 @@ export function createRuntime(opts) {
     const p = allocBytes(bytes.length + 1);
     memU8.set(bytes, p);
     memU8[p + bytes.length] = 0;
+    // Record the exact byte length so `readCString` can recover the full
+    // string even when it contains an embedded NUL (see `strLenByPtr`).
+    strLenByPtr.set(p, bytes.length);
     return p;
   }
 
