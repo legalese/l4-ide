@@ -9,6 +9,7 @@ module L4.Export (
   getExportedFunctions,
   getDefaultFunction,
   enrichReturnTypes,
+  enrichParamTypes,
   buildTypeDescMap,
   assumesFromModule,
   extractAssumeParamTypes,
@@ -162,6 +163,53 @@ enrichReturnTypes entInfo = map enrich
           Fun _ _ ret -> ret
           other       -> other
       _ -> Nothing
+
+-- | Fill in missing parameter types using type-checker entity info — the
+-- parameter-side sibling of 'enrichReturnTypes'. A bare-head DECIDE
+-- (@DECIDE factorial x IS …@ with no GIVEN) carries no annotated type for
+-- its params, but the typechecker still infers one; we look up the
+-- function's inferred 'Fun' type and pair its argument types with the
+-- params positionally. Only the leading GIVEN\/head params are paired —
+-- ASSUME-derived params (appended after them by 'buildExportedFunction')
+-- carry their own type signature and the argument list has run out by the
+-- time the zip reaches them. Params that already have a type are never
+-- overwritten.
+enrichParamTypes :: EntityInfo -> [ExportedFunction] -> [ExportedFunction]
+enrichParamTypes entInfo = map enrich
+ where
+  enrich ef
+    | all (isJust . (.paramType)) ef.exportParams = ef
+    | otherwise =
+        let MkDecide _ _ (MkAppForm _ name _ _) _ = ef.exportDecide
+        in ef { exportParams = zipFill ef.exportParams (inferArgTypes name) }
+
+  inferArgTypes :: Resolved -> [Type' Resolved]
+  inferArgTypes name =
+    case Map.lookup (getUnique name) entInfo of
+      Just (_, KnownTerm (Fun _ args _) _) ->
+        [ty | MkOptionallyNamedType _ _ ty <- args]
+      _ -> []
+
+  zipFill ps tys = zipWith fill ps (map Just tys ++ repeat Nothing)
+
+  fill p mty
+    | isJust p.paramType = p
+    -- An inference variable means the typechecker never pinned the type
+    -- down; @{"type":"object"}@ is wrong for a scalar, but an InfVar-derived
+    -- schema entry would be a differently-shaped lie. Leave it untyped.
+    | Just ty <- mty, not (hasInfVar ty) =
+        p { paramType = Just ty
+          , paramRequired = not (isMaybeType (Just ty))
+          }
+    | otherwise = p
+
+  hasInfVar :: Type' Resolved -> Bool
+  hasInfVar = \ case
+    InfVar {} -> True
+    TyApp _ _ tys -> any hasInfVar tys
+    Fun _ args ret -> any hasInfVar [ty | MkOptionallyNamedType _ _ ty <- args] || hasInfVar ret
+    Forall _ _ ty -> hasInfVar ty
+    Type {} -> False
 
 buildExportedFunction
   :: TypeDescMap

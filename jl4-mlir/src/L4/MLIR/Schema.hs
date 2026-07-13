@@ -71,7 +71,7 @@ import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, enrichParamTypes)
 import qualified L4.Print as Print
 import L4.StateGraph
   ( extractStateGraphs, stateGraphToDot, defaultStateGraphOptions
@@ -392,7 +392,14 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   -- module's declares take precedence on key collision.
   let declares = Map.unions (declaresFromModule resolvedModule
                             : map declaresFromModule depModules)
-      exports  = enrichReturnTypes entInfo (getExportedFunctions resolvedModule)
+      -- 'enrichParamTypes' fills bare-head params (@DECIDE factorial x IS@,
+      -- no GIVEN) from the typechecker's inferred Fun type. Without it the
+      -- param schema defaults to {"type":"object"}, marshalArg turns the
+      -- JSON number into a struct pointer of 0.0, and 0.0 as a rational-pool
+      -- handle aliases the interned literal 0 — so factorial returned 1 for
+      -- EVERY input, silently.
+      exports  = enrichParamTypes entInfo
+                   (enrichReturnTypes entInfo (getExportedFunctions resolvedModule))
       stateGraphs =
         [ StateGraphExport sg.sgName (stateGraphToDot defaultStateGraphOptions sg)
         | sg <- extractStateGraphs resolvedModule

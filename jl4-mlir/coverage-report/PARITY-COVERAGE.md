@@ -21,61 +21,79 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 
 | Outcome               | Cells | Meaning                                                        |
 | --------------------- | ----: | -------------------------------------------------------------- |
-| `byte-identical`      |   128 | WASM response == jl4-service, byte-for-byte                    |
-| `differs`             |     2 | **silent wrong answer** — `desc::factorial` (see below)        |
+| `byte-identical`      |   130 | WASM response == jl4-service, byte-for-byte                    |
+| `differs`             |     0 | (was 2 — `factorial` fixed by `enrichParamTypes`)              |
 | `wasm-error`          |     0 | (was 3 — the `is-a-weekday` crash class is gone)               |
 | `refused-unsupported` |     6 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
-**128 of 130 real comparisons (98.5%) are byte-identical**, and there are now
-**zero WASM crashes**. "Real comparisons" counts only cells where both backends
-produced a value (`byte-identical` + `differs`); `refused` cells are correct
-behaviour (the backend declines and routes to the fallback), not failures.
+**130 of 130 real comparisons (100%) are byte-identical — the extended-corpus gate
+passes (`PARITY OK`) for the first time.** Zero silent divergences, zero WASM
+crashes; the 6 `refused` cells are correct behaviour (the backend declines and
+routes to the fallback), not failures. The claim is bounded by the corpus and its
+curated cases — "no known divergences" is the honest phrasing, and the
+trivial-input-masking section of `../PARITY-HUNT-LOG.md` explains why the two
+statements differ.
 
-Movement since the last run, all from the fail-loud work:
+Movement across the campaign's last two steps:
 
+- `differs` **2 → 0** — `factorial` fixed by `enrichParamTypes` (Finding 1); its
+  formerly-xfail `desc.cases.json` flipped to 4/4 byte-identical.
 - `wasm-error` **3 → 0** — `is-a-weekday` no longer crashes (same-arity overload
   dispatch fixed); it now _refuses_, pending the helper-result return-type map.
 - `refused` **2 → 6** — `is-a-weekday` (+1), `ceo-performance-award` (+1, was
   `skip-no-cases`), and `britishcitizen5::is-British-citizen` (+2, **was
-  `byte-identical`**).
-- `byte-identical` **130 → 128** — exactly those 2 `britishcitizen5` cells. This is
-  a deliberate, correct trade: that function holds dates as STRINGs and compares
-  them with `GREATER THAN` in a helper the backend genuinely cannot compile (no
-  string-ordering builtin), so it was running on an always-FALSE comparison and was
-  byte-identical only because the one generated input happened to expect FALSE. A
-  truthful refusal beats a lucky right answer.
+  `byte-identical`**). The `britishcitizen5` move is a deliberate, correct trade:
+  that function holds dates as STRINGs and compares them with `GREATER THAN` in a
+  helper the backend genuinely cannot compile (no string-ordering builtin), so it
+  was running on an always-FALSE comparison and was byte-identical only because
+  the one generated input happened to expect FALSE. A truthful refusal beats a
+  lucky right answer.
 
 Four bug classes have now been found by differential parity in files the
-compile-sweep rated `clean`: `factorial` (open), DATE-arithmetic (fixed),
-same-arity overloads (fixed), and — via call-graph diagnostic propagation — a
-**prelude** wrong-body collision that made `sum [2,3,4]` return `3` (fixed;
-Finding 3 below).
+compile-sweep rated `clean` — and all four are now **fixed**: `factorial`
+(Finding 1), DATE-arithmetic (Finding 2), same-arity overloads, and — via
+call-graph diagnostic propagation — a **prelude** wrong-body collision that made
+`sum [2,3,4]` return `3` (Finding 3).
 
-## Finding 1: untyped scalar param → silent wrong answers 🔴
+## Finding 1: untyped scalar param → silent wrong answers ✅ FIXED
 
 `desc.l4`'s `factorial x` has **no `GIVEN x IS A NUMBER`**. jl4-core infers
-NUMBER, but the jl4-mlir schema emitter defaults the param to
-`{"type":"object"}` and the scalar is never bound as a number, so the WASM
-backend returns **`1` for every input**:
+NUMBER, but the jl4-mlir schema emitter defaulted the param to
+`{"type":"object"}`, so the WASM backend returned **`1` for every input**:
 
-| input | jl4-service | WASM |               |
-| ----: | ----------: | ---: | ------------- |
-|   `0` |         `1` |  `1` | ✓ (base case) |
-|   `1` |         `1` |  `1` | ✓ (coincides) |
-|   `5` |       `120` |  `1` | ✗             |
-|   `6` |       `720` |  `1` | ✗             |
+| input | jl4-service | WASM (before) | WASM (after) |
+| ----: | ----------: | ------------: | -----------: |
+|   `0` |         `1` |           `1` |       ✅ `1` |
+|   `1` |         `1` |           `1` |       ✅ `1` |
+|   `5` |       `120` |       `1` (✗) |     ✅ `120` |
+|   `6` |       `720` |       `1` (✗) |     ✅ `720` |
 
-**Silent** (`supported: true`, never routes to fallback). The base cases
+**Silent** (`supported: true`, never routed to fallback). The base cases
 coincidentally return `1` and the trivial generated input hid it entirely. This
 is the textbook bug differential parity exists to catch, and why compile-coverage
-overstates readiness. Tracked in `specs/todo/mlir-parity-fixes.md`; regression
-case in `jl4/examples/ok/desc.cases.json` (xfail-style — currently `differs`).
+overstates readiness.
 
-**Scope is narrow.** This is the **only** instance: it is specifically the
-_bare-head positional param_ style (`DECIDE foo x IS` with no `GIVEN`), the lone
-example in the corpus. The follow-up hunt confirmed the rest of the value core is
-solid (see "Curated cases" below).
+**Mechanism** (fully traced): `marshalArg` dispatches on the schema type;
+`"object"` routes a JSON number through `marshalStruct`, which returns pointer
+`0` for a schema with no `properties`. That `0.0`, read back as a rational-pool
+_handle_, aliases the pool's interned literal `0` — so `x EQUALS 0` was TRUE for
+**every** input and the recursion never ran. Deterministically wrong, not
+garbage.
+
+**Fix**: `enrichParamTypes` in `L4.Export` — the parameter-side sibling of the
+existing `enrichReturnTypes` (which was already fixing the _return_ type of this
+very function). A param with no annotated type gets one from the typechecker's
+inferred `Fun` type via positional zip against the leading given/head params;
+ASSUME-appended params keep their own signatures; types still containing an
+`InfVar` are left untyped rather than baked into the schema wrong. Guarded by a
+Haskell regression test and by `desc.l4` + its (formerly xfail) `desc.cases.json`
+— **now in the CI Tier-2 corpus, 4/4 byte-identical**.
+
+**Scope was narrow, as predicted.** The bare-head positional style
+(`DECIDE foo x IS` with no `GIVEN`) had exactly one instance in the corpus, and
+the earlier hunt had already confirmed ASSUME / implicit-ASSUME params were
+unaffected.
 
 ## Finding 2: DATE-typed operand in arithmetic → WASM crash ✅ FIXED
 
@@ -186,7 +204,9 @@ NUMBER`, nested records. Mirrors the file's own `#ASSERT`ed fixtures
   branches + discount boundary).
 - `jl4/experiments/query-planner-tests/04-alcohol-purchase.l4` — 6/6 (boolean
   tree).
-- `jl4/examples/ok/desc.l4` — factorial regression (Finding 1).
+- `jl4/examples/ok/desc.l4` — **4/4 byte-identical** after the Finding 1 fix
+  (was 2/4 with `factorial 5`/`6` differing). _In the CI Tier-2 corpus — guards
+  the bare-head-param enrichment._
 
 ## What this number does NOT yet cover
 
@@ -207,7 +227,8 @@ node jl4-mlir/scripts/parity-harness.mjs --out /tmp/parity \
   $(python3 -c "import json;print(' '.join(r['file'] for r in json.load(open('jl4-mlir/coverage-report/coverage.json'))['perFile'] if r['outcome'] in ('clean','has-unsupported')))")
 ```
 
-(The gate _fails_ on this extended corpus — by design: it still catches the two
-`factorial` divergences. The committed CI Tier-2 gate runs `test.l4` +
-`datetime-probe` + `list-probe` + the 3 deontic fixtures — **61 byte-identical, 1
-refused, exit 0**; `intrinsics-probe` is manual-corpus only.)
+(The extended-corpus gate now **passes** — 130 byte-identical, 0 differs, 6
+refused, exit 0 — for the first time since the hunt began. The committed CI
+Tier-2 gate runs `test.l4` + `datetime-probe` + `list-probe` + `desc.l4` + the 3
+deontic fixtures — **65 byte-identical, 1 refused, exit 0**; `intrinsics-probe`
+is manual-corpus only.)

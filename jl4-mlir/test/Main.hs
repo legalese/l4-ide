@@ -59,6 +59,7 @@ main = do
     , test "fnValue node + enter_fn/exit_fn"   testTraceFnValueAndContext
     , test "NOT-range disambiguation"          testTraceNotRangeDisambiguation
     , test "returnType enriched from EntityInfo" testReturnTypeEnrichedFromEntityInfo
+    , test "bare-head param typed from EntityInfo" testBareHeadParamTyped
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
@@ -714,6 +715,36 @@ testOverloadSameArityDispatch = do
       unless' ok $
         putStrLn $ "\n    expected distinct blend__ov0/blend__ov1 symbols. got:\n    "
           <> T.unpack (T.take 700 mlir)
+      pure ok
+  where
+    unless' b act = if b then pure () else act
+
+-- | A bare-head DECIDE (@DECIDE factorial x IS …@, no GIVEN) must get its
+-- param type from the typechecker's inferred Fun type ('enrichParamTypes'),
+-- not default to @{"type":"object"}@. The object default made 'marshalArg'
+-- treat the JSON number as a struct → pointer 0.0 → which, read as a
+-- rational-pool handle, aliased the interned literal 0 — so factorial
+-- returned 1 for EVERY input while claiming supported:true. The last of the
+-- parity hunt's silent wrong answers (ledger #9 in PARITY-HUNT-LOG.md).
+testBareHeadParamTyped :: IO Bool
+testBareHeadParamTyped = do
+  let src = T.unlines
+        [ "@export default Factorial of a number"
+        , "DECIDE factorial x IS"
+        , "  IF x EQUALS 0"
+        , "  THEN 1"
+        , "  ELSE x * factorial (x - 1)"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"x\":{\"type\":\"number\"}" json
+            && not (T.isInfixOf "\"x\":{\"type\":\"object\"}" json)
+      unless' ok $
+        putStrLn $ "\n    expected bare-head param x typed number via EntityInfo. got:\n    "
+          <> T.unpack (T.take 700 json)
       pure ok
   where
     unless' b act = if b then pure () else act

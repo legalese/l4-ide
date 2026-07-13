@@ -454,6 +454,13 @@ jobs:
           if [ ! -s "jl4-mlir/test/fixtures/list-probe.cases.json" ]; then
             echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/list-probe.cases.json" >&2; fail=1
           fi
+          # desc.{l4,cases.json} guards the bare-head-param fix (enrichParamTypes):
+          # an unannotated DECIDE param defaulted to {"type":"object"} in the
+          # schema and factorial returned 1 for EVERY input. factorial(0)==
+          # factorial(1)==1 masks it, so the 5/6 cases must stay.
+          for p in jl4/examples/ok/desc.l4 jl4/examples/ok/desc.cases.json; do
+            if [ ! -s "$p" ]; then echo "MISSING/EMPTY: $p" >&2; fail=1; fi
+          done
           # Each deontic fixture MUST keep a non-empty curated cases.json, else
           # every deontic fn silently degrades to skip-no-cases at harness time.
           for f in deontic-sale deontic-seatbelt deontic-breach; do
@@ -553,6 +560,7 @@ jobs:
             jl4-mlir/test/fixtures/test.l4 \
             jl4-mlir/test/fixtures/datetime-probe.l4 \
             jl4-mlir/test/fixtures/list-probe.l4 \
+            jl4/examples/ok/desc.l4 \
             jl4-mlir/test/fixtures/deontic-sale.l4 \
             jl4-mlir/test/fixtures/deontic-seatbelt.l4 \
             jl4-mlir/test/fixtures/deontic-breach.l4

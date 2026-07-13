@@ -40,13 +40,15 @@ ship; a 🔴 is not.
 | 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | 🟡    | refuses; see open #2                | `datetime-probe` (excluded from cases)              |
 | 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | 🟡    | refuses; no string-ordering builtin | corpus (2 cells now `refused`)                      |
 | 8   | **`ceo-performance-award`** — deontic, refuses; never actually tested     | 🟡    | needs event `cases.json`            | — (this is the gap)                                 |
-| 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | 🔴    | schema emitter                      | `desc.cases.json` (xfail — currently `differs`)     |
+| 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
 | 10  | **`orchestrator::evaluateClaim`** — `CONSIDER` ctor `RIGHT` unresolved    | 🟡    | pre-existing refusal                | corpus                                              |
 | 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
 
-**#9 (`factorial`) is the only remaining 🔴** — the only known case where the backend
-still returns a wrong answer while claiming `supported: true`. Everything else either
-computes correctly or refuses honestly.
+**There are no remaining 🔴s.** With #9 fixed, the extended corpus gate passes for the
+first time: **130 byte-identical, 0 differs, 0 wasm-error, 6 honest refusals**. Every
+known divergence either computes correctly or refuses honestly and routes to the
+fallback. (That claim is bounded by the corpus and the curated cases — the thesis below
+explains why "no known reds" and "no reds" are different statements.)
 
 **#11 is deliberate, not a to-do.** An `@export`ed same-arity collision is genuinely
 ambiguous at the JSON API (the caller cannot say which overload it meant), so it stays
@@ -204,11 +206,14 @@ and do not "recover" those two cells by reverting propagation.
 See the status ledger at the top for the full picture; this is the recommended order of
 attack.
 
-1. 🔴 **`factorial`** (ledger #9) — **the only remaining silent wrong answer**, and so the
-   only item that is unsafe to ship. Bare-head positional params are emitted into the
-   schema as `{"type":"object"}`, so the scalar is never bound and the backend returns `1`
-   for every input. Needs the schema emitter to consult jl4-core's inferred type.
-   Regression case already committed, xfail-style, in `jl4/examples/ok/desc.cases.json`.
+1. ~~🔴 **`factorial`** (ledger #9)~~ — **✅ FIXED** by `enrichParamTypes` (L4.Export),
+   the parameter-side sibling of `enrichReturnTypes`: a bare-head param with no GIVEN gets
+   its type from the typechecker's inferred `Fun` type (positional zip against the leading
+   given/head params; ASSUME-appended params are untouched; `InfVar`-containing types are
+   left alone rather than baked into the schema as a differently-shaped lie). Schema now
+   says `{"type":"number"}`, `marshalArg` builds a real rational handle, `factorial 5 =
+120`. `desc.l4` is now in the **CI Tier-2 corpus**; its former-xfail `desc.cases.json`
+   is 4/4 byte-identical. With this, **no known silent wrong answers remain**.
 2. 🟡 **Bundle-wide L4 return-type map** (clears ledger #6) — `funcSigs` stores only MLIR
    types (all `f64`), so `lowerCmp` cannot classify a comparison whose operand is a
    _helper's result_. It fails loud, which is correct, and is why `is-a-weekday` refuses

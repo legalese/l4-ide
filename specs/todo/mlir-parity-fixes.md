@@ -170,20 +170,27 @@ cannot compile: …`) so the refusal stays diagnosable.
   input coincidentally expected FALSE. It now correctly **refuses** and routes to
   the fallback: 2 cells move `byte-identical` → `refused-unsupported`. That is a
   deliberate, correct trade — a truthful refusal beats a lucky right answer.
-- 🔴 **Untyped scalar param → silent wrong answers** (found by differential
-  parity with curated `cases.json`, not the compile-sweep). `desc.l4`'s
-  `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers NUMBER, but the
-  jl4-mlir **schema emitter defaults the param to `{"type":"object"}`** and the
-  scalar is never bound as a number — so the WASM backend returns **`1` for all
-  inputs** (`factorial(5)` → WASM `1` vs jl4-service `120`; `factorial(6)` → `1`
-  vs `720`). **Silent**: the function is flagged `supported: true` (it is one of
-  the 36 "clean" files), so it does NOT route to fallback. base-case inputs
-  (`x=0`,`x=1`) coincidentally return `1` and hid it; the trivial/`null`
-  generated input hid it entirely. Fix spans schema type-inference (propagate
-  the inferred NUMBER instead of defaulting to object) and/or marshaling of
-  object-typed scalars. Regression case lives in `jl4/examples/ok/desc.cases.json`
-  (xfail-style: currently `differs`, flips to byte-identical when fixed). Until
-  then, the WASM path silently mis-evaluates any untyped scalar param.
+- ✅ **Untyped scalar param → silent wrong answers** — DONE (was the last open
+  🔴). `desc.l4`'s `factorial x` has no `GIVEN x IS A NUMBER`; jl4-core infers
+  NUMBER, but the jl4-mlir **schema emitter defaulted the param to
+  `{"type":"object"}`** — so the WASM backend returned **`1` for all inputs**
+  (`factorial(5)` → WASM `1` vs jl4-service `120`), at `supported: true`, never
+  routing to fallback. Mechanism, fully traced: `marshalArg` on `"object"` routes
+  a JSON number through `marshalStruct`, which returns pointer `0` for a schema
+  with no `properties`; `0.0` read as a rational-pool handle aliases the interned
+  literal `0`, so `x EQUALS 0` was TRUE for every input — deterministically
+  wrong, not garbage. **Fix** (`L4.Export.enrichParamTypes`, called from
+  `Schema.bundleExports`): the parameter-side sibling of `enrichReturnTypes` —
+  fill each unannotated param from the function's inferred `Fun` type via
+  positional zip against the leading given/head params (ASSUME-appended params
+  keep their own signatures; `InfVar`-containing types are left untyped rather
+  than emitted wrong). Verified: schema says `{"type":"number"}`;
+  `factorial 5/6/10 = 120/720/3628800`; the formerly-xfail
+  `jl4/examples/ok/desc.cases.json` is **4/4 byte-identical** and `desc.l4` is
+  now in the **CI Tier-2 corpus**; Haskell regression test
+  `bare-head param typed from EntityInfo` (30/30); jl4-core golden suite 46/46.
+  **With this, the full extended corpus gates `PARITY OK`: 130/130 byte-identical,
+  0 differs, 0 wasm-error, 6 honest refusals.**
   - **Scope (measured 2026-06-17):** this is **narrow**, not the tip of an
     iceberg. A follow-up hunt added branch-crossing `cases.json` for the rest of
     the exportable corpus and the value core held up everywhere: `test.l4`
