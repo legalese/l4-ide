@@ -91,9 +91,8 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   NUMBER→`__l4_rat_cmp`, STRING `==`/`!=`→`__l4_str_eq`; ordered-STRING (no
   runtime builtin) and genuinely-unresolvable both fail loud (`supported:false`);
   BOOLEAN/enum/DATE keep `arith.cmpf`. 4 regression tests; 26/26 pass.
-  Residual (tracked): a STRING comparison whose operands are _helper results_
-  still fails loud because `funcSigs` only stores MLIR types (f64) — recovering
-  the L4 return type needs a bundle-wide return-type map (larger change).
+  Residual is now DONE — see "Bundle-wide L4 type map" below: helper-result
+  comparisons classify via the callee's checked type from `EntityInfo`.
 - ✅ **Same-arity overload collision → wrong-overload dispatch** — DONE. The
   arity-only mangle (`dedupAndSynthExterns`) gave two overloads sharing a name
   AND arity but differing in argument type (e.g. `daydate`'s `Weekday of`/`Day`
@@ -112,11 +111,10 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   130 byte-identical / 2 differs (factorial), **no regressions**, the
   `is-a-weekday` crash class eliminated.
   - **Residual (2) is now DONE — see "Call-graph diagnostic propagation" below.**
-    `is-a-weekday` now correctly **refuses** (`supported:false`) instead of
-    silently answering, so it fails loud and routes to the fallback. Residual (1)
-    (helper-result return-type recovery, the bundle-wide return-type map) is still
-    open — it is what would let `is weekend` compile _natively_ rather than merely
-    refuse.
+    `is-a-weekday` correctly **refused** (`supported:false`) instead of
+    silently answering. **Residual (1) is now also DONE — see "Bundle-wide L4
+    type map" below**: `is weekend` compiles _natively_ and `is-a-weekday` is
+    3/3 byte-identical.
 - ✅ **Call-graph diagnostic propagation → an unsupported HELPER no longer ships a
   silent wrong answer through its exported caller** — DONE. `markUnsupported` keys
   a diagnostic on the **enclosing** function, but `Schema.applyDiagnostics` only
@@ -240,6 +238,27 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
     `datetime-probe.cases.json` (auto-generates to a harmless `both-error`), so
     it doesn't gate CI, but it remains a silent-ish gap until same-arity
     overloads are mangled by argument type.
+- ✅ **Bundle-wide L4 type map → helper-result comparisons classify** — DONE
+  (commit `62f5f909`, clears PARITY-HUNT-LOG ledger #6). `funcSigs` records only
+  MLIR types (all f64 under the uniform ABI), so `lowerCmp` refused any
+  comparison whose operand was a helper's CALL RESULT — which kept daydate's
+  `is weekend` (and the exported `is-a-weekday`) on the fallback. **Fix**
+  (`Lower.hs` + threading in `Pipeline.hs`): project the typechecker's
+  SUBSTITUTED `EntityInfo` (which unions dependencies) to
+  `funcL4Types :: Map Unique (Type' Resolved)`; `classifyOperand` resolves any
+  `App` operand via the callee's checked type — `resultTypeAtArity` (saturated
+  `Fun` → return; partial application refuses) then `classifyGroundType`, which
+  trusts ONLY builtin scalar heads (NUMBER/STRING/BOOLEAN/DATE/TIME). The closed
+  set is load-bearing: an entity's recorded type is the definition's _generic_
+  type, and a type-variable return slot is syntactically a nullary `TyApp` —
+  trusting it as a raw-f64 comparison key would silently compare rational-pool
+  handles (`LIST OF a -> a` at NUMBER). Haskell 33/33 (old unresolvable-cmp
+  fixture became the positive `testHelperResultStringEq`; its replacement pins
+  the tyvar guard); `is-a-weekday` 3/3 byte-identical on branch-crossing
+  Mon/Sat/Sun cases added to `datetime-probe.cases.json`; Tier-2 65+1 → 68+0;
+  extended corpus 130+6 → **133 byte-identical, 5 refused, 0 differs**.
+  Residual (tracked): enum/record helper results still refuse — widening needs a
+  reliable tyvar-vs-nullary-constructor discriminator.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into

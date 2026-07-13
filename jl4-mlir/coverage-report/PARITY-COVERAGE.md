@@ -21,34 +21,40 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 
 | Outcome               | Cells | Meaning                                                        |
 | --------------------- | ----: | -------------------------------------------------------------- |
-| `byte-identical`      |   130 | WASM response == jl4-service, byte-for-byte                    |
+| `byte-identical`      |   133 | WASM response == jl4-service, byte-for-byte                    |
 | `differs`             |     0 | (was 2 — `factorial` fixed by `enrichParamTypes`)              |
 | `wasm-error`          |     0 | (was 3 — the `is-a-weekday` crash class is gone)               |
-| `refused-unsupported` |     6 | backend correctly flags `supported:false` → routes to fallback |
+| `refused-unsupported` |     5 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
-**130 of 130 real comparisons (100%) are byte-identical — the extended-corpus gate
-passes (`PARITY OK`) for the first time.** Zero silent divergences, zero WASM
-crashes; the 6 `refused` cells are correct behaviour (the backend declines and
-routes to the fallback), not failures. The claim is bounded by the corpus and its
-curated cases — "no known divergences" is the honest phrasing, and the
-trivial-input-masking section of `../PARITY-HUNT-LOG.md` explains why the two
-statements differ.
+**133 of 133 real comparisons (100%) are byte-identical — the extended-corpus gate
+passes (`PARITY OK`).** Zero silent divergences, zero WASM crashes; the 5
+`refused` cells are correct behaviour (the backend declines and routes to the
+fallback), not failures: `britishcitizen5::is-British-citizen` ×2 (no
+string-ordering builtin), `ceo-performance-award` (deontic, needs event cases),
+`orchestrator::evaluateClaim` (pre-existing `CONSIDER` ctor gap), and
+`mixfix-garden-path::tax-on` (exported same-arity collision — refuses **by
+design**). The claim is bounded by the corpus and its curated cases — "no known
+divergences" is the honest phrasing, and the trivial-input-masking section of
+`../PARITY-HUNT-LOG.md` explains why the two statements differ.
 
-Movement across the campaign's last two steps:
+Movement across the campaign's last three steps:
 
 - `differs` **2 → 0** — `factorial` fixed by `enrichParamTypes` (Finding 1); its
   formerly-xfail `desc.cases.json` flipped to 4/4 byte-identical.
 - `wasm-error` **3 → 0** — `is-a-weekday` no longer crashes (same-arity overload
-  dispatch fixed); it now _refuses_, pending the helper-result return-type map.
-- `refused` **2 → 6** — `is-a-weekday` (+1), `ceo-performance-award` (+1, was
-  `skip-no-cases`), and `britishcitizen5::is-British-citizen` (+2, **was
-  `byte-identical`**). The `britishcitizen5` move is a deliberate, correct trade:
-  that function holds dates as STRINGs and compares them with `GREATER THAN` in a
-  helper the backend genuinely cannot compile (no string-ordering builtin), so it
-  was running on an always-FALSE comparison and was byte-identical only because
-  the one generated input happened to expect FALSE. A truthful refusal beats a
-  lucky right answer.
+  dispatch fixed); it refused for one step, then compiled (next bullet).
+- `refused` **2 → 6 → 5** and `byte-identical` **130 → 133** — the bundle-wide
+  L4 type map (`funcL4Types`, commit `62f5f909`) made helper-result comparisons
+  classifiable, so `is-a-weekday` moved `refused` → **3/3 byte-identical** on
+  newly curated branch-crossing dates (Mon/Sat/Sun). Of the earlier `2 → 6`
+  movement: `ceo-performance-award` (+1, was `skip-no-cases`) and
+  `britishcitizen5::is-British-citizen` (+2, **was `byte-identical`**) remain.
+  The `britishcitizen5` move is a deliberate, correct trade: that function holds
+  dates as STRINGs and compares them with `GREATER THAN` in a helper the backend
+  genuinely cannot compile (no string-ordering builtin), so it was running on an
+  always-FALSE comparison and was byte-identical only because the one generated
+  input happened to expect FALSE. A truthful refusal beats a lucky right answer.
 
 Four bug classes have now been found by differential parity in files the
 compile-sweep rated `clean` — and all four are now **fixed**: `factorial`
@@ -122,11 +128,15 @@ and stays a NUMBER. Comparison was already correct (DATE → `arith.cmpf` on the
 raw serial). Verified byte-identical; full corpus 124 → 130 byte-identical, no
 regressions. `datetime-probe` is now in the **CI Tier-2 corpus** to guard it.
 
-**Residual:** `is-a-weekday` (which crashed via a _separate_ same-arity overload
-collision, since fixed) now correctly **refuses** — `is weekend` compares a
-helper-result NUMBER that `lowerCmp` can't classify, and that diagnostic now
-reaches the export (Finding 3). Making it compile _natively_ rather than refuse
-needs the bundle-wide return-type map, still open in the spec.
+**Residual — since cleared:** `is-a-weekday` (which crashed via a _separate_
+same-arity overload collision, since fixed) refused for one step — `is weekend`
+compares a helper-result NUMBER that `lowerCmp` couldn't classify, and that
+diagnostic reached the export via Finding 3. The bundle-wide L4 type map
+(`funcL4Types`, commit `62f5f909`) closed the gap: `classifyOperand` now
+resolves an `App` operand through the callee's checked result type (guarded by
+a closed set of builtin scalar heads, so polymorphic return slots still refuse),
+and `is-a-weekday` compiles natively — 3/3 byte-identical on branch-crossing
+dates now curated in `datetime-probe.cases.json` (CI Tier-2).
 
 ## Finding 3: an unsupported HELPER shipped silent wrong answers ✅ FIXED
 
@@ -187,9 +197,10 @@ NUMBER`, nested records. Mirrors the file's own `#ASSERT`ed fixtures
   `STRINGLENGTH` (`"héllo"`, `"日本語"`), `REPLACE`, `TOUPPER`, `CONTAINS`,
   `IS INTEGER`.
 - `jl4-mlir/test/fixtures/datetime-probe.l4` — date construction (`make-date`/
-  `make-datetime`/`make-time`) and, after the Finding 2 fix, date arithmetic
-  (`days-between`, `shift-date`) are byte-identical. _In the CI Tier-2 corpus —
-  guards the date-ABI fix._ (`is-a-weekday` refuses; see Finding 3.)
+  `make-datetime`/`make-time`), date arithmetic after the Finding 2 fix
+  (`days-between`, `shift-date`), and `is-a-weekday` after the `funcL4Types` fix
+  (3/3 on branch-crossing Mon/Sat/Sun dates) are byte-identical. _In the CI
+  Tier-2 corpus — guards the date-ABI fix and the helper-result type map._
 - `jl4-mlir/test/fixtures/list-probe.l4` — **12/12 byte-identical**, and **7/12
   differ on the pre-Finding-3 build**: prelude `sum`/`product`/`count`/`maximum`/
   `reverse` over inputs chosen so each is distinguishable from the others _and_
@@ -227,8 +238,7 @@ node jl4-mlir/scripts/parity-harness.mjs --out /tmp/parity \
   $(python3 -c "import json;print(' '.join(r['file'] for r in json.load(open('jl4-mlir/coverage-report/coverage.json'))['perFile'] if r['outcome'] in ('clean','has-unsupported')))")
 ```
 
-(The extended-corpus gate now **passes** — 130 byte-identical, 0 differs, 6
-refused, exit 0 — for the first time since the hunt began. The committed CI
-Tier-2 gate runs `test.l4` + `datetime-probe` + `list-probe` + `desc.l4` + the 3
-deontic fixtures — **65 byte-identical, 1 refused, exit 0**; `intrinsics-probe`
-is manual-corpus only.)
+(The extended-corpus gate now **passes** — 133 byte-identical, 0 differs, 5
+refused, exit 0. The committed CI Tier-2 gate runs `test.l4` + `datetime-probe` +
+`list-probe` + `desc.l4` + the 3 deontic fixtures — **68 byte-identical, 0
+refused, exit 0**; `intrinsics-probe` is manual-corpus only.)

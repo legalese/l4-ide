@@ -5,13 +5,14 @@ say _what_ each fix does; this says _why the bugs existed_, _how they were found
 _what was tried and rejected_, and _what is still open_. Read this first, then the
 commits.
 
-| commit     | what                                                       |
-| ---------- | ---------------------------------------------------------- |
-| `7c61c21f` | the hunt: curated `cases.json` across the corpus           |
-| `b2ac28f3` | Finding 2 — DATE-operand arithmetic crash (ABI split)      |
-| `692e0f0b` | same-arity overload collision (`Weekday of`)               |
-| `a68195f2` | call-graph diagnostic propagation → prelude `go` collision |
-| `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`) |
+| commit     | what                                                        |
+| ---------- | ----------------------------------------------------------- |
+| `7c61c21f` | the hunt: curated `cases.json` across the corpus            |
+| `b2ac28f3` | Finding 2 — DATE-operand arithmetic crash (ABI split)       |
+| `692e0f0b` | same-arity overload collision (`Weekday of`)                |
+| `a68195f2` | call-graph diagnostic propagation → prelude `go` collision  |
+| `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`)  |
+| `62f5f909` | bundle-wide L4 type map (clears #6; `is-a-weekday` compiles) |
 
 Findings + matrices: [`coverage-report/PARITY-COVERAGE.md`](./coverage-report/PARITY-COVERAGE.md).
 Per-item fix tracker: [`../specs/todo/mlir-parity-fixes.md`](../specs/todo/mlir-parity-fixes.md).
@@ -38,18 +39,20 @@ ship; a 🔴 is not.
 | 3   | **Lifted local helpers collapse** → `sum [2,3,4] == 3` **in the prelude** | ✅    | `a68195f2` `localSymbolFor`         | `list-probe.cases.json` — **CI Tier-2** (+ Haskell) |
 | 4   | **`emittedBodies` false self-collision** (untraced + `$trace` re-emit)    | ✅    | `a68195f2`                          | Haskell (would spuriously refuse the corpus)        |
 | 5   | **Unsupported helper never reached its caller** (diagnostics discarded)   | ✅    | `a68195f2` `propagateDiagnostics`   | Haskell `unsupported helper → caller unsupported`   |
-| 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | 🟡    | refuses; see open #2                | `datetime-probe` (excluded from cases)              |
+| 6   | **`is-a-weekday`** — helper-result NUMBER comparison unclassifiable       | ✅    | `62f5f909` `funcL4Types`            | `datetime-probe.cases.json` — **CI Tier-2** (+ Haskell) |
 | 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | 🟡    | refuses; no string-ordering builtin | corpus (2 cells now `refused`)                      |
 | 8   | **`ceo-performance-award`** — deontic, refuses; never actually tested     | 🟡    | needs event `cases.json`            | — (this is the gap)                                 |
 | 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
 | 10  | **`orchestrator::evaluateClaim`** — `CONSIDER` ctor `RIGHT` unresolved    | 🟡    | pre-existing refusal                | corpus                                              |
 | 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
 
-**There are no remaining 🔴s.** With #9 fixed, the extended corpus gate passes for the
-first time: **130 byte-identical, 0 differs, 0 wasm-error, 6 honest refusals**. Every
-known divergence either computes correctly or refuses honestly and routes to the
-fallback. (That claim is bounded by the corpus and the curated cases — the thesis below
-explains why "no known reds" and "no reds" are different statements.)
+**There are no remaining 🔴s.** With #9 fixed, the extended corpus gate passed for the
+first time (130 byte-identical, 6 honest refusals); with #6 fixed it stands at
+**133 byte-identical, 0 differs, 0 wasm-error, 5 honest refusals** (Tier-2: 68
+byte-identical, 0 refused). Every known divergence either computes correctly or refuses
+honestly and routes to the fallback. (That claim is bounded by the corpus and the
+curated cases — the thesis below explains why "no known reds" and "no reds" are
+different statements.)
 
 **#11 is deliberate, not a to-do.** An `@export`ed same-arity collision is genuinely
 ambiguous at the JSON API (the caller cannot say which overload it meant), so it stays
@@ -61,8 +64,12 @@ Each 🟡 refuses because of exactly one missing capability. None of them is a
 correctness bug any more — they are unimplemented features that the backend now has the
 good manners to admit to.
 
-- **Bundle-wide L4 return-type map** → clears #6. `funcSigs` stores only MLIR types (all
-  `f64`), so a comparison on a _helper's result_ can't be classified.
+- ~~**Bundle-wide L4 return-type map** → clears #6.~~ **Done** (`62f5f909`): the
+  typechecker's substituted `EntityInfo` is projected to `funcL4Types` (checked type per
+  `Unique`, bundle-wide), and `classifyOperand` resolves any `App` operand through the
+  callee's result type — guarded by `classifyGroundType`, which trusts only builtin
+  scalar heads so a polymorphic return slot (a tyvar is syntactically a nullary `TyApp`)
+  can never classify as a raw-f64 comparison key.
 - **A string-ordering runtime builtin** → clears #7.
 - **Event-shaped deontic `cases.json`** → clears #8 (a test gap, not a code gap).
 - **`CONSIDER` constructor resolution for `RIGHT`** → clears #10 (pre-existing; predates
@@ -215,11 +222,22 @@ attack.
    says `{"type":"number"}`, `marshalArg` builds a real rational handle, `factorial 5 =
 120`. `desc.l4` is now in the **CI Tier-2 corpus**; its former-xfail `desc.cases.json`
    is 4/4 byte-identical. With this, **no known silent wrong answers remain**.
-2. 🟡 **Bundle-wide L4 return-type map** (clears ledger #6) — `funcSigs` stores only MLIR
-   types (all `f64`), so `lowerCmp` cannot classify a comparison whose operand is a
-   _helper's result_. It fails loud, which is correct, and is why `is-a-weekday` refuses
-   rather than compiling. This is the last thing between `is-a-weekday` and native
-   compilation.
+2. ~~🟡 **Bundle-wide L4 return-type map** (clears ledger #6)~~ — **✅ FIXED** by
+   `funcL4Types` (`62f5f909`): the typechecker's substituted `EntityInfo`, projected to
+   a `Map Unique (Type' Resolved)` covering every known term across the bundle.
+   `classifyOperand` resolves an `App` operand through the callee's result type
+   (`resultTypeAtArity`: saturated `Fun` → its return; partial application refuses),
+   classified by `classifyGroundType` — a closed set of builtin scalar heads
+   (NUMBER/STRING/BOOLEAN/DATE/TIME), because an entity's recorded type is the
+   definition's _generic_ type and a type-variable return slot must not be trusted as a
+   raw-f64 comparison key (that would be a silent wrong answer on `LIST OF a -> a`
+   helpers at NUMBER instantiations; the rewritten Haskell test
+   `tyvar-return cmp → supported:false` pins this). `is-a-weekday` now compiles
+   natively: 3/3 byte-identical on branch-crossing dates (Mon/Sat/Sun) newly added to
+   `datetime-probe.cases.json` (CI Tier-2). Tier-2 65+1 → **68+0**; extended corpus
+   130+6 → **133 byte-identical, 5 refused**. Enum/record helper results still refuse
+   (conservative) — widen `classifyGroundType` only with a way to tell a tyvar from a
+   nullary type constructor.
 3. 🟡 **String-ordering runtime builtin** (clears ledger #7) — would let
    `britishcitizen5` compile natively and recover the 2 cells that moved out of
    `byte-identical`.
