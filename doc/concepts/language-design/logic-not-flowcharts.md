@@ -343,8 +343,63 @@ Aucher, Berbinau & Morin, Journal of Applied Logics 6(5), 2019. See
 [QUESTION-ORDERING-SPEC](../../../specs/todo/QUESTION-ORDERING-SPEC.md) for the full
 related work.)_
 
-Here is A.3, as a ladder — the same rule, the same three definitions, drawn from
-the L4 above:
+Here is A.3 as a ladder. Same rule, same three definitions, **generated from the L4
+above** — and drawn by the same engine that drew the flowcharts, so that the only
+thing that differs between the two pictures is the notation:
+
+```mermaid
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#2f7a3f"
+    nonTerminalTextColor: "#111111"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#888888"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+---
+railroad-beta
+window_complies_with_A_3 = choice(nonterminal("NOT A.3 covers this window"), nonterminal("A.3 requirement met"));
+A_3_covers_this_window = sequence(nonterminal("on an upper floor"), terminal("and"), sequence(terminal("in a side elevation, either"), choice(nonterminal("in a wall"), nonterminal("in a roof slope"))));
+A_3_requirement_met = sequence(nonterminal("obscure-glazed"), terminal("and"), sequence(terminal("either"), choice(nonterminal("non-opening"), nonterminal("openable parts ≥ 1.7m above the floor"))));
+```
+
+Read it as a circuit. Current enters at the left terminal `●` and must find a path
+to the right one. Elements in **series** are conjoined; elements **stacked in
+parallel** are disjoined. Boxed items are the operative atoms — the facts you must
+establish about a window. The unboxed grey words are the statute's own connective
+prose, carried along because it is what makes the diagram read back against the
+text, and carrying no current of its own. That is the whole notation.
+
+Three rules, because the L4 had three definitions. The picture did not have to
+invent a structure; it inherited one.
+
+Now put it beside the flowchart above and count again. The flowchart needed six
+terminal boxes to say a two-valued thing. The ladder has **two terminals** —
+because "permitted" is not a place you arrive at, it is simply whether current got
+through. Every atom appears exactly **once**. Nothing is duplicated, because nothing
+needs to be: a circuit shares by construction.
+
+And notice what the picture does _not_ say. It does not say which contact you test
+first, because a circuit has no first. The left-to-right arrangement is the order of
+the **words in the statute**, not an order of operations — which is exactly why you
+can lay the diagram against the text and check it clause by clause. Permute two
+contacts in series and the circuit is unchanged; permute two tests in the flowchart
+and you must redraw it. That is the difference between a picture that _records_ the
+drafter's order and one that _invents_ an evaluator's.
+
+<details>
+<summary>The same view, in a code fence</summary>
+
+Because the picture is _derived_ and not drawn, it can be emitted into whatever
+carrier is to hand. Here is the identical rule as a monospace ladder — which renders
+verbatim in a terminal, a commit message, a PR comment, or a `git diff`, and which
+shows two things the railroad above cannot: the **NOT** as a scope frame with an
+inverter bubble `○`, and (with a valuation loaded) the flow of current itself.
 
 ```
                             a window complies with A.3 if either
@@ -372,26 +427,12 @@ the L4 above:
                                           └────────────────────────────────────────┘
 ```
 
-Read it as a circuit: current enters at the left terminal and must find a path to
-the right one. There are two such paths, stacked in parallel — the window escapes
-A.3 by **not being covered** (the upper rung, through the `NOT`, whose bubble `○`
-inverts what reaches it), or it satisfies the requirement (the lower rung).
-Within each rung, elements in **series** are conjoined and elements **stacked in
-parallel** are disjoined. That is the whole notation.
+Two carriers, one source. **This is the thesis of the page, running.** Neither
+picture is the truth; the L4 is. Both are emitted from it, so neither can drift, and
+if the rule changes both change with it. Had either picture been the substrate, the
+other would have been impossible.
 
-Now put it beside the flowchart above and count again. The flowchart needed six
-terminal boxes to say a two-valued thing. The ladder has **two terminals** — the
-`●` at each end — because "permitted" is not a place you arrive at, it is simply
-whether current got through. Every atom appears exactly **once**. Nothing is
-duplicated, because nothing needs to be: a circuit shares by construction.
-
-And notice what the picture does _not_ say. It does not say which contact you test
-first, because a circuit has no first. The left-to-right arrangement is the order
-of the **words in the statute**, not an order of operations — which is exactly why
-you can lay the diagram against the text and check it clause by clause. Permute
-two contacts in series and the circuit is unchanged; permute two tests in the
-flowchart and you must redraw it. That is the difference between a picture that
-_records_ the drafter's order and one that _invents_ an evaluator's.
+</details>
 
 ---
 

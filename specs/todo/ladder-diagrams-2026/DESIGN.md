@@ -1052,6 +1052,51 @@ step) is collectible only in the form that makes the picture unverifiable.
 draw.** The residual capability gaps (no text wrapping for statutory prose, no folding, no
 interactivity, no print) are supporting, not decisive.
 
+### 24.2a Correction #3 — and the verdict finally flips. **`I-d`, SHIPPED**
+
+The provenance argument above is sound, and it **only ever killed the _hand-written_ Mermaid
+ladder.** Meng: _"surely we can justify building a Mermaid railroad outputter from our ladder
+diagrams … or from the AST that generates the ladder diagrams."_ Quite. **Generated, the picture
+is derived — which is the thesis, not a violation of it.** The whole objection evaporates.
+
+And the fallback ("once you concede a build step, committed SVG dominates") was too quick. A
+generated Mermaid fence beats a committed SVG on things the earlier drafts never weighed:
+
+- it stays **text in the Markdown**, so `git diff` shows a _semantic_ change (`"in a wall"` →
+  `"in a window"`), not two hundred lines of path coordinates;
+- **no binary** in the repo (cf. the open H1 question);
+- **no build tooling at render time** — github.com does the rendering.
+
+SVG still wins on fidelity. But a _documentation figure_ does not need current flow, folding or
+interactivity. It needs structure — and railroad has exactly ours.
+
+**Cost: ~180 lines** (`src/mermaid.ts`), because `railroad-beta`'s grammar **is** our IR:
+
+| IRExpr  | railroad        |                                         |
+| ------- | --------------- | --------------------------------------- |
+| `And`   | `sequence(...)` | series on one wire                      |
+| `Or`    | `choice(...)`   | stacked rungs fanning off a common node |
+| `Leaf`  | `nonterminal()` | a boxed, operative atom                 |
+| `Inert` | `terminal()`    | unboxed grammatical prose (§17)         |
+| `Not`   | see §21a        | fold to `NOT <name>`, or De Morgan      |
+
+So it is a **pretty-printer over the same tree that feeds `layout()`**, not a second renderer.
+
+**One real bug, caught only by rendering it.** Inert prose must _not_ survive into a `choice`.
+In the ladder an inert child of an OR is a **heading** and carries no current (§17) — but every
+child of a railroad `choice` is a live **branch**, so emitting the prose as a rung silently adds
+a free pass-through path and makes the disjunction **trivially satisfiable**. Fix: hoist the
+leading run in front of the fan (`sequence(terminal("either"), choice(...))`, where it reads as
+the drafter's preamble) and drop the medial `"or"` glue, whose job the fan already performs.
+Pinned in `test/mermaid.test.ts`. _Look at the render; do not trust the tree._
+
+**Result.** `logic-not-flowcharts.md` now draws its ladder with the **same engine that draws its
+flowcharts**, so the only thing differing between the two pictures is the notation — which is
+much the strongest form of the argument. The fence is byte-identical to the generator's output,
+so it is CI-checkable (regenerate; fail if dirty). The ASCII ladder (I-b) stays, in a
+`<details>`, as the second carrier — demonstrating the page's own thesis in the page: **two
+pictures, one source, neither of them the truth.**
+
 **Two things to salvage.** (a) Mermaid `flowchart` should go **into** `logic-not-flowcharts.md`
 as the exhibit for the _wrong_ picture — GitHub renders it natively, and the rendered GPDO
 flowchart shows `permitted` duplicated **three times** and `BAD!!!` twice, which is exactly the

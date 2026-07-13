@@ -12,6 +12,8 @@ export {
   CELL_H,
 } from "./ascii.js";
 export type { AsciiOpts } from "./ascii.js";
+export { toMermaidRailroad } from "./mermaid.js";
+export type { MermaidOpts } from "./mermaid.js";
 export { fromVizFunDecl, fromVizExpr } from "./viz-adapter.js";
 export type { DecodedViz } from "./viz-adapter.js";
 export { expandSentences } from "./sentences.js";
