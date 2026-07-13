@@ -339,9 +339,9 @@ ones, which carry real execution semantics:
   and concurrency.
 
 This is the same distinction from the other side: **decision logic and process
-are different semantic categories.** DMN itself splits them — decision tables and
-trees for the logic, BPMN for the flow. The flowchart is precisely the tool that
-_refuses_ to make the split, which is why it is the wrong tool for both.
+are different semantic categories.** DMN itself splits them — decision tables for
+the logic, BPMN for the flow. The flowchart is precisely the tool that _refuses_
+to make the split, which is why it is the wrong tool for both.
 
 L4 is deliberately a specification language for **all three** concerns, with the
 right semantics for each:
@@ -365,28 +365,129 @@ pretends to be. See [Regulative Rules](../legal-modeling/regulative-rules.md).
 
 ---
 
-## Decision tables: better than flowcharts, still not the substrate
+## Decision tables: the strongest rival, and where it actually runs out
 
-Decision tables (as standardised in DMN) are a real improvement over flowcharts
-for classification. They are **order-independent** — a table is a truth table
-with actions — so they avoid the flowchart's invented-sequence sin, and they make
-a fine _view_ and a fine _input_ for simple, flat, finite decisions.
+Decision tables are the serious alternative, and this section used to dismiss them
+with four criticisms, three of which were simply **false**. They are worth correcting
+in public, partly because getting them wrong is embarrassing, and mostly because the
+truth is far more interesting than the strawman — the decision-table tradition is
+one of the great underappreciated bodies of work in our field, and it got there
+first.
 
-But a table is still a **flat classifier**, and the walls arrive quickly:
+### Give them their due
 
-- **No computation.** A table yields a chosen row, not a _number_. Fee schedules,
-  benefit amounts, and payout formulas are arithmetic over the facts. (This is
-  why DMN bolts the **FEEL** expression language under its cells — the moment the
-  logic gets real, you need a language. That bolt-on is the tell.)
-- **No composition or sharing.** `n` independent conditions is `2ⁿ` rows; tables
-  do not nest or factor, so shared sub-conditions are re-entered by hand.
-- **No obligations over time.** A table cannot express "must, within 30 days,
-  else…". That is state, not classification.
-- **Not solver-checkable across rules.** You cannot easily ask a pile of tables
-  "are these two contradictory?".
+**They compute.** A DMN rule's output entry is not a constant, it is a _FEEL
+expression_ — the specification says so in one line: "a rule output entry is an
+expression" (§8.2.9). So a fee schedule can compute `base + excess × rate` in the
+cell, and the `Collect` hit policy will sum, min, max or count across every rule that
+matched. The `C+`-aggregating fee table is precisely the thing this document used to
+say tables could not do.
 
-So tables and trees are welcome as _views and inputs_. They are the wrong
-_substrate_.
+**They factor.** The old "`n` conditions means `2ⁿ` rows" is bad arithmetic: it
+ignores the `-` (don't-care) cell. A DMN rule is a **cube**, not a minterm, so
+`(A ∧ B) ∨ (C ∧ D)` costs two rules, not sixteen. And DMN is not "decision tables" —
+above the tables sits the **Decision Requirements Graph**, in which a shared
+sub-condition becomes its own decision node feeding many others, and a **Business
+Knowledge Model** is a genuine parameterised function invoked by name. The spec's own
+phrase for this is "the clear semantics of **functional composition**."
+
+**And they are checkable — and have been for sixty years.** This is the part worth
+getting excited about.
+
+- **Montalbano (1962)**, in the very first volume of the _IBM Systems Journal_,
+  already had completeness and consistency checking of decision tables — **fifty-three
+  years before DMN existed.** The same paper shows that one table yields a
+  storage-optimal flowchart and a _different_ time-optimal one, and offers an ordering
+  heuristic: "ask those questions first which will make the two differentiated groups
+  of rule identifiers as similar in size as possible." That is an information-gain
+  criterion — **twenty-four years before ID3.**
+- **Vanthienen et al. (1998)** shipped _inter-tabular_ verification in the PROLOGA
+  tool: anomalies across chains of linked tables, circular dependencies, sub-tables
+  that can never fire — with the dependency structure drawn as a directed graph. A
+  Decision Requirements Graph in all but name, seventeen years early.
+- **Calvanese, Dumas, Laurson, Maggi, Montali & Teinemaa (2016, 2018)** gave DMN its
+  modern semantics: read each rule as a **hyper-rectangle** in the input space and
+  sweep for gaps and overlaps geometrically. This is not a whiteboard result — it is
+  the algorithm running inside Drools and Trisotech today.
+- **Vandevelde, Callewaert & Vennekens (2022)** discharge whole-graph consistency to an
+  SMT solver (IDP-Z3) and find rules that are dead **only in context** — unfireable not
+  because of anything in their own table, but because of what the tables upstream can
+  actually produce.
+
+Anyone who tells you decision tables cannot be verified has not looked.
+
+And they are **order-free in the case that matters**: under the default `Unique` hit
+policy a table is a truth table with actions, so it commits none of the flowchart's
+invented-sequence sin. DMN _does_ also offer the order-dependent `First` and
+`Rule order` hit policies — and, pleasingly for this document's argument, warns you off
+them in its own voice: with those, "the meaning depends on the order of the rules …
+the table is hard to validate manually and therefore has to be used with care"
+(§8.2.10). The standard has independently arrived at our thesis. Order-dependence is a
+validation hazard, and a notation that forces it on you is doing you harm.
+
+So the real objection is not that DMN is weak. It is narrower, and structural.
+
+### Where it runs out
+
+**What you can verify is not what you are told to write.** _Every one_ of those
+results — Montalbano's, Calvanese's geometry, the SMT prototype — is defined over
+**S-FEEL**, DMN's restricted sub-language, with **constant** outputs and **single-hit**
+policies. That puts the tables that _compute_ — the fee schedules, the payout formulas,
+the `Collect`-and-sum benefit tables — outside the analysable fragment _by
+construction_. Drools skips gap analysis for `Collect`; Trisotech's own manual says
+that "when generalized unary tests are used, it is no longer possible to use DT
+Analysis."
+
+And then read the DMN specification's §9.1, in its own voice:
+
+> "**Experience with DMN since its release has shown that few if any complete decision
+> models can be defined using S-FEEL** … Developers and users are therefore encouraged
+> to use and implement the **full FEEL** specification rather than the S-FEEL subset."
+
+The standard tells you to write in the fragment its own verification literature cannot
+check. **You can verify the DMN you would not write, and you cannot verify the DMN you
+would.** (The one published system that does handle generic FEEL gives up on static
+analysis altogether and falls back to guided-random testing — which is what you would
+expect.)
+
+**And in practice it is not even shipped.** A survey of fourteen DMN tools found five
+supporting any verification capability at all, and called the industry's coverage
+"alarmingly low." What does ship is per-table: Drools' analyser walks the model and
+examines each table _in isolation_. But the interesting contradiction in a body of law
+is almost never inside one table — it is _between_ provisions.
+
+**The logic is propositional, where law is quantified.** DMN's variables are, in the
+words of the researchers who set out to extend it, "constants (i.e. 0-ary functions)."
+No relations, no quantifiers, no sum types. You cannot say "_every_ upper-floor window
+in the side elevation", nor "_one of_ the following grounds applies, and no other" —
+and nothing tells you when a case has fallen between them.
+
+**Obligation is out of scope, and the seam is not sealed.** A table classifies; it
+cannot hold "must, within 30 days, else…" as a _state_. DMN never claimed it could —
+that is BPMN's job. But the standard joins the two with an _association_, not a
+semantics: an implementation "MAY" validate across the two models, and the link "does
+not of itself permit the decisions modeled in DMN to be executed automatically by
+processes modeled in BPMN." With no shared semantics across the seam, no property can
+span a decision and the obligation it triggers — which is exactly the property a lawyer
+cares about. As one DMN research group puts it: "the DMN notation has no notion of time
+and thus temporal properties cannot be expressed in standard DMN."
+
+### So
+
+None of this makes tables bad. It makes them an excellent **view** — one L4 should
+import and emit. It makes them a poor **substrate**: the moment the logic gets real you
+are writing FEEL, and at that point you have a language — just not one with
+quantifiers, recursion, sum types, obligations, or a checker that can read it.
+
+_Sources: OMG DMN 1.3 (§8.2.9, §8.2.10, §9.1); Montalbano, "Tables, Flow Charts, and
+Program Logic", IBM Systems Journal 1(1), 1962; Vanthienen, Mues, Wets & Delaere,
+"A tool-supported approach to inter-tabular verification", Expert Systems with
+Applications 15(3–4), 1998; Calvanese et al., "Semantics and Analysis of DMN Decision
+Tables", BPM 2016, and the extended version in Information Systems, 2018; Vandevelde,
+Callewaert & Vennekens, "Context-Aware Verification of DMN", HICSS-55, 2022; Grohé,
+Corea & Delfmann, "DMN 1.0 Verification Capabilities: An Analysis of Current Tool
+Support", 2021; Vandevelde et al., cDMN (RuleML+RR 2020 / TPLP 2021); Callewaert &
+Vennekens, TPLP 2024._
 
 ---
 
