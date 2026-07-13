@@ -541,13 +541,17 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     );
   }
   const t0 = Number(startTime);
-  const sortedEvents = (events || [])
-    .slice()
-    .sort((a, b) => Number(a.at) - Number(b.at));
+  // jl4-service replays the event LIST in SUBMISSION ORDER — jl4-core's
+  // ScrutinizeEvents walks the Cons chain exactly as given (CodeGen.hs builds
+  // it with no sort), and each event is timing-checked against the current
+  // obligation's deadline BEFORE any party/action match. An earlier version
+  // of this runtime sorted events by `at`; that reordered the stream and
+  // inverted FULFILLED-vs-BREACH verdicts on out-of-order inputs (a silent
+  // wrong answer at supported:true). We therefore MUST NOT sort.
+  const evts = (events || []).slice();
   const ctx = { args: args || {}, meta: meta || null };
 
   let current = contract;
-  let now = t0;
   let obligationStart = t0; // when the *current* obligation became active
   let cursor = 0;
 
@@ -577,83 +581,93 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
       );
     }
 
+    const modal = current.modal || "MUST";
     const deadlineLit =
       current.deadline == null ? null : Number(current.deadline);
     const absoluteDeadline =
       deadlineLit == null ? null : obligationStart + deadlineLit;
 
-    while (
-      cursor < sortedEvents.length &&
-      Number(sortedEvents[cursor].at) < now
-    ) {
-      cursor++;
-    }
-    let matchingIdx = -1;
-    for (let i = cursor; i < sortedEvents.length; i++) {
-      const ev = sortedEvents[i];
-      if (deonticEventMatchesObligation(ev, current, ctx)) {
-        matchingIdx = i;
+    // Walk the remaining events IN ORDER, mirroring jl4-core's
+    // ScrutinizeEvent loop (EvaluateLazy/Machine.hs:942-1057):
+    //   * timing check FIRST — an event whose stamp is strictly past the
+    //     obligation's absolute deadline discharges it (MAY → HENCE) or
+    //     breaches it (MUST/DO → LEST, else DeadlineMissed) NAMING that
+    //     event, even if a *later* event would have matched;
+    //   * otherwise, a party+action match fulfils the obligation and
+    //     continues with HENCE against the remaining events;
+    //   * a non-matching within-deadline event is "observed" (it advances
+    //     time) and we keep scanning.
+    // The absolute deadline is invariant as time advances (jl4-core keeps
+    // deadline = time + due while shrinking due), so a fixed
+    // 'obligationStart + deadlineLit' is faithful.
+    let advancedNode = false;
+    let observedAny = false;
+    let lastObserved = obligationStart;
+    for (let i = cursor; i < evts.length; i++) {
+      const ev = evts[i];
+      const stamp = Number(ev.at);
+      if (absoluteDeadline != null && stamp > absoluteDeadline) {
+        // Deadline lapsed at this event.
+        if (modal === "MAY") {
+          // Permission not exercised in time — that's fine; continue with
+          // HENCE (defaults to FULFILLED).
+          current = current.hence || { kind: "FULFILLED" };
+        } else if (current.lest) {
+          // Explicit LEST clause takes over.
+          current = current.lest;
+        } else {
+          // MUST/DO with no LEST → DeadlineMissed breach that names the
+          // lapsing event's party/action/time (jl4-core Machine.hs:995).
+          return {
+            value: deonticBreachToWire(
+              deonticDeadlineMissedNode(
+                current,
+                ev,
+                stamp,
+                absoluteDeadline,
+                ctx,
+              ),
+            ),
+            residual: null,
+            ctx,
+          };
+        }
+        obligationStart = stamp;
+        cursor = i + 1;
+        advancedNode = true;
         break;
       }
+      // Within deadline: did this event satisfy the obligation?
+      if (deonticEventMatchesObligation(ev, current, ctx)) {
+        // MUST/MAY/DO: action performed → fulfilled, continue with HENCE.
+        // (MUSTNOT is refused above, so a match here is always fulfilment.)
+        current = current.hence || { kind: "FULFILLED" };
+        obligationStart = stamp;
+        cursor = i + 1;
+        advancedNode = true;
+        break;
+      }
+      // Non-matching within-deadline event: observed, advances time.
+      observedAny = true;
+      if (stamp > lastObserved) lastObserved = stamp;
     }
 
-    const modal = current.modal || "MUST";
-    if (matchingIdx === -1) {
-      // No matching event. Find the latest event time the simulator
-      // has 'observed' — anything from 'cursor' onward, capped at
-      // the obligation's deadline (events past the deadline lapse
-      // it before they're observed for this obligation).
-      let lastObserved = now;
-      for (let i = cursor; i < sortedEvents.length; i++) {
-        const et = Number(sortedEvents[i].at);
-        if (absoluteDeadline != null && et > absoluteDeadline) break;
-        if (et > lastObserved) lastObserved = et;
-      }
+    if (advancedNode) continue;
 
-      // If any event sits strictly past the deadline → obligation
-      // lapsed, take LEST.
-      if (
-        absoluteDeadline != null &&
-        sortedEvents.some((e) => Number(e.at) > absoluteDeadline)
-      ) {
-        current = current.lest || { kind: "BREACH" };
-        continue;
-      }
-
-      if (modal === "MAY") {
-        // MAY is a permission — no event = terminal FULFILLED.
-        current = { kind: "FULFILLED" };
-        continue;
-      }
-
-      // Residual OBLIGATION. If 'now' has advanced past the
-      // obligation's start (real events tested against it), surface
-      // the *remaining* time as a JSON number; otherwise hand back
-      // the original WITHIN literal as a string (matches
-      // jl4-service's lazy display of un-instantiated obligations).
-      const advanced = lastObserved > obligationStart;
-      const remainingNum =
-        advanced && absoluteDeadline != null
-          ? absoluteDeadline - lastObserved
-          : null;
-      return {
-        value: deonticObligationToWire(current, ctx, remainingNum),
-        residual: current,
-        residualDeadline: remainingNum,
-        ctx,
-      };
-    }
-
-    const ev = sortedEvents[matchingIdx];
-    const evTime = Number(ev.at);
-    if (absoluteDeadline != null && evTime > absoluteDeadline) {
-      current = current.lest || { kind: "BREACH" };
-      continue;
-    }
-    now = evTime;
-    cursor = matchingIdx + 1;
-    obligationStart = now; // the next obligation in the cascade starts here
-    current = current.hence || { kind: "FULFILLED" };
+    // Events exhausted with no match and no lapse → residual obligation.
+    // jl4-core returns the still-open ValObligation here for EVERY modal
+    // (Machine.hs:939): a MAY that was simply never exercised surfaces as an
+    // open permission, NOT FULFILLED.
+    const remainingNum =
+      observedAny && absoluteDeadline != null
+        ? absoluteDeadline - lastObserved
+        : null;
+    return {
+      value: deonticObligationToWire(current, ctx, remainingNum, observedAny),
+      residual: current,
+      residualDeadline: remainingNum,
+      ctx,
+    };
   }
 
   if (!current) return { value: "FULFILLED", residual: null, ctx };
@@ -782,16 +796,26 @@ function deonticStripBackticks(s) {
   return s;
 }
 
-function deonticObligationToWire(o, ctx, remainingNum) {
+function deonticObligationToWire(o, ctx, remainingNum, observed) {
   const resolvedParty = resolveDeonticExpr(o.party, ctx);
   const resolvedAction = resolveDeonticExpr(o.action, ctx);
-  // Record-typed parties wrap as @{<TypeName>: <fields>}@ — pull
-  // the type name from the request's parameter schema (the wasm
-  // bundle's @x-l4-type@ stamp). Literal-string parties stay as-is.
-  const taggedParty =
-    o.party && o.party.param != null
+  // Party rendering mirrors jl4-service's lazy ValObligation display.
+  // A residual obligation whose party is a GIVEN parameter (@PARTY driver@)
+  // is only *resolved* once an event has been scrutinized against it: if the
+  // relevant event stream was empty ('observed' false), jl4-service prints the
+  // un-evaluated parameter NAME ("driver"), not the record value
+  // (Jl4.hs:1085 serializeEitherValue Left → prettyLayout of the party expr).
+  // Once an event has been compared, the party is a resolved value that
+  // records tag as @{<TypeName>: …}@ from the bundle's @x-l4-type@ stamp.
+  // Literal-string parties (@PARTY `the buyer`@) print identically either way.
+  let party;
+  if (o.party && typeof o.party === "object" && o.party.param != null) {
+    party = observed
       ? deonticTagRecord(resolvedParty, ctx, o.party.param)
-      : resolvedParty;
+      : o.party.param;
+  } else {
+    party = resolvedParty;
+  }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
   // walker picks which one to pass.
@@ -806,9 +830,51 @@ function deonticObligationToWire(o, ctx, remainingNum) {
       action: resolvedAction,
       deadline,
       modal: o.modal,
-      party: taggedParty,
+      party,
     },
   };
+}
+
+// Build the marker node the wire serializer turns into a jl4-service
+// DeadlineMissed breach object. 'ev' is the first event whose timestamp
+// lapsed a MUST/DO obligation with no LEST clause; jl4-core names that
+// event's party, action, and time in the breach (Machine.hs:995 →
+// serializeBreachReason at Jl4.hs:1216).
+function deonticDeadlineMissedNode(obligation, ev, stamp, absoluteDeadline, ctx) {
+  return {
+    kind: "BREACH",
+    _deadlineMissed: {
+      eventParty: deonticRenderEventParty(ev.party, obligation, ctx),
+      eventAction: deonticRenderEnumName(ev.action),
+      timestamp: stamp,
+      obligationAction: resolveDeonticExpr(obligation.action, ctx),
+      deadline: absoluteDeadline,
+    },
+  };
+}
+
+// Render an event's party the way jl4-service serializes 'ev'party':
+// record-typed parties tag with the obligation party's L4 type name
+// (@{Driver: {...}}@); scalar/enum parties render as their L4 constructor
+// name (backtick-quoted when not a plain identifier).
+function deonticRenderEventParty(evParty, obligation, ctx) {
+  if (evParty != null && typeof evParty === "object" && !Array.isArray(evParty)) {
+    const paramName =
+      obligation.party && obligation.party.param != null
+        ? obligation.party.param
+        : null;
+    return paramName ? deonticTagRecord(evParty, ctx, paramName) : evParty;
+  }
+  return deonticRenderEnumName(evParty);
+}
+
+// Approximate L4's 'Print.prettyLayout' of an enum-constructor name: a name
+// that is a plain identifier prints bare; anything with spaces / punctuation
+// is backtick-quoted. Enum constructors in the deontic corpus follow this
+// rule (@drive@ vs @`wear seatbelt`@).
+function deonticRenderEnumName(name) {
+  if (typeof name !== "string") return name;
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(name) ? name : "`" + name + "`";
 }
 
 // Wrap a resolved parameter value in its L4 type name when the
@@ -829,16 +895,37 @@ function deonticTagRecord(value, ctx, paramName) {
 }
 
 function deonticBreachToWire(b) {
-  // Bare BREACH (no BY / BECAUSE) wires as the literal string sentinel.
-  if (b == null || (b.by == null && b.because == null)) return "BREACH";
-  // jl4-service wraps explicit @BREACH BY p BECAUSE r@ as a tagged
-  // record { detail, party, reason: "explicit" }. The BECAUSE clause
-  // is an L4 string literal that pretty-prints with surrounding
-  // double quotes; strip them so the wire 'detail' is the bare text.
+  // jl4-service ALWAYS emits a structured object for a breach — never a bare
+  // "BREACH" string. There are two shapes:
+  //
+  //   * DeadlineMissed — a MUST/DO obligation lapsed with no LEST clause
+  //     (Jl4.hs:1216). Built by 'deonticDeadlineMissedNode' and tagged with
+  //     '_deadlineMissed'.
+  //   * ExplicitBreach — an explicit @LEST BREACH [BY p] [BECAUSE r]@ (or a
+  //     top-level BREACH). Emitted for EVERY explicit breach, including the
+  //     clause-less @LEST BREACH@ where party/detail are null (Jl4.hs:1228).
+  if (b && b._deadlineMissed) {
+    const d = b._deadlineMissed;
+    return {
+      BREACH: {
+        deadline: d.deadline,
+        eventAction: d.eventAction,
+        eventParty: d.eventParty,
+        obligationAction: d.obligationAction,
+        reason: "deadline_missed",
+        timestamp: d.timestamp,
+      },
+    };
+  }
+  // Explicit breach. The BECAUSE clause is an L4 string literal that
+  // pretty-prints with surrounding double quotes; strip them so the wire
+  // 'detail' is the bare text. Missing BY / BECAUSE serialize as null.
+  const detail = b == null ? null : stripStringLiteralQuotes(b.because);
+  const party = b == null ? null : b.by;
   return {
     BREACH: {
-      detail: stripStringLiteralQuotes(b.because),
-      party: b.by,
+      detail: detail == null ? null : detail,
+      party: party == null ? null : party,
       reason: "explicit",
     },
   };

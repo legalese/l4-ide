@@ -404,6 +404,161 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
 }
 
 // ---------------------------------------------------------------------------
+// Regression: the three adversarially-found blockers on supported:true deontic
+// fixtures. jl4-service is the reference; these lock the runtime to it.
+//   1. events are replayed in SUBMISSION order (no sort) — an out-of-order
+//      stream must not invert FULFILLED/BREACH.
+//   2. every breach serializes as a STRUCTURED object (never bare "BREACH"):
+//      explicit LEST BREACH → {reason:"explicit",…}; a MUST lapse with no LEST
+//      → {reason:"deadline_missed",…}.
+//   3. an unexercised MAY surfaces a residual OBLIGATION, not FULFILLED.
+// ---------------------------------------------------------------------------
+{
+  const jeq = (name, got, want) =>
+    eq(name, JSON.stringify(got), JSON.stringify(want));
+
+  // Sale cascade: seller MUST deliver WITHIN 14 (LEST BREACH), then buyer MUST
+  // pay WITHIN 30 (LEST BREACH).
+  const sale = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "`the seller`",
+    action: "`deliver the goods`",
+    deadline: 14,
+    hence: {
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "`the buyer`",
+      action: "`pay the invoice`",
+      deadline: 30,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    },
+    lest: { kind: "BREACH", by: null, because: null },
+  };
+
+  // Blocker 1 — out-of-order events must NOT be sorted. deliver@20 precedes
+  // deliver@5; the first event (20) is already past the WITHIN-14 deadline, so
+  // the seller obligation lapses to its explicit LEST BREACH.
+  jeq(
+    "deontic: out-of-order events replay in submission order → BREACH",
+    runDeontic(sale, 0, [
+      { party: "the seller", action: "deliver the goods", at: 20 },
+      { party: "the seller", action: "deliver the goods", at: 5 },
+    ], {}, null),
+    { BREACH: { detail: null, party: null, reason: "explicit" } },
+  );
+  // Control: the same multiset in ascending order fulfils the first leg and
+  // leaves a residual buyer obligation — proving order is the sole driver.
+  eq(
+    "deontic: ascending order does NOT breach the seller leg",
+    !!runDeontic(sale, 0, [
+      { party: "the seller", action: "deliver the goods", at: 5 },
+      { party: "the seller", action: "deliver the goods", at: 20 },
+    ], {}, null).OBLIGATION,
+    true,
+  );
+
+  // Blocker 2a — clause-less explicit LEST BREACH serializes as a structured
+  // object, never the bare string "BREACH".
+  jeq(
+    "deontic: clause-less LEST BREACH → structured explicit object",
+    runDeontic(sale, 0, [
+      { party: "the seller", action: "deliver the goods", at: 15 },
+    ], {}, null),
+    { BREACH: { detail: null, party: null, reason: "explicit" } },
+  );
+
+  // Blocker 2a — explicit LEST BREACH BY p BECAUSE r carries party/detail.
+  const repay = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "`the borrower`",
+    action: "`repay loan`",
+    deadline: 30,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: "`the borrower`", because: '"loan not repaid"' },
+  };
+  jeq(
+    "deontic: explicit BREACH BY/BECAUSE → party + detail",
+    runDeontic(repay, 0, [
+      { party: "the borrower", action: "repay loan", at: 100 },
+    ], {}, null),
+    { BREACH: { detail: "loan not repaid", party: "`the borrower`", reason: "explicit" } },
+  );
+
+  // Blocker 2b — a MUST with NO LEST that lapses → deadline_missed breach that
+  // names the lapsing event's party/action/time and the obligation's deadline.
+  const seatbeltMust = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: { param: "driver" },
+    action: "`wear seatbelt`",
+    deadline: 1,
+    hence: {
+      kind: "OBLIGATION",
+      modal: "MAY",
+      party: { param: "driver" },
+      action: "drive",
+      deadline: null,
+    },
+  };
+  const driverMeta = {
+    parameters: { properties: { driver: { "x-l4-type": "Driver" } } },
+  };
+  jeq(
+    "deontic: MUST lapse without LEST → deadline_missed structured breach",
+    runDeontic(
+      seatbeltMust,
+      0,
+      [{ party: { name: "Alice" }, action: "wear seatbelt", at: 2 }],
+      { driver: { name: "Alice" } },
+      driverMeta,
+    ),
+    {
+      BREACH: {
+        deadline: 1,
+        eventAction: "`wear seatbelt`",
+        eventParty: { Driver: { name: "Alice" } },
+        obligationAction: "`wear seatbelt`",
+        reason: "deadline_missed",
+        timestamp: 2,
+      },
+    },
+  );
+
+  // Blocker 3 — an unexercised MAY (no matching event, no lapse) surfaces the
+  // residual OBLIGATION, NOT FULFILLED. Here the MUST is met at t=1 and the
+  // HENCE MAY is never exercised; the residual party is the lazy parameter
+  // name ("driver"), not the resolved record (matches jl4-service).
+  jeq(
+    "deontic: unexercised MAY → residual OBLIGATION (not FULFILLED)",
+    runDeontic(
+      seatbeltMust,
+      0,
+      [{ party: { name: "Alice" }, action: "wear seatbelt", at: 1 }],
+      { driver: { name: "Alice" } },
+      driverMeta,
+    ),
+    { OBLIGATION: { action: "drive", deadline: null, modal: "MAY", party: "driver" } },
+  );
+
+  // Minor — a residual MUST with ZERO observed events renders the lazy party
+  // name and the original WITHIN literal as a string.
+  jeq(
+    "deontic: residual MUST at zero events → lazy party + string deadline",
+    runDeontic(
+      seatbeltMust,
+      0,
+      [],
+      { driver: { name: "Alice" } },
+      driverMeta,
+    ),
+    { OBLIGATION: { action: "`wear seatbelt`", deadline: "1", modal: "MUST", party: "driver" } },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TDD (expected-fail): bold deontic claims from the docs, not yet realized.
 // These encode jl4-core's prohibition semantics (EvaluateLazy/Machine.hs) and
 // go RED today because QW2 refuses MUSTNOT loudly. When correct prohibition
