@@ -772,13 +772,17 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- @supported: true@ with a null contract — a silent landmine. Refuse
       -- loudly and structurally here instead, so the caller is routed to
       -- the jl4-service fallback (the reference) rather than a wasm module
-      -- that cannot evaluate the contract. Extraction returns 'Nothing'
-      -- for, e.g., IF guards that are helper-call applications
-      -- ('exprToGuard' only handles operators/projections/nullary vars) or
-      -- actions carrying a PROVIDED guard (silently dropped by
-      -- 'deontonToContract') — either of which would make an interpreted
-      -- answer wrong, so refusing is the correct (right-answer-preserving)
-      -- outcome, per the refuse-vs-silent-wrong bias.
+      -- that cannot evaluate the contract. Extraction ('extractDeonticContract'
+      -- / 'deontonToContract') returns 'Nothing' — fail-closed — for any
+      -- construct that would otherwise be lost in translation and produce a
+      -- silent wrong answer: an IF guard that is a helper-call application
+      -- ('exprToGuard' only handles operators/projections/nullary vars); an
+      -- action carrying a PROVIDED guard (which the runtime never evaluates);
+      -- a non-literal deadline (only a numeric literal survives the runtime's
+      -- @Number(deadline)@ — a computed one becomes NaN and never lapses); or a
+      -- present-but-unextractable HENCE/LEST continuation. Refusing is the
+      -- correct (right-answer-preserving) outcome, per the refuse-vs-silent-wrong
+      -- bias.
       deonticExtractionFailed = isDeonticFn && isNothing deonticContract_
       (supported_, unsupportedReason_)
         | deonticExtractionFailed =
@@ -786,10 +790,11 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
             , Just "DEONTIC contract could not be extracted to a schema tree the \
                    \runtime interpreter can walk: the regulative body uses a \
                    \construct the extractor does not represent (e.g. an IF guard \
-                   \that is a helper-call application, or an action carrying a \
-                   \PROVIDED guard, which would be silently dropped). Interpreting \
-                   \it would risk a wrong answer, so the WASM backend refuses and \
-                   \routes to the jl4-service fallback."
+                   \that is a helper-call application, an action carrying a \
+                   \PROVIDED guard, a non-literal deadline that would evaluate to \
+                   \NaN in the runtime, or an unextractable HENCE/LEST branch). \
+                   \Interpreting it would risk a wrong answer, so the WASM backend \
+                   \refuses and routes to the jl4-service fallback."
             )
         | otherwise = (True, Nothing)
   in FunctionExport
@@ -821,7 +826,7 @@ extractDeonticContract (MkDecide _ _ _ body) = exprToContract body
 
 exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
-  Regulative _ deonton -> Just (deontonToContract deonton)
+  Regulative _ deonton -> deontonToContract deonton
   Breach _ mBy mBec ->
     Just (DCBreach (Print.prettyLayout <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
@@ -836,15 +841,50 @@ exprToContract = \case
     Just (DCIfThenElse cond' then' else')
   _ -> Nothing
 
-deontonToContract :: Deonton Resolved -> DeonticContract
-deontonToContract deonton =
-  DCObligation
+-- | Reduce a 'Deonton' to a 'DCObligation', or 'Nothing' when the
+-- obligation carries structure the WASM runtime cannot faithfully
+-- interpret. Each of these would otherwise ship @supported: true@ and
+-- produce a silent wrong answer, so we fail closed here; the
+-- schema-level 'deonticExtractionFailed' guard then refuses the whole
+-- export and routes the caller to the jl4-service fallback (the
+-- reference). The lossy cases:
+--
+--   * a PROVIDED guard on the action. The runtime never evaluates it
+--     (jl4-core gates the action on @fromMaybe trueExpr act.provided@),
+--     so silently dropping it would flip obligations that the guard
+--     should have made inert.
+--   * a deadline that is not a numeric literal. 'dcDeadline' is only a
+--     pretty-printed string and the runtime does @Number(deadline)@,
+--     which is NaN for any computed/aliased deadline (e.g.
+--     @WITHIN \`Deadline Days\`@). NaN makes every @at > deadline@ test
+--     false, so no obligation ever lapses — a FULFILLED where the
+--     reference says BREACH.
+--   * a HENCE / LEST continuation that is present but itself
+--     unextractable. Binding with '>>=' would silently drop such a
+--     branch; 'traverse' instead fails the whole obligation, so a
+--     continuation we cannot represent refuses rather than vanishes.
+deontonToContract :: Deonton Resolved -> Maybe DeonticContract
+deontonToContract deonton = do
+  -- Refuse actions carrying a PROVIDED guard (would be dropped).
+  case deonton.action.provided of
+    Just _  -> Nothing
+    Nothing -> Just ()
+  -- Only a literal numeric deadline round-trips through Number();
+  -- anything computed pretty-prints to a non-numeric string → NaN.
+  dcDeadline_ <- case deonton.due of
+    Nothing                       -> Just Nothing
+    Just e@(Lit _ (NumericLit{})) -> Just (Just (Print.prettyLayout e))
+    Just _                        -> Nothing
+  -- Fail closed on a present-but-unextractable HENCE / LEST branch.
+  dcHence_ <- traverse exprToContract deonton.hence
+  dcLest_  <- traverse exprToContract deonton.lest
+  Just DCObligation
     { dcParty    = exprToDeonticExpr (deonton.party)
     , dcAction   = patternToDeonticExpr (deonton.action.action)
     , dcModal    = modalToText deonton.action.modal
-    , dcDeadline = Print.prettyLayout <$> deonton.due
-    , dcHence    = deonton.hence >>= exprToContract
-    , dcLest     = deonton.lest >>= exprToContract
+    , dcDeadline = dcDeadline_
+    , dcHence    = dcHence_
+    , dcLest     = dcLest_
     }
 
 -- | Classify the party/action expression as either a parameter

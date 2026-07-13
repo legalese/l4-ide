@@ -78,10 +78,14 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
 ### Correctness
 
 - ⏸ **Deontic semantics, full fix** — MUSTNOT/prohibition (correct, not just
-  refuse), `DO`≡`MUST` collapse, **PROVIDED guards silently dropped** at
-  extraction (Schema.hs:801-810 ignores `action.provided`), regulative
-  `AND`/`OR` unsupported. Decision: port from jl4-core `Machine.hs` vs.
-  refuse-and-route-to-fallback.
+  refuse), `DO`≡`MUST` collapse, regulative `AND`/`OR` unsupported. Decision:
+  port from jl4-core `Machine.hs` vs. refuse-and-route-to-fallback. NOTE: the
+  two _silent-wrong_ lossy-extraction hazards here are now **closed
+  fail-closed** (not yet computed correctly, but no longer wrong) — see the
+  `deontonToContract` fix under Ledger #8 below: a `PROVIDED` guard and a
+  non-literal deadline each now make extraction return `Nothing` →
+  `supported:false` → jl4-service fallback, instead of shipping a
+  guard-ignoring / NaN-deadline answer at `supported:true`.
 - ✅ **Ledger #8 — `ceo-performance-award` deontic export: honest, loud refusal.**
   Investigated `Eligible Service Requirement`: it refuses for two real reasons — (1)
   call-graph propagation from helper `Musk In Eligible Service` (enum-`EQUALS` on a
@@ -105,6 +109,26 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
   events-codegen fix: `CodeGen.hs:431` can't encode a sum-type-with-fields action
   (`maintain eligible service status <Service Status>`), so fielded-action
   fulfilled/breach sequences aren't expressible even against the reference today.
+  - ✅ **Follow-up (lossy-extraction hardening) — `deontonToContract` now
+    fail-closes on the two silent-wrong hazards an adversarial pass found reachable
+    by natural adjacent inputs (the original Ledger #8 guard keyed on
+    _total_ extraction failure, so these lossy-but-non-null cases slipped through
+    at `supported:true`).** `deontonToContract :: Deonton -> Maybe DeonticContract`
+    now returns `Nothing` when (a) `action.provided` is present — the runtime never
+    evaluates the PROVIDED guard, so keeping it would answer as if the guard were
+    always true; (b) the deadline is not a numeric literal — `dcDeadline` is only a
+    pretty-printed string and the JS runtime does `Number(deadline)`, so any
+    computed/aliased deadline (e.g. `WITHIN \`Deadline Days\``) becomes **NaN**,
+    making every `at > deadline` test false so nothing ever lapses (FULFILLED where
+    the reference says BREACH); or (c) a present HENCE/LEST continuation is itself
+    unextractable (`traverse` instead of `>>=`, so a branch we cannot represent
+    refuses rather than silently vanishes). Each routes through the existing
+    `deonticExtractionFailed` guard → `supported:false`. Regression tests: `deontic
+    PROVIDED guard`, `deontic computed deadline`, `deontic literal deadline`
+    (positive control) — Haskell 34→37. Shipped corpus unchanged (8 byte-identical
+    + 1 refused, parityFails 0); the two adversarial probes
+    (`scratch-probe/provided-probe.l4`, `scratch-probe2/deadline-probe.l4`) that
+    previously shipped `supported:true` silent-wrongs now both refuse.
 - ✅ **`lowerCmp` InfoMap-miss fallback** — DONE (commit `65c94608`). Root cause
   was deeper than the review: `tcdInfoMap` isn't run through the typechecker's
   final substitution, so `typeOfExpr` returns `Just (InfVar …)` (not `Nothing`)

@@ -74,6 +74,9 @@ main = do
     , test "WHERE-local vs constant → __l4_rat_cmp"  testWhereLocalVsConstantCmp
     , test "helper-result STRING == → __l4_str_eq"   testHelperResultStringEq
     , test "deontic unextractable contract → supported:false" testDeonticUnextractableRefused
+    , test "deontic PROVIDED guard → supported:false" testDeonticProvidedRefused
+    , test "deontic computed deadline → supported:false" testDeonticComputedDeadlineRefused
+    , test "deontic literal deadline → supported:true" testDeonticLiteralDeadlineSupported
     ]
   if and results
     then do
@@ -282,6 +285,114 @@ testDeonticUnextractableRefused = do
         , "         HENCE FULFILLED"
         , "    ELSE FULFILLED"
         ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("isDeontic",            T.isInfixOf "\"isDeontic\":true" json)
+            , ("supported:false",      T.isInfixOf "\"supported\":false" json)
+            , ("reason names DEONTIC", T.isInfixOf "DEONTIC contract could not be extracted" json)
+            , ("no deonticContract",   not (T.isInfixOf "\"deonticContract\":" json))
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 700 json)
+          pure False
+
+-- | An action carrying a PROVIDED guard cannot be interpreted by the
+-- WASM runtime (it never evaluates the guard, so it would silently drop
+-- it and answer as if the guard were always true). Extraction must fail
+-- closed → @supported:false@, routing to the jl4-service fallback.
+testDeonticProvidedRefused :: IO Bool
+testDeonticProvidedRefused = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `alice`"
+        , "DECLARE Action IS ONE OF `pay`"
+        , ""
+        , "@export Provided demo"
+        , "GIVEN `allowed` IS A BOOLEAN"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `alice`"
+        , "    MUST `pay` PROVIDED `allowed`"
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH"
+        ]
+  assertDeonticRefused src
+
+-- | A non-literal (computed / aliased) deadline pretty-prints to a
+-- non-numeric string; the runtime's @Number(deadline)@ turns it into NaN
+-- so no obligation ever lapses (FULFILLED where the reference says
+-- BREACH). Extraction must fail closed → @supported:false@.
+testDeonticComputedDeadlineRefused :: IO Bool
+testDeonticComputedDeadlineRefused = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE `Repay Action` IS ONE OF `repay loan`"
+        , ""
+        , "`Deadline Days` MEANS 7 PLUS 7"
+        , ""
+        , "@export Computed deadline demo"
+        , "GIVETH A DEONTIC Party `Repay Action`"
+        , "`repayment` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN `Deadline Days`"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"late\""
+        ]
+  assertDeonticRefused src
+
+-- | Positive control: a plain obligation with a literal numeric deadline
+-- and no PROVIDED guard extracts cleanly and stays @supported:true@ with
+-- a @deonticContract@ tree. Guards against the fail-closed logic
+-- over-refusing the shipped-corpus shape.
+testDeonticLiteralDeadlineSupported :: IO Bool
+testDeonticLiteralDeadlineSupported = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `alice`"
+        , "DECLARE Action IS ONE OF `pay`"
+        , ""
+        , "@export Plain demo"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `alice`"
+        , "    MUST `pay`"
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("isDeontic",         T.isInfixOf "\"isDeontic\":true" json)
+            , ("supported:true",    T.isInfixOf "\"supported\":true" json)
+            , ("has deonticContract", T.isInfixOf "\"deonticContract\":" json)
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 700 json)
+          pure False
+
+-- | Shared assertion: a DEONTIC export whose contract cannot be
+-- faithfully extracted must be @supported:false@ with the DEONTIC
+-- refusal reason and no @deonticContract@ tree.
+assertDeonticRefused :: T.Text -> IO Bool
+assertDeonticRefused src =
   case schemaWithDiagnostics src of
     Left errs -> do
       putStrLn $ "\n    typecheck failed: " <> show errs
