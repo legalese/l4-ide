@@ -69,7 +69,10 @@ main = do
     , test "NUMBER == (InfoMap miss) → __l4_rat_cmp" testNumberCmpInfoMapMiss
     , test "STRING == (InfoMap miss) → __l4_str_eq"  testStringEqInfoMapMiss
     , test "STRING ordered < → supported:false"      testStringOrderedUnsupported
-    , test "unresolvable cmp → supported:false"      testUnresolvableCmpUnsupported
+    , test "tyvar-return cmp → supported:false"      testUnresolvableCmpUnsupported
+    , test "helper-result NUMBER cmp → __l4_rat_cmp" testHelperResultNumberCmp
+    , test "WHERE-local vs constant → __l4_rat_cmp"  testWhereLocalVsConstantCmp
+    , test "helper-result STRING == → __l4_str_eq"   testHelperResultStringEq
     ]
   if and results
     then do
@@ -180,12 +183,14 @@ testArithOps = do
       && Text.isInfixOf "arith.divf" mlir
 
 -- | Lower an L4 source string to MLIR text, going through the real
--- typecheck + lowering pipeline.
+-- typecheck + lowering pipeline. The SUBSTITUTED entityInfo is threaded
+-- in (mirroring the production pipeline), so the lowering's bundle-wide
+-- 'funcL4Types' map sees resolved types for MEANS-binding constants.
 lowerSource :: T.Text -> Either [T.Text] T.Text
 lowerSource src =
   case checkWithImports emptyVFS src of
     Left errs -> Left errs
-    Right r -> Right (renderMLIR (lowerProgramWithInfo r.tcdInfoMap r.tcdModule []))
+    Right r -> Right (renderMLIR (lowerProgramWithInfo r.tcdInfoMap (substitutedEntityInfo r) r.tcdModule []))
 
 -- | Lower a source and render its schema JSON *with* per-function
 -- lowering diagnostics applied (the @supported@ / @unsupportedReason@
@@ -195,7 +200,7 @@ schemaWithDiagnostics src =
   case checkWithImports emptyVFS src of
     Left errs -> Left errs
     Right r ->
-      let (_mlir, diags) = lowerProgramWithDiagnostics r.tcdInfoMap r.tcdModule []
+      let (_mlir, diags) = lowerProgramWithDiagnostics r.tcdInfoMap (substitutedEntityInfo r) r.tcdModule []
           bundle = applyDiagnostics diags (bundleExports "test.wasm" "test" r.tcdInfoMap (substitutedEntityInfo r) r.tcdModule [])
       in Right (TE.decodeUtf8 (LBS.toStrict (encodeBundle bundle)))
 
@@ -935,18 +940,24 @@ testStringOrderedUnsupported = do
   where
     unless b act = if b then pure () else act
 
--- | When neither operand's type can be resolved by any source — here the
--- operands are the results of a STRING-returning helper whose return type
--- the (un-substituted) 'InfoMap' leaves as an inference variable, so
--- 'typeOfExpr', 'bindingL4Types' (the operands aren't bare params), and the
--- structural heuristic all come up empty — the compiler must fail loud
--- rather than emit a raw @arith.cmpf@ on values that might be pool
--- handles or pointers. The export is flagged @supported:false@.
+-- | When neither operand's type can be resolved by any source, the
+-- compiler must fail loud rather than emit a raw @arith.cmpf@ on values
+-- that might be pool handles or pointers. Since the bundle-wide
+-- 'funcL4Types' map landed, a MONOMORPHIC helper's call result classifies
+-- by its checked return type (see 'testHelperResultStringEq'), so the
+-- unresolvable case needs a POLYMORPHIC helper: @echo : Forall a. a -> a@
+-- has a type-variable return slot, which is syntactically a nullary
+-- 'TyApp' — trusting it as a raw-f64 comparison key would emit an
+-- @arith.cmpf@ on string-pool pointers at THIS instantiation. The
+-- conservative 'classifyGroundType' must refuse it, and the export is
+-- flagged @supported:false@. (This is the tyvar-hazard guard, tested
+-- directly.)
 testUnresolvableCmpUnsupported :: IO Bool
 testUnresolvableCmpUnsupported = do
   let src = T.unlines
-        [ "GIVEN x IS A STRING"
-        , "GIVETH A STRING"
+        [ "GIVEN a IS A TYPE"
+        , "      x IS AN a"
+        , "GIVETH AN a"
         , "`echo` MEANS x"
         , ""
         , "@export Compare"
@@ -965,6 +976,108 @@ testUnresolvableCmpUnsupported = do
       unless ok $
         putStrLn $ "\n    expected supported:false for the unresolvable comparison. got:\n    "
           <> T.unpack (T.take 700 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Ledger #6 — a comparison whose operands are helper CALL RESULTS.
+-- 'funcSigs' only records MLIR types (all f64 under the uniform ABI), so
+-- this used to be unclassifiable and refused. The bundle-wide
+-- 'funcL4Types' map recovers the callee's checked NUMBER return type, and
+-- the comparison routes through @__l4_rat_cmp@ — never a raw @arith.cmpf@
+-- on the two rational-pool handles. Both operands are calls, so no
+-- literal or param can rescue the classification: this exercises the
+-- entity-map path itself.
+testHelperResultNumberCmp :: IO Bool
+testHelperResultNumberCmp = do
+  let src = T.unlines
+        [ "GIVEN x IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`double` MEANS x TIMES 2"
+        , ""
+        , "@export Compare helper results"
+        , "GIVEN a IS A NUMBER"
+        , "      b IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS (`double` OF a) GREATER THAN (`double` OF b)"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_rat_cmp" mlir
+            && not (bareCmpf mlir)
+      unless ok $
+        putStrLn "\n    expected __l4_rat_cmp for helper-result NUMBER comparison"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | The daydate @is weekend@ shape that kept @is-a-weekday@ refusing
+-- (ledger #6): a zero-arg WHERE local bound to a helper call, compared
+-- against a zero-arg top-level MEANS constant. Neither side is a literal
+-- or a typed param — the local has no recorded source type and the
+-- constant has no GIVETH — so classification must come from the entity
+-- map (the constant's INFERRED NUMBER type, and/or the local's), routing
+-- the comparison through @__l4_rat_cmp@.
+testWhereLocalVsConstantCmp :: IO Bool
+testWhereLocalVsConstantCmp = do
+  let src = T.unlines
+        [ "`saturday` MEANS 6"
+        , ""
+        , "GIVEN days IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`weekday of` MEANS days MODULO 7"
+        , ""
+        , "@export Is it saturday"
+        , "GIVEN days IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "`probe` MEANS w EQUALS saturday"
+        , "  WHERE"
+        , "    w MEANS `weekday of` days"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_rat_cmp" mlir
+            && not (bareCmpf mlir)
+      unless ok $
+        putStrLn "\n    expected __l4_rat_cmp for WHERE-local vs zero-arg constant"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | The monomorphic sibling of 'testUnresolvableCmpUnsupported' — and its
+-- pre-'funcL4Types' fixture, verbatim. A STRING-returning helper's call
+-- result now classifies via the entity map, so equality on two such
+-- results compiles through @__l4_str_eq@ (content equality) instead of
+-- refusing — and crucially not through a raw @arith.cmpf@ on the two
+-- string-pool pointers.
+testHelperResultStringEq :: IO Bool
+testHelperResultStringEq = do
+  let src = T.unlines
+        [ "GIVEN x IS A STRING"
+        , "GIVETH A STRING"
+        , "`echo` MEANS x"
+        , ""
+        , "@export Compare"
+        , "GIVEN a IS A STRING"
+        , "      b IS A STRING"
+        , "GIVETH A BOOLEAN"
+        , "`g` MEANS (`echo` OF a) EQUALS (`echo` OF b)"
+        ]
+  case lowerSource src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right mlir -> do
+      let ok = T.isInfixOf "@__l4_str_eq" mlir
+            && not (bareCmpf mlir)
+      unless ok $
+        putStrLn "\n    expected __l4_str_eq for helper-result STRING equality"
       pure ok
   where
     unless b act = if b then pure () else act

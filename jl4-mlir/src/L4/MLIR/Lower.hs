@@ -42,7 +42,7 @@ import L4.Syntax
   )
 import L4.Annotation (HasSrcRange, emptyAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
-import L4.TypeCheck.Types (InfoMap)
+import L4.TypeCheck.Types (InfoMap, EntityInfo, CheckEntity(..))
 import qualified L4.Utils.IntervalMap as IV
 
 import Control.Monad (forM_, forM, unless, when)
@@ -81,6 +81,21 @@ data LowerState = LowerState
   , nextString :: !Int              -- Counter for string global names
   , funcSigs   :: Map Text ([MLIRType], MLIRType)  -- Known function signatures
   , funcListElems :: Map Text [Maybe MLIRType]  -- Known list element types per arg
+    -- | The bundle-wide L4 type map: the typechecker's checked type for
+    -- every known term — top-level and local DECIDE heads, ASSUMEs — keyed
+    -- by 'Unique', across the main module AND every dependency. 'funcSigs'
+    -- records only MLIR-level types, and under the uniform ABI those are
+    -- all @f64@ — so a comparison whose operand is a helper's CALL RESULT
+    -- used to be unclassifiable and 'lowerCmp' refused (daydate's
+    -- @is weekend@ compares the helper result @`Weekday of` d@ against the
+    -- constant @Saturday@, which is why @is-a-weekday@ routed to the
+    -- fallback). 'classifyOperand' uses this map to recover the callee's
+    -- L4-level result type at any 'App' operand. Derived from the
+    -- typechecker's 'EntityInfo' (must be the SUBSTITUTED one — see
+    -- 'applyFinalSubstitution' in the LSP rules; an un-substituted map is
+    -- full of 'InfVar's for MEANS bindings). Empty when the caller has no
+    -- typecheck result (the plain 'lowerProgram' entry point).
+  , funcL4Types :: !(Map Unique (Type' Resolved))
     -- | Ground-truth type info from the jl4-core typechecker. Every
     -- expression's inferred 'Type'' Resolved' is stored here, keyed by
     -- source range. Use 'typeOfExpr' to look up the type of any
@@ -225,6 +240,7 @@ initState info = LowerState
   , nextString = 0
   , funcSigs = Map.empty
   , funcListElems = Map.empty
+  , funcL4Types = Map.empty
   , sourceTypeMap = info
   , localCaptures = Map.empty
   , exportAssumeArgs = Map.empty
@@ -514,15 +530,17 @@ markUnsupported reason = do
 -- the same name (common in files that shadow prelude helpers) doesn't
 -- produce a duplicate symbol.
 lowerProgram :: Module Resolved -> [Module Resolved] -> MLIRModule
-lowerProgram = lowerProgramWithInfo IV.empty
+lowerProgram = lowerProgramWithInfo IV.empty Map.empty
 
--- | Like 'lowerProgram' but threads the typechecker's 'InfoMap' through
--- so the lowering can query ground-truth types for every expression.
+-- | Like 'lowerProgram' but threads the typechecker's 'InfoMap' and
+-- (substituted) 'EntityInfo' through so the lowering can query
+-- ground-truth types for every expression and every known term.
 -- This is the preferred entry point — callers that already have a
--- 'TypeCheckResult' should pass its @infoMap@ field here.
-lowerProgramWithInfo :: InfoMap -> Module Resolved -> [Module Resolved] -> MLIRModule
-lowerProgramWithInfo info mainMod deps =
-  fst (lowerProgramWithDiagnostics info mainMod deps)
+-- 'TypeCheckResult' should pass its @infoMap@ and @entityInfo@ fields
+-- here.
+lowerProgramWithInfo :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> MLIRModule
+lowerProgramWithInfo info entInfo mainMod deps =
+  fst (lowerProgramWithDiagnostics info entInfo mainMod deps)
 
 -- | Like 'lowerProgramWithInfo' but also returns the per-function
 -- lowering diagnostics — a map from sanitized WASM symbol name to the
@@ -533,13 +551,14 @@ lowerProgramWithInfo info mainMod deps =
 -- fallback evaluator instead of trusting a WASM module that would
 -- silently return FALSE.
 lowerProgramWithDiagnostics
-  :: InfoMap -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
-lowerProgramWithDiagnostics info mainMod deps =
+  :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
+lowerProgramWithDiagnostics info entInfo mainMod deps =
   let mainNames = collectLocalNames mainMod
       exportArgs = collectExportAssumeArgs mainMod
       initial = (initState info)
         { exportAssumeArgs = exportArgs
         , overloadSymbols  = computeOverloadSymbols (mainMod : deps)
+        , funcL4Types      = knownTermTypes entInfo
         }
       finalState = execState (do
         forM_ deps (registerDependencyModule mainNames)
@@ -548,6 +567,17 @@ lowerProgramWithDiagnostics info mainMod deps =
       rawOps = reverse finalState.globals ++ reverse finalState.functions
       diags = propagateDiagnostics finalState.callGraph finalState.diagnostics
   in (MLIRModule { moduleOps = rawOps }, diags)
+
+-- | Project the typechecker's 'EntityInfo' down to the 'funcL4Types' map:
+-- every 'KnownTerm' entity's checked type, keyed by its 'Unique'. This is
+-- ground truth for the L4-level type of any resolved reference — a 'Ref'
+-- shares its 'Def's unique, so a call site's head 'Resolved' looks up the
+-- callee's own checked type, across module boundaries and irrespective of
+-- the f64 ABI erasure in 'funcSigs'.
+knownTermTypes :: EntityInfo -> Map Unique (Type' Resolved)
+knownTermTypes = Map.mapMaybe $ \(_, entity) -> case entity of
+  KnownTerm ty _ -> Just ty
+  _              -> Nothing
 
 -- | Lift each unsupported-construct diagnostic to every function that
 -- transitively calls the function it was raised in.
@@ -2245,8 +2275,11 @@ data CmpClass = CmpNumber | CmpString | CmpOther
 --   2. the recorded source-level type of a bare @Var@ reference
 --      ('bindingL4Types' — populated for GIVEN params and WHERE\/LET
 --      locals), which covers the very common case where the 'InfoMap'
---      has no exact-range entry for a leaf @Var@; and
---   3. structural shape inference ('structuralClass') for literals and
+--      has no exact-range entry for a leaf @Var@;
+--   3. the callee's checked type from the bundle-wide 'funcL4Types' map,
+--      for any 'App' operand — a helper CALL RESULT, or a bare reference
+--      to a zero-arg definition ('entityResultClass'); and
+--   4. structural shape inference ('structuralClass') for literals and
 --      builtins whose result type is fixed by their shape.
 --
 -- Returns 'Nothing' only when the type genuinely cannot be determined by
@@ -2271,14 +2304,70 @@ classifyOperand e = do
       -- A bare @Var@ reference (App with no args): the 'InfoMap' often
       -- lacks an exact-range entry — or carries only an 'InfVar' — for
       -- the leaf, but 'bindingL4Types' records the param's\/local's
-      -- resolved source type.
+      -- resolved source type. If that misses too (e.g. a reference to a
+      -- zero-arg top-level MEANS constant like daydate's @Saturday@),
+      -- fall through to the entity map.
       App _ n [] -> do
         let name = resolvedName n
         mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
         case mL4Ty >>= classifyL4Type of
           Just cls -> pure (Just cls)
-          Nothing  -> pure (structuralClass e)
+          Nothing  -> entityOrStructural n 0
+      -- A call: the operand's type is the callee's RESULT type, which
+      -- the f64 'funcSigs' erase but 'funcL4Types' preserves.
+      App _ n args -> entityOrStructural n (length args)
       _ -> pure (structuralClass e)
+  where
+    entityOrStructural n nargs = do
+      mCls <- entityResultClass n nargs
+      case mCls of
+        Just cls -> pure (Just cls)
+        Nothing  -> pure (structuralClass e)
+
+-- | Classify an 'App' operand by the callee's typechecker-recorded type
+-- from the bundle-wide 'funcL4Types' map: look up the head's 'Unique',
+-- reduce the recorded type to the RESULT type at this application's arity,
+-- and classify it — conservatively, via 'classifyGroundType'.
+entityResultClass :: Resolved -> Int -> LowerM (Maybe CmpClass)
+entityResultClass n nargs = do
+  types <- gets (.funcL4Types)
+  pure $ Map.lookup (getUnique n) types
+           >>= resultTypeAtArity nargs
+           >>= classifyGroundType
+
+-- | The type an application results in, given the callee's recorded type
+-- and the number of arguments applied. Conservative: only a SATURATED
+-- application of a 'Fun' reduces to its return type; a partial (or over-)
+-- application yields 'Nothing' rather than a guess. A 'Forall' wrapper is
+-- stripped first (prelude helpers like @count@ are polymorphic — their
+-- 'Fun' body may still name type variables, which 'classifyGroundType'
+-- refuses downstream).
+resultTypeAtArity :: Int -> Type' Resolved -> Maybe (Type' Resolved)
+resultTypeAtArity nargs (Forall _ _ ty) = resultTypeAtArity nargs ty
+resultTypeAtArity 0 ty = Just ty
+resultTypeAtArity nargs (Fun _ args ret)
+  | nargs == length args = Just ret
+resultTypeAtArity _ _ = Nothing
+
+-- | Conservative classifier for entity-derived types. Unlike
+-- 'classifyL4Type' — which may trust any resolved 'TyApp' head as
+-- 'CmpOther' — this accepts only the closed set of builtin scalar heads.
+-- An entity's recorded type is the DEFINITION's generic type, and a type
+-- VARIABLE reference is syntactically indistinguishable from a nullary
+-- type constructor ('TyApp' with no args): trusting one as 'CmpOther'
+-- would emit a raw @arith.cmpf@ on what is a rational-pool handle at the
+-- instantiated type (e.g. a @LIST OF a -> a@ helper used on NUMBERs) — a
+-- silent wrong answer, the exact bug class this branch exists to kill.
+-- Enum\/record\/type-variable results therefore refuse here: a routed
+-- fallback beats a misclassified comparison.
+classifyGroundType :: Type' Resolved -> Maybe CmpClass
+classifyGroundType t
+  | isNumberType t  = Just CmpNumber
+  | isStringType t  = Just CmpString
+  | isBooleanType t = Just CmpOther
+  | isDateType t    = Just CmpOther
+  | isTimeType t    = Just CmpOther
+  | otherwise       = Nothing
 
 -- | Classify a resolved L4 type into a 'CmpClass'. NUMBER and STRING are
 -- the handle\/pointer ABIs that need a runtime call. Returns 'Nothing'
@@ -2340,6 +2429,11 @@ isNumberType t = case t of
 isStringType :: Type' Resolved -> Bool
 isStringType t = case t of
   TyApp _ n _ -> nameMatches n ["STRING", "string"]
+  _ -> False
+
+isBooleanType :: Type' Resolved -> Bool
+isBooleanType t = case t of
+  TyApp _ n _ -> nameMatches n ["BOOLEAN", "boolean"]
   _ -> False
 
 -- | DATE\/TIME are NUMBER-compatible in jl4-core (a date /is/ its day-serial,
