@@ -1176,6 +1176,119 @@ ship a VS Code extension. Rides on the §13.1 `ladder-svg` split.
 
 ---
 
+## 25. IMPLIES — the seam between scope and requirement _(proposed; not built)_
+
+**The question (Meng, 2026-07-14):** _"do we draw implication as a new thing, or as a rung that
+fits into our current formalisms?"_
+
+### 25.1 The status quo is not neutral, and our own document condemns it
+
+Today the viz IR has no implication node (`IRExpr = And | Or | Not | UBoolVar | App | TrueE |
+FalseE | InertE`), so an L4 `P IMPLIES Q` either falls through to an opaque leaf or is rewritten
+by `Transform.simplify` into **`NOT P OR Q`** — two parallel rungs, the first negated. That is
+what the ladder in `logic-not-flowcharts.md` currently shows.
+
+It is truth-functionally impeccable. It is also **shape-destroying**, and that is exactly the
+charge the document levels at flowcharts: _"it says more than the law, and less than the law."_
+A statute has a **scope** (does this bite me?) and a **requirement** (then what must I do?), and
+those are the first two questions any lawyer asks in that order. `¬P ∨ Q` answers neither. It
+offers two escape routes; it inverts the antecedent; and it destroys the asymmetry that _is_ the
+legal object. **We are committing a milder version of the flowchart's crime inside the tool we
+are selling as the cure.** Truth-preserving, meaning-obscuring. Reject.
+
+So: **`Implies` must be a real IR node.** But — and this is the good news — it need not be a new
+_layout_ primitive.
+
+### 25.2 It is not a new thing. It is the thing ladder logic was always drawing.
+
+A real IEC 61131-3 rung is **`[contacts] ────( coil )`**: _if_ the contact network conducts,
+_then_ energize the coil. **A rung IS an implication** — antecedent on the left, consequent on
+the right. It is a Horn clause with a power rail.
+
+Our diagrams have quietly omitted the coil all along: we draw contact networks strung between
+two power terminals, which is only ever the _antecedent half_ of a rung. Adding implication and
+adding the coil are **the same task**, and doing it makes us _more_ faithful to the notation we
+claim descent from, not less.
+
+Note also that Meng drew this correctly in 2021, in the deck that started this: two panels,
+_"Every window which… **⇒** must be…"_, each panel a nested Venn/ladder. That design was right.
+
+### 25.3 The drawing: a two-panel seam, with a vacuity bypass
+
+```
+                    ┌────────── does not bite: A.3 never reached this window ─────────┐
+                    ┊  (vacuously true)                                               ┊
+     ●──[ SCOPE ]───┤                                                                 ├──●
+        on an upper │                                                                 │
+        floor AND … │  ══MUST══▶  [ REQUIREMENT ]  obscure-glazed AND (…)             │
+                    └─────────────────────────────────────────────────────────────────┘
+```
+
+Two panels — **scope** and **requirement** — joined by a distinguished `⇒` / `MUST` seam. In BBE
+this is nearly free: it is a **series whose connector is a seam glyph rather than a plain wire**,
+so the existing align-then-stack machinery handles it unchanged.
+
+**Flow (§20) is where it earns its keep.** The implication has _three_ states, not two, and the
+picture should show all three:
+
+| Scope    | Requirement | Reading                     | Render                                                                           |
+| -------- | ----------- | --------------------------- | -------------------------------------------------------------------------------- |
+| open     | —           | **vacuously true**          | the **bypass lights** (ghosted/dashed); the requirement panel greys out entirely |
+| conducts | conducts    | **in scope, and compliant** | current runs through both panels; seam closed                                    |
+| conducts | open        | **in scope, and IN BREACH** | current reaches the seam and **stops**; the break is drawn AT the seam           |
+
+That third row is the whole point: **breach is visible as a break at a named place.** And the
+first row is the case Meng's IMPLIES commit says flowcharts lose — _"it is precisely at such
+exits that real-world rules-as-code projects lose track of whether 'not covered' was supposed to
+mean pass, fail, or undefined."_ Here it is not an unlabelled exit; it is a labelled bypass that
+says **why** you are compliant: the rule never reached you.
+
+### 25.4 The dual: the breach view (the Bad Man's ladder) — a `ViewSpec` toggle, no new machinery
+
+`P → Q` is violated exactly when `P ∧ ¬Q`. So the same node can be drawn **inverted**, as a
+liability circuit:
+
+```
+     ●──[ SCOPE ]────[ NOT: REQUIREMENT ]────( BREACH )
+```
+
+Current reaching the coil **is** the breach. This needs **no new primitives at all** — it is
+`And(P, Not(Q))` plus a coil glyph, i.e. §21a's normally-closed contacts doing exactly the job
+they were built for.
+
+And it is the more natural reading for half our audience. A citizen asks _"am I compliant?"_ and
+wants current = good. A litigator, a regulator, or the white-hat Bad Man asks _"what gets me
+liable?"_ and wants current = **bad**. They are duals; the IR is the same; only the `ViewSpec`
+differs. This connects directly to the FM-in-law "white-hat Bad Man" line of work.
+
+### 25.5 Deontic vs material — one wrinkle to keep honest
+
+Two flavours hide under the same arrow:
+
+- **Material** (`P → Q`, both predicates): A.3 as formalised. The consequent is another contact
+  network. → **two-panel seam** (§25.3).
+- **Deontic** (`P → OBLIGATION`): "PARTY insurer MUST pay WITHIN 30 days". The consequent is an
+  _action_, not a predicate — and _that_ is a **coil** in the truest ladder-logic sense.
+
+The statute's own words ("must be obscure-glazed") are deontic; our formalisation is material. The
+seam glyph should therefore read `MUST` when the source said MUST and `⇒` when it did not —
+cheap, and it preserves the drafter's register (§17's whole argument, applied to the connective).
+
+### 25.6 Work
+
+- [ ] **25a.** Add `Implies` to `VizExpr.IRExpr` (Haskell) + `viz-expr.ts`, and a case in
+      `Viz.Ladder.translateExpr` — today it falls through to `leafFromExpr`. **Stop
+      `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
+- [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series with a seam
+      connector); the three-state flow above; the vacuity bypass.
+- [ ] **25c.** `ViewSpec.polarity: 'compliance' | 'breach'` — the §25.4 dual. Reuses §21a.
+- [ ] **25d.** The coil glyph, and with it the honest rung. (We have never drawn one.)
+- [ ] **25e.** Emitters: ASCII (a `══▶` seam), Mermaid railroad (**cannot** express the seam — it
+      has no implication; it must fall back to §25.4's breach form or to `NOT P OR Q`, and should
+      say so), SVG.
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.
