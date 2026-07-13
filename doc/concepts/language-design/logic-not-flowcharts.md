@@ -71,10 +71,7 @@ named parts that can be reused and read back against the statute:
 ```l4
 GIVEN w IS A Window
 `window complies with A.3` MEANS
-    -- a material conditional: the requirement bites only for the windows it covers
-    IF   `A.3 covers` w
-    THEN `A.3 requirement met by` w
-    ELSE TRUE
+    `A.3 covers` w  IMPLIES  `A.3 requirement met by` w
 
 GIVEN w IS A Window
 `A.3 covers` w MEANS
@@ -86,6 +83,43 @@ GIVEN w IS A Window
         w's `obscure-glazed`
     AND (w's `non-opening` OR w's `openable parts at least 1.7m above the floor`)
 ```
+
+The top-level rule is one line, and it is _the material conditional itself_:
+`IMPLIES` is a first-class L4 operator (symbolic alias `=>`), with the classical
+truth table — `P IMPLIES Q` is TRUE unless `P` is TRUE and `Q` is FALSE. It binds
+_loosest_ of all the operators, so the antecedent and consequent may be written as
+bare AND/OR formulas without parenthesising them:
+
+```l4
+-- parses as  (a AND b) IMPLIES (c OR d)
+a AND b IMPLIES c OR d
+```
+
+That is not a cosmetic convenience. The whole argument of this page is that the
+statute's shape is `P → Q` over two Boolean trees — so the language had better be
+able to _say_ `→`, rather than make you re-encode it as a branch. See
+[IMPLIES](../../reference/operators/IMPLIES.md).
+
+It also gets the boundary of the rule right for free. A ground-floor window makes
+the antecedent false, so the conditional is **vacuously true** — the window
+_complies_, not because it is obscure-glazed (it isn't) but because A.3 never
+reached it:
+
+```l4
+#EVAL `window complies with A.3` `ground floor window`     -- TRUE: A.3 does not bite
+#EVAL `window complies with A.3` `bare side window`        -- FALSE: covered, and in breach
+#EVAL `window complies with A.3` `compliant side window`   -- TRUE: covered, and compliant
+```
+
+"Out of scope" and "in scope and satisfied" are _both_ compliance, and the
+material conditional distinguishes them from breach without any extra machinery.
+A flowchart has to represent that distinction as a dangling arrow to some
+unlabelled exit — and it is precisely at such exits that real-world rules-as-code
+projects lose track of whether "not covered" was supposed to mean pass, fail, or
+undefined.
+
+The full runnable encoding is in
+[logic-not-flowcharts-example.l4](logic-not-flowcharts-example.l4).
 
 ---
 
@@ -129,14 +163,24 @@ are the ones built for sets and Booleans:
   out as a circuit. (Ladder logic, standardised as IEC 61131-3, descends from
   relay circuit diagrams — a Boolean-logic notation, not a flow notation.)
 - **The material conditional itself** — the `→` connective, with its familiar
-  truth table, making the antecedent-implies-consequent shape explicit.
+  truth table, making the antecedent-implies-consequent shape explicit. (L4
+  spells it `IMPLIES`.)
 
-L4's **[ladder diagram](../../reference/README.md)** is exactly the mashup of the
-first two: the Boolean AND/OR circuit structure, nested Venn-style, showing
-`antecedent ⇒ consequent`. It is **order-independent**, it **shares sub-terms**
-(a DAG, not a duplicating tree), and it stays **legible to a lawyer** — the three
-things the flowchart cannot do at once. And because it is _derived from the
-language_, it is a view, not the source.
+L4's **[ladder diagram](../../reference/README.md)** is a mashup of the first
+two: the Boolean AND/OR circuit structure, nested Venn-style. It is
+**order-independent**, it **shares sub-terms** rather than duplicating them
+across branches, and it stays **legible to a lawyer** — the three things the
+flowchart cannot do at once. And because it is _derived from the language_, it is
+a view, not the source.
+
+Note the direction of travel here. The ladder renders the AND/OR trees — `A.3
+covers` and `A.3 requirement met by` each draw beautifully — but it has no node
+for implication, so the `P IMPLIES Q` at the top of the rule is not yet drawn
+_as_ an implication. That is a gap in the _view_, not in the _language_: the
+semantics are already right, and the picture can be taught to catch up. This is
+exactly the asymmetry the page is arguing for. Had the diagram been the
+substrate, the missing connective would have been a missing _feature_, and the
+law would have had to be bent around it.
 
 ---
 
@@ -160,7 +204,7 @@ _refuses_ to make the split, which is why it is the wrong tool for both.
 L4 is deliberately a specification language for **all three** concerns, with the
 right semantics for each:
 
-- **decision logic** → Boolean/functional definitions (`GIVEN … MEANS`, `IF/THEN`)
+- **decision logic** → Boolean/functional definitions (`GIVEN … MEANS`, `AND`/`OR`/`IMPLIES`)
 - **data modelling** → types and records (`DECLARE … HAS`)
 - **state transitions** → regulative rules, which are a statechart in disguise:
 
@@ -217,7 +261,7 @@ derived picture_:
 
 | Concern           | Wrong single tool           | Principled formalism                                | L4 construct                          | Derived view          |
 | ----------------- | --------------------------- | --------------------------------------------------- | ------------------------------------- | --------------------- |
-| Decision logic    | flowchart linearises AND/OR | Venn · Boolean circuit · material cond. · DMN table | `GIVEN … MEANS`, `IF/THEN`, functions | **ladder diagram**    |
+| Decision logic    | flowchart linearises AND/OR | Venn · Boolean circuit · material cond. · DMN table | `GIVEN … MEANS`, `AND`/`OR`/`IMPLIES` | **ladder diagram**    |
 | Data modelling    | (flowchart can't)           | schema / type systems                               | `DECLARE … HAS`, algebraic types      | type / schema view    |
 | State transitions | flowchart _fakes_ it        | BPMN · Harel statechart · Petri net · DFA           | `PARTY/MUST/WITHIN/HENCE/LEST`        | statechart / timeline |
 
