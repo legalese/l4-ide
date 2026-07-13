@@ -42,7 +42,9 @@ passes (`PARITY OK`).** Zero silent divergences, zero WASM crashes; the 5
 fallback), not failures: `britishcitizen5::is-British-citizen` ×2 (no
 string-ordering builtin — **now fixed, see update above**),
 `ceo-performance-award` (deontic, needs event cases),
-`orchestrator::evaluateClaim` (pre-existing `CONSIDER` ctor gap), and
+`orchestrator::evaluateClaim` (now refuses for its legitimate IO dependency —
+`callClaudeWithKey` does a `POST`; the earlier `CONSIDER RIGHT/LEFT` ctor gap is
+fixed, see PARITY-HUNT-LOG ledger #10 and the `either-probe` fixture), and
 `mixfix-garden-path::tax-on` (exported same-arity collision — refuses **by
 design**). The claim is bounded by the corpus and its curated cases — "no known
 divergences" is the honest phrasing, and the trivial-input-masking section of

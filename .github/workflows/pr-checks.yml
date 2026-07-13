@@ -436,7 +436,7 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in test datetime-probe list-probe deontic-sale deontic-seatbelt deontic-breach; do
+          for f in test datetime-probe list-probe either-probe deontic-sale deontic-seatbelt deontic-breach; do
             p="jl4-mlir/test/fixtures/$f.l4"
             if [ ! -s "$p" ]; then echo "MISSING/EMPTY fixture: $p" >&2; fail=1; fi
           done
@@ -453,6 +453,14 @@ jobs:
           # these cases must keep their branch-separating values.
           if [ ! -s "jl4-mlir/test/fixtures/list-probe.cases.json" ]; then
             echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/list-probe.cases.json" >&2; fail=1
+          fi
+          # either-probe.cases.json guards the EITHER (LEFT/RIGHT) CONSIDER fix:
+          # EITHER a b is a payload-carrying builtin ADT, not a nullary enum, so
+          # its RIGHT/LEFT constructor patterns used to refuse. The cases cross
+          # LEFT vs RIGHT and use payload values distinct from the 0/1 tag, so a
+          # tag-resolution or slot-0-vs-slot-1 payload regression diverges.
+          if [ ! -s "jl4-mlir/test/fixtures/either-probe.cases.json" ]; then
+            echo "MISSING/EMPTY cases sidecar: jl4-mlir/test/fixtures/either-probe.cases.json" >&2; fail=1
           fi
           # desc.{l4,cases.json} guards the bare-head-param fix (enrichParamTypes):
           # an unannotated DECIDE param defaulted to {"type":"object"} in the
@@ -560,6 +568,7 @@ jobs:
             jl4-mlir/test/fixtures/test.l4 \
             jl4-mlir/test/fixtures/datetime-probe.l4 \
             jl4-mlir/test/fixtures/list-probe.l4 \
+            jl4-mlir/test/fixtures/either-probe.l4 \
             jl4/examples/ok/desc.l4 \
             jl4-mlir/test/fixtures/deontic-sale.l4 \
             jl4-mlir/test/fixtures/deontic-seatbelt.l4 \

@@ -43,13 +43,16 @@ ship; a 🔴 is not.
 | 7   | **`britishcitizen5`** — ordered comparison on STRING-typed dates          | ✅    | `__l4_str_cmp` + synonym unfolding  | `britishcitizen5.cases.json` (5 cells) + `str-ordering-probe` — **CI Tier-2 candidate** (+ Haskell + JS) |
 | 8   | **`ceo-performance-award`** — deontic, refuses; now differentially tested  | 🟡    | refuses honestly (2 real gaps)      | harness (refused-unsupported) + `.cases.json.pending` + Haskell |
 | 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
-| 10  | **`orchestrator::evaluateClaim`** — `CONSIDER` ctor `RIGHT` unresolved    | 🟡    | pre-existing refusal                | corpus                                              |
+| 10  | **`orchestrator` helpers** — `CONSIDER` ctor `RIGHT`/`LEFT` (EITHER) unresolved | ✅ | `either-consider` LEFT/RIGHT lowering | `either-probe.cases.json` — **CI Tier-2** (+ Haskell) |
 | 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
 
 **There are no remaining 🔴s.** With #9 fixed, the extended corpus gate passed for the
 first time (130 byte-identical, 6 honest refusals); with #6 fixed it stands at
-**133 byte-identical, 0 differs, 0 wasm-error, 5 honest refusals** (Tier-2: 68
-byte-identical, 0 refused). Every known divergence either computes correctly or refuses
+**133 byte-identical, 0 differs, 0 wasm-error, 5 honest refusals**. With #10 fixed the
+new `either-probe` fixture joins CI Tier-2, which is now **83 byte-identical, 0 refused**
+(68 prior + 15 EITHER). The extended-corpus tally is unchanged — `orchestrator::evaluateClaim`
+was and remains one of the 5 refusals, but for the legitimate IO reason (`POST`), not the
+`CONSIDER` ctor gap, which is now closed. Every known divergence either computes correctly or refuses
 honestly and routes to the fallback. (That claim is bounded by the corpus and the
 curated cases — the thesis below explains why "no known reds" and "no reds" are
 different statements.)
@@ -85,8 +88,24 @@ good manners to admit to.
   closing a latent `supported:true`-with-null-contract landmine; curated
   branch-crossing cases are validated against jl4-service and parked in
   `jl4/examples/legal/ceo-performance-award.cases.json.pending` to gate the future fix.
-- **`CONSIDER` constructor resolution for `RIGHT`** → clears #10 (pre-existing; predates
-  this branch).
+- ~~**`CONSIDER` constructor resolution for `RIGHT`/`LEFT`** → clears #10.~~ **Done**
+  (branch `mlir-fix/either-consider`): `EITHER a b` is a payload-CARRYING builtin ADT
+  (prelude: `x IS AN EITHER a b`), not a nullary enum, so `testPatternTy` refused its
+  `RIGHT`/`LEFT` constructor patterns ("could not be resolved to an enum tag"). Fix
+  represents `EITHER` exactly like `MAYBE` — a 2-slot `[tag, payload]` record, `LEFT`
+  tagged `0.0`, `RIGHT` `1.0` — and wires `LEFT`/`RIGHT` through the three CONSIDER
+  choke points: construction (`lowerExpr` App, mirroring `JUST`), tag test
+  (`testPatternTy`, `RIGHT`≡`JUST`-tag, `LEFT`≡`NOTHING`-tag), and payload bind
+  (`bindPatternTy`, slot 1). The arity-1 string dispatch fires **only** for the builtin:
+  a user-declared `LEFT`/`RIGHT` constructor is caught earlier by `lookupRecordFields`/
+  `lookupEnumTag`. `orchestrator`'s four helpers (`isViolation`, `getConfidence`,
+  `getAllTests`, `extractText`) now compile cleanly; `evaluateClaim` **still refuses**,
+  but its reason chain is now purely the legitimate IO one (`depends on
+  'callClaudeWithKey' … POST (IO) not supported`) — the 18 `RIGHT`/`LEFT` enum-tag
+  diagnostics are gone. Guarded by `either-probe.cases.json` (**15/15 byte-identical**,
+  branch-crossing LEFT/RIGHT + payloads distinct from tags; NUMBER/STRING/BOOLEAN/LIST
+  payloads + a nested CONSIDER mirroring `extractText`) and the Haskell test
+  `EITHER CONSIDER → supported dispatch`.
 
 ---
 

@@ -1946,6 +1946,29 @@ lowerExprCases expr expectedTy = case expr of
               storeSlot mb 0 one
               storeSlot mb 1 innerVal
               pure mb
+            -- EITHER's LEFT / RIGHT — a payload-carrying builtin ADT
+            -- (prelude: @x IS AN EITHER a b@) represented exactly like
+            -- MAYBE: a 2-slot record [tag, payload]. LEFT is tagged 0.0,
+            -- RIGHT 1.0 — mirroring NOTHING/JUST's false/true tag — so the
+            -- CONSIDER lowering ('testPatternTy'/'bindPatternTy') can
+            -- dispatch on the tag and read the payload from slot 1. These
+            -- fire only for the arity-1 builtin: a user-declared
+            -- constructor named LEFT/RIGHT would already have been caught
+            -- above by 'lookupRecordFields' / 'lookupEnumTag'.
+            ("LEFT", [inner]) -> do
+              innerVal <- lowerExpr inner l4NumberType
+              e <- allocSlots 2
+              zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+              storeSlot e 0 zero
+              storeSlot e 1 innerVal
+              pure e
+            ("RIGHT", [inner]) -> do
+              innerVal <- lowerExpr inner l4NumberType
+              e <- allocSlots 2
+              one <- emitVal $ \vid -> arithConstantFloat vid 1.0
+              storeSlot e 0 one
+              storeSlot e 1 innerVal
+              pure e
             -- DATE / TIME / DATETIME primitives. These don't need a fresh
             -- extern synthesized (we declare them in Runtime.Builtins); we
             -- just route the call directly so the f64 ABI is bypassed
@@ -2760,6 +2783,19 @@ testPatternTy = go
         "JUST" -> do
           tag <- loadSlot scrutF64 0
           unboxBoolI1 tag
+        -- EITHER RIGHT — matches when the tag slot is 1.0 (see the LEFT/
+        -- RIGHT construction in 'lowerExpr'); binds the payload in
+        -- 'bindPatternTy'. Same [tag, payload] layout as MAYBE's JUST.
+        "RIGHT" -> do
+          tag <- loadSlot scrutF64 0
+          unboxBoolI1 tag
+        -- EITHER LEFT — matches when the tag slot is 0.0 (NOT the tag),
+        -- mirroring the NOTHING test.
+        "LEFT" -> do
+          tag <- loadSlot scrutF64 0
+          tagI1 <- unboxBoolI1 tag
+          trueBit <- trueI1
+          emitVal $ \vid -> arithXori vid tagI1 trueBit
         _ -> do
           env <- gets (.typeEnv)
           case lookupEnumTag name env of
@@ -2855,6 +2891,14 @@ bindPatternTy val _ _ (PatApp _ con [innerPat]) = do
   let name = resolvedName con
   case name of
     "JUST" -> do
+      innerVal <- loadSlot val 1
+      bindPatternTy innerVal l4NumberType l4NumberType innerPat
+    -- EITHER LEFT / RIGHT both carry their payload in slot 1 of the
+    -- 2-slot [tag, payload] record (see 'lowerExpr' construction).
+    "LEFT" -> do
+      innerVal <- loadSlot val 1
+      bindPatternTy innerVal l4NumberType l4NumberType innerPat
+    "RIGHT" -> do
       innerVal <- loadSlot val 1
       bindPatternTy innerVal l4NumberType l4NumberType innerPat
     _ -> bindPatternTy val l4NumberType l4NumberType innerPat

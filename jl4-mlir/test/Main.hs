@@ -61,6 +61,7 @@ main = do
     , test "returnType enriched from EntityInfo" testReturnTypeEnrichedFromEntityInfo
     , test "bare-head param typed from EntityInfo" testBareHeadParamTyped
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
+    , test "EITHER CONSIDER → supported dispatch" testEitherConsiderSupported
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
@@ -778,6 +779,57 @@ testStringPatternStrEq = do
       let ok = T.isInfixOf "@__l4_str_eq" mlir
       unless ok $
         putStrLn "\n    expected a __l4_str_eq call for the string-literal patterns"
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | A CONSIDER over the EITHER builtin (payload-carrying LEFT / RIGHT
+-- constructor patterns) must compile @supported:true@ and lower to a
+-- real tag dispatch — NOT refuse with "could not be resolved to an enum
+-- tag". EITHER a b is a payload-CARRYING ADT (like MAYBE), represented
+-- as a 2-slot [tag, payload] record: LEFT tagged 0.0, RIGHT tagged 1.0,
+-- payload in slot 1. This is the ledger #10 fix; the four orchestrator
+-- helpers (isViolation/getConfidence/getAllTests/extractText) used to
+-- refuse on exactly these patterns.
+--
+-- The source both CONSTRUCTS the EITHER (via a helper that returns
+-- @RIGHT n@ / @LEFT "neg"@) and DESTRUCTURES it, so it exercises the
+-- construction path (@__l4_alloc@ 2-slot record) and the pattern path
+-- (@scf.if@ tag dispatch + payload bind) together.
+testEitherConsiderSupported :: IO Bool
+testEitherConsiderSupported = do
+  let src = T.unlines
+        [ "GIVEN n IS A NUMBER"
+        , "GIVETH AN EITHER STRING NUMBER"
+        , "`classify` MEANS"
+        , "  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT \"neg\""
+        , ""
+        , "@export Either dispatch"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`either dispatch` MEANS"
+        , "  CONSIDER `classify` n"
+        , "    WHEN RIGHT v THEN v TIMES 2"
+        , "    WHEN LEFT s THEN 0 MINUS STRINGLENGTH s"
+        ]
+  case (lowerSource src, schemaWithDiagnostics src) of
+    (Left errs, _) -> do
+      putStrLn $ "\n    typecheck/lower failed: " <> show errs
+      pure False
+    (_, Left errs) -> do
+      putStrLn $ "\n    schema failed: " <> show errs
+      pure False
+    (Right mlir, Right json) -> do
+      let noRefuse = not (T.isInfixOf "could not be resolved to an enum tag" json)
+          supported = T.isInfixOf "\"supported\":true" json
+          dispatched = T.isInfixOf "scf.if" mlir
+          constructed = T.isInfixOf "__l4_alloc" mlir
+          ok = noRefuse && supported && dispatched && constructed
+      unless ok $ do
+        putStrLn "\n    expected supported:true EITHER dispatch (no enum-tag refusal)."
+        putStrLn $ "    noRefuse=" <> show noRefuse <> " supported=" <> show supported
+          <> " scf.if=" <> show dispatched <> " __l4_alloc=" <> show constructed
+        putStrLn $ "    json: " <> T.unpack (T.take 400 json)
       pure ok
   where
     unless b act = if b then pure () else act

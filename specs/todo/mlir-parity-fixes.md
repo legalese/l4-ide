@@ -344,6 +344,32 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
   extended corpus 130+6 → **133 byte-identical, 5 refused, 0 differs**.
   Residual (tracked): enum/record helper results still refuse — widening needs a
   reliable tyvar-vs-nullary-constructor discriminator.
+- ✅ **CONSIDER over EITHER (`RIGHT`/`LEFT`) → resolved** — DONE (branch
+  `mlir-fix/either-consider`, PARITY-HUNT-LOG ledger #10). `EITHER a b` is a
+  payload-CARRYING builtin ADT (prelude `x IS AN EITHER a b`; `LEFT`/`RIGHT` are
+  `Constructor` entities analogous to `JUST`), not a nullary `DECLARE ... IS ONE
+  OF` enum — so `testPatternTy` had no enum tag for the constructor and refused
+  ("CONSIDER pattern constructor RIGHT could not be resolved to an enum tag").
+  `orchestrator.l4`'s four helpers (`isViolation`, `getConfidence`, `getAllTests`,
+  `extractText`) each raised it, and `propagateDiagnostics` lifted all 18
+  copies into the exported `evaluateClaim`'s refusal chain. **Fix** (`Lower.hs`):
+  represent `EITHER` exactly like `MAYBE` — a 2-slot `[tag, payload]` linear-memory
+  record, `LEFT` tagged `0.0` and `RIGHT` `1.0` (mirroring `NOTHING`/`JUST`) — and
+  handle `LEFT`/`RIGHT` at the three CONSIDER choke points: **construction**
+  (`lowerExpr` App intrinsics, alloc-2 + store tag/payload, cloned from `JUST`);
+  **tag test** (`testPatternTy` arity-1 `PatApp`: `RIGHT` = tag truthy like `JUST`,
+  `LEFT` = tag falsy like `NOTHING`); **payload bind** (`bindPatternTy`: slot 1 for
+  both). The arity-1 string dispatch is sound because a user-declared `LEFT`/`RIGHT`
+  constructor is caught earlier by `lookupRecordFields`/`lookupEnumTag`; only the
+  builtin reaches these arms. `EXACTLY` (`PatExpr`) patterns are untouched and still
+  refuse. Verified: `either-probe.{l4,cases.json}` **15/15 byte-identical** on
+  branch-crossing LEFT/RIGHT cases (NUMBER/STRING/BOOLEAN/LIST payloads distinct from
+  the 0/1 tag, plus a nested CONSIDER mirroring `extractText`), added to **CI Tier-2**;
+  Haskell `EITHER CONSIDER → supported dispatch` (34/34); `orchestrator::evaluateClaim`
+  STILL refuses but now **only** for the legitimate IO reason (`depends on
+  'callClaudeWithKey' … POST (IO)`) — the `RIGHT`/`LEFT` enum-tag diagnostics are
+  gone (before: 18 present; after: 0). Tier-2 68 → **83 byte-identical, 0 differs,
+  0 wasm-error**.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
