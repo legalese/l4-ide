@@ -941,30 +941,64 @@ constraint, and it is a _sanitizing_ renderer. What it permits:
 | Fenced code block                    | ✅ verbatim   | universal — also PR comments, commit messages, terminals, email                                                                    |
 | `![](x.svg)` / `<img src>`           | ✅ renders    | already used (`doc/README.md` → `![L4 Logo](./l4.svg)`). Loaded as an image ⇒ **no script, no CSS interaction, no links.** Static. |
 | Inline `<svg>…</svg>`                | ❌ stripped   | GitHub's HTML sanitizer. _(verify before building — but the `<img>` route is the right one regardless, for portability)_           |
-| ` ```mermaid `                       | ✅ native     | the **only** diagram DSL GitHub renders. Version pinned by GitHub; **no third-party plugins.**                                     |
+| ` ```mermaid `                       | ✅ native     | the **only** diagram DSL GitHub renders — and it is **current** Mermaid, not a pin. See §24.2, which corrects this row.            |
 | `<picture>` + `prefers-color-scheme` | ✅            | ⇒ ship a light/dark SVG pair (our `theme: 'screen' \| 'ink'` palettes already exist)                                               |
 | `<details>` / `<summary>`            | ✅            | ⇒ a poor-man's §16 fold: folded image in the summary, expanded inside                                                              |
 | `$$…$$` MathJax                      | ✅            | no TikZ. Dead end for diagrams.                                                                                                    |
 
-### 24.2 Mermaid is a trap (both ways)
+### 24.2 Mermaid — the verdict stands, the reasoning was wrong
 
-**(a) Register a custom Mermaid diagram type** (`mermaid.registerExternalDiagrams`). This only
-works where **we** control the Mermaid instance. GitHub pins its own and loads no plugins — so
-it renders nowhere on github.com. And everywhere it _would_ work (a future docs site, VS Code)
-we could simply call `ladder-core` directly. **Buys nothing; costs a dependency and a foreign
-lifecycle API.**
+> **This section was rewritten after an adversarial check** (`tmp/mermaid-planb.md`, which
+> replayed GitHub's exact rendering pipeline and rendered candidates rather than reasoning from
+> memory). **Two of the three premises the first draft rested on were false.** The conclusion —
+> don't do it — survives, but on a different and much stronger argument. Keeping the record of
+> the error here, because the first draft's confidence was unearned.
 
-**(b) Encode the ladder in Mermaid's existing grammar.** `flowchart` is _precisely the category
-error the document exists to refute_ — we would be illustrating "logic is not a flowchart" with
-a flowchart. `block-beta` is less wrong (no arrows-imply-sequence), and it does nest — but its
-layout engine will not do align-then-stack centering, so **the right-alignment infelicity this
-whole kernel was rebuilt to fix comes straight back**, and we lose the rails, the Bézier fan
-(§18), current-flow weights (§20), folding (§16), NOT scope frames (§21) and tentative marks
-(§22). The AND/OR distinction would survive only as node shapes.
+**What was wrong.** ① GitHub does **not** pin an old Mermaid: it renders in a sandboxed
+`viewscreen.githubusercontent.com` iframe whose bundle's diagram registry is **identical to
+current `mermaid@11.16.0`** (38 detectors), with no diagram-type allowlist. ② GitHub does
+**not** sanitize directives: its `secure` list is only
+`["secure","securityLevel","startOnLoad","maxTextSize"]`, so `%%{init}%%` / frontmatter
+`config:` — including **`themeCSS`** — take effect, and its DOMPurify allowlist passes
+`<style>`, so Mermaid's injected CSS survives. ③ And the first draft only tested `flowchart`
+and `block-beta`. It never looked at **`railroad-beta`**.
 
-The irony is worth naming: the one diagram language GitHub renders natively is a flowchart
-tool, and our thesis is that flowcharts are the wrong picture. Shoehorning in would be
-self-refuting **in the very document that makes the argument.** Don't.
+**Railroad-beta is a ladder renderer.** Concatenation = series on one wire; alternation =
+stacked rungs fanning off a common node; no arrowheads; power terminals at both ends. And —
+this is the part that stings — reading the emitted SVG transforms shows it centres a `choice` on
+**the vertical centre of its own bounding box**, with the parent `sequence` aligning to that
+axis. That is **§5.3/§5.4 align-then-stack, compositional at arbitrary depth**: the very
+property Dagre could not give us, and that this entire kernel was rebuilt to obtain, Mermaid's
+railroad renderer already has. A hand-written s415 comes out looking startlingly like
+`s415-court.svg`. With `themeCSS` you can further reach state colour, the §15 ghost rung, §22
+fine-dashes, unboxed inert prose, and even §20 current-flow stroke weights — perhaps 70%
+fidelity, on github.com, today.
+
+**Why it still fails.** Railroad has **no NOT**. The nearest hack, `special("NOT")`, renders as
+a box _in series_ — it reads as a conjunct with no scope. So there is no `¬P ∨ Q`, and
+therefore **no material conditional**: `P → Q`, the document's own headline example, is
+structurally undrawable. Also no text wrapping (statutory prose runs off-screen), no folding, no
+interactivity, no print.
+
+**The decisive argument is the build-step dilemma**, and it is stronger than "Mermaid can't":
+
+- Mermaid's _only_ prize is **source-in-the-Markdown, zero build step**. Only the **hand-written**
+  ladder collects it — and the hand-written ladder cannot say `→`. Shipping it would mean the
+  document that exists to insist on the material conditional could not draw one: a worse
+  self-refutation than the flowchart one the first draft warned about.
+- The **generated** ladder reaches ~70% — but it concedes a build step. And once you have
+  conceded a build step, **§24.3's option I-a strictly dominates it**: same build step, _zero_
+  fidelity loss, plus print and dark mode.
+
+So Mermaid spends its single advantage to buy a worse picture. **Don't** — but for that reason,
+not the ones the first draft gave.
+
+**Two things to salvage.** (a) Mermaid `flowchart` should go **into** `logic-not-flowcharts.md`
+as the exhibit for the _wrong_ picture — GitHub renders it natively, and the rendered GPDO
+flowchart shows `permitted` duplicated **three times** and `BAD!!!` twice, which is exactly the
+sub-condition duplication the document currently only _asserts_. Let Mermaid do the one thing
+Mermaid is genuinely good at: drawing the wrong picture, convincingly. (b) `railroad-beta` is a
+free external **oracle** for sanity-checking `ladder-core`'s layout on the AND/OR-only subset.
 
 ### 24.3 What to build instead: one Scene IR, many carriers
 
@@ -1028,8 +1062,13 @@ ship a VS Code extension. Rides on the §13.1 `ladder-svg` split.
 > **Status.** I-b is **shipped**. I-a (the generate-and-commit SVG build step) is the next
 > increment, and it now has everything it needs — the playground bridge already does L4 →
 > `jl4-lsp` → `funDecl`, and `sceneToSvg` already takes a theme. I-c waits on the §13.1
-> `ladder-svg` split. The "Mermaid never" verdict is being stress-tested adversarially before
-> we commit to it in print.
+> `ladder-svg` split. "Mermaid never" **has now been stress-tested** (§24.2) and survives — but
+> the first draft's reasons for it were wrong, and the rewrite records that.
+>
+> **Outstanding check:** the Mermaid findings come from replaying GitHub's pipeline byte-for-byte
+> (its exact bundle, `initialize()` config, DOMPurify allowlist and viewscreen CSS), **not** from
+> loading github.com. Before citing any of this in print, paste `tmp/mermaid-planb/honest.mmd`
+> into an issue comment and hit Preview.
 
 ---
 
