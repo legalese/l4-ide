@@ -923,6 +923,88 @@ the `App`-open rendering + a `age = 21 / ≥ 18?` fixture are the next increment
 
 ---
 
+## 24. Embedding ladders in Markdown (GFM) — carriers, and why not Mermaid
+
+**The ask.** `doc/concepts/language-design/logic-not-flowcharts.md` argues that a regulatory
+condition is a Boolean predicate, that a flowchart is the wrong picture for it, and that the
+ladder diagram is the right one — and then shows *no ladder*. It should. More generally: a
+ladder should be able to travel in a README, a PR comment, an issue, a commit message.
+
+### 24.1 The constraint that decides everything: where does the Markdown render?
+
+`doc/` has a `SUMMARY.md` (the mdBook/GitBook convention) but **no `book.toml`** — it is not
+built into a site today. It is read **on github.com**. So github.com's renderer is the binding
+constraint, and it is a *sanitizing* renderer. What it permits:
+
+| Mechanism | On github.com | Notes |
+| --- | --- | --- |
+| Fenced code block | ✅ verbatim | universal — also PR comments, commit messages, terminals, email |
+| `![](x.svg)` / `<img src>` | ✅ renders | already used (`doc/README.md` → `![L4 Logo](./l4.svg)`). Loaded as an image ⇒ **no script, no CSS interaction, no links.** Static. |
+| Inline `<svg>…</svg>` | ❌ stripped | GitHub's HTML sanitizer. *(verify before building — but the `<img>` route is the right one regardless, for portability)* |
+| ` ```mermaid ` | ✅ native | the **only** diagram DSL GitHub renders. Version pinned by GitHub; **no third-party plugins.** |
+| `<picture>` + `prefers-color-scheme` | ✅ | ⇒ ship a light/dark SVG pair (our `theme: 'screen' \| 'ink'` palettes already exist) |
+| `<details>` / `<summary>` | ✅ | ⇒ a poor-man's §16 fold: folded image in the summary, expanded inside |
+| `$$…$$` MathJax | ✅ | no TikZ. Dead end for diagrams. |
+
+### 24.2 Mermaid is a trap (both ways)
+
+**(a) Register a custom Mermaid diagram type** (`mermaid.registerExternalDiagrams`). This only
+works where **we** control the Mermaid instance. GitHub pins its own and loads no plugins — so
+it renders nowhere on github.com. And everywhere it *would* work (a future docs site, VS Code)
+we could simply call `ladder-core` directly. **Buys nothing; costs a dependency and a foreign
+lifecycle API.**
+
+**(b) Encode the ladder in Mermaid's existing grammar.** `flowchart` is *precisely the category
+error the document exists to refute* — we would be illustrating "logic is not a flowchart" with
+a flowchart. `block-beta` is less wrong (no arrows-imply-sequence), and it does nest — but its
+layout engine will not do align-then-stack centering, so **the right-alignment infelicity this
+whole kernel was rebuilt to fix comes straight back**, and we lose the rails, the Bézier fan
+(§18), current-flow weights (§20), folding (§16), NOT scope frames (§21) and tentative marks
+(§22). The AND/OR distinction would survive only as node shapes.
+
+The irony is worth naming: the one diagram language GitHub renders natively is a flowchart
+tool, and our thesis is that flowcharts are the wrong picture. Shoehorning in would be
+self-refuting **in the very document that makes the argument.** Don't.
+
+### 24.3 What to build instead: one Scene IR, many carriers
+
+The architecture already anticipated this. `IRExpr → BBE → Scene IR` with an **injected
+`TextMetrics`** and a **swappable renderer** was built for print parity (§4.4); the Scene IR is
+the fork point, and each carrier is just another emit.
+
+**I-a. Static SVG — committed, generated, CI-checked.** *(works on github.com today; zero new
+rendering tech)*
+A `ladder-md` build step scans `doc/**/*.md` for an L4 fence carrying a directive (` ```l4
+ladder=window-rule `, or an adjacent `<!-- ladder: … -->`), pipes the L4 through **the bridge we
+already have** (`standalone/serve.mjs`: L4 → `jl4-lsp` → `RenderAsLadderInfo.funDecl`), runs
+`ladder-core` + `sceneToSvg` **twice** (screen + ink), writes `doc/…/figures/*.svg`, and
+injects/refreshes a `<picture>` block after the fence. CI regenerates and fails if the tree is
+dirty, so the picture **cannot drift** from the L4.
+
+> The L4 stays the source *in the Markdown*; the SVG is derived and committed. That is the
+> document's own thesis — "a diagram is a good *view* of legal logic and a bad *substrate* for
+> it" — enacted in the build system. And the artifact then works everywhere: github.com, npm,
+> VS Code preview, a future site, print.
+
+**I-b. The ASCII ladder — the sleeper.** A fenced code block renders **verbatim wherever
+Markdown exists**: github.com, PR comments, commit messages, terminals, email, `git diff`. BBE
+makes this nearly free — swap in a **monospace `TextMetrics`** (width = 1 cell/char) and add a
+**Scene IR → character-grid** renderer (box-drawing glyphs) beside `svg.ts`. A ladder becomes
+**diffable in git** and pasteable anywhere; the CLI gets `l4 ladder --ascii` for free; and
+`logic-not-flowcharts.md` can sit the ladder *directly beside* the L4 source, one screen, no
+image load — the isomorphism argument made visible. (Constraint: wide trees need §7 Tiny scale
+or §16 folding to fit a column.)
+
+**I-c. A real fenced-block plugin.** A `markdown-it`/`remark` plugin that calls `ladder-core`
+in-process and inlines the SVG — *interactive* (fold, T/F/U cycling) on surfaces where **we**
+control the renderer: a future docs site, and the **VS Code Markdown preview**, which accepts
+markdown-it plugins contributed by an extension (`markdown.markdownItPlugins`) — and we already
+ship a VS Code extension. Rides on the §13.1 `ladder-svg` split.
+
+**Recommendation: I-a + I-b now; I-c with the IDE integration; Mermaid never.**
+
+---
+
 ## Appendix — source materials
 
 - `tmp/box model.pdf` — the BBE box model (margins, ports, connectors, align-then-stack, the `bblm/bbrm=0` nesting invariant, LR/TB, Full/Small/Tiny scales). Primary spec for §5–§7.
