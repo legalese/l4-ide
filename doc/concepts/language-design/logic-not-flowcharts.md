@@ -9,24 +9,17 @@ _wrong picture_.
 
 ## Overview
 
-In 2021 a digital-planning team posed a now-famous challenge:
+In July 2021 [Open Systems Lab](https://twitter.com/opensystemslab/status/1410976074822004736),
+a digital-planning team, posed a now-famous challenge:
 
 > "Can you write this piece of legislation as a flowchart, in a way that can be
 > understood by a 9 year old? If so, we'd like to give you a job."
 
 The legislation was a UK planning rule about windows (below). People answered
-with flowcharts — a hand-drawn one, a tidy boxes-and-arrows one. The instinct is
+with flowcharts — a hand-drawn one on a torn sheet of paper, a tidy
+boxes-and-arrows one. We will come back to both, because they are wrong, and
+because they are wrong in the two directions the notation pushes. The instinct is
 universal: _turn the law into a flowchart._
-
-<!-- TODO: embed the original thread's napkin sketches here, with a link to the
-     source. Meng has the URL in a slide deck. Two cautions before doing it:
-     (1) x.com now blocks unauthenticated media, so GitHub's camo proxy will most
-         likely 403 and render a broken image — a committed screenshot under
-         doc/concepts/language-design/figures/ plus a link to the thread is the
-         reliable form;
-     (2) the sketches are someone else's work. Reproducing them for critical
-         commentary is the point, but attribute them, and get permission if we
-         ever put this in print. -->
 
 With due respect, a flowchart is the wrong picture here — and not because it is
 too simple. It is wrong because it commits a **category error**: it draws a
@@ -118,17 +111,15 @@ Rendering a predicate as a flowchart therefore does two damaging things:
 
 - **It says _more_ than the law.** A flowchart must pick an order —
   "first ask if there's a side window, then ask if it's above ground…" — but the
-  law imposes no such order. The diagram invents sequence that isn't there. (The
-  hand-drawn "9-year-old" answer literally linearises the AND/OR tree into a
-  single decision path, complete with a triumphant `BAD!!!` leaf.)
+  law imposes no such order. The diagram invents sequence that isn't there.
 - **It says _less_ than the law.** Once the tree is linearised you can no longer
   see, at a glance, which conditions are conjunctive and which are disjunctive,
   or what the antecedent and consequent even are. The logical shape — the thing a
   lawyer must actually verify — is gone, and shared sub-conditions get duplicated
   across branches.
 
-Here is A.3 drawn the way the challenge asked for. It is a perfectly competent
-flowchart:
+Crucially, **neither failure is a mistake anyone made.** They survive a flowchart
+drawn perfectly. Here is A.3 as a flowchart with no bugs in it at all:
 
 ```mermaid
 flowchart LR
@@ -145,23 +136,97 @@ flowchart LR
   high -- no --> bad2[BAD!!!]
 ```
 
-Now count the leaves. `permitted` appears **four times** and `BAD!!!` **twice** —
-six terminal boxes for a rule with exactly **two** outcomes. Those duplicates are
-not a drafting slip; they are forced. A tree cannot share a subtree, so every
-distinct path to the same conclusion must re-draw that conclusion. This is the
-"says less" failure made visible: the reader cannot see that all four `permitted`
-boxes are _the same permitted_, and nothing in the picture says so.
+This chart is _correct_. It is also **six terminal boxes for a rule with two
+outcomes**: `permitted` four times, `BAD!!!` twice. That duplication is not
+sloppiness and cannot be tidied away — a tree cannot share a subtree, so every
+distinct path to a conclusion must redraw it. The reader is given no way to see
+that all four `permitted` boxes are _the same permitted_.
 
-And look at the staircase. Every diagonal step is a decision the diagram made and
-the statute did not. Ask why `obscure-glazed?` is tested before `non-opening?` and
-there is no answer in the law — only in the drawing. Permute those two tests and
-you get a differently-shaped flowchart of the identical rule; there is no
-canonical one, and the picture gives you no way to tell which of its lines are
-law and which are the draughtsman's convenience.
+And the staircase is not decoration. Ask why `obscure-glazed?` is tested before
+`non-opening?` and there is no answer in the law — only in the drawing. Permute the
+two and you get a differently-shaped picture of the identical rule. There is no
+canonical flowchart for A.3, and nothing in any of them tells you which lines are
+the statute and which are the draughtsman's convenience.
 
 So the flowchart is not merely _childish_ (the challenge's own worry); it is
 _category-wrong_. It is a picture of a process, drawn over something that is not a
-process.
+process. **This is the whole argument, and it does not depend on anyone having
+blundered.**
+
+### What happens in practice
+
+Having said that: the challenge got two serious public answers, and it is
+instructive that **both of them are wrong** — each in the direction the notation
+pushes. This proves nothing that the previous section has not already established.
+It is worth a look anyway, because the errors are so exactly the ones the structure
+predicts.
+
+[alby (@Alby)](https://twitter.com/opensystemslab/status/1410976074822004736)
+replied with a clean, professional, carefully glossed flowchart — plain-English
+explanations of "side" and "obscure-glazed", a shared `END`, the lot — and,
+reasonably enough, _"When do I start?"_ Redrawn, its skeleton is:
+
+```mermaid
+flowchart TB
+  side{"Is there a window on the <b>side</b> of the house?"}
+  roof{"Is there a window in the <b>roof</b> of the side of the house?"}
+  glazed["The window must be obscure-glazed."]
+  open{"Are there parts of the window that could open?"}
+  far{"How far above the floor are the parts that can open?"}
+  shut["That part must not be able to open."]
+  allow["That part is allowed to open."]
+  side -- NO --> END
+  side -- YES --> roof
+  roof -- NO --> END
+  roof -- YES --> glazed
+  glazed --> open
+  open -- NO --> END
+  open -- YES --> far
+  far -- "LESS than 1.7m" --> shut
+  far -- "MORE than 1.7m" --> allow
+```
+
+The statute covers a window in a wall **or** a roof slope. This chart asks "is
+there a window on the side?" — yes — and then "is there a window in the **roof** of
+the side?" — and on _no_, exits to `END`. An ordinary **wall** window on a side
+elevation, squarely covered by A.3, therefore acquires **no obligation at all**.
+The disjunction has become a conjunction.
+
+That is precisely the pressure the notation exerts. A chain of yes/no gates is
+natively an **AND**; to say **OR** you must draw two arrows converging on one box,
+which is awkward, and which is why the OR quietly did not get drawn. The flowchart
+makes conjunction cheap and disjunction expensive — and the law does not care which
+is cheap.
+
+[Riccardo Fabrizio (@ArchRicFabrizio)](https://twitter.com/opensystemslab/status/1410976074822004736)
+answered on a torn sheet of paper — _"I'm not sure whether it would be suitable for
+a 9y.o."_ — and failed in the complementary direction:
+
+```mermaid
+flowchart TB
+  w{"IS THERE A WINDOW ON THE SIDE OF THE HOUSE?"}
+  g{"IS IT ABOVE THE GROUND FLOOR?"}
+  s{"CAN YOU OR YOUR TALLER PARENTS SEE THROUGH IT,<br/>ALSO IF OPENING IT?"}
+  w -- NO --> n1["NO PROB."]
+  w -- YES --> g
+  g -- NO --> n2["NO PROB."]
+  g -- YES --> s
+  s -- NO --> n3["NO PROB."]
+  s -- YES --> bad["BAD!!!"]
+```
+
+Here the entire consequent — `obscure-glazed AND (non-opening OR openable parts
+above 1.7m)` — is **fused into one question**. Three atoms and two connectives
+collapse into a single unanswerable compound, and the 1.7-metre threshold is
+reconstituted as _your taller parents_. `NO PROB.` is written out three times, by
+hand, because a tree cannot share a leaf even when you are the one holding the pen.
+
+Neither author was careless. Both were doing exactly what the picture asked of
+them.
+
+_(Both diagrams above are our own redrawings, for the purpose of criticism; the
+originals are in the [thread](https://twitter.com/opensystemslab/status/1410976074822004736)
+and remain the work of their authors.)_
 
 ---
 
