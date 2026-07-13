@@ -66,7 +66,9 @@ which you test `onUpperFloor` versus `inWall` is irrelevant to the meaning. It i
 a static predicate that is simply _true or false_ of a given window.
 
 In L4 that structure is expressed directly — and, crucially, **factored** into
-named parts that can be reused and read back against the statute:
+named parts that can be reused and read back against the statute. Note that each
+disjunction is spread over its own lines: the indentation is doing the work the
+parentheses do, so the shape of the source is the shape of the logic.
 
 ```l4
 GIVEN w IS A Window
@@ -79,12 +81,14 @@ GIVEN w IS A Window
 GIVEN w IS A Window
 `A.3 covers` w MEANS
         w's `on an upper floor`
-    AND (w's `in a wall` OR w's `in a roof slope forming a side elevation`)
+    AND (   w's `in a wall`
+         OR w's `in a roof slope forming a side elevation`)
 
 GIVEN w IS A Window
 `A.3 requirement met by` w MEANS
         w's `obscure-glazed`
-    AND (w's `non-opening` OR w's `openable parts at least 1.7m above the floor`)
+    AND (   w's `non-opening`
+         OR w's `openable parts at least 1.7m above the floor`)
 ```
 
 ---
@@ -137,6 +141,46 @@ first two: the Boolean AND/OR circuit structure, nested Venn-style, showing
 (a DAG, not a duplicating tree), and it stays **legible to a lawyer** — the three
 things the flowchart cannot do at once. And because it is _derived from the
 language_, it is a view, not the source.
+
+Here is A.3, as a ladder — the same rule, the same three definitions, drawn from
+the L4 above:
+
+```
+                            a window complies with A.3 if either
+             ┌╌ NOT ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+             ╎                                                                ╎
+             ╎                                     forming a side elevation:  ╎
+             ╎                                           ┌────────────┐       ╎
+             ╎                                     ┌─────┤ in a wall  ├─────┐ ╎
+             ╎ ┌────────────────────┐              │     └────────────┘     │ ╎
+   ┌─────────┼─┤ on an upper floor  ├──── and  ────┤          or            ├─○──────────┐
+   │         ╎ └────────────────────┘              │  ┌──────────────────┐  │ ╎          │
+   │         ╎                                     └──┤ in a roof slope  ├──┘ ╎          │
+   │         ╎                                        └──────────────────┘    ╎          │
+   │         ╎                                                                ╎          │
+●──┤         ╎                                                                ╎          ├──●
+   │         └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘          │
+   │                                         or                                          │
+   │                                                        either                       │
+   │                                                   ┌──────────────┐                  │
+   │                                   ┌───────────────┤ non-opening  ├───────────────┐  │
+   │  ┌─────────────────┐              │               └──────────────┘               │  │
+   └──┤ obscure-glazed  ├──── and  ────┤                      or                      ├──┘
+      └─────────────────┘              │  ┌────────────────────────────────────────┐  │
+                                       └──┤ openable parts ≥ 1.7m above the floor  ├──┘
+                                          └────────────────────────────────────────┘
+```
+
+Read it as a circuit: current enters at the left terminal and must find a path to
+the right one. There are two such paths, stacked in parallel — the window escapes
+A.3 by **not being covered** (the upper rung, through the `NOT`, whose bubble `○`
+inverts what reaches it), or it satisfies the requirement (the lower rung).
+Within each rung, elements in **series** are conjoined and elements **stacked in
+parallel** are disjoined. That is the whole notation.
+
+Notice what the picture does _not_ say. It does not say which contact you test
+first, because a circuit has no first — and neither does A.3. Compare that to any
+flowchart of the same rule, which cannot avoid choosing.
 
 ---
 

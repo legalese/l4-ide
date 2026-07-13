@@ -27,15 +27,60 @@ import type {
   Flow,
 } from "./types.js";
 
-const PAD_X = 14;
-const PAD_Y = 10;
-const GAP_SERIES = 44; // horizontal gap between AND siblings
-const GAP_PARALLEL = 26; // vertical gap between OR siblings
-const BUS_PAD = 26; // gap between an OR's bus and its child boxes
-const INERT_PAD = 12; // horizontal breathing room around inline inert text
-const LEAD = 40; // power-lead length at the far left/right
-const MARGIN = 70;
-const FONT = 14;
+/**
+ * The kernel's geometry, injected (DESIGN §3.2). TextMetrics was always
+ * injectable, but these constants were not — so "substrate-independent" only
+ * half held: a substrate whose cells are not pixels (a MONOSPACE GRID; §24) needs
+ * the paddings and gaps to land on whole cells too, or identical boxes come out
+ * different sizes in different rungs. Units are notional pixels for the SVG and
+ * notional cells×scale for ASCII; the kernel never cares which.
+ */
+export interface Geometry {
+  PAD_X: number;
+  PAD_Y: number;
+  GAP_SERIES: number; // horizontal gap between AND siblings
+  GAP_PARALLEL: number; // vertical gap between OR siblings
+  BUS_PAD: number; // gap between an OR's bus and its child boxes
+  INERT_PAD: number; // horizontal breathing room around inline inert text
+  LEAD: number; // power-lead length at the far left/right
+  MARGIN: number;
+  FONT: number;
+  CARET_PAD: number; // extra room beside a fold placeholder's ▸
+  TAG_RISE: number; // how far above a box its otiose/typically tag sits
+  HEAD_PAD: number; // an OR heading's band = lineHeight + HEAD_PAD
+  HEAD_DROP: number; // …and the heading's baseline nudge inside that band
+  NOT_PAD_X: number;
+  NOT_PAD_Y: number;
+  NOT_LABEL: number;
+  NOT_BUBBLE: number; // output room for the inverter bubble
+  NOT_R: number; // bubble radius
+  CONNECTIVE_GAP: number; // clearance between wire and connective text
+  STRADDLE_MIN_WIDTH: number; // only wrap connectives wider than this
+}
+
+/** The pixel geometry the SVG target has always used. */
+export const PIXEL_GEOMETRY: Geometry = {
+  PAD_X: 14,
+  PAD_Y: 10,
+  GAP_SERIES: 44,
+  GAP_PARALLEL: 26,
+  BUS_PAD: 26,
+  INERT_PAD: 12,
+  LEAD: 40,
+  MARGIN: 70,
+  FONT: 14,
+  CARET_PAD: 8,
+  TAG_RISE: 9,
+  HEAD_PAD: 12,
+  HEAD_DROP: 2,
+  NOT_PAD_X: 16,
+  NOT_PAD_Y: 12,
+  NOT_LABEL: 16,
+  NOT_BUBBLE: 20,
+  NOT_R: 5,
+  CONNECTIVE_GAP: 3,
+  STRADDLE_MIN_WIDTH: 160,
+};
 
 interface Measured {
   w: number;
@@ -47,6 +92,7 @@ interface Measured {
 interface Ctx {
   vs: ViewSpec;
   tm: TextMetrics;
+  k: Geometry;
   values: Map<NodeId, UBoolValue>; // evaluated T/F/U per node id
   em: Map<NodeId, Energ> | null; // energization per node id, when showCurrent
 }
@@ -212,9 +258,11 @@ function leafBox(
   state: State,
   role: "leaf" | "placeholder",
   tm: TextMetrics,
+  k: Geometry,
   tentative = false,
 ): Measured {
-  const caretW = role === "placeholder" ? tm.width("▸", FONT) + 8 : 0;
+  const { FONT, PAD_X, PAD_Y, CARET_PAD, TAG_RISE } = k;
+  const caretW = role === "placeholder" ? tm.width("▸", FONT) + CARET_PAD : 0;
   const w = caretW + tm.width(label, FONT) + 2 * PAD_X;
   const h = tm.lineHeight(FONT) + 2 * PAD_Y;
   return {
@@ -253,7 +301,7 @@ function leafBox(
       if (state === "eliminable")
         out.push({
           kind: "text",
-          at: { x: ox + w / 2, y: oy - 9 },
+          at: { x: ox + w / 2, y: oy - TAG_RISE },
           text: "otiose — always open",
           anchor: "middle",
           state,
@@ -264,7 +312,7 @@ function leafBox(
         // riding a TYPICALLY presumption (DESIGN §22)
         out.push({
           kind: "text",
-          at: { x: ox + w / 2, y: oy - 9 },
+          at: { x: ox + w / 2, y: oy - TAG_RISE },
           text: "typically",
           anchor: "middle",
           state,
@@ -280,12 +328,11 @@ function leafBox(
  *  series wire connects through it (DESIGN §17). Two styles:
  *  - 'on-wire':    the series leaves the inert's span as a gap; text sits on the line.
  *  - 'below-wire': the inert draws a continuous wire across its span; text drops below. */
-// clearance between the wire and the nearest edge of connective text — shared by
-// above-wire / below-wire / straddle-wire so they all hug the line identically.
-const CONNECTIVE_GAP = 3;
-const C_ASCENT = FONT * 0.78;
-const C_DESCENT = FONT * 0.22;
-const STRADDLE_MIN_WIDTH = 160; // only wrap connectives wider than this (~a box width)
+// clearance between the wire and the nearest edge of connective text lives in
+// Geometry.CONNECTIVE_GAP — shared by above-wire / below-wire / straddle-wire so
+// they all hug the line identically. Ascent/descent are derived from the font.
+const ascent = (k: Geometry) => k.FONT * 0.78;
+const descent = (k: Geometry) => k.FONT * 0.22;
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
  *  can't split -> single line.
@@ -295,14 +342,14 @@ const STRADDLE_MIN_WIDTH = 160; // only wrap connectives wider than this (~a box
  *  compact block — e.g. balanceNLines(text, tm, targetWidth). Two lines is enough
  *  for now; the wire would thread the middle line (or the gap between the two
  *  central lines for even N). */
-function balanceTwoLines(text: string, tm: TextMetrics): string[] {
+function balanceTwoLines(text: string, tm: TextMetrics, k: Geometry): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 2) return [text];
   let best = 1;
   let bestDiff = Infinity;
   for (let i = 1; i < words.length; i++) {
-    const l = tm.width(words.slice(0, i).join(" "), FONT);
-    const r = tm.width(words.slice(i).join(" "), FONT);
+    const l = tm.width(words.slice(0, i).join(" "), k.FONT);
+    const r = tm.width(words.slice(i).join(" "), k.FONT);
     const diff = Math.abs(l - r);
     if (diff < bestDiff) {
       bestDiff = diff;
@@ -316,7 +363,9 @@ function inertInline(
   text: string,
   tm: TextMetrics,
   style: ConnectiveStyle,
+  k: Geometry,
 ): Measured {
+  const { FONT, PAD_Y, INERT_PAD, CONNECTIVE_GAP, STRADDLE_MIN_WIDTH } = k;
   const lineH = tm.lineHeight(FONT);
 
   // 'straddle-wire': long prose wraps to two balanced lines threading the
@@ -325,7 +374,7 @@ function inertInline(
   if (style === "straddle-wire") {
     const singleW = tm.width(text, FONT) + 2 * INERT_PAD;
     const lines =
-      singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm) : [text];
+      singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm, k) : [text];
     if (lines.length === 2) {
       const w =
         Math.max(tm.width(lines[0], FONT), tm.width(lines[1], FONT)) +
@@ -341,7 +390,7 @@ function inertInline(
           const mid = ox + w / 2;
           out.push({
             kind: "text",
-            at: { x: mid, y: cy - CONNECTIVE_GAP - C_DESCENT },
+            at: { x: mid, y: cy - CONNECTIVE_GAP - descent(k) },
             text: lines[0],
             anchor: "middle",
             state: "inert",
@@ -349,7 +398,7 @@ function inertInline(
           });
           out.push({
             kind: "text",
-            at: { x: mid, y: cy + CONNECTIVE_GAP + C_ASCENT },
+            at: { x: mid, y: cy + CONNECTIVE_GAP + ascent(k) },
             text: lines[1],
             anchor: "middle",
             state: "inert",
@@ -384,8 +433,8 @@ function inertInline(
         // spine wire under the span is drawn by measureAnd (flow-styled, §20)
         const baseline =
           style === "above-wire"
-            ? cy - CONNECTIVE_GAP - C_DESCENT
-            : cy + CONNECTIVE_GAP + C_ASCENT;
+            ? cy - CONNECTIVE_GAP - descent(k)
+            : cy + CONNECTIVE_GAP + ascent(k);
         out.push({
           kind: "text",
           at: { x: mid, y: baseline },
@@ -426,9 +475,10 @@ function cubicMid(c: Curve): Pt {
 }
 
 function measure(e: IRExpr, ctx: Ctx): Measured {
-  const { vs, tm } = ctx;
+  const { vs, tm, k } = ctx;
 
-  if (e.$type === "InertE") return inertInline(e.text, tm, vs.connectiveStyle);
+  if (e.$type === "InertE")
+    return inertInline(e.text, tm, vs.connectiveStyle, k);
 
   if (e.$type === "Not") {
     // NOT grammar (DESIGN §21): a scope FRAME round a complex negand (so you can see
@@ -440,11 +490,11 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       e.negand.$type === "And" ||
       e.negand.$type === "Or" ||
       e.negand.$type === "Not";
-    const NPX = 16;
-    const NPY = 12;
-    const LBL = complex ? 16 : 0;
-    const BR = 5; // bubble radius
-    const BUB = 20; // output room for the bubble
+    const NPX = k.NOT_PAD_X;
+    const NPY = k.NOT_PAD_Y;
+    const LBL = complex ? k.NOT_LABEL : 0;
+    const BR = k.NOT_R; // bubble radius
+    const BUB = k.NOT_BUBBLE; // output room for the bubble
     const band = LBL + NPY; // symmetric top/bottom so the port stays centred
     const framW = inner.w + 2 * NPX;
     const w = framW + BUB;
@@ -526,6 +576,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       renderState(ctx, e.id),
       "leaf",
       tm,
+      k,
       vs.provenance.get(e.id) === "default",
     );
   }
@@ -537,6 +588,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       renderState(ctx, e.id),
       "placeholder",
       tm,
+      k,
     );
   }
 
@@ -546,19 +598,20 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
 /** AND: series, children centered vertically. Inert children render inline and
  *  ride the wire; a leading inert thus sits to the LEFT of the next element. */
 function measureAnd(e: And, ctx: Ctx): Measured {
+  const { GAP_SERIES } = ctx.k;
   const kids = e.args.map((a) => measure(a, ctx));
-  const h = Math.max(...kids.map((k) => k.h));
-  const w = kids.reduce((s, k) => s + k.w, 0) + GAP_SERIES * (kids.length - 1);
+  const h = Math.max(...kids.map((m) => m.h));
+  const w = kids.reduce((s, m) => s + m.w, 0) + GAP_SERIES * (kids.length - 1);
   return {
     w,
     h,
     state: "inert",
     emit(ox, oy, out) {
       let x = ox;
-      const ports = kids.map((k) => {
-        const cy = oy + (h - k.h) / 2; // <-- centered on the cross axis
-        const p = k.emit(x, cy, out);
-        x += k.w + GAP_SERIES;
+      const ports = kids.map((m) => {
+        const cy = oy + (h - m.h) / 2; // <-- centered on the cross axis
+        const p = m.emit(x, cy, out);
+        x += m.w + GAP_SERIES;
         return p;
       });
       const fold = { t: "fold", id: e.id } as const;
@@ -615,6 +668,7 @@ function measureAnd(e: And, ctx: Ctx): Measured {
  *  needs the room (DESIGN §17). Not connected to the buses; it carries no current. */
 function measureOr(e: Or, ctx: Ctx): Measured {
   const { tm } = ctx;
+  const { FONT, INERT_PAD, GAP_PARALLEL, BUS_PAD, HEAD_PAD, HEAD_DROP } = ctx.k;
   const lineH = tm.lineHeight(FONT);
   const head = leadingInert(e.args);
   // drop the leading inert run (the heading); fold the remaining inerts into the
@@ -650,7 +704,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   const stackH =
     rungs.reduce((s, r) => s + r.m.h, 0) +
     gapLabel.reduce((s, _, k) => s + gapH(k), 0);
-  const band = head ? lineH + 12 : 0;
+  const band = head ? lineH + HEAD_PAD : 0;
   const h = stackH + 2 * band;
 
   return {
@@ -707,7 +761,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
       if (head)
         out.push({
           kind: "text",
-          at: { x: ox + totalW / 2, y: oy + band / 2 + 2 },
+          at: { x: ox + totalW / 2, y: oy + band / 2 + HEAD_DROP },
           text: head,
           anchor: "middle",
           state: "inert",
@@ -721,18 +775,23 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   };
 }
 
-export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
+export function layout(
+  fn: FunDecl,
+  vs: ViewSpec,
+  tm: TextMetrics,
+  k: Geometry = PIXEL_GEOMETRY,
+): Scene {
+  const { LEAD, MARGIN } = k;
   const prims: ScenePrim[] = [];
   const values = new Map<NodeId, UBoolValue>();
   nodeValue(fn.body, vs.valuation, values);
   const em = vs.showCurrent ? new Map<NodeId, Energ>() : null;
   if (em) energize(fn.body, true, values, em);
-  const m = measure(fn.body, { vs, tm, values, em });
+  const ctx: Ctx = { vs, tm, k, values, em };
+  const m = measure(fn.body, ctx);
   const ox = MARGIN + LEAD;
   const oy = MARGIN;
   const { inPort, outPort } = m.emit(ox, oy, prims);
-
-  const ctx: Ctx = { vs, tm, values, em };
   prims.push({
     kind: "wire",
     path: [{ x: MARGIN, y: inPort.y }, inPort],
