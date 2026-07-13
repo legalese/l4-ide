@@ -77,7 +77,38 @@ export interface Not {
   readonly negand: IRExpr;
 }
 
-export type IRExpr = Leaf | Inert | And | Or | Not;
+/**
+ * Material implication — the SEAM between scope and requirement (DESIGN §25).
+ *
+ * `P IMPLIES Q` is NOT sugar for `NOT P OR Q`. That expansion is truth-functionally
+ * perfect and SHAPE-DESTROYING: a statute has a SCOPE ("does this bite me?") and a
+ * REQUIREMENT ("then what must I do?"), those are the first two questions a lawyer
+ * asks, and a disjunction of escape routes answers neither. Drawing it that way is
+ * the very sin `logic-not-flowcharts.md` convicts flowcharts of, so the ladder gets
+ * a real node.
+ *
+ * Renders as ONE PATH — `[scope] ══MUST══▶ [requirement]` — with **two sinks** (§25.4):
+ * the requirement's verdict throws a CHANGEOVER, lighting a green coil (complies) or
+ * a red one (in breach). Vacuity needs no ink at all: if the scope does not conduct,
+ * no current leaves it and NEITHER lamp lights. That is N/A, and the reader can see
+ * exactly where it stopped.
+ *
+ * SCOPE (v1): top-level only. A rule *is* an implication; nesting one inside an
+ * And/Or is legal but the two-sink form has nowhere to put its lamps, so a nested
+ * `Implies` falls back to the `¬P ∨ Q` expansion (see `expandImplies`).
+ */
+export interface Implies {
+  readonly $type: "Implies";
+  readonly id: NodeId;
+  readonly scope: IRExpr;
+  readonly requirement: IRExpr;
+  /** The connective as the DRAFTER wrote it: 'MUST' when the source said MUST, else
+   *  '⇒'. §17's argument applied to the connective — the register survives (§25e). */
+  readonly must?: string;
+  readonly label?: string;
+}
+
+export type IRExpr = Leaf | Inert | And | Or | Not | Implies;
 
 export interface FunDecl {
   readonly id: NodeId;
@@ -222,7 +253,23 @@ export type ScenePrim =
   | {
       kind: "glyph";
       at: Pt;
-      role: "open-contact" | "power-terminal" | "inverter";
+      role: "open-contact" | "power-terminal" | "inverter" | "changeover";
+    }
+  /** A SINK (DESIGN §25.4). The right-hand half of a rung, which our diagrams have
+   *  never drawn: an implication routes its verdict to one of two lamps. `lit` is the
+   *  whole point — count the lit lamps and you have the verdict:
+   *    green lit  => in scope, and complies
+   *    red lit    => in scope, and IN BREACH
+   *    neither    => N/A (the scope did not conduct) or undetermined (something is ?)
+   *  For a regulative rule the red lamp is not a lamp but a DOORWAY — it is where
+   *  LEST hangs (§25.5). Not in this build. */
+  | {
+      kind: "coil";
+      at: Pt;
+      role: "green" | "red";
+      lit: boolean;
+      label: string;
+      id?: NodeId;
     }
   /** NOT scope frame (DESIGN §21) — a light enclosure round a negated complex
    *  subtree, tagged. The inversion itself is the 'inverter' bubble on the output. */
@@ -240,7 +287,8 @@ export type ScenePrim =
         | "heading"
         | "connective"
         | "caret"
-        | "typically";
+        | "typically"
+        | "seam"; // §25 — the MUST / ⇒ connective between scope and requirement
       size?: number;
       /** node id this text belongs to (heading -> its group; label -> its box) —
        *  used by renderers for click targets and FLIP matching. */

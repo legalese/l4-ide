@@ -83,6 +83,11 @@ export const ASCII_GEOMETRY: Geometry = {
   NOT_R: CELL_W,
   CONNECTIVE_GAP: 0,
   STRADDLE_MIN_WIDTH: Infinity, // a code cell has no sub-line room: use 'on-wire'
+  SEAM_W: 10 * CELL_W, //  ══MUST══▶
+  FORK_W: 4 * CELL_W,
+  COIL_R: CELL_W, //       a lamp is one cell: (✓) / (✗)
+  COIL_SEP: 2 * CELL_H, // exactly two rows off the axis, so the fork is drawable
+  COIL_LABEL: 12 * CELL_W,
 };
 
 /* -------------------------------------------------------------------- edges */
@@ -180,6 +185,7 @@ const ASCII_FALLBACK: Record<string, string> = {
   "✗": "F",
   "▸": ">",
   "○": "o",
+  "┿": "+",
 };
 
 class Grid {
@@ -424,10 +430,22 @@ export function sceneToAscii(scene: Scene, opts: AsciiOpts = {}): string {
     );
   }
 
+  /* lamps (§25.4) — the verdict, in two characters */
+  for (const p of scene.prims) {
+    if (p.kind !== "coil") continue;
+    const c = col(p.at.x),
+      r = row(p.at.y);
+    const mark = p.role === "green" ? "✓" : "✗";
+    // lit lamps get a bold ring and their label; dark ones stay hollow and italic-ish
+    g.text(c - 1, r, p.lit ? `(${mark})` : `( )`);
+    g.text(c + 3, r, ` ${p.lit ? p.label.toUpperCase() : p.label}`);
+  }
+
   /* glyphs */
   for (const p of scene.prims) {
     if (p.kind !== "glyph") continue;
     if (p.role === "power-terminal") g.text(col(p.at.x), row(p.at.y), "●");
+    else if (p.role === "changeover") g.text(col(p.at.x), row(p.at.y), "┿");
     else if (p.role === "inverter") g.text(col(p.at.x), row(p.at.y), "○");
     // 'open-contact' is left to the dotted flow + the ✗ marker: a single cell
     // cannot draw -| |- , and the rung already reads as broken.

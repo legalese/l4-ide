@@ -25,6 +25,7 @@ import type {
   ConnectiveStyle,
   UBoolValue,
   Flow,
+  Implies,
 } from "./types.js";
 
 /**
@@ -56,6 +57,12 @@ export interface Geometry {
   NOT_R: number; // bubble radius
   CONNECTIVE_GAP: number; // clearance between wire and connective text
   STRADDLE_MIN_WIDTH: number; // only wrap connectives wider than this
+  // §25 IMPLIES — the seam, the changeover fork, and the two sinks
+  SEAM_W: number; //   room for the MUST / ⇒ connective between the two panels
+  FORK_W: number; //   the changeover fan from the requirement to the lamps
+  COIL_R: number; //   lamp radius
+  COIL_SEP: number; // how far each lamp sits off the axis (green up, red down)
+  COIL_LABEL: number; // room to the right of a lamp for "complies" / "in breach"
 }
 
 /** The pixel geometry the SVG target has always used. */
@@ -80,6 +87,11 @@ export const PIXEL_GEOMETRY: Geometry = {
   NOT_R: 5,
   CONNECTIVE_GAP: 3,
   STRADDLE_MIN_WIDTH: 160,
+  SEAM_W: 66,
+  FORK_W: 44,
+  COIL_R: 9,
+  COIL_SEP: 40,
+  COIL_LABEL: 74,
 };
 
 interface Measured {
@@ -145,6 +157,20 @@ function nodeValue(
         : c === "FalseV"
           ? "TrueV"
           : "UnknownV";
+  } else if (e.$type === "Implies") {
+    // P → Q, three-valued (DESIGN §25). Note it is TRUE when the scope is FALSE —
+    // vacuously — and that is correct; L4's #EVAL says so too. The picture, not the
+    // logic, is what must distinguish "true because satisfied" from "true because
+    // never reached" (§25.3), and it does that with the lamps (§25.4).
+    const p = nodeValue(e.scope, val, out);
+    const q = nodeValue(e.requirement, val, out);
+    v = val.has(e.id)
+      ? val.get(e.id)!
+      : p === "FalseV" || q === "TrueV"
+        ? "TrueV"
+        : p === "TrueV" && q === "FalseV"
+          ? "FalseV"
+          : "UnknownV";
   } else if (e.$type === "InertE") {
     v = "TrueV"; // inert conducts (identity); nominal, excluded from derivation
   } else {
@@ -158,6 +184,28 @@ function nodeValue(
   }
   out.set(e.id, v);
   return v;
+}
+
+/** Which lamp is lit (DESIGN §25.4). The whole verdict, in two booleans.
+ *  Neither lit ⇒ **N/A** (the scope did not conduct) or **undetermined** (something
+ *  is still `?`). The reader tells those apart by looking at WHERE the break is —
+ *  a definitively-open scope shows a clean break; an unknown one is grey. */
+export interface Lamps {
+  green: boolean;
+  red: boolean;
+}
+function lampsFor(
+  e: Implies,
+  values: Map<NodeId, UBoolValue>,
+  inE: boolean,
+): Lamps {
+  const p = values.get(e.scope.id);
+  const q = values.get(e.requirement.id);
+  const reached = inE && p === "TrueV"; // current actually left the scope panel
+  return {
+    green: reached && q === "TrueV",
+    red: reached && q === "FalseV", // NOT on `?` — an unknown requirement is not a breach
+  };
 }
 
 interface Energ {
@@ -199,6 +247,13 @@ function energize(
   } else if (e.$type === "Not") {
     energize(e.negand, inE, values, em);
     outE = inE && values.get(e.id) === "TrueV";
+  } else if (e.$type === "Implies") {
+    // The scope sees the rule's own input. The requirement sees current ONLY IF the
+    // scope conducts — which is exactly why vacuity needs no bypass: when the scope
+    // is open, nothing downstream is energized and NEITHER lamp lights (§25.4).
+    energize(e.scope, inE, values, em);
+    energize(e.requirement, em.get(e.scope.id)!.outE, values, em);
+    outE = inE && values.get(e.id) === "TrueV"; // the node's own truth (¬P ∨ Q)
   } else {
     outE = inE && conducts(e);
   }
@@ -569,6 +624,8 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     };
   }
 
+  if (e.$type === "Implies") return measureImplies(e, ctx);
+
   if (e.$type !== "And" && e.$type !== "Or") {
     return leafBox(
       e.id,
@@ -775,6 +832,136 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   };
 }
 
+/** IMPLIES — the seam, the changeover, and the two sinks (DESIGN §25).
+ *
+ * ONE path: `[scope] ══MUST══▶ [requirement]`, then the requirement's verdict throws a
+ * CHANGEOVER — one pole, two throws — to a green lamp (complies) or a red one (in
+ * breach). There is deliberately NO bypass: when the scope does not conduct, no
+ * current leaves it and neither lamp lights. That is N/A, and the reader sees exactly
+ * where it stopped. Drawing the vacuous case as a rung would make "the rule never
+ * reached you" a co-equal way of COMPLYING, which it is not — it is a way of not
+ * being asked (§25.3).
+ */
+function measureImplies(e: Implies, ctx: Ctx): Measured {
+  const { tm, k } = ctx;
+  const { FONT, SEAM_W, FORK_W, COIL_R, COIL_SEP, COIL_LABEL } = k;
+  const s = measure(e.scope, ctx);
+  const r = measure(e.requirement, ctx);
+  const must = e.must ?? "⇒";
+
+  const lampsW = FORK_W + 2 * COIL_R + COIL_LABEL;
+  const w = s.w + SEAM_W + r.w + lampsW;
+  // tall enough for the widest panel AND for the lamp pair to clear the axis
+  const h = Math.max(s.h, r.h, 2 * (COIL_SEP + COIL_R + tm.lineHeight(FONT)));
+
+  return {
+    w,
+    h,
+    state: renderState(ctx, e.id),
+    emit(ox, oy, out) {
+      const cy = oy + h / 2; // the rule's axis
+      const sp = s.emit(ox, cy - s.h / 2, out);
+      const seamX = ox + s.w;
+      const reqX = seamX + SEAM_W;
+      const rp = r.emit(reqX, cy - r.h / 2, out);
+
+      const em = ctx.em;
+      const inE = !!em?.get(e.id)?.inE;
+      const scopeOut = !!em?.get(e.scope.id)?.outE; // did current LEAVE the scope?
+      const lamps = lampsFor(e, ctx.values, inE);
+
+      // ── the seam: the drafter's own connective, ON the wire ────────────────────
+      // The wire is drawn in TWO segments with a gap, so the connective sits in the
+      // line rather than being struck through by it (the 'on-wire' idiom of §17).
+      const seamMid = seamX + SEAM_W / 2;
+      const gap = tm.width(must, 12.5) / 2 + 8;
+      const seamFlow = flowFor(em, scopeOut, trueConducts(ctx.values, e.scope));
+      out.push({
+        kind: "wire",
+        path: [sp.outPort, { x: seamMid - gap, y: cy }],
+        role: "rung",
+        state: "inert",
+        flow: seamFlow,
+      });
+      out.push({
+        kind: "wire",
+        path: [
+          { x: seamMid + gap, y: cy },
+          { x: reqX, y: cy },
+        ],
+        role: "rung",
+        state: "inert",
+        flow: seamFlow,
+      });
+      out.push({
+        kind: "text",
+        at: { x: seamMid, y: cy },
+        text: must,
+        anchor: "middle",
+        state: scopeOut ? "live" : "inert",
+        tag: "seam",
+        size: 12.5,
+        id: e.id,
+      });
+
+      // ── the changeover: one pole, two throws (§25.4) ───────────────────────────
+      const pivotX = rp.outPort.x + FORK_W / 2;
+      const coilX = rp.outPort.x + FORK_W + COIL_R;
+      out.push({
+        kind: "wire",
+        path: [rp.outPort, { x: pivotX, y: cy }],
+        role: "rung",
+        state: "inert",
+        flow: flowFor(em, scopeOut, false),
+      });
+      out.push({ kind: "glyph", at: { x: pivotX, y: cy }, role: "changeover" });
+
+      const throwTo = (dy: number, lit: boolean) => {
+        const to = { x: coilX - COIL_R, y: cy + dy };
+        const from = { x: pivotX, y: cy };
+        const c = hCurve(from, to, "inert");
+        c.flow = flowFor(em, lit, false);
+        out.push(c);
+      };
+      throwTo(-COIL_SEP, lamps.green);
+      throwTo(COIL_SEP, lamps.red);
+
+      out.push({
+        kind: "coil",
+        at: { x: coilX, y: cy - COIL_SEP },
+        role: "green",
+        lit: lamps.green,
+        label: "complies",
+        id: e.id,
+      });
+      out.push({
+        kind: "coil",
+        at: { x: coilX, y: cy + COIL_SEP },
+        role: "red",
+        lit: lamps.red,
+        label: "in breach",
+        id: e.id,
+      });
+
+      // N/A is not a stamp and not a path — it is BOTH LAMPS DARK, with the break
+      // visible in the scope. We only say so in words when the scope is DEFINITIVELY
+      // open (a `?` scope is merely undetermined, and must not be reported as N/A).
+      if (inE && ctx.values.get(e.scope.id) === "FalseV")
+        out.push({
+          kind: "text",
+          at: { x: coilX + COIL_R + 7, y: cy },
+          text: "N/A — the rule does not reach this case",
+          anchor: "start",
+          state: "inert",
+          tag: "note",
+          size: 11,
+        });
+
+      return { inPort: sp.inPort, outPort: { x: ox + w, y: cy } };
+    },
+  };
+}
+
 export function layout(
   fn: FunDecl,
   vs: ViewSpec,
@@ -800,29 +987,39 @@ export function layout(
     flow: em ? "closed" : undefined,
   });
   prims.push({
-    kind: "wire",
-    path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }],
-    role: "rail",
-    state: "inert",
-    flow: flowFor(
-      em,
-      !!em?.get(fn.body.id)?.outE,
-      trueConducts(values, fn.body),
-      presumedConducts(ctx, fn.body),
-    ),
-  });
-  prims.push({
     kind: "glyph",
     at: { x: MARGIN, y: inPort.y },
     role: "power-terminal",
   });
-  prims.push({
-    kind: "glyph",
-    at: { x: ox + m.w + LEAD, y: outPort.y },
-    role: "power-terminal",
-  });
 
-  return { size: { w: ox + m.w + LEAD + MARGIN, h: oy + m.h + MARGIN }, prims };
+  // An IMPLIES already HAS its sinks — the two lamps (DESIGN §25.4). A right rail and
+  // a second power terminal on top of them would draw the same thing twice, and would
+  // claim the rule "conducts" past a breach, which it does not. This is where §25.2's
+  // observation is paid off: what was a second power terminal BECOMES the two lamps
+  // that report the verdict.
+  const twoSinks = fn.body.$type === "Implies";
+  if (!twoSinks) {
+    prims.push({
+      kind: "wire",
+      path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }],
+      role: "rail",
+      state: "inert",
+      flow: flowFor(
+        em,
+        !!em?.get(fn.body.id)?.outE,
+        trueConducts(values, fn.body),
+        presumedConducts(ctx, fn.body),
+      ),
+    });
+    prims.push({
+      kind: "glyph",
+      at: { x: ox + m.w + LEAD, y: outPort.y },
+      role: "power-terminal",
+    });
+  }
+
+  const w = ox + m.w + (twoSinks ? 0 : LEAD) + MARGIN;
+  return { size: { w, h: oy + m.h + MARGIN }, prims };
 }
 
 /** Cheap P0 metrics — proportional-ish estimate; good enough to prove centering.
