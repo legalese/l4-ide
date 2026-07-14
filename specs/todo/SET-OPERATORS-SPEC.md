@@ -12,11 +12,11 @@ nobody needs a semantics lecture to feel the problem.
 
 Its value here is **as a foil, not as an analogy** — and getting that right is the whole point.
 
-| Rung | Case                      | What is in dispute                                                        | Disease       | Fix                                   |
-| ---- | ------------------------- | ------------------------------------------------------------------------- | ------------- | ------------------------------------- |
-| 1    | `8÷2(2+2)` — 1 vs 16      | **How the tokens bind.** Nobody disputes what `÷` and `×` _mean_.          | **Syntactic** | Declared precedence; parentheses.     |
-| 2    | *Pulsifer* — `¬(A∧B∧C)` vs `(¬A)∧(¬B)∧(¬C)` | **Scope of the negation.** Operators still classical. | **Syntactic** (same disease as rung 1) | Declared precedence; parentheses. |
-| 3    | "residents of NY and NJ"  | **What `and` _denotes_** — Boolean meet, or lattice join. The parse is not in dispute. | **Semantic**  | Types + a lint. Parentheses cannot help. |
+| Rung | Case                                        | What is in dispute                                                                     | Disease                                | Fix                                      |
+| ---- | ------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------- |
+| 1    | `8÷2(2+2)` — 1 vs 16                        | **How the tokens bind.** Nobody disputes what `÷` and `×` _mean_.                      | **Syntactic**                          | Declared precedence; parentheses.        |
+| 2    | _Pulsifer_ — `¬(A∧B∧C)` vs `(¬A)∧(¬B)∧(¬C)` | **Scope of the negation.** Operators still classical.                                  | **Syntactic** (same disease as rung 1) | Declared precedence; parentheses.        |
+| 3    | "residents of NY and NJ"                    | **What `and` _denotes_** — Boolean meet, or lattice join. The parse is not in dispute. | **Semantic**                           | Types + a lint. Parentheses cannot help. |
 
 The rhetorical move: _"You might think law's and/or problem is just PEMDAS with higher stakes.
 It is — right up until it isn't."_ The reader arrives already conceding that notation can fail to
@@ -49,10 +49,10 @@ Any write-up must spend rung 3 explicitly saying: **here is where the parenthese
 
 Legal drafters write `AND` where a logician would expect `OR`, and it is not a mistake:
 
-| Clause                                                | Reading                                     | Operation      |
-| ----------------------------------------------------- | ------------------------------------------- | -------------- |
-| "cruel **and** unusual punishments"                   | must be **both**                            | conjunction ∧  |
-| "residents of New York **and** New Jersey may apply"  | resident of **either** qualifies            | union ∪        |
+| Clause                                               | Reading                          | Operation     |
+| ---------------------------------------------------- | -------------------------------- | ------------- |
+| "cruel **and** unusual punishments"                  | must be **both**                 | conjunction ∧ |
+| "residents of New York **and** New Jersey may apply" | resident of **either** qualifies | union ∪       |
 
 The second is the notorious "set-and means logical-or" case. It looks paradoxical only because
 one word is doing two jobs. Unbundle them and the paradox dissolves:
@@ -102,16 +102,16 @@ disambiguation** in a legal DSL. That combination is L4's contribution.
 
 Facts, verified against the tree:
 
-| Thing                   | Status                                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| A `SET` type            | **Does not exist.** L4 has `LIST OF a` only.                                                                |
-| Operator overloading    | **Exists**, via magic names. `jl4-core/src/L4/TypeCheck/Environment.hs:81-95` maps `__PLUS__`, `__MINUS__`, `__TIMES__`, `__DIVIDE__`, `__LT__`, `__LEQ__`, `__GT__`, `__GEQ__`, **`__AND__`**, **`__OR__`**, `__NOT__`, `__CONS__`, `__EQUALS__`. |
-| How you overload        | Define a function with the magic name; resolution is **by argument type**. See `jl4/examples/ok/overloaded.l4`, which overloads `PLUS`/`MINUS`/`TIMES`/`LESS THAN` for a `Vector` record. |
-| Library-defined containers | **Precedent exists.** `Dictionary` is declared _in the prelude_, not the compiler: `DECLARE Dictionary k v HAS contents IS A LIST OF PAIR OF k, v` (`jl4-core/libraries/prelude.l4:793`), with `dictUnion` / `dictUnionWith` alongside. |
-| `LESS`                  | Token **already exists** (`Lexer.hs:281`, `TKLess`) but the parser only ever consumes it as the two-token sequence `LESS THAN` → `Lt` (`Parser.hs:1491`). **Bare `LESS` is unclaimed.** |
-| `PLUS` / `MINUS`        | `Lexer.hs:274-275`; precedence 6, `AssocLeft` (`Parser.hs:1492-1493`).                                       |
-| `AND` / `OR`            | Precedence 3 / 2, `AssocRight` (`Parser.hs:1484-1485`).                                                      |
-| Mixfix operators        | **Exist** (`specs/done/mixfix-operators.md`). Let a library define `` a `UNION` b MEANS … `` with **no lexer change** — but backticks are required at the call site, and mixfix has **no precedence** (parentheses required). |
+| Thing                      | Status                                                                                                                                                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A `SET` type               | **Does not exist.** L4 has `LIST OF a` only.                                                                                                                                                                                                       |
+| Operator overloading       | **Exists**, via magic names. `jl4-core/src/L4/TypeCheck/Environment.hs:81-95` maps `__PLUS__`, `__MINUS__`, `__TIMES__`, `__DIVIDE__`, `__LT__`, `__LEQ__`, `__GT__`, `__GEQ__`, **`__AND__`**, **`__OR__`**, `__NOT__`, `__CONS__`, `__EQUALS__`. |
+| How you overload           | Define a function with the magic name; resolution is **by argument type**. See `jl4/examples/ok/overloaded.l4`, which overloads `PLUS`/`MINUS`/`TIMES`/`LESS THAN` for a `Vector` record.                                                          |
+| Library-defined containers | **Precedent exists.** `Dictionary` is declared _in the prelude_, not the compiler: `DECLARE Dictionary k v HAS contents IS A LIST OF PAIR OF k, v` (`jl4-core/libraries/prelude.l4:793`), with `dictUnion` / `dictUnionWith` alongside.            |
+| `LESS`                     | Token **already exists** (`Lexer.hs:281`, `TKLess`) but the parser only ever consumes it as the two-token sequence `LESS THAN` → `Lt` (`Parser.hs:1491`). **Bare `LESS` is unclaimed.**                                                            |
+| `PLUS` / `MINUS`           | `Lexer.hs:274-275`; precedence 6, `AssocLeft` (`Parser.hs:1492-1493`).                                                                                                                                                                             |
+| `AND` / `OR`               | Precedence 3 / 2, `AssocRight` (`Parser.hs:1484-1485`).                                                                                                                                                                                            |
+| Mixfix operators           | **Exist** (`specs/done/mixfix-operators.md`). Let a library define ``a `UNION` b MEANS …`` with **no lexer change** — but backticks are required at the call site, and mixfix has **no precedence** (parentheses required).                        |
 
 **The headline consequence:** almost all of this feature can ship **as prelude code, with zero
 compiler changes.** The compiler work is confined to ergonomics — bare keywords and precedence.
@@ -144,11 +144,11 @@ block on it.
 
 The **canonical, recommended** drafting vocabulary is explicit and unambiguous:
 
-| Operator            | Meaning                       | Legal register                                        |
-| ------------------- | ----------------------------- | ----------------------------------------------------- |
-| `A UNION B`         | `A ∪ B`                       | "the members of A and of B"                           |
-| `A INTERSECT B`     | `A ∩ B`                       | "those who are both"                                  |
-| `A LESS B`          | `A \ B` (relative complement) | **"all employees LESS those on probation"** — idiomatic statutory English |
+| Operator        | Meaning                       | Legal register                                                            |
+| --------------- | ----------------------------- | ------------------------------------------------------------------------- |
+| `A UNION B`     | `A ∪ B`                       | "the members of A and of B"                                               |
+| `A INTERSECT B` | `A ∩ B`                       | "those who are both"                                                      |
+| `A LESS B`      | `A \ B` (relative complement) | **"all employees LESS those on probation"** — idiomatic statutory English |
 
 `LESS` is the prize here. It reads naturally to a lawyer, it is the register legislation already
 uses for carve-outs, and — per §2 — bare `LESS` is a free slot in the grammar.
@@ -200,7 +200,7 @@ formalization** possible: the drafter can transcribe the statute's `and` verbati
 first deciding what it means, and still get the right answer.
 
 **But there is a real tension, and it is the crux of this design.** L4's product _is_
-explainability. Silently resolving `AND` by type risks *hiding* the very ambiguity we are in
+explainability. Silently resolving `AND` by type risks _hiding_ the very ambiguity we are in
 business to surface. This is our recurring **detect ≠ resolve** seam.
 
 **Decision — do both, and keep them separate:**
@@ -225,10 +225,10 @@ There is an existing and/or lint scaffold to hang this on: `jl4-core/src/L4/Lint
 
 Two routes, and they are not exclusive:
 
-| Route                              | Cost                                                            | Gets you                                                        |
-| ---------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
-| **A. Mixfix, in the prelude**      | Zero compiler change.                                            | `` A `UNION` B `` — backticks required, **no precedence** (parens everywhere). |
-| **B. Real keywords**               | Lexer entries + precedence-table rows in `Parser.hs`.            | `A UNION B INTERSECT C` — clean, and correct precedence.        |
+| Route                         | Cost                                                  | Gets you                                                                     |
+| ----------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **A. Mixfix, in the prelude** | Zero compiler change.                                 | ``A `UNION` B`` — backticks required, **no precedence** (parens everywhere). |
+| **B. Real keywords**          | Lexer entries + precedence-table rows in `Parser.hs`. | `A UNION B INTERSECT C` — clean, and correct precedence.                     |
 
 **Decision: Phase 1 ships route A** (prove the semantics, zero risk), **Phase 2 promotes to route
 B** once the vocabulary settles. Legal drafters will not tolerate backticks in production text,
@@ -236,11 +236,11 @@ so B is the real destination; A is scaffolding.
 
 **Proposed precedence for route B**, slotting into the table at `Parser.hs:1481-1497`:
 
-| Operator     | Prio | Assoc      | Rationale                                                       |
-| ------------ | ---- | ---------- | --------------------------------------------------------------- |
-| `UNION`      | 6    | `AssocLeft` | Mirrors `PLUS` (6). Union is the additive join.                 |
-| `LESS`       | 6    | `AssocLeft` | Mirrors `MINUS` (6).                                            |
-| `INTERSECT`  | 7    | `AssocLeft` | Mirrors `TIMES` (7). Gives conventional `∩` binds tighter than `∪`: `A UNION B INTERSECT C` = `A UNION (B INTERSECT C)`. ✔ |
+| Operator    | Prio | Assoc       | Rationale                                                                                                                  |
+| ----------- | ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `UNION`     | 6    | `AssocLeft` | Mirrors `PLUS` (6). Union is the additive join.                                                                            |
+| `LESS`      | 6    | `AssocLeft` | Mirrors `MINUS` (6).                                                                                                       |
+| `INTERSECT` | 7    | `AssocLeft` | Mirrors `TIMES` (7). Gives conventional `∩` binds tighter than `∪`: `A UNION B INTERSECT C` = `A UNION (B INTERSECT C)`. ✔ |
 
 All three land **above** comparisons (4) and `AND`/`OR` (3/2), so `A UNION B EQUALS C` parses as
 `(A UNION B) EQUALS C`. Correct.
@@ -294,15 +294,15 @@ anywhere.** O(n²), which is free at legal scale.
 
 We are emphatically not the first to approximate a set by a de-duplicated list. Representative:
 
-| Language / system            | How                                                                                          |
-| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| Language / system             | How                                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Prolog `library(ordsets)`** | Sets **are** sorted duplicate-free lists: `ord_union/3`, `ord_intersection/3`, `ord_subtract/3` — precisely our UNION/INTERSECT/LESS triple. Cf. `setof/3` (dedups) vs `bagof/3` (doesn't). |
-| **Erlang `ordsets`**          | Same design, inherited from Prolog.                                                           |
-| **SQL**                       | `UNION` / `INTERSECT` / `EXCEPT` over bags, with `UNION` dedup'ing and `UNION ALL` not. **Oracle spells `EXCEPT` as `MINUS`.** |
-| **Coq `Coq.Lists.ListSet`**   | `set_union`, `set_inter`, `set_diff` over lists.                                              |
-| **Scheme SRFI-1**             | "lset" operations: `lset-union`, `lset-intersection`, `lset-difference`.                      |
-| **Common Lisp**               | `union`, `intersection`, `set-difference` on lists.                                           |
-| **SETL** (1969)               | The ur-example: sets as a primitive programming construct.                                    |
+| **Erlang `ordsets`**          | Same design, inherited from Prolog.                                                                                                                                                         |
+| **SQL**                       | `UNION` / `INTERSECT` / `EXCEPT` over bags, with `UNION` dedup'ing and `UNION ALL` not. **Oracle spells `EXCEPT` as `MINUS`.**                                                              |
+| **Coq `Coq.Lists.ListSet`**   | `set_union`, `set_inter`, `set_diff` over lists.                                                                                                                                            |
+| **Scheme SRFI-1**             | "lset" operations: `lset-union`, `lset-intersection`, `lset-difference`.                                                                                                                    |
+| **Common Lisp**               | `union`, `intersection`, `set-difference` on lists.                                                                                                                                         |
+| **SETL** (1969)               | The ur-example: sets as a primitive programming construct.                                                                                                                                  |
 
 Two payoffs for us. First, **the SQL row vindicates §D2/§D3's keyword choices**: `UNION`,
 `INTERSECT`, `EXCEPT`/`MINUS` is already the vocabulary every enterprise data person knows —
@@ -314,8 +314,8 @@ than justify from first principles.
 
 `uniq` needs only **`Eq`**. `sort` needs **`Ord`**.
 
-Prolog and Erlang can represent sets as *sorted* dedup'd lists because they have a **standard
-order of terms** — a total order over *every* term (Prolog's `@=<`: `Var < Number < Atom <
+Prolog and Erlang can represent sets as _sorted_ dedup'd lists because they have a **standard
+order of terms** — a total order over _every_ term (Prolog's `@=<`: `Var < Number < Atom <
 String < Compound`). That is the enabling condition, and **L4 has not paid for it**: L4 has
 universal structural equality, but its order (`__LT__`) is restricted by `variants` to
 `["Number", "String", "Bool"]` (`Environment.hs:86`).
@@ -461,11 +461,11 @@ real, but it is a defeasible default, not a theorem — and the linguists active
 
 ### 9.1 The phenomenon has three names, one per discipline
 
-| Discipline           | Name                                                                     | Source                                    |
-| -------------------- | ------------------------------------------------------------------------ | ----------------------------------------- |
-| Formal semantics     | the **SPLIT** reading (vs. the **JOINT** reading) of DP-internal conjunction | Heycock & Zamparelli (2005)               |
-| Contract drafting    | **"Ambiguity of the Part Versus the Whole"** (MSCD ch. 11); the paradigm sub-case is **"The Ambiguity of 'Every X and Y'"** | Adams, MSCD; Adams & Kaye (2006) § IV.G   |
-| Legal-logic tradition | **"Disjunctive-Conjunctive Ambiguity"**                                  | Layman Allen, 66 Yale L.J. 833, § 10.0    |
+| Discipline            | Name                                                                                                                        | Source                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Formal semantics      | the **SPLIT** reading (vs. the **JOINT** reading) of DP-internal conjunction                                                | Heycock & Zamparelli (2005)             |
+| Contract drafting     | **"Ambiguity of the Part Versus the Whole"** (MSCD ch. 11); the paradigm sub-case is **"The Ambiguity of 'Every X and Y'"** | Adams, MSCD; Adams & Kaye (2006) § IV.G |
+| Legal-logic tradition | **"Disjunctive-Conjunctive Ambiguity"**                                                                                     | Layman Allen, 66 Yale L.J. 833, § 10.0  |
 
 ### 9.2 Yes, they collapse — and the leading practitioner authority says so outright
 
