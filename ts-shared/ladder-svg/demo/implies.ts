@@ -9,19 +9,19 @@
  *   ✓ then ✓  → GREEN      → complies
  *   ✓ then ✗  → RED        → in breach
  *
- * Run: cd ts-shared/ladder-core && npx tsx demo/implies.ts
+ * Run: cd ts-shared/ladder-svg && npx tsx demo/implies.ts
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import {
   layout,
   estimateMetrics,
-  sceneToSvg,
   sceneToAscii,
   monoMetrics,
   toMermaidRailroad,
   ASCII_GEOMETRY,
   defaultViewSpec,
-} from "../src/index.js";
+} from "@repo/ladder-core";
+import { sceneToSvg } from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
@@ -33,7 +33,7 @@ import type {
   NodeId,
   UBoolValue,
   ViewSpec,
-} from "../src/index.js";
+} from "@repo/ladder-core";
 
 let c = 0;
 const nid = () => ++c;

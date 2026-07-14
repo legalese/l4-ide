@@ -20,12 +20,12 @@
  */
 import {
   layout,
-  sceneToSvg,
   estimateMetrics,
   defaultViewSpec,
   fromVizFunDecl,
   expandSentences,
-} from "../src/index.js";
+} from "@repo/ladder-core";
+import { sceneToSvg } from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
@@ -35,7 +35,7 @@ import type {
   Provenance,
   ConnectiveStyle,
   Scene,
-} from "../src/index.js";
+} from "@repo/ladder-core";
 
 const $ = (id: string) => document.getElementById(id)!;
 const src = $("src") as HTMLTextAreaElement;

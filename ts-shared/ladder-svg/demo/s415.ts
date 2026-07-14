@@ -1,5 +1,6 @@
 /**
- * P0 demo: render Penal Code s 415 second limb (DESIGN §15.4) through ladder-core.
+ * P0 demo: render Penal Code s 415 second limb (DESIGN §15.4) through ladder-core
+ * and out through this package's SVG emit.
  *
  *   And[ Or[by-deceiving, dishonest-concealment]   "there is a deception"
  *      , intentionally, causes-harm
@@ -11,16 +12,12 @@
  *   s415-diff.svg       — the two stacked: the surplusage argument, drawn
  *   s415-folded.svg     — the harm group folded -> placeholder, to prove re-centering
  *
- * Run: cd ts-shared/ladder-core && npx tsx demo/s415.ts
+ * Run: cd ts-shared/ladder-svg && npx tsx demo/s415.ts
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import {
-  layout,
-  estimateMetrics,
-  sceneToSvg,
-  defaultViewSpec,
-} from "../src/index.js";
+import { layout, estimateMetrics, defaultViewSpec } from "@repo/ladder-core";
+import { sceneToSvg } from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
@@ -34,7 +31,7 @@ import type {
   NodeId,
   UBoolValue,
   Provenance,
-} from "../src/index.js";
+} from "@repo/ladder-core";
 
 let counter = 0;
 const nid = () => ++counter;

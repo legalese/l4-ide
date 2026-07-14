@@ -2,7 +2,7 @@
   "name": "@repo/ladder-core",
   "version": "0.0.0",
   "private": true,
-  "description": "Pure, substrate-independent ladder-diagram layout: IRExpr -> BBE -> Scene IR (no DOM). See specs/todo/ladder-diagrams-2026/DESIGN.md.",
+  "description": "Pure, substrate-independent ladder-diagram layout: IRExpr -> BBE -> Scene IR (no DOM, no rendering backend). SVG lives in @repo/ladder-svg. See specs/todo/ladder-diagrams-2026/DESIGN.md.",
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
@@ -12,12 +12,10 @@
   ],
   "scripts": {
     "clean": "git clean -fdx dist || echo 'git not available'",
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit",
-    "demo": "tsx demo/s415.ts",
-    "test": "tsx --test test/*.test.ts",
-    "standalone": "bash standalone/build.sh",
-    "playground": "node standalone/serve.mjs"
+    "demo": "tsx demo/ascii.ts",
+    "test": "tsx --test test/*.test.ts"
   },
   "packageManager": "npm@11.0.0",
   "engines": {

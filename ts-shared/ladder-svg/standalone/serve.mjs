@@ -7,7 +7,7 @@
  *      (initialize → didOpen → codeLens → executeCommand "Show decision graph")
  *      and returns every decision's RenderAsLadderInfo.funDecl.
  *
- * No SvelteKit, no Monaco, no webview. Run from ts-shared/ladder-core:
+ * No SvelteKit, no Monaco, no webview. Run from ts-shared/ladder-svg:
  *   node standalone/serve.mjs          # → http://localhost:8731
  * Env: JL4_LSP_PORT (default 5007), PORT (default 8731), REPO (auto).
  */
@@ -19,8 +19,8 @@ import { fileURLToPath } from "node:url";
 import net from "node:net";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CORE = resolve(HERE, "..");
-const REPO = process.env.REPO || resolve(CORE, "../..");
+const PKG = resolve(HERE, "..");
+const REPO = process.env.REPO || resolve(PKG, "../..");
 const LIBS = resolve(REPO, "jl4-core/libraries");
 const ROOT_URI = "file://" + LIBS;
 const HTTP_PORT = Number(process.env.PORT || 8731);
@@ -39,7 +39,7 @@ const build = spawnSync(
     "--format=iife",
     `--outfile=${resolve(DIST, "playground.js")}`,
   ],
-  { cwd: CORE, stdio: "inherit" },
+  { cwd: PKG, stdio: "inherit" },
 );
 if (build.status !== 0) {
   console.error("[playground] esbuild failed");

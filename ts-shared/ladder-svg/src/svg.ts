@@ -1,9 +1,11 @@
 /**
- * Scene IR -> SVG string (the shared `ladder-svg` emit, DESIGN §4; for P0 it lives
- * here, to be split out per §12). Canonical text is <text>/<tspan> so the same
+ * Scene IR -> SVG string (DESIGN §4). Canonical text is <text>/<tspan> so the same
  * emit feeds screen AND print (§4.4). `theme` maps state -> ink; no second layout.
+ *
+ * The import below is deliberately `import type`: the Scene IR is a *contract*, not
+ * a library, so this backend carries no runtime dependency on the layout engine.
  */
-import type { Scene, ScenePrim, State, Theme, Flow } from "./types.js";
+import type { Scene, ScenePrim, State, Theme, Flow } from "@repo/ladder-core";
 
 interface Palette {
   live: string;
