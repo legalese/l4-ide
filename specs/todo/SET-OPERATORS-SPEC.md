@@ -852,8 +852,14 @@ Picarda, quoted at ¶28:
 > '**otherwise called**' … However, this use of the word 'or' is **possible only if the words or
 > phrases which it joins connote the same thing and are interchangeable one with the other**."
 
-Lord Simonds in _Chichester_ is to the same effect. And the judge's test is **literally a set-overlap
-computation** (¶29):
+_Chichester_ is to the same effect — and it is now **verified first-hand** (BAILII [1944] UKHL 2 =
+[1944] AC 341; §12.6). The House of Lords holds "charitable **or** benevolent" void for
+uncertainty precisely because the two words do **not** coincide: _"the two words 'charitable' and
+'benevolent' do not ordinarily mean the same thing; they overlap … but also [each covers]
+something which is not covered by the other."_ The exegetical escape is available _only_ when the
+alternatives are convertible — the Lords describe it as _"an exegetical link between convertible
+and equivalent synonyms."_ That is the co-extensiveness (`A ≡ B`) precondition, from the primary
+source. And the judge's test in _Koh Lau Keow_ is **literally a set-overlap computation** (¶29):
 
 > "This poses the question **whether 'home' and 'sanctuary' sufficiently overlap in meaning** such
 > that 'or' can be interpreted exegetically."
@@ -1007,20 +1013,19 @@ _reconstruction of the legal test_.
 **legal-data-hunter has _zero_ sources for GB** (`discover_sources("GB")` → `[]`), so first-hand
 verification of the English/Commonwealth cases had to come from elsewhere. Current status:
 
-| Case                                                    | Status                             | Source of verification                        |
-| ------------------------------------------------------- | ---------------------------------- | --------------------------------------------- |
-| _A-G of the Bahamas v Royal Trust Co_ [1986] 1 WLR 1001 | ✅ **VERIFIED first-hand** (§12.5) | BAILII [1986] UKPC 34 (PDF)                   |
-| _Chichester Diocesan Fund v Simpson_ [1944] AC 341      | 🟡 second-best                     | quoted in verified _Koh Lau Keow_ ¶28         |
-| _Re Best_ [1904] 2 Ch 354                               | 🔴 **unverified**                  | secondary reproductions only                  |
-| _Re Eades_ [1920] 2 Ch 353 (newly surfaced)             | 🟡 second-best                     | quoted _in Royal Trust_, now verified (§12.5) |
+| Case                                                    | Status                             | Source of verification                               |
+| ------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------- |
+| _A-G of the Bahamas v Royal Trust Co_ [1986] 1 WLR 1001 | ✅ **VERIFIED first-hand** (§12.5) | BAILII [1986] UKPC 34 (PDF)                          |
+| _Chichester Diocesan Fund v Simpson_ [1944] AC 341      | ✅ **VERIFIED first-hand** (§12.6) | BAILII [1944] UKHL 2 (full HTML)                     |
+| _Re Best_ [1904] 2 Ch 354                               | 🟡 second-best (§12.6)             | **characterised by the HL in verified _Chichester_** |
+| _Re Eades_ [1920] 2 Ch 353                              | 🟡 second-best                     | quoted _in Royal Trust_, now verified (§12.5)        |
 
-**_Re Best_ is now the sole remaining first-hand gap.** It is English Chancery, so it is BAILII's
-territory, not CommonLII's — and BAILII's coverage of 1904 Chancery reports is thin. It must be
-pulled from **ICLR / Westlaw / HeinOnline** before publication. It is load-bearing for the
-trichotomy (§11.5, the "proper overlap ⇒ literal" row), so this is now the top citation risk in
-the document. Mitigant: _Royal Trust_ **itself** cites _Re Eades_ [1920] 2 Ch 353 for the same
-conjunctive/disjunctive dichotomy, so a verified same-line substitute is available if _Re Best_
-cannot be obtained.
+**No case now rests on secondary reproductions alone.** _Re Best_ is the only one whose _own
+report_ is still unobtained — but its holding is no longer uncorroborated: the House of Lords in
+_Chichester_ (verified) describes it directly (§12.6). For publication it is still worth pulling
+the _Re Best_ report itself from **ICLR / Westlaw / HeinOnline**, but it is no longer a bare
+citation risk, and _Re Eades_ [1920] 2 Ch 353 (cited inside _Royal Trust_) stands as a further
+same-line fallback.
 
 ### 12.5 ✅ _Royal Trust_ retrieved and verified — BAILII [1986] UKPC 34
 
@@ -1053,3 +1058,38 @@ second authority in the same line.
 **Correction to an earlier prediction:** §12.4 previously guessed BAILII's `UKPC` collection was
 "substantively post-1996." Wrong — BAILII has backfilled 1986 (the case is [1986] UKPC 34). The
 obstacle was never coverage; it was the Leopard.
+
+### 12.6 ✅ _Chichester_ retrieved — and it cracks _Re Best_ second-hand
+
+Searching BAILII for _Re Best_ (2026-07-15) returned **0 matches** across two queries (the "Re
+Best" hits are all modern _best-interests_ cases). **_Re Best_ [1904] 2 Ch 354 is not on BAILII**
+— unsurprising, as BAILII's free English holdings skip Law Reports Chancery of that vintage.
+
+But the same search surfaced **_Chichester Diocesan Fund v Simpson_ [1944] UKHL 2** (= [1944] AC
+341 = [1944] 2 All ER 60) as **full text** — and it does double duty:
+
+1. **It verifies §11.3's _Chichester_ dictum first-hand.** The House of Lords holds "charitable
+   **or** benevolent" void for uncertainty because the words do not coincide — _"the two words
+   'charitable' and 'benevolent' do not ordinarily mean the same thing; they overlap … but also
+   [each covers] something which is not covered by the other"_ — and confines the exegetical
+   reading to _"an exegetical link between convertible and equivalent synonyms."_ That is exactly
+   the `A ≡ B` co-extensiveness precondition of the trichotomy's EXEGETICAL row (§11.5), in the
+   Lords' own words.
+
+2. **It characterises _Re Best_ directly**, which is the next best thing to the report itself:
+
+   > "the strict rule only applies if … the two substantives or adjectives are to be read
+   > disjunctively. If they are to be read conjunctively, then there is only one class or area of
+   > selection, and if that is charitable, the bequest is good. **Such a case is illustrated by
+   > _in re Best_, 1904, 2 Ch. 354, where the two adjectives 'charitable' and 'benevolent,'
+   > coupled it is true by 'and' … were held to describe a single class, the members of which
+   > combine the qualities of charitable and benevolent.**"
+
+   That is precisely the §10.4 / §11.5 claim for _Re Best_ — "charitable **and** benevolent" read
+   **conjunctively** ⇒ one (non-vacuous) class ⇒ gift **valid** — now underwritten by a verified
+   House of Lords speech. The trichotomy's "proper overlap ⇒ literal/conjunctive" row is
+   confirmed against primary authority even though the 1904 report stayed out of reach.
+
+**Net effect on §12.4:** two rows upgrade at once. _Chichester_ 🟡→✅ (first-hand), and _Re Best_
+🔴→🟡 (characterised inside verified _Chichester_). No claim in this document now rests on
+secondary reproductions alone.
