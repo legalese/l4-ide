@@ -920,3 +920,98 @@ behind it, in the jurisdiction where L4's pilots actually run.
 **TODO before publication:** pull the two SGCA judgments in full from elitigation (the lawplain
 `body_text` truncates at 60k) and verify the paragraph numbers quoted above against the official
 report.
+
+## 12. Citation verification against the official reporter (legal-data-hunter, 2026-07-15)
+
+Chased the citations flagged as unverified in §9.6 and §10.4. Pulled **_Pulsifer_ from the official
+U.S. Reports preliminary print (601 U.S. 124–186)** — so the pin cites below are to the **official
+pagination**, not the slip opinion.
+
+### 12.1 Verified verbatim, with pin cites
+
+| Claim (as written in §10.1)                                              | Status          | Pin cite                |
+| ------------------------------------------------------------------------ | --------------- | ----------------------- |
+| "two grammatically permissible ways … not a matter of grammatical rules" | ✅ **verbatim** | 601 U.S. at **133**     |
+| "Really, it all depends."                                                | ✅ **verbatim** | 601 U.S. at **140**     |
+| drink-and-drive vs. eat-and-drink-before-surgery                         | ✅ **verbatim** | 601 U.S. at **141**     |
+| Gorsuch's "charitable and educational institutions"                      | ✅ **verbatim** | 601 U.S. at **166–167** |
+
+Bonus catch (majority, at 140): the Court notes **the dissent concedes the point** — "even the
+dissent must in the end concede … that whether a speaker 'intend[s] for a listener to distribute
+words implicitly' depends on the context."
+
+### 12.2 Two gaps from §9.6 now closed — and **Kirk is fully vindicated**
+
+Pass 1 wrongly told us to discard Maurice Kirk (§10.7 already flagged this; here is the receipt):
+
+> **"M. Kirk, _Legal Drafting: The Ambiguity of 'And' and 'Or_,' 2 Tex. Tech. L. Rev. 235, 239–240
+> (1971)"** — cited by **Gorsuch, J., dissenting**, 601 U.S. at 166.
+
+Alongside him, two more pass-1 gaps close:
+
+- **Reed Dickerson**, _The Fundamentals of Legal Drafting_ § 6.2, pp. 109–110 (2d ed. 1986) —
+  cited by Gorsuch at 166. (Pass 1 only ever saw Dickerson second-hand.)
+- **Senate Office of the Legislative Counsel, _Legislative Drafting Manual_ 64–65 (1997)** — cited
+  by Gorsuch at ~161. **This is the legislative-drafting-manual authority pass 1 declared
+  "effectively UNANSWERED."**
+
+And **Ken Adams is cited by the _majority_** (601 U.S. at 136–37) — for the _distributed_ reading
+under a negative:
+
+> "a manual of contract drafting observes that '[t]he more natural meaning' of '**Acme shall not
+> notify Able and Baker**' is '**Acme shall not notify Able and shall not notify Baker**' …
+> K. Adams, _A Manual of Style for Contract Drafting_ § 11.16, p. 212 (3d ed. 2013)."
+
+So Adams lands on the Government's side of the De Morgan question. Gorsuch cites him too
+(§§ 11.9–11.11, p. 211) — **both opinions cite MSCD.**
+
+### 12.3 ⭐ A **fourth** trigger, and it is already L4's type distinction
+
+Kirk and Dickerson, via Gorsuch (601 U.S. at 166–67), locate the ambiguity in **grammatical
+number** — and say so in terms that are, for us, startling:
+
+> "that '**singular**' construction '**tends to avoid the ambiguity**' about distribution that a
+> '**plural**' construction can invite. … The multiple '**institutions**' might distribute across
+> the multiple listed traits to describe both 'charitable institutions and educational
+> institutions.' … Or the term 'institutions' might not distribute, so the phrase describes only
+> institutions that are both charitable and educational. **But if there is just a single
+> 'institution,' any ambiguity dissipates**: 'A charitable and educational institution' is an
+> institution with both traits."
+
+Read that again with L4's types in mind:
+
+| Surface form                                      | Grammatical number | What `AND` is doing                                     | L4 type   |
+| ------------------------------------------------- | ------------------ | ------------------------------------------------------- | --------- |
+| "a charitable **and** educational institution"    | **singular**       | Boolean conjunction of two **predicates** on one entity | `BOOLEAN` |
+| "charitable **and** educational institution**s**" | **plural**         | join over two **collections**                           | `Set a`   |
+
+**The courts' "number" trigger _is_ L4's type distinction.** Singular head ⇒ scalar ⇒ predicate
+conjunction (∧), unambiguous. Plural head ⇒ collection ⇒ `Set`-valued, and the union reading
+becomes available. This is the same discriminator Heycock & Zamparelli reach (number, not the
+conjunction — §9.3), the same one Winter reaches (WS blocked under the indefinite article — §10.3),
+and now the same one the Supreme Court of the United States reaches by way of a 1971 Texas Tech law
+review article.
+
+**Four independent traditions, one discriminator, and it is the thing our type checker already
+computes.** That is the strongest argument in the whole spec for doing this in a typed language
+rather than a style guide — and it means §D4's type-directed dispatch is not a hack but a
+_reconstruction of the legal test_.
+
+**Amend §11.6:** add number/arity as the **zeroth** check — if the operands are scalars, `AND` is
+`∧` and no diagnostic fires at all. The defeaters only ever apply to `Set`-typed operands.
+
+### 12.4 Still unverified — a hard corpus gap
+
+**legal-data-hunter has _zero_ sources for GB** (`discover_sources("GB")` → `[]`). So the entire
+English/Commonwealth line remains **unverified at first hand**:
+
+- _A-G of the Bahamas v Royal Trust Co_ [1986] 1 WLR 1001 (PC) — §10.4, §11.5
+- _Chichester Diocesan Fund v Simpson_ [1944] AC 341 — §11.3
+- _Re Best_ [1904] 2 Ch 354 — §10.4
+
+These currently rest on (a) consistent secondary reproductions and (b) — for _Chichester_ and
+Picarda — **quotation inside _Koh Lau Keow_ [2013] SGHC 155 ¶28**, which _is_ a verified primary
+source and quotes Lord Simonds directly. That is a decent second-best for _Chichester_. **_Royal
+Trust_ and _Re Best_ have no first-hand verification and must be pulled from Westlaw/ICLR before
+publication.** They are load-bearing for the trichotomy (§11.5), so this is the top remaining
+citation risk in this document.
