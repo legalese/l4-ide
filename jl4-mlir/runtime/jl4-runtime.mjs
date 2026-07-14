@@ -540,7 +540,19 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
       "deontic function has no compiled contract metadata",
     );
   }
-  const t0 = Number(startTime);
+  // Deontic time arithmetic runs in EXACT rationals, never raw f64. jl4-service
+  // parses each request number as Aeson Scientific (exact base-10) and does the
+  // deadline arithmetic in Rational, emitting `fromRational` as the wire Double.
+  // The SAME single op in JS f64 (e.g. -0.95 + 1, or 15.1 - 2.2) rounds to a
+  // DIFFERENT double than fromRational(exact), so the shortest-round-trip wire
+  // bytes diverged for fractional inputs — a silent-wrong at supported:true
+  // (deadline 12.899999999999999 vs the reference's 12.9). We recover each
+  // input's exact decimal via `String(x)` (JS shortest-round-trip == the user's
+  // source decimal for the request values in scope) and parse it losslessly,
+  // mirroring the args path's `ratFromDecimalString(String(value))`. Integer
+  // inputs are unaffected (String(5)="5" -> 5/1 -> bare "5" on the wire).
+  const toRat = (x) => ratFromDecimalString(String(x));
+  const t0 = toRat(startTime);
   // jl4-service replays the event LIST in SUBMISSION ORDER — jl4-core's
   // ScrutinizeEvents walks the Cons chain exactly as given (CodeGen.hs builds
   // it with no sort), and each event is timing-checked against the current
@@ -583,9 +595,9 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
 
     const modal = current.modal || "MUST";
     const deadlineLit =
-      current.deadline == null ? null : Number(current.deadline);
+      current.deadline == null ? null : toRat(current.deadline);
     const absoluteDeadline =
-      deadlineLit == null ? null : obligationStart + deadlineLit;
+      deadlineLit == null ? null : ratAdd(obligationStart, deadlineLit);
 
     // Walk the remaining events IN ORDER, mirroring jl4-core's
     // ScrutinizeEvent loop (EvaluateLazy/Machine.hs:942-1057):
@@ -605,8 +617,8 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     let lastObserved = obligationStart;
     for (let i = cursor; i < evts.length; i++) {
       const ev = evts[i];
-      const stamp = Number(ev.at);
-      if (absoluteDeadline != null && stamp > absoluteDeadline) {
+      const stamp = toRat(ev.at);
+      if (absoluteDeadline != null && ratCmp(stamp, absoluteDeadline) > 0) {
         // Deadline lapsed at this event.
         if (modal === "MAY") {
           // Permission not exercised in time — that's fine; continue with
@@ -668,14 +680,18 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     // jl4-core returns the still-open ValObligation here for EVERY modal
     // (Machine.hs:939): a MAY that was simply never exercised surfaces as an
     // open permission, NOT FULFILLED.
+    // Exact residual: absoluteDeadline − (stamp of the LAST observed event).
+    // Kept as a rational so the value wire renders `fromRational` bytes.
     const remainingNum =
       observedAny && absoluteDeadline != null
-        ? absoluteDeadline - lastObserved
+        ? ratSub(absoluteDeadline, lastObserved)
         : null;
     return {
       value: deonticObligationToWire(current, ctx, remainingNum, observedAny),
       residual: current,
-      residualDeadline: remainingNum,
+      // The trace path (non-gated) formats residualDeadline via String();
+      // hand it the correctly-rounded Double so String() stays a number.
+      residualDeadline: remainingNum == null ? null : ratToDouble(remainingNum),
       ctx,
     };
   }
@@ -828,10 +844,13 @@ function deonticObligationToWire(o, ctx, remainingNum, observed) {
   }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
-  // walker picks which one to pass.
+  // walker picks which one to pass. When present, 'remainingNum' is an
+  // EXACT rational; ratToAesonValue emits it as the reference does
+  // (`fromRational` -> Aeson Double for non-integers, bare integer for
+  // integers) so fractional residual deadlines are byte-identical.
   const deadline =
     remainingNum != null
-      ? remainingNum
+      ? ratToAesonValue(remainingNum)
       : o.deadline == null
         ? null
         : String(o.deadline);
@@ -916,14 +935,19 @@ function deonticBreachToWire(b) {
   //     clause-less @LEST BREACH@ where party/detail are null (Jl4.hs:1228).
   if (b && b._deadlineMissed) {
     const d = b._deadlineMissed;
+    // 'deadline' (absolute, = obligationStart + WITHIN) and 'timestamp'
+    // (the lapsing event's stamp) are EXACT rationals; ratToAesonValue
+    // renders them the way jl4-service's `fromRational` does so fractional
+    // breach numbers stay byte-identical (0.05 -> "5.0e-2", not the f64
+    // "5.0000000000000044e-2").
     return {
       BREACH: {
-        deadline: d.deadline,
+        deadline: ratToAesonValue(d.deadline),
         eventAction: d.eventAction,
         eventParty: d.eventParty,
         obligationAction: d.obligationAction,
         reason: "deadline_missed",
-        timestamp: d.timestamp,
+        timestamp: ratToAesonValue(d.timestamp),
       },
     };
   }
