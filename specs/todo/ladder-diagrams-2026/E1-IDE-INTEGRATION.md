@@ -113,11 +113,14 @@ Also: Zen mode's edge labels (there are no edges to label), and `expandImplies`'
 
 ## 5. Risks
 
-- **R1 (highest) — BBE layout quality on real statutes is unmeasured.** BBE is align-then-stack
-  with no edge routing; a wide OR of long-prose leaves may blow the pane. **Cheap spike, and the
-  tooling already exists:** drive `ladder-svg/standalone/serve.mjs` (the headless LSP bridge) over
-  every `.l4` in `jl4/ok/**` and record `Scene.size`. **Run this before committing to Step 4** — a
-  bad answer promotes scale-modes/auto-fold onto E1's critical path.
+- **R1 — RESOLVED, and it was the wrong worry.** See §6 below. Verdict: **BBE survives; go to
+  Step 4.** But the spike found a different and sharper problem than the one it was looking for.
+
+  _(Original framing, kept because the shape of the miss is instructive: "BBE is align-then-stack
+  with no edge routing; a wide OR of long-prose leaves may blow the pane. A bad answer promotes
+  scale-modes/auto-fold onto E1's critical path." Fan-out turned out to be a non-problem, and
+  auto-fold would not have helped with the real one — you cannot fold a single leaf.)_
+
 - **R2 — repeated atoms.** One `Unique` can sit at several `NodeId`s. A binding must fan out to
   _all_ positions or one diagram will show the same atom with two different values.
 - **R3 — theming/CSP in the VS Code webview.** Unknown whether `{@html <svg>}` picks up the
@@ -129,3 +132,63 @@ Also: Zen mode's edge labels (there are no edges to label), and `expandImplies`'
 - **R7 — an armed trap (see TODO G10).** `types.ts:98` promises nested `Implies` falls back to
   `¬P ∨ Q`; `layout.ts:627` sends _every_ `Implies` to `measureImplies` with no pre-pass. Unreachable
   only because the Haskell expands nested implications first. Fix the guard or fix the comment.
+
+---
+
+## 6. The R1 spike — result
+
+`ts-shared/ladder-svg/spike/corpus-sizes.ts` drives **every decision in the corpus** through
+`jl4-lsp → RenderAsLadderInfo → fromVizFunDecl → layout` and records the `Scene` size. Run:
+`npx tsx spike/corpus-sizes.ts doc jl4-core/libraries jl4/examples/ok jl4/ok`.
+
+**313 files, 442 decisions laid out, 1 error** (a transient LSP `BadDependency`). Widths in
+`estimateMetrics` px — the crude estimator, not real browser metrics (S7), so treat as ±15%.
+
+|                | p50 | p90  | p99  | max      |
+| -------------- | --- | ---- | ---- | -------- |
+| width          | 530 | 1134 | 2882 | **4372** |
+| height         | 180 | 245  | 376  | 636      |
+| leaves         | 1   | 3    | —    | 18       |
+| depth          | 1   | 3    | —    | 7        |
+| **OR fan-out** | 0   | 2    | —    | **8**    |
+
+### The verdict: BBE survives. Proceed to Step 4.
+
+Nothing in the corpus is pathological for the _layout engine_. Heights are trivial throughout
+(max 636px — vertical stacking is a non-issue). **OR fan-out maxes at 8 across 442 decisions**,
+and the worst _compound_ diagram — s415's `second limb`, 7 leaves with an 8-way fan — lands at
+2866×444. That is ~3× a pane width: pannable, not a redesign. **The predicted pathology does not
+occur**, and scale-modes/auto-fold stay off E1's critical path.
+
+### But the spike found a different problem, and a worse-shaped one
+
+**17 of the 22 widest diagrams have exactly ONE leaf.** The width has nothing to do with structure.
+It is one box with a very long label — and the label is _raw L4 source_:
+
+```
+4372 × 180 px   leaves=1  depth=1  fan=0   `is adult`   (jl4-core/libraries/legal-persons.l4)
+   longest leaf label (247 chars):
+   "CONSIDER jurisdictionCode WHEN `United States alpha-2` THEN …"
+```
+
+Every construct L4 has that is **not** boolean And/Or — `CONSIDER`, `BRANCH` — collapses into a
+single leaf whose label is the entire expression's source text. **38 labels in the corpus contain a
+literal newline.** BBE does not wrap, and SVG `<text>` does not either, so a whole decision table
+renders as a 4372px single-line ribbon with its newlines collapsed to spaces. Label length is
+p50=24 chars but p99=336, max=526: a bimodal corpus, and the tail is all structured constructs.
+
+This is the **§23 membrane** (D1/R6) arriving with teeth. R6 recorded it as cosmetic — "`first limb
+OF s, i` loses its arguments, ship without it". That was an under-diagnosis: it is not decoration
+being lost, it is a **decision table rendered as an unreadable ribbon of source code**.
+
+Two distinct fixes, and only the first is E1's:
+
+1. **Leaf-label wrapping/elision in BBE** — _promote into E1, at Step 2_ (it lives next to the
+   metrics work, since both are about how text occupies a box). Wrap to N lines and grow the box's
+   height, or elide with the full text in a tooltip. Without it the widest real modules render as
+   ribbons. **Note this is a genuine BBE/SVG regression risk relative to Dagre**, whose nodes are
+   HTML `<div>`s that wrap for free — so the old renderer may well handle these gracefully today.
+   _Unverified: needs a live browser check, and it is the first thing the Step 5 side-by-side will
+   show us._
+2. **§23/D1 — draw a `CONSIDER`/`BRANCH` as a structured leaf** (a table inside the membrane), not
+   a box with a paragraph in it. Post-E1, and now clearly the highest-value item in task D.
