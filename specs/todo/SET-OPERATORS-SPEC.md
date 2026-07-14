@@ -24,9 +24,11 @@ fix meaning, then meets a failure mode that **parenthesization cannot touch**.
 
 Rung 2 is the bridge: **PEMDAS with a prison sentence.** Same underdetermined parse tree, except
 the disagreement ran 6–3 in the Supreme Court and a man's liberty turned on it.
-_(Provisional — pending verification that Pulsifer is genuinely a negation-scope case and not a
-set-union case. If it is a scope case it belongs on rung 2, and citing it for rung 3 would be
-precisely the category error this spec exists to prevent.)_
+**VERIFIED (§10.1): _Pulsifer_ is a negation-scope case, not a set-union case.** The majority kept
+`and` **conjunctive** throughout and distributed the negated verb phrase — `¬A ∧ ¬B ∧ ¬C`, which
+is `¬(A ∨ B ∨ C)` by De Morgan. **The negation does the union-producing work, not the
+conjunction.** Anyone citing _Pulsifer_ for "`and` means union" is overreading it — which is
+precisely the category error this spec exists to prevent. It belongs on rung 2 and nowhere else.
 
 **This yields L4's actual contribution: two mechanisms, because there are two diseases.**
 
@@ -576,3 +578,195 @@ right answer, only that **the choice becomes explicit**.
   place where and/or surface syntax got hard.
 - `jl4/examples/ok/overloaded.l4` — the overloading mechanism, by example.
 - `jl4-core/libraries/prelude.l4:789+` — `Dictionary`, the template for a library container type.
+
+## 10. The judicial and canon authority (researched 2026-07-15)
+
+Second research pass, four targets, primary sources with adversarial verification. **Headline: the
+authority _complicates_ the union claim, and on the strict question of DENOTATION it leans
+_contradict_ — while strongly supporting the availability of the union _reading_.** It also
+hands us a **new and better lint trigger** (§10.5), which is the most valuable thing to come out
+of either pass.
+
+### 10.1 _Pulsifer v. United States_, 601 U.S. 124 (2024) — a De Morgan case. Rung 2 confirmed.
+
+Kagan, J., 6–3 (Roberts, Thomas, Alito, Kavanaugh, Barrett; **Gorsuch dissenting**, joined by
+Sotomayor and Jackson). On 18 U.S.C. § 3553(f)(1) — "the defendant does not have— (A) … (B) …
+**and** (C) …".
+
+**The Court never turned `and` into `or`.** It kept `and` conjunctive and distributed the negated
+verb phrase across the list: `¬A ∧ ¬B ∧ ¬C`, which is `¬(A ∨ B ∨ C)` by De Morgan. The
+union-of-disqualifiers effect is produced **entirely by the negation**. The "`and` means `or`"
+theory was the Government's _abandoned_ position, disparaged by the dissent and never adopted.
+
+The passage that matters most to us (majority, slip op.):
+
+> "There are **two grammatically permissible** ways to read Paragraph (f)(1). … The choice
+> between the two … **is not a matter of grammatical rules**. … Paragraph (f)(1) cannot be
+> construed in the abstract, as if all a reader has to go on is the stripped-down phrase 'the
+> defendant does not have A, B, and C.' That might require the defendant not to have (A, B, and
+> C) — i.e., the combination of the three. Or it might require the defendant not to have A, and
+> not to have B, and not to have C — i.e., each of the three. **Really, it all depends.**"
+
+And the discriminator is **the content of the conjuncts, not the syntax**:
+
+> "We interpret the injunction against **drinking and driving** in Pulsifer's way — 'do not (A and
+> B)' — because the two activities are usually perilous **only in combination**. We interpret the
+> injunction against **eating and drinking before surgery** in the Government's way — 'do not A
+> and do not B' — because **each activity alone** is likely to have adverse consequence."
+
+Two delicious details. The Court cites **Huddleston & Pullum's CGEL** (1298–99) — and, at n.4,
+**Ken Adams's MSCD § 11.16**. The Supreme Court and this spec are reading the same books.
+Separately, **Gorsuch's dissent independently reproduces the joint/split distinction** for
+"charitable and educational institutions," and locates it in the **plurality of the head noun**,
+not in `and` — a singular head ("a charitable and educational institution") kills the ambiguity.
+That converges with Heycock & Zamparelli from the bench.
+
+### 10.2 Scalia & Garner, _Reading Law_ § 12 — the canon preserves De Morgan, and _licenses_ rung 3
+
+The Conjunctive/Disjunctive Canon opens: _"And joins a conjunctive list, or a disjunctive list —
+but with negatives, plurals, and various specific wordings there are nuances."_
+
+**It does _not_ encode a negation-context collapse.** Verbatim: _"**After a negative, the
+conjunctive `and` is still conjunctive**: Don't drink and drive. You can do either one, but you
+can't do them both."_ They name the **"conjunctive negative proof"** (`¬(A∧B∧C)`) against the
+**"disjunctive negative proof"** (`¬A∧¬B∧¬C`), and **invoke De Morgan's theorem by name**. So the
+canon is on rung 2's side. (Note: the _Pulsifer_ majority went **around** this canon rather than
+through it, never citing pp. 119–120.)
+
+**But canon § 12 #4 hands us rung 3 outright** — _"Every (each) husband and father"_ = _"Every
+husband and every father."_ **Scalia & Garner's own canon licenses the distributive/union reading
+under a universal quantifier.** That is the single strongest canon-based support for the NY/NJ
+reading, and it is hiding inside the very canon that otherwise insists `and` is conjunctive.
+(#7 "Variant Wordings" separately concedes and/or indifference in a permissive menu lead-in.)
+
+Empirical criticism worth knowing: **Tobia, Slocum & Nourse**, _Statutory Interpretation from the
+Outside_, 122 Colum. L. Rev. 213 (2022), tested the canon on ~4,500 laypeople. Ordinary readers
+read bare `and` conjunctively (canon supported), but `or` came out mixed — _"In some contexts,
+'or' actually expresses 'and' and vice versa."_ **The failure is on the `or` side, not the `and`
+side**, and the stimuli were neither benefit-conferring nor negated, so it does not directly test
+our problem.
+
+### 10.3 Yoad Winter — the term is **"wide scope" (WS) coordination**, and union is _derived_
+
+Winter's label for our configuration is **wide scope coordination**: `[X coor X] Y` has a WS
+reading iff it can be paraphrased `[X Y] coor [X Y]`. His attested datum is the exact structural
+analogue of NY/NJ — coordination in the **restrictor of a universal**:
+
+> "(13) John likes **every boy and girl** in the class. → WS: John likes every boy in the class
+> and likes every girl in the class." (WS attested.)
+> "(14) John likes every boy **or** girl in the class." (WS **unattested**.)
+
+**Mechanism: (a), not (b).** Conjunction is **syncategorematic** — `and` can be _meaningless_,
+with the Boolean meet supplied by a grammatical operation; the WS reading is derived via a
+Cresswell-style **structured meaning** to which the quantifier applies **pointwise**, yielding a
+**conjunction of quantifiers**. Because `every(A) ∧ every(B) ≡ every(A ∪ B)`, **the union is a
+derived truth-conditional _equivalence_ for universals — not the denotation of `and`.** Dalrymple's
+Strongest Meaning Hypothesis plays **no** role.
+
+⚠️ **Winter explicitly assigns union to `or`**: `[officer or gentleman] = o′ ∪ g′`, versus
+`[officer and gentleman] = o′ ∩ g′`. So **do not cite Winter for "`and` = union"** either.
+
+Caveats the verifiers insisted on: this is the **1995 SALT5 paper**, not the 2001 MIT Press book
+(the book was 403-walled; the dissertation summary is font-garbled), so read it as time-indexed;
+the vote was 2–1; and H&Z classify Winter as an _intersection_ theorist whom their Set Product
+supersedes. Also: **WS is blocked under an indefinite article** — _"?John likes some man and
+woman."_
+
+### 10.4 _A-G of the Bahamas v. Royal Trust Co_ [1986] 1 WLR 1001 (PC) — real AND→disjunctive
+
+Verified in substance. Lord Oliver of Aylmerton, for the Board. A bequest for "the **education and
+welfare** of Bahamian children" was held **not** a valid charitable trust because the phrase fell
+to be read **disjunctively** — and "welfare" alone is not exclusively charitable, so the fund
+could be applied in perpetuity to non-charitable purposes. **This is the clean, negation-free
+judicial instance of AND→union** that _Pulsifer_ is not.
+
+But read the ratio closely, because it is **not a semantic rule about `and`**:
+
+> "it is not easy to imagine a purpose connected with the education of a child which is not also a
+> purpose for the child's welfare. Thus, if welfare is to be given any separate meaning at all it
+> must be something different from and wider than mere education, **for otherwise the word becomes
+> otiose** … the phrase 'education and welfare' in this will inevitably fall[s] to be construed
+> disjunctively."
+
+That is an **anti-surplusage / anti-otiosity** argument — structurally **the same move _Pulsifer_
+makes** (Subparagraph A does no work on the joint reading). In both jurisdictions the union
+reading is **bought with a redundancy canon, not with the conjunction's lexical meaning**.
+
+**And the contrast case proves it.** _Re Best_ [1904] 2 Ch 354 read "charitable **and** benevolent"
+**conjunctively** and **saved** the gift. Same connective, opposite result. What distinguishes them
+is **not the word `and`** but whether the intersective reading is **vacuous**: in _Royal Trust_,
+education ⊆ welfare, so the intersection collapses to "education" and "welfare" does no work; in
+_Re Best_, charitable ∩ benevolent is a contentful set.
+
+_(Verification limit: the law report itself is behind Westlaw/vLex. The ratio and Lord Oliver's
+authorship rest on multiple consistent secondary reproductions — reliable but not confirmed at
+first hand. Get the report before quoting it in a paper.)_
+
+### 10.5 ⭐ The payoff: **non-vacuity is the trigger — and we can compute it**
+
+Two entirely independent traditions converge on the same discriminator, and neither of them is
+the conjunction:
+
+- **English charity law** (_Royal Trust_ vs. _Re Best_): the union reading wins exactly when the
+  intersective reading would render a term **otiose**.
+- **Boolean semantics** (Winter): _"every pianist over 60 **and** below 20 years old"_ — "the
+  prominent reading is the contingent WS and **not the vacuously true** NS with the empty common
+  noun set."
+
+**The intersective reading is rejected when it is empty or degenerate.** That is a redundancy
+canon in law and a non-vacuity preference in semantics, and **it is mechanically checkable.**
+
+**This is a better lint than §D4's.** §D4 fires on _type_ alone ("these operands are `Set`s"),
+which is a blunt instrument that will cry wolf on every set-valued `AND`. Instead:
+
+> **Fire the diagnostic when `A INTERSECT B` is empty (or provably empty), because that is
+> precisely when the law says the drafter cannot have meant the intersection.**
+
+```
+warning: `NY-residents AND NJ-residents` — the intersective reading denotes the EMPTY SET.
+         A drafter is presumed not to intend a term to be otiose
+         (A-G of the Bahamas v Royal Trust Co [1986] 1 WLR 1001).
+         Did you mean UNION?
+   fix:  NY-residents UNION NJ-residents
+```
+
+That is _Royal Trust_'s otiosity canon, **automated** — and it is cheap, because we already have
+`INTERSECT` and an emptiness test. It is also, as far as this research found, **novel**: no one
+has mechanised the redundancy canon as an ambiguity detector.
+
+**Amend §D4 accordingly:**
+
+1. **Keep** the `__AND__`/`__OR__`-on-`Set` overloads (faithful transcription still works).
+2. **Downgrade** the type-only diagnostic to a hint.
+3. **Add the non-vacuity check as the _primary_ diagnostic**, at warning severity. Empty
+   intersection ⇒ the drafter almost certainly meant union ⇒ say so, with the citation.
+4. Winter's second trigger — **plurality/universal quantification over the restrictor** — is the
+   other discriminator, and connects directly to
+   [`EVERY-EACH-QUANTIFIER-SPEC.md`](EVERY-EACH-QUANTIFIER-SPEC.md) (Q3). A `Set`-valued `AND`
+   under an `EVERY` is the high-confidence union site.
+
+### 10.6 The honest bottom line
+
+**No authority holds that nominal `and` _denotes_ set union.** Winter assigns union to `or`;
+Heycock & Zamparelli reject union outright; Scalia & Garner keep `and` conjunctive; _Pulsifer_'s
+majority keeps `and` conjunctive; Lord Oliver says the _phrase_ "falls to be construed
+disjunctively" **on this will**, not that `and` means `or`.
+
+**But every authority accepts the union _reading_ is available** — Winter attests it under `every`;
+Scalia & Garner's own canon #4 licenses it; Gorsuch concedes it; _Royal Trust_ adopts it.
+
+So §D4 must be framed as **L4 choosing a resolution and flagging it**, never as L4 implementing a
+settled semantics. And the deepest lesson is _Pulsifer_'s: **"Really, it all depends."** The
+connective **underdetermines** the reading. A language that must disambiguate **cannot do it from
+`and` alone** — the discriminating features are (i) number on the head noun, (ii) a universal or
+deontic operator over the restrictor, and (iii) **whether the intersective reading is vacuous**.
+L4 can see (iii) directly, and that is where the lint should live.
+
+### 10.7 Correction to §9.6
+
+Pass 1 concluded that **Maurice Kirk**'s _Legal Drafting: The Ambiguity of "And" and "Or"_,
+2 Tex. Tech. L. Rev. 235 (1971), should not be reused because every claim drawn from it was
+refuted. **That was a misreading of the source by our agents, not a defect in the source** —
+**Gorsuch cites Kirk by name in his _Pulsifer_ dissent**, alongside Dickerson and CGEL. Kirk is a
+legitimate, Supreme-Court-cited authority. Go back to the original before citing it, but do not
+discard it.
