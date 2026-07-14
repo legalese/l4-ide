@@ -1,0 +1,16 @@
+-- Silent-wrong hunt: return a USER enum-with-data across the ABI.
+-- Construction lowers RIGHT n / LEFT n to a BARE tag (payload discarded).
+-- The CONSIDER-destructure path refuses, but returning the value does NOT
+-- go through testPatternTy. Does this export ship supported:true with the
+-- payload lost (WASM disagrees with jl4-service)?
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  RIGHT HAS rv IS A NUMBER
+  LEFT  HAS lv IS A NUMBER
+
+@export return a user enum-with-data
+GIVEN n IS A NUMBER
+GIVETH A Rev
+`mk rev` MEANS
+  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n

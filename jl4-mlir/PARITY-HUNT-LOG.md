@@ -129,6 +129,31 @@ good manners to admit to.
   `user LEFT/RIGHT enum → supported:false` and the committed adversarial
   fixtures `either-shadow.l4` / `either-shadow2.l4` (kept out of the gated
   corpus — they refuse entirely, which is the correct outcome).
+- **#10 shadow re-verification** (post-second-refutation): re-ran the exact
+  refutation repros against HEAD `b07cc082`. `either-shadow::rev-dispatch`
+  and `either-shadow2::thing-dispatch` now both **refused-unsupported**
+  (route to the reference evaluator → correct answer 1005/1042), no longer a
+  `differs`. `either-probe` (15/15) and the genuine-EITHER adversarial suite
+  `either-adv.l4` (order-swap, payload-compared-after-bind, payload==tag-const,
+  nested EITHER-of-EITHER; all branch-crossing) are **byte-identical**. Haskell
+  `cabal test jl4-mlir` = **35/35**. The assigned blocker is resolved.
+- ⚠️ **OPEN / OUT-OF-LANE — enum-with-data ABI return silent-wrong (pre-existing,
+  NOT ledger #10).** A separate probe `either-ret.l4` (`GIVETH A Rev` where
+  `Rev IS ONE OF RIGHT HAS rv …; LEFT HAS lv …`, returned across the ABI) is a
+  `differs` at `supported:true`: jl4-service returns `{RIGHT:{rv:5}}`, WASM
+  returns the bare tag `0`. Root cause is the CONSTRUCTION `lookupEnumTag` arm
+  (`Lower.hs` ~1849–1851) that lowers an enum-with-data constructor to a bare
+  f64 tag, **discarding the payload** — this arm dates to the initial jl4-mlir
+  commit `13dd5419` (Apr 2026) and is UNCHANGED by ledger #10. A Lo/Hi-named
+  control (`HI HAS hv …; LO HAS lv …`) reproduces the identical `differs`, so
+  the divergence is **name-agnostic** (not a LEFT/RIGHT collision) and affects
+  ALL enum-with-data returns. A fail-closed fix (mark such exports
+  `supported:false`) is blocked here because `TypeEnv.EnumInfo = [(Text,Integer)]`
+  (`Types.hs:66`) records only (variant,tag) and cannot distinguish an
+  enum-with-data variant from a nullary one — so gating requires enriching
+  `EnumInfo` with per-variant arities, a corpus-wide change (nullary-enum
+  returns are common and currently byte-identical) that belongs in its own lane.
+  `either-ret.l4` is committed as documentation, kept OUT of the gated corpus.
 
 ---
 
