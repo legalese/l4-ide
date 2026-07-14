@@ -682,15 +682,16 @@ judicial instance of AND→union** that _Pulsifer_ is not.
 
 But read the ratio closely, because it is **not a semantic rule about `and`**:
 
-> "it is not easy to imagine a purpose connected with the education of a child which is not also a
-> purpose for the child's welfare. Thus, if welfare is to be given any separate meaning at all it
-> must be something different from and wider than mere education, **for otherwise the word becomes
-> otiose** … the phrase 'education and welfare' in this will inevitably fall[s] to be construed
-> disjunctively."
+> "if 'welfare' is to be given any separate meaning at all it must be something different from and
+> wider than mere education, **for otherwise the word becomes otiose**." … "their Lordships need
+> say no more than that they agree with Blake C.J. and the Court of Appeal that the phrase
+> '**education and welfare**' in this will **inevitably falls to be construed disjunctively**."
 
 That is an **anti-surplusage / anti-otiosity** argument — structurally **the same move _Pulsifer_
 makes** (Subparagraph A does no work on the joint reading). In both jurisdictions the union
-reading is **bought with a redundancy canon, not with the conjunction's lexical meaning**.
+reading is **bought with a redundancy canon, not with the conjunction's lexical meaning**. (The
+Board reaches it through **_Re Eades_ [1920] 2 Ch 353** (Sargant J), which frames the choice as
+"the change of the word 'and' into 'or'.")
 
 **And the contrast case proves it.** _Re Best_ [1904] 2 Ch 354 read "charitable **and** benevolent"
 **conjunctively** and **saved** the gift. Same connective, opposite result. What distinguishes them
@@ -698,9 +699,10 @@ is **not the word `and`** but whether the intersective reading is **vacuous**: i
 education ⊆ welfare, so the intersection collapses to "education" and "welfare" does no work; in
 _Re Best_, charitable ∩ benevolent is a contentful set.
 
-_(Verification limit: the law report itself is behind Westlaw/vLex. The ratio and Lord Oliver's
-authorship rest on multiple consistent secondary reproductions — reliable but not confirmed at
-first hand. Get the report before quoting it in a paper.)_
+_(✅ **VERIFIED first-hand** against the primary source — BAILII [1986] UKPC 34 (= [1986] 1 WLR
+1001 = [1986] 3 All ER 423), PC Appeal No. 37 of 1984, delivered 23 June 1986, **[Delivered by
+Lord Oliver of Aylmerton]**. Both "otiose" and "falls to be construed disjunctively" confirmed
+verbatim; see §12.5. Only `Re Best` now remains unconfirmed at first hand.)_
 
 ### 10.5 ⭐ The payoff: **non-vacuity is the trigger — and we can compute it**
 
@@ -1000,35 +1002,54 @@ _reconstruction of the legal test_.
 **Amend §11.6:** add number/arity as the **zeroth** check — if the operands are scalars, `AND` is
 `∧` and no diagnostic fires at all. The defeaters only ever apply to `Set`-typed operands.
 
-### 12.4 Still unverified — a hard corpus gap
+### 12.4 English/Commonwealth line — verification status
 
-**legal-data-hunter has _zero_ sources for GB** (`discover_sources("GB")` → `[]`). So the entire
-English/Commonwealth line remains **unverified at first hand**:
+**legal-data-hunter has _zero_ sources for GB** (`discover_sources("GB")` → `[]`), so first-hand
+verification of the English/Commonwealth cases had to come from elsewhere. Current status:
 
-- _A-G of the Bahamas v Royal Trust Co_ [1986] 1 WLR 1001 (PC) — §10.4, §11.5
-- _Chichester Diocesan Fund v Simpson_ [1944] AC 341 — §11.3
-- _Re Best_ [1904] 2 Ch 354 — §10.4
+| Case                                                    | Status                             | Source of verification                        |
+| ------------------------------------------------------- | ---------------------------------- | --------------------------------------------- |
+| _A-G of the Bahamas v Royal Trust Co_ [1986] 1 WLR 1001 | ✅ **VERIFIED first-hand** (§12.5) | BAILII [1986] UKPC 34 (PDF)                   |
+| _Chichester Diocesan Fund v Simpson_ [1944] AC 341      | 🟡 second-best                     | quoted in verified _Koh Lau Keow_ ¶28         |
+| _Re Best_ [1904] 2 Ch 354                               | 🔴 **unverified**                  | secondary reproductions only                  |
+| _Re Eades_ [1920] 2 Ch 353 (newly surfaced)             | 🟡 second-best                     | quoted _in Royal Trust_, now verified (§12.5) |
 
-These currently rest on (a) consistent secondary reproductions and (b) — for _Chichester_ and
-Picarda — **quotation inside _Koh Lau Keow_ [2013] SGHC 155 ¶28**, which _is_ a verified primary
-source and quotes Lord Simonds directly. That is a decent second-best for _Chichester_. **_Royal
-Trust_ and _Re Best_ have no first-hand verification and must be pulled from Westlaw/ICLR before
-publication.** They are load-bearing for the trichotomy (§11.5), so this is the top remaining
-citation risk in this document.
+**_Re Best_ is now the sole remaining first-hand gap.** It is English Chancery, so it is BAILII's
+territory, not CommonLII's — and BAILII's coverage of 1904 Chancery reports is thin. It must be
+pulled from **ICLR / Westlaw / HeinOnline** before publication. It is load-bearing for the
+trichotomy (§11.5, the "proper overlap ⇒ literal" row), so this is now the top citation risk in
+the document. Mitigant: _Royal Trust_ **itself** cites _Re Eades_ [1920] 2 Ch 353 for the same
+conjunctive/disjunctive dichotomy, so a verified same-line substitute is available if _Re Best_
+cannot be obtained.
 
-**Free-database attempts (2026-07-15) — exhausted, both negative.** Checked whether the two
-uncorroborated cases are reachable on the open Commonwealth databases:
+### 12.5 ✅ _Royal Trust_ retrieved and verified — BAILII [1986] UKPC 34
 
-- **BAILII** is behind an **Anubis proof-of-work wall** — a `200` response is a disguised
-  "Making sure you're not a bot!" JS-hashcash challenge that `curl`/headless fetchers cannot
-  solve; a real browser can, but coverage is the deeper problem (BAILII's `UKPC` collection is
-  substantively post-1996, so a 1986 PC advice is unlikely to be there in any case).
-- **CommonLII** (reached via a real browser; it 403s `curl`) has Bahamas holdings — _Bahamas Law
-  Reports (Solomon)_ and _Bahamas Court of Appeal_ — but a full-database search returns
-  **0 documents** for both `"Royal Trust" Bahamas` and `Best charitable benevolent Birmingham
-Lord Mayor`. **Neither case is on CommonLII.**
+Retrieved the full judgment PDF from BAILII (2026-07-15). Getting to it was the "**Beware of the
+Leopard**" experience — the notice _was_ on display, just: behind an **Anubis JS proof-of-work
+wall** (a `200` is a disguised "Making sure you're not a bot!" challenge; `curl`/WebFetch get the
+wall, only a real browser clears it); at an **unguessable filename** (`1986_34.pdf`, not the
+expected `34.html`); as a **PDF-only** page ("A HTML version of this file isn't available"); with
+**no text layer** (image scan — screenshot-read page by page). CommonLII, for its part, returns
+**0 documents** for the case despite holding _Bahamas Law Reports (Solomon)_.
 
-Expected, on reflection: _Re Best_ [1904] is English Chancery (BAILII territory, not CommonLII's
-Commonwealth focus), and CommonLII's pre-1990 Bahamas coverage is thin. **Conclusion unchanged:
-ICLR/Westlaw (or HeinOnline for the WLR) is the only path to first-hand verification.** The free
-databases have been ruled out, not merely left untried.
+**Everything in §10.4 / §11.4 now confirmed against the primary source:**
+
+| Element                              | Confirmed                                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Neutral / parallel citations         | **[1986] UKPC 34 = [1986] 1 WLR 1001 = [1986] 3 All ER 423** (BAILII header)                                                                  |
+| Court below / appeal no.             | Court of Appeal of the Commonwealth of the Bahamas; PC Appeal No. 37 of 1984                                                                  |
+| Date                                 | delivered **23 June 1986**                                                                                                                    |
+| Board                                | Lords Keith of Kinkel, Templeman, Griffiths, **Oliver of Aylmerton**, Goff of Chieveley                                                       |
+| Author of the advice                 | **"[Delivered by Lord Oliver of Aylmerton]"** — as §11.4 stated                                                                               |
+| Ratio (verbatim)                     | "the phrase '**education and welfare**' in this will **inevitably falls to be construed disjunctively**" (agreeing with **Blake C.J.** below) |
+| Otiosity reasoning (verbatim, twice) | "for otherwise **the word becomes otiose**"; "the reference to 'welfare' would **again become otiose**"                                       |
+| Authority relied on                  | **_Re Eades_ [1920] 2 Ch 353** (Sargant J) — the conjunctive/disjunctive dichotomy, "the change of the word 'and' into 'or'"                  |
+
+**Bonus for §11.5:** the Board's reasoning is a clean, negation-free `AND`→disjunctive holding
+whose engine is _explicitly_ otiosity — first-hand primary-source confirmation of the trichotomy's
+top row, in the exact terms the spec predicted. And it independently surfaces _Re Eades_ as a
+second authority in the same line.
+
+**Correction to an earlier prediction:** §12.4 previously guessed BAILII's `UKPC` collection was
+"substantively post-1996." Wrong — BAILII has backfilled 1986 (the case is [1986] UKPC 34). The
+obstacle was never coverage; it was the Leopard.
