@@ -4,7 +4,7 @@
 considered (`railroad-beta`, not `block-beta` or `flowchart`), and the last 30% of fidelity
 costs a code generator, which dissolves the only reason to want Mermaid at all.**
 
-§24's *conclusion* ("Mermaid never") survives. Its *reasoning* does not, and should be
+§24's _conclusion_ ("Mermaid never") survives. Its _reasoning_ does not, and should be
 rewritten: two of its three load-bearing premises are factually wrong, and the honest
 argument is a different (stronger) one.
 
@@ -32,7 +32,7 @@ swimlane-beta  timeline  treeView-beta  treemap  venn-beta  wardley-beta  xychar
 
 The string `"11.16.0"` is also present in the bundle (passed to `renderer.draw`). **GitHub
 ships current Mermaid.** The widely-cited community-discussion answers ("GitHub is on v10")
-are stale. So `block-beta`, `flowchart-elk`, `venn-beta` *and* `railroad-beta` are all live on
+are stale. So `block-beta`, `flowchart-elk`, `venn-beta` _and_ `railroad-beta` are all live on
 github.com today. There is also **no diagram-type allowlist** in GitHub's wrapper — it calls
 `mermaid.render` on whatever you give it.
 
@@ -45,18 +45,20 @@ mermaid.initialize({
   startOnLoad: false,
   secure: ["secure", "securityLevel", "startOnLoad", "maxTextSize"],
   securityLevel: "antiscript",
-  flowchart: { diagramPadding: 48 }, gantt: { useWidth: 1200 },
-  pie: { useWidth: 1200 }, sequence: { diagramMarginY: 40 },
+  flowchart: { diagramPadding: 48 },
+  gantt: { useWidth: 1200 },
+  pie: { useWidth: 1200 },
+  sequence: { diagramMarginY: 40 },
   theme: "dark" === colorMode ? "dark" : "default",
 });
 ```
 
 `themeVariables`, `themeCSS` and per-diagram config blocks are **not** in `secure` — so
-frontmatter `config:` / `%%{init}%%` directives *do* take effect on github.com.
+frontmatter `config:` / `%%{init}%%` directives _do_ take effect on github.com.
 
 The output SVG is then DOMPurified against a 102-tag allowlist. I extracted it: `svg`, `g`,
 `rect`, `path`, `text`, `tspan`, `circle`, `ellipse`, `defs`, `marker` **and `style`** are all
-allowed (`script` is not). Mermaid's injected `<style>` element — which is where *all*
+allowed (`script` is not). Mermaid's injected `<style>` element — which is where _all_
 railroad styling lives — **survives GitHub's sanitizer intact.**
 
 ### 1.3 A lovely detail worth knowing
@@ -68,7 +70,11 @@ shrink 104px → 20px; flowchart viewBox collapses to `-8 -8 16 16`). GitHub def
 deliberately, in `mermaid-a1eea15eae7bd19ad131.css`:
 
 ```css
-#mermaid-view-template{display:block;border:1px solid var(--borderColor-muted);min-width:1600px}
+#mermaid-view-template {
+  display: block;
+  border: 1px solid var(--borderColor-muted);
+  min-width: 1600px;
+}
 ```
 
 A `<template>` forced to `display:block` at 1600px, purely as a text-measuring surface. Any
@@ -77,7 +83,7 @@ mislead you into thinking Mermaid is broken on GitHub.
 
 ---
 
-## 2. The find: `railroad-beta` *is* a ladder renderer
+## 2. The find: `railroad-beta` _is_ a ladder renderer
 
 §24 evaluated `flowchart` (category error) and `block-beta` (no centering) and stopped.
 It missed the one Mermaid diagram type that is **structurally the same object as a ladder**.
@@ -87,14 +93,14 @@ series on one wire; alternation = stacked rungs fanning off a common node; no ar
 implied sequence; power terminals at both ends.** That is the ladder, under a different name.
 The grammar has exactly the eight constructors we need — and the mapping is an isomorphism:
 
-| L4 `IRExpr` | railroad-beta |
-| --- | --- |
-| `And [a,b,c]` (series) | `sequence(a, b, c)` |
-| `Or [a,b,c]` (parallel) | `choice(a, b, c)` |
-| `Leaf` (operative atom, boxed) | `nonterminal("…")` — a rect |
-| `InertE` (grammatical glue) | `terminal("…")` — restylable to *unboxed* |
-| eliminable / tentative | `special("…")` — a **dashed** box (but see §4.3) |
-| `Not` | **— nothing —** |
+| L4 `IRExpr`                    | railroad-beta                                    |
+| ------------------------------ | ------------------------------------------------ |
+| `And [a,b,c]` (series)         | `sequence(a, b, c)`                              |
+| `Or [a,b,c]` (parallel)        | `choice(a, b, c)`                                |
+| `Leaf` (operative atom, boxed) | `nonterminal("…")` — a rect                      |
+| `InertE` (grammatical glue)    | `terminal("…")` — restylable to _unboxed_        |
+| eliminable / tentative         | `special("…")` — a **dashed** box (but see §4.3) |
+| `Not`                          | **— nothing —**                                  |
 
 ### 2.1 Align-then-stack centering: present, exact, compositional
 
@@ -160,7 +166,7 @@ path (`.railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(2)` = `
 style it individually. That restores, on github.com:
 
 - per-leaf **state colour** (live green / unknown grey)
-- **ELIMINABLE** ghost rung (§15) — dashed box *and* dashed ghost fan-curves
+- **ELIMINABLE** ghost rung (§15) — dashed box _and_ dashed ghost fan-curves
 - **TYPICALLY / tentative** (§22) — amber fine-dash on `mind`
 - **unboxed inert prose** (§17), italic, grey
 - **current flow** (§20) — leader thick+black down the spine and through `body`'s fan,
@@ -170,16 +176,16 @@ That is a genuinely high-fidelity s415 ladder, in a ```mermaid fence, on github.
 
 ### 4.1 The hard walls (evidenced)
 
-**`NOT` does not exist, and the nearest hack is *actively wrong*.** (`GH-not.png`)
+**`NOT` does not exist, and the nearest hack is _actively wrong_.** (`GH-not.png`)
 The best available encoding, `special("NOT")`, renders `? NOT ?` as **a box in series** —
-i.e. it reads as a *conjunct*, with no scope whatsoever. A reader cannot tell whether the NOT
+i.e. it reads as a _conjunct_, with no scope whatsoever. A reader cannot tell whether the NOT
 governs the following choice or not. §21's scope frame and inverter bubble are unreachable
 (no enclosure primitive, no per-edge inversion).
 
 **Consequence: the document's own headline example is undrawable.** A.3 is a material
 conditional `P → Q ≡ ¬P ∨ Q`. With no `NOT`, railroad can draw `P` and `Q` as two disconnected
 rules and nothing else. The `→` — "the thing a lawyer must actually verify" — is exactly what
-is lost. That is a *very* citable fact for §24.
+is lost. That is a _very_ citable fact for §24.
 
 **No text wrapping.** (`wrap-test.png`) `\n` in a label is ignored; there is no `wrap`/
 `maxWidth` in the config key set. Long statutory prose therefore runs on one line and blows the
@@ -211,37 +217,37 @@ which reads as an assignment, not a legal name.
 
 Verified against GitHub's exact pipeline (§7). ✅ works · ⚠️ degraded · ❌ impossible.
 
-| Ladder property | Hand-written (A) | Generated `themeCSS` (B) | Note |
-| --- | :--: | :--: | --- |
-| **align-then-stack centering** (§5.3/5.4) | ✅ | ✅ | exact, compositional, at depth |
-| series (AND) = one wire, L→R | ✅ | ✅ | `sequence` |
-| parallel (OR) = stacked rungs, common node | ✅ | ✅ | `choice` |
-| no arrowheads / no implied sequence | ✅ | ✅ | |
-| power terminals | ✅ | ✅ | `markerFill`, `showMarkers` |
-| curved fan connectors (§18) | ⚠️ | ⚠️ | arcs+lines, not cubic Béziers; close enough |
-| boxed operative atoms | ✅ | ✅ | `nonterminal` |
-| **unboxed inert text** (§17) | ⚠️ | ⚠️ | achievable, but the wire **breaks** around it — i.e. forced into the `on-wire` style §17 explicitly discourages ("its gap reads like a contact, which inert never is") |
-| OR heading / `Pre` (§5.6, §17) | ❌ | ❌ | no primitive; `.railroad-comment` exists in the CSS but is **dead code** — no parser path emits it |
-| medial connective ("or" between rungs) | ❌ | ❌ | same |
-| long-prose wrapping / straddle-wire (§17) | ❌ | ❌ | no wrap; diagrams run wide |
-| state colour live/inert/dead (§15) | ❌ | ✅ | needs generated CSS |
-| ELIMINABLE ghost rung (§15) | ❌ | ✅ | dashed box + dashed fan |
-| TYPICALLY / tentative (§22) | ❌ | ✅ | fine-dash + amber |
-| current-flow weights (§20) | ❌ | ✅ | `stroke-width` is global in config, but per-path via `themeCSS` |
-| **NOT** — scope frame + bubble (§21) | ❌ | ❌ | **no primitive; the hack is semantically wrong** |
-| **material conditional `P → Q`** | ❌ | ❌ | follows from NOT |
-| folding / progressive disclosure (§16) | ❌ | ❌ | `<details>` = two static pictures |
-| T/F/U click, hover, eval, minimap (§19) | ❌ | ❌ | no `click`; `<script>` stripped |
-| Full/Small/Tiny scales (§7) | ❌ | ❌ | `fontSize` only |
-| print / A3 / PDF (target D) | ❌ | ❌ | browser-bound; no headless path |
-| dark/light adaptive | ✅ | ❌ | `themeCSS` pins colours |
-| **source lives in the Markdown, no build step** | ✅ | ❌ | (B) is 3.4 KB of generated CSS |
+| Ladder property                                 | Hand-written (A) | Generated `themeCSS` (B) | Note                                                                                                                                                                   |
+| ----------------------------------------------- | :--------------: | :----------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **align-then-stack centering** (§5.3/5.4)       |        ✅        |            ✅            | exact, compositional, at depth                                                                                                                                         |
+| series (AND) = one wire, L→R                    |        ✅        |            ✅            | `sequence`                                                                                                                                                             |
+| parallel (OR) = stacked rungs, common node      |        ✅        |            ✅            | `choice`                                                                                                                                                               |
+| no arrowheads / no implied sequence             |        ✅        |            ✅            |                                                                                                                                                                        |
+| power terminals                                 |        ✅        |            ✅            | `markerFill`, `showMarkers`                                                                                                                                            |
+| curved fan connectors (§18)                     |        ⚠️        |            ⚠️            | arcs+lines, not cubic Béziers; close enough                                                                                                                            |
+| boxed operative atoms                           |        ✅        |            ✅            | `nonterminal`                                                                                                                                                          |
+| **unboxed inert text** (§17)                    |        ⚠️        |            ⚠️            | achievable, but the wire **breaks** around it — i.e. forced into the `on-wire` style §17 explicitly discourages ("its gap reads like a contact, which inert never is") |
+| OR heading / `Pre` (§5.6, §17)                  |        ❌        |            ❌            | no primitive; `.railroad-comment` exists in the CSS but is **dead code** — no parser path emits it                                                                     |
+| medial connective ("or" between rungs)          |        ❌        |            ❌            | same                                                                                                                                                                   |
+| long-prose wrapping / straddle-wire (§17)       |        ❌        |            ❌            | no wrap; diagrams run wide                                                                                                                                             |
+| state colour live/inert/dead (§15)              |        ❌        |            ✅            | needs generated CSS                                                                                                                                                    |
+| ELIMINABLE ghost rung (§15)                     |        ❌        |            ✅            | dashed box + dashed fan                                                                                                                                                |
+| TYPICALLY / tentative (§22)                     |        ❌        |            ✅            | fine-dash + amber                                                                                                                                                      |
+| current-flow weights (§20)                      |        ❌        |            ✅            | `stroke-width` is global in config, but per-path via `themeCSS`                                                                                                        |
+| **NOT** — scope frame + bubble (§21)            |        ❌        |            ❌            | **no primitive; the hack is semantically wrong**                                                                                                                       |
+| **material conditional `P → Q`**                |        ❌        |            ❌            | follows from NOT                                                                                                                                                       |
+| folding / progressive disclosure (§16)          |        ❌        |            ❌            | `<details>` = two static pictures                                                                                                                                      |
+| T/F/U click, hover, eval, minimap (§19)         |        ❌        |            ❌            | no `click`; `<script>` stripped                                                                                                                                        |
+| Full/Small/Tiny scales (§7)                     |        ❌        |            ❌            | `fontSize` only                                                                                                                                                        |
+| print / A3 / PDF (target D)                     |        ❌        |            ❌            | browser-bound; no headless path                                                                                                                                        |
+| dark/light adaptive                             |        ✅        |            ❌            | `themeCSS` pins colours                                                                                                                                                |
+| **source lives in the Markdown, no build step** |        ✅        |            ❌            | (B) is 3.4 KB of generated CSS                                                                                                                                         |
 
 Also tried and rejected: **`block-beta`** (`GH-block.png`) — no rails, no fan, no centering;
 children stretch/left-align inside the group; it draws two adjacent containers, exactly the
 §24 prediction. **`flowchart`/`flowchart-elk`** (`GH-flowchart.png`) — the category error made
 visible: invented sequence, arrowheads, and `permitted` duplicated three times because the
-AND/OR tree has been linearised. Keep that image; it is a *better* illustration of the thesis
+AND/OR tree has been linearised. Keep that image; it is a _better_ illustration of the thesis
 than anything we could draw by hand.
 
 ---
@@ -252,8 +258,8 @@ than anything we could draw by hand.
 
 The decisive argument is not "Mermaid can't". It's **the build-step dilemma**:
 
-- **The hand-written ladder (A)** is the only version that delivers Mermaid's *one* real
-  prize — *source in the Markdown, renders on github.com, zero build step*. But it cannot draw
+- **The hand-written ladder (A)** is the only version that delivers Mermaid's _one_ real
+  prize — _source in the Markdown, renders on github.com, zero build step_. But it cannot draw
   `NOT`, and therefore cannot draw the **material conditional**, which is the entire subject of
   `logic-not-flowcharts.md`. Illustrating "the law here is a material conditional `P → Q`" with
   a picture that structurally cannot express `→` is a worse self-refutation than the flowchart
@@ -262,8 +268,8 @@ The decisive argument is not "Mermaid can't". It's **the build-step dilemma**:
 - **The generated ladder (B)** reaches ~70% fidelity — but it needs a **code generator** emitting
   3.4 KB of positional, `>`-free CSS whose `nth-of-type` indices silently mis-style every node
   if anyone edits the tree. And the moment you accept a build step, **§24's option I-a (generate
-  and commit an SVG) strictly dominates**: same build step, *zero* fidelity loss, plus print,
-  plus `<picture>` dark-mode, plus it works in npm/VS Code/PDF. Mermaid's *only* advantage is
+  and commit an SVG) strictly dominates**: same build step, _zero_ fidelity loss, plus print,
+  plus `<picture>` dark-mode, plus it works in npm/VS Code/PDF. Mermaid's _only_ advantage is
   "no build step", and (B) spends exactly that to buy a strictly worse picture.
 
 So: **do not ship a Mermaid ladder.** Not because it's impossible — it is surprisingly
@@ -275,18 +281,18 @@ that's hand-writable can't say `→`.
 1. **Delete the factual claims** that GitHub pins an old Mermaid and may sanitize `%%{init}%%`.
    Both are false and will embarrass us. GitHub ships **11.16.0**, current, with the full
    registry, and honours `themeCSS`.
-2. **Replace §24.2(b)'s reasoning.** "block-beta won't centre" is true but is *not* the
+2. **Replace §24.2(b)'s reasoning.** "block-beta won't centre" is true but is _not_ the
    interesting objection, and it's the wrong diagram type to have tested. The real chapter and
    verse is:
-   > Mermaid's `railroad-beta` *is* a ladder renderer — it even does align-then-stack centring
+   > Mermaid's `railroad-beta` _is_ a ladder renderer — it even does align-then-stack centring
    > exactly, at depth. It has no **NOT**, therefore no scope frame (§21) and no material
    > conditional; no text wrapping (§17); and no per-node styling except through generated,
-   > `>`-free `themeCSS`. So a *hand-written* Mermaid ladder cannot draw the very rule this
-   > document is about, and a *generated* one concedes the build step that makes committed SVG
+   > `>`-free `themeCSS`. So a _hand-written_ Mermaid ladder cannot draw the very rule this
+   > document is about, and a _generated_ one concedes the build step that makes committed SVG
    > (I-a) strictly better in every dimension. **Mermaid never — and now we know exactly why.**
 3. **Keep `GH-flowchart.png`** and consider actually putting it in `logic-not-flowcharts.md` as
-   the "wrong picture" exhibit, beside the ladder. The document currently *asserts* the
-   linearisation damage; that image *shows* it (`permitted` × 3).
+   the "wrong picture" exhibit, beside the ladder. The document currently _asserts_ the
+   linearisation damage; that image _shows_ it (`permitted` × 3).
 4. Optional: if we ever want a Mermaid fallback, the honest one is (A) restricted to
    NOT-free subtrees — e.g. render `A.3 covers` and `A.3 requirement met` as two railroads and
    state the `→` in prose. Better than nothing on a PR comment; **not** good enough for the
