@@ -770,3 +770,153 @@ refuted. **That was a misreading of the source by our agents, not a defect in th
 **Gorsuch cites Kirk by name in his _Pulsifer_ dissent**, alongside Dickerson and CGEL. Kirk is a
 legitimate, Supreme-Court-cited authority. Go back to the original before citing it, but do not
 discard it.
+
+## 11. Singapore authority (lawplain corpus, 2026-07-15)
+
+Searched the Singapore judgments corpus directly. **This is the most valuable authority we have
+found** — not because it says something new, but because two Court of Appeal judgments, both led
+by **Menon CJ**, come out **opposite ways on the same word**, and the reason they diverge is
+_computable_. Together with a third case on the "exegetical" connective, they yield a complete
+**trichotomy driven by the extensional relationship between the two operand sets** — which is
+exactly the thing a set-aware language can see and a prose drafter cannot.
+
+### 11.1 _Nam Hong Construction v Kori Construction_ [2016] SGCA 42 — AND read as UNION
+
+Menon CJ, Phang JA, Chong J. Building Control Act s 2(1): "structural steelwork … comprising—
+(i) fabrication of structural elements; (ii) … erection works; **and** (iii) installation of steel
+supports for geotechnical building works". Does a contractor need **all three**, or **any one**?
+
+**Held: disjunctive. Any one suffices.** A genuine AND→union, in a _definition_, with no negation
+anywhere — the clean instance _Pulsifer_ is not.
+
+The echo of _Pulsifer_ is uncanny (¶19):
+
+> "It is common ground that **both the conjunctive and disjunctive interpretations are
+> grammatically possible**. … Whether one reading or the other is to be preferred **turns on
+> Parliamentary intention**."
+
+Two apex courts, two continents, eight years apart: **grammar underdetermines; context decides.**
+(Compare Kagan's "Really, it all depends.")
+
+**And the decisive argument was otiosity** (¶26):
+
+> "On the conjunctive interpretation, the performance of fabrication work and/or erection work of
+> any dimension would not fall within the definition … **This renders the carve-outs in s 29A(1)
+> of the Act completely otiose.** To us, this is a strong indication that Parliament intended that
+> para (d) be read disjunctively."
+
+Same move as _Royal Trust_ ("otherwise the word becomes otiose"), same move as _Pulsifer_
+(Subparagraph A does no work). **Third jurisdiction, same trigger.**
+
+### 11.2 _Sit Kwong Lam v MCST 2645_ [2018] SGCA 14 — AND read as CONJUNCTION
+
+Menon CJ, Prakash JA, Chong JA — **the same court, two years later, going the other way.** BMSMA
+s 2(1) "common property": "(i) not comprised in any lot …; **and** (ii) used or capable of being
+used … by occupiers of 2 or more lots".
+
+**Held: conjunctive. Both limbs required.** ¶42 states the **default**, and cites _Nam Hong_ only
+to distinguish it:
+
+> "**In ordinary usage … the word 'and' has a conjunctive effect**, as opposed to the word 'or',
+> which has a disjunctive effect. The Respondent … cited [_Kori_] as authority for the proposition
+> that … the word 'and' could be interpreted as either conjunctive or disjunctive, depending on
+> the context. **This might be so, but** in the present case, we were satisfied that the word 'and'
+> clearly had a conjunctive meaning …"
+
+**And here is the anti-defeater — the meaningful-variation canon** (¶43), which is _also_
+computable:
+
+> "Sub-sections (a) and (b) were separated by the word '**or**' … It would be **unlikely** then to
+> find … that **within the same definition**, Parliament had decided to use **two different words,
+> 'and' and 'or', to achieve the same disjunctive effect**. Rather, the more logical conclusion was
+> that Parliament had clearly appreciated the difference … and had **consciously used** these two
+> words to convey the meaning that it intended."
+
+**If the drafter uses both connectives contrastively in the same instrument, they knew the
+difference — so do not second-guess the connective.** That is a scan of the enclosing scope, and
+we can do it.
+
+### 11.3 _Koh Lau Keow v AG_ [2013] SGHC 155 — a **third** sense: the exegetical connective
+
+A charitable trust for use as "a **home or sanctuary** for Chinese women vegetarians of the
+Buddhist faith". Held: "or" is **exegetical**, not alternative (¶31) — the two words name _the same
+thing_.
+
+This is **neither ∪ nor ∩**. It is **apposition / aliasing**: `A ≡ B`. "Falklands **or** Malvinas."
+Picarda, quoted at ¶28:
+
+> "The primary meaning of 'or' is disjunctive, but there is a secondary meaning which may perhaps
+> be called **exegetical or explanatory**. So used the word is equivalent to '**alias**' or
+> '**otherwise called**' … However, this use of the word 'or' is **possible only if the words or
+> phrases which it joins connote the same thing and are interchangeable one with the other**."
+
+Lord Simonds in _Chichester_ is to the same effect. And the judge's test is **literally a set-overlap
+computation** (¶29):
+
+> "This poses the question **whether 'home' and 'sanctuary' sufficiently overlap in meaning** such
+> that 'or' can be interpreted exegetically."
+
+### 11.4 _PP v Low Kok Heng_ [2007] SGHC 123 — the principle, stated flatly
+
+V K Rajah JA. The headnote itself carries: _"Statutory Interpretation — Construction of statute —
+Whether 'or' could mean 'and'"_. At ¶69:
+
+> "It is a **settled principle** of statutory interpretation that **not every application of the
+> word 'or' produces a disjunctive result**."
+
+_(Corpus note: `get_document` truncates at 60,000 chars and the `offset` param is ignored, so ¶69ff
+is cut off. Fetch the rest from elitigation before quoting further.)_
+
+### 11.5 ⭐ The trichotomy — one canon, three readings, all computable
+
+Put the Singapore cases beside the US/UK ones and a **single meta-canon** — _the drafter wasted no
+word_ — generates **three different readings depending only on the extensional relationship between
+the two operand sets**:
+
+| Extensional relation of `A`, `B`          | Forced reading                                    | Why (the same canon)                           | Authority                                                                                         |
+| ----------------------------------------- | ------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **`A ∩ B = ∅`** (disjoint)                | **UNION** — the `AND` is a join                   | the _intersective_ reading makes a term otiose | _Nam Hong_ [2016] SGCA 42; _A-G Bahamas v Royal Trust_ [1986] 1 WLR 1001; _Pulsifer_ (surplusage) |
+| **`A ≡ B`** (co-extensive)                | **EXEGETICAL** — `or` = "alias", "that is to say" | the _alternative_ reading makes a term otiose  | _Koh Lau Keow_ [2013] SGHC 155; _Chichester_ (Lord Simonds); Picarda                              |
+| **`A ∩ B ≠ ∅`, `A ≠ B`** (proper overlap) | **LITERAL** — take the connective as written      | no otiosity; **both terms do work**            | _Re Best_ [1904] 2 Ch 354; _Sit Kwong Lam_ [2018] SGCA 14                                         |
+
+**The connective never changes meaning. The _sets_ do.** That is the whole insight, and it is why
+this belongs in a language with a set type rather than in a style guide.
+
+### 11.6 The decision procedure (supersedes §10.5)
+
+```
+DEFAULT           AND = ∧ (intersection)   OR = ∨ (union)          [Sit Kwong Lam ¶42]
+
+DEFEATER 1        A ∩ B = ∅   ⇒  warn: the intersective reading is otiose.
+                               "Did you mean UNION?"                [Nam Hong ¶26; Royal Trust]
+
+DEFEATER 2        A ≡ B       ⇒  warn: the alternatives are co-extensive.
+                               "Is this an exegetical OR (an alias)?"  [Koh Lau Keow ¶29-31]
+
+ANTI-DEFEATER     the enclosing instrument uses AND *and* OR contrastively
+                               ⇒  suppress. The drafter knew the difference.  [Sit Kwong Lam ¶43]
+
+ESCAPE HATCH      AMBIGUOUS marker ⇒ suppress; the vagueness is deliberate.   [Allen 1957, §9.4]
+```
+
+Every line of that is mechanisable, and **every line has apex-court authority.** Defeater 1 and
+the anti-defeater are cheap (an emptiness test; a scan of the enclosing `§` scope). Defeater 2
+needs co-extensiveness, which for finite enumerated sets is just mutual subset — the very
+`__EQUALS__` overload §D6 already requires.
+
+**This supersedes §10.5's single empty-intersection lint.** Same idea, but the Singapore pair
+supplies (i) the _default_ the lint deviates from, (ii) a _second_ defeater we had missed
+entirely, and (iii) an _anti-defeater_ that will keep the false-positive rate down — which is the
+difference between a lint people keep on and a lint people disable.
+
+### 11.7 Why this matters beyond the lint
+
+_Nam Hong_ and _Sit Kwong Lam_ are the **worked example the papers have been missing**: same court,
+same Chief Justice, same word, opposite outcomes — and the difference is not linguistic intuition
+but a **structural property of the denoted sets** that a compiler can check and a human reading
+prose cannot. That is the "detect ≠ resolve" thesis with Singapore Court of Appeal authority
+behind it, in the jurisdiction where L4's pilots actually run.
+
+**TODO before publication:** pull the two SGCA judgments in full from elitigation (the lawplain
+`body_text` truncates at 60k) and verify the paragraph numbers quoted above against the official
+report.
