@@ -1015,3 +1015,20 @@ source and quotes Lord Simonds directly. That is a decent second-best for _Chich
 Trust_ and _Re Best_ have no first-hand verification and must be pulled from Westlaw/ICLR before
 publication.** They are load-bearing for the trichotomy (§11.5), so this is the top remaining
 citation risk in this document.
+
+**Free-database attempts (2026-07-15) — exhausted, both negative.** Checked whether the two
+uncorroborated cases are reachable on the open Commonwealth databases:
+
+- **BAILII** is behind an **Anubis proof-of-work wall** — a `200` response is a disguised
+  "Making sure you're not a bot!" JS-hashcash challenge that `curl`/headless fetchers cannot
+  solve; a real browser can, but coverage is the deeper problem (BAILII's `UKPC` collection is
+  substantively post-1996, so a 1986 PC advice is unlikely to be there in any case).
+- **CommonLII** (reached via a real browser; it 403s `curl`) has Bahamas holdings — _Bahamas Law
+  Reports (Solomon)_ and _Bahamas Court of Appeal_ — but a full-database search returns
+  **0 documents** for both `"Royal Trust" Bahamas` and `Best charitable benevolent Birmingham
+Lord Mayor`. **Neither case is on CommonLII.**
+
+Expected, on reflection: _Re Best_ [1904] is English Chancery (BAILII territory, not CommonLII's
+Commonwealth focus), and CommonLII's pre-1990 Bahamas coverage is thin. **Conclusion unchanged:
+ICLR/Westlaw (or HeinOnline for the WLR) is the only path to first-hand verification.** The free
+databases have been ruled out, not merely left untried.
