@@ -2222,7 +2222,7 @@ export function createRuntime(opts) {
   // The wire ABI stores strings as NUL-terminated UTF-8, but a STRING may
   // legitimately CONTAIN U+0000 (a single 0x00 byte). A NUL-terminated
   // reader would truncate such a string at the first embedded NUL, so a
-  // string like "a " would compare EQUAL to "a" — a silent wrong
+  // string like "a\0" would compare EQUAL to "a" — a silent wrong
   // answer that disagrees with jl4-service's Data.Text (which keeps the
   // whole string). Recording the true length here lets `readCString` read
   // exactly the bytes that were written, embedded NULs included. Compiler-
