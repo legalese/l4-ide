@@ -847,7 +847,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
   const { FONT, SEAM_W, FORK_W, COIL_R, COIL_SEP, COIL_LABEL } = k;
   const s = measure(e.scope, ctx);
   const r = measure(e.requirement, ctx);
-  const must = e.must ?? "⇒";
+  const seam = e.seam ?? "⇒";
 
   const lampsW = FORK_W + 2 * COIL_R + COIL_LABEL;
   const w = s.w + SEAM_W + r.w + lampsW;
@@ -874,7 +874,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
       // The wire is drawn in TWO segments with a gap, so the connective sits in the
       // line rather than being struck through by it (the 'on-wire' idiom of §17).
       const seamMid = seamX + SEAM_W / 2;
-      const gap = tm.width(must, 12.5) / 2 + 8;
+      const gap = tm.width(seam, 12.5) / 2 + 8;
       const seamFlow = flowFor(em, scopeOut, trueConducts(ctx.values, e.scope));
       out.push({
         kind: "wire",
@@ -896,7 +896,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
       out.push({
         kind: "text",
         at: { x: seamMid, y: cy },
-        text: must,
+        text: seam,
         anchor: "middle",
         state: scopeOut ? "live" : "inert",
         tag: "seam",
@@ -905,6 +905,16 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
       });
 
       // ── the changeover: one pole, two throws (§25.4) ───────────────────────────
+      // This segment carries the REQUIREMENT's own conduction, not the scope's. The
+      // distinction is not pedantry: feeding it from `scopeOut` would draw a heavy,
+      // live wire coming OUT of a requirement that did not conduct — a picture saying
+      // current flowed through a failed contact, which is precisely the sort of lie
+      // this whole notation exists to refuse. When the requirement fails, current goes
+      // in and does not come out, and the changeover — sensing that — throws to red.
+      // The red current therefore originates AT the pivot, which is honest: the pole is
+      // fed by the rule's own supply and the requirement merely ACTUATES the switch.
+      // That compression (one device instead of a `[Q]`/`[/Q]` pair of rungs) is the
+      // whole reason the requirement gets drawn once instead of twice.
       const pivotX = rp.outPort.x + FORK_W / 2;
       const coilX = rp.outPort.x + FORK_W + COIL_R;
       out.push({
@@ -912,7 +922,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
         path: [rp.outPort, { x: pivotX, y: cy }],
         role: "rung",
         state: "inert",
-        flow: flowFor(em, scopeOut, false),
+        flow: flowFor(em, lamps.green, false),
       });
       out.push({ kind: "glyph", at: { x: pivotX, y: cy }, role: "changeover" });
 

@@ -64,13 +64,13 @@ const or = (args: IRExpr[], label?: string): Or => ({
 const implies = (
   scope: IRExpr,
   requirement: IRExpr,
-  must: string,
+  seam: string,
 ): Implies => ({
   $type: "Implies",
   id: nid(),
   scope,
   requirement,
-  must,
+  seam,
 });
 
 const upper = leaf("on an upper floor");
@@ -102,12 +102,16 @@ const met = and(
   "A.3 requirement met",
 );
 
-// The statute says MUST. §25e: the connective keeps the drafter's register.
+// §25e: the seam keeps the connective as the DRAFTER wrote it. The L4 source for this
+// rule reads `\`A.3 covers\` w  IMPLIES  \`A.3 requirement met by\` w`, so the picture
+// says IMPLIES. It would read more sweetly as MUST — but the source did not say MUST,
+// and a diagram that says more than its source is the very fault this whole exercise
+// convicts flowcharts of. (This is exactly what `seamLabel` emits from real L4.)
 const fn: FunDecl = {
   id: nid(),
   name: "window complies with A.3",
   params: ["w"],
-  body: implies(covers, met, "MUST"),
+  body: implies(covers, met, "IMPLIES"),
 };
 
 const V = (m: Record<number, UBoolValue>) =>

@@ -1413,20 +1413,46 @@ state it cannot. Which is exactly the work §25b exists to do in the native rend
 
 ### 25.7 Work — **constitutive ("must be") ONLY**
 
-- [ ] **25a.** Add `Implies` to `VizExpr.IRExpr` (Haskell) + `viz-expr.ts`, and a case in
-      `Viz.Ladder.translateExpr` — today it falls through to `leafFromExpr`. **Stop
+- [x] **25a.** Add `Implies` to `VizExpr.IRExpr` (Haskell) + `viz-expr.ts`, and a case in
+      `Viz.Ladder.translateExpr` — it used to fall through to `leafFromExpr`. **Stop
       `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
-- [ ] **25b.** `ladder-core`: `Implies` in the IR; `measureImplies` (a series whose connector is
-      the seam glyph, so BBE is unchanged); the **three-state flow** of §25.3 — vacuous / compliant
-      / **breach-at-the-seam**. **No bypass is drawn** (§25.3); N/A is "neither lamp lit" (§25.4).
-- [ ] **25c.** **Two sinks** (§25.4). The requirement panel gets a **changeover** exit — one pole,
-      two throws — feeding a **green** coil (complies) and a **red** coil (in breach). New Scene
-      prims: `coil` (lit / dark, green / red) and the changeover pivot. **No `ViewSpec.polarity`
-      toggle** — it is no longer needed; the citizen and the Bad Man read the same diagram and watch
-      different lamps.
-- [ ] **25d.** Emitters. ASCII: a `══▶` seam. SVG: the two-panel seam. **Mermaid: use §25.6's bottleneck**
-      (`sequence(P, MUST, Q)` — the bottleneck) and NEVER `optional()`.
-- [ ] **25e.** The `MUST` / `⇒` glyph choice, from the source's register.
+      **DONE.** `translateExpr` now peels the top-level implication off _before_ `simplify` runs and
+      simplifies each side on its own, so the seam survives while the panels still get NNF/CNF —
+      which is what we actually want, since simplification is a readability win _inside_ a panel and
+      a shape-destroyer _across_ the seam. Pinned end-to-end in `jl4/tests/VizImplies.hs`.
+- [x] **25b/c/d.** `ladder-core`: the `Implies` IR node, `measureImplies`, three-valued flow, the
+      **changeover** (one pole, two throws) into a **green** coil (complies) and a **red** one (in
+      breach). **No bypass drawn**; N/A is "neither lamp lit". Emitters: ASCII `(✓)`/`(✗)`/`┿`, SVG
+      coils, Mermaid `sequence(P, IMPLIES, Q)` — never `optional()`. **No `ViewSpec.polarity`
+      toggle**: the citizen and the Bad Man read the same diagram and watch different lamps.
+- [x] **25e.** The seam's glyph, from the source's register. **DONE, but the ambition was defeated
+      and the reason is worth keeping.** L4 spells the constitutive conditional two ways (`IMPLIES`
+      and `=>`), and we wanted the picture to keep whichever the drafter used. It cannot: the
+      typechecker desugars every binop into a function application (`desugarBinOpToFunction` at the
+      `Implies` case), and its `annoNoFunName` rebuilds the annotation as two bare holes — destroying
+      the concrete-syntax node that held the operator token. The node is _resugared_ back into an
+      `Implies` afterwards, so the visualiser does get a real implication; but its annotation carries
+      no tokens at all, and the spelling is gone. Recovering it means preserving concrete syntax
+      across binop desugaring — a change to every operator in the language, for a cosmetic difference
+      between two spellings of ONE operator. Not worth it: rendering `=>` as `IMPLIES` is of a kind
+      with rendering `>=` as `≥`, and says nothing the source did not. The wire field stays free-form
+      so a future NLG annotation (or a hand-authored scene) can still carry the statute's own words.
+
+**Two findings from the build, both worth keeping:**
+
+- **The ink must not outrun the current.** The first cut fed the requirement→changeover wire from
+  `scopeOut`, which drew a heavy live wire coming _out of a requirement that did not conduct_ — a
+  picture asserting current flowed through a failed contact. It is now fed by the requirement's own
+  conduction, so on a breach the current visibly goes in and does not come out, and the red lamp is
+  fed from the changeover itself. That is honest: the pole is the rule's supply and the requirement
+  merely **actuates** the switch. This compression (one device instead of a `[Q]`/`[/Q]` pair of
+  rungs) is exactly what buys us "every atom appears once".
+- **The vacuity error recurs one level up, in the wizard.** `QueryPlan` and `decision-query` compile
+  the seam classically, and are right to — to _settle_ the rule, `¬P ∨ Q` is the proposition, and it
+  hands the planner its best short-circuit (show the scope false and there is nothing left to ask).
+  But the TRUE that comes back must not be _reported_ to a user as "complies": for a vacuous case it
+  means "the rule never bit you". Same category error as §25.3, one layer out, and it belongs to the
+  wizard's **presentation**. Not fixed here. **Open.**
 
 **Explicitly NOT in this build** (§25.5): regulative / "must do" rules. The ladder will render
 their **guard** — free, since it is the same machinery — and then **stop**, handing the obligation

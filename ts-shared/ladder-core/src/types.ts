@@ -102,9 +102,17 @@ export interface Implies {
   readonly id: NodeId;
   readonly scope: IRExpr;
   readonly requirement: IRExpr;
-  /** The connective as the DRAFTER wrote it: 'MUST' when the source said MUST, else
-   *  '⇒'. §17's argument applied to the connective — the register survives (§25e). */
-  readonly must?: string;
+  /**
+   * The connective AS THE DRAFTER WROTE IT — §17's argument for inert prose, applied
+   * to the operator (§25e). From real L4 this is `'IMPLIES'` or `'=>'`, the two ways
+   * the language spells the constitutive conditional; the picture does not get to
+   * invent a register the source did not use. Absent ⇒ the renderer's own '⇒'.
+   *
+   * Deliberately NOT `'MUST'`: there is no constitutive MUST in L4. MUST is the
+   * regulative deontic keyword (`PARTY p MUST …`), whose consequent is a whole
+   * transition system rather than a coil — a different diagram entirely (§25.5).
+   */
+  readonly seam?: string;
   readonly label?: string;
 }
 

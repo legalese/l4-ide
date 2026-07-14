@@ -57,6 +57,8 @@ annotateLadderWithAtomIds ladderInfo vizState =
         VizExpr.Or uid (map annotateExpr xs)
       VizExpr.Not uid x ->
         VizExpr.Not uid (annotateExpr x)
+      VizExpr.Implies uid scope requirement seam ->
+        VizExpr.Implies uid (annotateExpr scope) (annotateExpr requirement) seam
       VizExpr.TrueE uid nm ->
         VizExpr.TrueE uid nm
       VizExpr.FalseE uid nm ->
@@ -126,6 +128,21 @@ vizExprToBoolExpr expr =
     VizExpr.Not _ x ->
       let (ex, m, o) = go x
        in (BDQ.BNot ex, m, o)
+    -- The query planner is a consumer of the FUNCTION, not of the picture, so here
+    -- the classical reading is not merely allowed but correct: to decide whether the
+    -- rule holds, `NOT scope OR requirement` is exactly the proposition to settle,
+    -- and it buys the planner its best short-circuit — establish the scope is false
+    -- and there is nothing left to ask. Scope questions stay ahead of requirement
+    -- questions in the ask-order for free, because that is where the information is.
+    --
+    -- What the planner must NOT do is report the resulting TRUE as "complies": for a
+    -- vacuous case it means "the rule never bit". That is the same N/A-vs-complies
+    -- category error the ladder fixes with two lamps (DESIGN §25.3), one level up,
+    -- and it belongs to the wizard's PRESENTATION, not to this compilation.
+    VizExpr.Implies _ scope requirement _seam ->
+      let (ep, mp, op) = go scope
+          (eq, mq, oq) = go requirement
+       in (BDQ.BOr [BDQ.BNot ep, eq], mp <> mq, op <> oq)
     VizExpr.And _ xs ->
       let (es, ms, os) = unzip3 (map go xs)
        in (BDQ.BAnd es, mconcat ms, mconcat os)

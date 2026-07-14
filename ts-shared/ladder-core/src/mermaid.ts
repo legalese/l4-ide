@@ -73,7 +73,7 @@ function nameOf(e: IRExpr): string {
   if (e.$type === "Not") return `NOT ${nameOf(e.negand)}`;
   if (e.$type === "Implies")
     return (
-      e.label ?? `${nameOf(e.scope)} ${e.must ?? "⇒"} ${nameOf(e.requirement)}`
+      e.label ?? `${nameOf(e.scope)} ${e.seam ?? "⇒"} ${nameOf(e.requirement)}`
     );
   return e.label;
 }
@@ -182,15 +182,16 @@ export function toMermaidRailroad(fn: FunDecl, opts: MermaidOpts = {}): string {
         );
         return go(pushNot(n, nid));
       }
-      // §25.6 — IMPLIES as the BOTTLENECK. `sequence(P, MUST, Q)`: one path, no bypass
-      // ink, reading as the statute's own sentence. Under a strict railroad grammar a
-      // `sequence` is concatenation (P ∧ Q), so a purist would miss the vacuous case —
-      // but the seam is labelled with the drafter's own MUST, and no English reader
-      // parses "covered — MUST — compliant" as a conjunction. The word carries the
-      // semantics. NEVER use `optional(Q)`: that is an UNGATED bypass (Q ∨ ⊤), which
-      // says the requirement is MOOT — the picture we want, meaning the opposite.
+      // §25.6 — IMPLIES as the BOTTLENECK. `sequence(P, IMPLIES, Q)`: one path, no
+      // bypass ink, reading as the statute's own sentence. Under a strict railroad
+      // grammar a `sequence` is concatenation (P ∧ Q), so a purist would miss the
+      // vacuous case — but the seam is labelled with the drafter's own connective, and
+      // no reader parses "covered — IMPLIES — compliant" as a conjunction. The word
+      // carries the semantics. NEVER use `optional(Q)`: that is an UNGATED bypass
+      // (Q ∨ ⊤), which says the requirement is MOOT — the picture we want, meaning
+      // the exact opposite.
       case "Implies":
-        return `sequence(${go(e.scope)}, terminal("${lit(e.must ?? "⇒")}"), ${go(e.requirement)})`;
+        return `sequence(${go(e.scope)}, terminal("${lit(e.seam ?? "⇒")}"), ${go(e.requirement)})`;
       default:
         return `nonterminal("${lit(e.label)}")`;
     }

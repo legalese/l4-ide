@@ -100,10 +100,23 @@ instance Aeson.FromJSON InertContext where
     t -> fail $ "Unknown InertContext: " <> show t
 
 -- | Intermediate representation for boolean expressions in the visualizer.
+--
+-- 'Implies' is the SEAM between a rule's scope and its requirement (ladder DESIGN
+-- §25). It is deliberately NOT sugar for @Or [Not scope, requirement]@: that
+-- expansion is truth-functionally perfect and shape-destroying, and it cannot
+-- distinguish the two cases a reader most needs distinguished — a window the rule
+-- never reached (N\/A) from one that complies. Both make @NOT P OR Q@ true. The
+-- ladder therefore keeps the connective and draws it, with two sinks.
+--
+-- Consumers that only care about the Boolean FUNCTION (question ordering, BDD
+-- compilation) are free to read it classically; consumers that draw a PICTURE are
+-- not. See 'L4.Viz.Ladder.translateExpr', which peels the seam off before handing
+-- either side to 'L4.Transform.simplify' (whose whole job is to eliminate it).
 data IRExpr
   = And ID [IRExpr]
   | Or ID [IRExpr]
   | Not ID IRExpr
+  | Implies ID IRExpr IRExpr Text          -- ^ id scope requirement seam
   | UBoolVar ID Name UBoolValue Bool Text (Maybe Bool)  -- ^ id name value canInline atomId typically
   | App ID Name [IRExpr] Text              -- ^ id fnName args atomId
   | TrueE ID Name
@@ -116,6 +129,8 @@ instance Aeson.ToJSON IRExpr where
     And uid args -> Aeson.object ["$type" .= ("And" :: Text), "id" .= uid, "args" .= args]
     Or uid args -> Aeson.object ["$type" .= ("Or" :: Text), "id" .= uid, "args" .= args]
     Not uid negand -> Aeson.object ["$type" .= ("Not" :: Text), "id" .= uid, "negand" .= negand]
+    Implies uid scope requirement seam -> Aeson.object
+      ["$type" .= ("Implies" :: Text), "id" .= uid, "scope" .= scope, "requirement" .= requirement, "seam" .= seam]
     UBoolVar uid name value canInline atomId typically -> Aeson.object
       ["$type" .= ("UBoolVar" :: Text), "id" .= uid, "name" .= name, "value" .= value, "canInline" .= canInline, "atomId" .= atomId, "typically" .= typically]
     App uid fnName args atomId -> Aeson.object
@@ -131,6 +146,7 @@ instance Aeson.FromJSON IRExpr where
       "And"      -> And <$> o .: "id" <*> o .: "args"
       "Or"       -> Or <$> o .: "id" <*> o .: "args"
       "Not"      -> Not <$> o .: "id" <*> o .: "negand"
+      "Implies"  -> Implies <$> o .: "id" <*> o .: "scope" <*> o .: "requirement" <*> (fromMaybe "IMPLIES" <$> o .:? "seam")
       "UBoolVar" -> UBoolVar <$> o .: "id" <*> o .: "name" <*> o .: "value" <*> o .: "canInline" <*> o .: "atomId" <*> o .:? "typically"
       "App"      -> App <$> o .: "id" <*> o .: "fnName" <*> o .: "args" <*> o .: "atomId"
       "TrueE"    -> TrueE <$> o .: "id" <*> o .: "name"
@@ -188,4 +204,7 @@ boolPriorsFromBody = Map.fromList . go
     And _ xs   -> concatMap go xs
     Or _ xs    -> concatMap go xs
     Not _ x    -> go x
+    -- The seam is not a barrier: an atom's prior is a fact about the atom, and
+    -- the atoms of a rule live on BOTH sides of the implication.
+    Implies _ p q _ -> go p <> go q
     _          -> []

@@ -45,6 +45,7 @@ import type {
   And,
   Or,
   Not,
+  Implies,
   NodeId,
   UBoolValue,
   Provenance,
@@ -117,6 +118,20 @@ function convert(
         $type: "Not",
         id: e.id.id,
         negand: convert(e.negand, valuation, provenance),
+      };
+      return node;
+    }
+    case "Implies": {
+      // The seam (DESIGN §25), carried through intact. This is the one place the
+      // new renderer earns its keep over the old one: every other consumer of the
+      // wire IR has to flatten this to `NOT scope OR requirement` and lose the
+      // scope/requirement split. The ladder keeps it and draws two sinks.
+      const node: Implies = {
+        $type: "Implies",
+        id: e.id.id,
+        scope: convert(e.scope, valuation, provenance),
+        requirement: convert(e.requirement, valuation, provenance),
+        seam: e.seam,
       };
       return node;
     }

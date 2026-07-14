@@ -43,6 +43,13 @@ function collectVarOrder(expr: IRExpr): Unique[] {
         }
       })
       .with({ $type: 'Not' }, (n) => go(n.negand))
+      // Scope before requirement — the source's own order, which is the initial
+      // variable order the ROBDD is built in. It is also the sane one to ask in:
+      // settle whether the rule bites you before asking what it demands.
+      .with({ $type: 'Implies' }, (i) => {
+        go(i.scope)
+        go(i.requirement)
+      })
       .with({ $type: 'And' }, (a) => a.args.forEach(go))
       .with({ $type: 'Or' }, (o) => o.args.forEach(go))
       .with({ $type: 'App' }, () => {
@@ -93,35 +100,56 @@ export function compileDecisionQuery(
   }
 
   const compile = (e: IRExpr): number => {
-    return match(e)
-      .with({ $type: 'TrueE' }, () => ROBDD.TRUE)
-      .with({ $type: 'FalseE' }, () => ROBDD.FALSE)
-      .with({ $type: 'UBoolVar' }, (v) => {
-        const idx = uniqueToVarIndex.get(v.name.unique)
-        if (idx === undefined) {
-          throw new Error(
-            `Internal error: missing var index for unique ${v.name.unique}`
-          )
-        }
-        return bdd.var(idx)
-      })
-      .with({ $type: 'Not' }, (n) => bdd.neg(compile(n.negand)))
-      .with({ $type: 'And' }, (a) =>
-        a.args.reduce((acc, x) => bdd.apply('and', acc, compile(x)), ROBDD.TRUE)
-      )
-      .with({ $type: 'Or' }, (o) =>
-        o.args.reduce((acc, x) => bdd.apply('or', acc, compile(x)), ROBDD.FALSE)
-      )
-      .with({ $type: 'App' }, (app) => {
-        throw new Error(
-          `Cannot compile decision query: App ${app.fnName.label} not supported`
+    return (
+      match(e)
+        .with({ $type: 'TrueE' }, () => ROBDD.TRUE)
+        .with({ $type: 'FalseE' }, () => ROBDD.FALSE)
+        .with({ $type: 'UBoolVar' }, (v) => {
+          const idx = uniqueToVarIndex.get(v.name.unique)
+          if (idx === undefined) {
+            throw new Error(
+              `Internal error: missing var index for unique ${v.name.unique}`
+            )
+          }
+          return bdd.var(idx)
+        })
+        .with({ $type: 'Not' }, (n) => bdd.neg(compile(n.negand)))
+        // The planner is a consumer of the FUNCTION, not of the picture, so the
+        // classical reading is not merely permitted here but correct: to settle
+        // whether the rule holds, `NOT scope OR requirement` is exactly the
+        // proposition, and it hands the planner its best short-circuit — show the
+        // scope false and there is nothing left to ask.
+        //
+        // The care needed is downstream: the resulting TRUE must not be reported to a
+        // user as "complies", because for a vacuous case it means "the rule never bit
+        // you". That is the N/A-vs-complies category error the ladder fixes with two
+        // lamps (DESIGN §25.3), and it lives in the wizard's PRESENTATION, not here.
+        .with({ $type: 'Implies' }, (i) =>
+          bdd.apply('or', bdd.neg(compile(i.scope)), compile(i.requirement))
         )
-      })
-      .with({ $type: 'InertE' }, (inert) =>
-        // Inert elements evaluate to identity for their context: AND→True, OR→False
-        inert.context === 'InertAnd' ? ROBDD.TRUE : ROBDD.FALSE
-      )
-      .exhaustive()
+        .with({ $type: 'And' }, (a) =>
+          a.args.reduce(
+            (acc, x) => bdd.apply('and', acc, compile(x)),
+            ROBDD.TRUE
+          )
+        )
+        .with({ $type: 'Or' }, (o) =>
+          o.args.reduce(
+            (acc, x) => bdd.apply('or', acc, compile(x)),
+            ROBDD.FALSE
+          )
+        )
+        .with({ $type: 'App' }, (app) => {
+          throw new Error(
+            `Cannot compile decision query: App ${app.fnName.label} not supported`
+          )
+        })
+        .with({ $type: 'InertE' }, (inert) =>
+          // Inert elements evaluate to identity for their context: AND→True, OR→False
+          inert.context === 'InertAnd' ? ROBDD.TRUE : ROBDD.FALSE
+        )
+        .exhaustive()
+    )
   }
 
   const root = compile(expr)

@@ -18,6 +18,7 @@ import {
   layout,
   sceneToAscii,
   monoMetrics,
+  toMermaidRailroad,
   ASCII_GEOMETRY,
   defaultViewSpec,
 } from "../src/index.js";
@@ -28,7 +29,7 @@ import type {
   Inert,
   And,
   Or,
-  Not,
+  Implies,
   NodeId,
   UBoolValue,
   Provenance,
@@ -48,46 +49,63 @@ const inert = (text: string, context: "InertAnd" | "InertOr"): Inert => ({
   text,
   context,
 });
-const and = (args: IRExpr[]): And => ({ $type: "And", id: nid(), args });
+const and = (args: IRExpr[], label?: string): And => ({
+  $type: "And",
+  id: nid(),
+  args,
+  label,
+});
 const or = (args: IRExpr[]): Or => ({ $type: "Or", id: nid(), args });
-const not = (negand: IRExpr): Not => ({ $type: "Not", id: nid(), negand });
+const implies = (
+  scope: IRExpr,
+  requirement: IRExpr,
+  seam: string,
+): Implies => ({ $type: "Implies", id: nid(), scope, requirement, seam });
 
 /* ---- A.3 covers w:  upper floor AND (in a wall OR in a roof slope) ---- */
 const upper = leaf("on an upper floor");
 const inWall = leaf("in a wall");
 const inRoof = leaf("in a roof slope");
-const covers = and([
-  upper,
-  inert("and", "InertAnd"),
-  or([
-    inert("in a side elevation:", "InertOr"),
-    inWall,
-    inert("or", "InertOr"),
-    inRoof,
-  ]),
-]);
+const covers = and(
+  [
+    upper,
+    inert("and", "InertAnd"),
+    or([
+      inert("in a side elevation:", "InertOr"),
+      inWall,
+      inert("or", "InertOr"),
+      inRoof,
+    ]),
+  ],
+  "A.3 covers this window",
+);
 
 /* ---- A.3 requirement met:  obscure-glazed AND (non-opening OR >= 1.7m) ---- */
 const obscure = leaf("obscure-glazed");
 const nonOpening = leaf("non-opening");
 const high = leaf("openable parts ≥ 1.7m up");
-const requirement = and([
-  obscure,
-  inert("and", "InertAnd"),
-  or([inert("either", "InertOr"), nonOpening, inert("or", "InertOr"), high]),
-]);
+const requirement = and(
+  [
+    obscure,
+    inert("and", "InertAnd"),
+    or([inert("either", "InertOr"), nonOpening, inert("or", "InertOr"), high]),
+  ],
+  "A.3 requirement met",
+);
 
-/* ---- the material conditional, as a ladder: covered => requirement met ----
-   `IF P THEN Q ELSE TRUE` IS `NOT P OR Q`, so the conditional is not a special
-   node — it is an OR whose first rung is a NOT. Drawn that way the reader can SEE
-   the two ways a window satisfies A.3: escape the antecedent, or meet the
-   consequent. The NOT gets a scope frame + an inverter bubble (DESIGN §21). */
-const rule = or([
-  inert("the window complies with A.3 if either", "InertOr"),
-  not(covers),
-  inert("or", "InertOr"),
-  requirement,
-]);
+/* ---- the material conditional, as a SEAM (DESIGN §25) ----------------------
+   This demo used to build the rule as `NOT covers OR requirement` — classically
+   perfect, and a lie about the shape. It drew the vacuous escape ("the rule never
+   reached your window") as a RUNG: a co-equal way of complying, sitting right
+   alongside actually meeting the requirement. No one reading a statute thinks
+   that way; on a form they would write "N/A".
+
+   So implication is a real node now, drawn as ONE path with TWO sinks. Current
+   leaves the scope panel only if the rule bites you, crosses the seam, and the
+   requirement's verdict throws a changeover to the green lamp or the red one.
+   Vacuity needs no ink at all: if the scope does not conduct, nothing leaves it
+   and NEITHER lamp lights. That is N/A, and you can see exactly where it stopped. */
+const rule = implies(covers, requirement, "IMPLIES");
 
 const fn: FunDecl = {
   id: nid(),
@@ -137,4 +155,14 @@ console.log(render(spec({ foldSet: new Set([covers.id]) })));
 banner("5. pure-ASCII fallback (no Unicode box-drawing)");
 console.log(
   sceneToAscii(layout(fn, spec(), tm, ASCII_GEOMETRY), { pure: true }),
+);
+
+/* Both of the doc's exhibits come from THIS tree, so they cannot drift apart: the
+   ASCII fence above and the Mermaid fence below are two renderings of one IR. */
+banner("6. the same rule as a Mermaid railroad (§24 carrier I-d)");
+console.log(
+  toMermaidRailroad(fn, {
+    factor: new Set([covers.id, requirement.id]),
+    frontmatter: false,
+  }),
 );

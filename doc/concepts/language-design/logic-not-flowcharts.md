@@ -327,16 +327,32 @@ DAG, not a duplicating tree), it stays **legible to a lawyer**, and its layout
 **carries no semantic order** — the three things the flowchart cannot do at once.
 And because it is _derived from the language_, it is a view, not the source.
 
-Note the direction of travel, though. The ladder renders the AND/OR trees — `A.3
-covers` and `A.3 requirement met by` each draw beautifully — but **it has no node
-for implication**. So the `P IMPLIES Q` at the top of the rule is not drawn _as_ an
-implication; it is drawn as its De Morgan equivalent, `NOT P OR Q` — two parallel
-rungs, one of them negated. That is what you will see below.
+Note the direction of travel, though, because we got this wrong once and the way we
+got it wrong is instructive.
 
-This is a gap in the _view_, not in the _language_: the semantics are already right,
-and the picture can be taught to catch up. And it is exactly the asymmetry this page
-is arguing for. **Had the diagram been the substrate, the missing connective would
-have been a missing _feature_, and the law would have had to be bent around it.**
+The ladder renders AND/OR trees natively. Implication it did not: for a long time the
+`P IMPLIES Q` at the top of the rule was drawn as its classical equivalent, `NOT P OR
+Q` — two parallel rungs, one of them negated. Truth-functionally that is beyond
+reproach. As a picture it is a small disaster, and for a reason worth naming: it draws
+the **vacuous case as a rung**. A ground-floor window satisfies `NOT P` and the current
+sails through the top branch, so the diagram reports, in the same ink it uses for a
+properly obscure-glazed window, that the rule is satisfied. Both are `TRUE`. Only one
+of them _complies_. The other was never asked.
+
+Anyone filling in a form would write **N/A** and move on. Our picture instead offered
+"the rule never reached you" as a co-equal way of complying, sitting right beside
+actually meeting the requirement. That is a category error, and it is precisely the
+error this page convicts flowcharts of — a picture that _says more than its source_.
+
+So implication is now a real node, and it is drawn as one: **one path, two sinks**. You
+will see it below. The fix is worth dwelling on because of _where_ it was available.
+The semantics were never wrong; `IMPLIES` had been a first-class operator in the
+language all along. It was the **view** that was impoverished, and a view can be taught
+to catch up in an afternoon. **Had the diagram been the substrate, the missing
+connective would have been a missing _feature_, and the law would have had to be bent
+around it** — drafters would have written `NOT P OR Q` because that is what the tool
+could draw, and the vacuity would have been baked into the statute instead of into a
+renderer.
 
 That last claim needs care, because a careless version of it is false. The ladder
 plainly _has_ an order: things are drawn left to right and top to bottom. Three
@@ -407,26 +423,32 @@ config:
     fontSize: 15
 ---
 railroad-beta
-window_complies_with_A_3 = choice(nonterminal("NOT A.3 covers this window"), nonterminal("A.3 requirement met"));
-A_3_covers_this_window = sequence(nonterminal("on an upper floor"), terminal("and"), sequence(terminal("in a side elevation, either"), choice(nonterminal("in a wall"), nonterminal("in a roof slope"))));
-A_3_requirement_met = sequence(nonterminal("obscure-glazed"), terminal("and"), sequence(terminal("either"), choice(nonterminal("non-opening"), nonterminal("openable parts ≥ 1.7m above the floor"))));
+window_complies_with_A_3 = sequence(nonterminal("A.3 covers this window"), terminal("IMPLIES"), nonterminal("A.3 requirement met"));
+A_3_covers_this_window = sequence(nonterminal("on an upper floor"), terminal("and"), sequence(terminal("in a side elevation:"), choice(nonterminal("in a wall"), nonterminal("in a roof slope"))));
+A_3_requirement_met = sequence(nonterminal("obscure-glazed"), terminal("and"), sequence(terminal("either"), choice(nonterminal("non-opening"), nonterminal("openable parts ≥ 1.7m up"))));
 ```
 
-Read it as a circuit. Current enters at the left terminal `●` and must find a path
-to the right one. Elements in **series** are conjoined; elements **stacked in
-parallel** are disjoined. Boxed items are the operative atoms — the facts you must
-establish about a window. The unboxed grey words are the statute's own connective
-prose, carried along because it is what makes the diagram read back against the
-text, and carrying no current of its own. That is the whole notation.
+Read it as a circuit. Current enters at the left terminal `●`. Elements in **series**
+are conjoined; elements **stacked in parallel** are disjoined. Boxed items are the
+operative atoms — the facts you must establish about a window. The unboxed grey words
+are the statute's own connective prose, carried along because it is what makes the
+diagram read back against the text, and carrying no current of its own. That is the
+whole notation.
+
+`IMPLIES` is the **seam**, and it is a bottleneck rather than a fork: the current must
+pass through the scope to reach the requirement at all. Which is what a rule _is_. The
+first question a lawyer asks is "does this bite me?", and only then "so what must be
+true?" — and a disjunction of escape routes answers neither.
 
 Three rules, because the L4 had three definitions. The picture did not have to
 invent a structure; it inherited one.
 
-Now put it beside the flowchart above and count again. The flowchart needed six
-terminal boxes to say a two-valued thing. The ladder has **two terminals** —
-because "permitted" is not a place you arrive at, it is simply whether current got
-through. Every atom appears exactly **once**. Nothing is duplicated, because nothing
-needs to be: a circuit shares by construction.
+Now put it beside the flowchart above and count again. The flowchart needed **six**
+terminal boxes — `permitted` four times, `BAD!!!` twice — to say a two-valued thing. It
+needed six because a flowchart has to re-state the verdict at the end of every path it
+invents. The ladder has exactly **two sinks**, because there are exactly two verdicts,
+and each is drawn once. Every atom likewise appears exactly **once**. Nothing is
+duplicated, because nothing needs to be: a circuit shares by construction.
 
 And notice what the picture does _not_ say. It does not say which contact you test
 first, because a circuit has no first. The left-to-right arrangement is the order of
@@ -442,34 +464,44 @@ drafter's order and one that _invents_ an evaluator's.
 Because the picture is _derived_ and not drawn, it can be emitted into whatever
 carrier is to hand. Here is the identical rule as a monospace ladder — which renders
 verbatim in a terminal, a commit message, a PR comment, or a `git diff`, and which
-shows two things the railroad above cannot: the **NOT** as a scope frame with an
-inverter bubble `○`, and (with a valuation loaded) the flow of current itself.
+shows the two sinks the railroad can only gesture at:
 
 ```
-                            a window complies with A.3 if either
-             ┌╌ NOT ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
-             ╎                                                                ╎
-             ╎                                     forming a side elevation:  ╎
-             ╎                                           ┌────────────┐       ╎
-             ╎                                     ┌─────┤ in a wall  ├─────┐ ╎
-             ╎ ┌────────────────────┐              │     └────────────┘     │ ╎
-   ┌─────────┼─┤ on an upper floor  ├──── and  ────┤          or            ├─○──────────┐
-   │         ╎ └────────────────────┘              │  ┌──────────────────┐  │ ╎          │
-   │         ╎                                     └──┤ in a roof slope  ├──┘ ╎          │
-   │         ╎                                        └──────────────────┘    ╎          │
-   │         ╎                                                                ╎          │
-●──┤         ╎                                                                ╎          ├──●
-   │         └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘          │
-   │                                         or                                          │
-   │                                                        either                       │
-   │                                                   ┌──────────────┐                  │
-   │                                   ┌───────────────┤ non-opening  ├───────────────┐  │
-   │  ┌─────────────────┐              │               └──────────────┘               │  │
-   └──┤ obscure-glazed  ├──── and  ────┤                      or                      ├──┘
-      └─────────────────┘              │  ┌────────────────────────────────────────┐  │
-                                       └──┤ openable parts ≥ 1.7m above the floor  ├──┘
-                                          └────────────────────────────────────────┘
+                                          in a side elevation:                                                           either
+                                             ┌────────────┐                                                          ┌──────────────┐
+                                       ┌─────┤ in a wall  ├─────┐                                          ┌─────────┤ non-opening  ├────────┐ ┌─( )  complies
+   ┌────────────────────┐              │     └────────────┘     │         ┌─────────────────┐              │         └──────────────┘        │ │
+●──┤ on an upper floor  ├──── and  ────┤           or           │ IMPLIES │ obscure-glazed  ├──── and  ────┤               or                ├─┿
+   └────────────────────┘              │  ┌──────────────────┐  │         └─────────────────┘              │  ┌───────────────────────────┐  │ │
+                                       └──┤ in a roof slope  ├──┘                                          └──┤ openable parts ≥ 1.7m up  ├──┘ └─( )  in breach
+                                          └──────────────────┘                                                └───────────────────────────┘
 ```
+
+The `┿` is a **changeover** — one pole, two throws. It is what lets the requirement be
+drawn _once_ instead of twice (once plain for the green lamp and once negated for the
+red one), and it is what makes the vacuous case cost no ink at all: if the scope does
+not conduct, nothing reaches the seam, neither lamp lights, and the reader can see
+exactly where it stopped. **N/A is a state, not a path.**
+
+Load a valuation and the picture starts reporting. Here is a real window — upper floor,
+in a wall, properly obscure-glazed, but its openable parts sit below 1.7m:
+
+```
+                                          in a side elevation:                                                           either
+                                             ┏━━━━━━━━━━━━┓                                                          ┌──────────────┐
+                                       ┏━━━━━┫in a wall ✓ ┣━━━━━┓                                          ┏━━━━━━━━━┫non-opening ✗ ├┈┈┈┈┈┈┈┈┐ ┌┈( )  complies
+   ┏━━━━━━━━━━━━━━━━━━━━┓              ┃     ┗━━━━━━━━━━━━┛     ┃         ┏━━━━━━━━━━━━━━━━━┓              ┃         └──────────────┘        ┊ ┊
+●━━┫on an upper floor ✓ ┣━━━━ and  ━━━━┫           or           ┃ IMPLIES ┃obscure-glazed ✓ ┣━━━━ and  ━━━━┫               or                ├┈┿
+   ┗━━━━━━━━━━━━━━━━━━━━┛              ┃  ┌──────────────────┐  ┊         ┗━━━━━━━━━━━━━━━━━┛              ┃  ┌───────────────────────────┐  ┊ ┃
+                                       ┗━━┫in a roof slope ✗ ├┈┈┘                                          ┗━━┫openable parts ≥ 1.7m up ✗ ├┈┈┘ ┗━(✗)  IN BREACH
+                                          └──────────────────┘                                                └───────────────────────────┘
+```
+
+Follow the heavy line. It reaches the seam — so the rule _does_ bite this window — and
+enters the requirement. Then it stops: neither disjunct conducts, so **no current
+leaves the requirement**, and the changeover throws to `IN BREACH`. The diagram does not
+merely report a verdict; it shows you the two contacts that produced it, and the one
+place a redesign could fix it.
 
 Two carriers, one source. **This is the thesis of the page, running.** Neither
 picture is the truth; the L4 is. Both are emitted from it, so neither can drift, and

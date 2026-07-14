@@ -57,7 +57,7 @@ const rule: Implies = {
   id: nid(),
   scope,
   requirement,
-  must: "MUST",
+  seam: "IMPLIES",
 };
 const fn: FunDecl = { id: nid(), name: "complies", params: [], body: rule };
 
@@ -128,6 +128,52 @@ test("three-valued short-circuit: a settled breach needs no further questions", 
   assert.deepEqual(lamps(s), { green: false, red: true });
 });
 
+test("no current is drawn LEAVING a requirement that did not conduct", () => {
+  // The ink must not claim current flowed through a failed contact. On a breach the
+  // segment out of the requirement panel is dead, and the red lamp is fed from the
+  // changeover itself — the pole is the rule's supply; the requirement only actuates.
+  const breach = draw({
+    [upper.id]: T,
+    [side.id]: T,
+    [glazed.id]: T,
+    [shut.id]: F,
+  });
+  const complies = draw({
+    [upper.id]: T,
+    [side.id]: T,
+    [glazed.id]: T,
+    [shut.id]: T,
+  });
+
+  const pivot = (s: Scene) => {
+    const g = s.prims.find(
+      (p) => p.kind === "glyph" && p.role === "changeover",
+    );
+    assert.ok(g && g.kind === "glyph");
+    return g.at;
+  };
+  // the one wire that ENDS at the pivot is the requirement's output
+  const intoPivot = (s: Scene) => {
+    const at = pivot(s);
+    const w = s.prims.find(
+      (p) =>
+        p.kind === "wire" &&
+        p.path.length === 2 &&
+        p.path[1].x === at.x &&
+        p.path[1].y === at.y,
+    );
+    assert.ok(w && w.kind === "wire", "the requirement feeds the changeover");
+    return w.flow;
+  };
+
+  assert.equal(intoPivot(complies), "closed", "it conducted: draw it live");
+  assert.notEqual(
+    intoPivot(breach),
+    "closed",
+    "it did NOT conduct: drawing current out of it would be a lie",
+  );
+});
+
 test("the two lamps ARE the sinks: no second power terminal is drawn", () => {
   const s = draw({ [upper.id]: T, [side.id]: T, [glazed.id]: T, [shut.id]: T });
   const terminals = s.prims.filter(
@@ -147,7 +193,7 @@ test("the two lamps ARE the sinks: no second power terminal is drawn", () => {
 test("the seam keeps the drafter's register, and is not struck through by its wire", () => {
   const s = draw({ [upper.id]: T, [side.id]: T });
   const seam = s.prims.find((p) => p.kind === "text" && p.tag === "seam");
-  assert.ok(seam && seam.kind === "text" && seam.text === "MUST");
+  assert.ok(seam && seam.kind === "text" && seam.text === "IMPLIES");
   // the wire is drawn in two segments with a gap, so the connective sits IN the line
   const through = s.prims.filter(
     (p) =>
@@ -162,7 +208,9 @@ test("the seam keeps the drafter's register, and is not struck through by its wi
 
 test("Mermaid emits the BOTTLENECK, never optional()", () => {
   const m = toMermaidRailroad(fn, { frontmatter: false });
-  assert.match(m, /sequence\(.*terminal\("MUST"\).*\)/);
+  // the seam is a terminal BETWEEN the two panels — one path, no bypass ink — and it
+  // carries the drafter's own spelling, not one we invented for readability (§25e)
+  assert.match(m, /sequence\(.*terminal\("IMPLIES"\).*\)/);
   assert.ok(
     !m.includes("optional("),
     "optional() is an UNGATED bypass: it says the requirement is moot (§25.6)",
