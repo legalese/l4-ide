@@ -419,25 +419,34 @@ IRExpr (fixture or live export)
 
 ---
 
-## 12. Package & repo layout (proposed)
+## 12. Package & repo layout
 
 ```
 ts-shared/
-  ladder-core/        # pure: IRExpr → BBE → Scene IR (§4.2); no DOM; ViewSpec (§4.3)
-  ladder-svg/         # Scene IR → SVG primitives (DOM sink + string sink)
-  l4-ladder-visualizer/   # existing pkg, slimmed to the web interactive overlay
-                          # (re-exports core/svg; drops Dagre/SvelteFlow layout)
+  ladder-core/        # ✅ pure: IRExpr → BBE → Scene IR (§4.2); no DOM; ViewSpec (§4.3)
+                      #    + the ASCII and Mermaid text carriers (§24)
+  ladder-svg/         # ✅ Scene IR → SVG (string sink; DOM sink when E2 wants one)
+                      #    + the demos and the standalone/playground harnesses
+  l4-ladder-visualizer/   # ☐ existing pkg, to be slimmed to the web interactive overlay
+                          #   (re-exports core/svg; drops Dagre/SvelteFlow layout) — E1
 tools/
-  ladder-print/       # Node CLI: (IRExpr, ViewSpec) → A3+ SVG/PDF
+  ladder-print/       # ☐ Node CLI: (IRExpr, ViewSpec) → A3+ SVG/PDF — F1
 ```
 
-(Alternative: keep everything inside `l4-ladder-visualizer` as internal modules and only split packages once stable. Decide in §13.)
+**The split is done** (G6/E4). The seam between the two packages is the **Scene IR**: `ladder-svg` imports `Scene` from `ladder-core` with `import type` and nothing else, so at runtime the renderer has no dependency on the layout engine at all. Its tests build `Scene` literals by hand — no `layout`, no metrics — which is the property under test as much as the output is: if they ever need `layout` to compile, the seam has leaked.
+
+ASCII and Mermaid stayed in `ladder-core`. They are peers of the SVG emit (all three consume `Scene` and nothing else), but they are string-only carriers for the doc pipeline with no sink to speak of, and pulling them out would buy nothing today. If a third backend ever needs its own package, the precedent is set.
+
+Two latent bugs surfaced the moment `ladder-svg` became the **first cross-package consumer of `ladder-core`** — which is the real argument for splitting _before_ E1 rather than during it:
+
+- **`ladder-core`'s package entry point had never resolved.** `exports` promised `./dist/index.js`; `rootDir: "./"` emitted `dist/src/index.js`. Nothing had ever imported the package, so nothing had ever noticed. Both packages now build via a `tsconfig.build.json` that emits only `src/` (the `@repo/boolean-analysis` convention), while `tsconfig.json` keeps typechecking `demo/`, `test/` and `standalone/`. E1 would have hit this from Svelte, where it would have looked like a Vite problem.
+- **The SVG emit had no tests.** Nine now (§25.4 lamps, XML escaping, §20 flow weights, §22-vs-§15 dashes, the `data-*` host contract).
 
 ---
 
 ## 13. Open decisions
 
-1. **Package split now vs later** — three packages up front, or one package with internal modules until the core stabilizes?
+1. ~~**Package split now vs later**~~ — **RESOLVED (G6/E4):** split, and split _before_ the IDE integration. See §12: being the first consumer is what proved `ladder-core` was importable at all.
 2. **PrePost / protrude model** — finalize how label bands attach without breaking the parked-origin invariant.
 3. **Sub-ordering within groups** (§6) — implement the selectivity reorder, or preserve strict source order? Interacts with stable `atomId` and user mental model.
 4. **`IRExpr` extensions** (§11) — what, if anything, must move into Haskell vs be derived in TS. **Leading candidate: a `NamedExpr` wrapper for subtree labels** (§16.1) — the wire IR currently can't name an interior node, which folding wants; `@repo/viz-expr` already stubs it out. Decide whether Haskell populates it from the inlined DECIDE/`Where` name, NLG fills it, or both.
@@ -490,11 +499,14 @@ restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
 **☐ P4 — Print pipeline.** `ladder-print` Node CLI; A3+ PDF; a poster. The
 `ViewSpec`→SVG-string seam exists; no CLI/PDF yet. Not started.
 
-**Cross-cutting open** (see also §13): `ladder-svg` package split still deferred
-(§13.1); N-line straddle + trailing `Post` (§17); font parity for real metrics (§4.4,
-P0 uses an estimator); `NamedExpr` wrapper for subtree labels (§13.4). **Landing:**
-eventually push the branch and PR into `unstable`; re-merge unstable periodically to
-avoid drift.
+**✅ `ladder-svg` package split (DONE — G6/E4).** `@repo/ladder-svg` is its own package,
+seamed on the Scene IR (§12). It is the first cross-package consumer of `ladder-core`,
+which is how we found out that `ladder-core`'s package entry point had never resolved.
+
+**Cross-cutting open** (see also §13): N-line straddle + trailing `Post` (§17); font
+parity for real metrics (§4.4, P0 uses an estimator); `NamedExpr` wrapper for subtree
+labels (§13.4). **Landing:** PR [#116](https://github.com/legalese/l4-ide/pull/116) into
+`unstable`; re-merge unstable periodically to avoid drift.
 
 ---
 
@@ -1159,14 +1171,15 @@ window rule comes in at 93 columns.)
 in-process and inlines the SVG — _interactive_ (fold, T/F/U cycling) on surfaces where **we**
 control the renderer: a future docs site, and the **VS Code Markdown preview**, which accepts
 markdown-it plugins contributed by an extension (`markdown.markdownItPlugins`) — and we already
-ship a VS Code extension. Rides on the §13.1 `ladder-svg` split.
+ship a VS Code extension. Rode on the §13.1 `ladder-svg` split — **which is now done** (§12).
 
 **Recommendation: I-a + I-b now; I-c with the IDE integration; Mermaid never.**
 
 > **Status.** I-b is **shipped**. I-a (the generate-and-commit SVG build step) is the next
 > increment, and it now has everything it needs — the playground bridge already does L4 →
-> `jl4-lsp` → `funDecl`, and `sceneToSvg` already takes a theme. I-c waits on the §13.1
-> `ladder-svg` split. "Mermaid never" **has now been stress-tested** (§24.2) and survives — but
+> `jl4-lsp` → `funDecl`, and `sceneToSvg` already takes a theme. I-c waited on the §13.1
+> `ladder-svg` split, **which has now landed** (§12), so it is unblocked and rides with E1/E3.
+> "Mermaid never" **has now been stress-tested** (§24.2) and survives — but
 > the first draft's reasons for it were wrong, and the rewrite records that.
 >
 > **Outstanding check:** the Mermaid findings come from replaying GitHub's pipeline byte-for-byte
