@@ -10,6 +10,7 @@ import Test.QuickCheck.Instances ()
 
 import Backend.Api
 import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryPlanResponse (..))
+import qualified L4.Decision.QueryPlan as QP
 import L4.FunctionSchema (Parameters (..), Parameter (..))
 import ControlPlane (DeploymentStatusResponse (..))
 import qualified Data.Aeson as Aeson
@@ -217,8 +218,11 @@ instance Arbitrary OutputSummary where
 instance Arbitrary QueryAtom where
   arbitrary = QueryAtom <$> arbitrary <*> arbitrary <*> arbitrary <*> pure []
 
+instance Arbitrary QP.Verdict where
+  arbitrary = Q.elements [minBound .. maxBound]
+
 instance Arbitrary QueryOutcome where
-  arbitrary = QueryOutcome <$> arbitrary <*> arbitrary
+  arbitrary = QueryOutcome <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary QueryImpact where
   arbitrary = QueryImpact <$> arbitrary <*> arbitrary
@@ -245,6 +249,7 @@ instance Arbitrary QueryPlanResponse where
   arbitrary =
     QueryPlanResponse
       <$> arbitrary
+      <*> arbitrary
       <*> arbitrary
       <*> arbitrary
       <*> arbitrary

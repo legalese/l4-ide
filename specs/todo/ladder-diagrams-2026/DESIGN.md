@@ -1438,6 +1438,10 @@ state it cannot. Which is exactly the work §25b exists to do in the native rend
       with rendering `>=` as `≥`, and says nothing the source did not. The wire field stays free-form
       so a future NLG annotation (or a hand-authored scene) can still carry the statute's own words.
 
+- [x] **25f.** The seam in the **wizard**: a `Verdict` on the query plan, and a planner that stops
+      short-circuiting the interview when the verdict is not yet settled. See §25f below — the
+      short-circuit turned out to BE the bug, not just its symptom.
+
 **Two findings from the build, both worth keeping:**
 
 - **The ink must not outrun the current.** The first cut fed the requirement→changeover wire from
@@ -1447,17 +1451,75 @@ state it cannot. Which is exactly the work §25b exists to do in the native rend
   fed from the changeover itself. That is honest: the pole is the rule's supply and the requirement
   merely **actuates** the switch. This compression (one device instead of a `[Q]`/`[/Q]` pair of
   rungs) is exactly what buys us "every atom appears once".
-- **The vacuity error recurs one level up, in the wizard.** `QueryPlan` and `decision-query` compile
-  the seam classically, and are right to — to _settle_ the rule, `¬P ∨ Q` is the proposition, and it
-  hands the planner its best short-circuit (show the scope false and there is nothing left to ask).
-  But the TRUE that comes back must not be _reported_ to a user as "complies": for a vacuous case it
-  means "the rule never bit you". Same category error as §25.3, one layer out, and it belongs to the
-  wizard's **presentation**. Not fixed here. **Open.**
+- **The vacuity error recurs one level up, in the wizard. FIXED — see §25f.** And the diagnosis
+  above was too kind: it is not only a presentation bug.
 
 **Explicitly NOT in this build** (§25.5): regulative / "must do" rules. The ladder will render
 their **guard** — free, since it is the same machinery — and then **stop**, handing the obligation
 to a statechart view via a folded handle. Drawing a deontic lifecycle as a coil, or as anything
 else the ladder owns, would be the very category error this project exists to name.
+
+### 25f. The seam in the WIZARD — **the short-circuit was the bug**
+
+The finding recorded at §25b–e was that the query planner must not _report_ a vacuous TRUE as
+"complies". True, and an under-diagnosis. Fixing it properly turned up something sharper:
+
+> **The classical short-circuit is valid only if you are computing a truth VALUE.** If you are
+> computing a **verdict**, a met requirement does **not** settle it — you must still establish the
+> scope, because _"the rule never reached you"_ and _"you comply"_ are different answers, and only
+> the scope tells them apart.
+
+So the planner did not merely mislabel the vacuous case. Given `requirement = TRUE` and the scope
+still unknown, `¬P ∨ Q` restricts to TRUE, the support goes **empty**, and the interview **stops** —
+with the one question that would have distinguished N/A from compliance still unasked. It could not
+have reported the right answer, because it had thrown away the means of reaching it. A presentation
+fix alone would have papered over a planner that stops too early.
+
+**What was built.**
+
+- **`BoolExpr` gains `BImplies`** (`BooleanDecisionQuery.hs`, mirrored in `decision-query.ts`). It
+  still compiles into the diagram classically — for settling whether the rule _holds_, `¬P ∨ Q` is
+  exactly the proposition — but the two sides are **also kept as roots of their own, in the same
+  BDD**. Hash-consing makes that nearly free, and it is the only way to tell the two TRUEs apart.
+  `vizExprToBoolExpr` therefore hands the seam over **intact** instead of flattening it on the way in.
+- **`Verdict`** — `Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` — on
+  `QueryPlanResponse`, on `QueryOutcome`, and so on every impact preview too (a preview that says
+  "answer NO and you're compliant" is the same lie, just earlier). `determined` **stays**, unchanged
+  and still correct: it is the function's truth value, which the API owes its callers. What changes
+  is that the honest field is now the obvious one to switch on, and the note in the response says so.
+- **Support is computed against the VERDICT**, not the value: the support of the two _sides_, with
+  the requirement's dropped once the scope is settled FALSE (a rule established not to reach you is
+  not worth another question). It costs questions in exactly one case — requirement met, scope open —
+  and that is the trade, made deliberately: **a shorter interview that ends in the wrong word is not
+  a bargain.**
+- **Information gain is measured about the verdict**: `H(scope) + P(scope)·H(requirement)`. This is
+  not decoration. With the old measure, the moment the function settled, every atom scored **zero**
+  and the ranking went blind precisely when the fix needs it to keep working. It also earns
+  "ask the scope first" from the arithmetic rather than from a hand-tuned rule — a requirement you
+  may never be measured against carries less information about the verdict than the scope that
+  decides whether you are measured at all.
+
+**The verdict table is `lampsFor`'s table, deliberately.** Same rows, and the two engines' tests
+assert it in the same words. A wizard and a diagram that disagreed about a case would be lying to the
+same user, in the same window.
+
+| scope | requirement | `determined` |    `verdict`    |
+| :---: | :---------: | :----------: | :-------------: |
+|   ✗   |    _any_    |   **TRUE**   | `NotApplicable` |
+|   ✓   |      ✓      |     TRUE     |   `Complies`    |
+|   ✓   |      ✗      |    FALSE     |   `InBreach`    |
+|   ✓   |      ?      |      —       | `Undetermined`  |
+|   ?   |      ✓      |   **TRUE**   | `Undetermined`  |
+|   ?   |   _else_    |      —       | `Undetermined`  |
+
+The two bold rows are the whole finding. Both are `determined = TRUE`; neither may be shown to a user
+as compliance; and the second is the one that used to end the interview.
+
+**Still open — the old visualizer.** `l4-ladder-visualizer` runs `expandImplies` at its single entry
+point (§25a), so its LIR has no seam and its partial-eval never sees one. It is therefore _truthful_
+— it prints the boolean and claims nothing about compliance — but it cannot draw the two lamps, and
+in the IDE that is still the picture a user gets. The fix is not to retrofit a verdict into it; it is
+`ladder-core`, which is what this whole project is for.
 
 ---
 

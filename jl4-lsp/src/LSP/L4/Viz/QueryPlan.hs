@@ -128,21 +128,18 @@ vizExprToBoolExpr expr =
     VizExpr.Not _ x ->
       let (ex, m, o) = go x
        in (BDQ.BNot ex, m, o)
-    -- The query planner is a consumer of the FUNCTION, not of the picture, so here
-    -- the classical reading is not merely allowed but correct: to decide whether the
-    -- rule holds, `NOT scope OR requirement` is exactly the proposition to settle,
-    -- and it buys the planner its best short-circuit — establish the scope is false
-    -- and there is nothing left to ask. Scope questions stay ahead of requirement
-    -- questions in the ask-order for free, because that is where the information is.
+    -- Hand the seam to the planner INTACT. It will still compile it classically into
+    -- the diagram — to settle whether the rule holds, `NOT scope OR requirement` is
+    -- exactly the proposition — but it also keeps the two sides as roots of their own,
+    -- which is the only way to tell a vacuous TRUE from a compliant one and so the only
+    -- way to report a verdict rather than a bare truth value (DESIGN §25.3).
     --
-    -- What the planner must NOT do is report the resulting TRUE as "complies": for a
-    -- vacuous case it means "the rule never bit". That is the same N/A-vs-complies
-    -- category error the ladder fixes with two lamps (DESIGN §25.3), one level up,
-    -- and it belongs to the wizard's PRESENTATION, not to this compilation.
+    -- Flattening it here, as we used to, threw that away before the planner ever saw
+    -- it: same value, different ink, and the ink is what the user reads.
     VizExpr.Implies _ scope requirement _seam ->
       let (ep, mp, op) = go scope
           (eq, mq, oq) = go requirement
-       in (BDQ.BOr [BDQ.BNot ep, eq], mp <> mq, op <> oq)
+       in (BDQ.BImplies ep eq, mp <> mq, op <> oq)
     VizExpr.And _ xs ->
       let (es, ms, os) = unzip3 (map go xs)
        in (BDQ.BAnd es, mconcat ms, mconcat os)

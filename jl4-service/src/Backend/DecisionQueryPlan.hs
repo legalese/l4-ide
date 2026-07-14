@@ -215,6 +215,10 @@ mkVerDocId fileName =
 
 data QueryPlanResponse = QueryPlanResponse
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value. Correct, and NOT a verdict — see 'verdict'.
+  , verdict :: !QP.Verdict
+  -- ^ What may be shown to a user. Clients should switch on THIS: for a rule stated as
+  -- a seam, @Complies@ and @NotApplicable@ are both @determined = true@ (DESIGN §25.3).
   , stillNeeded :: ![QueryAtom]
   , ranked :: ![QueryAtom]
   , inputs :: ![QueryInput]
@@ -257,7 +261,7 @@ queryPlan name cached args =
             Just v -> flattenBoolBindings k v
         | (k, mv) <- Map.toList args.fnArguments
         ]
-    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
+    QP.QueryPlanResponse{determined, verdict, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
       QP.queryPlan name paramsByUnique cached.core flattenedLabelBindings
 
     asksEnriched =
@@ -275,6 +279,7 @@ queryPlan name cached args =
    in
     QueryPlanResponse
       { determined
+      , verdict
       , stillNeeded
       , ranked
       , inputs
