@@ -47,14 +47,32 @@ import type {
   Not,
   Implies,
   NodeId,
+  Unique,
   UBoolValue,
   Provenance,
 } from "./types.js";
 
-/** The result of decoding a wire `FunDecl`: the ladder tree plus the valuation
- *  side-channel lifted from inline leaf values. Feed `valuation` straight into
- *  `defaultViewSpec({ valuation })` (or merge with live eval results, A3). */
-export interface DecodedViz {
+/**
+ * The identity index a decoded tree needs to be driven by the IDE evaluator (§E1/S1).
+ *
+ * `unique`/`atomId` are keyed per drawn node (`NodeId`); the inverses are PLURAL because
+ * one proposition can occupy several positions — `nodesByUnique.get(u)` is every box that
+ * must move when the user binds `u`. `unique`/`nodesByUnique` cover `UBoolVar` only (the
+ * atoms the evaluator's `Assignment` keys on); `atomId` covers `UBoolVar` and `App` (both
+ * eval-addressable, `App` via `evalApp`).
+ */
+export interface DecodedIdentity {
+  readonly uniqueByNode: Map<NodeId, Unique>;
+  readonly nodesByUnique: Map<Unique, NodeId[]>;
+  readonly atomIdByNode: Map<NodeId, string>;
+  readonly nodesByAtomId: Map<string, NodeId[]>;
+}
+
+/** The result of decoding a wire `FunDecl`: the ladder tree, the valuation/provenance
+ *  side-channels lifted from inline leaf fields, and the identity index (§E1/S1). Feed
+ *  `valuation` straight into `defaultViewSpec({ valuation })` (or merge with live eval
+ *  results, A3). */
+export interface DecodedViz extends DecodedIdentity {
   readonly fn: FunDecl;
   /** Positional (keyed by node id) T/F/U lifted from `UBoolVar.value`. */
   readonly valuation: Map<NodeId, UBoolValue>;
@@ -63,43 +81,82 @@ export interface DecodedViz {
   readonly provenance: Map<NodeId, Provenance>;
 }
 
-/** Decode a wire `FunDecl` into a ladder `FunDecl` + valuation/provenance side-channels. */
+/** Everything `convert` fills as it walks. Bundling the side-channels keeps the recursive
+ *  signature to two args and makes adding a channel a one-line change, not a re-thread. */
+interface Sink {
+  readonly valuation: Map<NodeId, UBoolValue>;
+  readonly provenance: Map<NodeId, Provenance>;
+  readonly uniqueByNode: Map<NodeId, Unique>;
+  readonly atomIdByNode: Map<NodeId, string>;
+}
+
+const emptySink = (): Sink => ({
+  valuation: new Map(),
+  provenance: new Map(),
+  uniqueByNode: new Map(),
+  atomIdByNode: new Map(),
+});
+
+/** Build the plural inverse of a per-node map (one key can land on several positions). */
+function invert<K>(byNode: Map<NodeId, K>): Map<K, NodeId[]> {
+  const out = new Map<K, NodeId[]>();
+  for (const [node, key] of byNode) {
+    const existing = out.get(key);
+    if (existing) existing.push(node);
+    else out.set(key, [node]);
+  }
+  return out;
+}
+
+const identityOf = (s: Sink): DecodedIdentity => ({
+  uniqueByNode: s.uniqueByNode,
+  nodesByUnique: invert(s.uniqueByNode),
+  atomIdByNode: s.atomIdByNode,
+  nodesByAtomId: invert(s.atomIdByNode),
+});
+
+/** Decode a wire `FunDecl` into a ladder `FunDecl` + valuation/provenance/identity. */
 export function fromVizFunDecl(viz: VizFunDecl): DecodedViz {
-  const valuation = new Map<NodeId, UBoolValue>();
-  const provenance = new Map<NodeId, Provenance>();
-  const body = convert(viz.body, valuation, provenance);
+  const sink = emptySink();
+  const body = convert(viz.body, sink);
   const fn: FunDecl = {
     id: viz.id.id,
     name: viz.name.label,
     params: viz.params.map((p) => p.label),
     body,
   };
-  return { fn, valuation, provenance };
+  return {
+    fn,
+    valuation: sink.valuation,
+    provenance: sink.provenance,
+    ...identityOf(sink),
+  };
 }
 
 /** Decode a bare wire `IRExpr` (e.g. an inlined sub-expression) the same way. */
-export function fromVizExpr(viz: VizIRExpr): {
+export function fromVizExpr(viz: VizIRExpr): DecodedIdentity & {
   readonly expr: IRExpr;
   readonly valuation: Map<NodeId, UBoolValue>;
   readonly provenance: Map<NodeId, Provenance>;
 } {
-  const valuation = new Map<NodeId, UBoolValue>();
-  const provenance = new Map<NodeId, Provenance>();
-  const expr = convert(viz, valuation, provenance);
-  return { expr, valuation, provenance };
+  const sink = emptySink();
+  const expr = convert(viz, sink);
+  return {
+    expr,
+    valuation: sink.valuation,
+    provenance: sink.provenance,
+    ...identityOf(sink),
+  };
 }
 
-function convert(
-  e: VizIRExpr,
-  valuation: Map<NodeId, UBoolValue>,
-  provenance: Map<NodeId, Provenance>,
-): IRExpr {
+function convert(e: VizIRExpr, sink: Sink): IRExpr {
+  const { valuation, provenance } = sink;
   switch (e.$type) {
     case "And": {
       const node: And = {
         $type: "And",
         id: e.id.id,
-        args: e.args.map((a) => convert(a, valuation, provenance)),
+        args: e.args.map((a) => convert(a, sink)),
         // wire And/Or carry no name today; when a NamedExpr wrapper lands
         // (viz-expr.ts ~L198, TODO §G5) its name becomes `label`.
       };
@@ -109,7 +166,7 @@ function convert(
       const node: Or = {
         $type: "Or",
         id: e.id.id,
-        args: e.args.map((a) => convert(a, valuation, provenance)),
+        args: e.args.map((a) => convert(a, sink)),
       };
       return node;
     }
@@ -117,7 +174,7 @@ function convert(
       const node: Not = {
         $type: "Not",
         id: e.id.id,
-        negand: convert(e.negand, valuation, provenance),
+        negand: convert(e.negand, sink),
       };
       return node;
     }
@@ -129,8 +186,8 @@ function convert(
       const node: Implies = {
         $type: "Implies",
         id: e.id.id,
-        scope: convert(e.scope, valuation, provenance),
-        requirement: convert(e.requirement, valuation, provenance),
+        scope: convert(e.scope, sink),
+        requirement: convert(e.requirement, sink),
         seam: e.seam,
       };
       return node;
@@ -148,18 +205,26 @@ function convert(
       // `value`. Presence-of-a-boolean, not truthiness, decides provenance.
       if (e.typically === true || e.typically === false)
         provenance.set(e.id.id, "default");
+      // §E1/S1: carry the semantic identity the evaluator keys on. `unique` and the
+      // unique-maps are UBoolVar-only; `atomId` also indexes App below.
+      sink.uniqueByNode.set(e.id.id, e.name.unique);
+      sink.atomIdByNode.set(e.id.id, e.atomId);
       const leaf: Leaf = {
         $type: "UBoolVar",
         id: e.id.id,
         label: e.name.label,
         atomId: e.atomId,
+        unique: e.name.unique,
+        canInline: e.canInline,
       };
       return leaf;
     }
     case "App": {
       // §23 membrane leaf. Args are literal/value children rendered "drawn open"
       // (D1); A1 keeps the leaf flat but preserves `atomId` for eval addressing
-      // and the predicate name as the label.
+      // and the predicate name as the label. Addressed by `atomId` (via `evalApp`),
+      // NOT by `unique` — so it is in the atomId index but not the unique one.
+      sink.atomIdByNode.set(e.id.id, e.atomId);
       const leaf: Leaf = {
         $type: "App",
         id: e.id.id,

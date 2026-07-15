@@ -14,6 +14,18 @@
 
 export type NodeId = number;
 
+/**
+ * Semantic identity of a proposition, mirror of viz-expr's `Unique` (TODO §E1 / S1).
+ *
+ * Distinct from `NodeId`, and the distinction is load-bearing: `NodeId` is POSITIONAL
+ * (every drawn box has its own), while `Unique` is SEMANTIC — two `UBoolVar` leaves that
+ * refer to the same proposition share a `Unique` but not a `NodeId`. The IDE's evaluator
+ * keys its `Assignment` by `Unique`, so a binding on one occurrence must fan out to every
+ * `NodeId` that shares the `Unique` (see `DecodedViz.nodesByUnique`). Get this backwards
+ * and one diagram shows the same atom with two different values.
+ */
+export type Unique = number;
+
 /** Mirror of viz-expr's UBoolValue. */
 export type UBoolValue = "TrueV" | "FalseV" | "UnknownV";
 
@@ -33,6 +45,19 @@ export interface Leaf {
   readonly id: NodeId;
   readonly label: string;
   readonly atomId?: string;
+  /**
+   * Semantic identity (§E1/S1). Set for `UBoolVar` only — the leaves the IDE evaluator
+   * addresses by `Unique`. `App` is eval-addressed by `atomId` (via `evalApp`), and
+   * `TrueE`/`FalseE` are constants, so neither carries one. The invariant is
+   * `leaf.unique !== undefined ⟺ leaf ∈ DecodedViz.nodesByUnique`, which lets a caller
+   * read identity off the drawn tree without a side table.
+   */
+  readonly unique?: Unique;
+  /**
+   * Whether this atom can be unfolded to its definition (the IDE's `+` button, gated on
+   * `inlineExprs`). From the wire `UBoolVar.canInline`; absent on every other leaf kind.
+   */
+  readonly canInline?: boolean;
 }
 
 /**

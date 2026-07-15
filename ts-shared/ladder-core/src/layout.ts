@@ -27,6 +27,7 @@ import type {
   Flow,
   Implies,
 } from "./types.js";
+import type { Verdict } from "@repo/boolean-analysis";
 
 /**
  * The kernel's geometry, injected (DESIGN §3.2). TextMetrics was always
@@ -206,6 +207,51 @@ function lampsFor(
     green: reached && q === "TrueV",
     red: reached && q === "FalseV", // NOT on `?` — an unknown requirement is not a breach
   };
+}
+
+/**
+ * The verdict for a decision, from its top-level shape and a valuation (§E1/S9, DESIGN §25f).
+ *
+ * This is the picture's half of the same answer `BooleanDecisionQuery.verdictOf` computes
+ * for the wizard — the SAME six-row table, deliberately, because a diagram and a wizard that
+ * disagreed about a case would be lying to the same user. What the IDE header must show is
+ * this, NOT the raw truth value: telling someone they "comply" with a rule that never reached
+ * them is the N/A-vs-complies category error the whole seam exists to fix.
+ *
+ *   no seam (body is not an Implies): the function's own value — TrueV `Holds`, FalseV
+ *     `Fails`, else `Undetermined`.
+ *   seam, scope FALSE:      `NotApplicable`   — the rule never bit; the function is vacuously
+ *                                               TRUE, and that TRUE is not compliance.
+ *   seam, scope UNKNOWN:    `Undetermined`    — even if the requirement is already met and the
+ *                                               function is settled TRUE, we do not know WHICH
+ *                                               true it is (N/A vs complies).
+ *   seam, scope TRUE + req TRUE:    `Complies`
+ *   seam, scope TRUE + req FALSE:   `InBreach`
+ *   seam, scope TRUE + req UNKNOWN: `Undetermined`
+ *
+ * `valuation` is the same map `layout` takes (`ViewSpec.valuation`): positional per-node
+ * pins/values, three-valued-evaluated through the tree exactly as the render is.
+ */
+export function verdictFor(
+  fn: FunDecl,
+  valuation: ReadonlyMap<NodeId, UBoolValue>,
+): Verdict {
+  const values = new Map<NodeId, UBoolValue>();
+  nodeValue(fn.body, valuation, values);
+  const body = fn.body;
+  if (body.$type !== "Implies") {
+    const v = values.get(body.id);
+    return v === "TrueV" ? "Holds" : v === "FalseV" ? "Fails" : "Undetermined";
+  }
+  const scope = values.get(body.scope.id);
+  if (scope === "FalseV") return "NotApplicable";
+  if (scope !== "TrueV") return "Undetermined"; // unknown scope: verdict not settled
+  const req = values.get(body.requirement.id);
+  return req === "TrueV"
+    ? "Complies"
+    : req === "FalseV"
+      ? "InBreach"
+      : "Undetermined";
 }
 
 interface Energ {

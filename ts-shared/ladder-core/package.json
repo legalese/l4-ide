@@ -27,6 +27,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@repo/boolean-analysis": "*",
     "@repo/viz-expr": "*"
   }
 }
