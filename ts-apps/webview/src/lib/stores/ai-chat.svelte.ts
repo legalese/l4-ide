@@ -17,6 +17,7 @@ import {
   AiMcpAllSetEnabled,
   AiMcpServerAction,
   AiMcpServerAdd,
+  AiMcpServerImport,
   AiMcpServerSetEnabled,
   AiMcpServersGet,
   AiMcpToolSetEnabled,
@@ -26,6 +27,7 @@ import {
   AiUsageSubscribe,
   AiUsageUnsubscribe,
   type AiChatAttachment,
+  type AiMcpCandidateInfo,
   type AiMcpServerInfo,
   type AiConversation,
   type AiConversationSummary,
@@ -1794,10 +1796,11 @@ export function createAiChatStore(
 
   async function getMcpServers(): Promise<{
     servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
     allEnabled: boolean
   }> {
     const m = getMessenger()
-    if (!m) return { servers: [], allEnabled: true }
+    if (!m) return { servers: [], candidates: [], allEnabled: true }
     try {
       return await m.sendRequest(
         AiMcpServersGet,
@@ -1805,7 +1808,22 @@ export function createAiChatStore(
         undefined as never
       )
     } catch {
-      return { servers: [], allEnabled: true }
+      return { servers: [], candidates: [], allEnabled: true }
+    }
+  }
+
+  async function importMcpServer(
+    id: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    const m = getMessenger()
+    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    try {
+      return await m.sendRequest(AiMcpServerImport, HOST_EXTENSION, { id })
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
     }
   }
 
@@ -1857,7 +1875,8 @@ export function createAiChatStore(
     url?: string
     command?: string
     bearerToken?: string
-  }): Promise<{ ok: boolean; error?: string }> {
+    overwrite?: boolean
+  }): Promise<{ ok: boolean; error?: string; exists?: boolean }> {
     const m = getMessenger()
     if (!m) return { ok: false, error: 'Not connected to the extension.' }
     try {
@@ -2000,6 +2019,7 @@ export function createAiChatStore(
     getPermissions,
     setPermission,
     getMcpServers,
+    importMcpServer,
     setMcpServerEnabled,
     setMcpAllEnabled,
     mcpServerAction,
@@ -2081,8 +2101,10 @@ export type AiChatStore = {
   ) => void
   getMcpServers: () => Promise<{
     servers: AiMcpServerInfo[]
+    candidates: AiMcpCandidateInfo[]
     allEnabled: boolean
   }>
+  importMcpServer: (id: string) => Promise<{ ok: boolean; error?: string }>
   setMcpServerEnabled: (id: string, enabled: boolean) => void
   setMcpAllEnabled: (enabled: boolean) => void
   mcpServerAction: (
@@ -2100,7 +2122,8 @@ export type AiChatStore = {
     url?: string
     command?: string
     bearerToken?: string
-  }) => Promise<{ ok: boolean; error?: string }>
+    overwrite?: boolean
+  }) => Promise<{ ok: boolean; error?: string; exists?: boolean }>
   refreshHistory: () => Promise<void>
   loadConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
