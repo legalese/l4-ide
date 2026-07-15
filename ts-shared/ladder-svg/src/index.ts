@@ -8,4 +8,6 @@
  *  can render through here; anything that can consume a `Scene` (ASCII, Mermaid)
  *  is a peer, not a subclass. */
 export { sceneToSvg } from "./svg.js";
+export { canvasMetrics } from "./metrics.js";
+export type { CanvasMetricsOpts } from "./metrics.js";
 export type { Theme } from "@repo/ladder-core";

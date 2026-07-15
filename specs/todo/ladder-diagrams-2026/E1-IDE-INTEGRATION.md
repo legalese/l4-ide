@@ -100,6 +100,25 @@ Each is one commit; each leaves `npx turbo run check test` green.
 
 ≈ 3 L-equivalents. Critical path **1 → 3 → 4 → 5**; Step 2 runs in parallel.
 
+### Step 1 as built (commit `d3651fdb`), and a gap found reading ahead
+
+Step 1 shipped `Leaf.unique`/`canInline`, `verdictFor`, and the node-space index
+(`uniqueByNode`/`nodesByUnique`/`atomIdByNode`/`nodesByAtomId`) — plus a `Sink` refactor of
+`convert` so a new channel is a one-line change. Two refinements surfaced while reading the
+Step 3 targets:
+
+- **`elicitationOverrideFromQueryPlan` works in UNIQUE space, not node space.** It calls
+  `getUniquesForAtomId(atomId): Unique[]` and `getUniquesForLabel(label): Unique[]`. Step 1
+  gave node-space inverses; the model needs `uniquesByAtomId`/`uniquesByLabel` too. Fold these
+  into `DecodedIdentity` (the adapter already walks the tree — deriving them in the model would
+  re-scatter identity, the exact thing Step 1 exists to prevent). App atomIds correctly resolve
+  to `[]` uniques (App ∉ `uniqueByNode`), matching the LIR.
+- **The display valuation is nearly free.** The evaluator's `EvalResult.intermediate` is keyed
+  by `IRId`, which `fromVizFunDecl` preserves as the ladder `NodeId` — so projecting eval →
+  `ViewSpec.valuation` is a value-type conversion, no map walk. `nodesByUnique` earns its keep
+  elsewhere: elicitation marks (`ranked`/`next` are `Unique[]` → which boxes to mark) and
+  click→bind fan-out (which the evaluator then spreads to every position automatically).
+
 ---
 
 ## 4. What dies
