@@ -212,11 +212,10 @@ function lampsFor(
 /**
  * The verdict for a decision, from its top-level shape and a valuation (§E1/S9, DESIGN §25f).
  *
- * This is the picture's half of the same answer `BooleanDecisionQuery.verdictOf` computes
- * for the wizard — the SAME six-row table, deliberately, because a diagram and a wizard that
- * disagreed about a case would be lying to the same user. What the IDE header must show is
- * this, NOT the raw truth value: telling someone they "comply" with a rule that never reached
- * them is the N/A-vs-complies category error the whole seam exists to fix.
+ * This is the PICTURE's verdict: it reads the same three-valued node values the render draws
+ * (`nodeValue`), so it says exactly what the ladder shows. That makes it the right thing for
+ * the IDE header, for print, and for any headless context — and it means it can be computed
+ * without a BDD engine, which is why it lives in the drawing core and not in `boolean-analysis`.
  *
  *   no seam (body is not an Implies): the function's own value — TrueV `Holds`, FalseV
  *     `Fails`, else `Undetermined`.
@@ -228,6 +227,20 @@ function lampsFor(
  *   seam, scope TRUE + req TRUE:    `Complies`
  *   seam, scope TRUE + req FALSE:   `InBreach`
  *   seam, scope TRUE + req UNKNOWN: `Undetermined`
+ *
+ * **Relationship to `BooleanDecisionQuery.verdictOf` (the wizard's engine): SOUND, not COMPLETE.**
+ * Wherever the picture's Kleene evaluation is determinate, the two agree row-for-row — and the
+ * §25f rows are exactly there, so the header never commits the N/A-vs-complies error. They part
+ * on ONE thing: `verdictOf` reduces with an ROBDD and so recognises boolean identities across
+ * repeated propositions (`a ∨ ¬a` ⇒ TRUE, `a ∧ ¬a` ⇒ FALSE) even while `a` is unknown; `nodeValue`
+ * evaluates each occurrence independently and leaves such a subtree `UnknownV`. So on a
+ * tautological/contradictory subformula with an unknown atom, `verdictFor` is conservatively
+ * `Undetermined` where `verdictOf` would settle. This is SOUND — every *definite* verdict here
+ * is correct; the imprecision is always toward `Undetermined`, never toward a wrong Complies /
+ * InBreach / NotApplicable — and it is faithful to the grey the ladder actually draws for that
+ * unresolved subtree. A caller that needs the sharper reduced verdict (the wizard does, to avoid
+ * asking a redundant question) should read it off the query engine; a caller annotating the
+ * picture wants this. The boundary is pinned in `verdict.test.ts`.
  *
  * `valuation` is the same map `layout` takes (`ViewSpec.valuation`): positional per-node
  * pins/values, three-valued-evaluated through the tree exactly as the render is.

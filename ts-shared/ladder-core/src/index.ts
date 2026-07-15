@@ -15,7 +15,10 @@ export {
 export type { Geometry, Lamps } from "./layout.js";
 /** The verdict vocabulary is defined ONCE, in `@repo/boolean-analysis` (the "what a
  *  wizard may tell a user" module), and re-exported here so ladder-core's `verdictFor`
- *  and the wizard's `queryDecision` name the same six values — §E1/S9. */
+ *  and the wizard's `queryDecision` name the same six values — §E1/S9. Note `verdictFor`
+ *  is the SOUND-not-complete picture verdict (see its doc); it agrees with the wizard's
+ *  `verdictOf` on every determinate input and is conservatively `Undetermined` only where
+ *  the ROBDD would reduce a tautology/contradiction the drawn ladder leaves grey. */
 export type { Verdict } from "@repo/boolean-analysis";
 export {
   sceneToAscii,
