@@ -567,9 +567,18 @@ function inertInline(
  *  enters the target from the left) — the Layman / box-model fan (DESIGN §17a). */
 type Curve = Extract<ScenePrim, { kind: "curve" }>;
 function hCurve(from: Pt, to: Pt, state: State): Curve {
+  // Control-point reach = how far the curve stays HORIZONTAL out of each port before it
+  // banks toward the bus. A stronger reach reads as a deliberate thrust off the box rather
+  // than an immediate diagonal — the fan looks sprung, not slack. The vertical-spread term
+  // dominates the fan (rungs far off the axis get more thrust); the cap keeps the tallest
+  // fans from overshooting into an S.
   const t = Math.min(
-    60,
-    Math.max(Math.abs(to.x - from.x) * 0.6, Math.abs(to.y - from.y) * 0.35, 22),
+    120,
+    Math.max(
+      Math.abs(to.x - from.x) * 0.75,
+      Math.abs(to.y - from.y) * 0.55,
+      30,
+    ),
   );
   return {
     kind: "curve",
