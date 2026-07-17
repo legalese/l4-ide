@@ -784,9 +784,11 @@ exactly the thing a set-aware language can see and a prose drafter cannot.
 
 ### 11.1 _Nam Hong Construction v Kori Construction_ [2016] SGCA 42 — AND read as UNION
 
-Menon CJ, Phang JA, Chong J. Building Control Act s 2(1): "structural steelwork … comprising—
-(i) fabrication of structural elements; (ii) … erection works; **and** (iii) installation of steel
-supports for geotechnical building works". Does a contractor need **all three**, or **any one**?
+Menon CJ (authoring), Phang JA, Chong J. Building Control Act (Cap 29, 1999 Rev Ed) s 2(1),
+definition of "specialist building works", para (d): "structural steelwork comprising—
+(i) fabrication of structural elements; (ii) erection work like site cutting, site welding and
+site bolting; **and** (iii) installation of steel supports for geotechnical building works". Does
+a contractor need **all three**, or **any one**?
 
 **Held: disjunctive. Any one suffices.** A genuine AND→union, in a _definition_, with no negation
 anywhere — the clean instance _Pulsifer_ is not.
@@ -810,20 +812,26 @@ Two apex courts, two continents, eight years apart: **grammar underdetermines; c
 Same move as _Royal Trust_ ("otherwise the word becomes otiose"), same move as _Pulsifer_
 (Subparagraph A does no work). **Third jurisdiction, same trigger.**
 
+_(✅ **VERIFIED first-hand** against elitigation `2016_SGCA_42`, 2026-07-18: coram, statute, and
+¶19 + ¶26 all confirmed verbatim; see §12.7.)_
+
 ### 11.2 _Sit Kwong Lam v MCST 2645_ [2018] SGCA 14 — AND read as CONJUNCTION
 
 Menon CJ, Prakash JA, Chong JA — **the same court, two years later, going the other way.** BMSMA
 s 2(1) "common property": "(i) not comprised in any lot …; **and** (ii) used or capable of being
 used … by occupiers of 2 or more lots".
 
-**Held: conjunctive. Both limbs required.** ¶42 states the **default**, and cites _Nam Hong_ only
-to distinguish it:
+**Held: conjunctive. Both limbs required.** ¶42 states the **default**, and cites the _Nam Hong_
+litigation only to distinguish it. (**Pin-cite correction, verified 2026-07-18:** what ¶42
+actually cites is the **High Court decision below** — _Kori Construction (S) Pte Ltd v Nam Hong
+Construction & Engineering Pte Ltd_ [2015] 2 SLR 616 — **not** the CA judgment [2016] SGCA 42.
+Cite it accordingly.)
 
-> "**In ordinary usage … the word 'and' has a conjunctive effect**, as opposed to the word 'or',
-> which has a disjunctive effect. The Respondent … cited [_Kori_] as authority for the proposition
-> that … the word 'and' could be interpreted as either conjunctive or disjunctive, depending on
-> the context. **This might be so, but** in the present case, we were satisfied that the word 'and'
-> clearly had a conjunctive meaning …"
+> "**In ordinary usage**, however, **the word 'and' has a conjunctive effect**, as opposed to the
+> word 'or', which has a disjunctive effect. The Respondent … cited [_Kori v Nam Hong_ [2015] 2
+> SLR 616 (HC)] as authority for the proposition that … the word 'and' could be interpreted as
+> either conjunctive or disjunctive, depending on the context. **This might be so, but** in the
+> present case, we were satisfied that the word 'and' clearly had a conjunctive meaning …"
 
 **And here is the anti-defeater — the meaningful-variation canon** (¶43), which is _also_
 computable:
@@ -837,6 +845,10 @@ computable:
 **If the drafter uses both connectives contrastively in the same instrument, they knew the
 difference — so do not second-guess the connective.** That is a scan of the enclosing scope, and
 we can do it.
+
+_(✅ **VERIFIED first-hand** against elitigation `2018_SGCA_14`, 2026-07-18: coram — Menon CJ
+(authoring), Prakash JA, Chong JA — and ¶42 + ¶43 confirmed verbatim, subject to the pin-cite
+correction above; see §12.7.)_
 
 ### 11.3 _Koh Lau Keow v AG_ [2013] SGHC 155 — a **third** sense: the exegetical connective
 
@@ -864,6 +876,12 @@ source. And the judge's test in _Koh Lau Keow_ is **literally a set-overlap comp
 > "This poses the question **whether 'home' and 'sanctuary' sufficiently overlap in meaning** such
 > that 'or' can be interpreted exegetically."
 
+_(✅ **VERIFIED first-hand** against elitigation `2013_SGHC_155`, 2026-07-18: Tay Yong Kwang J;
+the Picarda quote (¶28, from the 4th ed 2010, p 330), the ¶29 "sufficiently overlap" test, and
+the holding — ¶31: "Looking at the Declaration of Trust as a whole, I hold that 'home or
+sanctuary' is to be interpreted exegetically and not conjunctively as true alternatives" — all
+confirmed verbatim; see §12.7.)_
+
 ### 11.4 _PP v Low Kok Heng_ [2007] SGHC 123 — the principle, stated flatly
 
 V K Rajah JA. The headnote itself carries: _"Statutory Interpretation — Construction of statute —
@@ -872,8 +890,14 @@ Whether 'or' could mean 'and'"_. At ¶69:
 > "It is a **settled principle** of statutory interpretation that **not every application of the
 > word 'or' produces a disjunctive result**."
 
-_(Corpus note: `get_document` truncates at 60,000 chars and the `offset` param is ignored, so ¶69ff
-is cut off. Fetch the rest from elitigation before quoting further.)_
+_(✅ **VERIFIED first-hand** against elitigation `2007_SGHC_123`, 2026-07-18 — superseding the
+earlier corpus-truncation caveat. ¶69 confirmed verbatim (the court's own emphasis falls on
+"every"), the catchwords do carry "Statutory Interpretation — Construction of statute — Whether
+'or' could mean 'and'", and the statute is s 133 of the Bankruptcy Act (Cap 20, 2000 Rev Ed) —
+"no intent to defraud or to conceal the state of his affairs". ¶69 grounds the principle in
+_Rickerby v Nicholson_ [1912] 1 IR 343 at 348 (Ross J): the word "or" is "often used … not to
+connect real alternatives, but merely to connect different words expressing the same or a cognate
+idea" — which is the exegetical row of §11.5's trichotomy, stated in 1912. See §12.7.)_
 
 ### 11.5 ⭐ The trichotomy — one canon, three readings, all computable
 
@@ -925,9 +949,10 @@ but a **structural property of the denoted sets** that a compiler can check and 
 prose cannot. That is the "detect ≠ resolve" thesis with Singapore Court of Appeal authority
 behind it, in the jurisdiction where L4's pilots actually run.
 
-**TODO before publication:** pull the two SGCA judgments in full from elitigation (the lawplain
+~~**TODO before publication:** pull the two SGCA judgments in full from elitigation (the lawplain
 `body_text` truncates at 60k) and verify the paragraph numbers quoted above against the official
-report.
+report.~~ **DONE 2026-07-18 — all four Singapore judgments verified first-hand against
+elitigation; see §12.7.**
 
 ## 12. Citation verification against the official reporter (legal-data-hunter, 2026-07-15)
 
@@ -1093,3 +1118,31 @@ But the same search surfaced **_Chichester Diocesan Fund v Simpson_ [1944] UKHL 
 **Net effect on §12.4:** two rows upgrade at once. _Chichester_ 🟡→✅ (first-hand), and _Re Best_
 🔴→🟡 (characterised inside verified _Chichester_). No claim in this document now rests on
 secondary reproductions alone.
+
+### 12.7 ✅ The Singapore quartet verified against elitigation (2026-07-18)
+
+Closes §11.7's TODO. All four Singapore judgments pulled in full from elitigation
+(`https://www.elitigation.sg/gd/s/<year>_<court>_<no>` — no bot wall, unlike BAILII's Leopard),
+and every quoted paragraph checked against the official text:
+
+| Case                             | Source              | Checked                             | Result                                                                                                                          |
+| -------------------------------- | ------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| _Nam Hong_ [2016] SGCA 42        | `2016_SGCA_42`      | coram; statute; ¶19; ¶26            | ✅ all verbatim. Menon CJ authored. Definition is "specialist building works" para (d), Building Control Act (Cap 29, 1999 Rev Ed) |
+| _Sit Kwong Lam_ [2018] SGCA 14   | `2018_SGCA_14`      | coram; BMSMA definition; ¶42; ¶43   | ✅ verbatim, **one pin-cite correction**: ¶42 cites the **HC** decision _Kori v Nam Hong_ [2015] 2 SLR 616, not [2016] SGCA 42     |
+| _Koh Lau Keow_ [2013] SGHC 155   | `2013_SGHC_155`     | judge; Picarda ¶28; ¶29; holding ¶31 | ✅ all verbatim. Tay Yong Kwang J. Picarda is 4th ed (2010) p 330                                                                  |
+| _Low Kok Heng_ [2007] SGHC 123   | `2007_SGHC_123`     | judge; catchwords; ¶69              | ✅ all verbatim. V K Rajah JA. Emphasis in ¶69 falls on "every"                                                                    |
+
+Two small dividends beyond confirmation:
+
+1. **The pin-cite correction in _Sit Kwong Lam_ ¶42** (HC citation, not CA) — exactly the class
+   of error this verification campaign exists to catch before a reviewer does.
+2. **_Rickerby v Nicholson_ [1912] 1 IR 343 at 348** surfaces inside verified ¶69 as the
+   root authority for the exegetical `or` — "not to connect real alternatives, but merely to
+   connect different words expressing the same or a cognate idea." The trichotomy's EXEGETICAL
+   row now has an Irish 1912 ancestor beneath Picarda and _Koh Lau Keow_.
+
+**Verification ledger, whole spec:** every case cited in §§10–12 is now either ✅ first-hand
+(_Pulsifer_, _Royal Trust_, _Chichester_, _Nam Hong_, _Sit Kwong Lam_, _Koh Lau Keow_,
+_Low Kok Heng_) or 🟡 characterised inside a verified primary source (_Re Best_, _Re Eades_,
+_Rickerby_). The only remaining publication nicety is pulling _Re Best_ [1904] 2 Ch 354 from a
+paid reporter (ICLR / Westlaw / HeinOnline).
