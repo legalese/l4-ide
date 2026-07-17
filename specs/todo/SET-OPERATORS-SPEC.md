@@ -113,7 +113,7 @@ Facts, verified against the tree:
 | `LESS`                     | Token **already exists** (`Lexer.hs:281`, `TKLess`) but the parser only ever consumes it as the two-token sequence `LESS THAN` → `Lt` (`Parser.hs:1491`). **Bare `LESS` is unclaimed.**                                                            |
 | `PLUS` / `MINUS`           | `Lexer.hs:274-275`; precedence 6, `AssocLeft` (`Parser.hs:1492-1493`).                                                                                                                                                                             |
 | `AND` / `OR`               | Precedence 3 / 2, `AssocRight` (`Parser.hs:1484-1485`).                                                                                                                                                                                            |
-| Mixfix operators           | **Exist** (`specs/done/mixfix-operators.md`). Let a library define ``a `UNION` b MEANS …`` with **no lexer change** — but backticks are required at the call site, and mixfix has **no precedence** (parentheses required).                        |
+| Mixfix operators           | **Exist** (`specs/done/mixfix-operators.md`). Let a library define `a UNION b MEANS …` with **no lexer change** — bare, no backticks: _"backticks simply allow identifiers to contain whitespace… you may omit them entirely"_ (verified live 2026-07-18, §5.1). Backticks are needed only for **multi-word names** (`` `is in` ``) and **keyword-colliding names** (`` `LESS` `` — bare `LESS` is a lexer keyword). Mixfix has **no precedence** (parentheses required).                        |
 
 **The headline consequence:** almost all of this feature can ship **as prelude code, with zero
 compiler changes.** The compiler work is confined to ergonomics — bare keywords and precedence.
@@ -234,14 +234,18 @@ There is an existing and/or lint scaffold to hang this on: `jl4-core/src/L4/Lint
 
 Two routes, and they are not exclusive:
 
-| Route                         | Cost                                                  | Gets you                                                                     |
-| ----------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **A. Mixfix, in the prelude** | Zero compiler change.                                 | ``A `UNION` B`` — backticks required, **no precedence** (parens everywhere). |
-| **B. Real keywords**          | Lexer entries + precedence-table rows in `Parser.hs`. | `A UNION B INTERSECT C` — clean, and correct precedence.                     |
+| Route                         | Cost                                                  | Gets you                                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A. Mixfix, in the prelude** | Zero compiler change.                                 | **`A UNION B` — bare, today** (§5.1-verified). But **no precedence** (parens for anything compound), and no bare `LESS` (lexer keyword). |
+| **B. Real keywords**          | Lexer entries + precedence-table rows in `Parser.hs`. | `A UNION B INTERSECT C` — correct precedence, plus bare `LESS`.                                                                            |
 
 **Decision: Phase 1 ships route A** (prove the semantics, zero risk), **Phase 2 promotes to route
-B** once the vocabulary settles. Legal drafters will not tolerate backticks in production text,
-so B is the real destination; A is scaffolding.
+B** once the vocabulary settles. Route A is better than this table originally believed — the
+production spellings `A UNION B` / `A INTERSECT B` already work bare — so what B actually buys
+is **precedence** and **bare `LESS`**, not de-backticking. In Phase 1, set difference either
+wears backticks (`` A `LESS` B ``) or ships bare under a keyword-free alias — **`WITHOUT` and
+`EXCEPT` are both unclaimed identifiers** (verified against `Lexer.hs`; of the §D2 vocabulary
+only `LESS` and `MINUS` are keywords).
 
 **Proposed precedence for route B**, slotting into the table at `Parser.hs:1481-1497`:
 
@@ -532,10 +536,12 @@ hint in the IDE telling the drafter that `UNION` was the reading taken.
 
 The following all **run today** (`l4 run`, zero compiler changes) against a ~50-line prelude
 sketch: `SET OF a` + `setFromList` (via prelude `nub`), `` `is in` `` (via prelude `elem`),
-`` `is subset of` ``, `` `set equals` `` (mutual subset), `` `UNION` `` (via prelude `append`),
-`` `INTERSECT` ``, `` `LESS` ``, `setSize`. **Ten `#EVAL`s, ten expected answers — Phase 1 is
-not a sketch, it is a prototype.** Phase-1 spellings shown; the route-α form
-(`SET OF "a", "b", …`) is noted where it will apply.
+`` `is subset of` ``, `` `set equals` `` (mutual subset), `UNION` (via prelude `append`),
+`INTERSECT`, `` `LESS` ``, `setSize`. **Ten `#EVAL`s, ten expected answers — Phase 1 is
+not a sketch, it is a prototype.** Phase-1 spellings shown — note `UNION` and `INTERSECT` are
+**bare**, no backticks, at definition and call sites alike (re-verified after Meng challenged
+the backtick claim); only multi-word names and the keyword-colliding `` `LESS` `` wear
+backticks. The route-α form (`SET OF "a", "b", …`) is noted where it will apply.
 
 **Strings — the §11.5 trichotomy, all three rows executable.** The legal discriminator is the
 extensional relationship between the operand sets, so each case is just data:
@@ -547,13 +553,13 @@ extensional relationship between the operand sets, so each case is just data:
 `welfare purposes`   MEANS setFromList (LIST "schools", "universities", "scholarships",
                                              "housing", "recreation")
 #EVAL `education purposes` `is subset of` `welfare purposes`          -- TRUE ✓
-#EVAL setSize (`education purposes` `INTERSECT` `welfare purposes`)   -- 3 ✓  (= education)
+#EVAL setSize (`education purposes` INTERSECT `welfare purposes`)   -- 3 ✓  (= education)
 
 -- NY/NJ: disjoint operands, empty intersection → Defeater 1 fires
 `new yorkers`   MEANS setFromList (LIST "alice", "bob")
 `new jerseyans` MEANS setFromList (LIST "carol")
-#EVAL setSize (`new yorkers` `UNION` `new jerseyans`)                 -- 3 ✓
-#EVAL setSize (`new yorkers` `INTERSECT` `new jerseyans`)             -- 0 ✓  (otiose ⇒ UNION?)
+#EVAL setSize (`new yorkers` UNION `new jerseyans`)                 -- 3 ✓
+#EVAL setSize (`new yorkers` INTERSECT `new jerseyans`)             -- 0 ✓  (otiose ⇒ UNION?)
 
 -- Koh Lau Keow: co-extensive operands → Defeater 2 (exegetical)
 `home uses`      MEANS setFromList (LIST "refuge", "residence")
@@ -563,7 +569,7 @@ extensional relationship between the operand sets, so each case is just data:
 -- Re Best: proper overlap, both terms do work → literal reading
 `charitable objects` MEANS setFromList (LIST "almshouse", "school")
 `benevolent objects` MEANS setFromList (LIST "school", "social club")
-#EVAL setSize (`charitable objects` `INTERSECT` `benevolent objects`) -- 1 ✓  (no lint)
+#EVAL setSize (`charitable objects` INTERSECT `benevolent objects`) -- 1 ✓  (no lint)
 ```
 
 **Sum types — eligibility by state.** Structural `EQUALS` covers enum constructors, so
@@ -586,16 +592,24 @@ After route α, the constructions shed their `LIST`:
 `setFromList (LIST NY, NJ)` → `SET OF NY, NJ`;
 `setFromList (LIST "refuge", "residence")` → `SET OF "refuge", "residence"`.
 
-**Three syntax findings from the probe** (each empirically confirmed, each already predicted):
+**Three syntax findings from the probe** (each empirically confirmed — including one false
+belief of this spec's own, caught by Meng in review):
 
-1. **Mixfix operators need backticks at call sites** (§D5 route A, confirmed): bare
-   `` A INTERSECT B `` parses as juxtaposition application and dies in typecheck; bare
-   `` A LESS B `` is worse — see next.
+1. **Backticks are NOT operator syntax — an earlier draft of this spec (and its §2 table) said
+   they were required at call sites, and that was wrong.** Bare `A INTERSECT B` and `A UNION B`
+   work at definition and call sites alike; all ten `#EVAL`s re-verified bare. The governing
+   rule is `mixfix-operators.md`'s: _"backticks simply allow identifiers to contain whitespace
+   or punctuation; they do not tell the parser that something is an operator."_ Backticks are
+   needed exactly twice in the Phase-1 vocabulary: **multi-word names** (`` `is in` ``,
+   `` `set equals` ``) and **keyword collisions** — which is the next finding.
 2. **The `LESS THAN` landmine (§D5) is real and the error is exactly as baffling as predicted:**
-   `` A LESS B `` inside parentheses reports _"unexpected `(`"_ at the opening parenthesis,
-   three tokens before the actual problem, because the `LESS`-consuming branch fails hard with
-   no `try`. First-hand confirmation that `Parser.hs:1491` is the highest-risk line.
-3. **Mixfix has no precedence against juxtaposition either**: `` f x `set equals` y `` needs
+   bare `A LESS B` inside parentheses reports _"unexpected `(`"_ at the opening parenthesis,
+   three tokens before the actual problem, because the keyword `LESS` starts the `LESS THAN`
+   branch, which fails hard with no `try`. Backticked `` A `LESS` B `` escapes the keyword and
+   works. First-hand confirmation that `Parser.hs:1491` is the highest-risk line — and the
+   reason Phase 1 difference is either backticked or spelled `WITHOUT`/`EXCEPT` (both unclaimed
+   identifiers; §D5).
+3. **Mixfix has no precedence against juxtaposition**: `` f x `set equals` y `` needs
    `` (f x) `set equals` y ``. Also `WITH` record construction resists a less-indented
    continuation line — prefer `setFromList (…)` over multi-line `SET WITH contents IS …`.
 
