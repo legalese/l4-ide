@@ -122,14 +122,21 @@ compiler changes.** The compiler work is confined to ergonomics — bare keyword
 
 ### D1 — A real `Set a` type, not `LIST` sugar
 
-**Decision: introduce `Set a` as a library type**, following the `Dictionary` precedent exactly:
+**Decision: introduce `SET OF a` as a library type**, following the prelude's `PAIR` precedent
+(`DECLARE PAIR OF a, b`, `prelude.l4:577`) — which is an even better template than `Dictionary`,
+because the `OF`-style declaration buys the type-position syntax for free (§D7):
 
 ```l4
-GIVEN a IS A TYPE
-GIVETH A TYPE
-DECLARE Set a
+DECLARE SET OF a
     HAS contents IS A LIST OF a
 ```
+
+**Machine-verified 2026-07-18** (`l4 run`, zero compiler changes): this declaration checks; so do
+`GIVETH A SET OF a` in signatures, `SET OF someList` as constructor application, and
+`SET WITH contents IS …` record syntax. It is a plain parametric **record wrapper** (a product
+type with one field) — _not_ an enum (`IS ONE OF`): the element type `a` is open, and the
+contents are runtime values, not compile-time constructors. Enums enter the picture as the
+natural _element_ type — see §D7.
 
 Rationale: overload resolution is **by type**. If sets are just `LIST OF a`, then `AND` on two
 lists cannot be distinguished from `AND` on two lists — there is no type to dispatch on, and the
@@ -184,9 +191,9 @@ Because `__AND__` and `__OR__` are overloadable magic names, we can literally do
 
 ```l4
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
-GIVETH A Set a
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
 `__AND__` p q MEANS p UNION q          -- term-level AND: the lattice join
 ```
 
@@ -283,8 +290,8 @@ prelude**, by overloading set equality as mutual subset:
 
 ```l4
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
+      p IS A SET OF a
+      q IS A SET OF a
 GIVETH A BOOLEAN
 `__EQUALS__` p q MEANS (p `is subset of` q) AND (q `is subset of` p)
 ```
@@ -344,6 +351,52 @@ This is a **bigger, independently-motivated language decision** and must not be 
 a set-operators spec. Flagged here, deliberately deferred. If it is ever taken, revisit this
 section — the sorted representation strictly dominates.
 
+### D7 — Literal syntax: `SET` mirrors `LIST`, because L4 has no square brackets
+
+Caught in review (Meng, 2026-07-18): earlier drafts wrote `setFromList [alice, bob]` — but **L4
+has no `[…]` list literals.** The term-level list syntax is the keyword form
+`LIST alice, bob, carol` (`Parser.hs:1818`, layout-aware: items may continue on more-indented
+lines). So the set syntax should **parallel `LIST` at both levels**:
+
+| Position | `LIST` today                | `SET` proposal            | Status                                       |
+| -------- | --------------------------- | ------------------------- | -------------------------------------------- |
+| type     | `LIST OF a`                 | `SET OF a`                | ✅ **works today** — free via §D1's `DECLARE` |
+| term     | `LIST alice, bob, carol`    | `SET alice, bob, carol`   | Phase 3 — needs a lexer keyword + production |
+| term     | —                           | `SET OF someList`         | ✅ **works today** — constructor application  |
+
+All the ✅ rows were **machine-verified 2026-07-18** with `l4 run` on a probe file — including the
+pleasant surprise that the unparenthesized nesting works:
+
+```l4
+probe MEANS SET OF LIST 1, 2, 3     -- LIST binds greedily; SET OF receives the whole list ✓
+```
+
+`SET` the name is unclaimed (no lexer token, nothing in the prelude), and `PAIR` proves all-caps
+library type names are legal — **`SET` only _looks_ like a keyword**, which is exactly the
+ergonomic effect we want at zero compiler cost.
+
+**The Phase 3 ergonomic** is the variadic term literal `SET alice, bob, carol` — a clone of the
+`list` production at `Parser.hs:1818` (same `listItemThreshold` layout machinery), desugaring to
+dedup'd construction. That is deferred alongside the other keyword work in §D5's route B.
+
+**The dedup caveat, and its resolution.** The raw constructor `SET OF xs` does **not** dedup, so
+"`contents` is duplicate-free" cannot be a construction invariant unless we hide the constructor
+— and L4 has no module-privacy to hide it with. **Decision: make the _observers_
+quotient-respecting instead.** Membership (`any` over `contents`) and mutual-subset `__EQUALS__`
+(§D6) are already duplicate-insensitive; the only operations that must dedup on read are
+`setSize` (count `dedup contents`, not `count contents`) and printing. Then a duplicated
+representation is semantically invisible, `setFromList`/the Phase-3 literal dedup merely as an
+optimization, and no invariant is load-bearing. This is the standard quotient-type move, and it
+is _simpler_ than policing construction.
+
+**Enums are the natural element type, not the underlying representation.** `SET OF a` wraps a
+`LIST OF a`; it does not build on `IS ONE OF`. But when `a` _is_ an enum, the element domain is
+finite and closed, and two upgrades unlock: (i) an **absolute complement** becomes computable —
+`universe LESS s`, where `universe` enumerates the constructors — whereas for open `a` only the
+relative complement `LESS` exists; and (ii) §11.6's Defeater 2 (co-extensiveness, `A ≡ B`)
+becomes decidable against the whole domain, not just the enumerated contents. The CONSIDER
+exhaustiveness machinery already walks enum constructor lists, so (i) has in-tree precedent.
+
 ## 4. Proposed prelude sketch
 
 Illustrative, not verified against the checker — treat as pseudocode in L4's clothing:
@@ -351,52 +404,52 @@ Illustrative, not verified against the checker — treat as pseudocode in L4's c
 ```l4
 §§ `Sets`
 
-GIVEN a IS A TYPE
-GIVETH A TYPE
-DECLARE Set a
-    HAS contents IS A LIST OF a
+DECLARE SET OF a
+    HAS contents IS A LIST OF a       -- verified: checks today (§D1, §D7)
 
 -- construction
 GIVEN a IS A TYPE
-GIVETH A Set a
-emptySet MEANS Set WITH contents IS EMPTY
+GIVETH A SET OF a
+emptySet MEANS SET WITH contents IS EMPTY
 
 GIVEN a IS A TYPE
       xs IS A LIST OF a
-GIVETH A Set a
-setFromList xs MEANS Set WITH contents IS dedup xs      -- dedup: needs writing
+GIVETH A SET OF a
+setFromList xs MEANS SET WITH contents IS dedup xs      -- dedup: needs writing
 
 -- membership: the disjunctive core (§1)
 GIVEN a IS A TYPE
       x IS AN a
-      s IS A Set a
+      s IS A SET OF a
 GIVETH A BOOLEAN
 x `is in` s MEANS any (EQUALS x) (s's contents)
 
 -- the three canonical operators
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
-GIVETH A Set a
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
 p `UNION` q MEANS setFromList (p's contents FOLLOWED BY q's contents)
 
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
-GIVETH A Set a
-p `INTERSECT` q MEANS Set WITH contents IS filter (\x -> x `is in` q) (p's contents)
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p `INTERSECT` q MEANS SET WITH contents IS
+    filter (GIVEN x YIELD x `is in` q) (p's contents)
 
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
-GIVETH A Set a
-p `LESS` q MEANS Set WITH contents IS filter (\x -> NOT (x `is in` q)) (p's contents)
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p `LESS` q MEANS SET WITH contents IS
+    filter (GIVEN x YIELD NOT (x `is in` q)) (p's contents)
 
 -- overloads (§D3, §D4) — free, no compiler change
 GIVEN a IS A TYPE
-      p IS A Set a
-      q IS A Set a
-GIVETH A Set a
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
 `__PLUS__`  p q MEANS p `UNION` q
 `__MINUS__` p q MEANS p `LESS`  q
 `__AND__`   p q MEANS p `UNION` q     -- the term-level AND. Lint fires here.
@@ -408,10 +461,12 @@ GIVETH A Set a
 The acceptance test for this whole spec:
 
 ```l4
-DECLARE Person HAS name IS A STRING; state IS A STRING
+DECLARE Person
+    HAS name  IS A STRING
+        state IS A STRING
 
-`new yorkers`     MEANS setFromList [alice, bob]
-`new jerseyans`   MEANS setFromList [carol]
+`new yorkers`   MEANS SET OF LIST alice, bob      -- no square brackets in L4 (§D7)
+`new jerseyans` MEANS SET OF LIST carol
 
 -- term-level AND → union. Three eligible people.
 `eligible` MEANS `new yorkers` AND `new jerseyans`
@@ -434,7 +489,8 @@ hint in the IDE telling the drafter that `UNION` was the reading taken.
 - **Phase 2 — the overloads.** `__PLUS__`, `__MINUS__`, `__AND__`, `__OR__` on `Set a`. Add the
   §5 worked example as the acceptance test. This is where the paper-worthy behaviour appears.
 - **Phase 3 — keywords + precedence.** Lexer entries for `UNION`/`INTERSECT`; bare `LESS`;
-  precedence rows per §D5; **the `try` fix at `Parser.hs:1491`.**
+  precedence rows per §D5; **the `try` fix at `Parser.hs:1491`**; the variadic term literal
+  `SET alice, bob, carol` mirroring `LIST` (§D7).
 - **Phase 4 — the lint.** Diagnostic + quick-fix for `AND`/`OR` on `Set`, hung off
   `Lint/AndOrDepth.hs`. This is the part that turns a language feature into a _product_ feature.
 
