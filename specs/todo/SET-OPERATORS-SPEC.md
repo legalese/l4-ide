@@ -442,6 +442,9 @@ wrap-list to singleton-containing-a-list.
 cosmetic completion that can come later or never.** α slots into Phase 3 (the first
 compiler-touching phase) and likely obviates β.
 
+**DECIDED (Meng, 2026-07-18): route α adopted.** β stays in the spec as the rejected
+alternative, for the record.
+
 ## 4. Proposed prelude sketch
 
 Illustrative, not verified against the checker — treat as pseudocode in L4's clothing:
@@ -460,7 +463,7 @@ emptySet MEANS SET WITH contents IS EMPTY
 GIVEN a IS A TYPE
       xs IS A LIST OF a
 GIVETH A SET OF a
-setFromList xs MEANS SET WITH contents IS dedup xs      -- dedup: needs writing
+setFromList xs MEANS SET WITH contents IS nub xs        -- nub = dedup, already in the prelude
 
 -- membership: the disjunctive core (§1)
 GIVEN a IS A TYPE
@@ -525,12 +528,88 @@ DECLARE Person
 Same token. Different types. Different operators. **Both correct.** And the first one raises a
 hint in the IDE telling the drafter that `UNION` was the reading taken.
 
+### 5.1 More worked examples — strings and sum types (machine-verified 2026-07-18)
+
+The following all **run today** (`l4 run`, zero compiler changes) against a ~50-line prelude
+sketch: `SET OF a` + `setFromList` (via prelude `nub`), `` `is in` `` (via prelude `elem`),
+`` `is subset of` ``, `` `set equals` `` (mutual subset), `` `UNION` `` (via prelude `append`),
+`` `INTERSECT` ``, `` `LESS` ``, `setSize`. **Ten `#EVAL`s, ten expected answers — Phase 1 is
+not a sketch, it is a prototype.** Phase-1 spellings shown; the route-α form
+(`SET OF "a", "b", …`) is noted where it will apply.
+
+**Strings — the §11.5 trichotomy, all three rows executable.** The legal discriminator is the
+extensional relationship between the operand sets, so each case is just data:
+
+```l4
+-- Royal Trust: education ⊆ welfare. The intersective reading of
+-- "education AND welfare" collapses to education — "welfare" is otiose.
+`education purposes` MEANS setFromList (LIST "schools", "universities", "scholarships")
+`welfare purposes`   MEANS setFromList (LIST "schools", "universities", "scholarships",
+                                             "housing", "recreation")
+#EVAL `education purposes` `is subset of` `welfare purposes`          -- TRUE ✓
+#EVAL setSize (`education purposes` `INTERSECT` `welfare purposes`)   -- 3 ✓  (= education)
+
+-- NY/NJ: disjoint operands, empty intersection → Defeater 1 fires
+`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+`new jerseyans` MEANS setFromList (LIST "carol")
+#EVAL setSize (`new yorkers` `UNION` `new jerseyans`)                 -- 3 ✓
+#EVAL setSize (`new yorkers` `INTERSECT` `new jerseyans`)             -- 0 ✓  (otiose ⇒ UNION?)
+
+-- Koh Lau Keow: co-extensive operands → Defeater 2 (exegetical)
+`home uses`      MEANS setFromList (LIST "refuge", "residence")
+`sanctuary uses` MEANS setFromList (LIST "residence", "refuge")
+#EVAL `home uses` `set equals` `sanctuary uses`                       -- TRUE ✓  (alias?)
+
+-- Re Best: proper overlap, both terms do work → literal reading
+`charitable objects` MEANS setFromList (LIST "almshouse", "school")
+`benevolent objects` MEANS setFromList (LIST "school", "social club")
+#EVAL setSize (`charitable objects` `INTERSECT` `benevolent objects`) -- 1 ✓  (no lint)
+```
+
+**Sum types — eligibility by state.** Structural `EQUALS` covers enum constructors, so
+membership, subset, and set-equality work on `IS ONE OF` types with no extra machinery — and the
+finite constructor universe makes the **absolute complement** real (§D7):
+
+```l4
+DECLARE State IS ONE OF NY, NJ, CT
+
+`the tri-state universe` MEANS setFromList (LIST NY, NJ, CT)
+`eligible states`        MEANS setFromList (LIST NY, NJ)
+
+#EVAL NY `is in` `eligible states`                                    -- TRUE ✓
+#EVAL CT `is in` `eligible states`                                    -- FALSE ✓
+#EVAL setSize (`the tri-state universe` `LESS` `eligible states`)     -- 1 ✓  (absolute complement)
+#EVAL (setFromList (LIST NJ, NY, NJ)) `set equals` `eligible states`  -- TRUE ✓  (order & dups invisible)
+```
+
+After route α, the constructions shed their `LIST`:
+`setFromList (LIST NY, NJ)` → `SET OF NY, NJ`;
+`setFromList (LIST "refuge", "residence")` → `SET OF "refuge", "residence"`.
+
+**Three syntax findings from the probe** (each empirically confirmed, each already predicted):
+
+1. **Mixfix operators need backticks at call sites** (§D5 route A, confirmed): bare
+   `` A INTERSECT B `` parses as juxtaposition application and dies in typecheck; bare
+   `` A LESS B `` is worse — see next.
+2. **The `LESS THAN` landmine (§D5) is real and the error is exactly as baffling as predicted:**
+   `` A LESS B `` inside parentheses reports _"unexpected `(`"_ at the opening parenthesis,
+   three tokens before the actual problem, because the `LESS`-consuming branch fails hard with
+   no `try`. First-hand confirmation that `Parser.hs:1491` is the highest-risk line.
+3. **Mixfix has no precedence against juxtaposition either**: `` f x `set equals` y `` needs
+   `` (f x) `set equals` y ``. Also `WITH` record construction resists a less-indented
+   continuation line — prefer `setFromList (…)` over multi-line `SET WITH contents IS …`.
+
+Prelude inventory note: `nub` (dedup), `elem` (membership), and `append` all exist already —
+the §4 sketch's helper burden is smaller than drafted.
+
 ## 6. Implementation phases
 
 - **Phase 0 — spec review.** This document. Settle D1–D5 and Q1–Q4.
-- **Phase 1 — prelude only, zero compiler change.** `Set a` + `is in`, `UNION`, `INTERSECT`,
-  `LESS`, `subset`, `setSize`, `dedup`, list↔set conversions, all as mixfix. Golden tests in
-  `jl4/examples/ok/set-operators.l4`. Proves the semantics.
+- **Phase 1 — prelude only, zero compiler change.** `SET OF a` + `is in`, `UNION`, `INTERSECT`,
+  `LESS`, `subset`, `setSize`, list↔set conversions, all as mixfix over prelude `nub`/`elem`/
+  `append`. Golden tests in `jl4/examples/ok/set-operators.l4`. **Prototyped and verified
+  2026-07-18 — the §5.1 probe runs all ten `#EVAL`s green on today's compiler**; landing it is
+  transcription, not development.
 - **Phase 2 — the overloads.** `__PLUS__`, `__MINUS__`, `__AND__`, `__OR__` on `Set a`. Add the
   §5 worked example as the acceptance test. This is where the paper-worthy behaviour appears.
 - **Phase 3 — keywords + precedence.** Lexer entries for `UNION`/`INTERSECT`; bare `LESS`;
