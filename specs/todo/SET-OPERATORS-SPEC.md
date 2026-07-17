@@ -534,8 +534,9 @@ hint in the IDE telling the drafter that `UNION` was the reading taken.
 - **Phase 2 — the overloads.** `__PLUS__`, `__MINUS__`, `__AND__`, `__OR__` on `Set a`. Add the
   §5 worked example as the acceptance test. This is where the paper-worthy behaviour appears.
 - **Phase 3 — keywords + precedence.** Lexer entries for `UNION`/`INTERSECT`; bare `LESS`;
-  precedence rows per §D5; **the `try` fix at `Parser.hs:1491`**; the variadic term literal
-  `SET alice, bob, carol` mirroring `LIST` (§D7).
+  precedence rows per §D5; **the `try` fix at `Parser.hs:1491`**; the §D7.1 route-α elaboration
+  (variadic `SET OF 1, 2, 3` via arg-collection in the typechecker — likely obviating the
+  route-β `SET alice, bob, carol` keyword literal).
 - **Phase 4 — the lint.** Diagnostic + quick-fix for `AND`/`OR` on `Set`, hung off
   `Lint/AndOrDepth.hs`. This is the part that turns a language feature into a _product_ feature.
 
