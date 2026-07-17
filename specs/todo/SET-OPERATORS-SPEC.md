@@ -358,11 +358,11 @@ has no `[…]` list literals.** The term-level list syntax is the keyword form
 `LIST alice, bob, carol` (`Parser.hs:1818`, layout-aware: items may continue on more-indented
 lines). So the set syntax should **parallel `LIST` at both levels**:
 
-| Position | `LIST` today                | `SET` proposal            | Status                                       |
-| -------- | --------------------------- | ------------------------- | -------------------------------------------- |
-| type     | `LIST OF a`                 | `SET OF a`                | ✅ **works today** — free via §D1's `DECLARE` |
-| term     | `LIST alice, bob, carol`    | `SET alice, bob, carol`   | Phase 3 — needs a lexer keyword + production |
-| term     | —                           | `SET OF someList`         | ✅ **works today** — constructor application  |
+| Position | `LIST` today             | `SET` proposal          | Status                                        |
+| -------- | ------------------------ | ----------------------- | --------------------------------------------- |
+| type     | `LIST OF a`              | `SET OF a`              | ✅ **works today** — free via §D1's `DECLARE` |
+| term     | `LIST alice, bob, carol` | `SET alice, bob, carol` | Phase 3 — needs a lexer keyword + production  |
+| term     | —                        | `SET OF someList`       | ✅ **works today** — constructor application  |
 
 All the ✅ rows were **machine-verified 2026-07-18** with `l4 run` on a probe file — including the
 pleasant surprise that the unparenthesized nesting works:
@@ -396,6 +396,51 @@ finite and closed, and two upgrades unlock: (i) an **absolute complement** becom
 relative complement `LESS` exists; and (ii) §11.6's Defeater 2 (co-extensiveness, `A ≡ B`)
 becomes decidable against the whole domain, not just the enumerated contents. The CONSIDER
 exhaustiveness machinery already walks enum constructor lists, so (i) has in-tree precedent.
+
+#### D7.1 — Erasing the otiose `LIST`: two routes to `SET OF 1, 2, 3`
+
+Review quip (Meng, 2026-07-18), too good to lose: in `SET OF LIST 1, 2, 3` the embedded `LIST`
+is — **by this spec's own canon** — otiose, and the drafter is presumed not to intend a term to
+be otiose. So what does it take to write `SET OF 1, 2, 3` directly?
+
+**Load-bearing fact (verified in-tree): `SET OF 1, 2, 3` already _parses_.** Term-level
+`f OF x, y` is ordinary application syntax — the `app` production (`Parser.hs:1945`) reads it as
+`App SET [1, 2, 3]`. The phrase dies only in the type checker, where `matchFunTy`
+(`TypeCheck.hs:2319`) finds a one-field constructor applied to three arguments. **This is not a
+grammar problem; it is an arity problem.** Which suggests fixing it where it fails:
+
+**Route α — typechecker elaboration (recommended).** In `App` inference (`TypeCheck.hs:1684`),
+when the head resolves to a record constructor with **exactly one field of type `LIST OF a`**,
+add a resolution alternative that collects the arguments into a `List` literal and retries:
+`App SET [e₁, …, eₙ] ⇒ App SET [List [e₁, …, eₙ]]`. The checker's application resolution is
+already alternative-driven — that is precisely how magic-name overloading dispatches — so this
+is an idiomatic, contained change, not surgery.
+
+- **It is a conservative extension.** The alternative fires only where direct application fails,
+  and every program it rescues is _today a type error_. No existing program changes meaning.
+  Exact fit wins: `SET OF xs` (where `xs` is already a list) keeps its verified wrap-this-list
+  reading.
+- **Corner case, document it:** for sets _of lists_, `SET OF (LIST 1, 2)` takes the exact-fit
+  reading — the two-element set `{1, 2}` — not the singleton `{⟨1,2⟩}`. A singleton containing a
+  list needs `setFromList (LIST (LIST 1, 2))`.
+- **It generalizes.** Any single-list-field record gets variadic construction for free
+  (`Dictionary OF pair₁, pair₂, …` falls out). Decide whether to gate the rule to `SET` or adopt
+  it whole as a general variadic-constructor rule — SETL heritage either way.
+- **No dedup at the elaboration site** — the quotient-observer decision above already makes raw
+  contents semantically harmless.
+
+**Route β — the keyword literal `SET 1, 2, 3`** — the strict parallel to `LIST 1, 2, 3` (note
+that the `LIST` term literal takes **no `OF`** either): lexer `TKSet` plus a clone of the `list`
+production (`Parser.hs:1817`), desugaring to `setFromList`. Costlier than it looks: once `SET`
+is a keyword, every position where `SET` must still act as a _name_ — `tyApp` (precedent:
+`tokenAsName (TKeywords TKList)`, `Parser.hs:1096`), the `DECLARE` head, term application,
+`WITH` record heads, patterns — needs a `tokenAsName` admission. And β must **not** swallow
+`OF`: if the literal accepted `SET OF xs`, it would silently flip that phrase's meaning from
+wrap-list to singleton-containing-a-list.
+
+**Verdict: α delivers the requested spelling with zero grammar changes and no new keyword; β is
+cosmetic completion that can come later or never.** α slots into Phase 3 (the first
+compiler-touching phase) and likely obviates β.
 
 ## 4. Proposed prelude sketch
 
@@ -951,9 +996,9 @@ earlier corpus-truncation caveat. ¶69 confirmed verbatim (the court's own empha
 "every"), the catchwords do carry "Statutory Interpretation — Construction of statute — Whether
 'or' could mean 'and'", and the statute is s 133 of the Bankruptcy Act (Cap 20, 2000 Rev Ed) —
 "no intent to defraud or to conceal the state of his affairs". ¶69 grounds the principle in
-_Rickerby v Nicholson_ [1912] 1 IR 343 at 348 (Ross J): the word "or" is "often used … not to
+\_Rickerby v Nicholson_ [1912] 1 IR 343 at 348 (Ross J): the word "or" is "often used … not to
 connect real alternatives, but merely to connect different words expressing the same or a cognate
-idea" — which is the exegetical row of §11.5's trichotomy, stated in 1912. See §12.7.)_
+idea" — which is the exegetical row of §11.5's trichotomy, stated in 1912. See §12.7.)\_
 
 ### 11.5 ⭐ The trichotomy — one canon, three readings, all computable
 
@@ -1010,10 +1055,12 @@ behind it, in the jurisdiction where L4's pilots actually run.
 report.~~ **DONE 2026-07-18 — all four Singapore judgments verified first-hand against
 elitigation; see §12.7.**
 
-## 12. Citation verification against the official reporter (legal-data-hunter, 2026-07-15)
+## 12. Citation verification against primary sources
 
-Chased the citations flagged as unverified in §9.6 and §10.4. Pulled **_Pulsifer_ from the official
-U.S. Reports preliminary print (601 U.S. 124–186)** — so the pin cites below are to the **official
+Verifying the citations flagged as unverified in §9.6 and §10.4 against primary sources, across
+several passes and providers: legal-data-hunter / official U.S. Reports (§12.1–12.3, 2026-07-15),
+BAILII (§12.5–12.6), and elitigation (§12.7). Pass 1 pulled **_Pulsifer_ from the official U.S.
+Reports preliminary print (601 U.S. 124–186)** — so the pin cites below are to the **official
 pagination**, not the slip opinion.
 
 ### 12.1 Verified verbatim, with pin cites
@@ -1181,12 +1228,12 @@ Closes §11.7's TODO. All four Singapore judgments pulled in full from elitigati
 (`https://www.elitigation.sg/gd/s/<year>_<court>_<no>` — no bot wall, unlike BAILII's Leopard),
 and every quoted paragraph checked against the official text:
 
-| Case                             | Source              | Checked                             | Result                                                                                                                          |
-| -------------------------------- | ------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| _Nam Hong_ [2016] SGCA 42        | `2016_SGCA_42`      | coram; statute; ¶19; ¶26            | ✅ all verbatim. Menon CJ authored. Definition is "specialist building works" para (d), Building Control Act (Cap 29, 1999 Rev Ed) |
-| _Sit Kwong Lam_ [2018] SGCA 14   | `2018_SGCA_14`      | coram; BMSMA definition; ¶42; ¶43   | ✅ verbatim, **one pin-cite correction**: ¶42 cites the **HC** decision _Kori v Nam Hong_ [2015] 2 SLR 616, not [2016] SGCA 42     |
-| _Koh Lau Keow_ [2013] SGHC 155   | `2013_SGHC_155`     | judge; Picarda ¶28; ¶29; holding ¶31 | ✅ all verbatim. Tay Yong Kwang J. Picarda is 4th ed (2010) p 330                                                                  |
-| _Low Kok Heng_ [2007] SGHC 123   | `2007_SGHC_123`     | judge; catchwords; ¶69              | ✅ all verbatim. V K Rajah JA. Emphasis in ¶69 falls on "every"                                                                    |
+| Case                           | Source          | Checked                              | Result                                                                                                                             |
+| ------------------------------ | --------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| _Nam Hong_ [2016] SGCA 42      | `2016_SGCA_42`  | coram; statute; ¶19; ¶26             | ✅ all verbatim. Menon CJ authored. Definition is "specialist building works" para (d), Building Control Act (Cap 29, 1999 Rev Ed) |
+| _Sit Kwong Lam_ [2018] SGCA 14 | `2018_SGCA_14`  | coram; BMSMA definition; ¶42; ¶43    | ✅ verbatim, **one pin-cite correction**: ¶42 cites the **HC** decision _Kori v Nam Hong_ [2015] 2 SLR 616, not [2016] SGCA 42     |
+| _Koh Lau Keow_ [2013] SGHC 155 | `2013_SGHC_155` | judge; Picarda ¶28; ¶29; holding ¶31 | ✅ all verbatim. Tay Yong Kwang J. Picarda is 4th ed (2010) p 330                                                                  |
+| _Low Kok Heng_ [2007] SGHC 123 | `2007_SGHC_123` | judge; catchwords; ¶69               | ✅ all verbatim. V K Rajah JA. Emphasis in ¶69 falls on "every"                                                                    |
 
 Two small dividends beyond confirmation:
 
