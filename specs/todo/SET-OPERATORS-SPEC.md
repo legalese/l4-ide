@@ -674,15 +674,17 @@ die — on its own merits.)_
 - **Phase 3a — route-α elaboration** (§D7.1, DECIDED): variadic construction
   `SET OF 1, 2, 3` via argument-collection in the typechecker. First compiler-touching change;
   independent of everything below.
-- **Phase 3b — precedence for identifier operators: REOPENED AND LANDED as option A (§13.2 outcome).**
+- **Phase 3b — precedence for identifier operators: REOPENED, BUILT as option A, in the merge queue (§13.2 outcome).**
   The original assessment recommended building nothing (the §D3/§D4 overloads cover the
   capabilities; the only residual gap was the literal words `UNION`/`INTERSECT` carrying
   precedence). Meng then greenlit the fixity mechanism as a decoupled timeboxed spike, and it
   **shipped as PR [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128)** (see
   §13.2 OUTCOME): `@infixl`/`@infixr`/`@infix N` declarations for binary identifier operators,
   the flat-App re-association proving out exactly as §13.1 predicted, adversarially reviewed
-  and green. **Q5 answer upgraded from (C)+(D) to option A.**
-- **Phase 3d — prelude fixity landing (follow-up unlocked by Phase 3b).** With #128 merged, add
+  and green — **in the merge queue as of 2026-07-18, not yet on `unstable`.**
+  **Q5 answer upgraded from (C)+(D) to option A.**
+- **Phase 3d — prelude fixity landing (follow-up unlocked by Phase 3b).** Once #128 lands
+  (in the merge queue as of 2026-07-18), add
   the fixity declarations to the set vocabulary in the prelude: `@infixl 6` on `UNION` and
   `WITHOUT`/`EXCEPT` (same precedence, both left-associative), `@infixl 7` on `INTERSECT` (binds
   tighter, à la ×/+ — so `a UNION b INTERSECT c` groups as `a UNION (b INTERSECT c)`). Purely
@@ -768,9 +770,10 @@ die — on its own merits.)_
   **RESOLVED (Meng sign-off, 2026-07-18): (C)+(D) adopted for this spec; (B) dead; (A)
   proceeds as the decoupled experiment per
   [`FIXITY-DECLARATIONS-SPEC.md`](FIXITY-DECLARATIONS-SPEC.md).**
-  **REOPENED (2026-07-18, post-landing): (A) LANDED — PR
-  [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128), merged to current
-  `unstable`, green.** Final Q5 disposition: **(A) fixity** is the answer for
+  **REOPENED (2026-07-18): (A) DONE — PR
+  [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128), green and in the merge
+  queue (branch HEAD `e61dbf30`); not yet on `unstable`.** Final Q5 disposition: **(A) fixity**
+  is the answer for
   `UNION`/`INTERSECT` as words with precedence; (D) keyword-operator overloads remain in hand
   for the union/difference vocabulary; (B) keywords are dead; (C) parens-forever is superseded
   by (A) but stays available for any operator left undeclared (there is no default fixity).
@@ -1531,11 +1534,12 @@ proceed regardless and take no dependency on the experiment. If the spike lands,
 per that brief's §8; if it dies, its §7 kill criteria route the post-mortem back to this
 section and (C)+(D) closes permanently.
 
-**OUTCOME (2026-07-18, post-landing): the spike LANDED. Q5 reopens with option A real.**
+**OUTCOME (2026-07-18): the spike is DONE and green. Q5 reopens with option A real.**
 `@infixl` / `@infixr` / `@infix N` declarations for binary identifier operators shipped on
-branch `mengwong/fixity-declarations` as **PR [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128)**
-into `unstable` (merged up to current `unstable`, green: jl4-test 1221/0, jl4-core-test 208/0,
-l4-cli-test 55/0). The parser was untouched — the flat-App parse shape and registry import
+branch `mengwong/fixity-declarations` (HEAD `e61dbf30`, work-head `8ba51c1d`) as
+**PR [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128)** into `unstable` —
+green (jl4-test 1221/0, jl4-core-test 208/0, l4-cli-test 55/0), all checks CLEAN, **in the
+merge queue** as of 2026-07-18 (not yet on `unstable`; HEAD there is still `5ca076a6`). The parser was untouched — the flat-App parse shape and registry import
 plumbing fit exactly as §13.1 predicted; a shunting-yard pre-pass in the typechecker
 re-associates the chain, and fixity rides `MixfixInfo` through `IMPORT` for free. A
 6-dimension adversarial review (3 refuters/finding) surfaced 8 findings, all fixed:
