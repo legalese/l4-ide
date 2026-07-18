@@ -1,0 +1,262 @@
+% =====================================================================
+% SECTION DRAFT: "The second order: legal powers as position-changing operators"
+% Intended to be \input into the Deontics as Domination paper
+% (paper/bounded-deontics/), as the second-order companion to the
+% first-order dominator/necessity story.
+%
+% Citation style matches the bounded-deontics draft: \src{Author Year}
+% placeholders (see \newcommand{\src} in bd-draft.tex), later converted to
+% \citep{}. Companion entries have been merged into
+% ../bounded-deontics/draft/bounded-deontics.bib. Deliberately copious on prior
+% art: most readers of a computational-law paper will not know the
+% Kanger--Lindahl / normative-positions literature.
+% =====================================================================
+
+\section{The second order: legal powers as position-changing operators}
+\label{sec:hohfeld-higher-order}
+
+The dominator reading of Section~\ref{sec:nec} treats a
+\textsc{must} as a fact \emph{about} a fixed transition system: the obligated
+act is the graph dominator of the goal. But law does not only regulate conduct
+inside a fixed rulebook; it also lets certain actors \emph{change the rulebook}.
+A legislature enacts; a judge sentences; a police officer arrests; a party to a
+contract waives, assigns, or terminates. Each of these is an act whose effect is
+not a move within the normative state but an edit \emph{to} it. This section
+develops the second-order layer that the first-order dominator story presupposes,
+and---because the intended audience spans programming languages, formal methods,
+and law---it does so with a fuller tour of the prior art than a specialist venue
+would require. The short version is stated up front, in the interest of
+scholarly honesty: \emph{the reading we give is, at the conceptual level, the
+received view.} Our contribution is narrow, technical, and deferred to
+Section~\ref{sec:ho-contribution}.
+
+\subsection{Hohfeld's eight conceptions, in two orders}
+\label{sec:hohfeld-primer}
+
+The vocabulary comes from Wesley Newcomb Hohfeld, whose two Yale Law Journal
+articles \src{Hohfeld 1913; Hohfeld 1917} remain the standard analytic
+decomposition of the loose word ``right.'' Hohfeld observed that legal talk
+conflates eight distinct positions, which he arranged by two relations. Two
+positions are \emph{jural correlatives} when they are the same legal fact seen
+from the two parties' sides: if Alice has a \emph{claim} that Bob mow the lawn,
+then Bob is under a \emph{duty} to Alice to mow it---one relation, two ends. Two
+positions are \emph{jural opposites} when the presence of one is the absence of
+the other for the same party: a \emph{privilege} (Hohfeld's word for a bare
+liberty) to enter is the negation of a \emph{duty} not to enter.
+
+Hohfeld's eight conceptions fall into two groups, and the division is the pivot
+of this section. The \emph{first} group---claim/right, duty, privilege/liberty,
+no-right---concerns what a party may or must \emph{do}. In the deontic vocabulary
+of this paper these are ordinary party-indexed positions: a duty is
+$\textsc{must}$, a privilege is $\textsc{may}$, their opposites are
+$\textsc{shant}$ and no-claim. The \emph{second} group---power, liability,
+immunity, disability---concerns something categorically different: the capacity
+to \emph{alter} first-group positions. A \emph{power} is the ability to change
+another party's legal position; its correlative \emph{liability} is that party's
+susceptibility to having their position changed; \emph{immunity} and
+\emph{disability} are the respective opposites (no one can change my position; I
+cannot change yours).
+
+Our running example makes the type distinction visible. A pedestrian has, by
+default, a privilege of free movement:
+\[
+  \textsc{may}(\textit{pedestrian}, \textit{leave}).
+\]
+A police officer's power to arrest is not itself a first-order permission or
+prohibition on leaving. It is the capacity to \emph{replace} the pedestrian's
+position---to reset $\textsc{may}(\textit{pedestrian},\textit{leave})$ to
+$\textsc{shant}(\textit{pedestrian},\textit{leave})$, installing a duty to remain.
+The power's natural type is therefore not a proposition but an
+\emph{operator on positions}: informally, $\textit{position}\to\textit{position}$.
+That the second group is, in this sense, ``one order up'' from the first is the
+observation this section is about---and, as the next subsection documents, it is
+an old observation.
+
+\subsection{The received view: the second order is ``higher-order''}
+\label{sec:received-view}
+
+It would be convenient to claim the higher-order reading as our own. We cannot,
+and we say so plainly. That Hohfeld's second group differs from the first by
+operating \emph{on} legal relations rather than \emph{within} them is, in the
+words of one recent survey, ``usually considered'' the correct view
+\src{Markovich 2020}; the second group is routinely called the class of
+\emph{higher-order rights}. The genealogy of this reading runs at least to
+Frederic Fitch's revision of Hohfeld \src{Fitch 1967} and to David Makinson's
+influential remarks on the Kanger--Lindahl formalisation \src{Makinson 1986},
+both of which argued that the power/liability layer is structurally more
+sophisticated than a mere further permission. A computational-law paper that
+presented ``powers are higher-order'' as a discovery would simply be unaware of
+its own literature. What follows is that literature, in enough detail to be
+useful to a reader meeting it for the first time.
+
+\subsection{Four ways the higher-order reading has been formalised}
+\label{sec:four-formalisations}
+
+Prior formal treatments cluster into four families. They differ in the logic
+they use, but they agree that power is position-changing; none renders it as a
+\emph{typed} function, and none is \emph{model-checked}---the two gaps we later
+occupy.
+
+\paragraph{(1) The Kanger--Lindahl theory of normative positions.}
+The foundational formalisation is due to Stig Kanger and, as its principal
+expositor, Lars Lindahl \src{Kanger 1971; Lindahl 1977}, with a modern survey by
+Sergot \src{Sergot 2013}. Kanger's insight was that plain deontic logic---the
+logic of ``it ought to be that''---cannot express Hohfeld's distinctions, because
+Hohfeld's relations are irreducibly about \emph{agency}: who is to bring what
+about. The remedy combines a standard deontic operator (``it shall be the case
+that'') with an action operator of the ``sees to it that'' or ``brings it about''
+family---a so-called \textsc{stit} operator, read ``agent $x$ sees to it that
+$\varphi$.'' Composing the two, and systematically varying negations, yields an
+exhaustive enumeration of the logically possible one-agent and two-agent
+positions; Hohfeld's first group falls out as a subset of these ``types of
+position.'' The apparatus is propositional multi-modal logic, with no typed or
+higher-order machinery. Crucially for us, the tradition \emph{saw} the second
+group but set it aside: Kanger and Lindahl explicitly note that power concerns
+``changes of legal relations,'' and Sergot lists power as a ``well-documented
+limitation'' of the framework, to be supplied later \src{Sergot 2001}. The
+position-changing character of power was recognised and deliberately deferred,
+not captured.
+
+\paragraph{(2) Lindahl's ability spaces (\emph{Spielraum}).}
+In the second part of \emph{Position and Change} \src{Lindahl 1977}, and later
+restated \src{Lindahl 2006}, Lindahl does treat power directly, as the ability to
+bring about a change in a legal relation. He models an agent's options as a set
+of reachable positions---an \emph{ability space} or \emph{Spielraum}---and
+represents the exercise of a power as an enlargement or reduction of another
+party's option-set, ordered by the subset relation. This is the closest that the
+classical literature comes to a functional ``position$\to$position'' picture: a
+power maps one option-structure to another. But it is rendered in informal set
+theory over subset-ordered trees, not as an operator with a type, and it is not
+executable.
+
+\paragraph{(3) Jones and Sergot's ``counts-as'' and institutionalised power.}
+Andrew Jones and Marek Sergot gave the most influential logical account of power
+as such \src{Jones \& Sergot 1996}. Their key move is to deny that power reduces
+to permission---an agent may have the power to do something they are not
+permitted to do, and vice versa (Makinson's marriage example: an official may be
+empowered to solemnise a marriage they are forbidden to solemnise). In its place
+they introduce a \emph{counts-as} conditional connective: within a designated
+institution, a designated act by a designated agent in specified circumstances
+\emph{counts as} the creation or modification of an institutional relation. Power
+is then the holding of such a counts-as conditional. Sergot's later work turns
+this into an automatable, computational theory of normative positions
+\src{Sergot 2001} and the standard survey \src{Sergot 2013}; it is the direct
+logical ancestor of rules-as-code treatments, and the reading we recommend for
+any reader wanting one entry point to the field.
+
+\paragraph{(4) Defeasible ``potestative'' operators.}
+The strand that comes closest to an explicit operator on positions is the
+defeasible-logic school of Governatori, Rotolo, and Sartor. Their temporalised
+normative positions \src{Governatori, Rotolo \& Sartor 2005} organise Hohfeld's
+eight conceptions into exactly the two layered sets we use here: a first set built
+from directed obligation (duty, right, no-right, privilege) and a second,
+``potestative'' set (power, liability, disability, immunity) built from normative
+conditionals. Most tellingly, Gelati, Governatori, Rotolo, and Sartor
+\src{Gelati et al. 2002} write legal power as an agent-indexed operator
+$\mathit{DeclPow}_{j}\,A$---``agent $j$ has the declarative power to produce
+$A$''---where the argument $A$ is itself a normative position, and may range over
+duties, permissions, and \emph{further powers to create positions on other
+agents}. This is, in all but the type system, the position$\to$position operator:
+an operator applied to a position, yielding a position, iterable to higher orders.
+Sartor's teleological characterisation \src{Sartor 2006} rounds out the account.
+
+\subsection{The idea already runs, too: executable Hohfeld}
+\label{sec:executable-prior}
+
+Lest the contribution be mislocated in ``making it executable,'' that has been
+done. \textsc{eFLINT} \src{van Binsbergen et al. 2020} is a domain-specific
+language whose stated foundations are transition systems together with Hohfeld's
+fundamental conceptions, and whose specifications run---supporting case
+assessment, simulation, and exploration. It models the second-order layer
+explicitly: a power is realised as an act-type whose post-conditions create or
+terminate the normative positions of other actors, with the correlative party
+``bound to'' the effects. \textsc{eFLINT} advertises exactly the integration we
+would otherwise claim---both Hohfeldian orders in one executable artefact, with
+normative relations changing over time through the effects of acts. It is
+action-based and transition-system-oriented, and it is not typed in the
+functional sense nor model-checked to a temporal logic; but any honest positioning
+must treat it as the nearest executable neighbour, not a distant one. A more
+recent line reads power and immunity through \emph{dynamic} logic
+\src{Dong \& Roy 2021}, reinforcing that the operator-on-positions view is now
+mainstream rather than novel.\footnote{We were unable to obtain the full text of
+\src{Dong \& Roy 2021} during preparation; the characterisation here rests on its
+abstract and secondary description and should be confirmed against the primary
+source before camera-ready.}
+
+\subsection{The deeper lineage: Hohfeld and the square of opposition}
+\label{sec:square-of-opposition}
+
+Hohfeld drew his conceptions as tables of \emph{opposites} and
+\emph{correlatives}, and to a reader with any logic the arrangement is
+suggestive: it looks like Aristotle's \emph{square of opposition}. The square
+organises the four categorical forms---universal affirmative (A), universal
+negative (E), particular affirmative (I), particular negative (O)---by four
+relations: \emph{contradictories} (A/O and E/I, which cannot share a truth value),
+\emph{contraries} (A/E, which cannot both hold), \emph{subcontraries} (I/O, which
+cannot both fail), and \emph{subalternation} (A entails I, E entails O). The
+square recurs across logics: the modal square relates $\Box$ and $\Diamond$, and
+the \emph{deontic} square relates obligation, permission, and prohibition, with a
+\emph{deontic hexagon} \src{Blanché 1966; McNamara 2019} adding the ``optional''
+and ``non-optional'' vertices that a four-corner square omits. This revival of the
+square as a general instrument of conceptual analysis is an active programme
+\src{Béziau 2012}.
+
+The parallel to Hohfeld is real but imperfect, and the imperfection is
+instructive. Hohfeld's \emph{opposites} do behave like the square's
+\emph{contradictories}: privilege and duty-not, claim and no-claim, are genuine
+negations. But Hohfeld's \emph{correlatives} are not a relation the classical
+square contains at all: a correlative pairs the \emph{two parties'} views of one
+relation---it is a \emph{converse}, not an opposition. A faithful diagram of
+Hohfeld therefore needs an axis the Aristotelian square lacks. This is not our
+observation: Lima, Griffo, Almeida, Guizzardi, and Aranha
+\src{Lima et al. 2021} have cast precisely ``the light of the theory of
+opposition'' onto Hohfeld, confirming that his relations comprise
+contradictories, contraries, and subcontraries while the correlatives are
+\emph{converse} (reciprocal) relations; and they extend the picture beyond the
+square to Blanché's hexagon and, via Pellissier's ``weak hexagon,'' to a
+three-dimensional logical cube, in order to accommodate ``open'' normative systems
+in which conduct may be neither obligatory, prohibited, nor strongly permitted.
+Their treatment even gives the constitutive-norm (power) layer a parallel
+hexagonal reading in alethic modalities. For our purposes the lesson is that both
+the Aristotelian lineage \emph{and} its careful modern reconstruction for Hohfeld
+are already in print; we cite them as background, and claim neither.
+
+\subsection{What we add: a typed, functional, model-checked reading}
+\label{sec:ho-contribution}
+
+Against this background our contribution is deliberately small, and precisely
+located. Every formalisation surveyed above is one of: propositional modal logic
+(Kanger--Lindahl, Markovich), informal set theory (Lindahl's \emph{Spielraum}), a
+counts-as conditional (Jones \& Sergot), defeasible modal operators (Gelati,
+Governatori, Rotolo, Sartor), or a transition-system action language
+(\textsc{eFLINT}). None is simultaneously (a)~\emph{typed}, presenting a power as
+a value of an operator type that a compiler checks, and (b)~\emph{model-checked},
+compiling the second-order layer to a temporal logic so that loopholes and
+deadlocks in the power structure are found automatically. That conjunction is the
+whole of our claim.
+
+Concretely, we read a power not as a pure function $\textit{DP}\to\textit{DP}$
+but---faithfully to the fact that exercising a power is a \emph{guarded update on
+an event-sourced normative store}---as a guarded transformer
+$\textit{NormState}\to\textit{NormState}$, conditioned by the power's
+preconditions (the officer's \textsc{provided} clauses). Typing it exposes
+mis-wired powers (a power whose argument is not a well-formed position) at
+compile time, which the logical accounts cannot do; compiling the transformer's
+reachable effects to \textsc{ltl} lets the same model checker that finds
+first-order double-binds (Section~\ref{sec:tooling}) find second-order ones:
+an unintended chain of powers that reaches a state no party can exit.
+
+Finally, the second-order layer inherits, one order up, the modal split that
+organises the first-order story of this paper. A \emph{power} is an existential,
+constructive capability---there is an act the empowered party can perform to reach
+a changed position---which is naturally a liveness/reachability property,
+$\mathsf{EF}\,\textit{changed}$. An \emph{immunity} is its universal dual---\emph{no}
+power of any party reaches my position---which is a safety property,
+$\mathsf{AG}\,\lnot\textit{changed}$, and is exactly the kind of closed,
+statically checkable guarantee the type system and model checker are built to
+certify. Thus power sits with liveness, $\exists$, and runtime; immunity sits with
+safety, $\forall$, and static verification---the same $\forall/\exists$ axis that
+Section~\ref{sec:boundary} draws through the first-order layer. The two orders are
+not two theories but one, read at two altitudes; and the value of the typed,
+model-checked instantiation is that it makes the second altitude carry its weight
+as an object one can compile and check, rather than only reason about.

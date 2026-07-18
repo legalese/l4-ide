@@ -5,6 +5,26 @@
 > the end. Sequel / second-order counterpart to the Bounded Deontics paper
 > ("Deontics as Domination", `../bounded-deontics/`).
 
+> **RESTRUCTURED 2026-07-18 → NOW A SECTION, NOT A STANDALONE PAPER.** A verified
+> prior-art pass (deep-research `wf_dd21e9a3`) found the higher-order reading is the
+> *received view* (Fitch 1967, Makinson 1986, Markovich 2020 "higher-order rights"),
+> formalised four ways (Kanger–Lindahl; Lindahl's *Spielraum*; Jones & Sergot
+> counts-as; Gelati/Governatori/Rotolo/Sartor potestative `DeclPow`), already made
+> **executable** (eFLINT 2020), and the square-of-opposition angle already published
+> (Lima et al. 2021, *Legal Theory* — opposite=contradictory, correlative=converse,
+> extended to Blanché's hexagon + a logical cube). So the standalone conceptual claim
+> is anticipated. The defensible residue is a *typed, functional, model-checked*
+> instantiation only. **Deliverable is now a section draft** intended to `\input` into
+> "Deontics as Domination":
+> - `section-powers-as-higher-order-deontics.tex` — the section (copious prior-art
+>   background for unfamiliar readers; concede-then-claim; wired to the main paper's
+>   dominator / ∀-∃ static-runtime spine: immunity = safety/∀/`AG¬changed`, power =
+>   liveness/∃/`EF`).
+> - citations merged into `../bounded-deontics/draft/bounded-deontics.bib` (20 entries,
+>   provenance-tiered; `fitch1967` and `dongroy2021` flagged UNVERIFIED). The section is
+>   `\input` into `bd-draft.tex` after the boundary section.
+> The material below is retained as the fuller design record.
+
 ## Working title
 
 - **"Deontics as Domination, Powers as Higher-Order Deontics"** (ties it to facet 2), or
