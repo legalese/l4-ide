@@ -1,0 +1,1533 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+
+§ `Charities (Jersey) Law 2014 — Part 5 — Governors of registered charities (Articles 18-20)`
+
+-- ===========================================================================
+-- PART 5 — GOVERNORS OF REGISTERED CHARITIES. Articles 18, 19 and 20.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF EACH PROVISION:
+--
+--   Art 18(1)  DUTY (MUST), on every governor of a registered charity: seek, in
+--              good faith, to ensure the charity does (a) AND (b). A CONJUNCTION
+--              of two limbs inside one duty.
+--   Art 18(2)  DUTY (MUST), but GATED: it bites only on a governor of an entity
+--              that is "an unincorporated body or association of persons falling
+--              within Article 2(1)(i)". Four limbs, all CONJUNCTIVE:
+--              (a)(i) due diligence, (a)(ii) prudent person, (a)(iii) best of
+--              ability and skill, and (b) utmost good faith.
+--   Art 18(3)  OVERRIDE + PROVISO. The Article 18 duties apply DESPITE any
+--              contrary provision in the constitution — EXCEPT to any extent
+--              that the provision imposes a MORE ONEROUS duty. A defeater on
+--              the override: the harsher rule wins, whichever it is.
+--   Art 18(4)  CONSTITUTIVE. A four-limb DISJUNCTION (a)-(d) defining when a
+--              GOVERNOR engages in misconduct. (d) is itself a CONJUNCTION of
+--              two limbs, each of which is a DISJUNCTION.
+--   Art 19(1)  CONSTITUTIVE. "Reportable matter" — an EIGHT-limb DISJUNCTION
+--              (a)-(h). (a) is itself a conjunction (misconduct AND it led to a
+--              required steps notice); (g) is a conjunction (unspent AND within
+--              Art 2(10)(b)); (h) is the Order-making catch-all.
+--   Art 19(2)  DUTY (MUST) — report promptly, to the entity AND the Commissioner.
+--   Art 19(3)  DUTY (MUST) — declaration to the entity, before the application.
+--   Art 19(4)  DUTY (MUST) — declaration to the charity, on the annual return.
+--   Art 19(5)  DUTY (MUST) — on the ENTITY / CHARITY, not the governor.
+--   Art 19(6)  CONSTITUTIVE, ONE-WAY: an application is NOT COMPLETE if 19(5)
+--              is not complied with. It does not say the converse.
+--   Art 19(7)  DUTY (MUST) — explain a contravention of 19(5).
+--   Art 19(8)  PROHIBITION (SHANT) — must not act while in breach of (2) or (4).
+--   Art 19(9)  A MIXED SUITE on the Commissioner: (a) MUST, (b) MAY, (c) SHANT,
+--              (d) MAY, (e) MUST (an ELECTION between (e)(i) and (e)(ii)).
+--   Art 19(10) PROHIBITION (SHANT) — must not act after reporting, UNLESS
+--              (a) permitted AND (b) acting in accordance with any condition.
+--   Art 19(11) OFFENCE, paired with the 19(10) prohibition, with a DEFEATER:
+--              "without reasonable excuse". Penalty: imprisonment for 1 year
+--              and a fine.
+--   Art 19(12) SAVING — a contravention of (10) does not of itself make the act
+--              void or invalid.
+--   Art 19(13) DISCRETIONARY POWER (MAY) — the Commissioner may apply to the
+--              court on suspicion of a 19(2) breach.
+--   Art 20(1)  A NON-EXHAUSTIVE catalogue of orders ("any order that the court
+--              sees fit, INCLUDING WITHOUT LIMITATION"). Carried as inert prose:
+--              a closed disjunction would misstate it.
+--   Art 20(2)  Scope of an order — again "without limitation". Inert.
+--   Art 20(3)  The disqualification-order application (MAY, by the Commissioner
+--              or the Attorney General).
+--   Art 20(4)  DISCRETIONARY POWER (MAY): the court MAY make a disqualification
+--              order IF SATISFIED the person is UNFIT, BY VIRTUE OF (a) conduct
+--              OR (b) the seriousness of a reportable matter. Gate AND disjunction.
+--   Art 20(5)  A CHECKABLE NUMERIC BOUND: "not exceeding 15 years".
+--   Art 20(6)  OFFENCE: contravening a disqualification order. Imprisonment for
+--              2 years and a fine. NO "reasonable excuse" defeater here — the
+--              contrast with 19(11) is deliberate in the statute, and preserved.
+--
+-- ENCODING STYLE — INERT. The verbatim statutory words ride inline as bare
+-- strings (inert: identity of their context — TRUE under AND, FALSE under OR),
+-- with `...` as AND-sugar and `..` as OR-sugar. Layout IS the bracketing. Only
+-- the operative atoms are lifted to BOOLEANs.
+--
+-- THE DEFINITIONAL CROSS-REFERENCE. Article 18(4)(a) does not restate what
+-- misconduct is; it points: "the governor contravenes a provision, or commits
+-- an offence, MENTIONED IN ARTICLE 2(10)". So limb (a) below REUSES the Part 1
+-- predicate `is misconduct` on a MisconductAllegation, and Articles 19(1)(a)
+-- and 19(1)(g) in turn reuse the Article 18(4) predicate and the Part 1
+-- `(b) — the commission of an offence in relation to a charity` predicate. The
+-- chain Art 2(10) -> Art 18(4) -> Art 19(1) is what makes the corpus hang
+-- together, and it is spelled, not paraphrased.
+--
+-- >>> INTERPRETATION CALL — ATTRIBUTION IN ART 18(4)(a). Article 2(10)(b)
+--     defines misconduct to include an offence committed "BY ANY PERSON" in
+--     relation to a registered charity — an outsider's money-laundering is
+--     misconduct for the purposes of the Law (and Part 1 tests exactly that).
+--     But Article 18(4)(a) asks whether THE GOVERNOR "contravenes a provision,
+--     or commits an offence, mentioned in Article 2(10)". So the Art 2(10)
+--     catalogue is imported, but the ACTOR must be this governor. We therefore
+--     conjoin `is misconduct` with an express attribution atom,
+--     `the governor is the person who contravened the provision or committed the
+--     offence`. Without it, every governor of a charity victimised by an
+--     outsider's fraud would themselves "engage in misconduct" under 18(4)(a) —
+--     an absurdity. See the test `an outsider's fraud is NOT the governor's
+--     misconduct` below, which is precisely the case this call decides.
+--
+-- >>> INTERPRETATION CALL — "TO ANY EXTENT" IN ART 18(3). The proviso is
+--     severable at the level of the individual duty ("except TO ANY EXTENT that
+--     such provision imposes a more onerous duty"), so in principle a single
+--     constitutional clause could be displaced in part and preserved in part. We
+--     model the provision as a whole, with one BOOLEAN for "is contrary" and one
+--     for "imposes a more onerous duty", and flag that a finer-grained model
+--     would index both by the particular Article 18 duty in issue.
+--
+-- >>> INTERPRETATION CALL — ART 19(6) IS ONE-WAY. "An application for
+--     registration is not complete if the entity has not complied with paragraph
+--     (5)." That is a sufficient condition for INcompleteness, not a definition
+--     of completeness: Part 4 imposes other requirements. We encode only the
+--     direction the statute states, as `the application is not complete by virtue
+--     of Article 19(6)`, and do NOT infer completeness from compliance.
+--
+-- >>> INTERPRETATION CALL — ART 19(1)(a) AND THE REQUIRED STEPS NOTICE. Limb (a)
+--     is not "has engaged in misconduct" simpliciter: it is qualified misconduct
+--     — "BEING misconduct that led to the service of a required steps notice on
+--     that governor or on that charity or on another governor of that charity".
+--     We read "being" as restrictive (a conjunct), not appositive: bare
+--     misconduct that never produced a notice is not a reportable matter under
+--     (a). Tested below.
+--
+-- >>> INTERPRETATION CALL — ART 19(10)'s "UNLESS". The exception is a
+--     CONJUNCTION: the governor must be permitted (a) AND must act in accordance
+--     with any condition on that permission (b). So a governor who has permission
+--     but breaches its conditions is squarely within the prohibition — and, absent
+--     a reasonable excuse, commits the 19(11) offence. Tested below.
+--
+-- >>> OPEN-TEXTURED DEADLINES — REVIEWABLE PLACEHOLDERS. The statute says
+--     "promptly" (19(2)), "within a reasonable time" (18(4)(d)(ii)), "before the
+--     application is made" (19(3)), "when notified" (19(4)), "until the issue has
+--     been determined" (19(9)(c)), "at any time" (19(8), (10)). None of those is a
+--     number. Every `WITHIN n` below is therefore a PLACEHOLDER for an
+--     open-textured standard, flagged at its site. What is "prompt" or
+--     "reasonable" is a question of fact for the Commissioner, the tribunal or the
+--     court; the model must pick something to make the trace executable, and says
+--     so rather than inventing precision the statute lacks.
+-- ===========================================================================
+
+§§ `Part 5 — the regulated acts not already in the shared Action vocabulary`
+
+-- charities-common's Action enum already carries the Part 5 acts the rest of the
+-- corpus refers to (`seek in good faith to ensure the charity complies`,
+-- `report the reportable matter`, `provide a declaration of no reportable matter`,
+-- `act as a governor`, `make inquiries as to fitness`,
+-- `apply to the court to determine fitness`, `make a disqualification order`,
+-- `contravene a disqualification order`, and `register the applicant as a
+-- charity` from Part 4, which Art 19(9)(c) forbids). The acts below are local to
+-- Part 5 and are NOT added to the shared enum, so that other Parts are unaffected.
+--
+-- CONSEQUENCE, stated honestly: a deontic over Part5Action cannot be RAND-ed with
+-- a deontic over Action. So Article 19(9) appears below as TWO threads —
+-- (a)-(c) over Action, (d)-(e) over Part5Action. That is a modelling artefact of
+-- the two enums, not a feature of the Law: in the Law they are one suite.
+DECLARE Part5Action IS ONE OF
+  `act with due diligence`                                                        -- Art 18(2)(a)(i)
+  `act as would a prudent person`                                                 -- Art 18(2)(a)(ii)
+  `act to the best of the ability and skill of the governor`                      -- Art 18(2)(a)(iii)
+  `observe the utmost good faith`                                                 -- Art 18(2)(b)
+  `take proper steps to protect or restore the property of the charity or to prevent the misconduct`  -- Art 18(4)(d)(ii)
+  `state that it holds declarations from all of its governors who have not made a report under paragraph (2)`  -- Art 19(5)
+  `explain to the Commissioner the reason for the contravention`                  -- Art 19(7)
+  `permit the governor to act as a governor until the issue is determined or the notice is withdrawn`  -- Art 19(9)(d)
+  `notify the entity that the application will be refused unless the governor is removed, or serve a required steps notice requiring the charity to suspend or remove the governor`  -- Art 19(9)(e)(i)
+  `give permission by notice in writing, entered in the register, for the governor to act as a governor`  -- Art 19(9)(e)(ii)
+  `apply to the court for a disqualification order against the person`            -- Art 20(3)
+
+§ `Article 18 — General duties of governors of registered charities`
+
+§§ `Article 18(1) — the good-faith duty, and its two limbs`
+
+-- The two limbs of 18(1) are what the governor must seek IN GOOD FAITH to ensure.
+-- They are facts about the CHARITY, not about the governor, so they are lifted onto
+-- a record of the charity's compliance; the governor's duty is the regulative
+-- MUST below, and these limbs are its content.
+DECLARE Article18CharityCompliance HAS
+    `the charity`                                                   IS AN Entity
+    `(1)(a) acts in a manner that is consistent with its registered charitable purposes and with its registered public benefit statement`  IS A BOOLEAN
+    `(1)(b) complies with any direction, requirement, notice or duty imposed on it by or under this Law`  IS A BOOLEAN
+
+GIVEN c IS AN Article18CharityCompliance
+GIVETH A BOOLEAN
+`Article 18(1) — the charity does what the governor must seek to ensure` c MEANS
+        "(1) A governor of a registered charity must seek, in good faith, to ensure that the charity -"
+    ... "(a) acts in a manner that is consistent with its registered charitable purposes and with its registered public benefit statement; and"
+    ... c's `(1)(a) acts in a manner that is consistent with its registered charitable purposes and with its registered public benefit statement`
+    AND "(b) complies with any direction, requirement, notice or duty imposed on it by or under this Law."
+    ... c's `(1)(b) complies with any direction, requirement, notice or duty imposed on it by or under this Law`
+
+-- The duty itself. Note what it is NOT: it is not a duty that the charity comply.
+-- It is a duty to SEEK, IN GOOD FAITH, TO ENSURE that it does. A governor who tried
+-- in good faith and failed has performed; a governor who did not try has not.
+-- >>> PLACEHOLDER: the statute sets no deadline — this is a CONTINUING duty. WITHIN
+--     365 is a reviewable observation window, not a statutory period.
+GIVETH A DEONTIC Actor Action
+`Article 18(1) — the good-faith duty` MEANS
+    PARTY Governor MUST `seek in good faith to ensure the charity complies` WITHIN 365
+
+§§ `Article 18(2) — the extra duties on a governor of an Article 2(1)(i) unincorporated entity`
+
+-- The GATE is Article 2(1)(i), imported from Part 1: "an unincorporated body or
+-- association of persons falling within Article 2(1)(i)". We read the gate straight
+-- off the Entity record's (i) flag, which is exactly the sub-paragraph the statute
+-- names.
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`Article 18(2) — the gate: the charity is an unincorporated body within Article 2(1)(i)` e MEANS
+        "(2) A governor of a registered charity, that is an unincorporated body or association of persons falling within Article 2(1)(i), must in the execution of his or her duties and in the exercise of his or her powers and discretions -"
+    ... e's `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`
+
+-- Four CONJUNCTIVE duties. Not a menu: the governor must do all of them.
+-- >>> PLACEHOLDER: again a continuing duty with no statutory period. WITHIN 365.
+GIVEN e IS AN Entity
+GIVETH A DEONTIC Actor Part5Action
+`Article 18(2) — the duties of a governor of an unincorporated entity` e MEANS
+    IF   `Article 18(2) — the gate: the charity is an unincorporated body within Article 2(1)(i)` e
+    THEN     (PARTY Governor MUST `act with due diligence` WITHIN 365)                       -- (a)(i)
+         RAND (PARTY Governor MUST `act as would a prudent person` WITHIN 365)               -- (a)(ii)
+         RAND (PARTY Governor MUST `act to the best of the ability and skill of the governor` WITHIN 365)  -- (a)(iii)
+         RAND (PARTY Governor MUST `observe the utmost good faith` WITHIN 365)               -- (b)
+    ELSE FULFILLED   -- the gate is shut: a governor of a company owes 18(1), but not 18(2)
+
+§§ `Article 18(3) — despite any contrary provision, except a more onerous one`
+
+DECLARE Article18ConstitutionalProvision HAS
+    description                                                     IS A STRING
+    `the provision is a contrary provision in the constitution or the constitutional Law of the charity`  IS A BOOLEAN
+    `the provision imposes a more onerous duty`                     IS A BOOLEAN
+
+-- The OVERRIDE. The Article 18 duties displace the constitutional provision...
+GIVEN p IS AN Article18ConstitutionalProvision
+GIVETH A BOOLEAN
+`Article 18(3) — the Article 18 duty displaces the contrary provision` p MEANS
+        "(3) The duties imposed by this Article apply despite any contrary provision in the constitution or the constitutional Law of the charity,"
+    ... p's `the provision is a contrary provision in the constitution or the constitutional Law of the charity`
+    AND "except to any extent that such provision imposes a more onerous duty."
+    ... NOT p's `the provision imposes a more onerous duty`
+
+-- ...EXCEPT where the provision is the harsher of the two, in which case the
+-- provision stands and the governor is held to it. The Law ratchets in one
+-- direction only: whichever duty is more onerous is the one that binds.
+GIVEN p IS AN Article18ConstitutionalProvision
+GIVETH A BOOLEAN
+`Article 18(3) — the more onerous constitutional provision prevails` p MEANS
+        "except to any extent that such provision imposes a more onerous duty."
+    ... p's `the provision imposes a more onerous duty`
+
+§§ `Article 18(4) — when a GOVERNOR engages in misconduct`
+
+-- The record. Note the first field: an Article 2(10) MisconductAllegation, imported
+-- wholesale from Part 1. Article 18(4)(a) does not restate the catalogue; it points
+-- at it, so neither do we.
+DECLARE GovernorMisconduct HAS
+    governor                                                        IS A STRING
+
+    -- (4)(a) — "the governor contravenes a provision, or commits an offence,
+    -- mentioned in Article 2(10)". The allegation is scored against Art 2(10) by
+    -- the imported `is misconduct` predicate; the attribution atom below is our
+    -- flagged INTERPRETATION CALL (see the header).
+    `the Article 2(10) allegation`                                  IS A MisconductAllegation
+    `the governor is the person who contravened the provision or committed the offence`  IS A BOOLEAN
+
+    -- (4)(b)
+    `(4)(b) the governor concurs in misconduct by the charity`      IS A BOOLEAN
+
+    -- (4)(c)
+    `(4)(c) the governor assists or encourages another governor to engage in misconduct`  IS A BOOLEAN
+
+    -- (4)(d)(i) — a two-way disjunction: actual OR constructive knowledge.
+    `(4)(d)(i) the governor becomes aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`  IS A BOOLEAN
+    `(4)(d)(i) the governor ought to have become aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`  IS A BOOLEAN
+
+    -- (4)(d)(ii) — a two-way disjunction: active concealment OR culpable inaction.
+    `(4)(d)(ii) the governor actively conceals that misconduct or that intention`  IS A BOOLEAN
+    `(4)(d)(ii) the governor fails within a reasonable time to take proper steps to protect or restore the property of the charity or to prevent the misconduct`  IS A BOOLEAN
+
+-- (4)(a) — THE DEFINITIONAL CROSS-REFERENCE. `is misconduct` is Article 2(10),
+-- imported from part-1-interpretation. We conjoin the attribution atom: Art 2(10)(b)
+-- catches an offence by ANY person, but Art 18(4)(a) asks what THE GOVERNOR did.
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` g MEANS
+        "(a) the governor contravenes a provision, or commits an offence, mentioned in Article 2(10);"
+    ... `is misconduct` (g's `the Article 2(10) allegation`)   -- Article 2(10), imported from Part 1
+    AND "-- and it is THE GOVERNOR who did so: see the INTERPRETATION CALL in the header"
+    ... g's `the governor is the person who contravened the provision or committed the offence`
+
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(b) — the governor concurs in misconduct by the charity` g MEANS
+        "(b) the governor concurs in misconduct by the charity;"
+    ... g's `(4)(b) the governor concurs in misconduct by the charity`
+
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(c) — the governor assists or encourages another governor` g MEANS
+        "(c) the governor assists or encourages another governor to engage in misconduct; or"
+    ... g's `(4)(c) the governor assists or encourages another governor to engage in misconduct`
+
+-- (4)(d)(i) — knowledge, actual or constructive.
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(d)(i) — became aware, or ought to have become aware` g MEANS
+        "(i) becomes aware or ought to have become aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct, and"
+    ..  g's `(4)(d)(i) the governor becomes aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`
+    ..  g's `(4)(d)(i) the governor ought to have become aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`
+
+-- (4)(d)(ii) — the culpable response: conceal, OR fail in time to act.
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(d)(ii) — actively conceals, or fails in time to take proper steps` g MEANS
+        "(ii) the governor actively conceals that misconduct or that intention, or fails within a reasonable time to take proper steps to protect or restore the property of the charity or to prevent the misconduct."
+    ..  g's `(4)(d)(ii) the governor actively conceals that misconduct or that intention`
+    ..  g's `(4)(d)(ii) the governor fails within a reasonable time to take proper steps to protect or restore the property of the charity or to prevent the misconduct`
+
+-- (4)(d) — THE TWO-LIMB CONJUNCTION. Knowledge alone is not misconduct; a culpable
+-- response alone is not (4)(d) either. It takes both. This is the limb that
+-- distinguishes the governor who saw the fraud and hid it from the governor who saw
+-- the fraud and blew the whistle.
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` g MEANS
+        "(d) the governor -"
+    ... `Article 18(4)(d)(i) — became aware, or ought to have become aware` g
+    AND `Article 18(4)(d)(ii) — actively conceals, or fails in time to take proper steps` g
+
+GIVEN g IS A GovernorMisconduct
+GIVETH A BOOLEAN
+`Article 18(4) — the governor engages in misconduct` g MEANS
+        "(4) For the purposes of this Law a governor engages in misconduct if -"
+    ..  `Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` g
+    ..  `Article 18(4)(b) — the governor concurs in misconduct by the charity` g
+    ..  `Article 18(4)(c) — the governor assists or encourages another governor` g
+    ..  `Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` g
+
+-- The (d)(ii) inaction limb, read regulatively. Once the governor knows (or ought
+-- to), a DUTY to act crystallises; failing it within a reasonable time is what
+-- (d)(ii) makes culpable.
+-- >>> PLACEHOLDER: "within a reasonable time" is open-textured. WITHIN 21 is a
+--     reviewable stand-in, not a statutory period.
+GIVEN g IS A GovernorMisconduct
+GIVETH A DEONTIC Actor Part5Action
+`Article 18(4)(d)(ii) — the duty to take proper steps within a reasonable time` g MEANS
+    IF   `Article 18(4)(d)(i) — became aware, or ought to have become aware` g
+    THEN PARTY Governor MUST `take proper steps to protect or restore the property of the charity or to prevent the misconduct` WITHIN 21
+    ELSE FULFILLED   -- no knowledge, no duty to act
+
+§ `Article 19 — Reportable matters and acting as a governor`
+
+§§ `Article 19(1) — "reportable matter": an eight-limb disjunction`
+
+DECLARE ReportableMatter HAS
+    person                                                          IS A STRING
+
+    -- (1)(a) — QUALIFIED misconduct. Two conjuncts: the Art 18(4) misconduct, AND
+    -- the fact that it led to a required steps notice. See the INTERPRETATION CALL.
+    `the alleged misconduct as a governor`                          IS A GovernorMisconduct
+    `(1)(a) the misconduct led to the service of a required steps notice on that governor, on that charity, or on another governor of that charity`  IS A BOOLEAN
+
+    -- (1)(b)
+    `(1)(b) is the subject of a disqualification order, or of any other restriction on his or her acting as a governor, imposed under this Law`  IS A BOOLEAN
+    -- (1)(c)
+    `(1)(c) has been disqualified from or for being a charity trustee or trustee for a charity under the law of any part of the United Kingdom, or from holding any equivalent position under the law of any other jurisdiction`  IS A BOOLEAN
+    -- (1)(d)
+    `(1)(d) has been disqualified from being a company director, or has been made subject to any equivalent disqualification under the law of any jurisdiction other than Jersey`  IS A BOOLEAN
+    -- (1)(e)
+    `(1)(e) is bankrupt or otherwise insolvent, whether under the law of Jersey or elsewhere`  IS A BOOLEAN
+    -- (1)(f) — note: WHETHER OR NOT SPENT. Contrast (g).
+    `(1)(f) has a conviction (whether or not spent) for an offence under this Law`  IS A BOOLEAN
+
+    -- (1)(g) — an UNSPENT conviction for an offence falling within Article 2(10)(b).
+    -- The offence is scored by the imported Part 1 predicate; "unspent" is the
+    -- extra conjunct that distinguishes (g) from (f).
+    `the conviction relied on under paragraph (1)(g)`               IS A MisconductAllegation
+    `(1)(g) the conviction is unspent`                              IS A BOOLEAN
+
+    -- (1)(h) — "any other description that may be prescribed by the Minister by
+    -- Order". A LIVE disjunct: the Order-making power is real, so an entity can be
+    -- caught by (h) without this file changing. Exposed as a single atom.
+    `(1)(h) falls within any other description prescribed by the Minister by Order`  IS A BOOLEAN
+
+GIVEN r IS A ReportableMatter
+GIVETH A BOOLEAN
+`Article 19(1)(a) — misconduct as a governor that led to a required steps notice` r MEANS
+        "(a) has engaged in misconduct as a governor of a registered charity,"
+    ... `Article 18(4) — the governor engages in misconduct` (r's `the alleged misconduct as a governor`)
+    AND "being misconduct that led to the service of a required steps notice on that governor or on that charity or on another governor of that charity;"
+    ... r's `(1)(a) the misconduct led to the service of a required steps notice on that governor, on that charity, or on another governor of that charity`
+
+GIVEN r IS A ReportableMatter
+GIVETH A BOOLEAN
+`Article 19(1)(g) — an unspent conviction for an offence falling within Article 2(10)(b)` r MEANS
+        "(g) has an unspent conviction for an offence falling within Article 2(10)(b); or"
+    ... r's `(1)(g) the conviction is unspent`
+    AND `(b) — the commission of an offence in relation to a charity` (r's `the conviction relied on under paragraph (1)(g)`)   -- Article 2(10)(b), imported from Part 1
+
+GIVEN r IS A ReportableMatter
+GIVETH A BOOLEAN
+`Article 19(1) — is a reportable matter` r MEANS
+        "(1) A reportable matter in relation to a person is the fact that the person -"
+    ..  `Article 19(1)(a) — misconduct as a governor that led to a required steps notice` r
+    ..  "(b) is the subject of a disqualification order, or of any other restriction on his or her acting as a governor, imposed under this Law;"
+    ..  r's `(1)(b) is the subject of a disqualification order, or of any other restriction on his or her acting as a governor, imposed under this Law`
+    ..  "(c) has been disqualified from or for being a charity trustee or trustee for a charity under the law of any part of the United Kingdom, or from holding any equivalent position under the law of any other jurisdiction;"
+    ..  r's `(1)(c) has been disqualified from or for being a charity trustee or trustee for a charity under the law of any part of the United Kingdom, or from holding any equivalent position under the law of any other jurisdiction`
+    ..  "(d) has been disqualified from being a company director, or has been made subject to any equivalent disqualification under the law of any jurisdiction other than Jersey;"
+    ..  r's `(1)(d) has been disqualified from being a company director, or has been made subject to any equivalent disqualification under the law of any jurisdiction other than Jersey`
+    ..  "(e) is bankrupt or otherwise insolvent, whether under the law of Jersey or elsewhere;"
+    ..  r's `(1)(e) is bankrupt or otherwise insolvent, whether under the law of Jersey or elsewhere`
+    ..  "(f) has a conviction (whether or not spent) for an offence under this Law;"
+    ..  r's `(1)(f) has a conviction (whether or not spent) for an offence under this Law`
+    ..  `Article 19(1)(g) — an unspent conviction for an offence falling within Article 2(10)(b)` r
+    ..  "(h) falls within any other description that may be prescribed by the Minister by Order."
+    ..  r's `(1)(h) falls within any other description prescribed by the Minister by Order`
+
+§§ `Article 19(2) to (7) — the reporting and declaration duties`
+
+DECLARE Part5GovernorStatus HAS
+    governor                                                        IS A STRING
+    `there is a reportable matter in relation to the governor`      IS A BOOLEAN
+    `the governor is a governor of an entity applying for registration`  IS A BOOLEAN
+    `the governor is a governor of a registered charity`            IS A BOOLEAN
+    `the charity has notified the governor that it is preparing its annual return`  IS A BOOLEAN
+
+-- Article 19(2) — REPORT, to BOTH the entity/charity AND the Commissioner. One act
+-- with two addressees; the statute treats it as a single duty and so do we.
+-- >>> PLACEHOLDER: "promptly". WITHIN 14 is a reviewable stand-in.
+GIVEN s IS A Part5GovernorStatus
+GIVETH A DEONTIC Actor Action
+`Article 19(2) — the duty to report a reportable matter promptly` s MEANS
+    IF       s's `there is a reportable matter in relation to the governor`
+         AND (    s's `the governor is a governor of an entity applying for registration`
+               OR s's `the governor is a governor of a registered charity` )
+    THEN PARTY Governor MUST `report the reportable matter` WITHIN 14
+    ELSE FULFILLED
+
+-- Article 19(3) — the DECLARATION, by a governor of an applicant entity, where there
+-- is NO reportable matter. Note the mirror-image gate: 19(2) fires when there IS a
+-- reportable matter, 19(3) when there is NOT. Every governor is caught by one or the
+-- other; neither is optional.
+-- >>> PLACEHOLDER: "before the application is made". WITHIN 30.
+GIVEN s IS A Part5GovernorStatus
+GIVETH A DEONTIC Actor Action
+`Article 19(3) — the applicant governor's declaration of no reportable matter` s MEANS
+    IF       s's `the governor is a governor of an entity applying for registration`
+         AND NOT s's `there is a reportable matter in relation to the governor`
+    THEN PARTY Governor MUST `provide a declaration of no reportable matter` WITHIN 30
+    ELSE FULFILLED
+
+-- Article 19(4) — the same declaration, by a governor of a REGISTERED charity, but
+-- triggered by the charity's notification that it is preparing its annual return.
+-- >>> PLACEHOLDER: "when notified". WITHIN 30 from the notification.
+GIVEN s IS A Part5GovernorStatus
+GIVETH A DEONTIC Actor Action
+`Article 19(4) — the registered charity governor's annual declaration` s MEANS
+    IF       s's `the governor is a governor of a registered charity`
+         AND s's `the charity has notified the governor that it is preparing its annual return`
+         AND NOT s's `there is a reportable matter in relation to the governor`
+    THEN PARTY Governor MUST `provide a declaration of no reportable matter` WITHIN 30
+    ELSE FULFILLED
+
+-- Article 19(5) — a duty on the ENTITY and on the CHARITY, not on the governor: each
+-- must STATE that it holds declarations from all governors who have not reported.
+GIVETH A DEONTIC Actor Part5Action
+`Article 19(5) — the entity and the charity must state that they hold the declarations` MEANS
+        (PARTY Applicant MUST `state that it holds declarations from all of its governors who have not made a report under paragraph (2)` WITHIN 30)
+    RAND (PARTY Charity  MUST `state that it holds declarations from all of its governors who have not made a report under paragraph (2)` WITHIN 30)
+
+§§ `Article 19(6) — an application is NOT COMPLETE without the Article 19(5) statement`
+
+-- See the INTERPRETATION CALL: this is ONE-WAY. It gives a sufficient condition for
+-- incompleteness. It does not define completeness, and we do not pretend it does.
+DECLARE Part5ApplicationState HAS
+    applicant                                                       IS A STRING
+    `the entity has complied with paragraph (5)`                    IS A BOOLEAN
+
+GIVEN a IS A Part5ApplicationState
+GIVETH A BOOLEAN
+`Article 19(6) — the application is not complete` a MEANS
+        "(6) An application for registration is not complete if the entity has not complied with paragraph (5)."
+    ... NOT a's `the entity has complied with paragraph (5)`
+
+-- Article 19(7) — the charity that contravenes (5) must explain why.
+GIVEN a IS A Part5ApplicationState
+GIVETH A DEONTIC Actor Part5Action
+`Article 19(7) — the duty to explain a contravention of paragraph (5)` a MEANS
+    IF   NOT a's `the entity has complied with paragraph (5)`
+    THEN PARTY Charity MUST `explain to the Commissioner the reason for the contravention` WITHIN 30
+    ELSE FULFILLED
+
+§§ `Article 19(8) to (13) — acting as a governor: the prohibitions, the offence, the saving`
+
+DECLARE ActingAsGovernor HAS
+    person                                                          IS A STRING
+
+    -- Art 19(8) — the two breaches that bar a person from acting.
+    `the person is in breach of paragraph (2)`                      IS A BOOLEAN
+    `the person is in breach of paragraph (4)`                      IS A BOOLEAN
+
+    -- Art 19(10) — the trigger, and the two-limb "unless".
+    `the person has reported a reportable matter`                   IS A BOOLEAN
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS A BOOLEAN
+    `(10)(b) does so in accordance with any condition on that permission`  IS A BOOLEAN
+
+    -- The act itself, and the Art 19(11) defeater.
+    `the person acts as a governor of a registered charity`         IS A BOOLEAN
+    `the person has a reasonable excuse`                            IS A BOOLEAN
+
+    -- Art 19(13)
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS A BOOLEAN
+
+    -- Art 19(9)(c) — the gate on the SHANT-register limb.
+    `there is an application for registration on foot`              IS A BOOLEAN
+
+-- --- Article 19(8) -------------------------------------------------------------
+
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(8) — the prohibition applies` a MEANS
+        "(8) A person must not act as a governor of a registered charity at any time when the person is in breach of paragraph (2) or (4)."
+    ..  a's `the person is in breach of paragraph (2)`
+    ..  a's `the person is in breach of paragraph (4)`
+
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(8) — contravened` a MEANS
+        `Article 19(8) — the prohibition applies` a
+    AND a's `the person acts as a governor of a registered charity`
+
+-- SHANT: doing the act IS the breach. The guard is the STATUS (in breach of (2) or
+-- (4)); the ACT is the event the trace supplies.
+-- >>> PLACEHOLDER: "at any time" — a standing prohibition. WITHIN 365 is the
+--     observation window, not a statutory period.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A DEONTIC Actor Action
+`Article 19(8) — the prohibition on acting while in breach of paragraph (2) or (4)` a MEANS
+    IF   `Article 19(8) — the prohibition applies` a
+    THEN PARTY Governor SHANT `act as a governor` WITHIN 365
+    ELSE FULFILLED
+
+-- --- Article 19(9) -------------------------------------------------------------
+
+-- (a) MUST, (b) MAY, (c) SHANT. All three over the shared Action enum. Get the
+-- modality right: (a) omission is a BREACH; (b) omission is FULFILLED (that is what
+-- makes it a power, not a duty); (c) DOING the act is the breach.
+-- >>> PLACEHOLDER on (c): "until the issue has been determined and any resulting
+--     order or notice complied with" is a condition, not a period. WITHIN 365.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A DEONTIC Actor Action
+`Article 19(9)(a) to (c) — what the Commissioner must and may do on a report` a MEANS
+    IF   a's `the person has reported a reportable matter`
+    THEN     (PARTY Commissioner MUST  `make inquiries as to fitness` WITHIN 90)          -- (a) MUST
+         RAND (PARTY Commissioner MAY   `apply to the court to determine fitness` WITHIN 90)  -- (b) MAY
+         RAND (PARTY Commissioner SHANT `register the applicant as a charity` WITHIN 365)     -- (c) SHANT
+    ELSE FULFILLED
+
+-- (d) MAY — the interim permission; (e) MUST — the determination, which is an
+-- ELECTION between (e)(i) and (e)(ii). ROR over two UNGUARDED duties: the
+-- Commissioner must do one or the other, and either discharges the duty.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A DEONTIC Actor Part5Action
+`Article 19(9)(d) and (e) — the interim permission, and the determination` a MEANS
+    IF   a's `the person has reported a reportable matter`
+    THEN     (PARTY Commissioner MAY `permit the governor to act as a governor until the issue is determined or the notice is withdrawn` WITHIN 90)   -- (d)
+         RAND (    (PARTY Commissioner MUST `notify the entity that the application will be refused unless the governor is removed, or serve a required steps notice requiring the charity to suspend or remove the governor` WITHIN 180)   -- (e)(i)
+               ROR (PARTY Commissioner MUST `give permission by notice in writing, entered in the register, for the governor to act as a governor` WITHIN 180) )                                                                             -- (e)(ii)
+    ELSE FULFILLED
+
+-- --- Article 19(10) and (11) — THE PROHIBITION AND ITS OFFENCE ------------------
+
+-- The "unless" is a CONJUNCTION: permitted AND within the conditions of the
+-- permission. See the INTERPRETATION CALL.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(10) — the person is permitted, and acts within the permission` a MEANS
+        "unless the governor -"
+    ... "(a) is permitted to do so by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20; and"
+    ... a's `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`
+    AND "(b) does so in either case in accordance with any condition on that permission."
+    ... a's `(10)(b) does so in accordance with any condition on that permission`
+
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(10) — the prohibition applies` a MEANS
+        "(10) A person must not act as a governor of a registered charity at any time after reporting a reportable matter,"
+    ... a's `the person has reported a reportable matter`
+    AND NOT `Article 19(10) — the person is permitted, and acts within the permission` a
+
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(10) — contravened` a MEANS
+        `Article 19(10) — the prohibition applies` a
+    AND a's `the person acts as a governor of a registered charity`
+
+-- THE PROHIBITION. SHANT: the act IS the breach.
+-- >>> PLACEHOLDER: "at any time after reporting" — standing. WITHIN 365.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A DEONTIC Actor Action
+`Article 19(10) — the prohibition on acting as a governor after reporting` a MEANS
+    IF   `Article 19(10) — the prohibition applies` a
+    THEN PARTY Governor SHANT `act as a governor` WITHIN 365
+    ELSE FULFILLED
+
+-- THE OFFENCE, AND ITS DEFEATER. "A person who WITHOUT REASONABLE EXCUSE contravenes
+-- paragraph (10) commits an offence". The contravention is the actus reus; the
+-- reasonable excuse is a DEFEATER ON LIABILITY, subtracted from it — exactly as
+-- Art 5(3) is subtracted from the Art 5(2) knock-out in Part 3. The act remains a
+-- contravention of (10) either way (and so the SHANT still BREACHES); what the
+-- excuse defeats is the OFFENCE.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(11) — the offence is made out` a MEANS
+        "(11) A person who without reasonable excuse contravenes paragraph (10) commits an offence"
+    ... `Article 19(10) — contravened` a
+    AND "-- 'without reasonable excuse': the defeater on liability"
+    ... NOT a's `the person has a reasonable excuse`
+
+-- The penalty, lifted as a checkable number: "liable to imprisonment for one year
+-- and to a fine." (The fine is unlimited — the Law states no maximum — so only the
+-- custodial bound is a number.)
+GIVETH A NUMBER
+`Article 19(11) — the maximum term of imprisonment, in years` MEANS 1
+
+-- --- Article 19(12) — THE SAVING ------------------------------------------------
+
+-- "Paragraphs (10) and (11) are NOT to be construed as requiring an act to be
+-- treated as void or invalid MERELY by virtue of the act constituting a
+-- contravention of paragraph (10)."
+--
+-- Encoded as a disjunction with NO disjuncts. The saving leaves nothing that could
+-- make the act void; the verbatim prose rides inert, and an inert string in OR
+-- context is FALSE. So the answer is FALSE whatever the contravention — which is
+-- precisely what the saving provides.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(12) — is the act void or invalid MERELY by virtue of the contravention` a MEANS
+        "(12) Paragraphs (10) and (11) are not to be construed as requiring an act to be treated as void or invalid merely by virtue of the act constituting a contravention of paragraph (10)."
+    ..  FALSE   -- the only disjunct, and it is FALSE: the saving admits of no route to invalidity
+
+-- --- Article 19(13) -------------------------------------------------------------
+
+-- A DISCRETIONARY power on suspicion: MAY. Note the express saving of the
+-- Commissioner's other powers ("without prejudice to any other of his or her
+-- powers"), carried inert — it subtracts nothing, it preserves.
+GIVEN a IS AN ActingAsGovernor
+GIVETH A BOOLEAN
+`Article 19(13) — the Commissioner suspects a breach of paragraph (2)` a MEANS
+        "(13) If at any time the Commissioner suspects that a governor of a registered charity may have breached paragraph (2), the Commissioner may, without prejudice to any other of his or her powers, apply to the court to determine whether the governor is a fit and proper person to be a governor."
+    ... a's `the Commissioner suspects that the governor may have breached paragraph (2)`
+
+GIVEN a IS AN ActingAsGovernor
+GIVETH A DEONTIC Actor Action
+`Article 19(13) — the Commissioner's power to apply to the court on suspicion` a MEANS
+    IF   `Article 19(13) — the Commissioner suspects a breach of paragraph (2)` a
+    THEN PARTY Commissioner MAY `apply to the court to determine fitness` WITHIN 90
+    ELSE FULFILLED   -- MAY: benign omission is FULFILLED. That is what makes it a power.
+
+§ `Article 20 — Court orders as to fitness of governor`
+
+§§ `Article 20(1) and (2) — the non-exhaustive catalogue of orders, and their scope`
+
+-- "the court may make ANY ORDER THAT THE COURT SEES FIT, INCLUDING WITHOUT
+-- LIMITATION -". A closed disjunction over (a)-(f) would MISSTATE this: it would
+-- turn an open power into a menu. So the catalogue rides entirely as inert prose
+-- (an AND-chain of strings: TRUE, adding nothing and subtracting nothing), and the
+-- operative content of Article 20 lives in 20(4)-(6), which ARE closed.
+GIVETH A BOOLEAN
+`Article 20(1) — the court may make any order it sees fit` MEANS
+        "(1) On an application under Article 19(9)(b) or (13), the court may make any order that the court sees fit, including without limitation -"
+    ... "(a) an order dismissing the application;"
+    ... "(b) an order giving permission for the governor to act as a governor despite a reportable matter;"
+    ... "(c) an order that the entity must not be registered as a charity;"
+    ... "(d) an order requiring a registered charity to suspend or remove the governor;"
+    ... "(e) an order making any provision that could be made by a required steps notice;"
+    ... "(f) any order ancillary to any such order."
+
+GIVETH A BOOLEAN
+`Article 20(2) — the scope of an order under Article 20(1)` MEANS
+        "(2) An order under paragraph (1) may, without limitation -"
+    ... "(a) apply to a governor in respect of a particular registered charity, a description of registered charities or all registered charities;"
+    ... "(b) be made subject to any condition or time limit that appears to the court to be necessary or equitable."
+
+§§ `Article 20(3) to (6) — the disqualification order`
+
+DECLARE DisqualificationOrder HAS
+    person                                                          IS A STRING
+
+    -- Art 20(5) — the period the court directs. THE checkable number of this Part.
+    `the period of the order, in years`                             IS A NUMBER
+
+    -- Art 20(3) — the public-interest gate on the application.
+    `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`  IS A BOOLEAN
+
+    -- Art 20(4) — the gate on the ORDER: satisfaction of unfitness, BY VIRTUE OF
+    -- (a) or (b). Both the satisfaction and the ground are required.
+    `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`  IS A BOOLEAN
+    `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`  IS A BOOLEAN
+    `(4)(b) the seriousness of a reportable matter in relation to the person`  IS A BOOLEAN
+
+    -- Art 20(6)
+    `the person contravenes the disqualification order`             IS A BOOLEAN
+
+GIVEN d IS A DisqualificationOrder
+GIVETH A BOOLEAN
+`Article 20(3) — the public-interest ground for applying` d MEANS
+        "(3) If it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that a person should not, without the leave of the court, be a governor of or in any way whether directly or indirectly be concerned or take part in the management of a registered charity, the Commissioner or the Attorney General may apply to the court for an order to that effect against the person (a 'disqualification order')."
+    ... d's `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`
+
+-- Article 20(4) — a GATE ("if it is satisfied that the person is UNFIT") whose
+-- warrant must be one of two grounds ("BY VIRTUE OF (a) ... or (b) ..."). Both are
+-- needed: a court satisfied of unfitness on some ground OUTSIDE (a) and (b) has no
+-- power under this Article.
+GIVEN d IS A DisqualificationOrder
+GIVETH A BOOLEAN
+`Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` d MEANS
+        "(4) The court may, on such an application or on an application under Article 19(9)(b) or (13), make a disqualification order if it is satisfied that the person is unfit to be concerned in the management of a registered charity, by virtue of -"
+    ... d's `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`
+    AND     "(a) the person's conduct in relation to a registered charity, or to an entity applying for registration; or"
+        ..  d's `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`
+        ..  "(b) the seriousness of a reportable matter in relation to the person."
+        ..  d's `(4)(b) the seriousness of a reportable matter in relation to the person`
+
+-- Article 20(5) — THE NUMERIC BOUND, lifted so it can be checked.
+GIVETH A NUMBER
+`Article 20(5) — the maximum period of a disqualification order, in years` MEANS 15
+
+GIVEN d IS A DisqualificationOrder
+GIVETH A BOOLEAN
+`Article 20(5) — the period does not exceed 15 years` d MEANS
+        "(5) A disqualification order is to be for such period, not exceeding 15 years, as the court directs."
+    ... d's `the period of the order, in years`
+        AT MOST `Article 20(5) — the maximum period of a disqualification order, in years`
+
+-- The order is within the court's power only if BOTH the 20(4) gate and the 20(5)
+-- bound are satisfied. A 20-year order is ULTRA VIRES however unfit the person.
+GIVEN d IS A DisqualificationOrder
+GIVETH A BOOLEAN
+`Article 20 — the disqualification order is within the power of the court` d MEANS
+        `Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` d
+    AND `Article 20(5) — the period does not exceed 15 years` d
+
+-- Article 20(3) — the APPLICATION. Each of the Commissioner and the Attorney General
+-- holds the permission independently ("the Commissioner or the Attorney General
+-- may apply"), so they are woven with RAND: two standing permissions, either or both
+-- exercisable, and benign omission of both is FULFILLED.
+GIVEN d IS A DisqualificationOrder
+GIVETH A DEONTIC Actor Part5Action
+`Article 20(3) — the power to apply for a disqualification order` d MEANS
+    IF   `Article 20(3) — the public-interest ground for applying` d
+    THEN     (PARTY Commissioner    MAY `apply to the court for a disqualification order against the person` WITHIN 90)
+         RAND (PARTY AttorneyGeneral MAY `apply to the court for a disqualification order against the person` WITHIN 90)
+    ELSE FULFILLED
+
+-- Article 20(4) and (5) — the court's DISCRETIONARY power. MAY: a court that
+-- declines to disqualify is not in breach of anything. The guard carries the 20(5)
+-- bound with it: the power to make an order simply does not extend to a period
+-- exceeding 15 years.
+GIVEN d IS A DisqualificationOrder
+GIVETH A DEONTIC Actor Action
+`Article 20(4) and (5) — the court's power to make a disqualification order` d MEANS
+    IF   `Article 20 — the disqualification order is within the power of the court` d
+    THEN PARTY Court MAY `make a disqualification order` WITHIN 90
+    ELSE FULFILLED
+
+-- Article 20(6) — THE OFFENCE. Contrast Article 19(11): there is NO "without
+-- reasonable excuse" defeater here. The statute gives one to the governor who acts
+-- after reporting, and withholds one from the person who defies a court order. That
+-- asymmetry is deliberate and is preserved.
+GIVEN d IS A DisqualificationOrder
+GIVETH A BOOLEAN
+`Article 20(6) — the offence is made out` d MEANS
+        "(6) A person who contravenes a disqualification order commits an offence and is liable to imprisonment for 2 years and to a fine."
+    ... d's `the person contravenes the disqualification order`
+
+GIVETH A NUMBER
+`Article 20(6) — the maximum term of imprisonment, in years` MEANS 2
+
+-- SHANT: the regulated act IS the contravention, so doing it IS the breach.
+-- >>> PLACEHOLDER: the prohibition endures for the period of the order (up to 15
+--     years). WITHIN 365 is the observation window.
+GIVETH A DEONTIC Actor Action
+`Article 20(6) — the prohibition on contravening a disqualification order` MEANS
+    PARTY Person SHANT `contravene a disqualification order` WITHIN 365
+
+§ `Tests — Part 5`
+
+§§ `Article 2(10) allegations, reused from Part 1`
+
+`nothing alleged under Article 2(10)` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS FALSE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS FALSE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS FALSE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS FALSE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS FALSE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS FALSE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+#ASSERT NOT `is misconduct` `nothing alleged under Article 2(10)`
+
+-- Art 2(10)(a)(ii): a governor breaches the charity's constitution.
+`the governor breached the charity constitution (Art 2(10)(a)(ii))` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS TRUE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS TRUE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS FALSE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS FALSE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS FALSE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS FALSE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+#ASSERT `is misconduct` `the governor breached the charity constitution (Art 2(10)(a)(ii))`
+
+-- Art 2(10)(b)(v): an offence of dishonesty in relation to the charity — committed by
+-- an OUTSIDER, not by any governor. It IS misconduct within Art 2(10) (Part 1 tests
+-- this), but it is NOT the governor's misconduct under Art 18(4)(a). That is the
+-- flagged INTERPRETATION CALL, made executable below.
+`dishonesty in relation to the charity (Art 2(10)(b)(v))` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS FALSE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS FALSE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS FALSE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS TRUE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS FALSE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS TRUE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+#ASSERT `is misconduct` `dishonesty in relation to the charity (Art 2(10)(b)(v))`
+
+§§ `A constructor for Article 18(4) cases`
+
+-- There is no record-update operator in L4, so rather than spell an eight-field
+-- literal per knock-out we expose a GIVEN-parameterised constructor and vary one
+-- limb at a time. Reading the applications below IS reading the four limbs of 18(4).
+GIVEN `the allegation`                IS A MisconductAllegation
+      `the governor is the actor`     IS A BOOLEAN
+      `concurs`                       IS A BOOLEAN
+      `assists or encourages`         IS A BOOLEAN
+      `became aware`                  IS A BOOLEAN
+      `ought to have become aware`    IS A BOOLEAN
+      `actively conceals`             IS A BOOLEAN
+      `fails in time to take proper steps`  IS A BOOLEAN
+GIVETH A GovernorMisconduct
+`a governor misconduct case` MEANS GovernorMisconduct WITH
+    governor                                                        IS "Mr de Gruchy"
+    `the Article 2(10) allegation`                                  IS `the allegation`
+    `the governor is the person who contravened the provision or committed the offence`  IS `the governor is the actor`
+    `(4)(b) the governor concurs in misconduct by the charity`      IS `concurs`
+    `(4)(c) the governor assists or encourages another governor to engage in misconduct`  IS `assists or encourages`
+    `(4)(d)(i) the governor becomes aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`  IS `became aware`
+    `(4)(d)(i) the governor ought to have become aware of any misconduct in relation to the charity, or of the intention of another governor to engage in misconduct`  IS `ought to have become aware`
+    `(4)(d)(ii) the governor actively conceals that misconduct or that intention`  IS `actively conceals`
+    `(4)(d)(ii) the governor fails within a reasonable time to take proper steps to protect or restore the property of the charity or to prevent the misconduct`  IS `fails in time to take proper steps`
+
+§§ `Article 18(4) — each limb, made out in turn`
+
+-- The clean governor: nothing alleged, nothing done.
+`a governor against whom nothing is alleged` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT NOT `Article 18(4) — the governor engages in misconduct` `a governor against whom nothing is alleged`
+
+-- (a) — the governor himself breached the constitution: Art 2(10)(a)(ii), attributed
+-- to him. THE DEFINITIONAL CROSS-REFERENCE, made out: `is misconduct` (Part 1, Art
+-- 2(10)) does the work, and Art 18(4)(a) adds only the attribution.
+`(a) the governor breached the constitution` MEANS
+    `a governor misconduct case` `the governor breached the charity constitution (Art 2(10)(a)(ii))` TRUE FALSE FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT `Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` `(a) the governor breached the constitution`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `(a) the governor breached the constitution`
+
+-- >>> THE INTERPRETATION CALL, MADE EXECUTABLE. An OUTSIDER defrauds the charity.
+--     Under Article 2(10)(b) that IS misconduct for the purposes of the Law — the
+--     offence need only be committed "by any person" in relation to the charity, and
+--     Part 1 asserts exactly that. But it is NOT the GOVERNOR's misconduct under Art
+--     18(4)(a), because the governor is not the person who committed it. Flip the
+--     attribution atom to TRUE and 18(4)(a) fires; leave it FALSE and it does not.
+`an outsider's fraud, not attributed to the governor` MEANS
+    `a governor misconduct case` `dishonesty in relation to the charity (Art 2(10)(b)(v))` FALSE FALSE FALSE FALSE FALSE FALSE FALSE
+
+-- The allegation IS misconduct under Article 2(10)...
+#ASSERT `is misconduct` (`an outsider's fraud, not attributed to the governor`'s `the Article 2(10) allegation`)
+-- ...but Article 18(4)(a) is NOT made out, because it was not the governor who did it.
+#ASSERT NOT `Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` `an outsider's fraud, not attributed to the governor`
+#ASSERT NOT `Article 18(4) — the governor engages in misconduct` `an outsider's fraud, not attributed to the governor`
+
+-- The SAME fraud, this time committed BY the governor. Now 18(4)(a) fires.
+`the governor's own fraud` MEANS
+    `a governor misconduct case` `dishonesty in relation to the charity (Art 2(10)(b)(v))` TRUE FALSE FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT `Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` `the governor's own fraud`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `the governor's own fraud`
+
+-- (b) — concurrence in the charity's misconduct. No Article 2(10) allegation against
+-- the governor at all; limb (b) stands on its own.
+`(b) the governor concurred in the charity's misconduct` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE TRUE FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT NOT `Article 18(4)(a) — the governor contravenes a provision, or commits an offence, mentioned in Article 2(10)` `(b) the governor concurred in the charity's misconduct`
+#ASSERT `Article 18(4)(b) — the governor concurs in misconduct by the charity` `(b) the governor concurred in the charity's misconduct`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `(b) the governor concurred in the charity's misconduct`
+
+-- (c) — assisting or encouraging ANOTHER governor.
+`(c) the governor encouraged a fellow governor` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE TRUE FALSE FALSE FALSE FALSE
+
+#ASSERT `Article 18(4)(c) — the governor assists or encourages another governor` `(c) the governor encouraged a fellow governor`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `(c) the governor encouraged a fellow governor`
+
+-- (d) — THE TWO-LIMB CONJUNCTION, made out: aware AND actively concealed.
+`(d) the governor knew and concealed` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE FALSE TRUE FALSE TRUE FALSE
+
+#ASSERT `Article 18(4)(d)(i) — became aware, or ought to have become aware` `(d) the governor knew and concealed`
+#ASSERT `Article 18(4)(d)(ii) — actively conceals, or fails in time to take proper steps` `(d) the governor knew and concealed`
+#ASSERT `Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` `(d) the governor knew and concealed`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `(d) the governor knew and concealed`
+
+-- (d) via the CONSTRUCTIVE-knowledge branch of (d)(i) and the INACTION branch of
+-- (d)(ii): the governor ought to have known, and failed in time to take proper steps.
+-- Both limbs of the conjunction are satisfied by their second disjunct.
+`(d) the governor ought to have known and sat on his hands` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE FALSE FALSE TRUE FALSE TRUE
+
+#ASSERT `Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` `(d) the governor ought to have known and sat on his hands`
+#ASSERT `Article 18(4) — the governor engages in misconduct` `(d) the governor ought to have known and sat on his hands`
+
+-- >>> THE (d) KNOCK-OUT. The governor BECAME AWARE — (d)(i) is squarely made out —
+--     but neither concealed the misconduct nor failed to act in time: she took proper
+--     steps within a reasonable time. (d)(ii) fails, so the CONJUNCTION fails, and she
+--     engages in no misconduct at all. Knowledge alone is not (d).
+`(d) the governor knew but took proper steps in time` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE FALSE TRUE FALSE FALSE FALSE
+
+#ASSERT `Article 18(4)(d)(i) — became aware, or ought to have become aware` `(d) the governor knew but took proper steps in time`
+#ASSERT NOT `Article 18(4)(d)(ii) — actively conceals, or fails in time to take proper steps` `(d) the governor knew but took proper steps in time`
+#ASSERT NOT `Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` `(d) the governor knew but took proper steps in time`
+#ASSERT NOT `Article 18(4) — the governor engages in misconduct` `(d) the governor knew but took proper steps in time`
+
+-- The mirror image: the governor CONCEALED, but never knew and could not have known.
+-- (d)(ii) made out, (d)(i) not. The conjunction fails from the other side.
+`(d) concealment without knowledge` MEANS
+    `a governor misconduct case` `nothing alleged under Article 2(10)` FALSE FALSE FALSE FALSE FALSE TRUE FALSE
+
+#ASSERT NOT `Article 18(4)(d)(i) — became aware, or ought to have become aware` `(d) concealment without knowledge`
+#ASSERT `Article 18(4)(d)(ii) — actively conceals, or fails in time to take proper steps` `(d) concealment without knowledge`
+#ASSERT NOT `Article 18(4)(d) — the governor knew (or should have) AND concealed or failed to act` `(d) concealment without knowledge`
+#ASSERT NOT `Article 18(4) — the governor engages in misconduct` `(d) concealment without knowledge`
+
+§§ `Article 18(4)(d)(ii) — the duty to act, traced`
+
+-- The governor who became aware, and took proper steps on day 10 — inside the
+-- (reviewable placeholder) 21-day window. The duty is FULFILLED, and (d) never bites.
+#TRACE `Article 18(4)(d)(ii) — the duty to take proper steps within a reasonable time` `(d) the governor knew but took proper steps in time` AT 0 WITH
+    PARTY Governor DOES `take proper steps to protect or restore the property of the charity or to prevent the misconduct` AT 10
+
+-- The governor who became aware and, by day 30, still had not acted. MUST: the
+-- deadline passes unperformed, and the residual is a BREACH — which is exactly the
+-- state of affairs (d)(ii) calls "fails within a reasonable time to take proper
+-- steps". The deontic layer and the constitutive limb agree.
+#TRACE `Article 18(4)(d)(ii) — the duty to take proper steps within a reasonable time` `(d) the governor knew and concealed` AT 0 WITH
+    PARTY Governor DOES `observe the utmost good faith` AT 30
+
+-- No knowledge, no duty: the guard is shut and there is nothing to discharge.
+#TRACE `Article 18(4)(d)(ii) — the duty to take proper steps within a reasonable time` `a governor against whom nothing is alleged` AT 0 WITH
+    PARTY Governor DOES `observe the utmost good faith` AT 5
+
+§§ `Article 18(1), (2) and (3)`
+
+`the charity complies on both limbs` MEANS Article18CharityCompliance WITH
+    `the charity`                                                   IS `Jersey Heritage Ltd`
+    `(1)(a) acts in a manner that is consistent with its registered charitable purposes and with its registered public benefit statement`  IS TRUE
+    `(1)(b) complies with any direction, requirement, notice or duty imposed on it by or under this Law`  IS TRUE
+
+`the charity ignores a required steps notice` MEANS Article18CharityCompliance WITH
+    `the charity`                                                   IS `Jersey Heritage Ltd`
+    `(1)(a) acts in a manner that is consistent with its registered charitable purposes and with its registered public benefit statement`  IS TRUE
+    `(1)(b) complies with any direction, requirement, notice or duty imposed on it by or under this Law`  IS FALSE   -- limb (b) fails
+
+#ASSERT `Article 18(1) — the charity does what the governor must seek to ensure` `the charity complies on both limbs`
+-- 18(1) is a CONJUNCTION: one limb down, the whole is down.
+#ASSERT NOT `Article 18(1) — the charity does what the governor must seek to ensure` `the charity ignores a required steps notice`
+
+-- The governor who seeks, in good faith, to ensure compliance: duty discharged.
+#TRACE `Article 18(1) — the good-faith duty` AT 0 WITH
+    PARTY Governor DOES `seek in good faith to ensure the charity complies` AT 100
+
+-- The governor who never tries — he governs happily for 400 days and never once seeks
+-- to ensure the charity complies. MUST: the omission is a BREACH.
+#TRACE `Article 18(1) — the good-faith duty` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 400
+
+-- ARTICLE 18(2) — THE GATE. `St Ouen Angling Club` (from Part 1) is an Article
+-- 2(1)(i) unincorporated association: the gate is OPEN, and its governors owe the
+-- four extra duties. `Jersey Heritage Ltd` is a company: the gate is SHUT.
+#ASSERT `Article 18(2) — the gate: the charity is an unincorporated body within Article 2(1)(i)` `St Ouen Angling Club`
+#ASSERT NOT `Article 18(2) — the gate: the charity is an unincorporated body within Article 2(1)(i)` `Jersey Heritage Ltd`
+
+-- The gate is open, and the governor performs all four. All four MUSTs discharge.
+#TRACE `Article 18(2) — the duties of a governor of an unincorporated entity` `St Ouen Angling Club` AT 0 WITH
+    PARTY Governor DOES `act with due diligence` AT 30
+    PARTY Governor DOES `act as would a prudent person` AT 30
+    PARTY Governor DOES `act to the best of the ability and skill of the governor` AT 30
+    PARTY Governor DOES `observe the utmost good faith` AT 30
+
+-- The gate is open, and the governor observes the utmost good faith but is careless.
+-- The four duties are CONJUNCTIVE (RAND), so the residual carries the three he owes.
+#TRACE `Article 18(2) — the duties of a governor of an unincorporated entity` `St Ouen Angling Club` AT 0 WITH
+    PARTY Governor DOES `observe the utmost good faith` AT 30
+
+-- The gate is SHUT: a company's director owes Article 18(1), but not Article 18(2).
+-- Nothing is owed, and nothing done or left undone can breach it.
+#TRACE `Article 18(2) — the duties of a governor of an unincorporated entity` `Jersey Heritage Ltd` AT 0 WITH
+    PARTY Governor DOES `observe the utmost good faith` AT 30
+
+-- ARTICLE 18(3) — the constitution that tries to water the duties down is DISPLACED;
+-- the constitution that ratchets them up PREVAILS. The Law is a floor, not a ceiling.
+`a constitution excusing the governors from diligence` MEANS Article18ConstitutionalProvision WITH
+    description                                                     IS "no governor shall be liable for want of diligence"
+    `the provision is a contrary provision in the constitution or the constitutional Law of the charity`  IS TRUE
+    `the provision imposes a more onerous duty`                     IS FALSE
+
+`a constitution demanding more than the Law does` MEANS Article18ConstitutionalProvision WITH
+    description                                                     IS "every governor shall account for all sums to the penny within 7 days"
+    `the provision is a contrary provision in the constitution or the constitutional Law of the charity`  IS TRUE
+    `the provision imposes a more onerous duty`                     IS TRUE
+
+#ASSERT `Article 18(3) — the Article 18 duty displaces the contrary provision` `a constitution excusing the governors from diligence`
+#ASSERT NOT `Article 18(3) — the more onerous constitutional provision prevails` `a constitution excusing the governors from diligence`
+
+-- The "except" bites: the harsher constitutional duty survives, and Article 18 does
+-- not displace it.
+#ASSERT NOT `Article 18(3) — the Article 18 duty displaces the contrary provision` `a constitution demanding more than the Law does`
+#ASSERT `Article 18(3) — the more onerous constitutional provision prevails` `a constitution demanding more than the Law does`
+
+§§ `A constructor for Article 19(1) cases`
+
+GIVEN `the misconduct`   IS A GovernorMisconduct
+      `notice served`    IS A BOOLEAN
+      `b`                IS A BOOLEAN
+      `c`                IS A BOOLEAN
+      `d`                IS A BOOLEAN
+      `e`                IS A BOOLEAN
+      `f`                IS A BOOLEAN
+      `the conviction`   IS A MisconductAllegation
+      `g unspent`        IS A BOOLEAN
+      `h`                IS A BOOLEAN
+GIVETH A ReportableMatter
+`a reportable matter case` MEANS ReportableMatter WITH
+    person                                                          IS "Mrs Falle"
+    `the alleged misconduct as a governor`                          IS `the misconduct`
+    `(1)(a) the misconduct led to the service of a required steps notice on that governor, on that charity, or on another governor of that charity`  IS `notice served`
+    `(1)(b) is the subject of a disqualification order, or of any other restriction on his or her acting as a governor, imposed under this Law`  IS `b`
+    `(1)(c) has been disqualified from or for being a charity trustee or trustee for a charity under the law of any part of the United Kingdom, or from holding any equivalent position under the law of any other jurisdiction`  IS `c`
+    `(1)(d) has been disqualified from being a company director, or has been made subject to any equivalent disqualification under the law of any jurisdiction other than Jersey`  IS `d`
+    `(1)(e) is bankrupt or otherwise insolvent, whether under the law of Jersey or elsewhere`  IS `e`
+    `(1)(f) has a conviction (whether or not spent) for an offence under this Law`  IS `f`
+    `the conviction relied on under paragraph (1)(g)`               IS `the conviction`
+    `(1)(g) the conviction is unspent`                              IS `g unspent`
+    `(1)(h) falls within any other description prescribed by the Minister by Order`  IS `h`
+
+§§ `Article 19(1) — each of the eight limbs, made out in turn`
+
+-- The clean governor: no limb of the eight is made out.
+`no reportable matter` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT NOT `Article 19(1) — is a reportable matter` `no reportable matter`
+
+-- (a) — misconduct as a governor THAT LED TO a required steps notice. The Art 18(4)
+-- predicate does the misconduct work, and the notice is the extra conjunct. So the
+-- chain Art 2(10) -> Art 18(4) -> Art 19(1)(a) runs end to end in this one value.
+`(a) misconduct that led to a required steps notice` MEANS
+    `a reportable matter case` `(a) the governor breached the constitution` TRUE FALSE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1)(a) — misconduct as a governor that led to a required steps notice` `(a) misconduct that led to a required steps notice`
+#ASSERT `Article 19(1) — is a reportable matter` `(a) misconduct that led to a required steps notice`
+
+-- >>> "BEING misconduct that led to the service of a required steps notice" — read as
+--     RESTRICTIVE. The SAME misconduct, but no notice was ever served. Limb (a) fails.
+--     Bare misconduct is not, without more, a reportable matter.
+`(a) misconduct, but no required steps notice was served` MEANS
+    `a reportable matter case` `(a) the governor breached the constitution` FALSE FALSE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 18(4) — the governor engages in misconduct` (`(a) misconduct, but no required steps notice was served`'s `the alleged misconduct as a governor`)
+#ASSERT NOT `Article 19(1)(a) — misconduct as a governor that led to a required steps notice` `(a) misconduct, but no required steps notice was served`
+#ASSERT NOT `Article 19(1) — is a reportable matter` `(a) misconduct, but no required steps notice was served`
+
+-- Conversely: a required steps notice was served, but the governor engaged in no
+-- misconduct at all. (a) is a CONJUNCTION; it fails from this side too.
+`(a) a required steps notice, but no misconduct by this governor` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` TRUE FALSE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT NOT `Article 19(1)(a) — misconduct as a governor that led to a required steps notice` `(a) a required steps notice, but no misconduct by this governor`
+#ASSERT NOT `Article 19(1) — is a reportable matter` `(a) a required steps notice, but no misconduct by this governor`
+
+-- (b) — subject to a disqualification order or other restriction under this Law.
+`(b) subject to a disqualification order` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE TRUE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(b) subject to a disqualification order`
+
+-- (c) — disqualified as a charity trustee in the UK (or an equivalent elsewhere).
+`(c) disqualified as a UK charity trustee` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE TRUE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(c) disqualified as a UK charity trustee`
+
+-- (d) — disqualified as a company director.
+`(d) disqualified as a company director` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE TRUE FALSE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(d) disqualified as a company director`
+
+-- (e) — bankruptcy or insolvency, here or anywhere.
+`(e) bankrupt` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE TRUE FALSE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(e) bankrupt`
+
+-- (f) — a conviction for an offence under THIS Law, WHETHER OR NOT SPENT. Contrast
+-- (g), which reaches other offences only while the conviction is UNSPENT. The Law is
+-- harder on those who break the Charities Law itself, and the difference is visible.
+`(f) a spent conviction under this Law` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE FALSE TRUE `nothing alleged under Article 2(10)` FALSE FALSE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(f) a spent conviction under this Law`
+
+-- (g) — an UNSPENT conviction for an offence falling within Article 2(10)(b). The
+-- SECOND definitional cross-reference: Part 1's `(b) — the commission of an offence in
+-- relation to a charity` scores the offence; "unspent" is the extra conjunct.
+`(g) an unspent conviction for dishonesty` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE FALSE FALSE `dishonesty in relation to the charity (Art 2(10)(b)(v))` TRUE FALSE
+
+#ASSERT `Article 19(1)(g) — an unspent conviction for an offence falling within Article 2(10)(b)` `(g) an unspent conviction for dishonesty`
+#ASSERT `Article 19(1) — is a reportable matter` `(g) an unspent conviction for dishonesty`
+
+-- The SAME conviction, now SPENT. (g) is a conjunction, and it fails. Nothing else in
+-- the eight limbs catches it: it is not a conviction under THIS Law, so (f) is shut.
+`(g) the same conviction, now spent` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE FALSE FALSE `dishonesty in relation to the charity (Art 2(10)(b)(v))` FALSE FALSE
+
+#ASSERT NOT `Article 19(1)(g) — an unspent conviction for an offence falling within Article 2(10)(b)` `(g) the same conviction, now spent`
+#ASSERT NOT `Article 19(1) — is a reportable matter` `(g) the same conviction, now spent`
+
+-- (h) — the Order-making catch-all. A LIVE disjunct: the Minister has the power, and
+-- the moment an Order prescribes a description, a person answering it is caught —
+-- without a line of this file changing.
+`(h) caught by a description prescribed by Ministerial Order` MEANS
+    `a reportable matter case` `a governor against whom nothing is alleged` FALSE FALSE FALSE FALSE FALSE FALSE `nothing alleged under Article 2(10)` FALSE TRUE
+
+#ASSERT `Article 19(1) — is a reportable matter` `(h) caught by a description prescribed by Ministerial Order`
+
+§§ `Article 19(2) to (7) — the reporting and declaration duties, traced`
+
+`a governor of a registered charity with a reportable matter` MEANS Part5GovernorStatus WITH
+    governor                                                        IS "Mrs Falle"
+    `there is a reportable matter in relation to the governor`      IS TRUE
+    `the governor is a governor of an entity applying for registration`  IS FALSE
+    `the governor is a governor of a registered charity`            IS TRUE
+    `the charity has notified the governor that it is preparing its annual return`  IS TRUE
+
+`a governor of an applicant entity with a clean record` MEANS Part5GovernorStatus WITH
+    governor                                                        IS "Mr Bisson"
+    `there is a reportable matter in relation to the governor`      IS FALSE
+    `the governor is a governor of an entity applying for registration`  IS TRUE
+    `the governor is a governor of a registered charity`            IS FALSE
+    `the charity has notified the governor that it is preparing its annual return`  IS FALSE
+
+-- 19(2) — the governor reports on day 3: "promptly" (placeholder: within 14).
+#TRACE `Article 19(2) — the duty to report a reportable matter promptly` `a governor of a registered charity with a reportable matter` AT 0 WITH
+    PARTY Governor DOES `report the reportable matter` AT 3
+
+-- 19(2) — the governor sits on it and carries on governing. By day 20 the "prompt"
+-- window (placeholder: 14) has closed unperformed. MUST: a BREACH.
+#TRACE `Article 19(2) — the duty to report a reportable matter promptly` `a governor of a registered charity with a reportable matter` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 20
+
+-- 19(2) does not fire on the clean governor — but 19(3) does. The two are mirror
+-- images: there is no governor who owes neither.
+#TRACE `Article 19(2) — the duty to report a reportable matter promptly` `a governor of an applicant entity with a clean record` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 3
+
+#TRACE `Article 19(3) — the applicant governor's declaration of no reportable matter` `a governor of an applicant entity with a clean record` AT 0 WITH
+    PARTY Governor DOES `provide a declaration of no reportable matter` AT 20
+
+-- 19(4) — the annual declaration is owed only where there is NO reportable matter.
+-- The governor WITH one owes 19(2) instead, so 19(4) is FULFILLED vacuously.
+#TRACE `Article 19(4) — the registered charity governor's annual declaration` `a governor of a registered charity with a reportable matter` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 3
+
+-- 19(5) — the entity and the charity each state that they hold the declarations.
+#TRACE `Article 19(5) — the entity and the charity must state that they hold the declarations` AT 0 WITH
+    PARTY Applicant DOES `state that it holds declarations from all of its governors who have not made a report under paragraph (2)` AT 10
+    PARTY Charity   DOES `state that it holds declarations from all of its governors who have not made a report under paragraph (2)` AT 10
+
+§§ `Article 19(6) and (7) — the incomplete application, and the duty to explain`
+
+`an application without the Article 19(5) statement` MEANS Part5ApplicationState WITH
+    applicant                                                       IS "St Ouen Angling Club"
+    `the entity has complied with paragraph (5)`                    IS FALSE
+
+`an application with the Article 19(5) statement` MEANS Part5ApplicationState WITH
+    applicant                                                       IS "St Ouen Angling Club"
+    `the entity has complied with paragraph (5)`                    IS TRUE
+
+#ASSERT `Article 19(6) — the application is not complete` `an application without the Article 19(5) statement`
+#ASSERT NOT `Article 19(6) — the application is not complete` `an application with the Article 19(5) statement`
+
+-- 19(7) — the charity that contravened (5) explains itself on day 20.
+#TRACE `Article 19(7) — the duty to explain a contravention of paragraph (5)` `an application without the Article 19(5) statement` AT 0 WITH
+    PARTY Charity DOES `explain to the Commissioner the reason for the contravention` AT 20
+
+-- 19(7) — and the charity that never explains itself. MUST: a BREACH.
+#TRACE `Article 19(7) — the duty to explain a contravention of paragraph (5)` `an application without the Article 19(5) statement` AT 0 WITH
+    PARTY Commissioner DOES `permit the governor to act as a governor until the issue is determined or the notice is withdrawn` AT 40
+
+§§ `Article 19(8) to (13) — acting as a governor`
+
+-- The governor who reported, was permitted, and stayed within the conditions of the
+-- permission. The 19(10) prohibition does NOT apply to her at all.
+`the governor who reported and was properly permitted` MEANS ActingAsGovernor WITH
+    person                                                          IS "Mrs Falle"
+    `the person is in breach of paragraph (2)`                      IS FALSE
+    `the person is in breach of paragraph (4)`                      IS FALSE
+    `the person has reported a reportable matter`                   IS TRUE
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS TRUE
+    `(10)(b) does so in accordance with any condition on that permission`  IS TRUE
+    `the person acts as a governor of a registered charity`         IS TRUE
+    `the person has a reasonable excuse`                            IS FALSE
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS FALSE
+    `there is an application for registration on foot`              IS FALSE
+
+#ASSERT `Article 19(10) — the person is permitted, and acts within the permission` `the governor who reported and was properly permitted`
+#ASSERT NOT `Article 19(10) — the prohibition applies` `the governor who reported and was properly permitted`
+#ASSERT NOT `Article 19(10) — contravened` `the governor who reported and was properly permitted`
+#ASSERT NOT `Article 19(11) — the offence is made out` `the governor who reported and was properly permitted`
+
+-- >>> THE "UNLESS" IS A CONJUNCTION. The governor who reported and WAS permitted —
+--     but who ignored the conditions on the permission. Limb (a) is satisfied; limb
+--     (b) is not; so the exception fails and the prohibition bites. No reasonable
+--     excuse: the 19(11) OFFENCE is made out.
+`the governor who was permitted but breached the conditions` MEANS ActingAsGovernor WITH
+    person                                                          IS "Mrs Falle"
+    `the person is in breach of paragraph (2)`                      IS FALSE
+    `the person is in breach of paragraph (4)`                      IS FALSE
+    `the person has reported a reportable matter`                   IS TRUE
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS TRUE
+    `(10)(b) does so in accordance with any condition on that permission`  IS FALSE   -- the only change
+    `the person acts as a governor of a registered charity`         IS TRUE
+    `the person has a reasonable excuse`                            IS FALSE
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS FALSE
+    `there is an application for registration on foot`              IS FALSE
+
+#ASSERT NOT `Article 19(10) — the person is permitted, and acts within the permission` `the governor who was permitted but breached the conditions`
+#ASSERT `Article 19(10) — the prohibition applies` `the governor who was permitted but breached the conditions`
+#ASSERT `Article 19(10) — contravened` `the governor who was permitted but breached the conditions`
+#ASSERT `Article 19(11) — the offence is made out` `the governor who was permitted but breached the conditions`
+
+-- The governor who reported and simply carried on, with NO permission at all.
+`the governor who reported and carried on regardless` MEANS ActingAsGovernor WITH
+    person                                                          IS "Mr de Gruchy"
+    `the person is in breach of paragraph (2)`                      IS FALSE
+    `the person is in breach of paragraph (4)`                      IS FALSE
+    `the person has reported a reportable matter`                   IS TRUE
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS FALSE
+    `(10)(b) does so in accordance with any condition on that permission`  IS FALSE
+    `the person acts as a governor of a registered charity`         IS TRUE
+    `the person has a reasonable excuse`                            IS FALSE
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS TRUE
+    `there is an application for registration on foot`              IS TRUE
+
+#ASSERT `Article 19(10) — the prohibition applies` `the governor who reported and carried on regardless`
+#ASSERT `Article 19(10) — contravened` `the governor who reported and carried on regardless`
+#ASSERT `Article 19(11) — the offence is made out` `the governor who reported and carried on regardless`
+
+-- >>> THE 19(11) DEFEATER. The SAME contravention, but this time with a REASONABLE
+--     EXCUSE. The act is still a contravention of paragraph (10) — the prohibition is
+--     still breached, and the SHANT below still fires — but the OFFENCE is defeated.
+--     That is the whole point of modelling the excuse as a defeater on LIABILITY
+--     rather than as a limb of the prohibition: it exculpates without legalising.
+`the same governor, with a reasonable excuse` MEANS ActingAsGovernor WITH
+    person                                                          IS "Mr de Gruchy"
+    `the person is in breach of paragraph (2)`                      IS FALSE
+    `the person is in breach of paragraph (4)`                      IS FALSE
+    `the person has reported a reportable matter`                   IS TRUE
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS FALSE
+    `(10)(b) does so in accordance with any condition on that permission`  IS FALSE
+    `the person acts as a governor of a registered charity`         IS TRUE
+    `the person has a reasonable excuse`                            IS TRUE   -- the only change
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS TRUE
+    `there is an application for registration on foot`              IS TRUE
+
+-- Still a contravention of paragraph (10)...
+#ASSERT `Article 19(10) — contravened` `the same governor, with a reasonable excuse`
+-- ...but NOT an offence under paragraph (11).
+#ASSERT NOT `Article 19(11) — the offence is made out` `the same governor, with a reasonable excuse`
+
+-- The penalty, checked: "imprisonment for one year and to a fine".
+#ASSERT `Article 19(11) — the maximum term of imprisonment, in years` EQUALS 1
+
+-- Article 19(12) — THE SAVING. The governor contravened (10) and committed the
+-- offence; his acts as a governor are STILL NOT void or invalid merely by virtue of
+-- the contravention. The third parties who dealt with the charity are protected.
+#ASSERT NOT `Article 19(12) — is the act void or invalid MERELY by virtue of the contravention` `the governor who reported and carried on regardless`
+#ASSERT NOT `Article 19(12) — is the act void or invalid MERELY by virtue of the contravention` `the governor who was permitted but breached the conditions`
+
+-- Article 19(8) — the person in breach of paragraph (2) who acts anyway.
+`the governor in breach of paragraph (2) who acts anyway` MEANS ActingAsGovernor WITH
+    person                                                          IS "Mr Le Maistre"
+    `the person is in breach of paragraph (2)`                      IS TRUE
+    `the person is in breach of paragraph (4)`                      IS FALSE
+    `the person has reported a reportable matter`                   IS FALSE   -- that is precisely the breach of (2)
+    `(10)(a) is permitted to act by the Commissioner under paragraph (9)(d) or (e)(ii), or by the court under Article 20`  IS FALSE
+    `(10)(b) does so in accordance with any condition on that permission`  IS FALSE
+    `the person acts as a governor of a registered charity`         IS TRUE
+    `the person has a reasonable excuse`                            IS FALSE
+    `the Commissioner suspects that the governor may have breached paragraph (2)`  IS TRUE
+    `there is an application for registration on foot`              IS FALSE
+
+#ASSERT `Article 19(8) — the prohibition applies` `the governor in breach of paragraph (2) who acts anyway`
+#ASSERT `Article 19(8) — contravened` `the governor in breach of paragraph (2) who acts anyway`
+-- Note: 19(10) does NOT bite on him. He never reported — that is his breach of (2) —
+-- and 19(10) is triggered by REPORTING. The two prohibitions are complementary, and
+-- between them they leave no gap.
+#ASSERT NOT `Article 19(10) — the prohibition applies` `the governor in breach of paragraph (2) who acts anyway`
+
+§§ `The prohibitions, traced — the SHANT must BREACH`
+
+-- >>> THE HEADLINE TRACE. A governor who acts as a governor while in breach of
+--     Article 19(10). SHANT: DOING the act IS the breach.
+#TRACE `Article 19(10) — the prohibition on acting as a governor after reporting` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 30
+
+-- The governor with a reasonable excuse ALSO breaches the prohibition — the excuse
+-- defeats the OFFENCE, not the prohibition. Same residual: BREACH.
+#TRACE `Article 19(10) — the prohibition on acting as a governor after reporting` `the same governor, with a reasonable excuse` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 30
+
+-- The properly-permitted governor: the guard is shut, the prohibition never attaches,
+-- and she may act freely.
+#TRACE `Article 19(10) — the prohibition on acting as a governor after reporting` `the governor who reported and was properly permitted` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 30
+
+-- Article 19(8) — acting while in breach of paragraph (2). SHANT: BREACH.
+#TRACE `Article 19(8) — the prohibition on acting while in breach of paragraph (2) or (4)` `the governor in breach of paragraph (2) who acts anyway` AT 0 WITH
+    PARTY Governor DOES `act as a governor` AT 30
+
+-- Article 19(8) — the same prohibition, but the governor REFRAINS: he reports instead
+-- of acting. SHANT: nothing is breached, and the residual is the prohibition itself,
+-- still standing over him. A prohibition is not "discharged" by obedience; it endures.
+#TRACE `Article 19(8) — the prohibition on acting while in breach of paragraph (2) or (4)` `the governor in breach of paragraph (2) who acts anyway` AT 0 WITH
+    PARTY Governor DOES `report the reportable matter` AT 30
+
+§§ `Article 19(9) and (13) — the Commissioner's suite, traced`
+
+-- (a) MUST, (b) MAY, (c) SHANT. The Commissioner inquires (discharging (a)), declines
+-- to go to court (benign: (b) is a MAY), and does not register the applicant while the
+-- issue is open (refraining: (c) is a SHANT).
+#TRACE `Article 19(9)(a) to (c) — what the Commissioner must and may do on a report` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `make inquiries as to fitness` AT 45
+
+-- The Commissioner who inquires AND goes to court: (a) discharged, (b) exercised.
+#TRACE `Article 19(9)(a) to (c) — what the Commissioner must and may do on a report` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `make inquiries as to fitness` AT 45
+    PARTY Commissioner DOES `apply to the court to determine fitness` AT 60
+
+-- >>> 19(9)(c), BREACHED. The Commissioner registers the applicant BEFORE the fitness
+--     issue has been determined. SHANT: doing the forbidden act is the breach — and
+--     it is a breach even though (a) was duly performed.
+#TRACE `Article 19(9)(a) to (c) — what the Commissioner must and may do on a report` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `make inquiries as to fitness` AT 45
+    PARTY Commissioner DOES `register the applicant as a charity` AT 60
+
+-- The Commissioner who never inquires at all. (a) is a MUST, and its deadline
+-- (placeholder: 90) passes unperformed: BREACH. Contrast (b), the MAY alongside it,
+-- which is equally unexercised and breaches nothing. That is the whole MUST/MAY
+-- distinction, in one trace.
+#TRACE `Article 19(9)(a) to (c) — what the Commissioner must and may do on a report` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `deregister the entity` AT 120
+
+-- (d) and (e). The Commissioner grants an interim permission (exercising the (d) MAY)
+-- and then, on determining the issue, gives permission under (e)(ii) — discharging the
+-- (e) election by its second limb.
+#TRACE `Article 19(9)(d) and (e) — the interim permission, and the determination` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `permit the governor to act as a governor until the issue is determined or the notice is withdrawn` AT 30
+    PARTY Commissioner DOES `give permission by notice in writing, entered in the register, for the governor to act as a governor` AT 120
+
+-- The same election, discharged by its FIRST limb instead: the Commissioner serves the
+-- required steps notice. Either limb discharges (e) — that is what ROR means.
+#TRACE `Article 19(9)(d) and (e) — the interim permission, and the determination` `the governor who reported and carried on regardless` AT 0 WITH
+    PARTY Commissioner DOES `notify the entity that the application will be refused unless the governor is removed, or serve a required steps notice requiring the charity to suspend or remove the governor` AT 120
+
+-- Article 19(13) — the Commissioner suspects a breach of (2) and goes to court.
+#ASSERT `Article 19(13) — the Commissioner suspects a breach of paragraph (2)` `the governor in breach of paragraph (2) who acts anyway`
+
+#TRACE `Article 19(13) — the Commissioner's power to apply to the court on suspicion` `the governor in breach of paragraph (2) who acts anyway` AT 0 WITH
+    PARTY Commissioner DOES `apply to the court to determine fitness` AT 45
+
+-- ...and the Commissioner who suspects but does NOT go to court. MAY: the omission is
+-- benign — no BREACH, just the permission still standing, unexercised. That is what
+-- makes Article 19(13) a power and not a duty. Compare the 19(9)(a) MUST above, whose
+-- identical omission is a breach.
+#TRACE `Article 19(13) — the Commissioner's power to apply to the court on suspicion` `the governor in breach of paragraph (2) who acts anyway` AT 0 WITH
+    PARTY Commissioner DOES `make inquiries as to fitness` AT 45
+
+§§ `Article 20 — the disqualification order, and the 15-year bound`
+
+-- The 20(1) catalogue and the 20(2) scope are non-exhaustive, and ride as inert prose.
+-- An AND-chain of inert strings is TRUE: they add nothing and subtract nothing, which
+-- is precisely their legal effect.
+#EVAL `Article 20(1) — the court may make any order it sees fit`
+#EVAL `Article 20(2) — the scope of an order under Article 20(1)`
+
+-- A 10-year order against a person the court is satisfied is unfit, by virtue of his
+-- conduct (20(4)(a)). Within the power of the court.
+`a 10-year order for unfitness by conduct` MEANS DisqualificationOrder WITH
+    person                                                          IS "Mr de Gruchy"
+    `the period of the order, in years`                             IS 10
+    `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`  IS TRUE
+    `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`  IS TRUE
+    `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`  IS TRUE
+    `(4)(b) the seriousness of a reportable matter in relation to the person`  IS FALSE
+    `the person contravenes the disqualification order`             IS FALSE
+
+#ASSERT `Article 20(3) — the public-interest ground for applying` `a 10-year order for unfitness by conduct`
+#ASSERT `Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` `a 10-year order for unfitness by conduct`
+#ASSERT `Article 20(5) — the period does not exceed 15 years` `a 10-year order for unfitness by conduct`
+#ASSERT `Article 20 — the disqualification order is within the power of the court` `a 10-year order for unfitness by conduct`
+
+-- The other 20(4) ground: unfitness by virtue of the SERIOUSNESS of a reportable
+-- matter. A 15-year order — exactly at the statutory ceiling, and therefore lawful.
+`a 15-year order for the seriousness of a reportable matter` MEANS DisqualificationOrder WITH
+    person                                                          IS "Mrs Falle"
+    `the period of the order, in years`                             IS 15
+    `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`  IS TRUE
+    `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`  IS TRUE
+    `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`  IS FALSE
+    `(4)(b) the seriousness of a reportable matter in relation to the person`  IS TRUE
+    `the person contravenes the disqualification order`             IS FALSE
+
+#ASSERT `Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` `a 15-year order for the seriousness of a reportable matter`
+-- "NOT EXCEEDING 15 years": 15 is not an excess. The boundary is inclusive.
+#ASSERT `Article 20(5) — the period does not exceed 15 years` `a 15-year order for the seriousness of a reportable matter`
+#ASSERT `Article 20 — the disqualification order is within the power of the court` `a 15-year order for the seriousness of a reportable matter`
+
+-- >>> THE 15-YEAR BOUND, ENFORCED. A 20-year order against a person the court is
+--     entirely satisfied is unfit, on BOTH grounds. Every substantive condition in
+--     Article 20(4) is met — and the order is still ULTRA VIRES, because Article 20(5)
+--     caps the court's power at 15 years. This is the checkable numeric bound: the
+--     court's satisfaction cannot enlarge its jurisdiction.
+`a 20-year order — ultra vires` MEANS DisqualificationOrder WITH
+    person                                                          IS "Mr de Gruchy"
+    `the period of the order, in years`                             IS 20
+    `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`  IS TRUE
+    `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`  IS TRUE
+    `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`  IS TRUE
+    `(4)(b) the seriousness of a reportable matter in relation to the person`  IS TRUE
+    `the person contravenes the disqualification order`             IS TRUE
+
+-- The 20(4) gate is wide open...
+#ASSERT `Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` `a 20-year order — ultra vires`
+-- ...but 20(5) shuts the door: 20 years EXCEEDS the maximum.
+#ASSERT NOT `Article 20(5) — the period does not exceed 15 years` `a 20-year order — ultra vires`
+#ASSERT NOT `Article 20 — the disqualification order is within the power of the court` `a 20-year order — ultra vires`
+
+-- The bound itself, checked.
+#ASSERT `Article 20(5) — the maximum period of a disqualification order, in years` EQUALS 15
+
+-- The court that is satisfied of unfitness but on NO Article 20(4) ground — some
+-- ground of its own devising. The gate is shut: "by virtue of (a) ... or (b)" is
+-- exhaustive of the warrants for this order.
+`unfitness on a ground outside Article 20(4)` MEANS DisqualificationOrder WITH
+    person                                                          IS "Mr Le Maistre"
+    `the period of the order, in years`                             IS 5
+    `it appears to the Commissioner or the Attorney General that it is or may be expedient in the public interest that the person should not, without the leave of the court, be a governor of or in any way be concerned or take part in the management of a registered charity`  IS TRUE
+    `the court is satisfied that the person is unfit to be concerned in the management of a registered charity`  IS TRUE
+    `(4)(a) the conduct of the person in relation to a registered charity, or to an entity applying for registration`  IS FALSE
+    `(4)(b) the seriousness of a reportable matter in relation to the person`  IS FALSE
+    `the person contravenes the disqualification order`             IS FALSE
+
+#ASSERT NOT `Article 20(4) — satisfied that the person is unfit, by virtue of (a) or (b)` `unfitness on a ground outside Article 20(4)`
+#ASSERT `Article 20(5) — the period does not exceed 15 years` `unfitness on a ground outside Article 20(4)`
+#ASSERT NOT `Article 20 — the disqualification order is within the power of the court` `unfitness on a ground outside Article 20(4)`
+
+§§ `Article 20 — the powers and the offence, traced`
+
+-- 20(3) — the Commissioner applies for a disqualification order. The Attorney General
+-- does not: each holds the permission independently, and a MAY unexercised is FULFILLED.
+#TRACE `Article 20(3) — the power to apply for a disqualification order` `a 10-year order for unfitness by conduct` AT 0 WITH
+    PARTY Commissioner DOES `apply to the court for a disqualification order against the person` AT 45
+
+-- 20(4) — the court exercises its power and disqualifies for 10 years.
+#TRACE `Article 20(4) and (5) — the court's power to make a disqualification order` `a 10-year order for unfitness by conduct` AT 0 WITH
+    PARTY Court DOES `make a disqualification order` AT 45
+
+-- 20(4) — the court declines to disqualify. MAY: the omission is benign — no BREACH,
+-- just the permission still standing. That is what makes the power discretionary.
+#TRACE `Article 20(4) and (5) — the court's power to make a disqualification order` `a 10-year order for unfitness by conduct` AT 0 WITH
+    PARTY Court DOES `contravene a disqualification order` AT 45
+
+-- >>> 20(5), AT THE TRACE LEVEL. The court PURPORTS to make the 20-year order. The
+--     guard on the power is FALSE — the order exceeds the 15-year maximum — so there
+--     is no power to exercise, and the contract is FULFILLED (nothing is owed and
+--     nothing is authorised). The order the court "makes" has no warrant in Article 20.
+#TRACE `Article 20(4) and (5) — the court's power to make a disqualification order` `a 20-year order — ultra vires` AT 0 WITH
+    PARTY Court DOES `make a disqualification order` AT 45
+
+-- Article 20(6) — the offence. NOTE THE CONTRAST WITH 19(11): no "reasonable excuse".
+#ASSERT `Article 20(6) — the offence is made out` `a 20-year order — ultra vires`
+#ASSERT NOT `Article 20(6) — the offence is made out` `a 10-year order for unfitness by conduct`
+#ASSERT `Article 20(6) — the maximum term of imprisonment, in years` EQUALS 2
+
+-- The penalties, side by side: 19(11) is one year; 20(6) is two. Defying a court order
+-- costs twice what acting without the Commissioner's permission costs.
+#ASSERT `Article 20(6) — the maximum term of imprisonment, in years` EQUALS (`Article 19(11) — the maximum term of imprisonment, in years` TIMES 2)
+
+-- 20(6) — the SHANT. The disqualified person acts anyway: doing it IS the breach.
+#TRACE `Article 20(6) — the prohibition on contravening a disqualification order` AT 0 WITH
+    PARTY Person DOES `contravene a disqualification order` AT 100
+
+-- ...and the disqualified person who obeys. SHANT: no BREACH; the prohibition simply
+-- stands, as it will for the whole period the court directed.
+#TRACE `Article 20(6) — the prohibition on contravening a disqualification order` AT 0 WITH
+    PARTY Person DOES `act as a governor` AT 100

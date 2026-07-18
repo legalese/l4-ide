@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750">
+<rect width="1200" height="750" fill="#ffffff"/>
+<text x="600" y="34" font-family="Georgia, serif" font-size="16" font-weight="700" text-anchor="middle" fill="#222" opacity="1.0">Penal Code s 415, second limb (no property) — surplusage as a dead rung</text>
+<text x="40" y="94" font-family="Georgia, serif" font-size="18" font-weight="700" text-anchor="start" fill="#222" opacity="1.0">The court’s reading  (Fourth Interpretation)</text>
+<rect x="70" y="168" width="190" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="165" y="192" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">by deceiving</text>
+<line x1="50" y1="187" x2="70" y2="187" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="260" y1="187" x2="280" y2="187" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="70" y="264" width="190" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="165" y="288" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">dishonest concealment</text>
+<line x1="50" y1="283" x2="70" y2="283" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="260" y1="283" x2="280" y2="283" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="50" y1="187" x2="50" y2="283" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="280" y1="187" x2="280" y2="283" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<text x="165" y="157" font-family="Georgia, serif" font-size="12" font-weight="400" text-anchor="middle" fill="#555" opacity="1.0" font-style="italic">“there is a deception”  (Expl. 1)</text>
+<rect x="326" y="216" width="150" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="401" y="240" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">intentionally</text>
+<rect x="522" y="216" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="582" y="240" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">causes harm</text>
+<line x1="476" y1="235" x2="522" y2="235" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="280" y1="235" x2="326" y2="235" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="129" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="153" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">body</text>
+<line x1="686" y1="148" x2="706" y2="148" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="148" x2="846" y2="148" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="187" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="211" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">mind</text>
+<line x1="686" y1="206" x2="706" y2="206" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="206" x2="846" y2="206" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="245" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="269" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">reputation</text>
+<line x1="686" y1="264" x2="706" y2="264" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="264" x2="846" y2="264" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="303" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="327" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">property</text>
+<line x1="686" y1="322" x2="706" y2="322" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="322" x2="846" y2="322" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="686" y1="148" x2="686" y2="322" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="846" y1="148" x2="846" y2="322" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="642" y1="235" x2="686" y2="235" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<text x="766" y="105" font-family="Georgia, serif" font-size="12" font-weight="400" text-anchor="middle" fill="#555" opacity="1.0" font-style="italic">harm to…</text>
+<line x1="40" y1="235" x2="50" y2="235" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="846" y1="235" x2="1160" y2="235" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<circle cx="44" cy="235" r="3.5" fill="#3a3a3a"/>
+<circle cx="1156" cy="235" r="3.5" fill="#3a3a3a"/>
+<line x1="40" y1="400" x2="1160" y2="400" stroke="#e2e4e7" stroke-width="1" opacity="1.0"/>
+<text x="40" y="434" font-family="Georgia, serif" font-size="18" font-weight="700" text-anchor="start" fill="#222" opacity="1.0">The applicants’ reading  (Second Interpretation)</text>
+<rect x="70" y="508" width="190" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="165" y="532" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">by deceiving</text>
+<line x1="50" y1="527" x2="70" y2="527" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="260" y1="527" x2="280" y2="527" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="70" y="604" width="190" height="38" rx="7" fill="#f6f7f8" stroke="#b9bdc2" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>
+<text x="165" y="628" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#b9bdc2" opacity="0.95" font-style="italic">dishonest concealment</text>
+<text x="165" y="595" font-family="Georgia, serif" font-size="11" font-weight="400" text-anchor="middle" fill="#b9bdc2" opacity="1.0" font-style="italic">otiose — always open</text>
+<line x1="50" y1="623" x2="53" y2="623" stroke="#b9bdc2" stroke-width="1.4" stroke-dasharray="5 4" opacity="0.9"/>
+<line x1="53" y1="616" x2="53" y2="630" stroke="#b9bdc2" stroke-width="1.6" opacity="1.0"/>
+<line x1="67" y1="616" x2="67" y2="630" stroke="#b9bdc2" stroke-width="1.6" opacity="1.0"/>
+<line x1="67" y1="623" x2="70" y2="623" stroke="#b9bdc2" stroke-width="1.4" stroke-dasharray="5 4" opacity="0.9"/>
+<line x1="260" y1="623" x2="280" y2="623" stroke="#b9bdc2" stroke-width="1.4" stroke-dasharray="5 4" opacity="0.9"/>
+<line x1="50" y1="527" x2="50" y2="623" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="280" y1="527" x2="280" y2="623" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<text x="165" y="497" font-family="Georgia, serif" font-size="12" font-weight="400" text-anchor="middle" fill="#555" opacity="1.0" font-style="italic">“there is a deception”  (Expl. 1)</text>
+<rect x="326" y="556" width="150" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="401" y="580" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">intentionally</text>
+<rect x="522" y="556" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="582" y="580" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">causes harm</text>
+<line x1="476" y1="575" x2="522" y2="575" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="280" y1="575" x2="326" y2="575" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="469" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="493" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">body</text>
+<line x1="686" y1="488" x2="706" y2="488" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="488" x2="846" y2="488" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="527" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="551" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">mind</text>
+<line x1="686" y1="546" x2="706" y2="546" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="546" x2="846" y2="546" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="585" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="609" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">reputation</text>
+<line x1="686" y1="604" x2="706" y2="604" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="604" x2="846" y2="604" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<rect x="706" y="643" width="120" height="38" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" opacity="1.0"/>
+<text x="766" y="667" font-family="Georgia, serif" font-size="14" font-weight="400" text-anchor="middle" fill="#222" opacity="1.0">property</text>
+<line x1="686" y1="662" x2="706" y2="662" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="826" y1="662" x2="846" y2="662" stroke="#1a7f37" stroke-width="1.4" opacity="1.0"/>
+<line x1="686" y1="488" x2="686" y2="662" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="846" y1="488" x2="846" y2="662" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="642" y1="575" x2="686" y2="575" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<text x="766" y="445" font-family="Georgia, serif" font-size="12" font-weight="400" text-anchor="middle" fill="#555" opacity="1.0" font-style="italic">harm to…</text>
+<line x1="40" y1="575" x2="50" y2="575" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<line x1="846" y1="575" x2="1160" y2="575" stroke="#3a3a3a" stroke-width="1.4" opacity="1.0"/>
+<circle cx="44" cy="575" r="3.5" fill="#3a3a3a"/>
+<circle cx="1156" cy="575" r="3.5" fill="#3a3a3a"/>
+<text x="600" y="730" font-family="Georgia, serif" font-size="12.5" font-weight="400" text-anchor="middle" fill="#444" opacity="1.0" font-style="italic">The “dishonest concealment” rung can never carry current ⇒ a don’t-care ⇒ the minimiser deletes it ⇒ Explanation 1 is otiose.  (GD [30], [32])</text>
+</svg>

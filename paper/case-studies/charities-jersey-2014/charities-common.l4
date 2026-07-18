@@ -1,0 +1,80 @@
+§ `Charities (Jersey) Law 2014 — Shared vocabulary (Actor, Action)`
+
+-- ===========================================================================
+-- SHARED VOCABULARY for the Charities (Jersey) Law 2014 corpus.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- Every Part file in this corpus shares two regulative primitives:
+--   * Actor  — the persons on whom this Law imposes duties, prohibitions and
+--              permissions. The Commissioner is the principal duty-bearer;
+--              the court and the tribunal exercise the adjudicative powers.
+--   * Action — the operative acts the Law regulates.
+--
+-- Hoisted here once so each Part file can `IMPORT \`charities-common\`` rather
+-- than re-declaring them.
+-- ===========================================================================
+
+DECLARE Actor IS ONE OF
+  Commissioner        -- the Jersey Charity Commissioner (Art 3)
+  Minister            -- the Minister for External Relations (Art 1)
+  States              -- the States of Jersey (Regulations)
+  Court               -- the Royal Court (Arts 14, 20, 35)
+  Tribunal            -- the Charity Tribunal (Art 32)
+  AttorneyGeneral     -- (Arts 14, 17, 20, 33)
+  Comptroller         -- (Art 30)
+  JFSC                -- the Jersey Financial Services Commission (Art 30)
+  Charity             -- a registered charity (Arts 13, 19, 21, 23)
+  Applicant           -- an entity applying for registration (Art 11)
+  Governor            -- a governor of a registered charity (Arts 18, 19)
+  Person              -- any other person (Arts 21, 26, 29)
+
+DECLARE Action IS ONE OF
+  -- Part 3 — the charity test
+  `publish and maintain guidance on the charity test`        -- Art 5(4)
+  `have regard to the guidance`                              -- Art 5(5)
+  `consult before issuing or amending guidance`              -- Art 5(6)(a)
+  `publish a report on the consultation`                     -- Art 5(6)(b)
+  `provide the guidance and report to the Minister`          -- Art 5(7)
+  `lay the guidance and report before the States`            -- Art 5(8)
+  `have regard to the comparison of benefit and disbenefit`  -- Art 7(2)(a)
+  `have regard to whether any condition on obtaining the benefit is unduly restrictive`  -- Art 7(2)(b)
+  `presume a particular charitable purpose to be for the public benefit`  -- Art 7(3)(a)
+  `treat identified natural persons as a section of the public`           -- Art 7(3)(b)
+
+  -- Part 4 — the register
+  `register the applicant as a charity`                      -- Art 11(4)
+  `refuse to register the applicant`                         -- Art 11(5)
+  `issue a certificate of registration`                      -- Art 11(9)(a)
+  `refuse permission to change the registered name`          -- Art 12(4)
+  `provide public benefit in accordance with the registered public benefit statement`  -- Art 13(4)(a)
+  `report the matter to the Commissioner`                    -- Art 13(6)
+  `send an annual return`                                    -- Art 13(7)
+  `make an order in respect of the charity`                  -- Art 14(2)
+  `deregister the entity`                                    -- Arts 15(3)(a), 16
+  `refuse to deregister the entity`                          -- Art 15(3)(b)
+
+  -- Part 5 — governors
+  `seek in good faith to ensure the charity complies`        -- Art 18(1)
+  `report the reportable matter`                             -- Art 19(2)
+  `provide a declaration of no reportable matter`            -- Arts 19(3), 19(4)
+  `act as a governor`                                        -- Arts 19(8), 19(10)
+  `make inquiries as to fitness`                             -- Art 19(9)(a)
+  `apply to the court to determine fitness`                  -- Arts 19(9)(b), 19(13)
+  `make a disqualification order`                            -- Art 20(4)
+  `contravene a disqualification order`                      -- Art 20(6)
+
+  -- Part 6 — use of terms
+  `refer to the entity as being registered by the Commissioner`  -- Art 21(1), (2)
+  `refer to the entity as a charity`                             -- Art 21(3)-(6)
+  `refer to the entity as a Jersey charity`                      -- Art 23(1), (2)
+
+  -- Part 7 — information and enforcement
+  `provide information or a document to the Commissioner`    -- Art 26(1)(a)
+  `attend and answer questions`                              -- Art 26(1)(b)
+  `take the steps required by the notice`                    -- Art 27(2)
+  `disclose restricted information`                          -- Art 29(1)
+  `disclose information to the Comptroller`                  -- Art 30(1)
+  `disclose information to the JFSC`                         -- Art 30(2)
