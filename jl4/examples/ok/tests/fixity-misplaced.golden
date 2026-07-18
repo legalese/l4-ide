@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+fixity-misplaced.l4:10:1-14:
+  3
+fixity-misplaced.l4:25:1-24:
+  6
+fixity-misplaced.l4:37:1-22:
+  321

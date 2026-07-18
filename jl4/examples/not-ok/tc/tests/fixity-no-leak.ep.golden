@@ -1,0 +1,17 @@
+-- Regression: a fixity annotation stranded above a directive must NOT leak
+-- to a later definition. Here `@infixl 6` sits above an #EVAL directive, not
+-- above a binary operator definition. It is reported as misplaced and
+-- ignored; in particular `leakTarget` does NOT silently acquire fixity, so a
+-- bare chain over it keeps the usual arity error (no default fixity).
+
+@infixl 6
+#EVAL 1
+
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p leakTarget q MEANS p + q
+
+-- Must error: leakTarget has no fixity of its own, and the stray @infixl 6
+-- above the directive must not have reached it.
+#EVAL leakTarget leakTarget 1 2 leakTarget 3

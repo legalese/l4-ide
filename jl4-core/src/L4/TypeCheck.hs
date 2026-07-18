@@ -3102,15 +3102,26 @@ tryReassociateFixityChain ann headOp es = case splitChain es of
   Nothing -> pure Nothing
   Just (x0, x1, pairs) -> do
     registry <- asks (.mixfixRegistry)
+    -- If the pre-existing mixfix matcher already gives this exact flat shape a
+    -- meaning, that interpretation predates fixity declarations and keeps
+    -- priority — we must never steal it. Checking one canonical name (the
+    -- alternating '_ op1 _ op2 _') is not enough: the same flat App
+    -- '[x0, x1, App op2 [], x2, ...]' can also match a registered pattern with
+    -- consecutive param slots (e.g. '_ op1 _ _ _', where the nullary operator
+    -- marker is consumed as an ordinary argument) or a keyword-first pattern.
+    -- So we dry-run the actual matcher over the original shape and decline if
+    -- it engages at all. 'tryMatchMixfixCall' only reads the environment and
+    -- registry (it returns match errors rather than raising them), so this
+    -- has no checking side effects.
+    existingMatch <- tryMatchMixfixCall headOp es
     let allOps = headOp : map fst pairs
         operands = x0 : x1 : map snd pairs
-        canonicalNAry = buildCanonicalNameFromKeywords True (map rawName allOps)
         opFixities = map (\ op -> (op, chainOperatorFixity registry op)) allOps
         conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
         declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
     if | any (isDeclaredChainOperator registry) operands ->
            pure Nothing
-       | not (null (lookupByCanonicalName canonicalNAry registry)) ->
+       | Just _ <- existingMatch ->
            pure Nothing
        | ((op, fs) : _) <- conflicts -> do
            addError (FixityConflict (rawName op) fs)

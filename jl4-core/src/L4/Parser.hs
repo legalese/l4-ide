@@ -2745,11 +2745,12 @@ execParserForTokensWithHints hints p file input ts =
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
-        (withFixity, _fixityS) = Resolve.addFixityCommentsToAst pstate.fixities withDesc
+        (withFixity, fixityS) = Resolve.addFixityCommentsToAst pstate.fixities withDesc
         (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withFixity
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
+        fixityWarnings = fmap Resolve.renderFixityWarning fixityS.fixityWarnings
       in
-        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
+        Right (annotatedA, nlgS.warnings ++ refWarnings ++ fixityWarnings, pstate)
   where
     env = Env
       { moduleUri = file

@@ -34,3 +34,34 @@ GIVETH A NUMBER
 myif c mythen t myelse e MEANS IF c THEN t ELSE e
 
 #EVAL myif TRUE mythen 42 myelse 7
+
+-- A subtler theft: an n-ary pattern with CONSECUTIVE param slots
+-- (`_ quop _ _ _`) matches the same flat App shape as a `quop`/`opdue`
+-- chain, because the `opdue` operator marker is consumed as an ordinary
+-- argument (here a function-typed one). The old guard only checked the
+-- alternating canonical name `_ quop _ opdue _` and so did NOT decline; the
+-- fixed guard dry-runs the real matcher and declines whenever any registered
+-- pattern engages this flat shape.
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p quop q MEANS p + q
+
+@infixl 7
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p opdue q MEANS p * q
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      f IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+a quop b f d MEANS 100 + a + b + d
+
+-- quaternary interpretation: f = the `opdue` operator, result 100 + 1 + 2 + 3
+-- = 106 — NOT re-association to 1 quop (2 opdue 3) = 7, even though both quop
+-- and opdue carry @infixl declarations
+#EVAL 1 quop 2 opdue 3

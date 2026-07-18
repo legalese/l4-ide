@@ -1,0 +1,33 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: fixity-no-leak.l4
+  Hidden: no
+  Range: 7:1-7:10
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition.Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: fixity-no-leak.l4
+  Hidden: no
+  Range: 17:9-17:32
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      leakTarget (predefined)
+
+    expects 2 arguments,
+    but you are applying it to 4 arguments here.
+
+File: fixity-no-leak.l4
+  Hidden: no
+  Range: 7:1-7:10
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition.

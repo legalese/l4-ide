@@ -8,6 +8,7 @@ module L4.Parser.ResolveAnnotation (
   addDescCommentsToAst,
   HasFixity(..),
   addFixityCommentsToAst,
+  renderFixityWarning,
   FixityS(..),
   FixityWarning(..),
   FixityWithSpan,
@@ -68,6 +69,11 @@ data Warning
     -- ^ A @ref could not be attached to any following AST node.
   | RefNoLocation Ref
     -- ^ A @ref had no source location. That's a bug.
+  | FixityAnnotationMisplaced FixityWithSpan
+    -- ^ A fixity annotation (@infixl\/@infixr\/@infix) was not on the line
+    -- directly above a binary operator definition; it is ignored.
+  | FixityAnnotationNoLocation Fixity
+    -- ^ A fixity annotation had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -802,6 +808,12 @@ type FixityWithSpan = WithSpan Fixity
 
 data FixityWarning
   = FixityMissingLocation Fixity
+    -- ^ A fixity annotation had no source range. Internal error.
+  | FixityMisplaced FixityWithSpan
+    -- ^ A fixity annotation was not on the line directly above a binary
+    -- operator definition: it sat above a directive, import, type
+    -- declaration or section, inline on a parameter, inside a WHERE body, or
+    -- was superseded by a later annotation on the same definition. Ignored.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -821,8 +833,15 @@ addFixityCommentsToAst fixities ast =
         { fixities = List.sortOn (.range.start) withSpan
         , fixityWarnings = fmap FixityMissingLocation missing
         }
+    (ast', s) = runState (addFixity ast) initialS
   in
-    runState (addFixity ast) initialS
+    -- Any annotation still unclaimed after the whole module was walked (e.g.
+    -- a trailing annotation with no following definition) is misplaced too.
+    ( ast'
+    , s { fixities = []
+        , fixityWarnings = fmap FixityMisplaced s.fixities <> s.fixityWarnings
+        }
+    )
 
 preprocessFixities :: [Fixity] -> ([FixityWithSpan], [Fixity])
 preprocessFixities = foldl' go ([], [])
@@ -832,6 +851,16 @@ preprocessFixities = foldl' go ([], [])
       Nothing -> (located, fx : missing)
       Just r -> (WithSpan (fromSrcRange r) fx : located, missing)
 
+addFixityWarning :: FixityWarning -> State FixityS ()
+addFixityWarning w = modify' $ \s -> s{fixityWarnings = w : s.fixityWarnings}
+
+-- | Bridge a fixity-attachment warning into the shared parser warning
+-- channel (rendered by 'L4.Rules').
+renderFixityWarning :: FixityWarning -> Warning
+renderFixityWarning = \ case
+  FixityMissingLocation fx -> FixityAnnotationNoLocation fx
+  FixityMisplaced fxs      -> FixityAnnotationMisplaced fxs
+
 class HasFixity a where
   addFixity :: a -> State FixityS a
 
@@ -840,115 +869,39 @@ instance HasFixity (Module n) where
     MkModule uri ann <$> addFixity sect
 
 instance HasFixity (Section n) where
+  -- A section only sequences its declarations; each leaf construct below
+  -- claims the annotations that precede it. A fixity above a section header
+  -- therefore becomes the leading annotation of the section's first
+  -- declaration — the nearest following construct.
   addFixity (MkSection ann lbl maka decls) = do
     decls' <- traverse addFixity decls
     pure $ MkSection ann lbl maka decls'
 
 instance HasFixity (TopDecl n) where
+  -- Only DECIDE/ASSUME can define a binary operator, so only they honor a
+  -- leading fixity annotation. Every other top-level construct still CLAIMS
+  -- (and reports) any fixity annotation stranded on it, so that a stray
+  -- annotation cannot leak past it to a later, unrelated definition.
+  -- Processing runs in document order, which bounds a Decide's leading
+  -- annotation to genuine adjacency: any intervening construct claims first.
   addFixity = \ case
-    Declare ann decl -> Declare ann <$> addFixity decl
-    Decide ann dec -> Decide ann <$> addFixity dec
-    Assume ann asm -> Assume ann <$> addFixity asm
-    Directive ann dir -> Directive ann <$> addFixity dir
-    Import ann imp -> Import ann <$> addFixity imp
-    Section ann sect -> Section ann <$> addFixity sect
-    Timezone ann e -> pure $ Timezone ann e
+    Declare ann decl  -> do rejectFixityAround decl; pure (Declare ann decl)
+    Decide ann dec    -> Decide ann <$> honorDecideFixity dec
+    Assume ann asm    -> Assume ann <$> honorAssumeFixity asm
+    Directive ann dir -> do rejectFixityAround dir; pure (Directive ann dir)
+    Import ann imp    -> do rejectFixityAround imp; pure (Import ann imp)
+    Section ann sect  -> Section ann <$> addFixity sect
+    Timezone ann e    -> do rejectFixityAround e; pure (Timezone ann e)
 
--- | A fixity annotation on a DECLARE is meaningless, but we still claim it
--- here so it cannot leak downwards and attach to an unrelated later
--- definition. Claimed-but-inert mirrors how @desc behaves on nodes that no
--- downstream pass reads.
-instance HasFixity (Declare n) where
-  addFixity decl@(MkDeclare ann tySig appForm tyDecl) = do
-    ann' <- attachLeadingFixity decl ann
-    tySig' <- addFixity tySig
-    app' <- addFixity appForm
-    tyDecl' <- addFixity tyDecl
-    pure $ MkDeclare ann' tySig' app' tyDecl'
+honorDecideFixity :: Decide n -> State FixityS (Decide n)
+honorDecideFixity dec@(MkDecide ann tySig appForm expr) = do
+  ann' <- honorLeadingFixity dec ann
+  pure (MkDecide ann' tySig appForm expr)
 
-instance HasFixity (Decide n) where
-  addFixity dec@(MkDecide ann tySig appForm expr) = do
-    -- Attach leading fixity to Decide FIRST, before processing children,
-    -- so the annotation is claimed by the definition itself rather than by
-    -- parameters in the tySig.
-    ann' <- attachLeadingFixity dec ann
-    tySig' <- addFixity tySig
-    app' <- addFixity appForm
-    expr' <- addFixity expr
-    pure $ MkDecide ann' tySig' app' expr'
-
-instance HasFixity (Assume n) where
-  addFixity asm@(MkAssume ann tySig appForm mType mTypically) = do
-    ann' <- attachLeadingFixity asm ann
-    tySig' <- addFixity tySig
-    app' <- addFixity appForm
-    mType' <- traverse addFixity mType
-    mTypically' <- traverse addFixity mTypically
-    pure $ MkAssume ann' tySig' app' mType' mTypically'
-
-instance HasFixity (Directive n) where
-  addFixity = \ case
-    LazyEval ann e -> LazyEval ann <$> addFixity e
-    LazyEvalTrace ann e -> LazyEvalTrace ann <$> addFixity e
-    Check ann e -> Check ann <$> addFixity e
-    Contract ann e t evs -> Contract ann <$> addFixity e <*> addFixity t <*> traverse addFixity evs
-    Assert ann e -> Assert ann <$> addFixity e
-
-instance HasFixity (Import n) where
-  addFixity a = pure a
-
-instance HasFixity (TypeSig n) where
-  addFixity (MkTypeSig ann given giveth) =
-    MkTypeSig ann <$> addFixity given <*> traverse addFixity giveth
-
-instance HasFixity (GivenSig n) where
-  addFixity (MkGivenSig ann names) =
-    MkGivenSig ann <$> traverse addFixity names
-
-instance HasFixity (OptionallyTypedName n) where
-  addFixity name@(MkOptionallyTypedName ann n mType mTypically) = do
-    mType' <- traverse addFixity mType
-    mTypically' <- traverse addFixity mTypically
-    ann' <- attachLeadingOrInlineFixity name ann
-    pure $ MkOptionallyTypedName ann' n mType' mTypically'
-
-instance HasFixity (GivethSig n) where
-  addFixity (MkGivethSig ann ty) = do
-    ty' <- addFixity ty
-    pure $ MkGivethSig ann ty'
-
-instance HasFixity (TypeDecl n) where
-  addFixity = \ case
-    RecordDecl ann mcon names ->
-      RecordDecl ann mcon <$> traverse addFixity names
-    EnumDecl ann cons ->
-      EnumDecl ann <$> traverse addFixity cons
-    SynonymDecl ann ty ->
-      SynonymDecl ann <$> addFixity ty
-
-instance HasFixity (ConDecl n) where
-  addFixity (MkConDecl ann name names) =
-    MkConDecl ann name <$> traverse addFixity names
-
-instance HasFixity (TypedName n) where
-  addFixity name@(MkTypedName ann n ty mTypically mExpr) = do
-    ty' <- addFixity ty
-    mTypically' <- traverse addFixity mTypically
-    ann' <- attachLeadingOrInlineFixity name ann
-    pure $ MkTypedName ann' n ty' mTypically' mExpr
-
-instance HasFixity (Type' n) where
-  addFixity = pure
-
-instance HasFixity (AppForm n) where
-  addFixity (MkAppForm ann name args maka) =
-    MkAppForm ann name args <$> traverse addFixity maka
-
-instance HasFixity (Aka n) where
-  addFixity (MkAka ann names) = pure (MkAka ann names)
-
-instance HasFixity (Expr n) where
-  addFixity = pure
+honorAssumeFixity :: Assume n -> State FixityS (Assume n)
+honorAssumeFixity asm@(MkAssume ann tySig appForm mType mTypically) = do
+  ann' <- honorLeadingFixity asm ann
+  pure (MkAssume ann' tySig appForm mType mTypically)
 
 takeMatchingFixities :: (FixityWithSpan -> Bool) -> State FixityS [FixityWithSpan]
 takeMatchingFixities predicate = do
@@ -957,23 +910,51 @@ takeMatchingFixities predicate = do
   put s{fixities = rest}
   pure matches
 
-attachLeadingFixity :: (HasSrcRange a) => a -> Anno -> State FixityS Anno
-attachLeadingFixity node ann =
+-- | Claim every not-yet-attached fixity annotation positioned before this
+-- construct ends, split into those preceding its start (@leading@) and those
+-- falling inside it (@interior@ — inline on a parameter, or within a WHERE
+-- body). Because processing runs in document order and each construct removes
+-- what it claims, a construct only ever sees annotations since the previous
+-- construct.
+claimFixitiesAround :: HasSrcRange a => a -> State FixityS ([FixityWithSpan], [FixityWithSpan])
+claimFixitiesAround node =
   case nodeSpan node of
-    Nothing -> pure ann
-    Just nodeRange -> do
-      matches <- takeMatchingFixities (descPrecedesNode nodeRange)
-      pure $ maybe ann (\d -> setFixity d.payload ann) (lastMaybe matches)
+    Nothing -> pure ([], [])
+    Just r -> do
+      claimed <- takeMatchingFixities (\fx -> posLt fx.range.start r.end)
+      pure (List.partition (\fx -> posLe fx.range.end r.start) claimed)
 
-attachLeadingOrInlineFixity :: (HasSrcRange a) => a -> Anno -> State FixityS Anno
-attachLeadingOrInlineFixity node ann =
-  case nodeSpan node of
-    Nothing -> pure ann
-    Just nodeRange -> do
-      leadingMatches <- takeMatchingFixities (descPrecedesNode nodeRange)
-      inlineMatches <- takeMatchingFixities (descInlineFor nodeRange)
-      let mChosen = lastMaybe (leadingMatches ++ inlineMatches)
-      pure $ maybe ann (\d -> setFixity d.payload ann) mChosen
+-- | Attach the closest leading fixity annotation to a binary-operator
+-- candidate's 'Anno' (the typechecker validates that it really is a binary
+-- operator, see 'L4.TypeCheck.applyFixityAnnotation'). A superseded stacked
+-- annotation, or any annotation sitting inside the definition, is reported as
+-- misplaced and dropped.
+honorLeadingFixity :: HasSrcRange a => a -> Anno -> State FixityS Anno
+honorLeadingFixity node ann = do
+  (leading, interior) <- claimFixitiesAround node
+  case reverse leading of
+    closest : superseded -> do
+      warnMisplaced (superseded <> interior)
+      pure (setFixity closest.payload ann)
+    [] -> do
+      warnMisplaced interior
+      pure ann
+
+-- | Claim and report every fixity annotation preceding or inside a construct
+-- that cannot carry fixity (a directive, import, DECLARE, or timezone).
+rejectFixityAround :: HasSrcRange a => a -> State FixityS ()
+rejectFixityAround node = do
+  (leading, interior) <- claimFixitiesAround node
+  warnMisplaced (leading <> interior)
+
+warnMisplaced :: [FixityWithSpan] -> State FixityS ()
+warnMisplaced = mapM_ (addFixityWarning . FixityMisplaced)
+
+posLt :: SrcPos -> SrcPos -> Bool
+posLt a b = a.line < b.line || (a.line == b.line && a.column < b.column)
+
+posLe :: SrcPos -> SrcPos -> Bool
+posLe a b = a.line < b.line || (a.line == b.line && a.column <= b.column)
 
 -- ----------------------------------------------------------------------------
 -- Ref attachment scaffolding
