@@ -659,7 +659,9 @@ _(Restructured 2026-07-18: the old "Phase 3 — keywords + precedence" bundled t
 things, one of which is now under active challenge. Split into 3a/3b/3c so each can land — or
 die — on its own merits.)_
 
-- **Phase 0 — spec review.** This document. Settled: D1–D7, Q2, Q4, α-vs-β. Open: Q3, Q5.
+- **Phase 0 — spec review.** This document. **COMPLETE 2026-07-18**: D1–D7, Q2, Q4, Q5,
+  α-vs-β, and the Q3 fence all settled (Q3's substantive distribution semantics deferred to
+  the EVERY-EACH joint read, by design).
 - **Phase 1 — prelude landing, zero compiler change.** `SET OF a` + `is in`, bare `UNION`, bare
   `INTERSECT`, `` `LESS` `` (backticked — lexer keyword; consider bare `WITHOUT`/`EXCEPT` as the
   drafting-canon alias, both verified unclaimed), `subset`, `setSize`, list↔set conversions,
@@ -680,7 +682,7 @@ die — on its own merits.)_
   parenthesize (Q5 option C), which is §0's own philosophy. The fixity mechanism (option A)
   is architecturally ready when L4 wants it as a _platform_ feature — the flat-App parse shape
   and registry import plumbing fit it exactly (§13.1) — but it is decoupled from this spec.
-  Pending Meng's sign-off on Q5.
+  **Q5 signed off 2026-07-18: CLOSED.**
 - **Phase 3c — bare `LESS`**, if ever: unreachable via fixity (a fixity mechanism cannot rescue
   a word the lexer already owns), but there is now a **discovered cheap design — `LESS` as a
   surface alias for the `Minus` node.** Restructure the operator-table entry at `Parser.hs:1491`
@@ -721,7 +723,7 @@ die — on its own merits.)_
   obligation over a set of parties. That is the same distribution question as
   [`EVERY-EACH-QUANTIFIER-SPEC.md`](EVERY-EACH-QUANTIFIER-SPEC.md), and it touches the
   actor-indexed action work. Needs a joint read; do not design in isolation.
-  **PROPOSED (2026-07-18) — fence it, don't decide it:** Phases 1–4 define sets in the
+  **ADOPTED (Meng sign-off, 2026-07-18) — fence it, don't decide it:** Phases 1–4 define sets in the
   _constitutive_ layer only; this spec assigns **no meaning** to a `SET OF`-typed term in the
   party position of a deontic. The distribution menu — one several obligation per member?
   joint? joint and several? collective? — is precisely the common-law joint/several-liability
@@ -756,9 +758,9 @@ die — on its own merits.)_
   (A) fixity declarations, (B) keywords, (C) parens forever, (D) keyword-operator overloads —
   with D already in hand and A/B/C only needed for what D cannot cover (`UNION`/`INTERSECT`
   as _words_ with precedence).
-  **RECOMMENDATION READY (assessment in §13): adopt (C)+(D) for this spec; (B) is dead; (A) is
-  sound but decoupled — a platform investment for when multiple libraries want declared
-  precedence. Awaiting sign-off.**
+  **RESOLVED (Meng sign-off, 2026-07-18): (C)+(D) adopted for this spec; (B) dead; (A)
+  proceeds as the decoupled experiment per
+  [`FIXITY-DECLARATIONS-SPEC.md`](FIXITY-DECLARATIONS-SPEC.md).**
 
 ## 9. Q2 resolved: what the authorities actually say
 
@@ -1505,7 +1507,8 @@ declared-precedence operators, not to precedence-enable one word.
 **Q5 recommendation: (C) + (D).** Compound identifier-operator expressions parenthesize —
 consonant with §0's own PEMDAS framing and mixfix's deliberate refusal of implicit precedence —
 while the keyword-operator overloads carry the bare ergonomics. (B) keywords: dead. (A) fixity:
-rescheduled to the platform backlog (candidate for `specs/roadmap/`). Awaiting sign-off.
+rescheduled to the platform backlog (candidate for `specs/roadmap/`). Signed off (Meng,
+2026-07-18).
 
 **UPDATE (Meng, 2026-07-18): option A greenlit as a decoupled, timeboxed EXPERIMENT** — branch
 brief at [`FIXITY-DECLARATIONS-SPEC.md`](FIXITY-DECLARATIONS-SPEC.md), to be attempted in a
