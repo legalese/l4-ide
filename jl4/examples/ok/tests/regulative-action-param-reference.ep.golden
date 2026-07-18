@@ -27,9 +27,8 @@ GIVETH A DEONTIC Actor Action
 
 -- Obligation: Alice must do `doThis`. A DIFFERENT action must NOT discharge it.
 #TRACE (`obligation to act` Alice doThis) AT 0 WITH
-  PARTY 5
+  PARTY Alice DOES doThat AT 5
 
 -- The MATCHING action discharges the obligation.
-DOES Alice AT doThat #TRACE (`obligation to act` Alice doThis) AT 0 WITH
-  PARTY 5
-DOES Alice AT doThis 
+#TRACE (`obligation to act` Alice doThis) AT 0 WITH
+  PARTY Alice DOES doThis AT 5
