@@ -174,5 +174,5 @@ Three assumptions the policy owner now has to confirm. That's the point.
 ## Next Steps
 
 - [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) — publish the rule as an API
-- [Common Patterns](../getting-started/common-patterns.md) — idioms worth knowing when reviewing AI's output
+- [Common Patterns](../../reference/patterns/common-patterns.md) — idioms worth knowing when reviewing AI's output
 - [Legislative Ingestion](legislative-ingestion.md) — deeper workflow for statute-scale text

@@ -1,5 +1,9 @@
 # Optimising for Natural Language Document Generation with `@nlg`
 
+**Prerequisites:** Basic L4 functions ([Your First L4 File](../getting-started/first-l4-file.md)) and [Infix, Postfix, and Mixfix Functions](natural-language-functions.md) — the calling-syntax foundation this tutorial builds on
+
+---
+
 L4 can render your rules back into formatted English prose — in the VS Code
 **Render** tab, or with `l4 render`. The renderer is **deterministic**: it walks
 your code and turns each construct into a sentence or an outline. That means the
@@ -15,14 +19,6 @@ This tutorial shows how to get transparent English prose out of the renderer, us
 
 It finishes with how **Legalese AI** can then apply drafting policies to refine
 the result further.
-
-## Prerequisites
-
-- Basic L4 functions (see [Your First L4 File](../getting-started/first-l4-file.md))
-- [Infix, Postfix, and Mixfix Functions](natural-language-functions.md) — the
-  calling-syntax foundation this tutorial builds on
-
----
 
 ## Lever 1 — Names do most of the work
 

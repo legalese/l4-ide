@@ -8,7 +8,7 @@ How L4 models obligations, permissions, and prohibitions — and how those rules
 
 **Regulative rules** govern behaviour. They tell parties what they must, may, or must not do. They are the foundation of contracts, regulations, and laws.
 
-Compare to **constitutive rules**, which define what things _are_ (DECLARE and DECIDE statements). A constitutive rule answers "is the borrower a small business?". A regulative rule answers "what is the borrower obligated to do now, given everything that has happened so far?".
+Compare to **constitutive rules**, which define what things _are_ (DECLARE and DECIDE statements). A constitutive rule answers "is the borrower a small business?". A regulative rule answers "what is the borrower obligated to do now, given everything that has happened so far?". The distinction — and why L4 keeps the two kinds of rule apart at the type level — is explored in [Constitutive vs Regulative Rules](constitutive-vs-regulative.md).
 
 ### Examples
 
@@ -151,6 +151,8 @@ HENCE FULFILLED
 LEST  BREACH BY Employee
 ```
 
+`MUST NOT` is accepted as a synonym of `SHANT` — write whichever reads closer to the source text.
+
 For prohibitions, **the meaning of "success" and "failure" is inverted compared to `MUST`**:
 
 |                            | MUST       | SHANT          |
@@ -176,13 +178,21 @@ WITHIN 14
 
 The deadline is `start_time + 14`. As the contract advances through events, the remaining window shrinks: after consuming an event at time 12, what was originally `WITHIN 14` is effectively `WITHIN 2` of any subsequent event.
 
-A duration can optionally be anchored to a specific event with `OF`:
+There is no special syntax for anchoring a deadline to a named event — the timeline is purely numeric, and every `WITHIN` window starts when its obligation becomes active. To express "deliver within 5 days of order confirmation", chain the obligations: the inner window starts from the event that triggered it.
 
 ```l4
-PARTY  Seller
-MUST   deliver
-WITHIN 5 days OF `order confirmation`
+PARTY Buyer
+MUST  `confirm order`
+WITHIN 30
+HENCE
+    PARTY  Seller
+    MUST   deliver
+    WITHIN 5
+    HENCE  FULFILLED
+    LEST   BREACH BY Seller
 ```
+
+If the buyer confirms at time 10, the seller's deadline is time 15 — the 5-unit window is measured from the confirmation event, not from the start of the contract.
 
 Without a `WITHIN`, the obligation is _ongoing_ and only fires (or breaches) when an explicit fulfilment or breach is reached:
 
@@ -541,7 +551,7 @@ Key conceptual takeaways:
 
 ## Further Reading
 
-- [Foundation Course Module 5](../../courses/foundation/module-5-regulative.md) — Hands-on tutorial
+- [Foundation Course Module 6](../../courses/foundation/module-6-regulative.md) — Hands-on tutorial
 - [Regulative Rule Keywords](../../reference/regulative/README.md) — Full keyword reference
 - [DEONTIC](../../reference/regulative/DEONTIC.md) — The regulative type, in detail
 - [PARTY](../../reference/regulative/PARTY.md), [MUST](../../reference/regulative/MUST.md), [MAY](../../reference/regulative/MAY.md), [SHANT](../../reference/regulative/SHANT.md), [BECAUSE](../../reference/regulative/BECAUSE.md) — Individual keyword pages

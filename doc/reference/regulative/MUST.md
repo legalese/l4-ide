@@ -14,6 +14,8 @@ PARTY partyName MUST NOT DO action
 
 MUST expresses a legal obligation - something that a party is required to do. If not fulfilled within the deadline, consequences (LEST) may apply.
 
+**Note:** `MUST NOT` is not a negated obligation but a prohibition — it is an accepted synonym for [SHANT](SHANT.md).
+
 ## Examples
 
 **Example file:** [must-example.l4](must-example.l4)
