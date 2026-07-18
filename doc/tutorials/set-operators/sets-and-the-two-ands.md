@@ -13,6 +13,21 @@ Courts see this ambiguity constantly. The Singapore Court of Appeal has read the
 
 L4's answer: give the two jobs two **types**, and let the type checker pick the right operation. This tutorial shows how.
 
+## Sets in one minute
+
+No mathematics background needed — a **set** is just a collection of things where two facts are ignored: **order** and **repetition**. The set of New York residents is the same set however you list them, and listing "alice" twice doesn't create two alices. (This is the one way a set differs from L4's ordinary `LIST`, which keeps both.)
+
+Four operations do almost all the work, and each has a plain-English name a drafter already uses:
+
+| Operation        | Everyday phrasing                          | Symbol | Example (NY = {alice, bob}, NJ = {carol}) |
+| ---------------- | ------------------------------------------ | ------ | ----------------------------------------- |
+| **union**        | "members of A **and** of B" / "either one" | A ∪ B  | NY ∪ NJ = {alice, bob, carol}             |
+| **intersection** | "those in **both**"                        | A ∩ B  | NY ∩ NJ = {} (nobody is in both)          |
+| **difference**   | "A **less** those in B"                    | A \ B  | employees \ probationers                  |
+| **membership**   | "is x **in** the set?"                     | x ∈ A  | alice ∈ NY is true                        |
+
+Two relationships round it out: A is a **subset** of B (A ⊆ B) when every member of A is also in B, and two sets are **equal** when each is a subset of the other — which is why order and repetition don't matter. That is the whole vocabulary; the rest of this tutorial is how L4 spells it.
+
 ## Building sets
 
 The prelude provides `SET OF a`, a collection in which order and duplicates don't matter:
@@ -27,7 +42,13 @@ IMPORT prelude
 #EVAL setSize `new yorkers`                -- 2
 ```
 
-`setFromList` discards duplicates: `setFromList (LIST 1, 1, 2)` has size 2.
+`setFromList` discards duplicates: `setFromList (LIST 1, 1, 2)` has size 2. You can also write two or more elements directly with `SET OF`:
+
+```l4
+`new yorkers` MEANS SET OF "alice", "bob"      -- same as setFromList (LIST "alice", "bob")
+```
+
+One catch: `SET OF` needs at least two elements. With a single argument, `SET OF x` reads `x` as the contents list — so `SET OF "carol"` is a type error. For a one-element set, stay with `setFromList (LIST "carol")`.
 
 ## The two ANDs, side by side
 
@@ -113,8 +134,10 @@ With sets, that test is a program:
 
 An empty intersection (like our New Yorkers and New Jerseyans) is the strongest signal of all: nobody writes an eligibility rule for the empty set, so the drafter must have meant union. A future L4 lint will make exactly this argument in a tooltip, with the citation attached.
 
+Seen from engineering, the redundancy canon is a **Boolean-minimization presumption**: courts presume statutory text is already minimized — every term load-bearing, nothing a Quine–McCluskey pass would delete — so a reading that renders a term otiose is evidence of the wrong reading, exactly as a minimizer flags a redundant clause as evidence of a drafting slip. Turning canons of construction into checkable properties of Boolean structure is a running theme of the L4 research programme; for how this style of analysis performs on a live appellate problem, see _Poh Yuan Nie v Public Prosecutor_ [2022] SGCA 74, the worked example of the L4 papers series.
+
 ## Where next
 
 - Reference: [Sets library](../../reference/libraries/sets.md)
 - The full design record, with the case law verified against primary sources: [SET-OPERATORS-SPEC](https://github.com/legalese/l4-ide/blob/docs/set-operators-spec/specs/todo/SET-OPERATORS-SPEC.md)
-- Coming separately: variadic construction (`SET OF NY, NJ` — [#123](https://github.com/legalese/l4-ide/pull/123)) and the ambiguity lint
+- Coming next: the ambiguity lint that surfaces the otiosity argument in the IDE

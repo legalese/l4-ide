@@ -2,7 +2,7 @@
 
 Set-theoretic collections: `SET OF a` with union, intersection, difference, membership, and subset — plus operator overloads that make L4's `AND`, `OR`, `PLUS`, and `MINUS` do the right thing when their operands are sets. Part of the prelude; available after `IMPORT prelude`.
 
-Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story.
+Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story (its [Sets in one minute](../../tutorials/set-operators/sets-and-the-two-ands.md#sets-in-one-minute) section is a from-scratch primer if union/intersection/subset are unfamiliar).
 
 ### Location
 
@@ -66,9 +66,14 @@ Order/duplicate-insensitivity applies to a set's **elements**, compared with bui
 
 See [set-operators-nested.l4](https://github.com/legalese/l4-ide/blob/main/jl4/examples/ok/set-operators-nested.l4), which pins this behavior.
 
-### Variadic construction (separate PR)
+### Variadic construction
 
-With the route-α typechecker elaboration ([#123](https://github.com/legalese/l4-ide/pull/123)), a set can be written directly as `SET OF "refuge", "residence"` or `SET OF NY, NJ` — the arguments collect into a list automatically. Until that lands, write `setFromList (LIST …)`.
+A set of **two or more** elements can be written directly as `SET OF "refuge", "residence"` or `SET OF NY, NJ` — the arguments collect into a list automatically (the route-α typechecker elaboration). `setFromList (LIST …)` still works and is equivalent.
+
+Two boundary cases to know:
+
+- **A single element cannot use bare `SET OF`.** The collection only fires for two or more arguments; with one argument, `SET OF x` reads `x` as the contents _list_, so `SET OF "carol"` is a type error (a string is not a list). Write `setFromList (LIST "carol")` or `SET OF LIST "carol"` for a singleton.
+- **A single list argument is taken literally:** `SET OF LIST 1, 2` is the two-element set `{1, 2}` (the list is the contents), not a one-element set containing a list.
 
 ### Example: Set Operations
 
