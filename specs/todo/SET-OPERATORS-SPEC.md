@@ -1608,3 +1608,45 @@ implementation taught us, superseding parts of §D6/§D7:
    comments in prelude/examples were tightened to attribute only the type-directed dispatch,
    per §9.3's own warning; deferred with in-code notes — "LIST literal" error attribution at
    rescued sites, and OF/comma semantic-token loss at rescued sites (highlighting-only).
+
+## 15. Phase 3d BLOCKED — prelude-fixity-export bug (2026-07-18)
+
+Prepping the Phase 3d prelude annotations (`@infixl 6` on `UNION`/`WITHOUT`, `@infixl 7` on
+`INTERSECT`) surfaced a blocker in the just-landed fixity feature (#128). The annotations are
+written and correctly placed, but they are **currently inert**: bare `a UNION b INTERSECT c`
+still fails to re-associate ("trying to apply `a` … to 4 arguments"), while the parenthesized
+form works.
+
+**Root cause, isolated by bisection (all single-path `l4 run`, well-formed inputs):**
+
+| Where the `@infixl` operator is defined | Bare-identifier chain re-associates? |
+| --------------------------------------- | ------------------------------------ |
+| In the **importing file** itself        | ✅ yes                               |
+| In a **user library** imported by name (`IMPORT defs`) — literal *and* identifier operands | ✅ yes |
+| In the **prelude** (`IMPORT prelude`)   | ❌ **no** — re-association never fires |
+
+The discriminator is decisive: a **fresh** operator (`p UNIONX q MEANS p`, no overloads, no
+self-reference) **appended to `prelude.l4`** and reached via `IMPORT prelude` does **not**
+re-associate, yet the *identical* operator in a `defs.l4` reached via `IMPORT defs` does. So it
+is neither polymorphism, nor the `__PLUS__`/`__AND__`/`__OR__` overloads, nor `@nlg`, nor
+identifier operands, nor cross-module import in general (all independently cleared). It is
+specific to **fixity declared inside the prelude not flowing to importers.** #128's own
+`fixity-cross-module-*` tests only exercise a library imported by name with literal operands,
+so the prelude path was never covered.
+
+**Consequences:**
+
+1. Phase 3d cannot deliver bare unparenthesized set-operator chains until this is fixed. The
+   annotations are committed to branch `mengwong/set-operators-phase3d` with in-code inert-notes;
+   they are a **strict conservative extension** (parenthesized chains and all existing programs
+   are unaffected — verified), so they do no harm while inert. **Not PR'd.**
+2. This is a bug in #128 (or the prelude load path), not in this spec's design. Hand to the
+   fixity implementer: check how the prelude's `MixfixRegistry`/`tcdMixfixRegistry` fixity map
+   is built and exported versus a name-imported user library — likely the prelude is loaded via
+   a path that drops or never populates the per-name fixity entries. A regression test in the
+   shape of the table above (prelude-defined `@infixl` operator, bare chain in an importer)
+   should accompany the fix.
+3. Q5's "(A) fixity is the answer for `UNION`/`INTERSECT` as words with precedence" holds as a
+   design conclusion, but its *realization* for the prelude waits on this fix. Until then, the
+   shipped ergonomics remain (D) overloads (`PLUS`/`MINUS` bare + precedence-correct) and (C)
+   parentheses for the word operators.
