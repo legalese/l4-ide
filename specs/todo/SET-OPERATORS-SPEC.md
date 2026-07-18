@@ -674,15 +674,22 @@ die — on its own merits.)_
 - **Phase 3a — route-α elaboration** (§D7.1, DECIDED): variadic construction
   `SET OF 1, 2, 3` via argument-collection in the typechecker. First compiler-touching change;
   independent of everything below.
-- **Phase 3b — precedence for identifier operators: RECOMMENDED CLOSED, build nothing (§13).**
-  The assessment came back: the §D3/§D4 overloads already cover the capabilities (union via
-  `PLUS`/`AND`/`OR`, difference via `MINUS`, all bare and precedence-correct), so the only
-  residual gap is the literal words `UNION`/`INTERSECT` carrying precedence — a register
-  preference that does not justify ~5–8 person-days and an M/L disambiguation risk. Compounds
-  parenthesize (Q5 option C), which is §0's own philosophy. The fixity mechanism (option A)
-  is architecturally ready when L4 wants it as a _platform_ feature — the flat-App parse shape
-  and registry import plumbing fit it exactly (§13.1) — but it is decoupled from this spec.
-  **Q5 signed off 2026-07-18: CLOSED.**
+- **Phase 3b — precedence for identifier operators: REOPENED AND LANDED as option A (§13.2 outcome).**
+  The original assessment recommended building nothing (the §D3/§D4 overloads cover the
+  capabilities; the only residual gap was the literal words `UNION`/`INTERSECT` carrying
+  precedence). Meng then greenlit the fixity mechanism as a decoupled timeboxed spike, and it
+  **shipped as PR [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128)** (see
+  §13.2 OUTCOME): `@infixl`/`@infixr`/`@infix N` declarations for binary identifier operators,
+  the flat-App re-association proving out exactly as §13.1 predicted, adversarially reviewed
+  and green. **Q5 answer upgraded from (C)+(D) to option A.**
+- **Phase 3d — prelude fixity landing (follow-up unlocked by Phase 3b).** With #128 merged, add
+  the fixity declarations to the set vocabulary in the prelude: `@infixl 6` on `UNION` and
+  `WITHOUT`/`EXCEPT` (same precedence, both left-associative), `@infixl 7` on `INTERSECT` (binds
+  tighter, à la ×/+ — so `a UNION b INTERSECT c` groups as `a UNION (b INTERSECT c)`). Purely
+  prelude annotations, zero compiler change; because there is no default fixity this is a strict
+  conservative extension. Then §D5 route B (keywordizing `UNION`/`INTERSECT`) is **formally
+  buried** — no keyword tax was ever needed — and Phase 3c's `LESS`-as-`Minus` alias remains the
+  only reason to touch the keyword operator table.
 - **Phase 3c — bare `LESS`**, if ever: unreachable via fixity (a fixity mechanism cannot rescue
   a word the lexer already owns), but there is now a **discovered cheap design — `LESS` as a
   surface alias for the `Minus` node.** Restructure the operator-table entry at `Parser.hs:1491`
@@ -761,6 +768,13 @@ die — on its own merits.)_
   **RESOLVED (Meng sign-off, 2026-07-18): (C)+(D) adopted for this spec; (B) dead; (A)
   proceeds as the decoupled experiment per
   [`FIXITY-DECLARATIONS-SPEC.md`](FIXITY-DECLARATIONS-SPEC.md).**
+  **REOPENED (2026-07-18, post-landing): (A) LANDED — PR
+  [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128), merged to current
+  `unstable`, green.** Final Q5 disposition: **(A) fixity** is the answer for
+  `UNION`/`INTERSECT` as words with precedence; (D) keyword-operator overloads remain in hand
+  for the union/difference vocabulary; (B) keywords are dead; (C) parens-forever is superseded
+  by (A) but stays available for any operator left undeclared (there is no default fixity).
+  Follow-up: Phase 3d adds the prelude `@infixl` annotations. See §13.2 OUTCOME.
 
 ## 9. Q2 resolved: what the authorities actually say
 
@@ -1516,6 +1530,25 @@ parallel session. The verdict above stands as a _dependency_ ruling: set-operato
 proceed regardless and take no dependency on the experiment. If the spike lands, Q5 reopens
 per that brief's §8; if it dies, its §7 kill criteria route the post-mortem back to this
 section and (C)+(D) closes permanently.
+
+**OUTCOME (2026-07-18, post-landing): the spike LANDED. Q5 reopens with option A real.**
+`@infixl` / `@infixr` / `@infix N` declarations for binary identifier operators shipped on
+branch `mengwong/fixity-declarations` as **PR [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128)**
+into `unstable` (merged up to current `unstable`, green: jl4-test 1221/0, jl4-core-test 208/0,
+l4-cli-test 55/0). The parser was untouched — the flat-App parse shape and registry import
+plumbing fit exactly as §13.1 predicted; a shunting-yard pre-pass in the typechecker
+re-associates the chain, and fixity rides `MixfixInfo` through `IMPORT` for free. A
+6-dimension adversarial review (3 refuters/finding) surfaced 8 findings, all fixed:
+chiefly an n-ary-theft guard (a consecutive-param mixfix pattern matched the same flat shape)
+now closed by dry-running the real matcher, and an attachment-adjacency bug (a `@infixl`
+stranded above a directive/import/`WHERE` leaked to a distant later definition) now closed by
+document-order claiming + a misplaced-annotation warning. **No default fixity**, so declaring
+it for the set vocabulary changes nothing for any operator left alone; the one constraint is
+that all overloads under one canonical name must agree on their fixity (else a chain over them
+errors at the use site). Effect on this spec: option A is now the real answer for
+`UNION`/`INTERSECT` as _words_ with precedence, not just (C)+(D). See the Phase table and the
+Q5 resolution below for the follow-up (add `@infixl` to the prelude operators; §D5 route B
+formally buried).
 
 ### 13.3 Independent findings (act on regardless of Q5)
 

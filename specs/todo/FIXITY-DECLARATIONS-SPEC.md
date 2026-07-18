@@ -1,6 +1,12 @@
 # Fixity Declarations for L4 — Branch Brief
 
-> **Status:** EXPERIMENTAL — greenlit by Meng 2026-07-18 as a decoupled, timeboxed spike.
+> **Status:** ✅ LANDED (2026-07-18) — shipped as PR
+> [legalese/l4-ide#128](https://github.com/legalese/l4-ide/pull/128), merged up to current
+> `unstable`, green (jl4-test 1221/0, jl4-core-test 208/0, l4-cli-test 55/0). Implemented per
+> this brief, then run through a 6-dimension adversarial review; all 8 confirmed findings fixed
+> (n-ary-theft guard via matcher dry-run; attachment adjacency + misplaced-annotation warning;
+> route-α merge reconciliation). Q5 reopens with option A real — see `SET-OPERATORS-SPEC.md`
+> §13.2 OUTCOME and Phases 3b/3d. Success routing of §8 executed.
 > **Branch:** `mengwong/fixity-declarations` off `origin/unstable`, in a worktree
 > (`~/src/legalese/l4wt/fixity-declarations`). PRs into `unstable`, per repo convention.
 > **Relationship to set operators:** NON-BLOCKING, both directions.
