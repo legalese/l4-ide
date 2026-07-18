@@ -106,7 +106,10 @@ spec = describe "STATE-AS-LEDGER M2: ledger surfacing + real provenance" $ do
       case ledgerProvenances res of
         [p] -> do
           p.source `shouldBe` "RECORD"
-          p.position `shouldBe` Just fixedNowIso
+          -- bitemporal stamps (#914): tx is the root eval clock; a write with
+          -- no EVAL UNDER VALID TIME in scope is contemporaneous (vtFrom empty)
+          p.txTime `shouldBe` fixedNow
+          p.vtFrom `shouldBe` Nothing
           -- party is intentionally empty in M2 (see openIssues)
           p.party `shouldBe` ""
         other -> expectationFailure ("expected exactly one Assign provenance, got " <> show (length other))

@@ -1,15 +1,15 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-record-thunk-once.l4:29:1-110:
+record-thunk-once.l4:32:1-110:
   0
   Ledger:
     RECORD `x` IS 100   [source=RECORD, at=2025-01-31T15:45:30Z]
-record-thunk-once.l4:45:1-133:
-  LIST 737789, 7, 737789
+record-thunk-once.l4:48:1-133:
+  LIST 737789, 7, 7
   Ledger:
     RECORD `x` IS 7   [source=RECORD, at=2025-01-31T15:45:30Z]
-record-thunk-once.l4:60:1-131:
+record-thunk-once.l4:65:1-65:
   LIST 0, 7, 0
   Ledger:
     RECORD `x` IS 7   [source=RECORD, at=2025-01-31T15:45:30Z]

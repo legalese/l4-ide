@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+bitemporal-correction.l4:13:1-365:
+  LIST 1, 2, 2, 0
+  Ledger:
+    RECORD `x` IS 1   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2024-01-01]
+    RECORD `x` IS 2   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2024-01-01]
