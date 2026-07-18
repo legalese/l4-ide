@@ -185,6 +185,17 @@ for `UNION` / `LESS`, but make `UNION` / `LESS` the canonical spelling in docs, 
 `l4` skill. Consider a lint (§D4) nudging `PLUS`-on-`Set` → `UNION`. Do **not** overload `TIMES`
 for intersection — the arithmetic analogy is even weaker there and `INTERSECT` is short enough.
 
+**Status upgrade (machine-verified 2026-07-18): these overloads are not mere aliases — they are
+currently the _only_ bare-and-precedence-correct spellings.** Because `PLUS`/`MINUS` are keyword
+operators in the parser's table (prio 6, `AssocLeft`) that desugar to overloadable magic names,
+the D3 overloads inherit **real precedence and associativity** with zero compiler work. Verified
+live: `setSize (a1 MINUS b1)` → 1, `setSize (a1 PLUS b1)` → 4, `5 MINUS 2` → 3 (numeric
+dispatch untouched), and the unparenthesized compound **`a1 PLUS b1 MINUS b1` → `{1}`** —
+left-associated at prio 6, no parens, no backticks. Until Q5 resolves, `MINUS` is therefore the
+ergonomic recommendation for set difference in running text (Oracle SQL precedent, §D6), with
+`LESS` remaining the aspirational drafting canon pending Phase 3c. The trap warning above
+applies with full force — the lint should fire on these spellings too.
+
 ### D4 — `AND` on sets: overload it, then _lint_ it. (The important one.)
 
 Because `__AND__` and `__OR__` are overloadable magic names, we can literally do this:
@@ -669,9 +680,17 @@ die — on its own merits.)_
   progress. If fixity wins, `UNION`/`INTERSECT` stay identifiers forever and every future
   library operator benefits; if keywords win, include **the `try` fix at `Parser.hs:1491`**
   as part of landing bare `LESS`.
-- **Phase 3c — bare `LESS`**, if ever: only reachable via the keyword route (a fixity mechanism
-  cannot rescue a word the lexer already owns). If 3b goes the fixity way, set difference stays
-  `WITHOUT`/`EXCEPT`/`` `LESS` `` and this phase is abandoned — acceptable, per §D5.
+- **Phase 3c — bare `LESS`**, if ever: unreachable via fixity (a fixity mechanism cannot rescue
+  a word the lexer already owns), but there is now a **discovered cheap design — `LESS` as a
+  surface alias for the `Minus` node.** Restructure the operator-table entry at `Parser.hs:1491`
+  to consume `TKLess` then branch on an _optional_ `TKThan`: with `THAN` → `Lt` at prio 4
+  (today's behaviour, unchanged); without → the `Minus` builder at prio 6. Roughly five lines;
+  no lexer change (`TKLess` exists); no new magic name (rides `__MINUS__`, so sets get
+  difference by the D3 overload and numbers get "the salary `LESS` deductions" — genuinely good
+  drafting register — for free); and the restructure _subsumes_ the `try` fix rather than
+  adding to it. **Untried as of 2026-07-18** — nobody has yet built the `try`/`optional`
+  variant; needs a feature-branch spike with regression tests around `LESS THAN`
+  (comparison unchanged, layout edge cases, error quality).
 - **Phase 4 — the lint.** Diagnostic + quick-fix per the §11.6 decision procedure (zeroth
   check: scalar operands exit; Defeater 1 empty-intersection; Defeater 2 co-extension;
   anti-defeater contrastive-connective scan; `AMBIGUOUS` escape hatch), hung off
@@ -716,8 +735,16 @@ die — on its own merits.)_
   implicit precedence is exactly how `8÷2(2+2)` happens. On that view `A UNION B INTERSECT C`
   _should_ be a parse error demanding parentheses, and Phase 3b is not deferred but rejected.
   The ladder visualizer weakens the worry (the binding is always renderable), but for a
-  drafting canon, mandatory explicit grouping may be the more on-message answer. So the Q5
-  decision is three-way: (A) fixity declarations, (B) keywords, (C) parens forever.
+  drafting canon, mandatory explicit grouping may be the more on-message answer. And there is a
+  **fourth option, which exists today and is verified (§D3): ride the overloadable keyword
+  operators.** `PLUS`/`MINUS` (and `AND`/`OR`, §D4) already sit in the parser's precedence
+  table and desugar to magic names, so their `Set` overloads are bare _and_ precedence-correct
+  now — `a1 PLUS b1 MINUS b1` evaluates unparenthesized. Coverage: union (`PLUS`, `AND`, `OR`)
+  and difference (`MINUS`, plus `LESS` after the Phase-3c alias) — but **not intersection**
+  (no keyword to ride; `TIMES` rejected by §D3). So the Q5 decision is four-way:
+  (A) fixity declarations, (B) keywords, (C) parens forever, (D) keyword-operator overloads —
+  with D already in hand and A/B/C only needed for what D cannot cover (`UNION`/`INTERSECT`
+  as _words_ with precedence).
 
 ## 9. Q2 resolved: what the authorities actually say
 
