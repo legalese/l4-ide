@@ -27,7 +27,13 @@ IMPORT prelude
 #EVAL setSize `new yorkers`                -- 2
 ```
 
-`setFromList` discards duplicates: `setFromList (LIST 1, 1, 2)` has size 2.
+`setFromList` discards duplicates: `setFromList (LIST 1, 1, 2)` has size 2. You can also write two or more elements directly with `SET OF`:
+
+```l4
+`new yorkers` MEANS SET OF "alice", "bob"      -- same as setFromList (LIST "alice", "bob")
+```
+
+One catch: `SET OF` needs at least two elements. With a single argument, `SET OF x` reads `x` as the contents list — so `SET OF "carol"` is a type error. For a one-element set, stay with `setFromList (LIST "carol")`.
 
 ## The two ANDs, side by side
 
@@ -119,4 +125,4 @@ Seen from engineering, the redundancy canon is a **Boolean-minimization presumpt
 
 - Reference: [Sets library](../../reference/libraries/sets.md)
 - The full design record, with the case law verified against primary sources: [SET-OPERATORS-SPEC](https://github.com/legalese/l4-ide/blob/docs/set-operators-spec/specs/todo/SET-OPERATORS-SPEC.md)
-- Coming separately: variadic construction (`SET OF NY, NJ` — [#123](https://github.com/legalese/l4-ide/pull/123)) and the ambiguity lint
+- Coming next: the ambiguity lint that surfaces the otiosity argument in the IDE

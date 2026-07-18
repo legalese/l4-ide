@@ -41,7 +41,10 @@ setSize s / setToList s / emptySet
    records with `set equals` fields can be `EQUALS`-unequal, silently. Compare set-valued
    record fields field-wise with `` `set equals` ``.
 5. **Field name is `elements`** (`s's elements`), not `contents` (that's `Dictionary`).
-6. `setFromList (LIST …)` is the construction idiom. `SET OF x, y, z` variadic construction
-   requires the route-α typechecker (PR #123); check it exists before using.
+6. Two construction idioms, equivalent for 2+ elements: `setFromList (LIST x, y, z)` and
+   the variadic `SET OF x, y, z`. Two boundary traps: (a) `SET OF` needs 2+ args —
+   `SET OF "carol"` is a TYPE ERROR (one arg is read as the contents list); use
+   `setFromList (LIST "carol")` for a singleton. (b) A single list arg is literal:
+   `SET OF LIST 1, 2` = `{1, 2}` (the list IS the contents), not a set containing a list.
 7. Deontic fence: a `SET OF Party` in the party position of an obligation has **no defined
    distribution semantics** yet (joint? several? each?). Do not write it expecting meaning.

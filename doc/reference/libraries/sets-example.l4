@@ -3,7 +3,10 @@ IMPORT prelude
 § `Set operations`
 
 -- "residents of New York and New Jersey may apply"
-`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+-- SET OF collects two-or-more arguments; equivalent to setFromList (LIST ...)
+`new yorkers`   MEANS SET OF "alice", "bob"
+-- a SINGLE element can't use bare SET OF (one argument is read as the
+-- contents list); use setFromList or SET OF LIST for singletons
 `new jerseyans` MEANS setFromList (LIST "carol")
 
 -- term-level AND on sets is union: three people are eligible
