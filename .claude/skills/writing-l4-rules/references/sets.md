@@ -1,7 +1,7 @@
 # Sets: `SET OF a`
 
 Prelude-provided (after `IMPORT prelude`). Backed by `LIST OF a`; order and duplicates are
-irrelevant to all observers. Motivation: legal *and* is type-ambiguous — "residents of NY
+irrelevant to all observers. Motivation: legal _and_ is type-ambiguous — "residents of NY
 **and** NJ" is a **union of people**; "cruel **and** unusual" is a **conjunction of
 conditions**. L4 disambiguates by type: `AND` on `SET`s is union; `AND` on `BOOLEAN`s stays
 conjunction. Transcribe the statute's connective verbatim and let the checker route it.

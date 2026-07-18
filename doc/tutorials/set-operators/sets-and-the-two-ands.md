@@ -1,15 +1,15 @@
 # Sets, and the Two Meanings of "And"
 
-Legal drafters write *and* where a logician expects *or*, and it is not a mistake:
+Legal drafters write _and_ where a logician expects _or_, and it is not a mistake:
 
 | Clause                                               | Reading                          |
 | ---------------------------------------------------- | -------------------------------- |
 | "cruel **and** unusual punishments"                  | must be **both**                 |
 | "residents of New York **and** New Jersey may apply" | resident of **either** qualifies |
 
-The second one looks paradoxical only because one word is doing two jobs. In the first clause, *and* joins two **conditions about the same punishment** — logical conjunction. In the second, *and* joins two **groups of people into a bigger group** — set union. And union is secretly disjunctive one level down: you are in the union of A and B exactly when you are in A **or** in B.
+The second one looks paradoxical only because one word is doing two jobs. In the first clause, _and_ joins two **conditions about the same punishment** — logical conjunction. In the second, _and_ joins two **groups of people into a bigger group** — set union. And union is secretly disjunctive one level down: you are in the union of A and B exactly when you are in A **or** in B.
 
-Courts see this ambiguity constantly. The Singapore Court of Appeal has read the same word *and* as union in one case (*Nam Hong Construction* [2016] SGCA 42) and as conjunction in another (*Sit Kwong Lam* [2018] SGCA 14) — same court, same Chief Justice, opposite results, and correctly so both times. The word underdetermines the meaning; the context decides. As the U.S. Supreme Court put it: "Really, it all depends" (*Pulsifer v. United States*, 601 U.S. 124, 140 (2024)).
+Courts see this ambiguity constantly. The Singapore Court of Appeal has read the same word _and_ as union in one case (_Nam Hong Construction_ [2016] SGCA 42) and as conjunction in another (_Sit Kwong Lam_ [2018] SGCA 14) — same court, same Chief Justice, opposite results, and correctly so both times. The word underdetermines the meaning; the context decides. As the U.S. Supreme Court put it: "Really, it all depends" (_Pulsifer v. United States_, 601 U.S. 124, 140 (2024)).
 
 L4's answer: give the two jobs two **types**, and let the type checker pick the right operation. This tutorial shows how.
 
@@ -42,9 +42,9 @@ Here is the whole point of the feature in four lines:
 `violates 8th amendment` MEANS `is cruel` AND `is unusual`
 ```
 
-Same token. Different types. Different operations. **Both correct.** You can transcribe the statute's *and* verbatim — without first deciding what it means — and the type system routes it to conjunction or union as the operands dictate.
+Same token. Different types. Different operations. **Both correct.** You can transcribe the statute's _and_ verbatim — without first deciding what it means — and the type system routes it to conjunction or union as the operands dictate.
 
-(`OR` on sets is *also* union — "residents of NY and NJ" and "residents of NY or NJ" describe the same eligible population. That the two connectives coincide on sets is not a bug; it is the ambiguity the drafter left behind, made visible.)
+(`OR` on sets is _also_ union — "residents of NY and NJ" and "residents of NY or NJ" describe the same eligible population. That the two connectives coincide on sets is not a bug; it is the ambiguity the drafter left behind, made visible.)
 
 ## Union, intersection, difference
 
@@ -55,7 +55,7 @@ The explicit vocabulary, when you want to leave no doubt:
 #EVAL setSize (`new yorkers` INTERSECT `new jerseyans`)   -- 0
 ```
 
-For set difference, legal English says *less*: "all employees LESS those on probation". In L4, `LESS` needs backticks — the bare word belongs to the `LESS THAN` comparison — and `WITHOUT` is the alias that doesn't:
+For set difference, legal English says _less_: "all employees LESS those on probation". In L4, `LESS` needs backticks — the bare word belongs to the `LESS THAN` comparison — and `WITHOUT` is the alias that doesn't:
 
 ```l4
 `all employees` MEANS setFromList (LIST "dilbert", "alice", "wally", "asok")
@@ -88,11 +88,11 @@ Bare `EQUALS` between two sets is a **compile-time error**, deliberately. Struct
 #EVAL (setFromList (LIST 2, 1, 1)) `set equals` (setFromList (LIST 1, 2))   -- TRUE
 ```
 
-One caveat to keep in mind: this extensional treatment is one level deep. A set *inside* another set, or inside a record field, compares by its written representation. When comparing records with set-valued fields, compare the fields with `` `set equals` `` rather than comparing the whole records. (See `ok/set-operators-nested.l4` in the examples for the full picture.)
+One caveat to keep in mind: this extensional treatment is one level deep. A set _inside_ another set, or inside a record field, compares by its written representation. When comparing records with set-valued fields, compare the fields with `` `set equals` `` rather than comparing the whole records. (See `ok/set-operators-nested.l4` in the examples for the full picture.)
 
 ## Why this matters: the otiosity test, executable
 
-When a court has to decide whether *and* means union or intersection, the decisive move is often the **redundancy canon**: a reading that makes one of the words do no work is presumed wrong. In *A-G of the Bahamas v Royal Trust* [1986] UKPC 34, "education and welfare" was read disjunctively because education is a subset of welfare — on the intersective reading, "welfare" would be otiose. In *Re Best* [1904] 2 Ch 354, "charitable and benevolent" was read conjunctively because the two genuinely overlap — both words do work.
+When a court has to decide whether _and_ means union or intersection, the decisive move is often the **redundancy canon**: a reading that makes one of the words do no work is presumed wrong. In _A-G of the Bahamas v Royal Trust_ [1986] UKPC 34, "education and welfare" was read disjunctively because education is a subset of welfare — on the intersective reading, "welfare" would be otiose. In _Re Best_ [1904] 2 Ch 354, "charitable and benevolent" was read conjunctively because the two genuinely overlap — both words do work.
 
 With sets, that test is a program:
 

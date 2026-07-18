@@ -2,7 +2,7 @@
 
 Set-theoretic collections: `SET OF a` with union, intersection, difference, membership, and subset — plus operator overloads that make L4's `AND`, `OR`, `PLUS`, and `MINUS` do the right thing when their operands are sets. Part of the prelude; available after `IMPORT prelude`.
 
-Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a *union of people*, while "cruel **and** unusual" conjoins two *conditions*. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story.
+Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story.
 
 ### Location
 
@@ -19,19 +19,19 @@ A `SET OF a` is a wrapper around a list in which **order and duplicates are irre
 
 ### Functions
 
-| Function                | Signature                              | Description                                       |
-| ----------------------- | -------------------------------------- | ------------------------------------------------- |
-| `emptySet`              | `SET OF a`                             | The set with no elements                          |
-| `setFromList`           | `LIST OF a → SET OF a`                 | Build a set from a list, discarding duplicates    |
-| `setToList`             | `SET OF a → LIST OF a`                 | The distinct elements, as a list                  |
-| `setSize`               | `SET OF a → NUMBER`                    | The number of distinct elements                   |
-| `` x `is in` s ``       | `a → SET OF a → BOOLEAN`               | Membership                                        |
-| `` p `is subset of` q`` | `SET OF a → SET OF a → BOOLEAN`        | Every element of `p` is in `q`                    |
-| `` p `set equals` q ``  | `SET OF a → SET OF a → BOOLEAN`        | Extensional equality (mutual subset)              |
-| `p UNION q`             | `SET OF a → SET OF a → SET OF a`       | `p ∪ q` — "the members of p and of q"             |
-| `p INTERSECT q`         | `SET OF a → SET OF a → SET OF a`       | `p ∩ q` — "those in both"                         |
-| `` p `LESS` q ``        | `SET OF a → SET OF a → SET OF a`       | `p \ q` — "all employees LESS those on probation" |
-| `p WITHOUT q`           | `SET OF a → SET OF a → SET OF a`       | Alias for `` `LESS` ``, no backticks needed       |
+| Function                | Signature                        | Description                                       |
+| ----------------------- | -------------------------------- | ------------------------------------------------- |
+| `emptySet`              | `SET OF a`                       | The set with no elements                          |
+| `setFromList`           | `LIST OF a → SET OF a`           | Build a set from a list, discarding duplicates    |
+| `setToList`             | `SET OF a → LIST OF a`           | The distinct elements, as a list                  |
+| `setSize`               | `SET OF a → NUMBER`              | The number of distinct elements                   |
+| ``x `is in` s``         | `a → SET OF a → BOOLEAN`         | Membership                                        |
+| `` p `is subset of` q`` | `SET OF a → SET OF a → BOOLEAN`  | Every element of `p` is in `q`                    |
+| ``p `set equals` q``    | `SET OF a → SET OF a → BOOLEAN`  | Extensional equality (mutual subset)              |
+| `p UNION q`             | `SET OF a → SET OF a → SET OF a` | `p ∪ q` — "the members of p and of q"             |
+| `p INTERSECT q`         | `SET OF a → SET OF a → SET OF a` | `p ∩ q` — "those in both"                         |
+| ``p `LESS` q``          | `SET OF a → SET OF a → SET OF a` | `p \ q` — "all employees LESS those on probation" |
+| `p WITHOUT q`           | `SET OF a → SET OF a → SET OF a` | Alias for `` `LESS` ``, no backticks needed       |
 
 `UNION`, `INTERSECT`, and `WITHOUT` are ordinary identifiers and work **bare** at call sites. `LESS` must be written `` `LESS` `` (backticked) because bare `LESS` is the lexer keyword that starts `LESS THAN`.
 
@@ -39,13 +39,13 @@ These word operators have **no precedence**: parenthesize compounds, e.g. `A UNI
 
 ### Operator overloads
 
-| Operator     | On sets, means | Notes                                                                 |
-| ------------ | -------------- | --------------------------------------------------------------------- |
-| `p PLUS q`   | `UNION`        | Bare **and precedence-correct**: `a PLUS b MINUS c` needs no parens   |
-| `p MINUS q`  | `` `LESS` ``   | Ditto (Oracle SQL's `MINUS` is the precedent)                         |
-| `p AND q`    | `UNION`        | Term-level "and" — see the two-ANDs discussion in the tutorial        |
-| `p OR q`     | `UNION`        | Union too: "NY and NJ residents" = "NY or NJ residents"               |
-| `p EQUALS q` | *error*        | Deliberately ambiguous — write `` `set equals` `` (see below)         |
+| Operator     | On sets, means | Notes                                                               |
+| ------------ | -------------- | ------------------------------------------------------------------- |
+| `p PLUS q`   | `UNION`        | Bare **and precedence-correct**: `a PLUS b MINUS c` needs no parens |
+| `p MINUS q`  | `` `LESS` ``   | Ditto (Oracle SQL's `MINUS` is the precedent)                       |
+| `p AND q`    | `UNION`        | Term-level "and" — see the two-ANDs discussion in the tutorial      |
+| `p OR q`     | `UNION`        | Union too: "NY and NJ residents" = "NY or NJ residents"             |
+| `p EQUALS q` | _error_        | Deliberately ambiguous — write `` `set equals` `` (see below)       |
 
 **Caution — sets are not arithmetic.** Union is idempotent (`A PLUS A` is `A`) and has no inverse: `(A PLUS B) MINUS B` is **not** `A` in general.
 
@@ -61,7 +61,7 @@ Bare `EQUALS` on two sets is a compile-time ambiguity error, **on purpose**. Bui
 
 Order/duplicate-insensitivity applies to a set's **elements**, compared with builtin structural equality. It does not compose:
 
-- `SET OF SET OF a` compares inner sets by representation — `{{1,2}}` and `{{2,1}}` are *different* elements;
+- `SET OF SET OF a` compares inner sets by representation — `{{1,2}}` and `{{2,1}}` are _different_ elements;
 - a set wrapped in any container (a record field, `PAIR`, `LIST`, `MAYBE`) compares structurally under bare `EQUALS`, with no diagnostic. Compare set-valued fields with `` `set equals` `` field-wise instead of comparing whole records.
 
 See [set-operators-nested.l4](https://github.com/legalese/l4-ide/blob/main/jl4/examples/ok/set-operators-nested.l4), which pins this behavior.
