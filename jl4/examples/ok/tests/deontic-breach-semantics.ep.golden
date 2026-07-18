@@ -92,9 +92,9 @@ GIVETH A DEONTIC Person Action
 -- Bob's delivery AT 7 both reveals Alice's expiry (7 > 5) AND is the very
 -- action the LEST reparation waits for => FULFILLED (not a pending residual).
 #TRACE `late delivery discharges the reparation` AT 0 WITH
-  PARTY 7
+  PARTY Bob DOES deliver AT 7
 
-DOES Bob AT deliver `prohibition hence sees the revealer` MEANS
+`prohibition hence sees the revealer` MEANS
   PARTY Alice
   SHANT smoke
   WITHIN 5
@@ -103,9 +103,9 @@ DOES Bob AT deliver `prohibition hence sees the revealer` MEANS
 -- Same re-offer on the prohibition HENCE path: the prohibition was respected,
 -- and the revealing delivery discharges the HENCE obligation => FULFILLED.
 #TRACE `prohibition hence sees the revealer` AT 0 WITH
-  PARTY 7
+  PARTY Bob DOES deliver AT 7
 
-DOES Bob AT deliver `anchor at reveal` MEANS
+`anchor at reveal` MEANS
   PARTY Alice
   MUST pay 1
   WITHIN 2
@@ -115,9 +115,9 @@ DOES Bob AT deliver `anchor at reveal` MEANS
 -- re-offered event (Bob at 7, wrong party) decrements the LEST WITHIN by
 -- zero, so the residual still shows WITHIN 3.
 #TRACE `anchor at reveal` AT 0 WITH
-  PARTY 7
+  PARTY Bob DOES deliver AT 7
 
-DOES Bob AT deliver `nested peel` MEANS
+`nested peel` MEANS
   PARTY Alice
   MUST pay 1
   WITHIN 2
@@ -130,9 +130,9 @@ DOES Bob AT deliver `nested peel` MEANS
 #TRACE `nested peel` AT 0 WITH
   (`WAIT UNTIL` 20)
   (`WAIT UNTIL` 30)
-  PARTY 35
+  PARTY Bob DOES deliver AT 35
 
-DOES Bob AT deliver GIVETH A DEONTIC Person Action
+GIVETH A DEONTIC Person Action
 `one event repairs both alternatives` MEANS
     (PARTY Alice MUST pay 1 WITHIN 2 LEST (PARTY Bob MUST deliver WITHIN 10))
     ROR
@@ -141,23 +141,23 @@ DOES Bob AT deliver GIVETH A DEONTIC Person Action
 -- Re-offer x ROR interaction: the single late delivery reveals expiry on BOTH
 -- alternatives and is then re-offered inside each, fulfilling both LESTs.
 #TRACE `one event repairs both alternatives` AT 0 WITH
-  PARTY 5
+  PARTY Bob DOES deliver AT 5
 
 -- ---------------------------------------------------------------------------
 -- (d) at-deadline boundary; SHANT stamp-as-deadline sentinel
 -- ---------------------------------------------------------------------------
 
-DOES Bob AT deliver `pay due` MEANS
+`pay due` MEANS
   PARTY Alice
   MUST pay 100
   WITHIN 5
 
 -- Exactly AT the deadline: timely.
 #TRACE `pay due` AT 0 WITH
-  PARTY 5
+  PARTY Alice DOES pay 100 AT 5
 
 -- Clock advanced exactly TO the deadline: not yet expired (residual WITHIN 0).
-DOES Alice AT pay 100 #TRACE `pay due` AT 0 WITH
+#TRACE `pay due` AT 0 WITH
   (`WAIT UNTIL` 5)
 
 -- Strictly past the deadline: breach, "deadline, which was at 5".
@@ -172,10 +172,10 @@ DOES Alice AT pay 100 #TRACE `pay due` AT 0 WITH
 -- Prohibited action exactly AT the deadline is still a violation; the breach
 -- record reuses the event stamp as its "deadline" sentinel (both fields 30).
 #TRACE `no smoking` AT 0 WITH
-  PARTY 30
+  PARTY Alice DOES smoke AT 30
 
 -- Prohibition respected once the deadline has passed => FULFILLED.
-DOES Alice AT smoke #TRACE `no smoking` AT 0 WITH
+#TRACE `no smoking` AT 0 WITH
   (`WAIT UNTIL` 31)
 
 -- ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ DOES Alice AT smoke #TRACE `no smoking` AT 0 WITH
   WITHIN 30
 
 #TRACE `pay exactly 100` AT 0 WITH
-  PARTY 10
+  PARTY Alice DOES pay 100 AT 10
 
 -- ---------------------------------------------------------------------------
 -- MAY expiry routes to LEST; HENCE fires only on exercise
@@ -199,7 +199,7 @@ DOES Alice AT smoke #TRACE `no smoking` AT 0 WITH
 -- ROUTING, not just the outcome: were expiry mis-routed to HENCE, the first
 -- trace would leave Bob's delivery obligation as a residual instead of
 -- FULFILLED.
-DOES Alice AT pay 100 `may with lest` MEANS
+`may with lest` MEANS
   PARTY Alice
   MAY exercise
   WITHIN 5
@@ -209,14 +209,14 @@ DOES Alice AT pay 100 `may with lest` MEANS
 -- Permission NOT exercised: expiry routes to LEST (Alice's reparation
 -- payment), and the revealing payment is re-offered to it => FULFILLED.
 #TRACE `may with lest` AT 0 WITH
-  PARTY 7
+  PARTY Alice DOES pay 50 AT 7
 
 -- Permission exercised: the HENCE obligation (Bob delivers) becomes the
 -- residual.
-DOES Alice AT pay 50 #TRACE `may with lest` AT 0 WITH
-  PARTY 3
+#TRACE `may with lest` AT 0 WITH
+  PARTY Alice DOES exercise AT 3
 
-DOES Alice AT exercise `may bare` MEANS
+`may bare` MEANS
   PARTY Alice
   MAY exercise
   WITHIN 5
@@ -243,5 +243,4 @@ DOES Alice AT exercise `may bare` MEANS
 -- evaluation terminates with the recursive obligation as the residual
 -- (before the at-most-once rule this trace looped forever).
 #TRACE `recursive lest` AT 0 WITH
-  PARTY 7
-DOES Bob AT deliver 
+  PARTY Bob DOES deliver AT 7

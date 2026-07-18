@@ -177,23 +177,23 @@ GIVEN `Outstanding Payment Amount` IS A Money
 -- after a set of actions have been completed at a certain amount of days.
 
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
-    PARTY Day (March 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (April 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (May 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (June 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (July 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (August 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (September 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (October 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (November 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (December 4 2025)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (January 4 2026)
-    DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) PARTY Day (February 4 2026)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (March 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (May 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (June 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (July 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (August 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (September 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (October 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (November 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (December 4 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (January 4 2026)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (February 4 2026)
 
 -- The #TRACE above is the happy case. Borrower pays everything on time, hence the contract is [FULFILLED]
 
-DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
-    PARTY Day (April 3 2025)
+#TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
 
 -- In this last #TRACE you see the state after just one event where Borrower pays once and late.
 -- The #TRACE returns the next obligation definition. Because the late payment
@@ -214,7 +214,7 @@ DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) #
 --                                   `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`
 
 
-DOES `The Borrower` AT `pay monthly installment to` `The Lender` (USD 2256.46) § `Promissory Appendix`
+§ `Promissory Appendix`
 
 -- This file contains definitions and helper functions that are used in the note
 -- to help destructure more complex types and relationships or make the note
