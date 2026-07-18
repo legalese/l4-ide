@@ -33,7 +33,7 @@ precisely the category error this spec exists to prevent. It belongs on rung 2 a
 **This yields L4's actual contribution: two mechanisms, because there are two diseases.**
 
 - **Rungs 1–2** get the boring, correct, sixty-year-old programming-language answer: an explicit
-  grammar with a **declared precedence table** (`Parser.hs:1481-1497`) — plus the thing legal
+  grammar with a **declared precedence table** (`Parser.hs:1496-1522`) — plus the thing legal
   drafting has never had: **a visualizer that renders the binding.** The ladder diagrams _are_ the
   answer to PEMDAS. You do not argue about the parse tree; you look at it.
   L4 already practises this: **mixfix operators deliberately refuse implicit precedence** and
@@ -258,7 +258,7 @@ wears backticks (`` A `LESS` B ``) or ships bare under a keyword-free alias — 
 `EXCEPT` are both unclaimed identifiers** (verified against `Lexer.hs`; of the §D2 vocabulary
 only `LESS` and `MINUS` are keywords).
 
-**Proposed precedence for route B**, slotting into the table at `Parser.hs:1481-1497`:
+**Proposed precedence for route B**, slotting into the table at `Parser.hs:1496-1522`:
 
 | Operator    | Prio | Assoc       | Rationale                                                                                                                  |
 | ----------- | ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -672,14 +672,15 @@ die — on its own merits.)_
 - **Phase 3a — route-α elaboration** (§D7.1, DECIDED): variadic construction
   `SET OF 1, 2, 3` via argument-collection in the typechecker. First compiler-touching change;
   independent of everything below.
-- **Phase 3b — precedence for identifier operators, mechanism TBD (Q5).** The old plan —
-  keywordize `UNION`/`INTERSECT` in the lexer + precedence rows per §D5 — is under challenge:
-  bare spellings already work, so keywords would buy _only_ precedence while importing the
-  keyword tax that `LESS` exemplifies (§D7.1). The alternative is a **fixity-declaration
-  mechanism** (Haskell `infixl`/`infixr`-style) for identifier operators; assessment in
-  progress. If fixity wins, `UNION`/`INTERSECT` stay identifiers forever and every future
-  library operator benefits; if keywords win, include **the `try` fix at `Parser.hs:1491`**
-  as part of landing bare `LESS`.
+- **Phase 3b — precedence for identifier operators: RECOMMENDED CLOSED, build nothing (§13).**
+  The assessment came back: the §D3/§D4 overloads already cover the capabilities (union via
+  `PLUS`/`AND`/`OR`, difference via `MINUS`, all bare and precedence-correct), so the only
+  residual gap is the literal words `UNION`/`INTERSECT` carrying precedence — a register
+  preference that does not justify ~5–8 person-days and an M/L disambiguation risk. Compounds
+  parenthesize (Q5 option C), which is §0's own philosophy. The fixity mechanism (option A)
+  is architecturally ready when L4 wants it as a _platform_ feature — the flat-App parse shape
+  and registry import plumbing fit it exactly (§13.1) — but it is decoupled from this spec.
+  Pending Meng's sign-off on Q5.
 - **Phase 3c — bare `LESS`**, if ever: unreachable via fixity (a fixity mechanism cannot rescue
   a word the lexer already owns), but there is now a **discovered cheap design — `LESS` as a
   surface alias for the `Minus` node.** Restructure the operator-table entry at `Parser.hs:1491`
@@ -755,6 +756,9 @@ die — on its own merits.)_
   (A) fixity declarations, (B) keywords, (C) parens forever, (D) keyword-operator overloads —
   with D already in hand and A/B/C only needed for what D cannot cover (`UNION`/`INTERSECT`
   as _words_ with precedence).
+  **RECOMMENDATION READY (assessment in §13): adopt (C)+(D) for this spec; (B) is dead; (A) is
+  sound but decoupled — a platform investment for when multiple libraries want declared
+  precedence. Awaiting sign-off.**
 
 ## 9. Q2 resolved: what the authorities actually say
 
@@ -1449,3 +1453,67 @@ Two small dividends beyond confirmation:
 _Low Kok Heng_) or 🟡 characterised inside a verified primary source (_Re Best_, _Re Eades_,
 _Rickerby_). The only remaining publication nicety is pulling _Re Best_ [1904] 2 Ch 354 from a
 paid reporter (ICLR / Westlaw / HeinOnline).
+
+## 13. Fixity-declaration assessment (Q5) — subagent report, 2026-07-18
+
+Full A–E assessment of a Haskell-`infixl`/`infixr`-style fixity mechanism for identifier
+operators, run read-only against the tree with `l4`-binary probes. Distilled here; the verdict
+reshapes Phase 3b.
+
+### 13.1 Architecture findings
+
+- **GHC model:** fixity is resolved in the _renamer_, not the parser — operator chains parse to
+  a provisional flat shape and are re-associated once fixities are in scope. Fixity is
+  module-scoped, imports carry it, undeclared defaults to `infixl 9`. (Agda/Coq resolve at
+  parse time via precedence graphs — more powerful, far more invasive.)
+- **L4 is already GHC-shaped, by accident.** Bare `1 UNION 2 INTERSECT 3` parses today to a
+  **flat n-ary App** — `App UNION [1, 2, App INTERSECT [], 3]` (`mixfixChainExpr`,
+  `Parser.hs:1643-1676`; verified via `l4 ast`). That is exactly the pre-renamer input a
+  re-association pass wants, sitting in parser output for free. Today the Dec-2025 matcher
+  fails such chains on arity — `matchLinearAfterHeadKeyword` requires equal lengths
+  (`TypeCheck.hs:2945`) — verified: even `1 UNION 2 UNION 3` errors; parenthesized works. So
+  identifier operators currently have _neither_ precedence _nor_ associativity.
+- **Minimal design, if ever built:** an `@infixl 6`-style **decorator** on the operator's
+  definition, riding the existing `@desc`/`@export`/`@nlg` annotation rail (no new keyword, no
+  new decl form); a **shunting-yard pre-pass in the typechecker** at the `App` inference site
+  (the parser's mixfix registry is module-local — `Parser/MixfixRegistry.hs:56-73` — only the
+  typechecker's registry unions imports, `TypeCheck.hs:190`); fixity ships with the registry
+  (one extra map-union in `unionMixfixRegistry`, `TypeCheck/Types.hs:359-364`); **no default
+  fixity** — undeclared chains stay parens errors, so the feature is strictly additive; the
+  keyword table is untouched, cross-family precedence stays parens-mandatory.
+- **Cost: ~5–8 person-days.** Crux (M/L): disambiguating binary-operator chains from genuine
+  n-ary mixfix patterns (identical flat shape — must not steal `if/then/else`), and keeping
+  source-range annotations honest through re-association (`rebuildMixfixAppAnno` is 2-hole
+  today; wrong holes silently break `#EVAL` lenses, `TypeCheck.hs:3033-3039`).
+
+### 13.2 Verdict: build nothing for this spec
+
+With the §D3/§D4 overloads verified (union bare-and-precedenced three ways — `PLUS`, `AND`,
+`OR`; difference one way — `MINUS`), **the capabilities are covered and fixity's unique residual
+payoff is the literal words `UNION`/`INTERSECT` carrying precedence — a register preference,
+not a capability gap.** Even intersection has a latent precedence-correct ride: `__TIMES__`
+exists at prio 7 > `PLUS`'s 6 (`Environment.hs:83`), declined on §D3's register grounds.
+5–8 days with an M/L disambiguation risk does not clear that bar.
+
+The general argument — every future library operator gains precedence; operators stay ordinary
+identifiers (no keyword tax, no `LESS` problem); the parse shape and import plumbing fit like a
+glove — **remains sound, and fixity is the right shape if L4 ever commits to user-declared
+precedence as a language feature.** But that is a **platform investment to schedule on its own
+merits, decoupled from set operators** — build it when a second or third library wants
+declared-precedence operators, not to precedence-enable one word.
+
+**Q5 recommendation: (C) + (D).** Compound identifier-operator expressions parenthesize —
+consonant with §0's own PEMDAS framing and mixfix's deliberate refusal of implicit precedence —
+while the keyword-operator overloads carry the bare ergonomics. (B) keywords: dead. (A) fixity:
+rescheduled to the platform backlog (candidate for `specs/roadmap/`). Awaiting sign-off.
+
+### 13.3 Independent findings (act on regardless of Q5)
+
+- **`l4 format` is already lossy on bare infix mixfix**: `1 UNION 2` formats to prefix
+  `UNION 1 2`; `1 UNION 2 UNION 3` garbles to `UNION UNION 1 2 UNION 3`. Pre-existing, fixity
+  or no fixity — deserves an upstream issue before Phase 1 ships operators people will format.
+- **Erratum:** this spec's `Parser.hs:1481-1497` citations were stale and are corrected to
+  `Parser.hs:1496-1522` (17-row body at `:1502-1518`). Inline `Parser.hs:1491` cites for the
+  `LESS THAN` row refer to the pre-drift line; the row now lives inside `:1502-1518`.
+- Probe files preserved in the session scratchpad (`fixity-chain-probe.l4`,
+  `fixity-ast-probe.l4`, `fixity-sameop-probe.l4`, `fixity-parens-probe.l4`, `fmt-single.l4`).
