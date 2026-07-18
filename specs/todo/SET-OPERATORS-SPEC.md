@@ -1765,3 +1765,46 @@ fixity-collection, or (b) fallback — ship the set vocabulary as a separate `IM
 rather than in the prelude, since **name-imported libraries already propagate fixity correctly**
 (verified). (b) costs an explicit import but works today; weigh against the "auto-available"
 goal.
+
+### 15.3 RESOLVED (2026-07-19, fixity implementer): real bug found + fixed — PR #131
+
+§15.2's hand-back was right to reopen, and its instinct ("trace the full prelude vs mini") was
+the right method — but the candidate ("a size/position limit in fixity-comment collection")
+was wrong. Traced with `Debug.Trace` on `addFixityCommentsToAst`, `applyFixityAnnotation`,
+`chainOperatorFixity`, and `tryReassociateFixityChain`, all four stages verify **correct** for
+the prelude's UNION: the `@infixl` is collected (1 token), attached to the UNION `Decide`
+(honored, not dropped), populated into `MixfixInfo.fixity`, propagated to the importer's
+registry, and found by `chainOperatorFixity` (`fixities=[Just (6,FixityLeft)]`). Attachment and
+import flow were never the problem.
+
+**The actual bug is the parser's flat-chain SHAPE, which differs by operand kind.** A chain over
+LITERAL operands emits an operator-head App (`App UNION [1, 2, App INTERSECT [], 3]`); a chain
+over bare-IDENTIFIER operands juxtaposition-parses to an operand-head App
+(`App aa [Var UNION, bb, Var UNION, aa]` — first operand as head, operators as arg markers).
+The re-association pre-pass only understood the operator-head shape, so it misread the
+operand-head one (treating `aa` as the head operator and the `UNION` markers as operands), hit
+its own "operator in an operand slot" guard, and declined. Every #128 golden used literal
+operands, so the entire identifier-operand class — which is what the prelude's set operators
+over named values are, and what §15.2's `aa UNION bb UNION aa` exercises — was untested.
+
+This also explains §15.2's puzzle (mini's MYUNION works, prelude's UNION doesn't, byte-identical
+content): a small lib's operator happens to be in the importer's parser mixfix-hints so its
+chain parses operator-head, whereas the full prelude's UNION isn't hinted the same way at the
+use site so it parses operand-head. The single (non-chain) `aa UNION bb` always worked (the
+typecheck-level reinterpret handles either shape); only the CHAIN exposed the gap.
+
+**Fix shipped as PR [legalese/l4-ide#131](https://github.com/legalese/l4-ide/pull/131)**
+(`mengwong/fixity-operand-head-fix`, off current `unstable`): `normalizeChain` handles both flat
+shapes and yields a uniform (operands, operators) list; a ≥2-operator guard stops a plain
+`a op b` (and the nested binaries the pass emits) from looping. Regression
+`ok/fixity-identifier-operands.l4` pins same-op, mixed-precedence, and mixed identifier/literal
+chains. Verified end-to-end: the annotated prelude's `aa UNION bb UNION aa` now re-associates.
+Suites green (jl4-test 1225/0, jl4-core-test 208/0).
+
+**Phase 3d verdict: keep sets in the prelude; option (b) is NOT needed.** The "ship a separate
+`IMPORT sets` library" fallback would only have masked this — it works today merely because a
+small lib parses operator-head; it would leave every future large-lib or identifier-operand
+chain latently broken, and would not give bare `a UNION b` from the prelude. With #131 the root
+cause is gone, so the Phase 3d annotations on `mengwong/set-operators-phase3d` become live once
+#131 lands on `unstable` and that branch rebases onto it. Recommend: land #131, rebase phase3d,
+drop the "currently INERT" in-code notes on the prelude set operators, and PR phase3d.
