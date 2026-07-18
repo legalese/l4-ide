@@ -858,6 +858,10 @@ prettyNlgResolveWarning = \ case
     "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
   Resolve.RefNoLocation ref ->
     "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
+  Resolve.FixityAnnotationMisplaced _ ->
+    "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
+  Resolve.FixityAnnotationNoLocation _ ->
+    "A fixity annotation has no source location. This might be an internal compiler error."
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -876,6 +880,10 @@ rangeOfResolveWarning = \ case
   Resolve.RefUnattached r ->
     srcSpanToLspRange $ Just r.range
   Resolve.RefNoLocation _ ->
+    srcSpanToLspRange Nothing
+  Resolve.FixityAnnotationMisplaced fx ->
+    srcSpanToLspRange $ Just fx.range
+  Resolve.FixityAnnotationNoLocation _ ->
     srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------

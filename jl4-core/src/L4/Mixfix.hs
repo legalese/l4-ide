@@ -6,11 +6,13 @@ module L4.Mixfix
   , firstKeyword
   , canonicalMixfixName
   , buildCanonicalNameFromKeywords
+  , isBinaryInfixPattern
   ) where
 
 import Base
 import qualified Base.Set as Set
 import qualified Base.Text as Text
+import L4.Lexer (FixityDirection)
 import L4.Syntax
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -33,9 +35,22 @@ data MixfixInfo = MkMixfixInfo
     -- ^ Just the keyword parts, for quick lookup (e.g., ["is eligible for"])
   , arity :: Int
     -- ^ Number of parameters (parameter slots in the pattern)
+  , fixity :: Maybe (Int, FixityDirection)
+    -- ^ Declared fixity ('@infixl N' \/ '@infixr N' \/ '@infix N') for binary
+    -- infix operators (pattern @[Param, Keyword, Param]@). Populated by the
+    -- typechecker's signature scan from the definition's annotation; always
+    -- 'Nothing' straight out of 'extractMixfixInfo' (in particular, in the
+    -- parser's hint registry, which has no use for it).
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData)
+
+-- | Is this the pattern of a plain binary infix operator, @_ op _@?
+-- Only such operators can carry a fixity declaration.
+isBinaryInfixPattern :: MixfixInfo -> Bool
+isBinaryInfixPattern info = case info.pattern of
+  [MixfixParam _, MixfixKeyword _, MixfixParam _] -> True
+  _ -> False
 
 -- | Extract parameter names from a TypeSig's GIVEN clause.
 givenParamNames :: TypeSig Name -> [RawName]
@@ -104,6 +119,7 @@ extractMixfixInfo tysig appForm =
               { pattern = patternTokens
               , keywords = keywordList
               , arity = paramCount
+              , fixity = Nothing
               }
        else Nothing
 

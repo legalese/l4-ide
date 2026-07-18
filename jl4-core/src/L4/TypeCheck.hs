@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant <$>" #-}
 module L4.TypeCheck
@@ -92,7 +93,8 @@ import L4.TypeCheck.Types as X
 import L4.TypeCheck.Unify
 import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
-import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword)
+import L4.Lexer (FixityDirection (..), fixityHerald)
+import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
 import qualified L4.Export as Export
 
 import Control.Applicative
@@ -108,6 +110,7 @@ import Optics ((%~), (^.))
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
+import Text.Read (readMaybe)
 import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypeSynonymCycles, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -1485,6 +1488,101 @@ checkConsider ec ann e branches t = do
 
   pure (Consider ann re rbranches)
 
+-- | Infer a plain (non-re-associated) application: the pre-existing App
+-- inference logic, factored out of 'inferExpr' so the fixity chain
+-- pre-pass can fall through to it unchanged.
+inferFlatApp :: Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferFlatApp ann n es = do
+      (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
+      -- We want good type error messages. Therefore, we pursue the
+      -- following strategy:
+      --
+      -- 1. We infer the type of the function and instantiate it.
+      --
+      -- 2. Then, we introduce fresh variables for the arguments and the result.
+      --
+      -- 3. Then, we unify the type of the function against a constructed
+      -- function type from the generated variables.
+      --
+      -- 4. At this point, if unification fails, we know that the function
+      -- is either not a function at all or expects a different number of
+      -- arguments than have been supplied.
+      --
+      -- 5. If unification succeeds, we can now proceed by *checking* all
+      -- arguments of the function against their expected result types.
+
+      -- First, try to match this as a mixfix call-site pattern.
+      -- If the function is a registered mixfix and the args contain the expected
+      -- keywords, restructure the args to remove the keywords.
+      -- For param-first patterns, this also returns the correct function name.
+      mMixfixMatch <- tryMatchMixfixCall initialFuncName initialArgs
+      let (actualFuncName, actualArgs, needsAnnoRebuild, mMixfixError) = case mMixfixMatch of
+            Nothing -> (initialFuncName, initialArgs, rewrotePostfix, Nothing)  -- Not a mixfix call, use original
+            Just (funcRawName, restructuredArgs, mErr) ->
+              -- Create a Name with the correct function name, preserving the annotation
+              let MkName nameAnno _ = initialFuncName
+                  newName = MkName nameAnno funcRawName
+                  -- We need to rebuild annotation if args were restructured
+                  -- (i.e., keyword placeholders were removed)
+                  argsChanged = length restructuredArgs /= length initialArgs || rewrotePostfix
+              in (newName, restructuredArgs, argsChanged, mErr)
+
+      -- Report any mixfix matching errors (e.g., wrong keyword, typo)
+      case mMixfixError of
+        Just err -> addError (MixfixMatchErrorCheck n err)
+        Nothing -> pure ()
+
+      -- 1. - 5. Direct inference first; the variadic-construction rescue
+      -- (SET-OPERATORS-SPEC §D7.1, "route α") is a biased FALLBACK via
+      -- 'orElse': it participates only when NO direct resolution of the call
+      -- site succeeds, so any program that typechecks without it — e.g. a
+      -- same-named function overload outcompeting a same-named constructor —
+      -- keeps its meaning verbatim. Within the fallback, a record constructor
+      -- with exactly one LIST-typed field applied to two or more arguments
+      -- collects the arguments into a synthesized List literal:
+      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en); every other candidate
+      -- re-fails exactly as the direct attempt did, preserving error
+      -- messages. One-argument applications never rescue (SET OF xs keeps
+      -- its wrap-this-list reading), and a synonym-obscured LIST field
+      -- misses the rescue rather than guessing.
+      --
+      -- Note that if there are no arguments, then matchFunTy does not
+      -- actually insist on the type t being a function.
+      let directApp = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            (res, rt) <- matchFunTy False rn t actualArgs
+            let finalAnn = if needsAnnoRebuild
+                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                           else ann
+            pure (App finalAnn rn res, rt)
+
+          variadicRescue = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            case t of
+              Fun _ [MkOptionallyNamedType _ _ argT] _
+                | isConstructorKind rn
+                , isListTyCon argT
+                -> do
+                  -- Known limitations, deliberately deferred (adversarial
+                  -- review 2026-07-18): element-type mismatches inside the
+                  -- collected arguments surface as "LIST literal" errors
+                  -- although the source has no LIST literal; and the anno
+                  -- rebuild drops the OF/comma concrete-syntax tokens from
+                  -- the typechecked AST (highlighting-only; exactprint reads
+                  -- the parsed AST and is unaffected).
+                  let collected = [collectIntoListLiteral actualArgs]
+                  (res, rt) <- matchFunTy False rn t collected
+                  pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
+              _ -> do
+                  (res, rt) <- matchFunTy False rn t actualArgs
+                  pure (App ann rn res, rt)
+
+      case actualArgs of
+        _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
+        _         -> directApp
+
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
   (re, te) <- inferExpr' g
@@ -1682,95 +1780,15 @@ inferExpr' g =
         pure (nlgRe, te, rgivens)
       pure (Lam ann rgivens re, fun_ rargts te)
     App ann n es -> do
-      (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
-      -- We want good type error messages. Therefore, we pursue the
-      -- following strategy:
-      --
-      -- 1. We infer the type of the function and instantiate it.
-      --
-      -- 2. Then, we introduce fresh variables for the arguments and the result.
-      --
-      -- 3. Then, we unify the type of the function against a constructed
-      -- function type from the generated variables.
-      --
-      -- 4. At this point, if unification fails, we know that the function
-      -- is either not a function at all or expects a different number of
-      -- arguments than have been supplied.
-      --
-      -- 5. If unification succeeds, we can now proceed by *checking* all
-      -- arguments of the function against their expected result types.
-
-      -- First, try to match this as a mixfix call-site pattern.
-      -- If the function is a registered mixfix and the args contain the expected
-      -- keywords, restructure the args to remove the keywords.
-      -- For param-first patterns, this also returns the correct function name.
-      mMixfixMatch <- tryMatchMixfixCall initialFuncName initialArgs
-      let (actualFuncName, actualArgs, needsAnnoRebuild, mMixfixError) = case mMixfixMatch of
-            Nothing -> (initialFuncName, initialArgs, rewrotePostfix, Nothing)  -- Not a mixfix call, use original
-            Just (funcRawName, restructuredArgs, mErr) ->
-              -- Create a Name with the correct function name, preserving the annotation
-              let MkName nameAnno _ = initialFuncName
-                  newName = MkName nameAnno funcRawName
-                  -- We need to rebuild annotation if args were restructured
-                  -- (i.e., keyword placeholders were removed)
-                  argsChanged = length restructuredArgs /= length initialArgs || rewrotePostfix
-              in (newName, restructuredArgs, argsChanged, mErr)
-
-      -- Report any mixfix matching errors (e.g., wrong keyword, typo)
-      case mMixfixError of
-        Just err -> addError (MixfixMatchErrorCheck n err)
-        Nothing -> pure ()
-
-      -- 1. - 5. Direct inference first; the variadic-construction rescue
-      -- (SET-OPERATORS-SPEC §D7.1, "route α") is a biased FALLBACK via
-      -- 'orElse': it participates only when NO direct resolution of the call
-      -- site succeeds, so any program that typechecks without it — e.g. a
-      -- same-named function overload outcompeting a same-named constructor —
-      -- keeps its meaning verbatim. Within the fallback, a record constructor
-      -- with exactly one LIST-typed field applied to two or more arguments
-      -- collects the arguments into a synthesized List literal:
-      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en); every other candidate
-      -- re-fails exactly as the direct attempt did, preserving error
-      -- messages. One-argument applications never rescue (SET OF xs keeps
-      -- its wrap-this-list reading), and a synonym-obscured LIST field
-      -- misses the rescue rather than guessing.
-      --
-      -- Note that if there are no arguments, then matchFunTy does not
-      -- actually insist on the type t being a function.
-      let directApp = do
-            (rn, pt) <- resolveTerm actualFuncName
-            t <- instantiate pt
-            (res, rt) <- matchFunTy False rn t actualArgs
-            let finalAnn = if needsAnnoRebuild
-                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
-                           else ann
-            pure (App finalAnn rn res, rt)
-
-          variadicRescue = do
-            (rn, pt) <- resolveTerm actualFuncName
-            t <- instantiate pt
-            case t of
-              Fun _ [MkOptionallyNamedType _ _ argT] _
-                | isConstructorKind rn
-                , isListTyCon argT
-                -> do
-                  -- Known limitations, deliberately deferred (adversarial
-                  -- review 2026-07-18): element-type mismatches inside the
-                  -- collected arguments surface as "LIST literal" errors
-                  -- although the source has no LIST literal; and the anno
-                  -- rebuild drops the OF/comma concrete-syntax tokens from
-                  -- the typechecked AST (highlighting-only; exactprint reads
-                  -- the parsed AST and is unaffected).
-                  let collected = [collectIntoListLiteral actualArgs]
-                  (res, rt) <- matchFunTy False rn t collected
-                  pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
-              _ -> do
-                  (res, rt) <- matchFunTy False rn t actualArgs
-                  pure (App ann rn res, rt)
-
-      case actualArgs of
-        _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
-        _         -> directApp
+      -- If this is a flat chain of fixity-declared binary operators, first
+      -- re-associate it into nested binary applications and infer the result;
+      -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
+      -- fall through to the ordinary application logic (including the route-α
+      -- variadic-construction rescue), which lives in 'inferFlatApp'.
+      mReassociated <- tryReassociateFixityChain ann n es
+      case mReassociated of
+        Just reassociated -> inferExpr reassociated
+        Nothing -> inferFlatApp ann n es
     AppNamed ann n nes _morder -> do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -3079,6 +3097,194 @@ rebuildMixfixAppAnno origAnn funcName args =
       newPayload = [funcHole, argsHole]
   in fixAnnoSrcRange $ set #payload newPayload origAnn
 
+-- ----------------------------------------------------------------------------
+-- Fixity-driven re-association of flat operator chains
+-- ----------------------------------------------------------------------------
+
+-- | The parser collects an unparenthesized chain of binary identifier
+-- operators into a single flat application (see @mixfixChainExpr@ in
+-- "L4.Parser"):
+--
+-- >  a UNION b INTERSECT c   ~>   App UNION [a, b, App INTERSECT [], c]
+--
+-- with every operator after the first appearing as a nullary marker in the
+-- argument list. Without fixity declarations, the mixfix matcher rejects
+-- this shape with an arity error. This pre-pass rewrites the flat chain into
+-- nested binary applications according to the operators' declared fixities
+-- (see 'applyFixityAnnotation') — the same tree shape that explicitly
+-- parenthesized source produces — and lets the existing inference machinery
+-- consume the result unchanged.
+--
+-- The rewrite fires only under conservative conditions; when any of them
+-- fails, the expression is left untouched and flows through the pre-existing
+-- code path (so programs that compile without fixity declarations keep
+-- their meaning):
+--
+--  * the argument list has the alternating operand\/operator chain shape;
+--  * no operand position holds a bare name that is itself a fixity-declared
+--    binary operator (an unexpected shape we refuse to guess about);
+--  * the whole chain does not coincide with a registered n-ary mixfix
+--    pattern (such a pattern matched before fixity declarations existed, so
+--    that interpretation keeps priority);
+--  * every operator in the chain (including the head) resolves to binary
+--    infix signatures that all carry the same declared fixity. Conflicting
+--    declarations for one operator are a use-site error ('FixityConflict').
+--
+-- Equal-precedence neighbours whose associativity does not determine a
+-- grouping (mixed left\/right, or a non-associative @infix operator chained
+-- with itself) report a 'FixityReassociationClash'; grouping then recovers
+-- left-associatively so that checking can continue past the error.
+tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Maybe (Expr Name))
+tryReassociateFixityChain ann headOp es = case splitChain es of
+  Nothing -> pure Nothing
+  Just (x0, x1, pairs) -> do
+    registry <- asks (.mixfixRegistry)
+    -- If the pre-existing mixfix matcher already gives this exact flat shape a
+    -- meaning, that interpretation predates fixity declarations and keeps
+    -- priority — we must never steal it. Checking one canonical name (the
+    -- alternating '_ op1 _ op2 _') is not enough: the same flat App
+    -- '[x0, x1, App op2 [], x2, ...]' can also match a registered pattern with
+    -- consecutive param slots (e.g. '_ op1 _ _ _', where the nullary operator
+    -- marker is consumed as an ordinary argument) or a keyword-first pattern.
+    -- So we dry-run the actual matcher over the original shape and decline if
+    -- it engages at all. 'tryMatchMixfixCall' only reads the environment and
+    -- registry (it returns match errors rather than raising them), so this
+    -- has no checking side effects.
+    existingMatch <- tryMatchMixfixCall headOp es
+    let allOps = headOp : map fst pairs
+        operands = x0 : x1 : map snd pairs
+        opFixities = map (\ op -> (op, chainOperatorFixity registry op)) allOps
+        conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
+        declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
+    if | any (isDeclaredChainOperator registry) operands ->
+           pure Nothing
+       | Just _ <- existingMatch ->
+           pure Nothing
+       | ((op, fs) : _) <- conflicts -> do
+           addError (FixityConflict (rawName op) fs)
+           pure Nothing
+       | length declared /= length allOps ->
+           -- at least one operator has no (complete) fixity declaration
+           pure Nothing
+       | otherwise -> do
+           let (reassociated, mClash) = shuntChain declared operands
+           case mClash of
+             Just (fxL, fxR) -> addError (FixityReassociationClash ann.range fxL fxR)
+             Nothing -> pure ()
+           -- Rebuild the root annotation from the original one, mirroring
+           -- the needsAnnoRebuild path of the App case: the root keeps the
+           -- original source range and extension, with the two-hole payload
+           -- the generic ToConcreteNodes instance for App expects.
+           pure $ Just $ case reassociated of
+             App _ rootOp rootArgs -> App (rebuildMixfixAppAnno ann rootOp rootArgs) rootOp rootArgs
+             other -> other
+  where
+    -- The flat chain shape: [x0, x1, marker2, x2, marker3, x3, ...].
+    -- Returns the first two operands and (operator, operand) pairs, with each
+    -- operator 'Name' carrying the marker's source annotation (so hover and
+    -- error ranges point at the operator token).
+    splitChain :: [Expr Name] -> Maybe (Expr Name, Expr Name, [(Name, Expr Name)])
+    splitChain (x0 : x1 : rest@(_ : _)) = (x0, x1,) <$> goPairs rest
+      where
+        goPairs [] = Just []
+        goPairs (m : y : more) = do
+          opName <- markerName m
+          ((opName, y) :) <$> goPairs more
+        goPairs _ = Nothing
+    splitChain _ = Nothing
+
+    markerName :: Expr Name -> Maybe Name
+    markerName (App a n []) = Just (setAnno a n)
+    markerName (Var a n) = Just (setAnno a n)
+    markerName _ = Nothing
+
+    -- An operand that is itself a bare fixity-declared operator name means
+    -- the expression does not have the shape we expect; refuse to touch it.
+    isDeclaredChainOperator :: MixfixRegistry -> Expr Name -> Bool
+    isDeclaredChainOperator registry e = case markerName e of
+      Nothing -> False
+      Just n -> case chainOperatorFixity registry n of
+        ChainOpUndeclared -> False
+        _ -> True
+
+-- | The fixity status of one operator occurring in a flat chain.
+data ChainOpFixity
+  = ChainOpUndeclared
+    -- ^ Not a binary infix operator, or at least one of its binary infix
+    -- signatures has no declared fixity: the chain is not re-associated.
+  | ChainOpConflict [(Int, FixityDirection)]
+    -- ^ All binary infix signatures declare a fixity, but they disagree.
+  | ChainOpFixity (Int, FixityDirection)
+    -- ^ The operator's unambiguous declared fixity.
+
+-- | Look up the declared fixity of a binary infix operator @_ op _@.
+-- All binary infix signatures registered under that canonical name
+-- (including overloads and imported ones) must declare the same fixity for
+-- the operator to participate in re-association; if any signature lacks a
+-- declaration, the operator counts as undeclared, which keeps the
+-- pre-fixity behaviour of the chain.
+chainOperatorFixity :: MixfixRegistry -> Name -> ChainOpFixity
+chainOperatorFixity registry op =
+  let binaryCanonical = buildCanonicalNameFromKeywords True [rawName op]
+      binaryInfos =
+        [ info
+        | sig <- lookupByCanonicalName binaryCanonical registry
+        , Just info <- [sig.mixfixInfo]
+        , isBinaryInfixPattern info
+        ]
+      fixities = map (.fixity) binaryInfos
+  in if null binaryInfos || any isNothing fixities
+       then ChainOpUndeclared
+       else case List.nub (catMaybes fixities) of
+         [f] -> ChainOpFixity f
+         fs  -> ChainOpConflict fs
+
+-- | Shunting-yard re-association of an alternating operator chain.
+-- @ops@ has one operator per pair of neighbouring operands; @operands@ has
+-- exactly one more element than @ops@. Returns the re-associated expression
+-- and the first associativity clash, if any (grouping recovers
+-- left-associatively past a clash so a tree can still be produced).
+shuntChain
+  :: [(Name, (Int, FixityDirection))]
+  -> [Expr Name]
+  -> (Expr Name, Maybe ((RawName, Int, FixityDirection), (RawName, Int, FixityDirection)))
+shuntChain ops operands = case operands of
+  (x0 : xs) -> go [x0] [] (zip ops xs) Nothing
+  [] -> error "shuntChain: empty operand list"
+  where
+    go outStack opStack [] mClash = (finish outStack opStack, mClash)
+    go outStack opStack (((op, fx), rhs) : rest) mClash =
+      let (outStack', opStack', mClash') = settle outStack opStack op fx mClash
+      in go (rhs : outStack') ((op, fx) : opStack') rest mClash'
+
+    -- Reduce stacked operators that bind at least as tightly as the incoming
+    -- operator, honouring associativity at equal priority.
+    settle outStack [] _ _ mClash = (outStack, [], mClash)
+    settle outStack opStack@((topOp, (topPrio, topDir)) : opRest) op fx@(prio, dir) mClash
+      | topPrio > prio || (topPrio == prio && topDir == FixityLeft && dir == FixityLeft) =
+          settle (reduceTop outStack topOp) opRest op fx mClash
+      | topPrio < prio || (topPrio == prio && topDir == FixityRight && dir == FixityRight) =
+          (outStack, opStack, mClash)
+      | otherwise =
+          let clash = mClash <|> Just ((rawName topOp, topPrio, topDir), (rawName op, prio, dir))
+          in settle (reduceTop outStack topOp) opRest op fx clash
+
+    reduceTop (r : l : outRest) op = mkReassociatedBinaryApp op l r : outRest
+    reduceTop _ _ = error "shuntChain: operand stack underflow (chain shape was checked)"
+
+    finish outStack [] = case outStack of
+      [e] -> e
+      _ -> error "shuntChain: leftover operands (chain shape was checked)"
+    finish outStack ((op, _) : opRest) = finish (reduceTop outStack op) opRest
+
+-- | Build one re-associated binary application node. The annotation follows
+-- 'rebuildMixfixAppAnno': exactly two holes (function name, argument list),
+-- with source ranges recomputed from the operands so ranges stay honest
+-- through re-association.
+mkReassociatedBinaryApp :: Name -> Expr Name -> Expr Name -> Expr Name
+mkReassociatedBinaryApp op l r =
+  App (rebuildMixfixAppAnno emptyAnno op [l, r]) op [l, r]
+
 -- | Route-α support (SET-OPERATORS-SPEC §D7.1): is this resolved head a data
 -- constructor? Read from the 'TypeInfo' annotation stamped by @resolveTerm'@.
 -- 'Nothing'/ambiguous resolutions answer 'False', so the variadic rewrite
@@ -3267,7 +3473,7 @@ scanFunSigDecide d@(MkDecide _ tysig appForm _) = prune $
     dty <- setAnnResolvedType rt (Just kind) d
     name <- withQualified (appFormHeads rappForm) ce'
     -- Extract mixfix pattern info by comparing AppForm against GIVEN parameters
-    let mMixfix = extractMixfixInfo tysig appForm
+    mMixfix <- applyFixityAnnotation (getAnno d) (getName appForm) (extractMixfixInfo tysig appForm)
     -- For mixfix functions, also register under the canonical name
     -- (e.g., "tax on _ item costing _ as GST in _") as an alias.
     -- This enables unambiguous resolution when multiple mixfix functions
@@ -3300,7 +3506,7 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt _mTypically) = do
     aty <- setAnnResolvedType rt (Just Assumed) a
     name <- withQualified (appFormHeads rappForm) ce
     -- Extract mixfix pattern info by comparing AppForm against GIVEN parameters
-    let mMixfix = extractMixfixInfo tysig' appForm
+    mMixfix <- applyFixityAnnotation (getAnno a) (getName appForm) (extractMixfixInfo tysig' appForm)
     -- For mixfix functions, also register under the canonical name
     name' <- case (mMixfix, name.names) of
       (Just info, origResolved:_) -> do
@@ -3339,6 +3545,38 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt _mTypically) = do
       MkTypeSig ann given (Just (MkGivethSig emptyAnno t))
     mergeResultTypeInto typesig _ =
       typesig
+
+-- | Resolve a fixity annotation (@infixl\/@infixr\/@infix) attached to a
+-- definition against the definition's mixfix pattern. Only a plain binary
+-- infix operator (pattern @_ op _@) can carry fixity, and the priority must
+-- be an integer between 1 and 9. On success, returns the 'MixfixInfo' with
+-- its 'fixity' field populated; the fixity then travels with the mixfix
+-- registry, including across imports. A fixity annotation on anything that
+-- is not a binary infix operator is ignored with a warning; a malformed
+-- priority is an error.
+applyFixityAnnotation :: Anno -> Name -> Maybe MixfixInfo -> Check (Maybe MixfixInfo)
+applyFixityAnnotation ann defName mMixfix =
+  case ann ^. annFixity of
+    Nothing -> pure mMixfix
+    Just fx@(MkFixity _ dir payload) ->
+      case mMixfix of
+        Just info | isBinaryInfixPattern info ->
+          case parseFixityPriority payload of
+            Just prio -> pure (Just info { fixity = Just (prio, dir) })
+            Nothing -> do
+              addError (FixityAnnotationMalformed (rangeOf fx) (fixityHerald dir <> payload))
+              pure mMixfix
+        _ -> do
+          addWarning (FixityIgnoredNonBinary (rawName defName) (rangeOf fx))
+          pure mMixfix
+
+-- | Parse the payload of a fixity annotation: a single integer between
+-- 1 and 9, and nothing else.
+parseFixityPriority :: Text -> Maybe Int
+parseFixityPriority t = do
+  n <- readMaybe (Text.unpack (Text.strip t))
+  guard (1 <= n && n <= 9)
+  pure n
 
 -- ----------------------------------------------------------------------------
 -- Desugaring Utilities
@@ -3707,6 +3945,33 @@ prettyCheckError (DesugarAnnoRewritingError context errorInfo) =
 prettyCheckError (CheckWarning warning) = prettyCheckWarning warning
 prettyCheckError (MixfixMatchErrorCheck funcName err) =
   prettyMixfixMatchError funcName err
+prettyCheckError (FixityAnnotationMalformed _ raw) =
+  [ "I could not parse this fixity annotation:"
+  , ""
+  , "  " <> Text.strip raw
+  , ""
+  , "A fixity annotation is @infixl, @infixr or @infix followed by a single"
+  , "priority between 1 and 9, for example: @infixl 6"
+  ]
+prettyCheckError (FixityConflict op fixities) =
+  [ "The operator " <> quotedName (MkName emptyAnno op) <> " has conflicting fixity declarations in scope:"
+  , ""
+  ]
+  <> map (("  " <>) . prettyFixityDecl) fixities
+  <> [ ""
+  , "so I cannot re-associate this operator chain. Parenthesize the"
+  , "expression, or make the declarations agree."
+  ]
+prettyCheckError (FixityReassociationClash _ (opL, prioL, dirL) (opR, prioR, dirR)) =
+  [ "I cannot group this operator chain without parentheses:"
+  , ""
+  , "  " <> quotedName (MkName emptyAnno opL) <> " is declared " <> prettyFixityDecl (prioL, dirL)
+  , "  " <> quotedName (MkName emptyAnno opR) <> " is declared " <> prettyFixityDecl (prioR, dirR)
+  , ""
+  , "Operators of equal priority can only be chained when they associate"
+  , "in the same direction (@infixl with @infixl, or @infixr with @infixr)."
+  , "Use explicit parentheses."
+  ]
 prettyCheckError (CyclicTypeSynonyms cycleSyns) =
   [ "Circular dependency detected between type synonyms:"
   , ""
@@ -3806,7 +4071,21 @@ prettyCheckWarning = \ case
     <>
     map (("  " <>) . prettyLayout) b
     <> [ "" ]
+  FixityIgnoredNonBinary n _ ->
+    [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
+    , ""
+    , "Fixity (@infixl, @infixr, @infix) can only be declared for a plain"
+    , "binary infix operator, i.e. a definition of the shape"
+    , ""
+    , "  a OP b MEANS ..."
+    , ""
+    , "where a and b are the GIVEN parameters."
+    ]
 
+
+-- | Render a fixity declaration the way the user writes it, e.g. "@infixl 6".
+prettyFixityDecl :: (Int, FixityDirection) -> Text
+prettyFixityDecl (prio, dir) = fixityHerald dir <> " " <> Text.pack (show prio)
 
 -- | Forms a plural when needed.
 prettyCount :: Int -> Text -> Text

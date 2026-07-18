@@ -6,6 +6,12 @@ module L4.Parser.ResolveAnnotation (
   addNlgCommentsToAst,
   HasDesc(..),
   addDescCommentsToAst,
+  HasFixity(..),
+  addFixityCommentsToAst,
+  renderFixityWarning,
+  FixityS(..),
+  FixityWarning(..),
+  FixityWithSpan,
   HasRef(..),
   addRefCommentsToAst,
   -- * Annotate Syntax Nodes with definite 'SrcSpan's.
@@ -63,6 +69,11 @@ data Warning
     -- ^ A @ref could not be attached to any following AST node.
   | RefNoLocation Ref
     -- ^ A @ref had no source location. That's a bug.
+  | FixityAnnotationMisplaced FixityWithSpan
+    -- ^ A fixity annotation (@infixl\/@infixr\/@infix) was not on the line
+    -- directly above a binary operator definition; it is ignored.
+  | FixityAnnotationNoLocation Fixity
+    -- ^ A fixity annotation had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -760,7 +771,7 @@ addDescWarning w = modify' $ \s -> s{descWarnings = w : s.descWarnings}
 nodeSpan :: (HasSrcRange a) => a -> Maybe SrcSpan
 nodeSpan = fmap fromSrcRange . rangeOf
 
-descPrecedesNode :: SrcSpan -> DescWithSpan -> Bool
+descPrecedesNode :: SrcSpan -> WithSpan a -> Bool
 descPrecedesNode nodeRange desc =
   let
     nodeStart = nodeRange.start
@@ -774,7 +785,7 @@ descPrecedesNode nodeRange desc =
   in
     beforeNode && alignedWithNode
 
-descInlineFor :: SrcSpan -> DescWithSpan -> Bool
+descInlineFor :: SrcSpan -> WithSpan a -> Bool
 descInlineFor nodeRange desc =
   let
     nodeEnd = nodeRange.end
@@ -788,6 +799,162 @@ topLevelColumnSlack = 8
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
 lastMaybe xs = Just (last xs)
+
+-- ----------------------------------------------------------------------------
+-- Fixity attachment (mirrors the Desc pass)
+-- ----------------------------------------------------------------------------
+
+type FixityWithSpan = WithSpan Fixity
+
+data FixityWarning
+  = FixityMissingLocation Fixity
+    -- ^ A fixity annotation had no source range. Internal error.
+  | FixityMisplaced FixityWithSpan
+    -- ^ A fixity annotation was not on the line directly above a binary
+    -- operator definition: it sat above a directive, import, type
+    -- declaration or section, inline on a parameter, inside a WHERE body, or
+    -- was superseded by a later annotation on the same definition. Ignored.
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (SOP.Generic)
+
+data FixityS = FixityS
+  { fixities :: ![FixityWithSpan]
+  , fixityWarnings :: ![FixityWarning]
+  }
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+addFixityCommentsToAst :: HasFixity a => [Fixity] -> a -> (a, FixityS)
+addFixityCommentsToAst fixities ast =
+  let
+    (withSpan, missing) = preprocessFixities fixities
+    initialS =
+      FixityS
+        { fixities = List.sortOn (.range.start) withSpan
+        , fixityWarnings = fmap FixityMissingLocation missing
+        }
+    (ast', s) = runState (addFixity ast) initialS
+  in
+    -- Any annotation still unclaimed after the whole module was walked (e.g.
+    -- a trailing annotation with no following definition) is misplaced too.
+    ( ast'
+    , s { fixities = []
+        , fixityWarnings = fmap FixityMisplaced s.fixities <> s.fixityWarnings
+        }
+    )
+
+preprocessFixities :: [Fixity] -> ([FixityWithSpan], [Fixity])
+preprocessFixities = foldl' go ([], [])
+ where
+  go (located, missing) fx =
+    case rangeOf fx of
+      Nothing -> (located, fx : missing)
+      Just r -> (WithSpan (fromSrcRange r) fx : located, missing)
+
+addFixityWarning :: FixityWarning -> State FixityS ()
+addFixityWarning w = modify' $ \s -> s{fixityWarnings = w : s.fixityWarnings}
+
+-- | Bridge a fixity-attachment warning into the shared parser warning
+-- channel (rendered by 'L4.Rules').
+renderFixityWarning :: FixityWarning -> Warning
+renderFixityWarning = \ case
+  FixityMissingLocation fx -> FixityAnnotationNoLocation fx
+  FixityMisplaced fxs      -> FixityAnnotationMisplaced fxs
+
+class HasFixity a where
+  addFixity :: a -> State FixityS a
+
+instance HasFixity (Module n) where
+  addFixity (MkModule uri ann sect) =
+    MkModule uri ann <$> addFixity sect
+
+instance HasFixity (Section n) where
+  -- A section only sequences its declarations; each leaf construct below
+  -- claims the annotations that precede it. A fixity above a section header
+  -- therefore becomes the leading annotation of the section's first
+  -- declaration — the nearest following construct.
+  addFixity (MkSection ann lbl maka decls) = do
+    decls' <- traverse addFixity decls
+    pure $ MkSection ann lbl maka decls'
+
+instance HasFixity (TopDecl n) where
+  -- Only DECIDE/ASSUME can define a binary operator, so only they honor a
+  -- leading fixity annotation. Every other top-level construct still CLAIMS
+  -- (and reports) any fixity annotation stranded on it, so that a stray
+  -- annotation cannot leak past it to a later, unrelated definition.
+  -- Processing runs in document order, which bounds a Decide's leading
+  -- annotation to genuine adjacency: any intervening construct claims first.
+  addFixity = \ case
+    Declare ann decl  -> do rejectFixityAround decl; pure (Declare ann decl)
+    Decide ann dec    -> Decide ann <$> honorDecideFixity dec
+    Assume ann asm    -> Assume ann <$> honorAssumeFixity asm
+    Directive ann dir -> do rejectFixityAround dir; pure (Directive ann dir)
+    Import ann imp    -> do rejectFixityAround imp; pure (Import ann imp)
+    Section ann sect  -> Section ann <$> addFixity sect
+    Timezone ann e    -> do rejectFixityAround e; pure (Timezone ann e)
+
+honorDecideFixity :: Decide n -> State FixityS (Decide n)
+honorDecideFixity dec@(MkDecide ann tySig appForm expr) = do
+  ann' <- honorLeadingFixity dec ann
+  pure (MkDecide ann' tySig appForm expr)
+
+honorAssumeFixity :: Assume n -> State FixityS (Assume n)
+honorAssumeFixity asm@(MkAssume ann tySig appForm mType mTypically) = do
+  ann' <- honorLeadingFixity asm ann
+  pure (MkAssume ann' tySig appForm mType mTypically)
+
+takeMatchingFixities :: (FixityWithSpan -> Bool) -> State FixityS [FixityWithSpan]
+takeMatchingFixities predicate = do
+  s <- get
+  let (matches, rest) = List.partition predicate s.fixities
+  put s{fixities = rest}
+  pure matches
+
+-- | Claim every not-yet-attached fixity annotation positioned before this
+-- construct ends, split into those preceding its start (@leading@) and those
+-- falling inside it (@interior@ — inline on a parameter, or within a WHERE
+-- body). Because processing runs in document order and each construct removes
+-- what it claims, a construct only ever sees annotations since the previous
+-- construct.
+claimFixitiesAround :: HasSrcRange a => a -> State FixityS ([FixityWithSpan], [FixityWithSpan])
+claimFixitiesAround node =
+  case nodeSpan node of
+    Nothing -> pure ([], [])
+    Just r -> do
+      claimed <- takeMatchingFixities (\fx -> posLt fx.range.start r.end)
+      pure (List.partition (\fx -> posLe fx.range.end r.start) claimed)
+
+-- | Attach the closest leading fixity annotation to a binary-operator
+-- candidate's 'Anno' (the typechecker validates that it really is a binary
+-- operator, see 'L4.TypeCheck.applyFixityAnnotation'). A superseded stacked
+-- annotation, or any annotation sitting inside the definition, is reported as
+-- misplaced and dropped.
+honorLeadingFixity :: HasSrcRange a => a -> Anno -> State FixityS Anno
+honorLeadingFixity node ann = do
+  (leading, interior) <- claimFixitiesAround node
+  case reverse leading of
+    closest : superseded -> do
+      warnMisplaced (superseded <> interior)
+      pure (setFixity closest.payload ann)
+    [] -> do
+      warnMisplaced interior
+      pure ann
+
+-- | Claim and report every fixity annotation preceding or inside a construct
+-- that cannot carry fixity (a directive, import, DECLARE, or timezone).
+rejectFixityAround :: HasSrcRange a => a -> State FixityS ()
+rejectFixityAround node = do
+  (leading, interior) <- claimFixitiesAround node
+  warnMisplaced (leading <> interior)
+
+warnMisplaced :: [FixityWithSpan] -> State FixityS ()
+warnMisplaced = mapM_ (addFixityWarning . FixityMisplaced)
+
+posLt :: SrcPos -> SrcPos -> Bool
+posLt a b = a.line < b.line || (a.line == b.line && a.column < b.column)
+
+posLe :: SrcPos -> SrcPos -> Bool
+posLe a b = a.line < b.line || (a.line == b.line && a.column <= b.column)
 
 -- ----------------------------------------------------------------------------
 -- Ref attachment scaffolding

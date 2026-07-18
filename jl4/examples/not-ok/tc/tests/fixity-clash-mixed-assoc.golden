@@ -1,0 +1,18 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: fixity-clash-mixed-assoc.l4
+  Hidden: no
+  Range: 16:7-16:24
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I cannot group this operator chain without parentheses:
+
+      `CONSR` is declared @infixr 5
+      `SNOCL` is declared @infixl 5
+
+    Operators of equal priority can only be chained when they associate
+    in the same direction (@infixl with @infixl, or @infixr with @infixr).
+    Use explicit parentheses.

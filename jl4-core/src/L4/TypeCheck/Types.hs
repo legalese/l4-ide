@@ -9,7 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, FixityDirection)
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
 import L4.TypeCheck.With
@@ -125,12 +125,30 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | FixityAnnotationMalformed (Maybe SrcRange) Text
+    -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
+    -- '@infix') is not an integer between 1 and 9. Carries the annotation's
+    -- source range and the raw payload text.
+  | FixityConflict RawName [(Int, FixityDirection)]
+    -- ^ At a use site, the binary operator has several fixity declarations in
+    -- scope (e.g. via conflicting imports) that disagree. Carries the
+    -- operator and the distinct conflicting fixities.
+  | FixityReassociationClash (Maybe SrcRange) (RawName, Int, FixityDirection) (RawName, Int, FixityDirection)
+    -- ^ An unparenthesized operator chain mixes operators of equal precedence
+    -- whose associativity does not determine a grouping: mixed left/right
+    -- associativity, or a non-associative ('@infix') operator chained at the
+    -- same level. Carries the chain's range and both operators with their
+    -- fixities.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
+  | FixityIgnoredNonBinary RawName (Maybe SrcRange)
+    -- ^ A fixity annotation was attached to a definition that is not a plain
+    -- binary infix operator (pattern @_ op _@); the annotation is ignored.
+    -- Carries the definition's name and the annotation's source range.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -229,6 +247,9 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
+  rangeOf (FixityAnnotationMalformed mr _)  = mr
+  rangeOf (FixityReassociationClash mr _ _) = mr
+  rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
