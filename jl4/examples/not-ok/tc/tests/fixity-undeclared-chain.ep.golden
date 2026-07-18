@@ -1,0 +1,11 @@
+-- Without a fixity declaration, an unparenthesized operator chain keeps its
+-- pre-fixity behaviour: an arity error. No default fixity is assumed
+-- (deliberate divergence from GHC's infixl 9 default), which makes fixity
+-- declarations a strict conservative extension.
+
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p PLAIN q MEANS p + q
+
+#EVAL PLAIN PLAIN 1 2 PLAIN 3

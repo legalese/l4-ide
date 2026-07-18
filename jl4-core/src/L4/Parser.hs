@@ -41,7 +41,7 @@ import qualified Data.List.Extra as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
-import GHC.Generics
+import GHC.Generics hiding (Fixity)
 import GHC.Records
 import Optics
 import Text.Megaparsec hiding (parseTest)
@@ -72,6 +72,7 @@ data PState = PState
   , nlgs :: [Nlg]
   , refs :: [Ref]
   , descs :: [Desc]
+  , fixities :: [Fixity]
   }
   deriving stock (Show, Eq, Generic)
   deriving (Semigroup, Monoid) via Generically PState
@@ -85,6 +86,9 @@ addRef ref s = over #refs (ref:) s
 addDesc :: Desc -> PState -> PState
 addDesc desc s = over #descs (desc:) s
 
+addFixity :: Fixity -> PState -> PState
+addFixity fx s = over #fixities (fx:) s
+
 spaces :: Parser [PosToken]
 spaces =
   takeWhileP (Just "space token") isSpaceToken
@@ -92,7 +96,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, ()]] <- many (fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, Fixity, ()]] <- many (fmap (S . S . S . S . Z) refAdditionalP <|> fmap (S . S . S . Z) fixityP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -116,6 +120,15 @@ descP = do
     )
     "Description annotation"
   pure $ fmap (MkDesc (mkSimpleEpaAnno e)) e
+
+fixityP :: Parser (Epa Fixity)
+fixityP = do
+  e <- hidden $ spacedTokenWs (\ case
+    TAnnotations (TFixity dir t) -> Just (dir, t)
+    _ -> Nothing
+    )
+    "Fixity annotation"
+  pure $ fmap (\ (dir, t) -> MkFixity (mkSimpleEpaAnno e) dir t) e
 
 
 nlgAnnotationP :: Parser (Epa Nlg)
@@ -246,8 +259,9 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : Fixity : xs) -> Parser ()
 addAnnotation = \ case
+  S (S (S (Z fx))) -> modify' (addFixity fx.payload)
   S (S (Z desc)) -> modify' (addDesc desc.payload)
   S (Z nlg) -> modify' (addNlg nlg.payload)
   Z ref -> modify' (addRef ref.payload)
@@ -2703,6 +2717,7 @@ execNlgParserForTokens p uri input ts =
       , comments = []
       , refs = []
       , descs = []
+      , fixities = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
@@ -2710,19 +2725,19 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
@@ -2730,7 +2745,8 @@ execParserForTokensWithHints hints p file input ts =
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
-        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withDesc
+        (withFixity, _fixityS) = Resolve.addFixityCommentsToAst pstate.fixities withDesc
+        (annotatedA, refS) = Resolve.addRefCommentsToAst pstate.refs withFixity
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
         Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
@@ -2744,6 +2760,7 @@ execParserForTokensWithHints hints p file input ts =
       , comments = []
       , refs = []
       , descs = []
+      , fixities = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
@@ -2797,7 +2814,7 @@ execProgramParserWithHintPass uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

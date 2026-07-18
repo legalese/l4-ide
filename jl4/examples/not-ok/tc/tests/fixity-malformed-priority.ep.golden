@@ -1,0 +1,15 @@
+-- The priority of a fixity annotation must be a single integer 1-9.
+
+@infixl 20
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p BADPRIO q MEANS p + q
+
+@infixr banana
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p BADTEXT q MEANS p + q
+
+#EVAL BADPRIO 1 2

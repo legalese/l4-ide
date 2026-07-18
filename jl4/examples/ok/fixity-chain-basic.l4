@@ -1,0 +1,39 @@
+-- Fixity declarations (@infixl N) let unparenthesized chains of binary
+-- identifier operators re-associate by declared priority, GHC-style:
+-- the chain parses flat and the typechecker re-associates it.
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p UNION q MEANS p + q
+
+@infixl 7
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p INTERSECT q MEANS p * q
+
+-- INTERSECT (priority 7) binds tighter than UNION (priority 6):
+-- 1 UNION (2 INTERSECT 3) = 1 + 6 = 7
+#EVAL 1 UNION 2 INTERSECT 3
+
+-- same operator chains left-associatively: (1 UNION 2) UNION 3 = 6
+#EVAL 1 UNION 2 UNION 3
+
+-- tighter operator first: (2 INTERSECT 3) UNION 1 = 7
+#EVAL 2 INTERSECT 3 UNION 1
+
+-- parenthesized controls agree with the re-associated results
+#EVAL 1 UNION (2 INTERSECT 3)
+#EVAL (1 UNION 2) UNION 3
+
+-- explicit parentheses still override declared priorities
+#EVAL (1 UNION 2) INTERSECT 3
+
+-- a longer mixed chain: 1 UNION (2 INTERSECT 3) UNION 4 = 11
+#EVAL 1 UNION 2 INTERSECT 3 UNION 4
+
+-- plain binary application is unaffected
+#EVAL 1 UNION 2
+#EVAL 2 INTERSECT 3

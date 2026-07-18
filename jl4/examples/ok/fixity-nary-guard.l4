@@ -1,0 +1,36 @@
+-- Re-association must not steal expressions that already have a meaning.
+-- A registered n-ary mixfix pattern whose flat shape coincides with an
+-- operator chain keeps its n-ary interpretation, even when every keyword in
+-- it is also a fixity-declared binary operator.
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p andop q MEANS p + q
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p hadop q MEANS p * q
+
+-- the ternary pattern `_ andop _ hadop _` predates re-association and wins
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+a andop b hadop c MEANS 1000 + a + b + c
+
+-- ternary interpretation: 1000 + 1 + 2 + 3 = 1006
+-- (re-association would have produced 1 + 2 * 3 = 7)
+#EVAL 1 andop 2 hadop 3
+
+-- keyword-first n-ary mixfix is likewise untouched
+GIVEN c IS A BOOLEAN
+      t IS A NUMBER
+      e IS A NUMBER
+GIVETH A NUMBER
+myif c mythen t myelse e MEANS IF c THEN t ELSE e
+
+#EVAL myif TRUE mythen 42 myelse 7

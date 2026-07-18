@@ -1,0 +1,17 @@
+-- Module defining fixity-declared binary operators for cross-module testing.
+-- The fixity travels with the mixfix registry, so an importing module can
+-- write bare operator chains (see fixity-cross-module-call.l4).
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p UNIONX q MEANS p + q
+
+@infixl 7
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p INTERSECTX q MEANS p * q
+
+#EVAL 1 UNIONX 2 INTERSECTX 3

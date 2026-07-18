@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, FixityDirection)
 
 #if defined(SERIALISE_ENABLED)
 import L4.Instances.Serialise ()
@@ -499,16 +499,17 @@ data Extension = Extension
   , nlg          :: Maybe Nlg
   , desc         :: Maybe Desc
   , ref          :: Maybe Ref
+  , fixityAnn    :: Maybe Fixity
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc ref1 <> Extension i2 nlg2 desc' ref2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2)
+  Extension i1 nlg1 desc ref1 fix1 <> Extension i2 nlg2 desc' ref2 fix2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -518,7 +519,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -537,6 +538,9 @@ annDesc = #extra % #desc
 annRef :: Lens' Anno (Maybe Ref)
 annRef = #extra % #ref
 
+annFixity :: Lens' Anno (Maybe Fixity)
+annFixity = #extra % #fixityAnn
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
@@ -545,6 +549,9 @@ setDesc d a = a & annDesc ?~ d
 
 setRef :: Ref -> Anno -> Anno
 setRef r a = a & annRef ?~ r
+
+setFixity :: Fixity -> Anno -> Anno
+setFixity f a = a & annFixity ?~ f
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -773,6 +780,21 @@ data Desc = MkDesc Anno Text
 getDesc :: Desc -> Text
 getDesc (MkDesc _ t) = t
 
+-- | A fixity annotation ('@infixl N' / '@infixr N' / '@infix N') attached to
+-- the definition of a binary identifier operator. The 'Text' is the raw
+-- payload following the herald; it is parsed and validated by the
+-- typechecker (see 'L4.TypeCheck'), which gives malformed payloads a proper
+-- diagnostic with the annotation's own source range.
+data Fixity = MkFixity Anno FixityDirection Text
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+getFixityDirection :: Fixity -> FixityDirection
+getFixityDirection (MkFixity _ dir _) = dir
+
+getFixityPayload :: Fixity -> Text
+getFixityPayload (MkFixity _ _ t) = t
+
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
 deriving via L4Syntax (NlgFragment n)
@@ -783,6 +805,8 @@ deriving via L4Syntax Ref
   instance HasAnno Ref
 deriving via L4Syntax Desc
   instance HasAnno Desc
+deriving via L4Syntax Fixity
+  instance HasAnno Fixity
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -891,6 +915,7 @@ deriving anyclass instance HasSrcRange Lit
 deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
+deriving anyclass instance HasSrcRange Fixity
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -971,5 +996,7 @@ deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
 deriving anyclass instance Serialise Desc
+deriving anyclass instance Serialise Fixity
+deriving anyclass instance Serialise FixityDirection
 #endif
 

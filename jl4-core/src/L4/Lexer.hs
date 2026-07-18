@@ -79,8 +79,26 @@ data TAnnotations
   | TNlgPrefix    -- ^ "@nlg"
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
+  | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
+
+-- | Associativity direction of a fixity annotation ('@infixl' / '@infixr' /
+-- '@infix'). Declared here (rather than in the parser or syntax tree) because
+-- the lexer token carries it.
+data FixityDirection
+  = FixityLeft   -- ^ "@infixl"
+  | FixityRight  -- ^ "@infixr"
+  | FixityNone   -- ^ "@infix" (non-associative)
+  deriving stock (Eq, Generic, Ord, Show)
+  deriving anyclass (ToExpr, NFData)
+
+-- | Render the herald that produced a 'FixityDirection'.
+fixityHerald :: FixityDirection -> Text
+fixityHerald = \ case
+  FixityLeft  -> "@infixl"
+  FixityRight -> "@infixr"
+  FixityNone  -> "@infix"
 
 data TIdentifiers
   = TIdentifier !Text
@@ -409,6 +427,14 @@ descAnnotation = fst <$> lineAnno "@desc"
 exportAnnotation :: Lexer Text
 exportAnnotation = fst <$> lineAnno "@export"
 
+-- | Fixity annotations: "@infixl", "@infixr", "@infix".
+-- NOTE: "@infix" is a prefix of the other two heralds, so it must be tried last.
+fixityAnnotation :: Lexer (FixityDirection, Text)
+fixityAnnotation =
+      ((FixityLeft,)  . fst <$> lineAnno "@infixl")
+  <|> ((FixityRight,) . fst <$> lineAnno "@infixr")
+  <|> ((FixityNone,)  . fst <$> lineAnno "@infix")
+
 nlgString :: Lexer Text
 nlgString =
   takeWhile1P (Just "character") (\c -> c `notElem` nlgSpecialChars && not (isSpace c))
@@ -553,6 +579,7 @@ annotationsPayload = asum
   , TRefMap       <$> refMapAnnotation
   , TDesc         <$> descAnnotation
   , TExport       <$> exportAnnotation
+  , uncurry TFixity <$> fixityAnnotation
   , uncurry TNlg  <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -1045,6 +1072,7 @@ displayTokenType = \case
     TNlgPrefix        -> "@nlg"
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
+    TFixity dir t     -> fixityHerald dir <> t
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
     TIdentifier t     -> t
