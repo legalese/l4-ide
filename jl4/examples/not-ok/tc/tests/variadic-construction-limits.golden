@@ -14,7 +14,7 @@ File: variadic-construction-limits.l4
 
     is expected to be of type
 
-      LIST OF a20
+      LIST OF a22
 
     but is here of type
 
@@ -47,3 +47,17 @@ File: variadic-construction-limits.l4
 
     expects 1 argument,
     but you are applying it to 3 arguments here.
+
+File: variadic-construction-limits.l4
+  Hidden: no
+  Range: 31:23-31:26
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      Bag (defined at variadic-construction-limits.l4:7:9-12)
+
+    expects 1 argument,
+    but you are applying it to 2 arguments here.

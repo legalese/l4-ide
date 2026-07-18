@@ -46,3 +46,16 @@ computed MEANS Bag OF (1 PLUS 1), (2 TIMES 3), 7
 DECLARE Colour IS ONE OF red, green, blue
 palette MEANS Bag OF red, green, blue
 #EVAL bagSize palette
+
+-- the rescue is a biased FALLBACK: a same-named binding that makes the
+-- call site typecheck directly wins, and the rescue never participates
+-- (adversarial-review regression lock, 2026-07-18)
+DECLARE Wrap OF a
+  HAS items IS A LIST OF a
+
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+Wrap p q MEANS 42
+
+#EVAL Wrap 1 2

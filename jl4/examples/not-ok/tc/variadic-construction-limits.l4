@@ -24,3 +24,8 @@ overApplied MEANS Tag OF "x", 1, 2
 
 -- an ordinary FUNCTION with a list parameter: constructors only
 fnApplied MEANS mkBag OF 1, 2, 3
+
+-- the infix chain spelling does not fire the rescue: mixfix-chain-parsed
+-- heads are synthesized rangeless and never carry the Constructor stamp
+-- (see isConstructorKind boundary note); this pins that behavior
+infixSpelling MEANS 1 Bag 2

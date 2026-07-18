@@ -1721,36 +1721,56 @@ inferExpr' g =
         Just err -> addError (MixfixMatchErrorCheck n err)
         Nothing -> pure ()
 
-      -- 1.
-      (rn, pt) <- resolveTerm actualFuncName
-      t <- instantiate pt
-
-      -- Variadic construction (SET-OPERATORS-SPEC §D7.1, "route α"): a record
-      -- constructor with exactly one LIST-typed field, applied to two or more
-      -- arguments, collects the arguments into a synthesized List literal:
-      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en). This fires only where
-      -- direct application is a guaranteed arity error, so no program that
-      -- typechecks today changes meaning. One-argument applications are never
-      -- rewritten (SET OF xs keeps its wrap-this-list reading), and a
-      -- synonym-obscured LIST field misses the rewrite rather than guessing.
-      let (elabArgs, elabRebuild) = case (actualArgs, t) of
-            (_ : _ : _, Fun _ [MkOptionallyNamedType _ _ argT] _)
-              | isConstructorKind rn
-              , isListTyCon argT
-              -> ([collectIntoListLiteral actualArgs], True)
-            _ -> (actualArgs, needsAnnoRebuild)
-
-      -- 2. - 5.
+      -- 1. - 5. Direct inference first; the variadic-construction rescue
+      -- (SET-OPERATORS-SPEC §D7.1, "route α") is a biased FALLBACK via
+      -- 'orElse': it participates only when NO direct resolution of the call
+      -- site succeeds, so any program that typechecks without it — e.g. a
+      -- same-named function overload outcompeting a same-named constructor —
+      -- keeps its meaning verbatim. Within the fallback, a record constructor
+      -- with exactly one LIST-typed field applied to two or more arguments
+      -- collects the arguments into a synthesized List literal:
+      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en); every other candidate
+      -- re-fails exactly as the direct attempt did, preserving error
+      -- messages. One-argument applications never rescue (SET OF xs keeps
+      -- its wrap-this-list reading), and a synonym-obscured LIST field
+      -- misses the rescue rather than guessing.
+      --
       -- Note that if there are no arguments, then matchFunTy does not
       -- actually insist on the type t being a function.
-      (res, rt) <- matchFunTy False rn t elabArgs
+      let directApp = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            (res, rt) <- matchFunTy False rn t actualArgs
+            let finalAnn = if needsAnnoRebuild
+                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                           else ann
+            pure (App finalAnn rn res, rt)
 
-      -- If mixfix args were restructured, rebuild annotation with correct holes
-      let finalAnn = if elabRebuild
-                     then rebuildMixfixAppAnno ann actualFuncName elabArgs
-                     else ann
+          variadicRescue = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            case t of
+              Fun _ [MkOptionallyNamedType _ _ argT] _
+                | isConstructorKind rn
+                , isListTyCon argT
+                -> do
+                  -- Known limitations, deliberately deferred (adversarial
+                  -- review 2026-07-18): element-type mismatches inside the
+                  -- collected arguments surface as "LIST literal" errors
+                  -- although the source has no LIST literal; and the anno
+                  -- rebuild drops the OF/comma concrete-syntax tokens from
+                  -- the typechecked AST (highlighting-only; exactprint reads
+                  -- the parsed AST and is unaffected).
+                  let collected = [collectIntoListLiteral actualArgs]
+                  (res, rt) <- matchFunTy False rn t collected
+                  pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
+              _ -> do
+                  (res, rt) <- matchFunTy False rn t actualArgs
+                  pure (App ann rn res, rt)
 
-      pure (App finalAnn rn res, rt)
+      case actualArgs of
+        _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
+        _         -> directApp
     AppNamed ann n nes _morder -> do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -3063,6 +3083,13 @@ rebuildMixfixAppAnno origAnn funcName args =
 -- constructor? Read from the 'TypeInfo' annotation stamped by @resolveTerm'@.
 -- 'Nothing'/ambiguous resolutions answer 'False', so the variadic rewrite
 -- never fires on uncertain heads.
+--
+-- Boundary note (pinned by not-ok\/tc\/variadic-construction-limits.l4): the
+-- stamp is applied via 'withRange', which silently skips RANGELESS names.
+-- Mixfix-chain-parsed heads (the infix spelling @1 Bag 2@) are synthesized
+-- rangeless, so they never answer 'True' here and the rescue does not fire
+-- on infix spellings — currently an accident of 'withRange', relied upon
+-- deliberately as of the 2026-07-18 review.
 isConstructorKind :: Resolved -> Bool
 isConstructorKind r = case getActual r of
   MkName cAnn _ -> case cAnn.extra.resolvedInfo of
