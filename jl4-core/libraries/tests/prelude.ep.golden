@@ -350,6 +350,7 @@ GIVETH A MAYBE NUMBER
 minimum list @nlg the smallest value in %list%
   MEANS
   CONSIDER list
+  WHEN EMPTY THEN NOTHING
   WHEN x FOLLOWED BY xs THEN minimum1 x xs
 
 GIVEN
@@ -367,7 +368,13 @@ GIVEN
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 min x y @nlg the lesser of %x% and %y%
-  MEANS IF x <= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a <= b THEN x ELSE y
 
 GIVEN
   list IS A LIST OF MAYBE NUMBER
@@ -375,7 +382,8 @@ GIVETH A MAYBE NUMBER
 maximum list @nlg the largest value in %list%
   MEANS
   CONSIDER list
-  WHEN x FOLLOWED BY xs THEN minimum1 x xs
+  WHEN EMPTY THEN NOTHING
+  WHEN x FOLLOWED BY xs THEN maximum1 x xs
 
 GIVEN
   x    IS A MAYBE NUMBER
@@ -385,14 +393,20 @@ maximum1 x list @nlg the largest of %x% and the values in %list%
   MEANS
   CONSIDER list
   WHEN EMPTY THEN x
-  WHEN y FOLLOWED BY ys THEN maximum1 (min x y) ys
+  WHEN y FOLLOWED BY ys THEN maximum1 (max x y) ys
 
 GIVEN
   x IS A MAYBE NUMBER
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 max x y @nlg the greater of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a >= b THEN x ELSE y
 
 
 §§ `Ranges, Sorting & Search`
