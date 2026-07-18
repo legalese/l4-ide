@@ -19,12 +19,12 @@ No mathematics background needed — a **set** is just a collection of things wh
 
 Four operations do almost all the work, and each has a plain-English name a drafter already uses:
 
-| Operation      | Everyday phrasing                          | Symbol | Example (NY = {alice, bob}, NJ = {carol}) |
-| -------------- | ------------------------------------------ | ------ | ----------------------------------------- |
-| **union**      | "members of A **and** of B" / "either one" | A ∪ B  | NY ∪ NJ = {alice, bob, carol}             |
-| **intersection** | "those in **both**"                      | A ∩ B  | NY ∩ NJ = {} (nobody is in both)          |
-| **difference** | "A **less** those in B"                    | A \ B  | employees \ probationers                  |
-| **membership** | "is x **in** the set?"                     | x ∈ A  | alice ∈ NY is true                        |
+| Operation        | Everyday phrasing                          | Symbol | Example (NY = {alice, bob}, NJ = {carol}) |
+| ---------------- | ------------------------------------------ | ------ | ----------------------------------------- |
+| **union**        | "members of A **and** of B" / "either one" | A ∪ B  | NY ∪ NJ = {alice, bob, carol}             |
+| **intersection** | "those in **both**"                        | A ∩ B  | NY ∩ NJ = {} (nobody is in both)          |
+| **difference**   | "A **less** those in B"                    | A \ B  | employees \ probationers                  |
+| **membership**   | "is x **in** the set?"                     | x ∈ A  | alice ∈ NY is true                        |
 
 Two relationships round it out: A is a **subset** of B (A ⊆ B) when every member of A is also in B, and two sets are **equal** when each is a subset of the other — which is why order and repetition don't matter. That is the whole vocabulary; the rest of this tutorial is how L4 spells it.
 
