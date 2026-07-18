@@ -449,6 +449,32 @@ compiler-touching phase) and likely obviates β.
 **DECIDED (Meng, 2026-07-18): route α adopted.** β stays in the spec as the rejected
 alternative, for the record.
 
+**Post-decision corroboration — the backtick retraction (§5.1 finding 1) strengthens α
+a fortiori.** That episode was an accidental controlled experiment in keyword cost versus
+identifier cost, and every arm of it points the same way:
+
+1. **`LESS` is the cautionary tale for β.** Everything that went wrong in the probe — the
+   baffling error three tokens from the fault, the backtick-escaping, the pending `try` fix —
+   happened _because `LESS` is a lexer keyword_ squatting on a word that wanted to be an
+   identifier. β would do precisely that to `SET`, a word that must simultaneously keep working
+   as a name in `DECLARE` heads, type applications, `WITH` constructions, and patterns.
+2. **`UNION`/`INTERSECT` bare are the advertisement for α's world.** They deliver the production
+   surface at zero cost _because they are not keywords_. `SET` currently enjoys the same status;
+   β would revoke it, α preserves it.
+3. **α's mechanism is house style, not a novelty.** The December-2025 change
+   (`mixfix-operators.md`): the typechecker already reinterprets misparsed
+   `App operand [keyword]` fragments so postfix mixfix works unparenthesized — rescue-by-
+   elaboration, applied only where the parse-level reading would be a type error. α is the same
+   bargain, with the same conservative-extension bound.
+4. **β's residual payoff shrank to the `OF`-less spelling `SET 1, 2, 3`** — its polish argument
+   evaporated with the backtick retraction, and `SET OF 1, 2, 3` is arguably the better legal
+   register anyway ("the set of A, B, and C").
+
+The honest cost of α, for the record: each elaboration rule makes checker behaviour slightly
+less predictable from syntax alone. The conservative-extension property is the containment —
+α only assigns meaning to programs that are errors today, so it cannot change any existing
+meaning. Same bargain as December 2025.
+
 ## 4. Proposed prelude sketch
 
 Illustrative, not verified against the checker — treat as pseudocode in L4's clothing:
@@ -618,20 +644,39 @@ the §4 sketch's helper burden is smaller than drafted.
 
 ## 6. Implementation phases
 
-- **Phase 0 — spec review.** This document. Settle D1–D5 and Q1–Q4.
-- **Phase 1 — prelude only, zero compiler change.** `SET OF a` + `is in`, `UNION`, `INTERSECT`,
-  `LESS`, `subset`, `setSize`, list↔set conversions, all as mixfix over prelude `nub`/`elem`/
-  `append`. Golden tests in `jl4/examples/ok/set-operators.l4`. **Prototyped and verified
-  2026-07-18 — the §5.1 probe runs all ten `#EVAL`s green on today's compiler**; landing it is
-  transcription, not development.
-- **Phase 2 — the overloads.** `__PLUS__`, `__MINUS__`, `__AND__`, `__OR__` on `Set a`. Add the
-  §5 worked example as the acceptance test. This is where the paper-worthy behaviour appears.
-- **Phase 3 — keywords + precedence.** Lexer entries for `UNION`/`INTERSECT`; bare `LESS`;
-  precedence rows per §D5; **the `try` fix at `Parser.hs:1491`**; the §D7.1 route-α elaboration
-  (variadic `SET OF 1, 2, 3` via arg-collection in the typechecker — likely obviating the
-  route-β `SET alice, bob, carol` keyword literal).
-- **Phase 4 — the lint.** Diagnostic + quick-fix for `AND`/`OR` on `Set`, hung off
-  `Lint/AndOrDepth.hs`. This is the part that turns a language feature into a _product_ feature.
+_(Restructured 2026-07-18: the old "Phase 3 — keywords + precedence" bundled three unrelated
+things, one of which is now under active challenge. Split into 3a/3b/3c so each can land — or
+die — on its own merits.)_
+
+- **Phase 0 — spec review.** This document. Settled: D1–D7, Q2, Q4, α-vs-β. Open: Q3, Q5.
+- **Phase 1 — prelude landing, zero compiler change.** `SET OF a` + `is in`, bare `UNION`, bare
+  `INTERSECT`, `` `LESS` `` (backticked — lexer keyword; consider bare `WITHOUT`/`EXCEPT` as the
+  drafting-canon alias, both verified unclaimed), `subset`, `setSize`, list↔set conversions,
+  over prelude `nub`/`elem`/`append`. Golden tests in `jl4/examples/ok/set-operators.l4`.
+  **Prototyped and verified 2026-07-18 — the §5.1 probe runs all ten `#EVAL`s green on today's
+  compiler**; landing it is transcription, not development.
+- **Phase 2 — the overloads.** `__PLUS__`, `__MINUS__`, `__AND__`, `__OR__` on `SET OF a`. Add
+  the §5 worked example as the acceptance test. This is where the paper-worthy behaviour
+  appears.
+- **Phase 3a — route-α elaboration** (§D7.1, DECIDED): variadic construction
+  `SET OF 1, 2, 3` via argument-collection in the typechecker. First compiler-touching change;
+  independent of everything below.
+- **Phase 3b — precedence for identifier operators, mechanism TBD (Q5).** The old plan —
+  keywordize `UNION`/`INTERSECT` in the lexer + precedence rows per §D5 — is under challenge:
+  bare spellings already work, so keywords would buy _only_ precedence while importing the
+  keyword tax that `LESS` exemplifies (§D7.1). The alternative is a **fixity-declaration
+  mechanism** (Haskell `infixl`/`infixr`-style) for identifier operators; assessment in
+  progress. If fixity wins, `UNION`/`INTERSECT` stay identifiers forever and every future
+  library operator benefits; if keywords win, include **the `try` fix at `Parser.hs:1491`**
+  as part of landing bare `LESS`.
+- **Phase 3c — bare `LESS`**, if ever: only reachable via the keyword route (a fixity mechanism
+  cannot rescue a word the lexer already owns). If 3b goes the fixity way, set difference stays
+  `WITHOUT`/`EXCEPT`/`` `LESS` `` and this phase is abandoned — acceptable, per §D5.
+- **Phase 4 — the lint.** Diagnostic + quick-fix per the §11.6 decision procedure (zeroth
+  check: scalar operands exit; Defeater 1 empty-intersection; Defeater 2 co-extension;
+  anti-defeater contrastive-connective scan; `AMBIGUOUS` escape hatch), hung off
+  `Lint/AndOrDepth.hs`. Independent of 3a–3c. This is the part that turns a language feature
+  into a _product_ feature.
 
 ## 7. Open questions
 
@@ -649,6 +694,17 @@ the §4 sketch's helper burden is smaller than drafted.
   [`EVERY-EACH-QUANTIFIER-SPEC.md`](EVERY-EACH-QUANTIFIER-SPEC.md), and it touches the
   actor-indexed action work. Needs a joint read; do not design in isolation.
 - ~~**Q4 — Ordering/canonicalization.**~~ **RESOLVED — see §D6.**
+- **Q5 — Precedence via fixity declarations instead of keywords?** (Opened 2026-07-18, from the
+  §5.1 backtick retraction.) Since identifier operators already work bare, keywordizing
+  `UNION`/`INTERSECT` (§D5 route B) buys _only_ precedence — at the keyword tax `LESS`
+  exemplifies. A Haskell-`infixl`/`infixr`-style **fixity declaration** for identifier
+  operators (e.g. a decorator on the operator's definition) would deliver precedence while
+  keeping the words ordinary identifiers, and would generalize to every future library
+  operator, not just the set vocabulary. GHC precedent: fixity is not a parser feature —
+  operator chains parse provisionally and the renamer re-associates. L4 analogue: re-associate
+  in the same phase as (or adjacent to) the December-2025 misparsed-`App` reinterpretation.
+  Note the limit: fixity cannot rescue lexer keywords, so bare `LESS` is out of its reach
+  regardless (Phase 3c). **Assessment of implementation cost in progress; decides Phase 3b.**
 
 ## 9. Q2 resolved: what the authorities actually say
 
