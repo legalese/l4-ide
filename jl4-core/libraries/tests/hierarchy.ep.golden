@@ -217,7 +217,7 @@ GIVETH A STRING
     WHEN LowerAlpha THEN TOLOWER (`alpha` n)
     WHEN UpperRoman THEN `roman` n
     WHEN LowerRoman THEN TOLOWER (`roman` n)
-    WHEN Bulleted   THEN "\8226"
+    WHEN Bulleted   THEN "•"
 
 -- The style in force at depth `d` (0 = top level); falls back to Decimal once
 -- the scheme runs out of levels.

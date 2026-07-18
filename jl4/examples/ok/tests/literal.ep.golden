@@ -15,8 +15,8 @@ DECIDE `another definition of primes` IS
 
 DECIDE countries IS
     "Germany" FOLLOWED BY
-    "\214sterreich" FOLLOWED BY
-    "\26032\21152\22369\20849\21644\22269" FOLLOWED BY -- Unicode test
+    "Österreich" FOLLOWED BY
+    "新加坡共和国" FOLLOWED BY -- Unicode test
     "Some \"country\"" FOLLOWED BY -- escapes
     EMPTY
 

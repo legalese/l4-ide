@@ -10,7 +10,7 @@
 -- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
 -- serial(2025-01-31) = 739646 (ambient); serial(2000-01-01) = 730484 (past).
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 past MEANS DATE_SERIAL (DATE_FROM_DMY 1 1 2000)
 

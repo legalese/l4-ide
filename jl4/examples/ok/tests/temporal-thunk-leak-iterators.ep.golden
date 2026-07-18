@@ -12,7 +12,7 @@
 -- TODAY = DATE OF 31, 1, 2025 = serial 739646.
 -- serial(2020-06-15) = 737955.
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 ----------------------------------------------------------------------------
 -- Case 1: seeding during WHEN LAST inside AS OF (probe 05)

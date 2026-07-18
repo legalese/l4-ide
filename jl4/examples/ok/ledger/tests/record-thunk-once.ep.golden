@@ -17,7 +17,7 @@
 --
 -- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 ----------------------------------------------------------------------------
 -- Write side: the RECORD fires exactly once per first force

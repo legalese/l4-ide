@@ -13,7 +13,7 @@
 -- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
 -- so ambient DATE_SERIAL TODAY is the serial of 2025-01-31.
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 ----------------------------------------------------------------------------
 -- Case 1: forced under the override first, read ambient second

@@ -11,7 +11,7 @@
 IMPORT prelude
 IMPORT daydate
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 -- GST rose from 7 to 9 effective 2024-01-01.
 `GST rate` MEANS

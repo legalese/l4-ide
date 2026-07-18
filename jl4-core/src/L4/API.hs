@@ -793,7 +793,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Literals
   TLiterals (TIntLit _ _) -> Just 4      -- Numbers (type index 4)
   TLiterals (TRationalLit _ _) -> Just 4 -- Numbers (type index 4)
-  TLiterals (TStringLit _) -> Just 5     -- Strings (type index 5)
+  TLiterals (TStringLit _ _) -> Just 5   -- Strings (type index 5)
   
   -- Operators (type index 6)
   TOperators _ -> Just 6
