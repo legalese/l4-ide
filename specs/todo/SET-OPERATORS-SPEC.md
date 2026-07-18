@@ -1530,3 +1530,44 @@ section and (C)+(D) closes permanently.
   `LESS THAN` row refer to the pre-drift line; the row now lives inside `:1502-1518`.
 - Probe files preserved in the session scratchpad (`fixity-chain-probe.l4`,
   `fixity-ast-probe.l4`, `fixity-sameop-probe.l4`, `fixity-parens-probe.l4`, `fmt-single.l4`).
+
+## 14. Implementation findings (Phases 1–3a built + adversarially reviewed, 2026-07-18)
+
+Phases 1, 2, and 3a are implemented on two branches (`mengwong/set-operators-phase1`:
+prelude + examples; `mengwong/set-operators-route-alpha`: the §D7.1 elaboration), both green
+across the full golden suite, then put through a 33-agent adversarial review (5 lenses × 2
+refuters per finding: 14 raw, 11 confirmed, all addressed or pinned). What the
+implementation taught us, superseding parts of §D6/§D7:
+
+1. **§D6's `__EQUALS__` plan fails as designed — and the failure is better than the plan.**
+   The builtin `__EQUALS__` is `FOR ALL A. A → A → BOOLEAN` and the checker has **no
+   specificity preference**, so a SET overload makes bare `EQUALS` on two sets an
+   **ambiguity error**, not extensional equality. Kept deliberately: a loud error beats
+   silently order-sensitive structural equality (detect ≠ resolve). Blessed spelling:
+   `` `set equals` ``. A not-ok golden documents when to celebrate: if it ever passes, the
+   checker gained specificity and bare set-EQUALS became extensional.
+2. **The quotient is one level deep, and §D7's "semantically invisible" claim was too
+   strong.** Element comparison is builtin structural equality, so it does not compose:
+   `SET OF SET OF a` compares inner sets by representation ({{1,2}} ∩ {{2,1}} = ∅), and a
+   set wrapped in ANY container (record field, PAIR, LIST, MAYBE) compares structurally
+   under bare `EQUALS` with no diagnostic — the ambiguity guard fires only on directly
+   SET-typed operands. Honestly scoped in the prelude header; pinned by
+   `ok/set-operators-nested.l4`. **Phase 4 gains two lint triggers:** (i) instantiating
+   SET's element parameter at a type containing SET; (ii) `EQUALS` where either operand's
+   type contains SET at any depth.
+3. **Route α as first written violated its own conservative-extension promise.** The rescue
+   fired per resolution CANDIDATE, so a same-named function/constructor pair where the dead
+   constructor branch previously lost now became AmbiguousTermError (4 verified repros, one
+   via the prelude's own `Dictionary`). Fixed: the rescue is a **per-call-site biased
+   fallback** — direct inference first; rescue participates only when the entire resolution
+   has zero successes — via a new `orElseKeepAll` combinator (plain `orElse` filters to
+   successes-only, which starves `prune` of `ambiguousTerm`'s curated error candidates and
+   degrades multi-overload diagnostics to internal errors; found the hard way).
+4. **The infix spelling `1 Bag 2` does not fire the rescue** — chain-parsed heads are
+   synthesized rangeless and `withRange` silently skips the Constructor stamp. Desirable,
+   but accidental; documented on `isConstructorKind` and pinned in the limits golden.
+5. **Smaller notes:** SET's field is `elements` (the natural `contents` collided with
+   `Dictionary`'s field, breaking previously-unique untyped projections); the Partee & Rooth
+   comments in prelude/examples were tightened to attribute only the type-directed dispatch,
+   per §9.3's own warning; deferred with in-code notes — "LIST literal" error attribution at
+   rescued sites, and OF/comma semantic-token loss at rescued sites (highlighting-only).
