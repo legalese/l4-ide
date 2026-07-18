@@ -1,0 +1,21 @@
+-- Bitemporal stamps (smucclaw/l4-ide#914 §2A): every ledger append carries a
+-- transaction time (at=, the ROOT eval clock) and, when a fact time was
+-- explicitly in scope at the write, a valid-from (vt=). The rendered Ledger
+-- blocks below lock three invariants:
+--
+--   * a plain RECORD is contemporaneous: at= the harness clock, NO vt= field;
+--   * a RECORD under EVAL UNDER VALID TIME carries vt=<the asserted day>;
+--   * tx-IMMUNITY (the audit invariant): a RECORD under EVAL AS OF SYSTEM
+--     TIME STILL stamps at= the harness clock, not the override — that
+--     clause scopes reads, never writes.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+-- expected: 1 — and a Ledger row [source=RECORD, at=2025-01-31T15:45:30Z] with no vt=
+#EVAL RECORD `a` IS 1
+
+-- expected: 2 — and a Ledger row with vt=2020-01-01
+#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (RECORD `b` IS 2)
+
+-- expected: 3 — and a Ledger row with at=2025-01-31T15:45:30Z (NOT 2020) and no vt=
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (RECORD `c` IS 3)

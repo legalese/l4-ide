@@ -7,7 +7,7 @@
 
 -- Stranded above a directive: warned, and does not reach `plusB` below.
 @infixl 6
-#EVAL plusA 1 2
+#EVAL 1 plusA 2
 
 GIVEN p IS A NUMBER
       q IS A NUMBER
@@ -22,7 +22,7 @@ p plusB q MEANS p + q
 -- plusB never received the stray @infixl 6, so a bare chain over it is still
 -- the usual arity situation — but written parenthesized here it evaluates,
 -- proving plusB is an ordinary undeclared operator.
-#EVAL plusB (plusB 1 2) 3
+#EVAL (1 plusB 2) plusB 3
 
 -- Stacked: the earlier annotation is superseded (warned); the closest one
 -- (@infixr 5) wins.
@@ -34,4 +34,4 @@ GIVETH A NUMBER
 p consB q MEANS p + 10 * q
 
 -- right-associative: 1 consB (2 consB 3) = 1 + 10*(2+30) = 321
-#EVAL consB consB 1 2 consB 3
+#EVAL 1 consB 2 consB 3

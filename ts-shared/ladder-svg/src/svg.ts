@@ -1,9 +1,11 @@
 /**
- * Scene IR -> SVG string (the shared `ladder-svg` emit, DESIGN §4; for P0 it lives
- * here, to be split out per §12). Canonical text is <text>/<tspan> so the same
+ * Scene IR -> SVG string (DESIGN §4). Canonical text is <text>/<tspan> so the same
  * emit feeds screen AND print (§4.4). `theme` maps state -> ink; no second layout.
+ *
+ * The import below is deliberately `import type`: the Scene IR is a *contract*, not
+ * a library, so this backend carries no runtime dependency on the layout engine.
  */
-import type { Scene, ScenePrim, State, Theme, Flow } from "./types.js";
+import type { Scene, ScenePrim, State, Theme, Flow } from "@repo/ladder-core";
 
 interface Palette {
   live: string;
@@ -81,7 +83,26 @@ function prim(p: ScenePrim, pal: Palette): string {
       const op = p.state === "eliminable" ? ' opacity="0.9"' : "";
       return `<path ${cls} d="${d}" fill="none" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${dash}${op}/>`;
     }
+    case "coil": {
+      // §25.4 — the right-hand half of a rung, which we have never drawn until now.
+      // LIT is the whole point: count the lit lamps and you have the verdict. Neither
+      // lit ⇒ N/A (the scope did not conduct) or undetermined.
+      const on = p.role === "green" ? "#1a7f37" : "#c0392b";
+      const off = "#c9ced3";
+      const col = p.lit ? on : off;
+      const r = 9;
+      return (
+        `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="${r}" ` +
+        `fill="${p.lit ? col : "#ffffff"}" stroke="${col}" stroke-width="${p.lit ? 2.6 : 1.4}"/>` +
+        `<text x="${(p.at.x + r + 7).toFixed(1)}" y="${(p.at.y + 4).toFixed(1)}" ` +
+        `font-family="Georgia, serif" font-size="12" fill="${p.lit ? col : off}"` +
+        `${p.lit ? ' font-weight="700"' : ' font-style="italic"'}>${esc(p.label)}</text>`
+      );
+    }
     case "glyph":
+      if (p.role === "changeover")
+        // one pole, two throws — the requirement's verdict throws the blade
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3" fill="#3a3a3a"/>`;
       if (p.role === "open-contact")
         return (
           `<line x1="${(p.at.x - 7).toFixed(1)}" y1="${(p.at.y - 7).toFixed(1)}" x2="${(p.at.x - 7).toFixed(1)}" y2="${(p.at.y + 7).toFixed(1)}" stroke="${pal.ghost}" stroke-width="1.6"/>` +
@@ -108,21 +129,25 @@ function prim(p: ScenePrim, pal: Palette): string {
           p.tag === "note" ||
           p.tag === "connective" ||
           p.tag === "typically");
+      // 'seam' is deliberately NOT inert: the MUST is the load-bearing connective
       const dy = inert ? 0 : 5; // vertical-center body/caret text
       const italic = inert ? ' font-style="italic"' : "";
-      const weight = p.tag === "title" ? ' font-weight="700"' : "";
+      const weight =
+        p.tag === "title" || p.tag === "seam" ? ' font-weight="700"' : "";
       // 'typically' (DESIGN §22) reads muted-amber to mark a rebuttable presumption.
       const fill = isCaret
         ? "#7a7f85"
-        : p.tag === "typically"
-          ? "#9a7b34"
-          : p.tag === "otiose"
-            ? pal.ghost
-            : p.state === "live"
-              ? pal.ink
-              : p.tag
-                ? "#555"
-                : pal.ink;
+        : p.tag === "seam"
+          ? "#1b1b1b"
+          : p.tag === "typically"
+            ? "#9a7b34"
+            : p.tag === "otiose"
+              ? pal.ghost
+              : p.state === "live"
+                ? pal.ink
+                : p.tag
+                  ? "#555"
+                  : pal.ink;
       const a = `${p.id != null ? ` data-fnid="${p.id}"` : ""}${actAttr(p.act)}${p.act ? ' class="lad-clickable"' : ""}`;
       return `<text${a} x="${p.at.x.toFixed(1)}" y="${(p.at.y + dy).toFixed(1)}" font-family="Georgia, serif" font-size="${size}" text-anchor="${p.anchor}" fill="${fill}"${italic}${weight}>${esc(p.text)}</text>`;
     }

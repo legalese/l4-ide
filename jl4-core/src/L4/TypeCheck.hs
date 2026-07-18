@@ -1532,21 +1532,56 @@ inferFlatApp ann n es = do
         Just err -> addError (MixfixMatchErrorCheck n err)
         Nothing -> pure ()
 
-      -- 1.
-      (rn, pt) <- resolveTerm actualFuncName
-      t <- instantiate pt
-
-      -- 2. - 5.
+      -- 1. - 5. Direct inference first; the variadic-construction rescue
+      -- (SET-OPERATORS-SPEC §D7.1, "route α") is a biased FALLBACK via
+      -- 'orElse': it participates only when NO direct resolution of the call
+      -- site succeeds, so any program that typechecks without it — e.g. a
+      -- same-named function overload outcompeting a same-named constructor —
+      -- keeps its meaning verbatim. Within the fallback, a record constructor
+      -- with exactly one LIST-typed field applied to two or more arguments
+      -- collects the arguments into a synthesized List literal:
+      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en); every other candidate
+      -- re-fails exactly as the direct attempt did, preserving error
+      -- messages. One-argument applications never rescue (SET OF xs keeps
+      -- its wrap-this-list reading), and a synonym-obscured LIST field
+      -- misses the rescue rather than guessing.
+      --
       -- Note that if there are no arguments, then matchFunTy does not
       -- actually insist on the type t being a function.
-      (res, rt) <- matchFunTy False rn t actualArgs
+      let directApp = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            (res, rt) <- matchFunTy False rn t actualArgs
+            let finalAnn = if needsAnnoRebuild
+                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                           else ann
+            pure (App finalAnn rn res, rt)
 
-      -- If mixfix args were restructured, rebuild annotation with correct holes
-      let finalAnn = if needsAnnoRebuild
-                     then rebuildMixfixAppAnno ann actualFuncName actualArgs
-                     else ann
+          variadicRescue = do
+            (rn, pt) <- resolveTerm actualFuncName
+            t <- instantiate pt
+            case t of
+              Fun _ [MkOptionallyNamedType _ _ argT] _
+                | isConstructorKind rn
+                , isListTyCon argT
+                -> do
+                  -- Known limitations, deliberately deferred (adversarial
+                  -- review 2026-07-18): element-type mismatches inside the
+                  -- collected arguments surface as "LIST literal" errors
+                  -- although the source has no LIST literal; and the anno
+                  -- rebuild drops the OF/comma concrete-syntax tokens from
+                  -- the typechecked AST (highlighting-only; exactprint reads
+                  -- the parsed AST and is unaffected).
+                  let collected = [collectIntoListLiteral actualArgs]
+                  (res, rt) <- matchFunTy False rn t collected
+                  pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
+              _ -> do
+                  (res, rt) <- matchFunTy False rn t actualArgs
+                  pure (App ann rn res, rt)
 
-      pure (App finalAnn rn res, rt)
+      case actualArgs of
+        _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
+        _         -> directApp
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
@@ -1747,7 +1782,9 @@ inferExpr' g =
     App ann n es -> do
       -- If this is a flat chain of fixity-declared binary operators, first
       -- re-associate it into nested binary applications and infer the result;
-      -- see 'tryReassociateFixityChain' (a no-op for anything else).
+      -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
+      -- fall through to the ordinary application logic (including the route-α
+      -- variadic-construction rescue), which lives in 'inferFlatApp'.
       mReassociated <- tryReassociateFixityChain ann n es
       case mReassociated of
         Just reassociated -> inferExpr reassociated
@@ -3247,6 +3284,38 @@ shuntChain ops operands = case operands of
 mkReassociatedBinaryApp :: Name -> Expr Name -> Expr Name -> Expr Name
 mkReassociatedBinaryApp op l r =
   App (rebuildMixfixAppAnno emptyAnno op [l, r]) op [l, r]
+
+-- | Route-α support (SET-OPERATORS-SPEC §D7.1): is this resolved head a data
+-- constructor? Read from the 'TypeInfo' annotation stamped by @resolveTerm'@.
+-- 'Nothing'/ambiguous resolutions answer 'False', so the variadic rewrite
+-- never fires on uncertain heads.
+--
+-- Boundary note (pinned by not-ok\/tc\/variadic-construction-limits.l4): the
+-- stamp is applied via 'withRange', which silently skips RANGELESS names.
+-- Mixfix-chain-parsed heads (the infix spelling @1 Bag 2@) are synthesized
+-- rangeless, so they never answer 'True' here and the rescue does not fire
+-- on infix spellings — currently an accident of 'withRange', relied upon
+-- deliberately as of the 2026-07-18 review.
+isConstructorKind :: Resolved -> Bool
+isConstructorKind r = case getActual r of
+  MkName cAnn _ -> case cAnn.extra.resolvedInfo of
+    Just (TypeInfo _ (Just Constructor)) -> True
+    _ -> False
+
+-- | Is this type an application of the builtin LIST type constructor?
+isListTyCon :: Type' Resolved -> Bool
+isListTyCon (TyApp _ n _) = getUnique n == getUnique listRef
+isListTyCon _ = False
+
+-- | Collect application arguments into a synthesized List literal. The
+-- annotation carries the args' real source range in a single hole — the
+-- shape the generic ToConcreteNodes instance for List expects — so range
+-- resolution (e.g. #EVAL code lenses) keeps working on rewritten sites.
+collectIntoListLiteral :: [Expr Name] -> Expr Name
+collectIntoListLiteral args =
+  let hole = mkHoleWithSrcRangeHint (rangeOf args)
+      lAnn = fixAnnoSrcRange (set #payload [hole] emptyAnno)
+  in List lAnn args
 
 -- | Flatten a binary mixfix application into a list of (Either Expr Keyword).
 -- Given: App had [App and [a, b], c]

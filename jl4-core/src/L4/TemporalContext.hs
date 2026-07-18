@@ -156,30 +156,42 @@ data CtxReads = MkCtxReads
     -- RULES EFFECTIVE DATE under an unset axis records @ReadEq Nothing@
     -- and additionally records the fact-time read and the
     -- system-time/timezone reads its fallback chain performs)
-  , crLedgerOps :: !Bool
-    -- ^ STATE-AS-LEDGER poison bit: did the force perform ANY ledger
-    -- operation — a RECORD\/COMMIT\/ATTEST\/NOTIFY append or a RECALL read?
-    -- Ledger ops break the deterministic-replay premise of 'WHNFWhen'
-    -- caching in BOTH directions: a re-force would APPEND the write again
-    -- (a double-write visible to @RECALL ALL@\/provenance), and a cached
-    -- read could be served under a DIFFERENT ledger than it observed (the
-    -- fingerprint tracks only temporal axes). A force with this bit set is
-    -- therefore cached as a plain 'WHNF' (snapshot at first force — exactly
-    -- the semantics a ledger-touching thunk WITHOUT temporal reads already
-    -- has), never as a 'WHNFWhen'. See the cache-install decision in the
+  , crLedgerWrite :: !Bool
+    -- ^ STATE-AS-LEDGER write-poison bit: did the force APPEND to the ledger
+    -- (a RECORD\/COMMIT\/ATTEST\/NOTIFY)? A re-force would append the write
+    -- AGAIN (a double-write visible to @RECALL ALL@\/provenance), so a force
+    -- with this bit is cached as a plain 'WHNF' (snapshot at first force:
+    -- the write fires exactly once, every later use shares the first-force
+    -- value), never as a 'WHNFWhen'. See the cache-install decision in the
     -- @UpdateThunk@ arm of 'L4.EvaluateLazy.Machine.backward'.
+  , crLedgerRead :: !Bool
+    -- ^ STATE-AS-LEDGER read marker: did the force READ the ledger (a
+    -- RECALL)? Unlike a write, re-forcing a pure read is harmless — and
+    -- since smucclaw\/l4-ide#914 a RECALL's result DEPENDS on the ambient
+    -- temporal axes (recorded into this same fingerprint by @finishRead@),
+    -- so a read-only ledger force is cached as a 'WHNFWhen' keyed on those
+    -- axes: SNAPSHOT PER TEMPORAL SCOPE. Under an unchanged context the
+    -- first-force value is re-served (the fingerprint deliberately does NOT
+    -- track the ledger, so later writes stay invisible to the shared thunk
+    -- — the pre-bitemporal per-directive snapshot, restricted per scope);
+    -- under a different context the thunk re-forces against the CURRENT
+    -- ledger, giving each scope its own snapshot. This bit does not veto
+    -- 'validFor'; it exists so read-ness propagates through the Semigroup
+    -- and future work can key on it (e.g. a ledger version in the
+    -- fingerprint).
   }
   deriving stock (Eq, Show)
 
 instance Semigroup CtxReads where
-  MkCtxReads a b v rv l <> MkCtxReads a' b' v' rv' l' = MkCtxReads (a <> a') (b <> b') (v <> v') (rv <> rv') (l || l')
+  MkCtxReads a b v rv w r <> MkCtxReads a' b' v' rv' w' r' =
+    MkCtxReads (a <> a') (b <> b') (v <> v') (rv <> rv') (w || w') (r || r')
 
 instance Monoid CtxReads where
   mempty = noReads
 
 -- | The empty fingerprint: no axis was read.
 noReads :: CtxReads
-noReads = MkCtxReads NotRead NotRead NotRead NotRead False
+noReads = MkCtxReads NotRead NotRead NotRead NotRead False False
 
 -- | Did this force observe the temporal context at all?
 hasReads :: CtxReads -> Bool
@@ -191,13 +203,16 @@ hasReads r = r /= noReads
 -- recorded read reproduces under the current context, re-forcing would
 -- deterministically replay to the identical value.
 --
--- A fingerprint carrying 'crLedgerOps' never validates: re-forcing such a
--- force is NOT a deterministic replay (it would re-append writes and re-read
--- a possibly-changed ledger). The evaluator never installs such a cache in
--- the first place (it installs a plain WHNF instead); this arm is defensive.
+-- A fingerprint carrying 'crLedgerWrite' never validates: re-forcing such a
+-- force is NOT a deterministic replay (it would re-append the write). The
+-- evaluator never installs such a cache in the first place (it installs a
+-- plain WHNF instead); this arm is defensive. 'crLedgerRead' deliberately
+-- does NOT veto: a read-only ledger force is valid exactly while its
+-- recorded temporal axes match (snapshot per temporal scope — see the field
+-- doc on 'crLedgerRead').
 validFor :: TemporalContext -> CtxReads -> Bool
 validFor tc r =
-  not r.crLedgerOps
+  not r.crLedgerWrite
     && axisValid tc.tcSystemTime r.crSystemTime
     && axisValid tc.tcDocumentTimezone r.crDocumentTimezone
     && axisValid tc.tcValidTime r.crValidTime

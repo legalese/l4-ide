@@ -1,11 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-fixity-chain-right.l4:11:1-22:
+fixity-chain-right.l4:11:1-24:
   321
-fixity-chain-right.l4:14:1-14:
+fixity-chain-right.l4:14:1-26:
   321
-fixity-chain-right.l4:17:1-24:
+fixity-chain-right.l4:17:1-26:
   51
-fixity-chain-right.l4:21:1-30:
+fixity-chain-right.l4:21:1-32:
   4321

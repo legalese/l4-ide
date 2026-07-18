@@ -172,6 +172,7 @@ test-suite jl4-core-test
     TemporalContextSpec
     UnifySpec
     MixfixParserSpec
+    EventExactPrintSpec
     PatternMatchParserSpec
     BulletParserSpec
     UUID5Spec
@@ -190,6 +191,8 @@ test-suite jl4-core-test
     M4PartyLedgerSpec
     M45ReadSpec
     M5DeonticSequencingSpec
+    BitemporalSubstrateSpec
+    BitemporalRecallSpec
     TraceOrderingSpec
   build-tool-depends:
     hspec-discover:hspec-discover

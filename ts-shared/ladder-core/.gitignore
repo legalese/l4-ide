@@ -2,4 +2,3 @@ dist
 demo/out
 node_modules
 *.tsbuildinfo
-standalone/dist

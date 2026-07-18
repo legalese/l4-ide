@@ -23,6 +23,7 @@ module L4.Viz.Ladder
     -- * Utilities (shared with LSP)
   , generateAtomId
   , collectTypicallyDefaults
+  , seamLabel
   ) where
 
 import Base
@@ -349,15 +350,51 @@ typicallyToBool = \case
     | getUnique r == TC.falseUnique -> Just False
   _ -> Nothing
 
+-- | The seam SURVIVES simplification (ladder DESIGN §25a).
+--
+-- 'Transform.simplify' is classical: its job is to reach CNF, and the very first
+-- thing CNF does is rewrite @P IMPLIES Q@ into @NOT P OR Q@. That is
+-- truth-functionally perfect and shape-destroying — it discards the scope /
+-- requirement split, which is the first thing a lawyer asks of a rule ("does this
+-- bite me?", then "so what must be true?"), and it leaves the picture unable to
+-- tell a window the rule never reached (N/A) from one that complies. Both satisfy
+-- @NOT P OR Q@.
+--
+-- So we peel the top-level implication off FIRST, simplify each side ON ITS OWN
+-- (inside a panel, NNF/CNF is a genuine readability win), and keep the connective
+-- between them.
 translateExpr :: Bool -> Expr Resolved -> Viz IRExpr
-translateExpr True = translateExpr False . Transform.simplify
-translateExpr False = go
+translateExpr shouldSimplify = top
   where
+    top :: Expr Resolved -> Viz IRExpr
+    top = \case
+      -- A DECIDE's WHERE block wraps the implication, so peel it before looking.
+      Where _ e ds -> withLocalDecls ds (top e)
+      Implies ann p q -> do
+        vid <- getFresh
+        VizExpr.Implies vid <$> side p <*> side q <*> pure (seamLabel ann)
+      e -> side e
+
+    side :: Expr Resolved -> Viz IRExpr
+    side e = go (if shouldSimplify then Transform.simplify e else e)
+
     go :: Expr Resolved -> Viz IRExpr
     go e = case e of
       Not _ negand -> do
         vid <- getFresh
         VizExpr.Not vid <$> go negand
+
+      -- A NESTED implication. The two-sink form is top-level only (v1): an
+      -- implication buried inside a conjunction has nowhere to hang its lamps.
+      -- Fall back to the classical reading — which is still far better than the
+      -- old behaviour, where this fell through to 'leafFromExpr' and the entire
+      -- implication was swallowed into a single opaque box.
+      Implies _ p q -> do
+        orId <- getFresh
+        notId <- getFresh
+        p' <- go p
+        q' <- go q
+        pure $ VizExpr.Or orId [VizExpr.Not notId p', q']
 
       And {} -> do
         vid <- getFresh
@@ -403,6 +440,34 @@ translateExpr False = go
             leafFromExpr e
 
       _ -> leafFromExpr e
+
+-- | How the seam is labelled in the picture (DESIGN §25e).
+--
+-- The ambition was §17's argument applied to the operator: keep the connective as the
+-- DRAFTER wrote it, since L4 spells the constitutive conditional two ways — the
+-- keyword @IMPLIES@ and the symbol @=>@. That turns out to be unrecoverable here, and
+-- the reason is worth recording rather than rediscovering.
+--
+-- The typechecker DESUGARS every binary operator into a function application
+-- ('L4.TypeCheck.desugarBinOpToFunction' at the @Implies@ case), and its
+-- @annoNoFunName@ rebuilds the annotation as two bare holes — dropping the concrete
+-- syntax node that held the operator token. The desugared @App@ is later RESUGARED
+-- back into an 'Implies', so the visualiser does get a real implication node; but its
+-- annotation carries no tokens at all, and the original spelling is simply gone by
+-- then. Recovering it would mean preserving concrete syntax across binop desugaring —
+-- a change to every operator in the language, for a purely cosmetic difference between
+-- two spellings of ONE operator. Not worth it: printing @=>@ as @IMPLIES@ is of a kind
+-- with printing @>=@ as @≥@, and says nothing the source did not.
+--
+-- Note what is NOT here, and could not be: @MUST@. There is no constitutive @MUST@ in
+-- L4 — @MUST@ is the regulative deontic keyword (@PARTY p MUST …@), and a regulative
+-- rule's consequent is a whole transition system, not a coil (§25.5). The ladder does
+-- not draw those, so a @MUST@ on this seam would be a register the source never used.
+--
+-- The wire field stays free-form, so a hand-authored scene (or a future NLG annotation
+-- carrying the statute's own words) can still override it.
+seamLabel :: Anno -> Text
+seamLabel _ann = "IMPLIES"
 
 scanAnd :: Expr Resolved -> [Expr Resolved]
 scanAnd (And _ e1 e2) = scanAnd e1 <> scanAnd e2

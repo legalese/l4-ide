@@ -24,7 +24,7 @@ a andop b hadop c MEANS 1000 + a + b + c
 
 -- ternary interpretation: 1000 + 1 + 2 + 3 = 1006
 -- (re-association would have produced 1 + 2 * 3 = 7)
-#EVAL andop hadop 1 2 hadop 3
+#EVAL 1 andop 2 hadop 3
 
 -- keyword-first n-ary mixfix is likewise untouched
 GIVEN c IS A BOOLEAN
@@ -64,4 +64,4 @@ a quop b f d MEANS 100 + a + b + d
 -- quaternary interpretation: f = the `opdue` operator, result 100 + 1 + 2 + 3
 -- = 106 — NOT re-association to 1 quop (2 opdue 3) = 7, even though both quop
 -- and opdue carry @infixl declarations
-#EVAL quop opdue 1 2 opdue 3
+#EVAL 1 quop 2 opdue 3

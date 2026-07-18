@@ -155,6 +155,7 @@ instance ToSchema VizExpr.RenderAsLadderInfo where
 
 instance ToSchema QP.InputRef
 instance ToSchema QueryAtom
+instance ToSchema QP.Verdict
 instance ToSchema QueryOutcome
 instance ToSchema QueryImpact
 instance ToSchema QueryInput

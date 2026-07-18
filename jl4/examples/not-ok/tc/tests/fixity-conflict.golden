@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: fixity-conflict.l4
   Hidden: no
-  Range: 17:9-17:26
+  Range: 17:7-17:28
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -18,7 +18,7 @@ File: fixity-conflict.l4
 
 File: fixity-conflict.l4
   Hidden: no
-  Range: 17:9-17:26
+  Range: 17:7-17:28
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

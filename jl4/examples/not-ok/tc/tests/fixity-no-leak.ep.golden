@@ -14,4 +14,4 @@ p leakTarget q MEANS p + q
 
 -- Must error: leakTarget has no fixity of its own, and the stray @infixl 6
 -- above the directive must not have reached it.
-#EVAL leakTarget leakTarget 1 2 leakTarget 3
+#EVAL 1 leakTarget 2 leakTarget 3

@@ -678,11 +678,14 @@ deriving anyclass instance ToConcreteNodes PosToken (GivenSig Name)
 deriving anyclass instance ToConcreteNodes PosToken (Directive Name)
 deriving anyclass instance ToConcreteNodes PosToken (Import Name)
 
+-- Manual instance: the hole-fit order must follow the *source* order of the
+-- clauses, which depends on 'atFirst'. @AT ts PARTY p DOES d@ (atFirst) puts
+-- the timestamp hole first; @PARTY p DOES d AT ts@ puts it last.
 instance ToConcreteNodes PosToken (Event Name) where
   toNodes (MkEvent ann party does ts atFirst) =
     if atFirst
-      then flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
-      else flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      then flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      else flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
 
 instance ToConcreteNodes PosToken (Module Name) where
   toNodes (MkModule ann _ secs) = flattenConcreteNodes ann [toNodes secs]
@@ -727,10 +730,12 @@ deriving anyclass instance ToConcreteNodes PosToken (Import Resolved)
 instance ToConcreteNodes PosToken (Module Resolved) where
   toNodes (MkModule ann _ secs) = flattenConcreteNodes ann [toNodes secs]
 
+-- See the 'Event Name' instance: hole-fit order follows the source order of
+-- the clauses, which depends on 'atFirst'.
 instance ToConcreteNodes PosToken (Event Resolved) where
   toNodes (MkEvent ann party does ts atFirst) = if atFirst
-      then flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
-      else flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      then flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      else flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
 
 data Comment = MkComment Anno [Text]
   deriving stock (Show, Eq, Ord, GHC.Generic)

@@ -34,7 +34,7 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 - `mengwong/consider-exhaustiveness` (active 83m ago) + `fix/consider-exhaustiveness-in-where` (60m ago) — **overlaps pattern-matching (CONSIDER/WHEN)**; coordinate at merge.
 - `mengwong/bounded-deontics-paper` (3d), `verification-backend-lowering-spec` (3d) — deontics/verification (Tier 3/5).
 - `dmnmd-to-l4` (18m), `ladder-diagrams-3` (2d) — active, unrelated.
-- `bullet-list-syntax` (2wk, stale) — separate list-syntax feature.
+- `bullet-list-syntax` — **ACTIVE, PR [#109](https://github.com/legalese/l4-ide/pull/109) → unstable** (2026-07-10). `•` bullet syntax + `hierarchy.l4` rose-tree library for isomorphic recitals/outlines. Rebased onto current unstable, multi-agent reviewed + hardened (stale-comment cleanup, doc-prose fixes, `BulletParserSpec` coverage, `indentedGE` corner case pinned — 0/571 corpus files affected). Fast-follow (not blocking): syntax-highlight `•` in `ts-shared/l4-highlight/src/monarch.ts`.
 
 ## Ladder diagram / visualizer
 
@@ -43,9 +43,9 @@ Home for the ladder rework: **`specs/todo/ladder-diagrams-2026/DESIGN.md` on bra
 - **#630 — "visualizer expansion could use some improvement"** (mislabeled `bug`; really an **enhancement**). The current-codebase symptom is the narrow `canInline` (boolean same-file top-level `DECIDE` only; no functions-with-args / imported / `WHERE`-bound; inline name lost). **Superseded by the 2026 design** — see DESIGN.md §16 "Folding & progressive disclosure" + §16.1 (`NamedExpr`), where #630's write-up now lives. Fix = "adopt the §16 fold model," not a `canInline` patch.
 - **#557** — viz sync race (inline-able subexpr + auto-refresh → stale ladder); scoping agent running. **#551** — jl4-web red gutter mispositioned; scoping agent running.
 
-### After #96 lands → question-ordering v2 (TYPICALLY priors) — **SPEC: `specs/todo/QUESTION-ORDERING-SPEC.md` (§8)**
+### question-ordering v2 (TYPICALLY priors) — ✅ MERGED 2026-07-10 (PR #110) — **SPEC: `specs/todo/QUESTION-ORDERING-SPEC.md` (§8)**
 
-Point a resuming session at that spec. State: v1 prior-free info-gain = **PR #94**; TYPICALLY metadata = **PR #92** (both MERGEABLE, unmerged). v2 = prior-aware ordering, **boolean-only** (Meng-approved 2026-07-08: `TYPICALLY TRUE→0.9 / FALSE→0.1`, everything else ½).
+**PR [#110](https://github.com/legalese/l4-ide/pull/110) "TYPICALLY priors for question ordering (v2)" merged to `unstable`** (commit a030d0b9, worktree `../l4wt/question-ordering-v2`). Its merge_group run doubled as the #110 Tier-1 cache reproduction (see Infra RESOLVED banner). Point a resuming session at the spec for follow-ups. State: v1 prior-free info-gain = **PR #94**; TYPICALLY metadata = **PR #92** (both MERGEABLE, unmerged). v2 = prior-aware ordering, **boolean-only** (Meng-approved 2026-07-08: `TYPICALLY TRUE→0.9 / FALSE→0.1`, everything else ½).
 **Blocking dependency is SHARED with #96 — do not build it twice.** TYPICALLY does not reach the wizard today (`PartialEvalAnalyzer` built from the `IRExpr` alone, `ladder.svelte.ts:322`; the default stops at the JSON schema). Both v2 (ordering weights) and #96's §22 tentative rendering need the SAME L4→atom flow: "which atoms are Boolean binders with a TYPICALLY default, and its value." #96 built the renderer but hand-feeds a demo `provenance` map; the real extraction is stubbed. → Fold that extraction into #96's productionization (cleanest: optional `typically?` field on viz `UBoolVar`, populated by the Haskell ladder builder); then v2 just reads it. Full detail + the backend-ranking alternative in QUESTION-ORDERING-SPEC.md §8.
 
 ## Next
@@ -53,9 +53,18 @@ Point a resuming session at that spec. State: v1 prior-free info-gain = **PR #94
 - Once the 4 implementers push, run an **ultracode hardening workflow** (adversarial review) across all ready branches, apply fixes, open + PR each to `unstable`.
 - Resolve L4-VERSIONING scope (see decision below).
 
-## Infra loose ends (investigate later)
+## Infra loose ends
 
-- **CI cache — PR runs WARM (8 min); merge QUEUE runs stay COLD (~35 min). DECISION 2026-07-07: WON'T FIX — live with it.**
+### ✅ RESOLVED 2026-07-09/10 — merge-queue cabal cache now WARM (Tier-1 warm-up shipped)
+
+The "WON'T FIX" decision below was **reversed and fixed**. A `main`-scoped scheduled warm-up (`.github/workflows/cache-warmup.yml`, cron every 6h) builds `unstable`'s cabal deps and saves the store under an `mq-warmup-*` key; because the run's ref is `main` (the default branch), the save lands in the one scope merge_group runs can read. `pr-checks.yml` restores that key **only** on the merge_group path, so pull_request→main runs are unaffected. Shipped: **PR #107** (unstable) + **#108** (main copy) + **#109** (prettier fix / first validation).
+
+- **Measured:** cold baseline (#102) Install-deps = **21m37s** → warm (#109, #110) = **1 second**. HIT on `mq-warmup-Linux-ghc-9.10.2-cabal-…`.
+- **Reproduced independently 2026-07-10 on #110** (merge_group run 29102678896): same 1s Install-deps, HIT on `…plan-b4d34b6e…` — durable steady-state, not a one-off.
+- **Remaining gap (Tier-1.5, deferred):** warm-up covers the cabal STORE only, not dist-newstyle → `Restore cached build artifacts` still MISSES on merge_group, Build step still ~6-7 min. Lower value / more churn (our own package sources change every PR). Tier-2 durable option = external S3 cabal-cache. Full mechanism in memory `mergequeue-cache-warmup-tier1`.
+- Historical diagnosis (superseded, kept for provenance) below.
+
+- **CI cache — PR runs WARM (8 min); merge QUEUE runs stay COLD (~35 min). DECISION 2026-07-07: WON'T FIX — live with it. [SUPERSEDED — see RESOLVED banner above]**
   Settled un-confounded by PR #52 (first PR into `unstable` after the base cache warmed), clean A/B on the same tree:
   **pull_request→unstable Haskell job = 8m03s** (inherited `refs/heads/unstable` `pr-checks-*-dist/cabal` base caches ✅);
   **merge_group `gh-readonly-queue/unstable/pr-52-*` Haskell job = 34m47s** (cold). ROOT CAUSE (proven from the run log):
@@ -114,3 +123,5 @@ Point a resuming session at that spec. State: v1 prior-free info-gain = **PR #94
 - Staleness audit PR #46 merged (9 archived, 18 banners).
 - Tier-1 #3/#5 + Tier-2 ref-annotation/batch-processing implementers launched (background).
 - 2026-07-07: logged CI-slowness loose end (~40 min/run, suspected cache failure) — see "Infra loose ends" above.
+- 2026-07-09: merge-queue cabal cache RESOLVED — Tier-1 `main`-scoped warm-up shipped (#107/#108/#109). Install-deps 21m37s → 1s.
+- 2026-07-10: #110 (question-ordering v2 / TYPICALLY priors) merged; its merge_group run independently reproduced the Tier-1 cache HIT (1s). Both lanes closed.

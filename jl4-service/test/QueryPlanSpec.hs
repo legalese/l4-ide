@@ -94,6 +94,20 @@ GIVETH A BOOLEAN
 DECIDE d IF presumed OR a OR b
 |]
 
+-- A rule with the shape of a real one: a scope, a requirement, and a seam between
+-- them. Both sides are compound, so the support assertions below are about more than
+-- one atom apiece.
+impliesL4 :: Text
+impliesL4 = [i|
+GIVEN upper IS A BOOLEAN
+      side IS A BOOLEAN
+      glazed IS A BOOLEAN
+      shut IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE compliant IF
+  (upper AND side) IMPLIES (glazed AND shut)
+|]
+
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -277,6 +291,76 @@ serviceTests = do
           rPartial = svcQP c [("walks", True)]
       length rPartial.asks `shouldSatisfy` (<= length rNone.asks)
 
+  -- The VERDICT, end to end from L4 source (DESIGN §25.7). `determined` is the
+  -- function's truth value and stays correct throughout; what these pin is that it is
+  -- NOT the thing to show a user, and that the planner now knows the difference.
+  describe "IMPLIES — the wizard must not report a vacuous TRUE as compliance" do
+    it "scope FALSE: the function is TRUE, and the verdict is NOT Complies" do
+      c <- serviceCache "compliant" impliesL4
+      let r = svcQP c [("upper", False)]
+      -- This is the bug, in one line: `NOT (upper AND side) OR ...` is TRUE, and a UI
+      -- switching on `determined` would print "complies" for a ground-floor window the
+      -- rule never reached.
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` QP.NotApplicable
+      -- and having settled that the rule does not reach this case, it stops asking
+      -- about a requirement the window will never be measured against
+      r.stillNeeded `shouldBe` []
+
+    it "scope TRUE, requirement TRUE: Complies" do
+      c <- serviceCache "compliant" impliesL4
+      let r = svcQP c [("upper", True), ("side", True), ("glazed", True), ("shut", True)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` QP.Complies
+      r.stillNeeded `shouldBe` []
+
+    it "scope TRUE, requirement FALSE: InBreach" do
+      c <- serviceCache "compliant" impliesL4
+      let r = svcQP c [("upper", True), ("side", True), ("shut", False)]
+      r.determined `shouldBe` Just False
+      r.verdict `shouldBe` QP.InBreach
+      r.stillNeeded `shouldBe` []
+
+    it "scope TRUE, requirement not yet asked: Undetermined, and it asks" do
+      c <- serviceCache "compliant" impliesL4
+      let r = svcQP c [("upper", True), ("side", True)]
+      r.determined `shouldBe` Nothing
+      r.verdict `shouldBe` QP.Undetermined
+      map (.label) r.stillNeeded `shouldMatchList` ["glazed", "shut"]
+
+    -- THE ONE THAT COST THE SHORT-CIRCUIT. The requirement is met, so the function is
+    -- settled TRUE and the classical planner had nothing left to ask — it would stop
+    -- here and report "complies". But we do not yet know whether the rule reached this
+    -- window at all, and "A.3 does not apply to you" and "you comply with A.3" go on
+    -- different pieces of paper. So the interview continues, and it continues on the
+    -- SCOPE.
+    it "requirement TRUE but scope unknown: the function is settled and the verdict is NOT" do
+      c <- serviceCache "compliant" impliesL4
+      let r = svcQP c [("glazed", True), ("shut", True)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` QP.Undetermined
+      map (.label) r.stillNeeded `shouldMatchList` ["upper", "side"]
+      length r.asks `shouldSatisfy` (> 0)
+
+    it "and answering the scope then settles it — either way, in the right word" do
+      c <- serviceCache "compliant" impliesL4
+      let na = svcQP c [("glazed", True), ("shut", True), ("upper", False)]
+          ok = svcQP c [("glazed", True), ("shut", True), ("upper", True), ("side", True)]
+      -- same `determined` for both; different verdicts. That is the whole finding.
+      na.determined `shouldBe` Just True
+      ok.determined `shouldBe` Just True
+      na.verdict `shouldBe` QP.NotApplicable
+      ok.verdict `shouldBe` QP.Complies
+
+    it "a plain rule with no seam still reports Holds/Fails, not Complies" do
+      c <- serviceCache "simple and" simpleAndL4
+      let held = svcQP c [("a", True), ("b", True)]
+          failed = svcQP c [("a", False)]
+          open = svcQP c []
+      held.verdict `shouldBe` QP.Holds
+      failed.verdict `shouldBe` QP.Fails
+      open.verdict `shouldBe` QP.Undetermined
+
 
 lspTests :: Spec
 lspTests = do
@@ -309,6 +393,28 @@ lspTests = do
       let r = lspQP "simple or" params info state [("a", False), ("b", False)]
       r.determined `shouldBe` Just False
 
+  -- The LSP path feeds the in-editor ladder, which draws the two lamps. If it and the
+  -- picture disagreed about a case, the same user would be told two different things by
+  -- two panes of the same window.
+  describe "IMPLIES" do
+    it "vacuous scope: TRUE function, NotApplicable verdict" do
+      (info, state, params) <- lspCache "compliant" impliesL4
+      let r = lspQP "compliant" params info state [("upper", False)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` QP.NotApplicable
+
+    it "requirement met, scope unknown: keeps asking the scope" do
+      (info, state, params) <- lspCache "compliant" impliesL4
+      let r = lspQP "compliant" params info state [("glazed", True), ("shut", True)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` QP.Undetermined
+      map (.label) r.stillNeeded `shouldMatchList` ["upper", "side"]
+
+    it "in breach" do
+      (info, state, params) <- lspCache "compliant" impliesL4
+      let r = lspQP "compliant" params info state [("upper", True), ("side", True), ("shut", False)]
+      r.verdict `shouldBe` QP.InBreach
+
 
 agreementTests :: Spec
 agreementTests = do
@@ -319,6 +425,7 @@ agreementTests = do
           let sResp = svcQP sCache bindings
               lResp = lspQP fnName params info state bindings
           sResp.determined `shouldBe` lResp.determined
+          sResp.verdict `shouldBe` lResp.verdict
 
   describe "simple AND" do
     testAgreement "no bindings" "simple and" simpleAndL4 []
@@ -330,3 +437,10 @@ agreementTests = do
     testAgreement "c=True" "nested" nestedL4 [("c", True)]
     testAgreement "a=False,c=False" "nested" nestedL4 [("a", False), ("c", False)]
     testAgreement "a=True" "nested" nestedL4 [("a", True)]
+
+  describe "IMPLIES" do
+    testAgreement "no bindings" "compliant" impliesL4 []
+    testAgreement "vacuous" "compliant" impliesL4 [("upper", False)]
+    testAgreement "complies" "compliant" impliesL4 [("upper", True), ("side", True), ("glazed", True), ("shut", True)]
+    testAgreement "in breach" "compliant" impliesL4 [("upper", True), ("side", True), ("shut", False)]
+    testAgreement "requirement met, scope open" "compliant" impliesL4 [("glazed", True), ("shut", True)]

@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: fixity-clash-mixed-assoc.l4
   Hidden: no
-  Range: 16:9-16:22
+  Range: 16:7-16:24
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

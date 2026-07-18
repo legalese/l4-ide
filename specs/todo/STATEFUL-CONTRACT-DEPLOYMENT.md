@@ -216,11 +216,11 @@ The later stateful machinery just _uses_ what's already there: the `version_hash
 
 The deployment runs in one of two modes, selected by whether the bundle declares `TIMEZONE IS …`.
 
-### 4.1 Abstract mode (no `TIMEZONE IS`)
+### 5.1 Abstract mode (no `TIMEZONE IS`)
 
 Today's behaviour. The numeric timeline is whatever the author says it is — ticks, days, abstract turns. All `at` parameters are required on event submission and ticks. Used for tests, simulation, and contracts whose semantics are unit-agnostic. The deployment layer does no auto-ticking; callers drive the clock explicitly.
 
-### 4.2 Wall-clock mode (with `TIMEZONE IS`)
+### 5.2 Wall-clock mode (with `TIMEZONE IS`)
 
 The numeric timeline is **Unix seconds (UTC)**. The declared timezone is for display and for resolving local-date references (`TODAY`, `BEFORE Friday`), not for the numeric timeline itself. Three things become implicit:
 
@@ -256,7 +256,7 @@ When the bundle contains at least one DEONTIC-returning `@export`, the deploymen
 
 With `rule` supplied, `results` has length 1.
 
-### 5.1 Discovery (bundle-level, no actor)
+### 6.1 Discovery (bundle-level, no actor)
 
 | #   | Endpoint            | Inputs            | Returns                                                              |
 | --- | ------------------- | ----------------- | -------------------------------------------------------------------- |
@@ -266,7 +266,7 @@ With `rule` supplied, `results` has length 1.
 | 4   | `list_action_types` | `rule?`           | grouped: discriminated union per action type                         |
 | 5   | `contract_skeleton` | `rule?, startAt?` | the initial residual _before any events_ — same shape as `get_state` |
 
-### 5.2 Event ingestion (the log sink)
+### 6.2 Event ingestion (the log sink)
 
 | #   | Endpoint        | Inputs                                       | Behaviour                                                                                                                                                           |
 | --- | --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -277,7 +277,7 @@ With `rule` supplied, `results` has length 1.
 
 In wall-clock mode `at` defaults to `now()`. In abstract mode it is mandatory.
 
-### 5.3 State inquiry
+### 6.3 State inquiry
 
 | #   | Endpoint         | Inputs           | Returns                                                                |
 | --- | ---------------- | ---------------- | ---------------------------------------------------------------------- |
@@ -286,7 +286,7 @@ In wall-clock mode `at` defaults to `now()`. In abstract mode it is mandatory.
 | 12  | `get_history`    | `rule?, actor`   | event log, each event tagged with its rule and residual snapshot after |
 | 13  | `get_status`     | `rule?, actor`   | cheap version of (11) returning only `PENDING / FULFILLED / BREACHED`  |
 
-### 5.4 Projections (per actor; pure walks of the residual)
+### 6.4 Projections (per actor; pure walks of the residual)
 
 | #   | Endpoint                              | Returns (per matching rule)                                             |
 | --- | ------------------------------------- | ----------------------------------------------------------------------- |
@@ -301,7 +301,7 @@ In wall-clock mode `at` defaults to `now()`. In abstract mode it is mandatory.
 
 Projections are pure walks of the residual `Deonton` tree: gather leaves, bucket by modal, attach deadlines and continuations. No event replay; microsecond responses.
 
-### 5.5 Simulation (pure; never mutates)
+### 6.5 Simulation (pure; never mutates)
 
 | #   | Endpoint                                      | Returns                                            |
 | --- | --------------------------------------------- | -------------------------------------------------- |
@@ -311,7 +311,7 @@ Projections are pure walks of the residual `Deonton` tree: gather leaves, bucket
 
 Implementation: load the actor's persisted history, run the evaluator with the hypothetical events appended, return the result, don't write.
 
-### 5.6 Admin
+### 6.6 Admin
 
 | #   | Endpoint           | Inputs                          | Notes                                                                  |
 | --- | ------------------ | ------------------------------- | ---------------------------------------------------------------------- |
@@ -323,7 +323,7 @@ Implementation: load the actor's persisted history, run the evaluator with the h
 
 ## 7. Webhook integration
 
-### 6.1 Where config lives
+### 7.1 Where config lives
 
 In the deployment record, not the L4 source. Webhook URLs and secrets are environment-specific and rotate independently of code.
 
@@ -357,7 +357,7 @@ Configure via PUT/PATCH on the deployment. No new top-level resource; surface a 
 | `POST /deployments/{id}/webhooks/{whid}/test`      | synthetic event for integration testing       |
 | `GET /deployments/{id}/webhooks/{whid}/deliveries` | recent attempts with status, response, timing |
 
-### 6.2 Event taxonomy
+### 7.2 Event taxonomy
 
 Start with the smallest set that distinguishes the cases consumers actually react to:
 
@@ -373,7 +373,7 @@ Start with the smallest set that distinguishes the cases consumers actually reac
 
 Webhooks may filter by event type, by rule, or both.
 
-### 6.3 Payload
+### 7.3 Payload
 
 Self-contained — the consumer never needs a round-trip to fetch state:
 
@@ -405,7 +405,7 @@ Self-contained — the consumer never needs a round-trip to fetch state:
 
 Sign the raw body with HMAC-SHA256 using the webhook's `secret`; put the result in `X-L4-Signature`. Standard pattern (Stripe/GitHub style).
 
-### 6.4 Delivery guarantees
+### 7.4 Delivery guarantees
 
 | Property    | Choice                                  | Notes                           |
 | ----------- | --------------------------------------- | ------------------------------- |
@@ -421,11 +421,11 @@ Don't bother with exactly-once or ordered delivery. Consumers dedupe on `deliver
 
 ## 8. State storage
 
-### 7.1 Technology choice
+### 8.1 Technology choice
 
 **AWS RDS Postgres 16, Multi-AZ.** No reason to reach further. Workload is small-payload, transactional, query-shaped data — Postgres handles years before anything else is needed. Avoid bringing in DynamoDB, EventStoreDB, or Kafka for a workload that fits in Postgres.
 
-### 7.2 Schema
+### 8.2 Schema
 
 ```sql
 CREATE TABLE deployments (
@@ -498,7 +498,7 @@ CREATE INDEX deliveries_pending
   WHERE status = 'pending';
 ```
 
-### 7.3 Hot path
+### 8.3 Hot path
 
 `submit_event` is exactly one transaction:
 
@@ -537,7 +537,7 @@ COMMIT;
 
 No replay. One round trip. Fully ACID.
 
-### 7.4 Auto-tick on read
+### 8.4 Auto-tick on read
 
 Reads should not block on `FOR UPDATE`. Pattern:
 
@@ -547,7 +547,7 @@ Reads should not block on `FOR UPDATE`. Pattern:
 
 This keeps the read path simple, caps per-request latency, and lets the write happen exactly once per advance (the `FOR UPDATE` in step 4 of the write path serialises concurrent ticks naturally).
 
-### 7.5 Scheduler & webhook delivery
+### 8.5 Scheduler & webhook delivery
 
 Both are **Postgres-as-queue** workers using `FOR UPDATE SKIP LOCKED`. No SQS or Kafka.
 
@@ -580,7 +580,7 @@ Attempt the HTTP POST, update `status` / `attempts` / `next_attempt_at`, commit.
 
 This pattern scales to thousands of operations per second on a single worker and remains correct under N parallel workers.
 
-### 7.6 RDS configuration
+### 8.6 RDS configuration
 
 | Setting        | Value                                        | Why                                                   |
 | -------------- | -------------------------------------------- | ----------------------------------------------------- |
@@ -593,7 +593,7 @@ This pattern scales to thousands of operations per second on a single worker and
 | Encryption     | At-rest (KMS) + TLS in-transit               | Standard for PII / legal data                         |
 | Read replica   | One, when dashboards become a real read path | Writes stay on primary                                |
 
-### 7.7 Performance principles, in order of impact
+### 8.7 Performance principles, in order of impact
 
 1. **Keep `instances.residual` bounded.** Prune the captured environment to variables actually reachable from the live sub-tree before each persist. Or switch to CBOR if JSONB grows noisy.
 2. **Optimistic CAS, not pessimistic cross-call locks.** Locks live inside the write transaction only.
@@ -602,7 +602,7 @@ This pattern scales to thousands of operations per second on a single worker and
 5. **JSONB GIN index on `instance_key`** only if you start needing "find all instances where `instance_key.id = 'Alice'`" lookups.
 6. **Partition `events` by month** once it crosses ~10M rows. Detach old partitions to S3 for cold storage.
 
-### 7.8 What you do NOT need
+### 8.8 What you do NOT need
 
 - A separate event store (EventStoreDB, Kafka). The `events` table _is_ it, with ACID guarantees.
 - Redis. The hot row sits in Postgres's shared buffers.
@@ -613,7 +613,7 @@ This pattern scales to thousands of operations per second on a single worker and
 
 ## 9. End-to-end request lifecycles
 
-### 8.1 `submit_event` (the canonical write)
+### 9.1 `submit_event` (the canonical write)
 
 ```
 client → POST /v1/events { party, action, at? }
@@ -636,7 +636,7 @@ client → POST /v1/events { party, action, at? }
   └─ respond { results, skipped, unmatched }
 ```
 
-### 8.2 `obligations` (the canonical read)
+### 9.2 `obligations` (the canonical read)
 
 ```
 client → GET /v1/projections/obligations?actor=Alice
@@ -650,7 +650,7 @@ client → GET /v1/projections/obligations?actor=Alice
   └─ respond { results, skipped, unmatched }
 ```
 
-### 8.3 Deadline expiry → webhook (no caller involved)
+### 9.3 Deadline expiry → webhook (no caller involved)
 
 ```
 scheduler worker ticks:

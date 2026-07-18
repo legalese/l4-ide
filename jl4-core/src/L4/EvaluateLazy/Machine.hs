@@ -23,6 +23,7 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+, formatUTCTimeIso
 -- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
 -- driver in 'L4.EvaluateLazy'; not part of the stable public API.
 , tellEventRouted
@@ -81,8 +82,8 @@ import L4.Evaluate.Ledger
   , LedgerStore (..)
   , Provenance (..)
   , anonymousParty
-  , readCell
-  , readCellAll
+  , readCellBitemporal
+  , readCellAllBitemporal
   , storeAppendOfficial
   , storeAppendOwn
   , storeOwnLedger
@@ -551,7 +552,7 @@ writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
 -- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
 tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
 tellEventRouted route ev = do
-  noteLedgerOp -- a write is a ledger op: poison the current force span (T6+ledger)
+  noteLedgerWrite -- a write POISONS the current force span (T6+ledger): write-once
   store <- asks (.envLedger)
   case route of
     RouteOfficial ->
@@ -569,20 +570,20 @@ tellEventRouted route ev = do
 -- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
 currentLedgerEval :: Eval Ledger
 currentLedgerEval = do
-  noteLedgerOp -- a RECALL is a ledger op: poison the current force span (T6+ledger)
+  noteLedgerRead -- a RECALL marks the span as a ledger READ: snapshot per scope
   party <- fromMaybe anonymousParty <$> readEvalRef (.currentParty)
   storeOwnLedger party <$> readEvalRef (.envLedger)
 
 -- | Read a NAMED party's own ledger (M4.5 cross-party @RECALL@).
 partyLedgerEval :: Text -> Eval Ledger
 partyLedgerEval key = do
-  noteLedgerOp -- see 'currentLedgerEval'
+  noteLedgerRead -- see 'currentLedgerEval'
   storeOwnLedger key <$> readEvalRef (.envLedger)
 
 -- | Read the shared official record (M4.5 @RECALL OFFICIAL's@).
 officialLedgerEval :: Eval Ledger
 officialLedgerEval = do
-  noteLedgerOp -- see 'currentLedgerEval'
+  noteLedgerRead -- see 'currentLedgerEval'
   (.officialLedger) <$> readEvalRef (.envLedger)
 
 -- | The party whose HENCE/LEST we are currently inside (M4).
@@ -607,16 +608,25 @@ noteCtxRead r = do
   accRef <- asks (.ctxReads)
   liftIO (modifyIORef' accRef (<> r))
 
--- | STATE-AS-LEDGER poison bit (see 'crLedgerOps'): record that the current
--- force span performed a ledger operation (a RECORD\/COMMIT\/ATTEST\/NOTIFY
--- append or a RECALL read). A force so marked must never be cached as a
--- 'WHNFWhen' — a re-force would replay the write (double-append) or re-read
--- a ledger the fingerprint does not track — so the @UpdateThunk@ arm of
--- 'backward' caches it as a plain 'WHNF' (snapshot at first force) instead.
--- Rides the 'ctxReads' accumulator so it inherits the span save\/merge
--- discipline (including exceptional unwind) for free.
-noteLedgerOp :: Eval ()
-noteLedgerOp = noteCtxRead noReads { crLedgerOps = True }
+-- | STATE-AS-LEDGER write-poison bit (see 'crLedgerWrite'): record that the
+-- current force span APPENDED to the ledger (a RECORD\/COMMIT\/ATTEST\/NOTIFY).
+-- A force so marked must never be cached as a 'WHNFWhen' — a re-force would
+-- replay the write (double-append) — so the @UpdateThunk@ arm of 'backward'
+-- caches it as a plain 'WHNF' (snapshot at first force: the write fires
+-- exactly once) instead. Rides the 'ctxReads' accumulator so it inherits the
+-- span save\/merge discipline (including exceptional unwind) for free.
+noteLedgerWrite :: Eval ()
+noteLedgerWrite = noteCtxRead noReads { crLedgerWrite = True }
+
+-- | STATE-AS-LEDGER read marker (see 'crLedgerRead'): record that the current
+-- force span READ the ledger (a RECALL). Read-only ledger forces stay
+-- 'WHNFWhen'-cacheable on their observed temporal axes — snapshot per
+-- temporal scope: an unchanged context re-serves the first-force value
+-- (the fingerprint does not track the ledger, preserving the pre-bitemporal
+-- sharing semantics within a scope), a changed context re-forces against the
+-- current ledger (smucclaw\/l4-ide#914 §2B).
+noteLedgerRead :: Eval ()
+noteLedgerRead = noteCtxRead noReads { crLedgerRead = True }
 
 -- | Install a new accumulator, returning the previous one. Used to open a
 -- fresh span at the start of a thunk force (and to reset residue at
@@ -1392,16 +1402,20 @@ backward val = withPoppedFrame $ \ case
     -- consuming thunk inherits the dependency.
     mine <- swapCtxReads noReads
     noteCtxRead (saved <> mine)
-    if mine.crLedgerOps
-      -- STATE-AS-LEDGER poison (see 'noteLedgerOp'): this force performed a
-      -- ledger op, so re-forcing is NOT a deterministic replay — it would
-      -- append any RECORD again (double-write) and re-read a ledger the
-      -- temporal fingerprint does not track. Cache as a plain 'WHNF'
-      -- (snapshot at first force): the write fires exactly once and every
-      -- later use shares the first-force value — precisely the semantics a
-      -- ledger-touching thunk WITHOUT temporal reads already has here.
+    if mine.crLedgerWrite
+      -- STATE-AS-LEDGER write poison (see 'noteLedgerWrite'): this force
+      -- APPENDED to the ledger, so re-forcing is NOT a deterministic replay
+      -- — it would fire the RECORD again (double-write). Cache as a plain
+      -- 'WHNF' (snapshot at first force): the write fires exactly once and
+      -- every later use shares the first-force value.
       then updateThunkToWHNF rf val
       else if hasReads mine
+        -- Covers both plain temporal reads AND read-only ledger forces
+        -- ('crLedgerRead' — finishRead always records the tx/vt axes, so a
+        -- RECALL force lands here): the fingerprint re-serves the value
+        -- while the observed axes match and re-forces under a different
+        -- temporal scope, giving each scope its own ledger snapshot
+        -- (smucclaw/l4-ide#914 §2B; snapshot-per-scope, see 'crLedgerRead').
         then updateThunkToWHNFWhen rf mine val
         else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
     continueBackward val
@@ -1770,16 +1784,25 @@ partyKeyWHNF = \ case
 runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
 runRecord cellVal val isOfficial env mHence mRecipientKey = do
   cell <- expectString cellVal
-  -- M2 provenance enrichment: stamp the write with the directive's evaluation
-  -- time ('getEvalTime', the same clock the deontic state machine and
-  -- @EVAL AS OF SYSTEM TIME@ already use) and the real write kind in 'source'.
+  -- Bitemporal stamps (smucclaw/l4-ide#914 §2A). Transaction time is the
+  -- ROOT eval clock ('getEvalTime'): a plain EvalState field that
+  -- @EVAL AS OF SYSTEM TIME@ never touches — that clause scopes reads,
+  -- never writes (the audit invariant). Valid-from is the ambient fact-time
+  -- axis when set (an enclosing @EVAL UNDER VALID TIME@ = an explicitly
+  -- dated assertion), 'Nothing' otherwise (contemporaneous; the effective
+  -- valid-from defaults to the tx day at read time, 'effectiveVt'). The
+  -- axis is read through the instrumented reader per the READER CONTRACT;
+  -- the enclosing force is write-poisoned by 'tellEventRouted' anyway, so
+  -- the observation can never install a context-fingerprint cache entry.
   evalNow <- getEvalTime
+  mVt     <- readTcValidTime
   mParty  <- getCurrentParty
   let prov = MkProvenance
-        { party    = fromMaybe "" mParty
-        , source   = if isOfficial then "COMMIT"
-                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
-        , position = Just (formatUTCTimeIso evalNow)
+        { party  = fromMaybe "" mParty
+        , source = if isOfficial then "COMMIT"
+                   else maybe "RECORD" (const "NOTIFY") mRecipientKey
+        , txTime = evalNow
+        , vtFrom = mVt
         }
       -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
       -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes
@@ -1803,29 +1826,54 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
 -- named party's own ledger (M4.5 cross-party), or the shared official record
 -- (M4.5 @official's@).
 --
---   * 'RecallLast' (@RECALL …@): read the LATEST projection via 'readCell'
---     (D2: a fold over the append log, last-write-wins). Result @MAYBE a@:
---     @JUST v@ when the cell has been written there, @NOTHING@ otherwise.
---   * 'RecallAll' (@RECALL ALL …@, approach B): fold EVERY 'Assign' to the
---     cell into a @LIST OF a@ via 'readCellAll' (oldest->newest, append order),
---     building it right-to-left as 'ValCons'/'ValNil'. Result @[]@ (ValNil)
---     when the cell has never been written there — NOT @NOTHING@.
+--   * 'RecallLast' (@RECALL …@): read through the AMBIENT TEMPORAL CONTEXT
+--     via 'readCellBitemporal' (smucclaw\/l4-ide#914 §2B): entries appended
+--     after the system-time bound (@EVAL AS OF SYSTEM TIME@) are invisible,
+--     and a fact-time point (@EVAL UNDER VALID TIME@) selects the visible
+--     entry whose positional valid interval covers it. With no clause in
+--     scope this degenerates to the last-write-wins projection. Result
+--     @MAYBE a@: @JUST v@ when a visible entry answers, @NOTHING@ otherwise
+--     — including when the cell HAS been written but the write is hidden by
+--     the tx bound or postdates the vt point (a principled miss).
+--   * 'RecallAll' (@RECALL ALL …@, approach B): fold every VISIBLE 'Assign'
+--     (the tx bound applies; a vt point deliberately does not — ALL is a
+--     whole-history projection) into a @LIST OF a@ via
+--     'readCellAllBitemporal' (oldest->newest, append order), building it
+--     right-to-left as 'ValCons'\/'ValNil'. Result @[]@ (ValNil) when no
+--     visible entry exists — NOT @NOTHING@.
 finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
 finishRead mode cellVal ledger = do
   cell <- expectString cellVal
+  -- Bitemporal read bounds (smucclaw/l4-ide#914 §2B): RECALL reads THROUGH
+  -- the ambient temporal context. @EVAL AS OF SYSTEM TIME t@ hides entries
+  -- appended after t (tx > t); @EVAL UNDER VALID TIME t@ selects, among
+  -- visible entries, the one whose positional valid interval covers t. With
+  -- neither clause in scope, tcSystemTime is the root eval clock — every
+  -- entry's tx equals it, so nothing is hidden — and the valid-time axis is
+  -- unset, so the fold degenerates to the historical last-write-wins
+  -- projection: bare RECALL is unchanged by construction. The axes are read
+  -- through the instrumented readers (READER CONTRACT): together with the
+  -- 'crLedgerRead' marker they make the enclosing force WHNFWhen-cached on
+  -- exactly these observations, so a SHARED thunk containing this RECALL is
+  -- re-served only under an unchanged context and re-forced under a new one
+  -- (snapshot per temporal scope — see 'noteLedgerRead').
+  txBound <- readTcSystemTime
+  vtBound <- readTcValidTime
   case mode of
     RecallLast ->
-      case readCell [cell] ledger of
+      case readCellBitemporal (Just txBound) vtBound [cell] ledger of
         Just storedVal -> do
           valueRef <- allocateValue storedVal
           continueBackward (ValConstructor TypeCheck.justRef [valueRef])
         Nothing ->
           continueBackward (ValConstructor TypeCheck.nothingRef [])
     RecallAll -> do
-      -- oldest->newest list of every assignment to this cell. Build the spine
-      -- right-to-left as ValCons cells terminating in ValNil (ValueLazy list
-      -- representation): the resulting WHNF has the oldest value at the head.
-      let storedVals = readCellAll [cell] ledger
+      -- oldest->newest list of every VISIBLE assignment to this cell (the
+      -- tx cutoff applies; a valid-time point deliberately does not — RECALL
+      -- ALL is a whole-history projection). Build the spine right-to-left as
+      -- ValCons cells terminating in ValNil (ValueLazy list representation):
+      -- the resulting WHNF has the oldest value at the head.
+      let storedVals = readCellAllBitemporal (Just txBound) [cell] ledger
       listVal <- foldrM
         (\v tailWHNF -> do
             headRef <- allocateValue v

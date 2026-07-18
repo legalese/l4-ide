@@ -1100,6 +1100,27 @@ orElse m1 m2 = do
         [] -> runCheck m2 e s
         xs -> xs
 
+-- | Like 'orElse', but when the first computation has at least one success,
+-- return its ENTIRE candidate set — successes and error candidates alike —
+-- rather than only the successes. The error candidates matter downstream:
+-- 'prune' surfaces e.g. @ambiguousTerm@'s curated error when multiple
+-- successes coexist, and filtering to successes-only would degrade that to
+-- an internal ambiguity error. Use this variant when wrapping a computation
+-- that already carries its own ambiguity reporting (e.g. whole-application
+-- inference); with at least one success it is observationally identity.
+orElseKeepAll :: Check a -> Check a -> Check a
+orElseKeepAll m1 m2 = do
+  MkCheck $ \ e s ->
+    let
+      candidates = runCheck m1 e s
+
+      isSuccess (Plain _, _)  = True
+      isSuccess (With _ _, _) = False
+    in
+      if any isSuccess candidates
+        then candidates
+        else runCheck m2 e s
+
 -- | Allow the subcomputation to have at most one result.
 --
 -- NOTE: This backtracking search is type-directed and prunes only after it

@@ -1,9 +1,9 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-fixity-nary-guard.l4:27:1-22:
+fixity-nary-guard.l4:27:1-24:
   1006
 fixity-nary-guard.l4:36:1-35:
   42
-fixity-nary-guard.l4:67:1-21:
+fixity-nary-guard.l4:67:1-23:
   106

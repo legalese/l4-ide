@@ -11,7 +11,7 @@ File: fixity-no-leak.l4
     This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition.Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: fixity-no-leak.l4
   Hidden: no
-  Range: 17:9-17:32
+  Range: 17:7-17:34
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

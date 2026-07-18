@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-fixity-cross-module-call.l4:8:1-28:
+fixity-cross-module-call.l4:8:1-30:
   7
-fixity-cross-module-call.l4:11:1-24:
+fixity-cross-module-call.l4:11:1-26:
   6

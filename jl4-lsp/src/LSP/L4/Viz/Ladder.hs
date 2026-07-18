@@ -39,7 +39,7 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
-import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults)
+import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, seamLabel)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
@@ -343,17 +343,45 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
 data TranslateContext = CtxAnd | CtxOr | CtxNone
   deriving (Eq, Show)
 
+-- | The seam SURVIVES simplification — see 'L4.Viz.Ladder.translateExpr' for the
+-- argument (DESIGN §25a). In short: 'Transform.simplify' exists to reach CNF, and
+-- CNF's first act is to rewrite @P IMPLIES Q@ into @NOT P OR Q@, discarding the
+-- scope/requirement split. So peel the top-level implication off first, simplify
+-- each side on its own, and keep the connective.
 translateExpr :: Bool -> Expr Resolved -> Viz IRExpr
-translateExpr True  =
-  translateExpr False . Transform.simplify
-translateExpr False = go CtxNone
+translateExpr shouldSimplify = top
   where
+    top :: Expr Resolved -> Viz IRExpr
+    top = \case
+      -- A DECIDE's WHERE block wraps the implication, so peel it before looking.
+      Where _ e ds -> withLocalDecls ds (top e)
+      Implies ann p q -> do
+        vid <- getFresh
+        V.Implies vid <$> side p <*> side q <*> pure (seamLabel ann)
+      e -> side e
+
+    side :: Expr Resolved -> Viz IRExpr
+    side e = go CtxNone (if shouldSimplify then Transform.simplify e else e)
+
     go :: TranslateContext -> Expr Resolved -> Viz IRExpr
     go _ctx e =
       case e of
         Not _ negand -> do
           vid <- getFresh
           V.Not vid <$> go CtxNone negand
+
+        -- A NESTED implication: the two-sink form is top-level only (v1), since an
+        -- implication buried in a conjunction has nowhere to hang its lamps. Fall
+        -- back to the classical reading — still far better than the old behaviour,
+        -- where this fell through to 'leafFromExpr' and the whole implication was
+        -- swallowed into one opaque box.
+        Implies _ p q -> do
+          orId <- getFresh
+          notId <- getFresh
+          p' <- go CtxNone p
+          q' <- go CtxNone q
+          pure $ V.Or orId [V.Not notId p', q']
+
         And {} -> do
           vid <- getFresh
           V.And vid <$> traverse (go CtxAnd) (scanAnd e)

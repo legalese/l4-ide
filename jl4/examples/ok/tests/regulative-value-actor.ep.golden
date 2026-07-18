@@ -34,6 +34,5 @@ pingpong MEANS
 
 -- The ball routes Eater -> Drinker, driven by a mixed-actor event stream:
 #TRACE pingpong AT 0 WITH
-  PARTY 5
-  DOES Eater   AT eat   PARTY 8
-DOES Drinker AT drink 
+  PARTY Eater   DOES eat   AT 5
+  PARTY Drinker DOES drink AT 8
