@@ -72,7 +72,7 @@ A set of **two or more** elements can be written directly as `SET OF "refuge", "
 
 Two boundary cases to know:
 
-- **A single element cannot use bare `SET OF`.** The collection only fires for two or more arguments; with one argument, `SET OF x` reads `x` as the contents *list*, so `SET OF "carol"` is a type error (a string is not a list). Write `setFromList (LIST "carol")` or `SET OF LIST "carol"` for a singleton.
+- **A single element cannot use bare `SET OF`.** The collection only fires for two or more arguments; with one argument, `SET OF x` reads `x` as the contents _list_, so `SET OF "carol"` is a type error (a string is not a list). Write `setFromList (LIST "carol")` or `SET OF LIST "carol"` for a singleton.
 - **A single list argument is taken literally:** `SET OF LIST 1, 2` is the two-element set `{1, 2}` (the list is the contents), not a one-element set containing a list.
 
 ### Example: Set Operations
