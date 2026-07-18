@@ -1695,3 +1695,73 @@ resolver vs `GetImports` can in principle pick different sources — a dev-envir
 a separate cleanup (cf. the "XDG library shadow" already noted elsewhere), but out of scope here.
 **No fix to #128 is required; no regression test for a non-bug.** §15's items 1–3 above stand as
 the original (mis-attributed) hypothesis, retained for the record; this subsection is the verdict.
+
+### 15.2 Re-opened: §15.1's fix is necessary but NOT sufficient (2026-07-18, verified)
+
+Crediting §15.1: the XDG-symlink stale-prelude issue is **real and confirmed** — with
+`JL4_LIBRARY_PATH` unset, `IMPORT prelude` loads the main checkout's un-annotated prelude, and
+my original §15 mechanism ("prelude-defined fixity never flows to importers") was **wrong**:
+a name-imported library's fixity flows fine. Corrections owed and paid.
+
+**But Phase 3d is still blocked.** With the annotated worktree prelude *verifiably loaded* via
+`JL4_LIBRARY_PATH` (canary operator resolves; no "not found"), the §15.1 A/B test case
+re-associates but the **actual set operators do not.** Reconciled side-by-side, one file, one
+binary, `JL4_LIBRARY_PATH=<worktree>/jl4-core/libraries`:
+
+| Expression | operator / operands | re-associates? |
+| --- | --- | --- |
+| `1 UNIONX 2 UNIONX 3` (§15.1's test, temp-added to prelude) | NUMBER / literal | ✅ |
+| `aa UNION bb UNION cc` (Phase 3d's real case) | prelude SET / identifier | ❌ "apply to 4 args" |
+| `(setFromList(LIST 1)) UNION (…) UNION (…)` | prelude SET / parenthesized | ✅ |
+| `aa MYUNION bb MYINT cc`, `MYUNION`/`MYINT` in a small **name-imported** lib | SET / identifier | ✅ |
+
+The discriminators §15.1 didn't vary: the failing case is **the prelude's own SET operators with
+bare identifier operands**. It is not the symlink (annotated prelude confirmed loaded), not
+literals-vs-identifiers alone (name-imported SET lib with identifier operands works), not
+polymorphism / `@nlg` / the `__PLUS__`-`__AND__`-`__OR__` overloads / the `WITHOUT`-alias-on-
+backticked-`LESS` (each independently cleared in a small lib). It reproduces with a **byte-identical
+copy of the full prelude imported under a different name** (`IMPORT pp`), so it is not the filename
+`prelude` either — it is something in the **full prelude's ~1290-line content** that the small
+libraries lack.
+
+**Minimal repro (no symlink involved — pure `JL4_LIBRARY_PATH`):**
+
+```
+# in a scratch dir D containing a copy of the annotated prelude.l4:
+cp <worktree>/jl4-core/libraries/prelude.l4 D/          # has @infixl 6 UNION / 7 INTERSECT
+cat > D/mini.l4 <<'X'
+IMPORT prelude
+@infixl 6
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p MYUNION q MEANS p
+X
+cat > D/use.l4 <<'X'
+IMPORT prelude
+IMPORT mini
+aa MEANS setFromList (LIST 1)
+bb MEANS setFromList (LIST 2)
+#EVAL setToList (aa MYUNION bb MYUNION aa)     -- ✅ re-associates (name-imported mini)
+#EVAL setToList (aa UNION bb UNION aa)          -- ❌ does not (prelude's own UNION)
+X
+JL4_LIBRARY_PATH=D l4 run D/use.l4
+```
+
+`MYUNION` (from the tiny `mini`) chains; `UNION` (from the full prelude) does not — same file,
+same operands, same load path.
+
+**Hand back to the fixity implementer** (their `Debug.Trace` on `addFixityCommentsToAst` /
+`applyFixityAnnotation` is the right tool): trace how many fixity tokens are collected for the
+**full prelude** vs `mini`, and whether the prelude's fixity map survives into the registry the
+importer re-associates against. Likely candidates: a size/position limit in fixity-comment
+collection, or a specific earlier prelude definition that interrupts it.
+
+**Phase 3d status:** annotations remain committed on `mengwong/set-operators-phase3d` (correct,
+inert, conservative extension — the branch's full suite is green because nothing *uses* bare
+prelude set chains yet). **Not merged.** Two paths forward once diagnosed: (a) the real fix in
+fixity-collection, or (b) fallback — ship the set vocabulary as a separate `IMPORT sets` library
+rather than in the prelude, since **name-imported libraries already propagate fixity correctly**
+(verified). (b) costs an explicit import but works today; weigh against the "auto-available"
+goal.
