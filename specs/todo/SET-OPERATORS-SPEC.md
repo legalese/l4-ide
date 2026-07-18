@@ -1507,6 +1507,13 @@ consonant with §0's own PEMDAS framing and mixfix's deliberate refusal of impli
 while the keyword-operator overloads carry the bare ergonomics. (B) keywords: dead. (A) fixity:
 rescheduled to the platform backlog (candidate for `specs/roadmap/`). Awaiting sign-off.
 
+**UPDATE (Meng, 2026-07-18): option A greenlit as a decoupled, timeboxed EXPERIMENT** — branch
+brief at [`FIXITY-DECLARATIONS-SPEC.md`](FIXITY-DECLARATIONS-SPEC.md), to be attempted in a
+parallel session. The verdict above stands as a _dependency_ ruling: set-operators Phases 1–3a
+proceed regardless and take no dependency on the experiment. If the spike lands, Q5 reopens
+per that brief's §8; if it dies, its §7 kill criteria route the post-mortem back to this
+section and (C)+(D) closes permanently.
+
 ### 13.3 Independent findings (act on regardless of Q5)
 
 - **`l4 format` is already lossy on bare infix mixfix**: `1 UNION 2` formats to prefix
