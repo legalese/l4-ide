@@ -1518,7 +1518,10 @@ section and (C)+(D) closes permanently.
 
 - **`l4 format` is already lossy on bare infix mixfix**: `1 UNION 2` formats to prefix
   `UNION 1 2`; `1 UNION 2 UNION 3` garbles to `UNION UNION 1 2 UNION 3`. Pre-existing, fixity
-  or no fixity — deserves an upstream issue before Phase 1 ships operators people will format.
+  or no fixity. Re-verified first-hand (semantics preserved on the single-op case — formatted
+  output still evaluates 3/6 — but the CNL register is destroyed, and non-typechecking chains
+  format to reordered soup with exit 0). **Filed as
+  [smucclaw/l4-ide#918](https://github.com/smucclaw/l4-ide/issues/918)** for another session.
 - **Erratum:** this spec's `Parser.hs:1481-1497` citations were stale and are corrected to
   `Parser.hs:1496-1522` (17-row body at `:1502-1518`). Inline `Parser.hs:1491` cites for the
   `LESS THAN` row refer to the pre-drift line; the row now lives inside `:1502-1518`.
