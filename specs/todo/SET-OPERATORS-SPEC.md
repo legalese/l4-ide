@@ -683,16 +683,22 @@ die — on its own merits.)_
 - **Q1 — `Set` vs `LIST` ergonomics.** Do we auto-coerce `LIST OF a` → `Set a` at operator sites?
   Convenient, but silent coercion is exactly the kind of magic that costs us explainability.
   Leaning **no**: require explicit `setFromList`.
-- **Q2 — What does `OR` on two sets mean?** `UNION` is the obvious answer, which makes `AND` and
-  `OR` on sets **the same operation** — startling, but arguably correct: "residents of NY and NJ"
-  and "residents of NY or NJ" _do_ denote the same eligible population. If that is right, it is a
-  genuinely interesting result to write up (and a lint should say so). If it is wrong,
-  `INTERSECT` is the alternative and we need an argument for why. **Unresolved; this is the most
-  interesting question in the spec.**
+- ~~**Q2 — What does `OR` on two sets mean?**~~ **RESOLVED — `UNION`, same as `AND`.** The
+  collapse is real (Adams & Kaye's "ironic twist"), it is a defeasible default rather than a
+  semantics, and the lint carries the disambiguation load. See §9 (authorities), §9.5
+  (consequences for §D4), §11.6 (decision procedure).
 - **Q3 — Sets of parties and deontics.** "Residents of NY and NJ **must** file" distributes an
   obligation over a set of parties. That is the same distribution question as
   [`EVERY-EACH-QUANTIFIER-SPEC.md`](EVERY-EACH-QUANTIFIER-SPEC.md), and it touches the
   actor-indexed action work. Needs a joint read; do not design in isolation.
+  **PROPOSED (2026-07-18) — fence it, don't decide it:** Phases 1–4 define sets in the
+  _constitutive_ layer only; this spec assigns **no meaning** to a `SET OF`-typed term in the
+  party position of a deontic. The distribution menu — one several obligation per member?
+  joint? joint and several? collective? — is precisely the common-law joint/several-liability
+  taxonomy, and it must be designed with the EVERY-EACH and actor-indexed-actions machinery,
+  not smuggled in under a set-operators spec. The fence costs nothing today (nothing in
+  Phases 1–2 touches `PARTY` positions) and prevents accidental semantics from leaking in
+  the meantime.
 - ~~**Q4 — Ordering/canonicalization.**~~ **RESOLVED — see §D6.**
 - **Q5 — Precedence via fixity declarations instead of keywords?** (Opened 2026-07-18, from the
   §5.1 backtick retraction.) Since identifier operators already work bare, keywordizing
@@ -705,6 +711,13 @@ die — on its own merits.)_
   in the same phase as (or adjacent to) the December-2025 misparsed-`App` reinterpretation.
   Note the limit: fixity cannot rescue lexer keywords, so bare `LESS` is out of its reach
   regardless (Phase 3c). **Assessment of implementation cost in progress; decides Phase 3b.**
+  And note a **third option with real support in this spec's own framing: no precedence, ever.**
+  L4's mixfix already _"deliberately refuses implicit precedence"_ (§0), and §0's rung 1 says
+  implicit precedence is exactly how `8÷2(2+2)` happens. On that view `A UNION B INTERSECT C`
+  _should_ be a parse error demanding parentheses, and Phase 3b is not deferred but rejected.
+  The ladder visualizer weakens the worry (the binding is always renderable), but for a
+  drafting canon, mandatory explicit grouping may be the more on-message answer. So the Q5
+  decision is three-way: (A) fixity declarations, (B) keywords, (C) parens forever.
 
 ## 9. Q2 resolved: what the authorities actually say
 
