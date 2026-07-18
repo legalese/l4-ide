@@ -419,25 +419,34 @@ IRExpr (fixture or live export)
 
 ---
 
-## 12. Package & repo layout (proposed)
+## 12. Package & repo layout
 
 ```
 ts-shared/
-  ladder-core/        # pure: IRExpr → BBE → Scene IR (§4.2); no DOM; ViewSpec (§4.3)
-  ladder-svg/         # Scene IR → SVG primitives (DOM sink + string sink)
-  l4-ladder-visualizer/   # existing pkg, slimmed to the web interactive overlay
-                          # (re-exports core/svg; drops Dagre/SvelteFlow layout)
+  ladder-core/        # ✅ pure: IRExpr → BBE → Scene IR (§4.2); no DOM; ViewSpec (§4.3)
+                      #    + the ASCII and Mermaid text carriers (§24)
+  ladder-svg/         # ✅ Scene IR → SVG (string sink; DOM sink when E2 wants one)
+                      #    + the demos and the standalone/playground harnesses
+  l4-ladder-visualizer/   # ☐ existing pkg, to be slimmed to the web interactive overlay
+                          #   (re-exports core/svg; drops Dagre/SvelteFlow layout) — E1
 tools/
-  ladder-print/       # Node CLI: (IRExpr, ViewSpec) → A3+ SVG/PDF
+  ladder-print/       # ☐ Node CLI: (IRExpr, ViewSpec) → A3+ SVG/PDF — F1
 ```
 
-(Alternative: keep everything inside `l4-ladder-visualizer` as internal modules and only split packages once stable. Decide in §13.)
+**The split is done** (G6/E4). The seam between the two packages is the **Scene IR**: `ladder-svg` imports `Scene` from `ladder-core` with `import type` and nothing else, so at runtime the renderer has no dependency on the layout engine at all. Its tests build `Scene` literals by hand — no `layout`, no metrics — which is the property under test as much as the output is: if they ever need `layout` to compile, the seam has leaked.
+
+ASCII and Mermaid stayed in `ladder-core`. They are peers of the SVG emit (all three consume `Scene` and nothing else), but they are string-only carriers for the doc pipeline with no sink to speak of, and pulling them out would buy nothing today. If a third backend ever needs its own package, the precedent is set.
+
+Two latent bugs surfaced the moment `ladder-svg` became the **first cross-package consumer of `ladder-core`** — which is the real argument for splitting _before_ E1 rather than during it:
+
+- **`ladder-core`'s package entry point had never resolved.** `exports` promised `./dist/index.js`; `rootDir: "./"` emitted `dist/src/index.js`. Nothing had ever imported the package, so nothing had ever noticed. Both packages now build via a `tsconfig.build.json` that emits only `src/` (the `@repo/boolean-analysis` convention), while `tsconfig.json` keeps typechecking `demo/`, `test/` and `standalone/`. E1 would have hit this from Svelte, where it would have looked like a Vite problem.
+- **The SVG emit had no tests.** Nine now (§25.4 lamps, XML escaping, §20 flow weights, §22-vs-§15 dashes, the `data-*` host contract).
 
 ---
 
 ## 13. Open decisions
 
-1. **Package split now vs later** — three packages up front, or one package with internal modules until the core stabilizes?
+1. ~~**Package split now vs later**~~ — **RESOLVED (G6/E4):** split, and split _before_ the IDE integration. See §12: being the first consumer is what proved `ladder-core` was importable at all.
 2. **PrePost / protrude model** — finalize how label bands attach without breaking the parked-origin invariant.
 3. **Sub-ordering within groups** (§6) — implement the selectivity reorder, or preserve strict source order? Interacts with stable `atomId` and user mental model.
 4. **`IRExpr` extensions** (§11) — what, if anything, must move into Haskell vs be derived in TS. **Leading candidate: a `NamedExpr` wrapper for subtree labels** (§16.1) — the wire IR currently can't name an interior node, which folding wants; `@repo/viz-expr` already stubs it out. Decide whether Haskell populates it from the inlined DECIDE/`Where` name, NLG fills it, or both.
@@ -477,8 +486,12 @@ awaiting the viz-expr field once PR #92 lands). ❌ Still open: **Full/Small/Tin
 scales + minimap** (§7); group sub-ordering (§13.3); **predicate leaves / typed
 values** (§23 — designed, not built: the membrane, `App`-drawn-open).
 
-**☐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
-statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). Not started.
+**◐ P2 — Live data.** Decode real `RenderAsLadderInfo` from the LSP; render real
+statutes. Fixture `cheating-415-poh-yuan-nie.l4` already vendored (§15.4). **A1 done:**
+`ts-shared/ladder-core/src/viz-adapter.ts` maps the `@repo/viz-expr` wire IR →
+ladder-core `IRExpr` + lifts `valuation` and `provenance` side-channels. ☐ Remaining:
+the live LSP transport (A2 — `l4/evalApp` · `l4/inlineExprs` · `l4/queryPlan`) and real
+browser `measureText` metrics (A4).
 
 **☐ P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`;
 restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
@@ -486,11 +499,14 @@ restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
 **☐ P4 — Print pipeline.** `ladder-print` Node CLI; A3+ PDF; a poster. The
 `ViewSpec`→SVG-string seam exists; no CLI/PDF yet. Not started.
 
-**Cross-cutting open** (see also §13): `ladder-svg` package split still deferred
-(§13.1); N-line straddle + trailing `Post` (§17); font parity for real metrics (§4.4,
-P0 uses an estimator); `NamedExpr` wrapper for subtree labels (§13.4). **Landing:**
-eventually push the branch and PR into `unstable`; re-merge unstable periodically to
-avoid drift.
+**✅ `ladder-svg` package split (DONE — G6/E4).** `@repo/ladder-svg` is its own package,
+seamed on the Scene IR (§12). It is the first cross-package consumer of `ladder-core`,
+which is how we found out that `ladder-core`'s package entry point had never resolved.
+
+**Cross-cutting open** (see also §13): N-line straddle + trailing `Post` (§17); font
+parity for real metrics (§4.4, P0 uses an estimator); `NamedExpr` wrapper for subtree
+labels (§13.4). **Landing:** PR [#116](https://github.com/legalese/l4-ide/pull/116) into
+`unstable`; re-merge unstable periodically to avoid drift.
 
 ---
 
@@ -798,6 +814,33 @@ a sub-circuit driving a normally-closed contact (relay-accurate, more layout); *
 Morgan push-down** — rewrite NOT to the leaves (changes displayed structure; better as
 an optional "normalize negation" view)._
 
+### 21a. Normally-closed contacts — the idiom we skipped _(proposed; not built)_
+
+The Mermaid exercise (§24.2) forced a re-read of the two alternatives above, and they were
+the right ones. The reasoning, which §21 never made explicit:
+
+**Structural NOT is not needed for expressiveness.** Negation normal form pushes every `¬` down
+to the atoms, and a negated atom needs no gate — only a **polarity**. Ground `¬x` as `¬v(x)` and
+negation vanishes from the circuit's structure entirely, becoming a property of a _contact_
+rather than a thing _between_ contacts. This is not a trick: it is the **normally-closed contact**
+`─┤/├─` of IEC 61131-3, the notation this whole diagram descends from. We inherited a ladder
+language that already had negation, and drew a scope frame instead.
+
+So the two mechanisms do **different jobs**, and we should ship both:
+
+| Negand                | Render                                                      | Why                                                                                          |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| an **atom**           | **normally-closed contact** — the box, with a `/` across it | native, compact, and the reader sees the polarity _on_ the contact                           |
+| a **complex subtree** | the §21 **scope frame + inverter bubble**                   | the reader must see the negation's **extent**; that is explanation, not expressive necessity |
+
+And **"normalize negation" (De Morgan to NNF) becomes a real `ViewSpec` toggle**, not a
+curiosity — it turns `¬(P) ∨ Q` into a flat disjunction of the ways to comply. That is close
+kin to the sentence expander (`sentences.ts`: And = product, Or = union), and answers a
+different question than the isomorphic view does: not _"what does the rule say?"_ but _"how may
+I comply?"_. Keep the isomorphic view primary — NNF re-expresses the statute's own shape and so
+breaks the read-back-against-the-text property that is the ladder's whole point (§0) — but offer
+NNF as the second view.
+
 ---
 
 ## 22. Defaulted vs given — TYPICALLY presumptions
@@ -847,10 +890,13 @@ override" falls out with no special-casing. The ladder is the _picture_ of that:
 tentative leaves are precisely the questions the wizard didn't need to ask. TYPICALLY is
 the priors mechanism and the provenance mark at once.
 
-**IR-independence.** `@repo/viz-expr` does **not** carry TYPICALLY yet (the metadata-only
-salvage is PR #92, not in `unstable`; the 5th `MkTypedName` field on the Haskell side).
-So the core takes `provenance` as injected data today; when #92 lands and the wire IR
-grows the field, populate it from the L4 TYPICALLY — no core change. Same staging as §15.
+**IR-independence.** `@repo/viz-expr` now **does** carry TYPICALLY: `UBoolVar.typically`
+(`optional(NullOr(Boolean))`), threaded end-to-end by the question-ordering v2 work
+(PR #110) — one shared wire field, "build once", feeding both the v2 ordering weights
+(`typicallyBridge`) and this provenance mark. The core still takes `provenance` as
+injected data (no core change); `ts-shared/ladder-core/src/viz-adapter.ts` populates it
+on the P2 decode path — a leaf whose `typically` is a concrete boolean (not `null`) is
+marked `default`. Same staging as §15.
 
 *Future: (a) **propagate** tentativeness along the leader so a segment *downstream* of a
 presumed contact also reads provisional (today only the presumed leaf's own adjacent
@@ -913,6 +959,580 @@ value/type metadata; live typed-value _editing_ (a real input widget) is a P3 we
 affordance. Keep the boolean circuit the load-bearing layer; the membrane is a
 progressive-disclosure detail on individual leaves. **Not built** (design captured here;
 the `App`-open rendering + a `age = 21 / ≥ 18?` fixture are the next increment).
+
+---
+
+## 24. Embedding ladders in Markdown (GFM) — carriers, and why not Mermaid
+
+**The ask.** `doc/concepts/language-design/logic-not-flowcharts.md` argues that a regulatory
+condition is a Boolean predicate, that a flowchart is the wrong picture for it, and that the
+ladder diagram is the right one — and then shows _no ladder_. It should. More generally: a
+ladder should be able to travel in a README, a PR comment, an issue, a commit message.
+
+### 24.1 The constraint that decides everything: where does the Markdown render?
+
+`doc/` has a `SUMMARY.md` (the mdBook/GitBook convention) but **no `book.toml`** — it is not
+built into a site today. It is read **on github.com**. So github.com's renderer is the binding
+constraint, and it is a _sanitizing_ renderer. What it permits:
+
+| Mechanism                            | On github.com | Notes                                                                                                                              |
+| ------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Fenced code block                    | ✅ verbatim   | universal — also PR comments, commit messages, terminals, email                                                                    |
+| `![](x.svg)` / `<img src>`           | ✅ renders    | already used (`doc/README.md` → `![L4 Logo](./l4.svg)`). Loaded as an image ⇒ **no script, no CSS interaction, no links.** Static. |
+| Inline `<svg>…</svg>`                | ❌ stripped   | GitHub's HTML sanitizer. _(verify before building — but the `<img>` route is the right one regardless, for portability)_           |
+| ` ```mermaid `                       | ✅ native     | the **only** diagram DSL GitHub renders — and it is **current** Mermaid, not a pin. See §24.2, which corrects this row.            |
+| `<picture>` + `prefers-color-scheme` | ✅            | ⇒ ship a light/dark SVG pair (our `theme: 'screen' \| 'ink'` palettes already exist)                                               |
+| `<details>` / `<summary>`            | ✅            | ⇒ a poor-man's §16 fold: folded image in the summary, expanded inside                                                              |
+| `$$…$$` MathJax                      | ✅            | no TikZ. Dead end for diagrams.                                                                                                    |
+
+### 24.2 Mermaid — the verdict stands, the reasoning was wrong
+
+> **This section was rewritten after an adversarial check** (`tmp/mermaid-planb.md`, which
+> replayed GitHub's exact rendering pipeline and rendered candidates rather than reasoning from
+> memory). **Two of the three premises the first draft rested on were false.** The conclusion —
+> don't do it — survives, but on a different and much stronger argument. Keeping the record of
+> the error here, because the first draft's confidence was unearned.
+
+**What was wrong.** ① GitHub does **not** pin an old Mermaid: it renders in a sandboxed
+`viewscreen.githubusercontent.com` iframe whose bundle's diagram registry is **identical to
+current `mermaid@11.16.0`** (38 detectors), with no diagram-type allowlist. ② GitHub does
+**not** sanitize directives: its `secure` list is only
+`["secure","securityLevel","startOnLoad","maxTextSize"]`, so `%%{init}%%` / frontmatter
+`config:` — including **`themeCSS`** — take effect, and its DOMPurify allowlist passes
+`<style>`, so Mermaid's injected CSS survives. ③ And the first draft only tested `flowchart`
+and `block-beta`. It never looked at **`railroad-beta`**.
+
+**Railroad-beta is a ladder renderer.** Concatenation = series on one wire; alternation =
+stacked rungs fanning off a common node; no arrowheads; power terminals at both ends. And —
+this is the part that stings — reading the emitted SVG transforms shows it centres a `choice` on
+**the vertical centre of its own bounding box**, with the parent `sequence` aligning to that
+axis. That is **§5.3/§5.4 align-then-stack, compositional at arbitrary depth**: the very
+property Dagre could not give us, and that this entire kernel was rebuilt to obtain, Mermaid's
+railroad renderer already has. A hand-written s415 comes out looking startlingly like
+`s415-court.svg`. With `themeCSS` you can further reach state colour, the §15 ghost rung, §22
+fine-dashes, unboxed inert prose, and even §20 current-flow stroke weights — perhaps 70%
+fidelity, on github.com, today.
+
+**The NOT objection was also wrong** (correction #2 — the second draft claimed railroad "has no
+NOT", so `¬P ∨ Q` and hence the material conditional were "structurally undrawable"). Meng:
+_"railroad diagrams basically are ladder diagrams modulo a de Morgan treatment of negation."_ He
+is right, and there are in fact **two** ways through, both rendered and verified:
+
+1. **Negation normal form.** De Morgan pushes negation down to the atoms:
+   `¬(upper ∧ (wall ∨ roof)) ≡ ¬upper ∨ (¬wall ∧ ¬roof)`. Negated atoms are just leaves, which
+   railroad draws fine. A.3 comes out as a clean three-rung `choice`. **This is not even a hack:
+   a negated atom in IEC 61131-3 ladder logic _is_ a primitive — the NORMALLY-CLOSED CONTACT
+   `─┤/├─`.** NNF is the native ladder idiom, and we are the ones not using it (see §21a below).
+2. **Factor and fold.** Railroad is a _grammar_ notation: several named rules. Write
+   `complies = choice(nonterminal("NOT: A3 covers"), nonterminal("A3 requirement met"))` plus the
+   two rules it names, and you get the material conditional at top level, with the antecedent
+   folded — which is _exactly_ the L4 factoring, rule for rule. The cost is that the `NOT` is
+   then only a **word**: nothing in the picture inverts, so the reader must read the negation
+   rather than see it.
+3. **Push it into grounding** (Meng again, and this is the general form of ①). A renderer needs no
+   negation _primitive_ at all if the leaf carries a **polarity**: ground `¬x` as `¬v(x)` at
+   valuation time. Negation then never appears in the circuit's _structure_ — it is a property of
+   a contact, not a gate between contacts. Which is, once more, precisely the normally-closed
+   contact. Any series/parallel notation whatever is then sufficient.
+
+The right way to say it: **structural NOT is not needed for EXPRESSIVENESS at all** — NNF plus
+leaf polarity covers every Boolean function. §21's scope frame earns its keep only for
+**EXPLANATION**: showing a reader the _extent_ of a negation over an un-normalised subtree, which
+is a presentation service, not an expressive necessity. Worth knowing which of the two we are
+selling.
+
+So: **Mermaid CAN draw our ladder.** Capability is no longer the argument, and after being wrong
+twice about capability we should stop making capability arguments.
+
+**What actually decides it is PROVENANCE — and it is the document's own thesis.**
+
+> "a diagram is a good _view_ of legal logic and a bad _substrate_ for it… the language is the
+> source, the picture is derived."
+
+A hand-written Mermaid ladder in the Markdown is a **second, unverified source of truth.** It is
+not derived from the L4; nothing checks it against the L4; it will drift. That is precisely the
+inversion `logic-not-flowcharts.md` exists to condemn — and we would be committing it _inside the
+document that condemns it_. Note that this objection does not depend on any capability claim, and
+so cannot be falsified the way the last two were.
+
+The moment you _generate_ it to prevent drift, you have conceded a build step — whereupon
+**§24.3's option I-a strictly dominates**: same build step, zero fidelity loss, plus folding,
+current flow, print and dark mode. So Mermaid's single prize (source-in-the-Markdown, no build
+step) is collectible only in the form that makes the picture unverifiable.
+
+**Verdict: still don't — but now for a reason about where truth lives, not about what Mermaid can
+draw.** The residual capability gaps (no text wrapping for statutory prose, no folding, no
+interactivity, no print) are supporting, not decisive.
+
+### 24.2a Correction #3 — and the verdict finally flips. **`I-d`, SHIPPED**
+
+The provenance argument above is sound, and it **only ever killed the _hand-written_ Mermaid
+ladder.** Meng: _"surely we can justify building a Mermaid railroad outputter from our ladder
+diagrams … or from the AST that generates the ladder diagrams."_ Quite. **Generated, the picture
+is derived — which is the thesis, not a violation of it.** The whole objection evaporates.
+
+And the fallback ("once you concede a build step, committed SVG dominates") was too quick. A
+generated Mermaid fence beats a committed SVG on things the earlier drafts never weighed:
+
+- it stays **text in the Markdown**, so `git diff` shows a _semantic_ change (`"in a wall"` →
+  `"in a window"`), not two hundred lines of path coordinates;
+- **no binary** in the repo (cf. the open H1 question);
+- **no build tooling at render time** — github.com does the rendering.
+
+SVG still wins on fidelity. But a _documentation figure_ does not need current flow, folding or
+interactivity. It needs structure — and railroad has exactly ours.
+
+**Cost: ~180 lines** (`src/mermaid.ts`), because `railroad-beta`'s grammar **is** our IR:
+
+| IRExpr  | railroad        |                                         |
+| ------- | --------------- | --------------------------------------- |
+| `And`   | `sequence(...)` | series on one wire                      |
+| `Or`    | `choice(...)`   | stacked rungs fanning off a common node |
+| `Leaf`  | `nonterminal()` | a boxed, operative atom                 |
+| `Inert` | `terminal()`    | unboxed grammatical prose (§17)         |
+| `Not`   | see §21a        | fold to `NOT <name>`, or De Morgan      |
+
+So it is a **pretty-printer over the same tree that feeds `layout()`**, not a second renderer.
+
+**One real bug, caught only by rendering it.** Inert prose must _not_ survive into a `choice`.
+In the ladder an inert child of an OR is a **heading** and carries no current (§17) — but every
+child of a railroad `choice` is a live **branch**, so emitting the prose as a rung silently adds
+a free pass-through path and makes the disjunction **trivially satisfiable**. Fix: hoist the
+leading run in front of the fan (`sequence(terminal("either"), choice(...))`, where it reads as
+the drafter's preamble) and drop the medial `"or"` glue, whose job the fan already performs.
+Pinned in `test/mermaid.test.ts`. _Look at the render; do not trust the tree._
+
+**Result.** `logic-not-flowcharts.md` now draws its ladder with the **same engine that draws its
+flowcharts**, so the only thing differing between the two pictures is the notation — which is
+much the strongest form of the argument. The fence is byte-identical to the generator's output,
+so it is CI-checkable (regenerate; fail if dirty). The ASCII ladder (I-b) stays, in a
+`<details>`, as the second carrier — demonstrating the page's own thesis in the page: **two
+pictures, one source, neither of them the truth.**
+
+**Two things to salvage.** (a) Mermaid `flowchart` should go **into** `logic-not-flowcharts.md`
+as the exhibit for the _wrong_ picture — GitHub renders it natively, and the rendered GPDO
+flowchart shows `permitted` duplicated **three times** and `BAD!!!` twice, which is exactly the
+sub-condition duplication the document currently only _asserts_. Let Mermaid do the one thing
+Mermaid is genuinely good at: drawing the wrong picture, convincingly. (b) `railroad-beta` is a
+free external **oracle** for sanity-checking `ladder-core`'s layout on the AND/OR-only subset.
+
+### 24.3 What to build instead: one Scene IR, many carriers
+
+The architecture already anticipated this. `IRExpr → BBE → Scene IR` with an **injected
+`TextMetrics`** and a **swappable renderer** was built for print parity (§4.4); the Scene IR is
+the fork point, and each carrier is just another emit.
+
+**I-a. Static SVG — committed, generated, CI-checked.** _(works on github.com today; zero new
+rendering tech)_
+A `ladder-md` build step scans `doc/**/*.md` for an L4 fence carrying a directive (` ```l4
+ladder=window-rule `, or an adjacent `<!-- ladder: … -->`), pipes the L4 through **the bridge we
+already have** (`standalone/serve.mjs`: L4 → `jl4-lsp` → `RenderAsLadderInfo.funDecl`), runs
+`ladder-core` + `sceneToSvg` **twice** (screen + ink), writes `doc/…/figures/*.svg`, and
+injects/refreshes a `<picture>` block after the fence. CI regenerates and fails if the tree is
+dirty, so the picture **cannot drift** from the L4.
+
+> The L4 stays the source _in the Markdown_; the SVG is derived and committed. That is the
+> document's own thesis — "a diagram is a good _view_ of legal logic and a bad _substrate_ for
+> it" — enacted in the build system. And the artifact then works everywhere: github.com, npm,
+> VS Code preview, a future site, print.
+
+**I-b. The ASCII ladder — the sleeper. SHIPPED** (`src/ascii.ts`). A fenced code block renders
+**verbatim wherever Markdown exists**: github.com, PR comments, commit messages, terminals,
+email, `git diff`. A ladder is now **diffable in git** and pasteable anywhere, and
+`logic-not-flowcharts.md` finally shows the ladder it argues for — beside the L4 source, one
+screen, no image load.
+
+Two translations did the work. **Edges, not glyphs**: cells accumulate a direction mask plus a
+weight and resolve to a character at the end, so junctions (`├ ┤ ┬ ┴ ┼`) fall out for free — a
+wire meeting a box border yields `┤` unasked. **The Bézier fan becomes a bus**: sampling §18's
+curves into characters would be mush, but every curve of one OR shares the group's port, so the
+fan is recoverable and we draw the vertical ladder-logic bus the curve always depicted.
+
+The visual language survives: the lightning model (§20) maps to heavy `━┃╋` (closed) / light
+`─│┼` (streamer) / dashed `┈┊` (open); §22 presumptions keep their fine dash _and_ their
+streamer cap; §15 eliminable rungs keep their coarse dash; §21 NOT keeps its frame and bubble.
+T/F/U is **colour** in the SVG and colour cannot survive a code fence, so it moves into the box
+as a `✓ / ✗ / ?` marker.
+
+**The enabling change — injectable `Geometry`.** TextMetrics was always injectable but the
+kernel's pixel constants were _not_, so §3.2's substrate-independence only half held. A
+character grid needs the paddings and gaps on whole cells too, or `round()` sends the same box
+to 3 rows in one rung and 4 in the next. So `layout()` now takes a `Geometry` (default
+`PIXEL_GEOMETRY` — bit-identical to the old constants; SVG output unchanged). `ASCII_GEOMETRY`
+solves for exactness: `box h = lineHeight + 2·PAD_Y = 2 cells` and `stride = box h +
+GAP_PARALLEL = 4 cells`, so every subtree height is an _even_ number of cells and BBE's
+centering — `(boundingExtent − childExtent)/2` — also lands on a whole cell. Exact all the way
+down; asserted in `test/ascii.test.ts`, because silent drift is the failure mode.
+
+(Constraint: wide trees still need §7 Tiny scale or §16 folding to fit a column. The GPDO
+window rule comes in at 93 columns.)
+
+**I-c. A real fenced-block plugin.** A `markdown-it`/`remark` plugin that calls `ladder-core`
+in-process and inlines the SVG — _interactive_ (fold, T/F/U cycling) on surfaces where **we**
+control the renderer: a future docs site, and the **VS Code Markdown preview**, which accepts
+markdown-it plugins contributed by an extension (`markdown.markdownItPlugins`) — and we already
+ship a VS Code extension. Rode on the §13.1 `ladder-svg` split — **which is now done** (§12).
+
+**Recommendation: I-a + I-b now; I-c with the IDE integration; Mermaid never.**
+
+> **Status.** I-b is **shipped**. I-a (the generate-and-commit SVG build step) is the next
+> increment, and it now has everything it needs — the playground bridge already does L4 →
+> `jl4-lsp` → `funDecl`, and `sceneToSvg` already takes a theme. I-c waited on the §13.1
+> `ladder-svg` split, **which has now landed** (§12), so it is unblocked and rides with E1/E3.
+> "Mermaid never" **has now been stress-tested** (§24.2) and survives — but
+> the first draft's reasons for it were wrong, and the rewrite records that.
+>
+> **Outstanding check:** the Mermaid findings come from replaying GitHub's pipeline byte-for-byte
+> (its exact bundle, `initialize()` config, DOMPurify allowlist and viewscreen CSS), **not** from
+> loading github.com. Before citing any of this in print, paste `tmp/mermaid-planb/honest.mmd`
+> into an issue comment and hit Preview.
+
+---
+
+## 25. IMPLIES — the seam between scope and requirement _(proposed; not built)_
+
+**The question (Meng, 2026-07-14):** _"do we draw implication as a new thing, or as a rung that
+fits into our current formalisms?"_
+
+> **SCOPE — decided 2026-07-14.** Build **"must be"** only: _material_ implication in
+> **constitutive** rules, where the consequent is another **predicate**. **"Must do"** —
+> _regulative_ rules, where the consequent is an obligation with a deadline and reparations — is
+> a **different visualization problem** (Petri nets, Harel statecharts, DFAs), and §25.5 explains
+> why the ladder must stop at its door rather than pretend. The gating conditions of a regulative
+> rule look exactly like the work below and are reusable as-is; **the consequent is not.**
+
+### 25.1 The status quo is not neutral, and our own document condemns it
+
+Today the viz IR has no implication node (`IRExpr = And | Or | Not | UBoolVar | App | TrueE |
+FalseE | InertE`), so an L4 `P IMPLIES Q` either falls through to an opaque leaf or is rewritten
+by `Transform.simplify` into **`NOT P OR Q`** — two parallel rungs, the first negated. That is
+what the ladder in `logic-not-flowcharts.md` currently shows.
+
+It is truth-functionally impeccable. It is also **shape-destroying**, and that is exactly the
+charge the document levels at flowcharts: _"it says more than the law, and less than the law."_
+A statute has a **scope** (does this bite me?) and a **requirement** (then what must I do?), and
+those are the first two questions any lawyer asks in that order. `¬P ∨ Q` answers neither. It
+offers two escape routes; it inverts the antecedent; and it destroys the asymmetry that _is_ the
+legal object. **We are committing a milder version of the flowchart's crime inside the tool we
+are selling as the cure.** Truth-preserving, meaning-obscuring. Reject.
+
+So: **`Implies` must be a real IR node.** But — and this is the good news — it need not be a new
+_layout_ primitive.
+
+### 25.2 It is not a new thing. It is the thing ladder logic was always drawing.
+
+A real IEC 61131-3 rung is **`[contacts] ────( coil )`**: _if_ the contact network conducts,
+_then_ energize the coil. **A rung IS an implication** — antecedent on the left, consequent on
+the right. It is a Horn clause with a power rail.
+
+Our diagrams have quietly omitted the right-hand half all along: we draw contact networks strung
+between two power terminals, which is only ever the **antecedent**. So implication is not a new
+shape; it is the shape we have been declining to finish.
+
+_(Careful with the coil, though. In a **constitutive** rule — our scope — the right-hand side is
+another **predicate**, so it is a second contact panel, not an output. The coil-as-**action**
+reading belongs to **regulative** rules, and §25.5 explains why we are not drawing those.)_
+
+Note also that Meng drew this correctly in 2021, in the deck that started this: two panels,
+_"Every window which… **⇒** must be…"_, each panel a nested Venn/ladder. That design was right.
+
+### 25.3 The drawing: a two-panel seam. **Vacuity is a STATE, not a PATH.**
+
+> **Correction (Meng, 2026-07-14).** The first draft drew the vacuous case as a **bypass rung**
+> around the requirement. That is wrong, and not merely ugly. _"The bypass is true but vacuously
+> obvious … the compliance state is 'your house has no windows' and any human would write **N/A**
+> on the form. If we include the bypass in the circuit we would be accused of pedantry."_
+>
+> He is right, and the error is a **category** one. A bypass rung makes "the rule never reached
+> you" a **co-equal way of complying**, drawn in parallel with actually complying. It is nothing
+> of the kind. It is a way of **not being asked**. No form offers _"my house has no windows"_ as a
+> compliance option; it greys the section and stamps it **N/A**.
+>
+> **So the bypass must never be ink.** It exists in the semantics, not in the drawing.
+
+```
+     ●──[ SCOPE ]════MUST════▶──[ REQUIREMENT ]──●
+        on an upper floor            obscure-glazed
+        AND (in a wall               AND (non-opening
+        OR in a roof slope)          OR openable parts ≥ 1.7m)
+```
+
+**One path.** Two panels — **scope** and **requirement** — joined by a distinguished `⇒` / `MUST`
+seam. In BBE this is nearly free: a **series whose connector is a seam glyph rather than a plain
+wire**, so align-then-stack is unchanged.
+
+**Flow (§20) is where it earns its keep.** The implication has _three_ outcomes, and the picture
+distinguishes them **without drawing a third path**:
+
+| Scope    | Requirement | Reading                      | Render                                                                                                       |
+| -------- | ----------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **open** | —           | **N/A — the rule never bit** | the seam stamps **`N/A`**; the requirement panel **greys out** and is not evaluated. **No bypass is drawn.** |
+| conducts | conducts    | **in scope, and compliant**  | current runs through both panels; seam closed                                                                |
+| conducts | open        | **in scope, and IN BREACH**  | current reaches the seam and **stops**; the break is drawn AT the seam                                       |
+
+> **Superseded in part by §25.4.** The two-sink form below does this better still: it needs no
+> `N/A` stamp and no greying rule, because **N/A is simply "neither lamp lit"**. Keep §25.3's
+> principle — _vacuity is a state, not a path_ — and take §25.4's mechanism.
+
+**Same truth value, different ink.** `#EVAL` returns `TRUE` for a ground-floor window, and that is
+correct — the conditional is vacuously true and L4 should not pretend otherwise. But a compliance
+report that prints _"✓ complies with A.3"_ for a house with no windows is **telling the truth
+misleadingly.** The renderer therefore distinguishes _true because satisfied_ from _true because
+unreached_, exactly as §22 distinguishes _given_ from _presumed_ — a **provenance of the verdict**,
+orthogonal to its value. The logic is untouched; only the ink changes.
+
+That third row is the whole point: **breach is visible as a break at a named place.** And the
+first row is the case Meng's IMPLIES commit says flowcharts lose — _"it is precisely at such
+exits that real-world rules-as-code projects lose track of whether 'not covered' was supposed to
+mean pass, fail, or undefined."_ Here it is not an unlabelled exit; it is a labelled bypass that
+says **why** you are compliant: the rule never reached you.
+
+### 25.4 Two sinks: the green lamp and the red lamp — **and N/A falls out for free**
+
+> **Meng, 2026-07-14:** _"Maybe we can allow a form that treats the coil as a switch in its own
+> right: we have one antecedent source on the left of the ladder but two sinks: if the compliance
+> consequent is connected then we happy path to the green light. Otherwise we switch to the red
+> light."_
+
+This is the right shape, and it **supersedes** the `ViewSpec` polarity toggle the first draft
+proposed. It is also, pleasingly, not an invention: it is a **changeover contact** — SPDT, one
+pole and two throws — which is native relay-ladder vocabulary. The requirement does not merely
+_conduct or not_; it **routes**.
+
+```
+                                             ╭──▶ ( ✓ GREEN — complies )
+     ●──[ SCOPE ]══MUST══▶──[ REQUIREMENT ]──┤
+                                             ╰──▶ ( ✗ RED — in breach )
+```
+
+One source on the left. **Two sinks** on the right. The requirement's verdict throws the blade.
+
+**And now count the lamps.** Every outcome the rule has is legible from which lamp is lit, with
+no extra ink and — crucially — **no bypass**:
+
+| Scope     | Requirement   | Green   | Red     | Reading                                                          |
+| --------- | ------------- | ------- | ------- | ---------------------------------------------------------------- |
+| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The break is visible IN THE SCOPE. |
+| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                       |
+| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                     |
+| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                    |
+
+This is the whole reason the two-sink form is better than anything above it. §25.3 had to
+_special-case_ vacuity — grey the panel, stamp `N/A`. Here **N/A is simply "no current left the
+scope"**, and the reader sees exactly _where_ it stopped. Nothing has to be drawn to say it, and
+nothing has to be suppressed either. The pedantry problem dissolves rather than being managed.
+
+_(N/A and "undetermined" are both dark lamps, and they are distinguished the same way a lawyer
+distinguishes them: by looking at **where the break is**. A scope that is definitively `✗` shows a
+clean open contact — tested, and it did not bite. A scope that is `?` is grey — not yet asked.)_
+
+**The polarity toggle is no longer needed.** The first draft made the citizen and the Bad Man
+read _different diagrams_. They now read the **same** diagram and simply care about different
+lamps: the citizen asks _"is green lit?"_, the litigator asks _"can red be lit?"_ — which is a
+**reachability query**, and one the verifier can actually discharge. The red lamp is the
+white-hat Bad Man's target, drawn.
+
+**And it completes §25.2.** We noted there that our diagrams have only ever drawn the antecedent
+half of a rung — contacts strung between two power terminals, with the coil quietly omitted.
+Here the coils arrive, and the right-hand side of the ladder finally means something. What was a
+second power terminal becomes **two lamps that report the verdict**.
+
+**Cost check — does the requirement appear twice?** No, and this is the point of the changeover.
+The naïve encoding is `[Q]──(green)` in parallel with `[¬Q]──(red)`, which duplicates `Q` — the
+very sin we charge trees with. The changeover has **one** requirement panel with a **two-way
+exit**: current leaves upward if it conducts, downward if it does not. One `Q`, two throws.
+(§21a's normally-closed contact is the same idea at atom scale; this is it at panel scale.)
+
+**Where LEST attaches.** For regulative rules (§25.5, not in this build) the red lamp is not a
+lamp at all — it is the **doorway**. Breach is where `LEST` hangs: the reparation, the statechart,
+the obligation's afterlife. So the two-sink form gives the §25.5 port a natural anchor, and the
+constitutive and regulative pictures agree on their skeleton even though only one of them is
+ours to draw.
+
+### 25.5 "Must be" vs "must do" — the seam is where the ladder ENDS
+
+Two quite different things hide under the same English word, and the scope decision above turns
+on telling them apart:
+
+|             | **"must _be_"** — constitutive                           | **"must _do_"** — regulative                                   |
+| ----------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| the MUST is | **characterizing**: it says what a compliant window _is_ | **directive**: it tells a party to _act_, by a deadline        |
+| consequent  | another **predicate**                                    | an **obligation**: deadline, fulfilment, breach, reparation    |
+| formalism   | Boolean function                                         | a **labelled transition system**                               |
+| the picture | a **ladder** (this document)                             | **Harel statechart / Petri net / DFA** (§ the doc's own table) |
+| example     | A.3: obscure-glazed and non-opening                      | `PARTY insurer MUST pay WITHIN 30 days HENCE … LEST …`         |
+
+A.3's "must be obscure-glazed" is the **first** kind. There is no process in it, no deadline, no
+reparation — a window either satisfies the predicate or it does not. Formalising it as
+`covers IMPLIES requirement-met` is therefore not a dodge; it is the honest reading.
+
+**And this is exactly why the coil metaphor must not be pushed.** For a regulative rule the
+consequent is not an output you energize. Meng: _"the coil is more than a coil: it's a
+whole-ass graph."_ Quite — it is the obligation's entire lifecycle. Drawing that as a coil, or as
+anything else the ladder owns, would be **the flowchart's own category error**, committed by us:
+flattening a transition system into a picture that cannot hold one. `logic-not-flowcharts.md`
+spends two hundred lines saying that decision logic and process are different semantic
+categories. The ladder must therefore **stop at the seam.**
+
+So for regulative rules the seam is **not a coil — it is a PORT**: the ladder renders the
+**guard** (the conditions under which the obligation arises), which looks exactly like everything
+built so far and is **reusable unchanged**, and then hands off. The consequent renders as a
+**folded handle** (§16) that opens into a _different view_.
+
+That gives the two formalism boundaries a pleasing symmetry, and they are the same idea twice:
+
+| Boundary             | Opens         | From → To                | Handle                                       |
+| -------------------- | ------------- | ------------------------ | -------------------------------------------- |
+| **§23 the membrane** | **downward**  | circuit → **typed data** | a predicate leaf opens into its value chip   |
+| **§25 the seam**     | **rightward** | circuit → **process**    | a deontic consequent opens into a statechart |
+
+In both, the honest move is the same: **draw the boundary, render a handle, and let the other
+formalism take over.** Never pretend the ladder can hold what it cannot.
+
+_(One nicety we keep for the constitutive case: the seam glyph should read `MUST` when the source
+said MUST and `⇒` when it did not — §17's argument, applied to the connective. The drafter's
+register survives into the picture.)_
+
+### 25.6 The seam in Mermaid: **the bottleneck was right.**
+
+Meng: _"if we just had a convention where we have a `=>` node that looks like a bottleneck
+between condition and coil, could we shoehorn into Mermaid?"_ Four encodings were rendered
+(`specs/research/mermaid-planb/implies-seam-candidates.mmd`). **Yes — and it is the bottleneck.**
+
+| Encoding                                    | Verdict                                                                                                                                                                                        |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `choice(NOT P, Q)` — status quo             | **Correct, shapeless.** Antecedent inverted; scope/requirement destroyed. What we ship today; §25.1 rejects it.                                                                                |
+| `choice(NOT P, sequence(P, MUST, Q))`       | **Correct, and pedantic.** Draws the vacuous escape as a co-equal rung — the very error §25.3 now forbids — and duplicates `P` to do it. **Rejected.**                                         |
+| `sequence(P, MUST, optional(Q))`            | **THE TRAP.** Draws exactly the picture we want and means the opposite: `optional` is an **ungated** bypass, `Q ∨ ⊤`, so it says **the requirement is moot**. Beautiful, and backwards. Never. |
+| **`sequence(P, MUST, Q)`** — the bottleneck | **✅ USE THIS.** One path, no bypass ink, and it reads as the statute's own sentence: _"A.3 covers this window — **MUST** — A.3 requirement met."_                                             |
+
+**Is that not alby's OR→AND bug in a new costume?** It is the fair objection, and the answer is
+no — for a reason worth being precise about. Under a **strict railroad grammar** a `sequence` is
+concatenation, so a purist (or a machine) reads `P ∧ Q` and would call a ground-floor window
+non-compliant. But alby's bug was **silent**: nothing in his notation signalled the OR he had
+dropped. Here the seam is labelled **`MUST`**, and no English reader parses _"covered — MUST —
+compliant"_ as a conjunction. **The word carries the semantics.** A declared connective is not an
+accident, and a notation is allowed to have conventions — that is what a notation _is_.
+
+And the vacuous case reads correctly **because the scope is the first thing on the path**: a
+ground-floor reader is stopped at the very first box, `A.3 covers this window`, and knows exactly
+why. That is **N/A**, legibly — which is the form-filling behaviour §25.3 is modelling. The
+residual risk is a machine consuming the figure as a grammar, and the figure is a **view**, not
+the source. The L4 is the source. That is the whole thesis.
+
+**What Mermaid still cannot do is the FLOW.** It has no way to grey out the requirement panel and
+stamp `N/A`, and no way to break the circuit **at the seam** on breach. Structure it can carry;
+state it cannot. Which is exactly the work §25b exists to do in the native renderer.
+
+### 25.7 Work — **constitutive ("must be") ONLY**
+
+- [x] **25a.** Add `Implies` to `VizExpr.IRExpr` (Haskell) + `viz-expr.ts`, and a case in
+      `Viz.Ladder.translateExpr` — it used to fall through to `leafFromExpr`. **Stop
+      `Transform.simplify` from rewriting it to `NOT P OR Q`** when the ladder is the consumer.
+      **DONE.** `translateExpr` now peels the top-level implication off _before_ `simplify` runs and
+      simplifies each side on its own, so the seam survives while the panels still get NNF/CNF —
+      which is what we actually want, since simplification is a readability win _inside_ a panel and
+      a shape-destroyer _across_ the seam. Pinned end-to-end in `jl4/tests/VizImplies.hs`.
+- [x] **25b/c/d.** `ladder-core`: the `Implies` IR node, `measureImplies`, three-valued flow, the
+      **changeover** (one pole, two throws) into a **green** coil (complies) and a **red** one (in
+      breach). **No bypass drawn**; N/A is "neither lamp lit". Emitters: ASCII `(✓)`/`(✗)`/`┿`, SVG
+      coils, Mermaid `sequence(P, IMPLIES, Q)` — never `optional()`. **No `ViewSpec.polarity`
+      toggle**: the citizen and the Bad Man read the same diagram and watch different lamps.
+- [x] **25e.** The seam's glyph, from the source's register. **DONE, but the ambition was defeated
+      and the reason is worth keeping.** L4 spells the constitutive conditional two ways (`IMPLIES`
+      and `=>`), and we wanted the picture to keep whichever the drafter used. It cannot: the
+      typechecker desugars every binop into a function application (`desugarBinOpToFunction` at the
+      `Implies` case), and its `annoNoFunName` rebuilds the annotation as two bare holes — destroying
+      the concrete-syntax node that held the operator token. The node is _resugared_ back into an
+      `Implies` afterwards, so the visualiser does get a real implication; but its annotation carries
+      no tokens at all, and the spelling is gone. Recovering it means preserving concrete syntax
+      across binop desugaring — a change to every operator in the language, for a cosmetic difference
+      between two spellings of ONE operator. Not worth it: rendering `=>` as `IMPLIES` is of a kind
+      with rendering `>=` as `≥`, and says nothing the source did not. The wire field stays free-form
+      so a future NLG annotation (or a hand-authored scene) can still carry the statute's own words.
+
+- [x] **25f.** The seam in the **wizard**: a `Verdict` on the query plan, and a planner that stops
+      short-circuiting the interview when the verdict is not yet settled. See §25f below — the
+      short-circuit turned out to BE the bug, not just its symptom.
+
+**Two findings from the build, both worth keeping:**
+
+- **The ink must not outrun the current.** The first cut fed the requirement→changeover wire from
+  `scopeOut`, which drew a heavy live wire coming _out of a requirement that did not conduct_ — a
+  picture asserting current flowed through a failed contact. It is now fed by the requirement's own
+  conduction, so on a breach the current visibly goes in and does not come out, and the red lamp is
+  fed from the changeover itself. That is honest: the pole is the rule's supply and the requirement
+  merely **actuates** the switch. This compression (one device instead of a `[Q]`/`[/Q]` pair of
+  rungs) is exactly what buys us "every atom appears once".
+- **The vacuity error recurs one level up, in the wizard. FIXED — see §25f.** And the diagnosis
+  above was too kind: it is not only a presentation bug.
+
+**Explicitly NOT in this build** (§25.5): regulative / "must do" rules. The ladder will render
+their **guard** — free, since it is the same machinery — and then **stop**, handing the obligation
+to a statechart view via a folded handle. Drawing a deontic lifecycle as a coil, or as anything
+else the ladder owns, would be the very category error this project exists to name.
+
+### 25f. The seam in the WIZARD — **the short-circuit was the bug**
+
+The finding recorded at §25b–e was that the query planner must not _report_ a vacuous TRUE as
+"complies". True, and an under-diagnosis. Fixing it properly turned up something sharper:
+
+> **The classical short-circuit is valid only if you are computing a truth VALUE.** If you are
+> computing a **verdict**, a met requirement does **not** settle it — you must still establish the
+> scope, because _"the rule never reached you"_ and _"you comply"_ are different answers, and only
+> the scope tells them apart.
+
+So the planner did not merely mislabel the vacuous case. Given `requirement = TRUE` and the scope
+still unknown, `¬P ∨ Q` restricts to TRUE, the support goes **empty**, and the interview **stops** —
+with the one question that would have distinguished N/A from compliance still unasked. It could not
+have reported the right answer, because it had thrown away the means of reaching it. A presentation
+fix alone would have papered over a planner that stops too early.
+
+**What was built.**
+
+- **`BoolExpr` gains `BImplies`** (`BooleanDecisionQuery.hs`, mirrored in `decision-query.ts`). It
+  still compiles into the diagram classically — for settling whether the rule _holds_, `¬P ∨ Q` is
+  exactly the proposition — but the two sides are **also kept as roots of their own, in the same
+  BDD**. Hash-consing makes that nearly free, and it is the only way to tell the two TRUEs apart.
+  `vizExprToBoolExpr` therefore hands the seam over **intact** instead of flattening it on the way in.
+- **`Verdict`** — `Undetermined | Holds | Fails | Complies | InBreach | NotApplicable` — on
+  `QueryPlanResponse`, on `QueryOutcome`, and so on every impact preview too (a preview that says
+  "answer NO and you're compliant" is the same lie, just earlier). `determined` **stays**, unchanged
+  and still correct: it is the function's truth value, which the API owes its callers. What changes
+  is that the honest field is now the obvious one to switch on, and the note in the response says so.
+- **Support is computed against the VERDICT**, not the value: the support of the two _sides_, with
+  the requirement's dropped once the scope is settled FALSE (a rule established not to reach you is
+  not worth another question). It costs questions in exactly one case — requirement met, scope open —
+  and that is the trade, made deliberately: **a shorter interview that ends in the wrong word is not
+  a bargain.**
+- **Information gain is measured about the verdict**: `H(scope) + P(scope)·H(requirement)`. This is
+  not decoration. With the old measure, the moment the function settled, every atom scored **zero**
+  and the ranking went blind precisely when the fix needs it to keep working. It also earns
+  "ask the scope first" from the arithmetic rather than from a hand-tuned rule — a requirement you
+  may never be measured against carries less information about the verdict than the scope that
+  decides whether you are measured at all.
+
+**The verdict table is `lampsFor`'s table, deliberately.** Same rows, and the two engines' tests
+assert it in the same words. A wizard and a diagram that disagreed about a case would be lying to the
+same user, in the same window.
+
+| scope | requirement | `determined` |    `verdict`    |
+| :---: | :---------: | :----------: | :-------------: |
+|   ✗   |    _any_    |   **TRUE**   | `NotApplicable` |
+|   ✓   |      ✓      |     TRUE     |   `Complies`    |
+|   ✓   |      ✗      |    FALSE     |   `InBreach`    |
+|   ✓   |      ?      |      —       | `Undetermined`  |
+|   ?   |      ✓      |   **TRUE**   | `Undetermined`  |
+|   ?   |   _else_    |      —       | `Undetermined`  |
+
+The two bold rows are the whole finding. Both are `determined = TRUE`; neither may be shown to a user
+as compliance; and the second is the one that used to end the interview.
+
+**Still open — the old visualizer.** `l4-ladder-visualizer` runs `expandImplies` at its single entry
+point (§25a), so its LIR has no seam and its partial-eval never sees one. It is therefore _truthful_
+— it prints the boolean and claims nothing about compliance — but it cannot draw the two lamps, and
+in the IDE that is still the picture a user gets. The fix is not to retrofit a verdict into it; it is
+`ladder-core`, which is what this whole project is for.
 
 ---
 

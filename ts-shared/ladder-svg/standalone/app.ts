@@ -8,12 +8,8 @@
  * Every interaction just mutates a ViewSpec and re-runs layout (FLIP animates the move).
  * Bundled to dist/app.js by build.sh (esbuild). No framework, no workspace deps.
  */
-import {
-  layout,
-  sceneToSvg,
-  estimateMetrics,
-  defaultViewSpec,
-} from "../src/index.js";
+import { layout, estimateMetrics, defaultViewSpec } from "@repo/ladder-core";
+import { sceneToSvg } from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
@@ -25,7 +21,7 @@ import type {
   UBoolValue,
   ConnectiveStyle,
   Scene,
-} from "../src/index.js";
+} from "@repo/ladder-core";
 
 /* ----------------------------------------------------- s415 fixture (inert style) */
 let counter = 0;

@@ -25,17 +25,75 @@ import type {
   ConnectiveStyle,
   UBoolValue,
   Flow,
+  Implies,
 } from "./types.js";
+import type { Verdict } from "@repo/boolean-analysis";
 
-const PAD_X = 14;
-const PAD_Y = 10;
-const GAP_SERIES = 44; // horizontal gap between AND siblings
-const GAP_PARALLEL = 26; // vertical gap between OR siblings
-const BUS_PAD = 26; // gap between an OR's bus and its child boxes
-const INERT_PAD = 12; // horizontal breathing room around inline inert text
-const LEAD = 40; // power-lead length at the far left/right
-const MARGIN = 70;
-const FONT = 14;
+/**
+ * The kernel's geometry, injected (DESIGN §3.2). TextMetrics was always
+ * injectable, but these constants were not — so "substrate-independent" only
+ * half held: a substrate whose cells are not pixels (a MONOSPACE GRID; §24) needs
+ * the paddings and gaps to land on whole cells too, or identical boxes come out
+ * different sizes in different rungs. Units are notional pixels for the SVG and
+ * notional cells×scale for ASCII; the kernel never cares which.
+ */
+export interface Geometry {
+  PAD_X: number;
+  PAD_Y: number;
+  GAP_SERIES: number; // horizontal gap between AND siblings
+  GAP_PARALLEL: number; // vertical gap between OR siblings
+  BUS_PAD: number; // gap between an OR's bus and its child boxes
+  INERT_PAD: number; // horizontal breathing room around inline inert text
+  LEAD: number; // power-lead length at the far left/right
+  MARGIN: number;
+  FONT: number;
+  CARET_PAD: number; // extra room beside a fold placeholder's ▸
+  TAG_RISE: number; // how far above a box its otiose/typically tag sits
+  HEAD_PAD: number; // an OR heading's band = lineHeight + HEAD_PAD
+  HEAD_DROP: number; // …and the heading's baseline nudge inside that band
+  NOT_PAD_X: number;
+  NOT_PAD_Y: number;
+  NOT_LABEL: number;
+  NOT_BUBBLE: number; // output room for the inverter bubble
+  NOT_R: number; // bubble radius
+  CONNECTIVE_GAP: number; // clearance between wire and connective text
+  STRADDLE_MIN_WIDTH: number; // only wrap connectives wider than this
+  // §25 IMPLIES — the seam, the changeover fork, and the two sinks
+  SEAM_W: number; //   room for the MUST / ⇒ connective between the two panels
+  FORK_W: number; //   the changeover fan from the requirement to the lamps
+  COIL_R: number; //   lamp radius
+  COIL_SEP: number; // how far each lamp sits off the axis (green up, red down)
+  COIL_LABEL: number; // room to the right of a lamp for "complies" / "in breach"
+}
+
+/** The pixel geometry the SVG target has always used. */
+export const PIXEL_GEOMETRY: Geometry = {
+  PAD_X: 14,
+  PAD_Y: 10,
+  GAP_SERIES: 44,
+  GAP_PARALLEL: 26,
+  BUS_PAD: 26,
+  INERT_PAD: 12,
+  LEAD: 40,
+  MARGIN: 70,
+  FONT: 14,
+  CARET_PAD: 8,
+  TAG_RISE: 9,
+  HEAD_PAD: 12,
+  HEAD_DROP: 2,
+  NOT_PAD_X: 16,
+  NOT_PAD_Y: 12,
+  NOT_LABEL: 16,
+  NOT_BUBBLE: 20,
+  NOT_R: 5,
+  CONNECTIVE_GAP: 3,
+  STRADDLE_MIN_WIDTH: 160,
+  SEAM_W: 66,
+  FORK_W: 44,
+  COIL_R: 9,
+  COIL_SEP: 40,
+  COIL_LABEL: 74,
+};
 
 interface Measured {
   w: number;
@@ -47,6 +105,7 @@ interface Measured {
 interface Ctx {
   vs: ViewSpec;
   tm: TextMetrics;
+  k: Geometry;
   values: Map<NodeId, UBoolValue>; // evaluated T/F/U per node id
   em: Map<NodeId, Energ> | null; // energization per node id, when showCurrent
 }
@@ -99,6 +158,20 @@ function nodeValue(
         : c === "FalseV"
           ? "TrueV"
           : "UnknownV";
+  } else if (e.$type === "Implies") {
+    // P → Q, three-valued (DESIGN §25). Note it is TRUE when the scope is FALSE —
+    // vacuously — and that is correct; L4's #EVAL says so too. The picture, not the
+    // logic, is what must distinguish "true because satisfied" from "true because
+    // never reached" (§25.3), and it does that with the lamps (§25.4).
+    const p = nodeValue(e.scope, val, out);
+    const q = nodeValue(e.requirement, val, out);
+    v = val.has(e.id)
+      ? val.get(e.id)!
+      : p === "FalseV" || q === "TrueV"
+        ? "TrueV"
+        : p === "TrueV" && q === "FalseV"
+          ? "FalseV"
+          : "UnknownV";
   } else if (e.$type === "InertE") {
     v = "TrueV"; // inert conducts (identity); nominal, excluded from derivation
   } else {
@@ -112,6 +185,86 @@ function nodeValue(
   }
   out.set(e.id, v);
   return v;
+}
+
+/** Which lamp is lit (DESIGN §25.4). The whole verdict, in two booleans.
+ *  Neither lit ⇒ **N/A** (the scope did not conduct) or **undetermined** (something
+ *  is still `?`). The reader tells those apart by looking at WHERE the break is —
+ *  a definitively-open scope shows a clean break; an unknown one is grey. */
+export interface Lamps {
+  green: boolean;
+  red: boolean;
+}
+function lampsFor(
+  e: Implies,
+  values: Map<NodeId, UBoolValue>,
+  inE: boolean,
+): Lamps {
+  const p = values.get(e.scope.id);
+  const q = values.get(e.requirement.id);
+  const reached = inE && p === "TrueV"; // current actually left the scope panel
+  return {
+    green: reached && q === "TrueV",
+    red: reached && q === "FalseV", // NOT on `?` — an unknown requirement is not a breach
+  };
+}
+
+/**
+ * The verdict for a decision, from its top-level shape and a valuation (§E1/S9, DESIGN §25f).
+ *
+ * This is the PICTURE's verdict: it reads the same three-valued node values the render draws
+ * (`nodeValue`), so it says exactly what the ladder shows. That makes it the right thing for
+ * the IDE header, for print, and for any headless context — and it means it can be computed
+ * without a BDD engine, which is why it lives in the drawing core and not in `boolean-analysis`.
+ *
+ *   no seam (body is not an Implies): the function's own value — TrueV `Holds`, FalseV
+ *     `Fails`, else `Undetermined`.
+ *   seam, scope FALSE:      `NotApplicable`   — the rule never bit; the function is vacuously
+ *                                               TRUE, and that TRUE is not compliance.
+ *   seam, scope UNKNOWN:    `Undetermined`    — even if the requirement is already met and the
+ *                                               function is settled TRUE, we do not know WHICH
+ *                                               true it is (N/A vs complies).
+ *   seam, scope TRUE + req TRUE:    `Complies`
+ *   seam, scope TRUE + req FALSE:   `InBreach`
+ *   seam, scope TRUE + req UNKNOWN: `Undetermined`
+ *
+ * **Relationship to `BooleanDecisionQuery.verdictOf` (the wizard's engine): SOUND, not COMPLETE.**
+ * Wherever the picture's Kleene evaluation is determinate, the two agree row-for-row — and the
+ * §25f rows are exactly there, so the header never commits the N/A-vs-complies error. They part
+ * on ONE thing: `verdictOf` reduces with an ROBDD and so recognises boolean identities across
+ * repeated propositions (`a ∨ ¬a` ⇒ TRUE, `a ∧ ¬a` ⇒ FALSE) even while `a` is unknown; `nodeValue`
+ * evaluates each occurrence independently and leaves such a subtree `UnknownV`. So on a
+ * tautological/contradictory subformula with an unknown atom, `verdictFor` is conservatively
+ * `Undetermined` where `verdictOf` would settle. This is SOUND — every *definite* verdict here
+ * is correct; the imprecision is always toward `Undetermined`, never toward a wrong Complies /
+ * InBreach / NotApplicable — and it is faithful to the grey the ladder actually draws for that
+ * unresolved subtree. A caller that needs the sharper reduced verdict (the wizard does, to avoid
+ * asking a redundant question) should read it off the query engine; a caller annotating the
+ * picture wants this. The boundary is pinned in `verdict.test.ts`.
+ *
+ * `valuation` is the same map `layout` takes (`ViewSpec.valuation`): positional per-node
+ * pins/values, three-valued-evaluated through the tree exactly as the render is.
+ */
+export function verdictFor(
+  fn: FunDecl,
+  valuation: ReadonlyMap<NodeId, UBoolValue>,
+): Verdict {
+  const values = new Map<NodeId, UBoolValue>();
+  nodeValue(fn.body, valuation, values);
+  const body = fn.body;
+  if (body.$type !== "Implies") {
+    const v = values.get(body.id);
+    return v === "TrueV" ? "Holds" : v === "FalseV" ? "Fails" : "Undetermined";
+  }
+  const scope = values.get(body.scope.id);
+  if (scope === "FalseV") return "NotApplicable";
+  if (scope !== "TrueV") return "Undetermined"; // unknown scope: verdict not settled
+  const req = values.get(body.requirement.id);
+  return req === "TrueV"
+    ? "Complies"
+    : req === "FalseV"
+      ? "InBreach"
+      : "Undetermined";
 }
 
 interface Energ {
@@ -153,6 +306,13 @@ function energize(
   } else if (e.$type === "Not") {
     energize(e.negand, inE, values, em);
     outE = inE && values.get(e.id) === "TrueV";
+  } else if (e.$type === "Implies") {
+    // The scope sees the rule's own input. The requirement sees current ONLY IF the
+    // scope conducts — which is exactly why vacuity needs no bypass: when the scope
+    // is open, nothing downstream is energized and NEITHER lamp lights (§25.4).
+    energize(e.scope, inE, values, em);
+    energize(e.requirement, em.get(e.scope.id)!.outE, values, em);
+    outE = inE && values.get(e.id) === "TrueV"; // the node's own truth (¬P ∨ Q)
   } else {
     outE = inE && conducts(e);
   }
@@ -212,9 +372,11 @@ function leafBox(
   state: State,
   role: "leaf" | "placeholder",
   tm: TextMetrics,
+  k: Geometry,
   tentative = false,
 ): Measured {
-  const caretW = role === "placeholder" ? tm.width("▸", FONT) + 8 : 0;
+  const { FONT, PAD_X, PAD_Y, CARET_PAD, TAG_RISE } = k;
+  const caretW = role === "placeholder" ? tm.width("▸", FONT) + CARET_PAD : 0;
   const w = caretW + tm.width(label, FONT) + 2 * PAD_X;
   const h = tm.lineHeight(FONT) + 2 * PAD_Y;
   return {
@@ -253,7 +415,7 @@ function leafBox(
       if (state === "eliminable")
         out.push({
           kind: "text",
-          at: { x: ox + w / 2, y: oy - 9 },
+          at: { x: ox + w / 2, y: oy - TAG_RISE },
           text: "otiose — always open",
           anchor: "middle",
           state,
@@ -264,7 +426,7 @@ function leafBox(
         // riding a TYPICALLY presumption (DESIGN §22)
         out.push({
           kind: "text",
-          at: { x: ox + w / 2, y: oy - 9 },
+          at: { x: ox + w / 2, y: oy - TAG_RISE },
           text: "typically",
           anchor: "middle",
           state,
@@ -280,12 +442,11 @@ function leafBox(
  *  series wire connects through it (DESIGN §17). Two styles:
  *  - 'on-wire':    the series leaves the inert's span as a gap; text sits on the line.
  *  - 'below-wire': the inert draws a continuous wire across its span; text drops below. */
-// clearance between the wire and the nearest edge of connective text — shared by
-// above-wire / below-wire / straddle-wire so they all hug the line identically.
-const CONNECTIVE_GAP = 3;
-const C_ASCENT = FONT * 0.78;
-const C_DESCENT = FONT * 0.22;
-const STRADDLE_MIN_WIDTH = 160; // only wrap connectives wider than this (~a box width)
+// clearance between the wire and the nearest edge of connective text lives in
+// Geometry.CONNECTIVE_GAP — shared by above-wire / below-wire / straddle-wire so
+// they all hug the line identically. Ascent/descent are derived from the font.
+const ascent = (k: Geometry) => k.FONT * 0.78;
+const descent = (k: Geometry) => k.FONT * 0.22;
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
  *  can't split -> single line.
@@ -295,14 +456,14 @@ const STRADDLE_MIN_WIDTH = 160; // only wrap connectives wider than this (~a box
  *  compact block — e.g. balanceNLines(text, tm, targetWidth). Two lines is enough
  *  for now; the wire would thread the middle line (or the gap between the two
  *  central lines for even N). */
-function balanceTwoLines(text: string, tm: TextMetrics): string[] {
+function balanceTwoLines(text: string, tm: TextMetrics, k: Geometry): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 2) return [text];
   let best = 1;
   let bestDiff = Infinity;
   for (let i = 1; i < words.length; i++) {
-    const l = tm.width(words.slice(0, i).join(" "), FONT);
-    const r = tm.width(words.slice(i).join(" "), FONT);
+    const l = tm.width(words.slice(0, i).join(" "), k.FONT);
+    const r = tm.width(words.slice(i).join(" "), k.FONT);
     const diff = Math.abs(l - r);
     if (diff < bestDiff) {
       bestDiff = diff;
@@ -316,7 +477,9 @@ function inertInline(
   text: string,
   tm: TextMetrics,
   style: ConnectiveStyle,
+  k: Geometry,
 ): Measured {
+  const { FONT, PAD_Y, INERT_PAD, CONNECTIVE_GAP, STRADDLE_MIN_WIDTH } = k;
   const lineH = tm.lineHeight(FONT);
 
   // 'straddle-wire': long prose wraps to two balanced lines threading the
@@ -325,7 +488,7 @@ function inertInline(
   if (style === "straddle-wire") {
     const singleW = tm.width(text, FONT) + 2 * INERT_PAD;
     const lines =
-      singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm) : [text];
+      singleW > STRADDLE_MIN_WIDTH ? balanceTwoLines(text, tm, k) : [text];
     if (lines.length === 2) {
       const w =
         Math.max(tm.width(lines[0], FONT), tm.width(lines[1], FONT)) +
@@ -341,7 +504,7 @@ function inertInline(
           const mid = ox + w / 2;
           out.push({
             kind: "text",
-            at: { x: mid, y: cy - CONNECTIVE_GAP - C_DESCENT },
+            at: { x: mid, y: cy - CONNECTIVE_GAP - descent(k) },
             text: lines[0],
             anchor: "middle",
             state: "inert",
@@ -349,7 +512,7 @@ function inertInline(
           });
           out.push({
             kind: "text",
-            at: { x: mid, y: cy + CONNECTIVE_GAP + C_ASCENT },
+            at: { x: mid, y: cy + CONNECTIVE_GAP + ascent(k) },
             text: lines[1],
             anchor: "middle",
             state: "inert",
@@ -384,8 +547,8 @@ function inertInline(
         // spine wire under the span is drawn by measureAnd (flow-styled, §20)
         const baseline =
           style === "above-wire"
-            ? cy - CONNECTIVE_GAP - C_DESCENT
-            : cy + CONNECTIVE_GAP + C_ASCENT;
+            ? cy - CONNECTIVE_GAP - descent(k)
+            : cy + CONNECTIVE_GAP + ascent(k);
         out.push({
           kind: "text",
           at: { x: mid, y: baseline },
@@ -404,9 +567,18 @@ function inertInline(
  *  enters the target from the left) — the Layman / box-model fan (DESIGN §17a). */
 type Curve = Extract<ScenePrim, { kind: "curve" }>;
 function hCurve(from: Pt, to: Pt, state: State): Curve {
+  // Control-point reach = how far the curve stays HORIZONTAL out of each port before it
+  // banks toward the bus. A stronger reach reads as a deliberate thrust off the box rather
+  // than an immediate diagonal — the fan looks sprung, not slack. The vertical-spread term
+  // dominates the fan (rungs far off the axis get more thrust); the cap keeps the tallest
+  // fans from overshooting into an S.
   const t = Math.min(
-    60,
-    Math.max(Math.abs(to.x - from.x) * 0.6, Math.abs(to.y - from.y) * 0.35, 22),
+    120,
+    Math.max(
+      Math.abs(to.x - from.x) * 0.75,
+      Math.abs(to.y - from.y) * 0.55,
+      30,
+    ),
   );
   return {
     kind: "curve",
@@ -426,9 +598,10 @@ function cubicMid(c: Curve): Pt {
 }
 
 function measure(e: IRExpr, ctx: Ctx): Measured {
-  const { vs, tm } = ctx;
+  const { vs, tm, k } = ctx;
 
-  if (e.$type === "InertE") return inertInline(e.text, tm, vs.connectiveStyle);
+  if (e.$type === "InertE")
+    return inertInline(e.text, tm, vs.connectiveStyle, k);
 
   if (e.$type === "Not") {
     // NOT grammar (DESIGN §21): a scope FRAME round a complex negand (so you can see
@@ -440,11 +613,11 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       e.negand.$type === "And" ||
       e.negand.$type === "Or" ||
       e.negand.$type === "Not";
-    const NPX = 16;
-    const NPY = 12;
-    const LBL = complex ? 16 : 0;
-    const BR = 5; // bubble radius
-    const BUB = 20; // output room for the bubble
+    const NPX = k.NOT_PAD_X;
+    const NPY = k.NOT_PAD_Y;
+    const LBL = complex ? k.NOT_LABEL : 0;
+    const BR = k.NOT_R; // bubble radius
+    const BUB = k.NOT_BUBBLE; // output room for the bubble
     const band = LBL + NPY; // symmetric top/bottom so the port stays centred
     const framW = inner.w + 2 * NPX;
     const w = framW + BUB;
@@ -519,6 +692,8 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     };
   }
 
+  if (e.$type === "Implies") return measureImplies(e, ctx);
+
   if (e.$type !== "And" && e.$type !== "Or") {
     return leafBox(
       e.id,
@@ -526,6 +701,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       renderState(ctx, e.id),
       "leaf",
       tm,
+      k,
       vs.provenance.get(e.id) === "default",
     );
   }
@@ -537,6 +713,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       renderState(ctx, e.id),
       "placeholder",
       tm,
+      k,
     );
   }
 
@@ -546,19 +723,20 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
 /** AND: series, children centered vertically. Inert children render inline and
  *  ride the wire; a leading inert thus sits to the LEFT of the next element. */
 function measureAnd(e: And, ctx: Ctx): Measured {
+  const { GAP_SERIES } = ctx.k;
   const kids = e.args.map((a) => measure(a, ctx));
-  const h = Math.max(...kids.map((k) => k.h));
-  const w = kids.reduce((s, k) => s + k.w, 0) + GAP_SERIES * (kids.length - 1);
+  const h = Math.max(...kids.map((m) => m.h));
+  const w = kids.reduce((s, m) => s + m.w, 0) + GAP_SERIES * (kids.length - 1);
   return {
     w,
     h,
     state: "inert",
     emit(ox, oy, out) {
       let x = ox;
-      const ports = kids.map((k) => {
-        const cy = oy + (h - k.h) / 2; // <-- centered on the cross axis
-        const p = k.emit(x, cy, out);
-        x += k.w + GAP_SERIES;
+      const ports = kids.map((m) => {
+        const cy = oy + (h - m.h) / 2; // <-- centered on the cross axis
+        const p = m.emit(x, cy, out);
+        x += m.w + GAP_SERIES;
         return p;
       });
       const fold = { t: "fold", id: e.id } as const;
@@ -615,6 +793,7 @@ function measureAnd(e: And, ctx: Ctx): Measured {
  *  needs the room (DESIGN §17). Not connected to the buses; it carries no current. */
 function measureOr(e: Or, ctx: Ctx): Measured {
   const { tm } = ctx;
+  const { FONT, INERT_PAD, GAP_PARALLEL, BUS_PAD, HEAD_PAD, HEAD_DROP } = ctx.k;
   const lineH = tm.lineHeight(FONT);
   const head = leadingInert(e.args);
   // drop the leading inert run (the heading); fold the remaining inerts into the
@@ -650,7 +829,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   const stackH =
     rungs.reduce((s, r) => s + r.m.h, 0) +
     gapLabel.reduce((s, _, k) => s + gapH(k), 0);
-  const band = head ? lineH + 12 : 0;
+  const band = head ? lineH + HEAD_PAD : 0;
   const h = stackH + 2 * band;
 
   return {
@@ -707,7 +886,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
       if (head)
         out.push({
           kind: "text",
-          at: { x: ox + totalW / 2, y: oy + band / 2 + 2 },
+          at: { x: ox + totalW / 2, y: oy + band / 2 + HEAD_DROP },
           text: head,
           anchor: "middle",
           state: "inert",
@@ -721,18 +900,163 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   };
 }
 
-export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
+/** IMPLIES — the seam, the changeover, and the two sinks (DESIGN §25).
+ *
+ * ONE path: `[scope] ══MUST══▶ [requirement]`, then the requirement's verdict throws a
+ * CHANGEOVER — one pole, two throws — to a green lamp (complies) or a red one (in
+ * breach). There is deliberately NO bypass: when the scope does not conduct, no
+ * current leaves it and neither lamp lights. That is N/A, and the reader sees exactly
+ * where it stopped. Drawing the vacuous case as a rung would make "the rule never
+ * reached you" a co-equal way of COMPLYING, which it is not — it is a way of not
+ * being asked (§25.3).
+ */
+function measureImplies(e: Implies, ctx: Ctx): Measured {
+  const { tm, k } = ctx;
+  const { FONT, SEAM_W, FORK_W, COIL_R, COIL_SEP, COIL_LABEL } = k;
+  const s = measure(e.scope, ctx);
+  const r = measure(e.requirement, ctx);
+  const seam = e.seam ?? "⇒";
+
+  const lampsW = FORK_W + 2 * COIL_R + COIL_LABEL;
+  const w = s.w + SEAM_W + r.w + lampsW;
+  // tall enough for the widest panel AND for the lamp pair to clear the axis
+  const h = Math.max(s.h, r.h, 2 * (COIL_SEP + COIL_R + tm.lineHeight(FONT)));
+
+  return {
+    w,
+    h,
+    state: renderState(ctx, e.id),
+    emit(ox, oy, out) {
+      const cy = oy + h / 2; // the rule's axis
+      const sp = s.emit(ox, cy - s.h / 2, out);
+      const seamX = ox + s.w;
+      const reqX = seamX + SEAM_W;
+      const rp = r.emit(reqX, cy - r.h / 2, out);
+
+      const em = ctx.em;
+      const inE = !!em?.get(e.id)?.inE;
+      const scopeOut = !!em?.get(e.scope.id)?.outE; // did current LEAVE the scope?
+      const lamps = lampsFor(e, ctx.values, inE);
+
+      // ── the seam: the drafter's own connective, ON the wire ────────────────────
+      // The wire is drawn in TWO segments with a gap, so the connective sits in the
+      // line rather than being struck through by it (the 'on-wire' idiom of §17).
+      const seamMid = seamX + SEAM_W / 2;
+      const gap = tm.width(seam, 12.5) / 2 + 8;
+      const seamFlow = flowFor(em, scopeOut, trueConducts(ctx.values, e.scope));
+      out.push({
+        kind: "wire",
+        path: [sp.outPort, { x: seamMid - gap, y: cy }],
+        role: "rung",
+        state: "inert",
+        flow: seamFlow,
+      });
+      out.push({
+        kind: "wire",
+        path: [
+          { x: seamMid + gap, y: cy },
+          { x: reqX, y: cy },
+        ],
+        role: "rung",
+        state: "inert",
+        flow: seamFlow,
+      });
+      out.push({
+        kind: "text",
+        at: { x: seamMid, y: cy },
+        text: seam,
+        anchor: "middle",
+        state: scopeOut ? "live" : "inert",
+        tag: "seam",
+        size: 12.5,
+        id: e.id,
+      });
+
+      // ── the changeover: one pole, two throws (§25.4) ───────────────────────────
+      // This segment carries the REQUIREMENT's own conduction, not the scope's. The
+      // distinction is not pedantry: feeding it from `scopeOut` would draw a heavy,
+      // live wire coming OUT of a requirement that did not conduct — a picture saying
+      // current flowed through a failed contact, which is precisely the sort of lie
+      // this whole notation exists to refuse. When the requirement fails, current goes
+      // in and does not come out, and the changeover — sensing that — throws to red.
+      // The red current therefore originates AT the pivot, which is honest: the pole is
+      // fed by the rule's own supply and the requirement merely ACTUATES the switch.
+      // That compression (one device instead of a `[Q]`/`[/Q]` pair of rungs) is the
+      // whole reason the requirement gets drawn once instead of twice.
+      const pivotX = rp.outPort.x + FORK_W / 2;
+      const coilX = rp.outPort.x + FORK_W + COIL_R;
+      out.push({
+        kind: "wire",
+        path: [rp.outPort, { x: pivotX, y: cy }],
+        role: "rung",
+        state: "inert",
+        flow: flowFor(em, lamps.green, false),
+      });
+      out.push({ kind: "glyph", at: { x: pivotX, y: cy }, role: "changeover" });
+
+      const throwTo = (dy: number, lit: boolean) => {
+        const to = { x: coilX - COIL_R, y: cy + dy };
+        const from = { x: pivotX, y: cy };
+        const c = hCurve(from, to, "inert");
+        c.flow = flowFor(em, lit, false);
+        out.push(c);
+      };
+      throwTo(-COIL_SEP, lamps.green);
+      throwTo(COIL_SEP, lamps.red);
+
+      out.push({
+        kind: "coil",
+        at: { x: coilX, y: cy - COIL_SEP },
+        role: "green",
+        lit: lamps.green,
+        label: "complies",
+        id: e.id,
+      });
+      out.push({
+        kind: "coil",
+        at: { x: coilX, y: cy + COIL_SEP },
+        role: "red",
+        lit: lamps.red,
+        label: "in breach",
+        id: e.id,
+      });
+
+      // N/A is not a stamp and not a path — it is BOTH LAMPS DARK, with the break
+      // visible in the scope. We only say so in words when the scope is DEFINITIVELY
+      // open (a `?` scope is merely undetermined, and must not be reported as N/A).
+      if (inE && ctx.values.get(e.scope.id) === "FalseV")
+        out.push({
+          kind: "text",
+          at: { x: coilX + COIL_R + 7, y: cy },
+          text: "N/A — the rule does not reach this case",
+          anchor: "start",
+          state: "inert",
+          tag: "note",
+          size: 11,
+        });
+
+      return { inPort: sp.inPort, outPort: { x: ox + w, y: cy } };
+    },
+  };
+}
+
+export function layout(
+  fn: FunDecl,
+  vs: ViewSpec,
+  tm: TextMetrics,
+  k: Geometry = PIXEL_GEOMETRY,
+): Scene {
+  const { LEAD, MARGIN } = k;
   const prims: ScenePrim[] = [];
   const values = new Map<NodeId, UBoolValue>();
   nodeValue(fn.body, vs.valuation, values);
   const em = vs.showCurrent ? new Map<NodeId, Energ>() : null;
   if (em) energize(fn.body, true, values, em);
-  const m = measure(fn.body, { vs, tm, values, em });
+  const ctx: Ctx = { vs, tm, k, values, em };
+  const m = measure(fn.body, ctx);
   const ox = MARGIN + LEAD;
   const oy = MARGIN;
   const { inPort, outPort } = m.emit(ox, oy, prims);
-
-  const ctx: Ctx = { vs, tm, values, em };
   prims.push({
     kind: "wire",
     path: [{ x: MARGIN, y: inPort.y }, inPort],
@@ -741,29 +1065,39 @@ export function layout(fn: FunDecl, vs: ViewSpec, tm: TextMetrics): Scene {
     flow: em ? "closed" : undefined,
   });
   prims.push({
-    kind: "wire",
-    path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }],
-    role: "rail",
-    state: "inert",
-    flow: flowFor(
-      em,
-      !!em?.get(fn.body.id)?.outE,
-      trueConducts(values, fn.body),
-      presumedConducts(ctx, fn.body),
-    ),
-  });
-  prims.push({
     kind: "glyph",
     at: { x: MARGIN, y: inPort.y },
     role: "power-terminal",
   });
-  prims.push({
-    kind: "glyph",
-    at: { x: ox + m.w + LEAD, y: outPort.y },
-    role: "power-terminal",
-  });
 
-  return { size: { w: ox + m.w + LEAD + MARGIN, h: oy + m.h + MARGIN }, prims };
+  // An IMPLIES already HAS its sinks — the two lamps (DESIGN §25.4). A right rail and
+  // a second power terminal on top of them would draw the same thing twice, and would
+  // claim the rule "conducts" past a breach, which it does not. This is where §25.2's
+  // observation is paid off: what was a second power terminal BECOMES the two lamps
+  // that report the verdict.
+  const twoSinks = fn.body.$type === "Implies";
+  if (!twoSinks) {
+    prims.push({
+      kind: "wire",
+      path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }],
+      role: "rail",
+      state: "inert",
+      flow: flowFor(
+        em,
+        !!em?.get(fn.body.id)?.outE,
+        trueConducts(values, fn.body),
+        presumedConducts(ctx, fn.body),
+      ),
+    });
+    prims.push({
+      kind: "glyph",
+      at: { x: ox + m.w + LEAD, y: outPort.y },
+      role: "power-terminal",
+    });
+  }
+
+  const w = ox + m.w + (twoSinks ? 0 : LEAD) + MARGIN;
+  return { size: { w, h: oy + m.h + MARGIN }, prims };
 }
 
 /** Cheap P0 metrics — proportional-ish estimate; good enough to prove centering.

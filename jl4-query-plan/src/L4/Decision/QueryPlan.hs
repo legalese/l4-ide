@@ -10,6 +10,7 @@ module L4.Decision.QueryPlan (
   QueryInput (..),
   QueryAsk (..),
   QueryPlanResponse (..),
+  BDQ.Verdict (..),
   atomIdByUnique,
   queryPlan,
 ) where
@@ -125,6 +126,9 @@ instance ToJSON QueryAtom where
 
 data QueryOutcome = QueryOutcome
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value. Correct, and NOT a verdict.
+  , verdict :: !BDQ.Verdict
+  -- ^ What may be shown to a user. Switch on this, not on 'determined'.
   , support :: ![QueryAtom]
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
@@ -177,7 +181,16 @@ instance ToJSON QueryAsk where
 
 data QueryPlanResponse = QueryPlanResponse
   { determined :: !(Maybe Bool)
+  -- ^ The FUNCTION's truth value: what @NOT scope OR requirement@ comes to. Correct,
+  -- and NOT something to show a user — see 'verdict'.
+  , verdict :: !BDQ.Verdict
+  -- ^ What may be TOLD to a user, and the field a wizard should switch on. For a rule
+  -- stated as a seam, 'BDQ.Complies' and 'BDQ.NotApplicable' are BOTH
+  -- @determined = Just True@, so a UI that reads 'determined' alone will sooner or
+  -- later tell someone they complied with a rule that never reached them (§25.3).
   , stillNeeded :: ![QueryAtom]
+  -- ^ Atoms still worth asking about — computed against the VERDICT, so it can be
+  -- non-empty even when 'determined' is settled (see 'BDQ.supportIdxOf').
   , ranked :: ![QueryAtom]
   , inputs :: ![QueryInput]
   , asks :: ![QueryAsk]
@@ -400,8 +413,8 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       Map.map
         ( \vi ->
             QueryImpact
-              { ifTrue = QueryOutcome vi.ifTrue.determined (atomsOfSet vi.ifTrue.support)
-              , ifFalse = QueryOutcome vi.ifFalse.determined (atomsOfSet vi.ifFalse.support)
+              { ifTrue = QueryOutcome vi.ifTrue.determined vi.ifTrue.verdict (atomsOfSet vi.ifTrue.support)
+              , ifFalse = QueryOutcome vi.ifFalse.determined vi.ifFalse.verdict (atomsOfSet vi.ifFalse.support)
               }
         )
         res.impact
@@ -558,9 +571,11 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     noteTxt =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
+        <> " Report `verdict`, not `determined`: when the rule is stated as a seam (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH `determined = true`, and telling a user they complied with a rule that never reached them is a category error, not a rounding error."
    in
     QueryPlanResponse
       { determined = res.determined
+      , verdict = res.verdict
       , stillNeeded = atomsOfSet res.support
       , ranked = map atomOf res.ranked
       , inputs = inputsRanked

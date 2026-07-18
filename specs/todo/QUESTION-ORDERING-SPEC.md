@@ -13,7 +13,7 @@
 
 **Explicitly NOT in scope (and why):**
 
-- **BDD variable reordering / sifting.** The variable order (`collectVarOrder`, `decision-query.ts:32`) only affects diagram _size_, not which question a user is asked. Chase it only if the BDD blows up; it is orthogonal to usability. This is the common conflation to avoid.
+- **BDD variable reordering / sifting.** The variable order (`collectVarOrder`, `decision-query.ts:32`) only affects diagram _size_, not which question a user is asked. This is the common conflation to avoid — and there is a second, better reason to leave it alone: that order is currently **first-occurrence DFS = the statute's own reading order**, so sifting would trade the compiled artifact's isomorphism with the source text for a smaller node count. Chase it only if the BDD actually blows up, and see §9.0 for what you would be selling.
 - **Formal decision-table analysis** (completeness / conflict / redundancy). Deferred per decision on 2026-07-06; tracked separately.
 - **Building `TYPICALLY`.** No longer backed out: `TYPICALLY` shipped as **metadata-only** via PR #92 (parse + store + literal-vs-type check + JSON-schema `default`; the risky PEVAL/PASSERT machinery was dropped). This spec _consumes_ those weights but the policy itself does not depend on the keyword — v1 runs prior-free, v2 reads the weights.
 
@@ -69,7 +69,7 @@ Properties:
 
 - **Subsumes the old heuristic.** An atom that _determines_ the outcome drives a branch to a terminal → `H = 0` → maximal gain. So "settles it now" is the top of the ranking, as before.
 - **Adds progress credit.** An atom that merely halves the remaining space still scores well — fixing defect (1).
-- **Near-optimal.** Greedy max-info-gain is the standard, cheap policy for minimizing expected question count. Multi-step lookahead is exponential and out of scope.
+- **Near-optimal — and now citably so.** We are greedy because the exact problem is intractable: **constructing an optimal binary decision tree is NP-complete (Hyafil & Rivest, 1976)**, and that is the problem this policy solves. Greedy max-info-gain is the standard response; multi-step lookahead is exponential and out of scope. The approximation guarantee the "near-optimal" claim was leaning on without attribution is **Golovin & Krause's adaptive submodularity** (JAIR 42, 2011): where the objective is adaptive-submodular and adaptive-monotone, greedy is within a `(ln(1/η) + 1)` factor of the optimal policy. Cite both; do not assert "near-optimal" bare.
 
 ### 3.3 Explainability (surface, not just rank)
 
@@ -180,3 +180,70 @@ Keep the existing `impact` (`ifTrue`/`ifFalse` outcomes) — it already feeds th
 3. v2 then becomes small: `PartialEvalAnalyzer` reads the field → `weights` → `compileDecisionQuery` (§7 step 1), plus the Haskell mirror/feed (§7 steps 2–3) for backend parity.
 
 **Do NOT** build a v2-private weights path in parallel with #96's provenance — that is the same extraction twice. If #96 ships demo-fed and defers the real extraction, the extraction is still owed; name it as a shared step so it lands once. (Answering the open question from 2026-07-08: yes, this plumbing gets built regardless of sequencing — the only choice is once-shared vs twice-duplicated.)
+
+---
+
+## 9. Related work — and what we may honestly claim (added 2026-07-14)
+
+### 9.0 Three orders, two hardnesses, and why we compile at all
+
+The companion doc (`doc/concepts/language-design/logic-not-flowcharts.md`) distinguishes **three** senses of "order" in a rule. They land in this codebase in three different places, and it is worth writing down where, because two of them are the NP-hard problems below and one of them is the thing we are deliberately _protecting_:
+
+| Order               | What it is                                                             | Where it lives                                                                                 | Do we optimise it?                                                              |
+| ------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Denotational**    | none — `AND`/`OR` commute; the rule is a Boolean function              | the function itself                                                                            | n/a — there is nothing to order                                                 |
+| **Textual**         | the statute's own sequence: `(i) obscure-glazed, and (ii) non-opening` | `collectVarOrder` (first-occurrence DFS ⇒ **source order**); and the ladder's L→R / T→B layout | **NO — and that is a decision, not an omission.** It is the isomorphism anchor. |
+| **Interrogational** | which question to put to the user next                                 | `rank` / the info-gain policy (§3.2)                                                           | **YES. This spec.**                                                             |
+
+**The textual order is load-bearing, and it is sitting inside the ROBDD for free.** `collectVarOrder` is a first-occurrence DFS over the ladder IR, which mirrors the L4, which mirrors the statute — so **the compiled ROBDD's variable order _is_ the statute's reading order**. §2 calls this "purely syntactic" as though it were a defect. It is not: it is the same property the ladder has (§"The right pictures for logic"), obtained at no cost, and it means the compiled artifact can still be read back against the source text.
+
+Which supplies a better reason to decline BDD sifting than the one §1 gives. Sifting does not merely fail to help the user — **it would overwrite the statute's order inside the compiled artifact**, trading isomorphism for node count. Do it only if the diagram actually blows up, and know what is being sold when you do.
+
+⚠️ **The two NP-hardnesses. Do not conflate them — they share the word "ordering" and nothing else.**
+
+|                     | **(a) Variable ordering for SIZE**                                                   | **(b) Question ordering for EXPECTED COST**                                      |
+| ------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| minimise            | the ROBDD's node count                                                               | the number of questions a user is actually asked                                 |
+| static or adaptive? | **static** — one order, fixed at compile time                                        | **adaptive** — re-chosen after every answer                                      |
+| hardness            | NP-complete — **Bollig & Wegener (1996)** (precisely: _improving_ a given order is)  | NP-complete — **Hyafil & Rivest (1976)**, optimal binary decision trees          |
+| our stance          | **OUT OF SCOPE** (§1). Affects diagram size only; chase it only if the BDD blows up. | **THIS SPEC.** Greedy info-gain (§3.2), with Golovin & Krause for the guarantee. |
+
+Both are famous, both are old, and they share the word "ordering" and nothing else. The wizard's user never sees (a).
+
+**Why compile to an ROBDD at all, given (a)?** Because the hardness is being _displaced on purpose_. Satisfiability is NP-complete; but on an ROBDD it is **O(1)** — is the root `⊥`? That does not refute anything, because _building_ the diagram can be exponential. The cost has simply been moved from query time to compile time. This is **knowledge compilation** (Darwiche & Marquis, JAIR 17:229–264, 2002): pay once, offline, in the size of the representation; then answer unboundedly many queries cheaply.
+
+That is precisely the wizard's shape — compile the decision once, then serve a next-question query after every keystroke — and it is the reason the design is sound rather than merely convenient. **`prob()` (§3.1) is a model count, and model counting is #P-complete in general; on an ROBDD it is one linear pass.** The whole policy is affordable only because the diagram was built first. Say so; it is the justification, not an implementation detail.
+
+This spec previously had **no related-work section at all**, and its "near-optimal" claim (§3.2) was uncited. A literature check found that we are working in a well-populated field, that our ingredients are all old, and that our actual contribution is narrower than the spec's tone implied. That is fine — but a reviewer who knows this literature and catches us claiming novelty would be entitled to be annoyed, so it is written down here.
+
+**Every ingredient is old, and the pedigree is an asset, not an embarrassment.**
+
+- **Hyafil & Rivest (1976)**, "Constructing Optimal Binary Decision Trees is NP-Complete", _Information Processing Letters_ 5(1):15–17. The hardness result that makes greedy the right answer. (This is the citation for "question ordering is NP-hard" — **not** Lamy 2024, which merely restates it. See §9.0.)
+- **Shwayder (1974)**, "Extending the Information Theory Approach to Converting Limited-Entry Decision Tables to Computer Programs", _CACM_ 17(9):532–537. **Entropy-driven test ordering from a rule base — fifty years ago.** The direct ancestor of §3.2. Cite it _first_; the lineage is the point.
+- **Darwiche & Marquis (2002)**, "A Knowledge Compilation Map", _JAIR_ 17:229–264. The framing that justifies the whole architecture (§9.0): pay at compile time, query cheaply thereafter.
+- **Montalbano (1962)**, "Tables, Flow Charts, and Program Logic", _IBM Systems Journal_ 1(1). His table→flowchart ordering heuristic — "ask those questions first which will make the two differentiated groups of rule identifiers as similar in size as possible" — is an information-gain criterion **24 years before ID3**.
+- **Bryant (1986)**, "Graph-Based Algorithms for Boolean Function Manipulation", _IEEE Trans. Computers_ C-35(8). The ROBDD, and the fact our whole three-orders argument rests on: variable order changes diagram _size_ enormously but has **"no effect on the correctness of the results."**
+- **Ünlüyurt (2004)**, "Sequential testing of complex systems: a review", _Discrete Applied Math_ 142. The survey of the field our next-question policy formally belongs to. We are doing **sequential testing**, and should say so.
+- **Golovin & Krause (2011)**, _JAIR_ 42:427–486. The near-optimality guarantee for greedy (see §3.2).
+- **Hadzic et al. (2004)** / **Andersen, Hadzic & Pisinger (2010)**, _JAIR_ 37. Compile a rule base to a BDD offline, drive a **backtrack-free** interactive configurator off it. Architecturally identical to a legal wizard; commercialised as Configit. Worth reading for the interaction model, not just the theory.
+
+**The closest existing work, and the one to engage with directly:**
+
+- ⭐ **Aucher, Berbinau & Morin (2019)**, "Principles for a Judgement Editor Based on Binary Decision Diagrams", _Journal of Applied Logics — IfCoLog_ 6(5):781–814. Built with the French **Cour de cassation** / IRISA. They compile legal rules to a propositional formula and thence to a **BDD whose nodes _are_ the questions put to the judge** — and add a "Multi-BDD" to reconcile substantive legal reasoning with the _procedural_ order mandated by trial protocol (which is a sharper version of our three-orders distinction, arrived at independently and from the bench). **They do not optimise the question order.** That is precisely, and only, our seam.
+
+**Two verified negatives, both usable in a related-work section:**
+
+- **Nobody has applied BDDs to DMN.** Full-text search of Calvanese et al. (BPM 2016 _and_ the IS 2018 extension) for "binary decision diagram" / "BDD" / "OBDD" returns **zero** occurrences; their method is purely geometric (hyper-rectangles + sweep-line).
+- **AI & Law has essentially never used BDDs.** Full-text search of the journal _Artificial Intelligence and Law_ for "binary decision diagram" returns **zero**. The only three exceptions found anywhere are Aucher et al. (2019), Gasiola (2025, _CLSR_ 58 — the EU AI Act's risk classification as a BDD, conceptual rather than compiled), and Mues & Vanthienen (DEXA 2004, BDDs for rule-base anomaly checking). **Three exceptions, in three different communities, none citing the others.**
+
+### The claim we may defend
+
+> **Model-counting information gain over a compiled ROBDD, as the next-question policy for a legal rules engine, appears to be new. Every ingredient is old.** Entropy-driven test ordering is Shwayder 1974; the ROBDD is Bryant 1986; BDD-driven legal interviewing is Aucher et al. 2019; the greedy near-optimality guarantee is Golovin & Krause 2011. What has not been done, so far as we can find, is to put them together — and the reason is plainly that the three communities that hold the pieces (decision-table verification, BDD/formal methods, AI&Law) do not read each other.
+
+Do **not** claim: that question ordering is a new problem; that nobody checks rule bases across tables; that BDDs are new to law; or that greedy info-gain is our invention.
+
+⚠️ **Baseline to beat — and read this one correctly.** Lamy et al. (2024), _BMC Med. Inform. Decis. Mak._ 24:326, solve "minimise questions asked given a rule base" end-to-end for clinical decision support. Their NP-hardness observation is **not news** — that is Hyafil & Rivest 1976, and everyone has always known it (§9.0). What _is_ news, and what should worry us, is **empirical**: they find a **dumb frequency heuristic** performs about as well as anything cleverer.
+
+So the theorem is not the threat; the benchmark is. Validation on the Housing Act Sch.2 corpus (§5) must measure against a **frequency baseline**, not merely against the old syntactic `[-determinableCount, level]` policy — which is the comparison that flatters us. If we cannot beat frequency on mean question count, the honest finding is that we cannot, and the contribution moves to **explainability** (§3.3): a frequency heuristic cannot tell a citizen _why_ it asked, and ours can.
+
+_Full annotated bibliography with confidence markers ([V] read at primary source / [P] record verified / [U] unverified — do not cite): the DMN/decision-table literature review carried out 2026-07-14._

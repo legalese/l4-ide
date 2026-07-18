@@ -57,6 +57,8 @@ annotateLadderWithAtomIds ladderInfo vizState =
         VizExpr.Or uid (map annotateExpr xs)
       VizExpr.Not uid x ->
         VizExpr.Not uid (annotateExpr x)
+      VizExpr.Implies uid scope requirement seam ->
+        VizExpr.Implies uid (annotateExpr scope) (annotateExpr requirement) seam
       VizExpr.TrueE uid nm ->
         VizExpr.TrueE uid nm
       VizExpr.FalseE uid nm ->
@@ -126,6 +128,18 @@ vizExprToBoolExpr expr =
     VizExpr.Not _ x ->
       let (ex, m, o) = go x
        in (BDQ.BNot ex, m, o)
+    -- Hand the seam to the planner INTACT. It will still compile it classically into
+    -- the diagram — to settle whether the rule holds, `NOT scope OR requirement` is
+    -- exactly the proposition — but it also keeps the two sides as roots of their own,
+    -- which is the only way to tell a vacuous TRUE from a compliant one and so the only
+    -- way to report a verdict rather than a bare truth value (DESIGN §25.3).
+    --
+    -- Flattening it here, as we used to, threw that away before the planner ever saw
+    -- it: same value, different ink, and the ink is what the user reads.
+    VizExpr.Implies _ scope requirement _seam ->
+      let (ep, mp, op) = go scope
+          (eq, mq, oq) = go requirement
+       in (BDQ.BImplies ep eq, mp <> mq, op <> oq)
     VizExpr.And _ xs ->
       let (es, ms, os) = unzip3 (map go xs)
        in (BDQ.BAnd es, mconcat ms, mconcat os)

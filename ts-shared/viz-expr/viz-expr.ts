@@ -120,7 +120,16 @@ export interface FunDecl extends IRNode {
 }
 
 /** The Ladder graph visualizer focuses on boolean formulas. */
-export type IRExpr = And | Or | Not | UBoolVar | TrueE | FalseE | App | InertE
+export type IRExpr =
+  | And
+  | Or
+  | Not
+  | Implies
+  | UBoolVar
+  | TrueE
+  | FalseE
+  | App
+  | InertE
 
 /* Thanks to Andres for pointing out that an n-ary representation would be better for the arguments for And / Or.
 It's one of those things that seems obvious in retrospect; to quote
@@ -153,6 +162,32 @@ export interface Not extends IRNode {
   readonly negand: IRExpr
 }
 
+/**
+ * Material implication — the SEAM between a rule's scope and its requirement
+ * (ladder DESIGN §25).
+ *
+ * Emphatically NOT sugar for `Not scope Or requirement`. That expansion is
+ * truth-functionally perfect and shape-destroying: it discards the scope /
+ * requirement split — the first two questions anyone asks of a rule ("does this
+ * bite me?", then "so what must be true?") — and, worse, it cannot tell apart the
+ * two cases a reader most needs told apart. A window the rule never reached (N/A)
+ * and a window that complies BOTH satisfy `NOT P OR Q`. Same value; different ink.
+ *
+ * Consumers that want only the Boolean FUNCTION (BDD compilation, question
+ * ordering) may read it classically and are correct to. Consumers that draw a
+ * PICTURE may not; use `expandImplies` if you have no seam of your own.
+ */
+export interface Implies extends IRNode {
+  readonly $type: 'Implies'
+  readonly scope: IRExpr
+  readonly requirement: IRExpr
+  /** The connective AS THE DRAFTER WROTE IT: `'IMPLIES'` or `'=>'`. §17's argument
+   *  for inert prose, applied to the operator — the picture does not get to invent
+   *  a register the source did not use. (Never `'MUST'`: there is no constitutive
+   *  MUST in L4. MUST is regulative, and the ladder does not draw those.) */
+  readonly seam: string
+}
+
 export interface App extends IRNode {
   readonly $type: 'App'
   readonly fnName: Name
@@ -179,6 +214,7 @@ export const IRExpr = Schema.Union(
   Schema.suspend((): Schema.Schema<And> => And),
   Schema.suspend((): Schema.Schema<Or> => Or),
   Schema.suspend((): Schema.Schema<Not> => Not),
+  Schema.suspend((): Schema.Schema<Implies> => Implies),
   Schema.suspend((): Schema.Schema<UBoolVar> => UBoolVar),
   Schema.suspend((): Schema.Schema<TrueE> => TrueE),
   Schema.suspend((): Schema.Schema<FalseE> => FalseE),
@@ -235,6 +271,14 @@ export const Not = Schema.Struct({
   negand: IRExpr,
   id: IRId,
 }).annotations({ identifier: 'Not' })
+
+export const Implies = Schema.Struct({
+  $type: Schema.tag('Implies'),
+  id: IRId,
+  scope: IRExpr,
+  requirement: IRExpr,
+  seam: Schema.String,
+}).annotations({ identifier: 'Implies' })
 
 export const BoolValue = Schema.Union(
   Schema.Literal('FalseV'),
@@ -321,6 +365,74 @@ export function makeVizInfoDecoder() {
 }
 
 /***********************************
+      Implication, classically
+************************************/
+
+/** Largest node id anywhere in the tree — so a rewrite can mint ids that cannot collide. */
+function maxNodeId(e: IRExpr): number {
+  switch (e.$type) {
+    case 'And':
+    case 'Or':
+      return e.args.reduce((m, a) => Math.max(m, maxNodeId(a)), e.id.id)
+    case 'Not':
+      return Math.max(e.id.id, maxNodeId(e.negand))
+    case 'Implies':
+      return Math.max(e.id.id, maxNodeId(e.scope), maxNodeId(e.requirement))
+    case 'App':
+      return e.args.reduce((m, a) => Math.max(m, maxNodeId(a)), e.id.id)
+    default:
+      return e.id.id
+  }
+}
+
+/**
+ * Rewrite every `Implies` to its classical equivalent, `NOT scope OR requirement`.
+ *
+ * This is a LOSSY rewrite, and deliberately so — it is the escape hatch for
+ * consumers that have no seam of their own and must render or compile something
+ * anyway (chiefly the original ladder visualizer, whose LIR predates `Implies`).
+ * What it loses is precisely what DESIGN §25 is about: after this runs, a rule that
+ * never reached the case and a rule the case satisfies are the same TRUE, and no
+ * downstream picture can tell them apart. If you are drawing, prefer the seam.
+ *
+ * Node ids are preserved where they can be (the `Or` inherits the `Implies`' id,
+ * which is now free); the one synthesized `Not` per implication gets a fresh id
+ * minted past the tree's maximum, so nothing collides with a positional key.
+ */
+export function expandImplies(expr: IRExpr): IRExpr {
+  let next = maxNodeId(expr) + 1
+  const fresh = (): IRId => ({ id: next++ })
+  const go = (e: IRExpr): IRExpr => {
+    switch (e.$type) {
+      case 'Implies': {
+        const not: Not = {
+          $type: 'Not',
+          id: fresh(),
+          negand: go(e.scope),
+        }
+        const or: Or = {
+          $type: 'Or',
+          id: e.id,
+          args: [not, go(e.requirement)],
+        }
+        return or
+      }
+      case 'And':
+        return { ...e, args: e.args.map(go) }
+      case 'Or':
+        return { ...e, args: e.args.map(go) }
+      case 'Not':
+        return { ...e, negand: go(e.negand) }
+      case 'App':
+        return { ...e, args: e.args.map(go) }
+      default:
+        return e
+    }
+  }
+  return go(expr)
+}
+
+/***********************************
         TYPICALLY bridge
 ************************************/
 
@@ -383,6 +495,12 @@ export function typicallyBridge(expr: IRExpr): TypicallyMaps {
       }
       case 'Not':
         go(e.negand)
+        return
+      // The seam is not a barrier: an atom's prior is a fact about the atom, and a
+      // rule's atoms live on BOTH sides of the implication.
+      case 'Implies':
+        go(e.scope)
+        go(e.requirement)
         return
       case 'And':
       case 'Or':
