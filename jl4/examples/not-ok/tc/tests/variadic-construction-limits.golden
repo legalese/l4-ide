@@ -1,0 +1,49 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: variadic-construction-limits.l4
+  Hidden: no
+  Range: 20:21-20:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first argument of function 
+
+      Bag (defined at variadic-construction-limits.l4:7:9-12)
+
+    is expected to be of type
+
+      LIST OF a20
+
+    but is here of type
+
+      NUMBER
+
+File: variadic-construction-limits.l4
+  Hidden: no
+  Range: 23:19-23:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      Tag (defined at variadic-construction-limits.l4:10:9-12)
+
+    expects 2 arguments,
+    but you are applying it to 3 arguments here.
+
+File: variadic-construction-limits.l4
+  Hidden: no
+  Range: 26:17-26:33
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      mkBag (defined at variadic-construction-limits.l4:17:1-6)
+
+    expects 1 argument,
+    but you are applying it to 3 arguments here.
