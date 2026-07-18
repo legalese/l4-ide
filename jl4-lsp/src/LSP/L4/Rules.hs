@@ -561,7 +561,11 @@ jl4Rules evalConfig rootDirectory recorder = do
         , substitution = result.substitution
         , environment = result.environment
         , entityInfo = applyFinalSubstitution result.substitution uri result.entityInfo
-        , success = null errors
+        -- NOTE: warnings (e.g. CONSIDER exhaustiveness) must not fail the
+        -- typecheck: downstream rules like EvaluateLazy depend on
+        -- SuccessfulTypeCheck, and a file with only warnings should still
+        -- evaluate its directives.
+        , success = all ((/= TypeCheck.SError) . TypeCheck.severity) errors
         , infos
         , errors  -- Include actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
         , infoMap = result.infoMap

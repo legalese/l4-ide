@@ -259,9 +259,13 @@ withDeclares rdecls =
     go (MkDeclChecked (Left  a) cis) = Left  . (, MkDeclChecked a cis) <$> rangeOf a
     go (MkDeclChecked (Right a) cis) = Right . (, MkDeclChecked a cis) <$> rangeOf a
   in
+    -- NOTE: union with the enclosing scope's declarations rather than replacing
+    -- them: WHERE/LET locals are also brought into scope via this function, and
+    -- pattern exhaustiveness analysis of their bodies needs the enclosing
+    -- module's DECLAREs to enumerate constructors.
     extendKnownMany topDeclares . local \s -> s
-      { declareDeclarations = Map.fromList rdeclares
-      , assumeDeclarations = Map.fromList rassumes
+      { declareDeclarations = Map.fromList rdeclares <> s.declareDeclarations
+      , assumeDeclarations = Map.fromList rassumes <> s.assumeDeclarations
       }
     where
       topDeclares = foldMap (.publicNames) rdecls
@@ -1144,13 +1148,20 @@ buildConstructorLookup = foldMap \decl ->
     EnumDecl _ cds -> map (\(MkConDecl _ n _) -> n) cds
     SynonymDecl _ _ -> [] -- TODO: how to look up synonyms?
 
+-- | Builtin algebraic types with a finite constructor set, so that CONSIDER
+-- scrutinees of these types are covered by exhaustiveness analysis just like
+-- user-declared enumerations.
+builtinConstructorLookup :: Map Unique [Resolved]
+builtinConstructorLookup =
+  Map.singleton booleanUnique [Def trueUnique trueName, Def falseUnique falseName]
+
 checkConsider :: ExpectationContext -> Anno -> Expr Name -> [Branch Name] -> Type' Resolved -> Check (Expr Resolved)
 checkConsider ec ann e branches t = do
   (re, te) <- inferExpr e
   rbranches <- traverse (checkBranch ec re te t) branches
   resolvedDecls <- asks (Map.elems . (.declareDeclarations))
   (scrutVar, pt) <- desugarBranches re rbranches
-  let cl = buildConstructorLookup resolvedDecls
+  let cl = buildConstructorLookup resolvedDecls <> builtinConstructorLookup
       bs = concretizeInfo cl pt
 
   let redundant = redundantBranches $ annotateRefinement bs
