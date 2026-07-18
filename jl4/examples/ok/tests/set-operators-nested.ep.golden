@@ -29,7 +29,7 @@ s21 MEANS setFromList (LIST 2, 1)
 #EVAL s21 `is in` (setFromList (LIST s12))
 
 -- and {{1,2}} INTERSECT {{2,1}} is empty
-#EVAL setSize (INTERSECT (setFromList (LIST s12)) (setFromList (LIST s21)))
+#EVAL setSize ((setFromList (LIST s12)) INTERSECT (setFromList (LIST s21)))
 
 §§ `Wrapped in a record: bare EQUALS is structural, silently`
 
@@ -40,7 +40,7 @@ t1 MEANS Team WITH members IS setFromList (LIST "alice", "bob")
 t2 MEANS Team WITH members IS setFromList (LIST "bob", "alice")
 
 -- the fields are extensionally equal...
-#EVAL `set equals` t1's members t2's members
+#EVAL t1's members `set equals` t2's members
 -- ...but the records compare structurally: FALSE, with no diagnostic.
 -- Compare fields with `set equals` instead of comparing whole records.
 #EVAL t1 EQUALS t2

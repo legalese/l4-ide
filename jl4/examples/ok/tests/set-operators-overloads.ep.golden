@@ -18,7 +18,7 @@ IMPORT prelude
 `eligible` MEANS `new yorkers` AND `new jerseyans`
 
 #EVAL setSize `eligible`
-#EVAL `is in` "carol" `eligible`
+#EVAL "carol" `is in` `eligible`
 
 -- OR on sets is the same operation — the collapse the lint will surface.
 #EVAL setSize (`new yorkers` OR `new jerseyans`)
@@ -53,8 +53,8 @@ b1 MEANS setFromList (LIST 2, 3, 4)
 -- order and duplicates are invisible under `set equals`.
 -- (Bare EQUALS on two SETs is deliberately an ambiguity error — see
 -- not-ok/tc/set-equals-ambiguous.l4 and prelude `Sets` notes.)
-#EVAL `set equals` (setFromList (LIST 2, 1, 1)) (setFromList (LIST 1, 2))
-#EVAL `set equals` (setFromList (LIST 1)) (setFromList (LIST 1, 2))
+#EVAL (setFromList (LIST 2, 1, 1)) `set equals` (setFromList (LIST 1, 2))
+#EVAL (setFromList (LIST 1)) `set equals` (setFromList (LIST 1, 2))
 -- numeric and string EQUALS untouched
 #EVAL 42 EQUALS 42
 #EVAL "a" EQUALS "b"

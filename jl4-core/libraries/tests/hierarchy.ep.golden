@@ -191,19 +191,19 @@ GIVETH A STRING
 GIVEN  n IS A NUMBER
 GIVETH A STRING
 `roman` n MEANS
-  BRANCH IF n AT LEAST 1000 THEN APPEND "M"  `roman` (n - 1000)
-         IF n AT LEAST 900  THEN APPEND "CM" `roman` (n - 900)
-         IF n AT LEAST 500  THEN APPEND "D"  `roman` (n - 500)
-         IF n AT LEAST 400  THEN APPEND "CD" `roman` (n - 400)
-         IF n AT LEAST 100  THEN APPEND "C"  `roman` (n - 100)
-         IF n AT LEAST 90   THEN APPEND "XC" `roman` (n - 90)
-         IF n AT LEAST 50   THEN APPEND "L"  `roman` (n - 50)
-         IF n AT LEAST 40   THEN APPEND "XL" `roman` (n - 40)
-         IF n AT LEAST 10   THEN APPEND "X"  `roman` (n - 10)
-         IF n AT LEAST 9    THEN APPEND "IX" `roman` (n - 9)
-         IF n AT LEAST 5    THEN APPEND "V"  `roman` (n - 5)
-         IF n AT LEAST 4    THEN APPEND "IV" `roman` (n - 4)
-         IF n AT LEAST 1    THEN APPEND "I"  `roman` (n - 1)
+  BRANCH IF n AT LEAST 1000 THEN "M"  APPEND `roman` (n - 1000)
+         IF n AT LEAST 900  THEN "CM" APPEND `roman` (n - 900)
+         IF n AT LEAST 500  THEN "D"  APPEND `roman` (n - 500)
+         IF n AT LEAST 400  THEN "CD" APPEND `roman` (n - 400)
+         IF n AT LEAST 100  THEN "C"  APPEND `roman` (n - 100)
+         IF n AT LEAST 90   THEN "XC" APPEND `roman` (n - 90)
+         IF n AT LEAST 50   THEN "L"  APPEND `roman` (n - 50)
+         IF n AT LEAST 40   THEN "XL" APPEND `roman` (n - 40)
+         IF n AT LEAST 10   THEN "X"  APPEND `roman` (n - 10)
+         IF n AT LEAST 9    THEN "IX" APPEND `roman` (n - 9)
+         IF n AT LEAST 5    THEN "V"  APPEND `roman` (n - 5)
+         IF n AT LEAST 4    THEN "IV" APPEND `roman` (n - 4)
+         IF n AT LEAST 1    THEN "I"  APPEND `roman` (n - 1)
          OTHERWISE ""
 
 -- Render sibling position `n` in the given style.
@@ -257,10 +257,10 @@ GIVETH A LIST OF STRING
                        WHEN Restart at            THEN at + 1
     -- one node: its own line, then its children one level deeper
     node prefix lvl idx t MEANS
-      (APPEND (here APPEND "\t") (t's value's text))
+      ((here APPEND "\t") APPEND (t's value's text))
         FOLLOWED BY forest here (lvl + 1) (t's children)
       WHERE
-        here   MEANS IF prefix EQUALS "" THEN marker ELSE APPEND (prefix APPEND ".") marker
+        here   MEANS IF prefix EQUALS "" THEN marker ELSE (prefix APPEND ".") APPEND marker
         marker MEANS CONSIDER t's value's numbering
                        WHEN Auto                  THEN `marker for` (`style at` scheme lvl) idx
                        WHEN Pinned m advances     THEN m

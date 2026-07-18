@@ -50,7 +50,7 @@ File: variadic-construction-limits.l4
 
 File: variadic-construction-limits.l4
   Hidden: no
-  Range: 31:23-31:26
+  Range: 31:21-31:28
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
