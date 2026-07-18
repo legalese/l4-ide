@@ -6,4 +6,5 @@ export {
   type VarImpact,
   type QueryOutcome,
   type Determined,
+  type Verdict,
 } from './decision-query.js'

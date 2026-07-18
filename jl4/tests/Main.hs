@@ -43,6 +43,7 @@ import LSP.L4.Rules
 import qualified Hover
 import qualified SemanticTokens
 import qualified VizAutoRefresh
+import qualified VizImplies
 
 main :: IO ()
 main = do
@@ -98,6 +99,7 @@ main = do
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     describe "viz" VizAutoRefresh.spec
+    describe "viz implies" VizImplies.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

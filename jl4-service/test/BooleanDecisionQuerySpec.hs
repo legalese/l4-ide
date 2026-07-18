@@ -26,6 +26,72 @@ spec = do
       rFalse.determined `shouldBe` Nothing
       rFalse.support `shouldBe` Set.fromList ["y"]
 
+  -- The seam, at the level of the engine (DESIGN §25.3, §25.7). The verdict table here
+  -- is the SAME table `lampsFor` implements in ladder-core — deliberately, because a
+  -- wizard and a diagram that disagreed about a case would be lying to the same user.
+  --
+  --   scope ✗              → NotApplicable   (the rule never bit)
+  --   scope ✓, req ✓       → Complies
+  --   scope ✓, req ✗       → InBreach
+  --   scope ✓, req ?       → Undetermined
+  --   scope ?              → Undetermined    (even when the FUNCTION is settled)
+  describe "BImplies — verdict, not truth value" do
+    let scope = "scope" :: String
+        req = "req"
+        impl = BImplies (BVar scope) (BVar req)
+        c = compileDecisionQuery [scope, req] impl
+        run bs = queryDecision c Map.empty (Map.fromList bs)
+
+    it "vacuous: the function is TRUE and the verdict is NotApplicable" do
+      let r = run [(scope, False)]
+      -- Both of these hold at once, and that is the entire problem in two lines: a
+      -- caller reading `determined` sees the same TRUE it sees for a compliant case.
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` NotApplicable
+      r.support `shouldBe` Set.empty
+
+    it "complies" do
+      let r = run [(scope, True), (req, True)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` Complies
+
+    it "in breach" do
+      let r = run [(scope, True), (req, False)]
+      r.determined `shouldBe` Just False
+      r.verdict `shouldBe` InBreach
+
+    it "an unasked requirement is not a breach" do
+      let r = run [(scope, True)]
+      r.verdict `shouldBe` Undetermined
+      r.support `shouldBe` Set.fromList [req]
+
+    it "requirement met, scope unknown: the value short-circuits and the VERDICT does not" do
+      -- The classical planner stops here: `NOT scope OR req` restricts to TRUE, support
+      -- is empty, nothing left to ask. But we still do not know whether the rule reached
+      -- this case — and N/A and compliance are different answers. So the interview goes
+      -- on, and it goes on about the SCOPE.
+      let r = run [(req, True)]
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` Undetermined
+      r.support `shouldBe` Set.fromList [scope]
+
+    it "no seam, no vacuity: a plain function still reports Holds/Fails" do
+      let plain = compileDecisionQuery [scope, req] (BOr [BNot (BVar scope), BVar req])
+          -- Note this is the SAME boolean function as `impl` — same BDD, same
+          -- `determined` for every binding. Only the shape differs, and only the shape
+          -- can tell you what the TRUE means.
+          r = queryDecision plain Map.empty (Map.fromList [(scope, False)])
+      r.determined `shouldBe` Just True
+      r.verdict `shouldBe` Holds
+      r.support `shouldBe` Set.empty
+
+    it "impact previews carry verdicts too, so a preview cannot lie either" do
+      let r = run []
+          scopeImpact = Map.lookup scope r.impact
+      (fmap (.ifFalse.verdict) scopeImpact) `shouldBe` Just NotApplicable
+      (fmap (.ifFalse.determined) scopeImpact) `shouldBe` Just (Just True)
+      (fmap (.ifTrue.verdict) scopeImpact) `shouldBe` Just Undetermined
+
   -- Shared cross-runtime parity fixture (question-ordering spec §7). The SAME
   -- structure, var order, priors and expected scores are asserted in the TS
   -- suite (ts-shared/boolean-analysis/src/tests/decision-query.test.ts,

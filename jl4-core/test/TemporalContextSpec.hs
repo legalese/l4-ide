@@ -93,7 +93,8 @@ ctxReadsSpec = describe "CtxReads pointwise Monoid" $ do
         , crDocumentTimezone = ReadEq (Just "Etc/UTC")
         , crValidTime = NotRead
         , crRuleValidTime = NotRead
-        , crLedgerOps = False
+        , crLedgerWrite = False
+        , crLedgerRead = False
         }
 
   it "hasReads distinguishes empty from non-empty" $ do
@@ -101,13 +102,20 @@ ctxReadsSpec = describe "CtxReads pointwise Monoid" $ do
     hasReads sysOnly `shouldBe` True
     hasReads tzOnly `shouldBe` True
 
-  it "crLedgerOps merges as OR (a ledger op anywhere in the span poisons the whole span)" $ do
-    let ledgerOnly = noReads { crLedgerOps = True }
-    (ledgerOnly <> noReads).crLedgerOps `shouldBe` True
-    (noReads <> ledgerOnly).crLedgerOps `shouldBe` True
-    (ledgerOnly <> sysOnly).crLedgerOps `shouldBe` True
-    (sysOnly <> ledgerOnly) `shouldBe` sysOnly { crLedgerOps = True }
-    (noReads <> noReads).crLedgerOps `shouldBe` False
+  it "crLedgerWrite merges as OR (a write anywhere in the span poisons the whole span)" $ do
+    let writeOnly = noReads { crLedgerWrite = True }
+    (writeOnly <> noReads).crLedgerWrite `shouldBe` True
+    (noReads <> writeOnly).crLedgerWrite `shouldBe` True
+    (writeOnly <> sysOnly).crLedgerWrite `shouldBe` True
+    (sysOnly <> writeOnly) `shouldBe` sysOnly { crLedgerWrite = True }
+    (noReads <> noReads).crLedgerWrite `shouldBe` False
+
+  it "crLedgerRead merges as OR (a read anywhere in the span marks the whole span)" $ do
+    let readOnly = noReads { crLedgerRead = True }
+    (readOnly <> noReads).crLedgerRead `shouldBe` True
+    (noReads <> readOnly).crLedgerRead `shouldBe` True
+    (sysOnly <> readOnly) `shouldBe` sysOnly { crLedgerRead = True }
+    (noReads <> noReads).crLedgerRead `shouldBe` False
 
 validForSpec :: Spec
 validForSpec = describe "validFor" $ do
@@ -127,9 +135,16 @@ validForSpec = describe "validFor" $ do
     validFor ambient fp `shouldBe` False
     validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
 
-  it "a fingerprint carrying crLedgerOps never validates (defensive; never installed)" $ do
-    let fp = noReads { crLedgerOps = True }
+  it "a fingerprint carrying crLedgerWrite never validates (defensive; never installed)" $ do
+    let fp = noReads { crLedgerWrite = True }
     validFor ambient fp `shouldBe` False
+    validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
+
+  it "crLedgerRead does NOT veto: a read-only ledger fingerprint validates on its axes (#914 snapshot-per-scope)" $ do
+    let fp = noReads { crLedgerRead = True, crSystemTime = ReadEq t1 }
+    -- same scope: re-served
+    validFor ambient fp `shouldBe` True
+    -- different scope: re-forced
     validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
 
   it "all read axes must match (mixed-axis combinations)" $ do
@@ -139,7 +154,8 @@ validForSpec = describe "validFor" $ do
             , crDocumentTimezone = ReadEq (Just "Etc/UTC")
             , crValidTime = NotRead
             , crRuleValidTime = NotRead
-            , crLedgerOps = False
+            , crLedgerWrite = False
+            , crLedgerRead = False
             }
         withTz = ambient { tcDocumentTimezone = Just "Etc/UTC" }
     validFor withTz fp `shouldBe` True

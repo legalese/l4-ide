@@ -183,3 +183,98 @@ describe('TYPICALLY priors — cross-runtime parity fixture', () => {
     expect(res.scores.get(2)!).toBeGreaterThan(res.scores.get(3)!)
   })
 })
+
+// The seam, in the planner (DESIGN §25.3, §25.7). The verdict table here is the SAME
+// table `lampsFor` implements in ladder-core, and the same one asserted in
+// BooleanDecisionQuerySpec.hs — deliberately, because a wizard and a diagram that
+// disagreed about a case would be lying to the same user.
+describe('Implies — verdict, not truth value', () => {
+  const SCOPE = 1
+  const REQ = 2
+  const implies = (): IRExpr => ({
+    $type: 'Implies',
+    id: { id: 3 },
+    scope: uboolVar(1, SCOPE, 'covered'),
+    requirement: uboolVar(2, REQ, 'requirement met'),
+    seam: 'IMPLIES',
+  })
+  const run = (bindings: [number, boolean][]) =>
+    compileDecisionQuery(implies(), [SCOPE, REQ]).query(new Map(bindings))
+
+  it('vacuous: the function is TRUE and the verdict is NotApplicable', () => {
+    const res = run([[SCOPE, false]])
+    // Both hold at once, and that is the entire problem in two lines: a caller reading
+    // `determined` sees the same TRUE it sees for a compliant case.
+    expect(res.determined).toBe(true)
+    expect(res.verdict).toBe('NotApplicable')
+    expect(res.support).toEqual([])
+  })
+
+  it('complies', () => {
+    const res = run([
+      [SCOPE, true],
+      [REQ, true],
+    ])
+    expect(res.determined).toBe(true)
+    expect(res.verdict).toBe('Complies')
+  })
+
+  it('in breach', () => {
+    const res = run([
+      [SCOPE, true],
+      [REQ, false],
+    ])
+    expect(res.determined).toBe(false)
+    expect(res.verdict).toBe('InBreach')
+  })
+
+  it('an unasked requirement is not a breach', () => {
+    const res = run([[SCOPE, true]])
+    expect(res.verdict).toBe('Undetermined')
+    expect(res.support).toEqual([REQ])
+  })
+
+  it('requirement met, scope unknown: the value short-circuits and the VERDICT does not', () => {
+    // The classical planner stops here: `NOT scope OR req` restricts to TRUE, support is
+    // empty, nothing left to ask. But we still do not know whether the rule reached this
+    // case — and N/A and compliance are different answers. So the interview goes on, and
+    // it goes on about the SCOPE.
+    const res = run([[REQ, true]])
+    expect(res.determined).toBe(true)
+    expect(res.verdict).toBe('Undetermined')
+    expect(res.support).toEqual([SCOPE])
+  })
+
+  it('no seam, no vacuity: the same boolean function reports Holds', () => {
+    // Truth-functionally identical to `implies()` — same BDD, same `determined` for
+    // every binding. Only the SHAPE differs, and only the shape can say what the TRUE
+    // means. This is `expandImplies`, and this test is what it costs.
+    const flattened = or(3, [
+      not(4, uboolVar(1, SCOPE, 'covered')),
+      uboolVar(2, REQ, 'requirement met'),
+    ])
+    const res = compileDecisionQuery(flattened, [SCOPE, REQ]).query(
+      new Map([[SCOPE, false]])
+    )
+    expect(res.determined).toBe(true)
+    expect(res.verdict).toBe('Holds')
+    expect(res.support).toEqual([])
+  })
+
+  it('impact previews carry verdicts too, so a preview cannot lie either', () => {
+    const res = run([])
+    const scopeImpact = res.impact.get(SCOPE)
+    expect(scopeImpact?.ifFalse.verdict).toBe('NotApplicable')
+    expect(scopeImpact?.ifFalse.determined).toBe(true)
+    expect(scopeImpact?.ifTrue.verdict).toBe('Undetermined')
+  })
+
+  it('the scope is asked before the requirement: information about the verdict, not the value', () => {
+    // Falls out of the verdict-entropy measure rather than a hand-tuned rule: a
+    // requirement you may never be measured against carries less information about the
+    // verdict than the scope that decides whether you are measured at all.
+    const res = run([])
+    expect(res.ranked[0]).toBe(SCOPE)
+    expect(res.scores.get(SCOPE)!).toBeGreaterThan(res.scores.get(REQ)!)
+  })
+})
