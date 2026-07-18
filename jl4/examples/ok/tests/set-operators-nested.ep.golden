@@ -1,0 +1,46 @@
+IMPORT prelude
+
+§ `Sets: the one-level quotient, pinned`
+
+-- DOCUMENTED CURRENT BEHAVIOR, not an endorsement (adversarial review
+-- 2026-07-18; see the KNOWN LIMIT note in the prelude's Sets section).
+-- SET's observers ignore order and duplicates among ELEMENTS, but element
+-- comparison itself is builtin structural equality. Consequently the
+-- quotient does not compose: inner sets, and sets wrapped in containers,
+-- compare by representation. If a future checker gains a specificity
+-- preference (making bare EQUALS on sets extensional) or the Phase-4 lint
+-- lands, several of these evaluations should change — this file exists so
+-- that change is loud, not silent.
+
+s12 MEANS setFromList (LIST 1, 2)
+s21 MEANS setFromList (LIST 2, 1)
+
+-- one level: extensionally equal, as promised
+#EVAL s12 `set equals` s21
+
+§§ `Two levels down: representation shows through`
+
+-- {{1,2}} and {{2,1}} count as two distinct elements...
+#EVAL setSize (setFromList (LIST s12, s21))
+-- ...though the same spelling twice counts once
+#EVAL setSize (setFromList (LIST s12, s12))
+
+-- membership one level down is spelling-sensitive
+#EVAL s21 `is in` (setFromList (LIST s12))
+
+-- and {{1,2}} INTERSECT {{2,1}} is empty
+#EVAL setSize (INTERSECT (setFromList (LIST s12)) (setFromList (LIST s21)))
+
+§§ `Wrapped in a record: bare EQUALS is structural, silently`
+
+DECLARE Team
+  HAS members IS A SET OF STRING
+
+t1 MEANS Team WITH members IS setFromList (LIST "alice", "bob")
+t2 MEANS Team WITH members IS setFromList (LIST "bob", "alice")
+
+-- the fields are extensionally equal...
+#EVAL `set equals` t1's members t2's members
+-- ...but the records compare structurally: FALSE, with no diagnostic.
+-- Compare fields with `set equals` instead of comparing whole records.
+#EVAL t1 EQUALS t2

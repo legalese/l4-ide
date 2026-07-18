@@ -1,0 +1,14 @@
+`_ is subset of _` with `education purposes` and `welfare purposes`
+`setSize` with `_ INTERSECT _` with `education purposes` and `welfare purposes`
+`setSize` with `_ UNION _` with `new yorkers` and `new jerseyans`
+`setSize` with `_ INTERSECT _` with `new yorkers` and `new jerseyans`
+`_ is subset of _` with `home uses` and `sanctuary uses` and `_ is subset of _` with `sanctuary uses` and `home uses`
+`setSize` with `_ INTERSECT _` with `charitable objects` and `benevolent objects`
+`setSize` with `_ LESS _` with `all employees` and `on probation`
+`setSize` with `_ WITHOUT _` with `all employees` and `on probation`
+`_ is in _` with `NY` and `eligible states`
+`_ is in _` with `CT` and `eligible states`
+`setToList` with `_ WITHOUT _` with `the tri-state universe` and `eligible states`
+`setSize` with `_ INTERSECT _` with `new yorkers` and `emptySet`
+`setSize` with `setFromList` with list of 1, 1, 2, 3, 3 and 3
+`setToList` with `SET` with list of 5, 5 and 6
