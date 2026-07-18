@@ -1725,14 +1725,29 @@ inferExpr' g =
       (rn, pt) <- resolveTerm actualFuncName
       t <- instantiate pt
 
+      -- Variadic construction (SET-OPERATORS-SPEC §D7.1, "route α"): a record
+      -- constructor with exactly one LIST-typed field, applied to two or more
+      -- arguments, collects the arguments into a synthesized List literal:
+      -- C OF e1, ..., en  ==>  C OF (LIST e1, ..., en). This fires only where
+      -- direct application is a guaranteed arity error, so no program that
+      -- typechecks today changes meaning. One-argument applications are never
+      -- rewritten (SET OF xs keeps its wrap-this-list reading), and a
+      -- synonym-obscured LIST field misses the rewrite rather than guessing.
+      let (elabArgs, elabRebuild) = case (actualArgs, t) of
+            (_ : _ : _, Fun _ [MkOptionallyNamedType _ _ argT] _)
+              | isConstructorKind rn
+              , isListTyCon argT
+              -> ([collectIntoListLiteral actualArgs], True)
+            _ -> (actualArgs, needsAnnoRebuild)
+
       -- 2. - 5.
       -- Note that if there are no arguments, then matchFunTy does not
       -- actually insist on the type t being a function.
-      (res, rt) <- matchFunTy False rn t actualArgs
+      (res, rt) <- matchFunTy False rn t elabArgs
 
       -- If mixfix args were restructured, rebuild annotation with correct holes
-      let finalAnn = if needsAnnoRebuild
-                     then rebuildMixfixAppAnno ann actualFuncName actualArgs
+      let finalAnn = if elabRebuild
+                     then rebuildMixfixAppAnno ann actualFuncName elabArgs
                      else ann
 
       pure (App finalAnn rn res, rt)
@@ -3043,6 +3058,31 @@ rebuildMixfixAppAnno origAnn funcName args =
       argsHole = mkHoleWithSrcRangeHint (rangeOf args)
       newPayload = [funcHole, argsHole]
   in fixAnnoSrcRange $ set #payload newPayload origAnn
+
+-- | Route-α support (SET-OPERATORS-SPEC §D7.1): is this resolved head a data
+-- constructor? Read from the 'TypeInfo' annotation stamped by @resolveTerm'@.
+-- 'Nothing'/ambiguous resolutions answer 'False', so the variadic rewrite
+-- never fires on uncertain heads.
+isConstructorKind :: Resolved -> Bool
+isConstructorKind r = case getActual r of
+  MkName cAnn _ -> case cAnn.extra.resolvedInfo of
+    Just (TypeInfo _ (Just Constructor)) -> True
+    _ -> False
+
+-- | Is this type an application of the builtin LIST type constructor?
+isListTyCon :: Type' Resolved -> Bool
+isListTyCon (TyApp _ n _) = getUnique n == getUnique listRef
+isListTyCon _ = False
+
+-- | Collect application arguments into a synthesized List literal. The
+-- annotation carries the args' real source range in a single hole — the
+-- shape the generic ToConcreteNodes instance for List expects — so range
+-- resolution (e.g. #EVAL code lenses) keeps working on rewritten sites.
+collectIntoListLiteral :: [Expr Name] -> Expr Name
+collectIntoListLiteral args =
+  let hole = mkHoleWithSrcRangeHint (rangeOf args)
+      lAnn = fixAnnoSrcRange (set #payload [hole] emptyAnno)
+  in List lAnn args
 
 -- | Flatten a binary mixfix application into a list of (Either Expr Keyword).
 -- Given: App had [App and [a, b], c]
