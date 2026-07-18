@@ -29,6 +29,7 @@
 - [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md)
 - [Natural Language Functions](tutorials/natural-language-functions/natural-language-functions.md)
 - [Optimising for Natural Language Generation with @nlg](tutorials/natural-language-functions/optimising-natural-language-generation.md)
+- [Sets, and the Two Meanings of "And"](tutorials/set-operators/sets-and-the-two-ands.md)
 
 ## Concepts
 
