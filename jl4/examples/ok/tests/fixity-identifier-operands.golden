@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+fixity-identifier-operands.l4:33:1-27:
+  6
+fixity-identifier-operands.l4:36:1-27:
+  7
+fixity-identifier-operands.l4:39:1-29:
+  6
+fixity-identifier-operands.l4:40:1-29:
+  7
+fixity-identifier-operands.l4:43:1-29:
+  9
+fixity-identifier-operands.l4:46:1-26:
+  7
