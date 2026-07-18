@@ -691,6 +691,16 @@ die — on its own merits.)_
   adding to it. **Untried as of 2026-07-18** — nobody has yet built the `try`/`optional`
   variant; needs a feature-branch spike with regression tests around `LESS THAN`
   (comparison unchanged, layout edge cases, error quality).
+  _Considered and rejected (Meng's quip, 2026-07-18): `THAN` as a high-precedence identity
+  operator, so `LESS` "works magic like `MINUS`" and `LESS THAN` reduces to `LESS`._ The
+  identity version is unsound — `x LESS THAN y : BOOLEAN` and `x LESS y : NUMBER` would become
+  the same expression, erasing the only token overload resolution could dispatch on. The
+  repaired version (`THAN : a → Comparand a`, a marker constructor; `__LESS__` dispatches on
+  the wrapper) is sound and would even make comparison user-extensible — but it needs _more_
+  parser surgery than the optional-`THAN` design above, and extensible comparison is more
+  directly had by relaxing `__LT__`'s `variants` pin (`Environment.hs:86`). Dominated on every
+  axis by boring alternatives; recorded because the failure mode (a transparent operator
+  erasing a type distinction) is exactly this spec's subject matter in miniature.
 - **Phase 4 — the lint.** Diagnostic + quick-fix per the §11.6 decision procedure (zeroth
   check: scalar operands exit; Defeater 1 empty-intersection; Defeater 2 co-extension;
   anti-defeater contrastive-connective scan; `AMBIGUOUS` escape hatch), hung off
