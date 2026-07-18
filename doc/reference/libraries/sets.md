@@ -2,7 +2,7 @@
 
 Set-theoretic collections: `SET OF a` with union, intersection, difference, membership, and subset — plus operator overloads that make L4's `AND`, `OR`, `PLUS`, and `MINUS` do the right thing when their operands are sets. Part of the prelude; available after `IMPORT prelude`.
 
-Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story.
+Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story (its [Sets in one minute](../../tutorials/set-operators/sets-and-the-two-ands.md#sets-in-one-minute) section is a from-scratch primer if union/intersection/subset are unfamiliar).
 
 ### Location
 
