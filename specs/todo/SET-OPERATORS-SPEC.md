@@ -1650,3 +1650,48 @@ so the prelude path was never covered.
    design conclusion, but its *realization* for the prelude waits on this fix. Until then, the
    shipped ergonomics remain (D) overloads (`PLUS`/`MINUS` bare + precedence-correct) and (C)
    parentheses for the word operators.
+
+### 15.1 RESOLVED (2026-07-18, fixity implementer): NOT a #128 bug — stale prelude loaded
+
+Investigated by the fixity implementer with `Debug.Trace` instrumentation of the parser's
+fixity collection (`addFixityCommentsToAst`) and the checker's `applyFixityAnnotation`, across
+both code paths. **The fixity feature is not at fault; fixity propagates through library imports
+correctly. Phase 3d is UNBLOCKED — the annotations simply weren't reaching the loaded prelude.**
+
+Root cause: `l4` was importing a **different `prelude.l4` than the one being edited.** Library
+resolution (`resolveLibraryFromFilesystem`, `LSP.L4.Rules`) searches, in order:
+`JL4_LIBRARY_PATH` → root dir → importing-file dir → **XDG (`~/.local/share/jl4/libraries/`)** →
+bundled (near the exe) → embedded (compiled-in). On this machine the XDG entry is a **symlink to
+the _main_ checkout**:
+
+```
+~/.local/share/jl4/libraries/prelude.l4 -> ~/src/legalese/l4-ide/jl4-core/libraries/prelude.l4
+```
+
+which has **zero** `@infixl`. So with `JL4_LIBRARY_PATH` unset, `IMPORT prelude` loaded the main
+checkout's prelude (no fixity annotations) — the edited worktree prelude was never consulted.
+The parser collected **0** fixity tokens for that prelude (traced), so no operator got a fixity,
+so no chain re-associated. `IMPORT defs` "worked" only because `defs` is not a library name on any
+of those search paths, so it resolved to the file actually next to the importer.
+
+Decisive A/B (same binary, same importer, only the loaded prelude changes):
+
+| `JL4_LIBRARY_PATH` | prelude loaded | `1 UNIONX 2 UNIONX 3` |
+| --- | --- | --- |
+| `<worktree>/jl4-core/libraries` (edited, has `@infixl`) | edited | ✅ re-associates (→ 6) |
+| `<main-checkout>/jl4-core/libraries` (no `@infixl`) | stale | ❌ "could not find UNIONX" |
+| unset | XDG symlink → main checkout (stale) | ❌ (the reported symptom) |
+
+**To land Phase 3d:** run with `JL4_LIBRARY_PATH` pointed at the branch's `jl4-core/libraries`
+(or repoint/remove the XDG symlink) so the edited prelude is the one loaded. For the *shipped*
+product this is a non-issue: the embedded prelude is compiled from the committed `prelude.l4` at
+release-build time, so once the Phase 3d annotations are committed and a release is built, users
+get them via the embedded copy. The annotations themselves are correct and inert until loaded, so
+they can land now.
+
+Secondary observation (pre-existing, not fixity-specific): the XDG/bundled search entries can
+**shadow both** the intended file and the embedded copy, and `GetMixfixRegistry`'s inline
+resolver vs `GetImports` can in principle pick different sources — a dev-environment footgun worth
+a separate cleanup (cf. the "XDG library shadow" already noted elsewhere), but out of scope here.
+**No fix to #128 is required; no regression test for a non-bug.** §15's items 1–3 above stand as
+the original (mis-attributed) hypothesis, retained for the record; this subsection is the verdict.
