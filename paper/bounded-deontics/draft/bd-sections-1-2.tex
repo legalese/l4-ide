@@ -1,0 +1,182 @@
+% Fragment: §1-§2 of Bounded Deontics. Preamble, macros, theorem envs live in bd-draft.tex.
+% (For standalone compilation, prepend the bd-draft.tex preamble.)
+
+\section{Introduction}
+\label{sec:intro}
+
+Every legal ``must'' invites a retort: \emph{or else what?} A statute or a contract
+tells us we \emph{must} file within thirty days, \emph{must} return the book, \emph{must}
+give notice; the vernacular question asks what stands behind the word---what consequence,
+and in service of what end. That question is not impertinent. It is the one a court asks
+when the relationship sours, and it is the one a programmer asks when a specification says
+a system ``must'' respond. This paper takes the question seriously and follows it to a
+formal account of obligation in which a ``must'' is \emph{bounded} in two senses we keep
+apart: bounded in \emph{domain}---it is true only relative to a frame, a goal, and a
+repertoire of available acts---and, within that domain, \emph{binding} only to a bounded
+degree, a force that can be measured and can fall to zero. \emph{Bounded}, not \emph{bound}:
+the modal is hemmed in before it grips, and the grip, when it comes, is itself finite.
+
+The starting distinction is between the \emph{letter} and the \emph{spirit} of a rule. A
+program executes; a specification judges. The letter is the executable artefact---the
+states a contract can be in and the actions it admits; the spirit is the property that
+artefact is supposed to satisfy. In model checking these inhabit different semantic
+levels: the implementation is a transition system, and a temporal-logic formula is not a
+rival implementation but a statement \emph{about} it. Law has the same two levels. The
+letter is the rule as written; the spirit is the purpose any compliant procedure must
+serve. The spirit is what survives refactoring: one may amend the forms, the deadlines,
+the administering agency, and still mean to preserve the same underlying objective.
+
+This two-level reading has a venerable jurisprudential shadow. For Austin and for Holmes,
+law is best seen through the eyes of the \emph{bad man}, who ``cares only for the material
+consequences'' and treats a duty as a prediction of sanction \src{Holmes 1897}. For Hart,
+that view misses what he called the \emph{internal point of view}: subjects of a
+functioning legal system do not merely predict the application of rules but \emph{use}
+them as standards for appraising conduct \src{Hart 1961}. The contrast has acquired fresh
+urgency: as autonomous AI agents become subjects, users, and even producers of law, they
+threaten to be the perfect Holmesian bad man---optimisers that respect the letter while
+gaming the spirit---which is precisely why we need formal tools for the spirit and not
+only the letter \src{Kolt 2026}.
+
+What goes wrong when the spirit is squeezed out? Two illustrations, one empirical and one
+literary, fix the phenomenon. Gneezy and Rustichini report that a day-care centre that
+imposed a \emph{fine} for late pickup saw lateness \emph{rise}: parents read the fine not
+as a sanction reinforcing a duty but as a price for a service, and ``a fine is a price''
+\src{Gneezy \& Rustichini 2000}. Compiling an obligation into a priced transition can
+dissolve the obligation. The literary case runs the compiler the other way. In Saki's
+\emph{The Schartz-Metterklume Method}, told ``You must be Miss Hope, the governess,'' Lady
+Carlotta replies ``Very well, if I must I must''---deliberately hearing an \emph{epistemic}
+``must'' (you surely are) as a \emph{deontic} one (you are required to be), and assuming
+the role. The same modal word carries different forces; which force is in play depends on
+a goal the speaker leaves implicit. Both cases teach the same lesson: a ``must'' is bounded
+by a goal---and, \emph{within} those bounds, its binding force is \emph{agent-relative}.
+(Section~\ref{sec:boundary} pushes this to its limit with a protester for whom the
+threatened sanction is the goal.)
+
+Consider, finally, a case with no rule in it at all. A restaurant patron \emph{may} raise a
+hand, fold a napkin, or let a spoon fall---all equally permitted, none prescribed; the
+``letter'' here is a bare menu of available acts, with no obligation written into any of
+them. Yet if he wants another glass of wine, and the convention of the house is that wine is
+summoned from the waiter and not fetched by the patron from the cellar, then he \emph{must}
+raise his hand. No clause obliges him: the ``must'' is manufactured entirely by a goal
+together with the absence of any other route to it, and it singles out one permitted act
+from a sea of equally permitted others by that act's \emph{relation} to the goal alone. We
+take this derived, rule-free ``must'' as our paradigm---obligation read \emph{off} the
+letter, not written \emph{into} it (Section~\ref{sec:nec}).
+
+\paragraph{Thesis.} Deontic force is not a primitive but a quantity \emph{derived} from the
+letter and \emph{bounded}---in the domain where it is defined, and in the magnitude to which
+it binds. On the account we develop: (i) the goal-relativised
+``must'' is a relation \emph{derived} from the letter---a necessity relation over a
+transition system---rather than an operator annotated onto an obligation; (ii) layering a
+party-indexed ordering source (the agent's goals) over that necessity yields a
+teleological \MUST{}; (iii) two distinguished orderings---the legal system's and the
+agent's---generate, by their \emph{divergence}, both Holmes's bad man and Hart's internal
+point of view; and (iv) the \emph{force} of a ``must'' is the gap, in the agent's
+ordering, between complying and breaching---which is why a small fine, or a desired jail
+cell, can drain or even reverse it.
+
+\paragraph{Contributions, and an honest posture.} We claim no new logical primitive. Every
+ingredient below is established prior art, and we concede each by name in
+Section~\ref{sec:background}: the reduction of obligation to a modality plus a violation
+\src{Anderson 1958; Meyer 1988}; necessity-to-a-goal as a graph dominator, known in
+planning as a \emph{landmark} \src{Hoffmann, Porteous \& Sebastia 2004}; betterness-and-
+priority orderings \src{van Benthem, Grossi \& Liu 2010}; and obligation as strategic
+ability \src{Wooldridge \& van der Hoek 2005}. Our contribution is the \emph{composition}
+and its \emph{jurisprudential reading}: (a)~the Holmes-and-Hart unification on a single
+ordering divergence; (b)~a party-indexed ordering composed specifically with a
+\emph{dominator} necessity; (c)~the sanction/goal duality as the \emph{sign} of an outcome
+under the agent's ordering; (d)~the force of an obligation as an ordinal preference gap;
+and (e)~an executable instantiation of all of this in the legal DSL L4. The reduction is
+old; the synthesis, and the legal payoff, are the work.
+
+\paragraph{Roadmap.} Section~\ref{sec:background} places the account in its three
+literatures. Section~\ref{sec:nec} defines the derived necessity relation---the bounded
+\MUST{} as goal-domination---and is deliberately party-neutral. Section~\ref{sec:boundary}
+adds the party-indexed ordering, derives the Holmes/Hart divergence and the force-gap, and
+maps the boundary within which the whole reduction is faithful.
+Section~\ref{sec:tooling} reports what of this is realised in the L4 toolchain today and
+what remains; Section~\ref{sec:eval} works one example---perfection of a security interest
+under UCC Article~9---end to end; and Section~\ref{sec:conclusion} concludes.
+
+\section{Background: a reduction with a long genealogy}
+\label{sec:background}
+
+The idea that an obligation can be reduced to other, better-understood notions---a
+modality, a goal, a sanction, an ordering---is not ours; it is one of the oldest moves in
+the formal study of norms. We rehearse it deliberately, because the contribution of this
+paper is to compose these strands, not to replace them, and an honest synthesis must first
+own its debts.
+
+\subsection{Reducing ``ought'' to a modality and a violation}
+The deflationary tradition in deontic logic defines obligation in terms of necessity plus
+a marker of breach. Anderson reduces ``it ought to be that $\varphi$'' to ``necessarily,
+$\neg\varphi$ brings about the sanction''---$O\varphi \leftrightarrow \Box(\neg\varphi \to
+S)$ for a propositional sanction constant $S$ \src{Anderson 1958}. This is the
+``or else what?'' of our introduction, formalised in 1958. Meyer pushes the same intuition
+into a \emph{state machine}: in dynamic deontic logic an action is forbidden iff every way
+of performing it leads to a distinguished violation state, $F\alpha \leftrightarrow
+[\alpha]V$ \src{Meyer 1988}. The violation atom $V$ is exactly the neutral
+\textsc{breach} terminal our object level will use in Section~\ref{sec:nec}: a marker, not
+a verdict, whose moral weight is supplied by context. We descend from this line directly,
+and say so.
+
+\subsection{Goal-relative modality}
+A parallel tradition in linguistic semantics holds that a modal is never an unindexed
+primitive. On Kratzer's standard account a ``must'' is necessity relative to a
+\emph{modal base} (the relevant circumstances) and an \emph{ordering source} (a set of
+goals or norms) \src{Kratzer 1991}. The point is sharpened by \emph{anankastic
+conditionals}---``if you want to go to Harlem, you must take the A train''---in which the
+agent's stated goal openly supplies the ordering source \src{von Fintel \& Iatridou 2005;
+Condoravdi \& Lauer 2016}. The same move appears in recent logics of \emph{instrumental}
+obligation, where the obligation takes the goal it serves as an argument
+\src{Yan \& He 2025}, and in accounts of obligation as optimal goal satisfaction, where a
+sanction is the worse disjunct of a goal \src{Kowalski \& Satoh 2018}. At the limit of this
+strand the modal ceases to be a necessity at all and becomes an \emph{optimum}: a
+conditional ought is read as the act that maximises a (qualitatively ranked) expected
+utility \src{Pearl 1993}. The two reductions of this section thus mark the poles of a single
+spectrum---from Anderson's box over \emph{every} path, through Kratzer's box over the
+\emph{best} worlds, to Pearl's pure best-choice---along which one slides by exposing first an
+ordering and then a probability. We adopt the
+ordering-source idea wholesale; our departure (Section~\ref{sec:ordering}) is to index it
+by \emph{party} and to compose it with a graph relation rather than a best-worlds selection,
+and to sit at the \emph{necessity} pole---an ordinal ordering and \emph{no} probability---for
+a reason the tooling section makes good (Section~\ref{sec:tooling}).
+
+\subsection{The jurisprudence of sanction and acceptance}
+The legal-theoretic counterpart is the long argument between sanction-based and
+acceptance-based accounts of legal obligation. Austin's command theory makes law a
+sovereign's commands backed by the threat of an ``evil''; Holmes's bad man is its
+behavioural shadow \src{Austin 1832; Holmes 1897}. Hart's decisive reply distinguishes
+\emph{being obliged} (the gunman's victim) from \emph{having an obligation}, and locates
+the latter in the internal point of view \src{Hart 1961}. Silk gives this contrast a
+formal semantics, reading Hart's internal/external distinction as a choice of which
+ordering-source variable a modal is evaluated against \src{Silk 2019}; Kolt transposes the
+whole debate to autonomous AI agents and ties the internal point of view to respect for a
+law's spirit over its letter \src{Kolt 2026}. On the empirical side, the behavioural
+economics of \emph{motivation crowding} and the expressive theory of law confirm that an
+obligation and a price are not interchangeable: making the consequence explicit can
+\emph{weaken} the norm \src{Gneezy \& Rustichini 2000; Frey \& Jegen 2001; Cooter 1984}.
+
+\subsection{Necessity as domination, and obligation as strategic ability}
+Finally, two formal toolkits supply the machinery we compose. First, ``what must happen on
+the way to a goal'' is, in automated planning, the theory of \emph{landmarks}: a fact or
+action that lies on every plan reaching the goal \src{Hoffmann, Porteous \& Sebastia 2004},
+computable via graph \emph{dominators} \src{Lengauer \& Tarjan 1979}. Second, when goals
+are pursued among strategic parties, ``what an agent can bring about'' is the province of
+alternating-time temporal logic \src{Alur, Henzinger \& Kupferman 2002}, in which
+obligation has been recast as a coalitional \emph{ability} \src{Wooldridge \& van der Hoek
+2005}. To these we add the betterness-plus-priority view of deontics as an ordering
+problem \src{Hansson 1969; van Benthem, Grossi \& Liu 2010}.
+
+\subsection{Position}
+Each strand supplies a single ingredient---but singly, and in a form that leaves the
+others out. The deontic reductions give necessity-plus-violation but no goal-ordering; the
+linguistic and instrumental accounts give a goal-indexed modality but attach the goal
+\emph{to} the obligation and over a best-worlds, not a graph, semantics; the jurisprudence
+names the Holmes/Hart divide but does not compute with it; the planning and strategic
+toolkits give exactly the right notion of necessity but no normative reading. No strand
+composes a \emph{party-indexed ordering} over a \emph{graph-dominator necessity}, and none
+turns the divergence between the law's ordering and the agent's into the formal locus of
+the bad-man/internal-point-of-view debate. That composition is the subject of
+Sections~\ref{sec:nec}--\ref{sec:boundary}; its executable form in L4 is the subject of
+Section~\ref{sec:tooling}.

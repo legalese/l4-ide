@@ -1,0 +1,61 @@
+% Bounded Deontics — assembled DRAFT (sections 1, 2, [3-4 stubs], 5, 6).
+% Build: pdflatex bd-draft ; pdflatex bd-draft   (twice, for cross-references)
+% Reslot into the JURIX IOS-Press FAIA class once the CFP/format is confirmed.
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{proposition}{Proposition}
+
+\newcommand{\src}[1]{(#1)}            % placeholder citation; -> \citep{} later
+\newcommand{\dom}{\operatorname{dom}}
+\newcommand{\nect}{\mathit{nec}}
+\newcommand{\EF}{\mathsf{EF}}
+\newcommand{\AG}{\mathsf{AG}}
+\newcommand{\MUST}{\textsc{must}}
+\newcommand{\MAY}{\textsc{may}}
+\newcommand{\Goals}{\operatorname{Goals}}
+\newcommand{\rank}{\operatorname{rank}}
+\newcommand{\plaw}{\preceq_{\mathrm{law}}}
+\newcommand{\ppref}{\preceq_{p}}
+
+\title{\textbf{Bounded Deontics}\\[3pt]
+\large Goal-Bounded Obligation as Derived Necessity,\\ and the Letter and the Spirit of the Law}
+\author{Wong Meng Weng\thanks{Working draft of \today. Co-authorship under discussion.
+Citations are \texttt{\textbackslash src\{\}} placeholders pending a verified bibliography
+(see \texttt{notes/citation-verification.md}). The implemented/roadmap split reported in
+Section~\ref{sec:tooling} is current as of this draft.}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Every legal ``must'' invites the question \emph{or else what?} We treat that question as
+constitutive of obligation rather than as a challenge to it: the deontic force of a rule
+is \emph{bounded} by a goal and by the ordering of preferences against which compliance
+and breach are judged. We model the object level of a contract as a labelled transition
+system---the ``letter''---and \emph{derive} the bounded \MUST{} as goal-domination, an
+action on every path to a goal (equivalently, a planning landmark), rather than declaring
+it. Layering a \emph{party-indexed} ordering source over this party-neutral necessity
+yields a teleological obligation; admitting two orderings---the law's and the agent's---
+recovers Holmes's bad man and Hart's internal point of view as the divergence and the
+coincidence of one object, and renders the force of a ``must'' the gap, in the agent's
+ordering, between complying and breaching. We claim no new logical primitive: the
+Anderson--Meyer reduction, planning landmarks, betterness orderings, and strategic ability
+are all conceded prior art. The contribution is their composition, its jurisprudential
+reading, and an executable instantiation in the legal DSL L4.
+\end{abstract}
+
+\input{bd-sections-1-2}
+
+\input{bd-sections-3-4}
+
+\input{bd-sections-5-6}
+
+\input{bd-sections-7-9}
+
+\end{document}

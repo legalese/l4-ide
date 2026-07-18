@@ -1,0 +1,265 @@
+% Fragment: §5-§6 of Bounded Deontics. Preamble, macros, theorem envs live in bd-draft.tex.
+% (For standalone compilation, prepend the bd-draft.tex preamble + \setcounter{section}{4}.)
+
+\section{The derived necessity relation: bounded \textsc{must} as goal-domination}
+\label{sec:nec}
+
+The object level of a contract or statute, in our setting, is a \emph{labelled
+transition system}---the ``letter'' of the law as a machine of states and admissible
+actions, carrying no goals and no preferences of its own. Deontic force is then not
+something we \emph{declare} on that machine but something we \emph{derive} from it,
+relative to a goal supplied separately. This section makes that precise; the next
+locates its boundary.
+
+\begin{definition}[Object level]
+A contract is a labelled transition system $T=(S,A,{\to},s_0)$ with states $S$, actions
+$A$, transition relation ${\to}\subseteq S\times A\times S$, and initial state $s_0$. A
+\emph{goal} $J\subseteq S$ is a set of states (equivalently, a state proposition). A path
+$\pi$ from $s$ \emph{reaches} $J$ if some state of $\pi$ lies in $J$; an action $K$
+\emph{occurs on} $\pi$ if some transition of $\pi$ is $K$-labelled. We write
+$s\models\EF J$ when some path from $s$ reaches $J$.
+\end{definition}
+
+\begin{definition}[Goal-domination and the necessity relation]
+\label{def:dom}
+Action $K$ \emph{dominates} goal $J$ from state $s$, written $K\in\dom_s(J)$, iff every
+path from $s$ that reaches $J$ contains a $K$-labelled transition. The \emph{necessity
+relation} at $s$ is
+\[
+  \nect_s \;=\; \{(K,J)\in A\times \mathcal{G} : K\in\dom_s(J)\},
+\]
+over the family $\mathcal{G}$ of goals of interest. The two bounded modalities are read
+off this relation:
+\[
+  s\models \MAY\,J \;\;\Longleftrightarrow\;\; s\models \EF J,
+  \qquad
+  s\models \MUST\,K \text{ for } J \;\;\Longleftrightarrow\;\; K\in\dom_s(J).
+\]
+That is: you \emph{may} pursue a goal when it is still reachable; you \emph{must} do
+exactly those acts without which it is not.
+\end{definition}
+
+\paragraph{A rule-free instance.} The derived reading is starkest where no rule is present
+at all. A restaurant patron may raise a hand, fold a napkin, or let a spoon fall---all
+permitted, none prescribed; the object level is a bare menu of acts with no obligation
+written into it. Fix a goal $J$, \emph{another glass of wine}, and the house convention that
+wine is summoned from the waiter rather than fetched from the cellar. Then exactly one of
+those permitted acts lies on every path to $J$, so that $\dom_s(J)=\{\textit{summon the
+waiter}\}$---of which raising a hand is the conventional token---while the napkin and the
+spoon, equally permitted, are not promoted, because nothing in \emph{their} relation to $J$
+makes them necessary. This is the whole content of the claim that the \MUST{} is
+\emph{derived} from the letter and a goal rather than \emph{declared}; and were the cellar
+self-service, a second route to $J$ would open and the \MUST{} would relax to a \MAY{}.
+
+\begin{remark}[Provenance: we concede the construct, and claim only its reading]
+\label{rem:landmarks}
+Definition~\ref{def:dom} is, as a graph construct, not new. An action on every path to
+the goal is precisely a \emph{landmark} in automated planning \src{Hoffmann, Porteous \&
+Sebastia 2004}, whose minimal-cut form is made explicit by \textsc{lm}-cut
+\src{Helmert \& Domshlak 2009}; computing dominators is near-linear
+\src{Lengauer \& Tarjan 1979}. We claim none of this machinery. Our contribution begins
+only with the \emph{reading} of this party-neutral necessity as the deontic \MUST{}, and
+with what that reading makes possible in Section~\ref{sec:boundary}. We flag one homonym
+to avoid: our goal-\emph{dominator} is unrelated to the decision-theoretic
+\emph{dominance} of one action over another across states of nature \src{Horty 2001}.
+\end{remark}
+
+\begin{remark}[Letter and spirit: the object level stays goal-free]
+The goal $J$ does not appear in $T$. It enters only at the assertion level, as the
+query against which $\nect$ is computed---the ``spirit'' read against the ``letter.''
+This is the point of departure from accounts that attach the goal \emph{to} the
+obligation, as in the dyadic instrumental obligation $O(J\!:\!K)$ of \src{Yan \& He 2025},
+where the goal $J$ is an argument of the operator (a causal target the action must bring
+about); here the obligation is \emph{derived}, the object level stays goal-free, and a
+single contract answers arbitrarily many goal queries.
+\end{remark}
+
+\begin{remark}[The relation is many-to-many]
+$\nect_s$ is a genuine relation, not a function. One action may dominate many goals; one
+goal may have many dominators; and whether $K$ dominates $J$ is \emph{non-local}---it
+turns on the presence or absence of \emph{alternative} paths to $J$ elsewhere in $T$,
+not on anything local to $K$. (This non-locality is also why necessity does not compose
+across conjunctions of goals; see Remark~\ref{rem:basket}.)
+\end{remark}
+
+\paragraph{Deadlines, and the non-temporal $\MAY\!\to\!\MUST$ transition.}
+Because $\nect_s$ is indexed by the state $s$, the bounded modality of an action can
+change as the system evolves. An action that is avoidable while alternative routes to
+$J$ survive becomes \emph{necessary} at the state where the last such alternative lapses:
+it \emph{enters} $\dom_s(J)$. A \textsc{within} deadline is one cause of this
+$\MAY\!\to\!\MUST$ transition, but it is not the only one---the alternatives may instead
+be eliminated by a change of circumstances rather than the passage of time. (Our running
+example in Section~\ref{sec:boundary}, a protester whose only remaining route to a bed
+for the night is arrest, is exactly such a \emph{non-temporal} collapse.) One caveat we
+honour: the necessary set grows monotonically only for a \emph{cumulative, whole-trace}
+notion of necessity; for the \emph{from-here-onward} $\nect_s$ defined above, an act
+already performed drops out of future necessity, and the two must not be conflated.
+
+\begin{remark}[Why not a lattice of goal-baskets]
+\label{rem:basket}
+It is tempting to lift $\nect$ to \emph{baskets} of goals---``what is the minimal set of
+acts I am bound to perform to secure all of $J_1,\dots,J_n$?''---via a concept lattice
+over $(A\times\mathcal{G},\nect)$. This is unsound: the lattice computes the
+column-intersection $\bigcap_i \dom_s(J_i)$, which can strictly \emph{under}-report the
+joint-goal necessity (take $a;c$ reaching $J_1$, $b;c$ reaching $J_2$, and only $a;b;c$
+reaching both: the intersection yields $\{c\}$ where the correct bound is $\{a,b,c\}$).
+Because necessity is non-local it does not factor through per-cell incidence. We
+therefore present $\nect$ only at a fixed state-cut and defer the basket question---whose
+correct tool is minimal-hitting-set enumeration \src{Reiter 1987}, not a Galois
+lattice---to separate work.
+\end{remark}
+
+\section{The boundary: two orderings, and where the reduction holds}
+\label{sec:boundary}
+
+The construction of Section~\ref{sec:nec} is, we freely concede, a \emph{synthesis} of
+established parts rather than a new primitive. Our claim is the composition and its
+jurisprudential reading. We therefore proceed by conceding each ingredient by name, and
+then isolating the four places where the assembled object does something its parts,
+taken singly, do not.
+
+\subsection{The ordering source, indexed by party}
+\label{sec:ordering}
+
+Reachability fixes what is \emph{necessary} to attain a goal, but not \emph{which} goals
+are worth attaining. For that we add a second component, in the manner of
+\src{Kratzer 1991}: a \emph{modal base} (here the transition system, party-neutral) and
+an \emph{ordering source}. We index the ordering source by party: each party $p$ carries
+a preorder $\ppref$ over outcomes. Writing $\Goals_p(s)$ for the $\ppref$-best outcomes
+reachable from $s$, the \emph{teleological} obligation on $p$ is
+\[
+  \MUST_p(s)\;=\;\bigcup_{J\in\Goals_p(s)} \dom_s(J).
+\]
+Both halves are anticipated and conceded: ordering sources indexed by an agent's goals
+are familiar from anankastic conditionals \src{von Fintel \& Iatridou 2005;
+Condoravdi \& Lauer 2016}, and the composition of an agent's ordering with a
+necessity-to-ensure over a transition system is, for a single agent, essentially
+\src{Shea-Blymyer \& Abbas 2022}. Our residue is narrow but real: the necessity we
+compose is a \emph{graph dominator}---an act on \emph{every} path---rather than a
+Bellman-optimal action, a best-world selection, or a causal intervention. It is this
+dominator form that the constructions of Sections~\ref{sec:duality}--\ref{sec:force}
+require, and that the neighbours lack. (A terminological caution: \src{Shea-Blymyer \&
+Abbas 2022} build on Horty's \emph{Dominance} Act Utilitarianism, so their ``dominance''
+is utility-dominance over actions---a second homonym, distinct from our graph
+goal-dominator and from Horty's action-dominance of Remark~\ref{rem:landmarks}.)
+
+\subsection{Sanction and goal are one machinery, toggled by sign}
+\label{sec:duality}
+
+A party's preorder does more than pick goals: its \emph{sign} on an outcome decides
+whether that outcome is to be \emph{reached} or \emph{avoided}, and thereby which
+necessity is in play. For a $\ppref$-\emph{good} outcome $J$ the relevant condition is
+liveness, $\EF J$, and the obligations are the dominators of $J$ (``to reach the good you
+must $K$''). For a $\ppref$-\emph{bad} outcome $S$---a sanction---the relevant condition
+is safety, $\AG\neg S$, and the obligations are the acts without which $S$ becomes
+unavoidable (``to avoid the sanction you must $K$''). Anderson's reduction of obligation
+to a violation constant \src{Anderson 1958} and Kowalski and Satoh's reading of a
+sanction as the worse disjunct of a goal \src{Kowalski \& Satoh 2018} already make
+sanction and goal one machinery; we concede that. What we add is that a \emph{single}
+party-indexed preorder, through the sign it assigns, \emph{routes the same dominator
+relation} to its liveness pole or its safety pole---so Anderson's $S$ and the
+teleological $G$ are not two devices but one, read at opposite polarity.
+
+\subsection{Two orderings: Holmes and Hart on one divergence}
+\label{sec:holmeshart}
+
+The decisive move is to admit \emph{two} distinguished orderings rather than one. Let
+$\plaw$ be the legal system's ordering (what one \emph{ought}, normative) and $\ppref$
+the agent's own (what the agent will in fact pursue, descriptive). The same dominator
+necessity, composed with each, yields two different objects:
+\[
+  \text{legal obligation} \;=\; \nect\circ\plaw,
+  \qquad
+  \text{predicted behaviour} \;=\; \nect\circ\ppref .
+\]
+Their relationship \emph{is} the classical jurisprudential debate. Where $\ppref$ and
+$\plaw$ \emph{diverge}, the agent computes its obligations against its own ordering and
+treats the law as a schedule of consequences---this is Holmes's bad man, who ``cares
+only for the material consequences'' \src{Holmes 1897}. Where they \emph{coincide}, the
+agent has taken the law's ordering as its own---this is Hart's internal point of view, on
+which subjects ``use the rules as standards for the appraisal of \dots\ behaviour''
+rather than merely predicting it \src{Hart 1961}. A sanction, on this picture, is the
+law's instrument for \emph{realignment}: an attempt to depress the $\ppref$-rank of
+non-compliance until compliance dominates.
+
+We are not the first to formalise the Hart half: \src{Silk 2019} already renders Hart's
+internal/external distinction as a choice of which contextual norm-set---a simplified
+Kratzer premise set---a modal is read against (for Silk the contrast is endorsing vs
+non-endorsing of the \emph{same} norms, not two parties' orderings); and \src{Kolt 2026}
+frames precisely the Austin--Holmes (instrumental) versus Hart (internal point of view)
+contrast for autonomous AI agents, tying the internal point of view to respect for the
+\emph{spirit}, not merely the letter, of the law. We concede both. (By contrast,
+\src{Yan \& He 2025} raise the agent-goal-vs-ideal-ordering distinction only to
+\emph{collapse} it into one ideal ordering; our move is the opposite---to keep the two
+apart and make their divergence the object.) Our claim is threefold: that
+\emph{one} divergence does double duty as \emph{both} Holmes (where it is wide) and Hart
+(where it closes); that $\ppref$ is read \emph{descriptively}, as a predictor of
+behaviour, not as an endorsement set; and that the whole construction sits atop the
+dominator necessity of Section~\ref{sec:nec}, so that the force-gap and the
+sign-duality (below) fall out of the same schema.
+
+\subsection{The force of an obligation as a preference gap}
+\label{sec:force}
+
+How much force does a ``must'' carry? On the present account, exactly the distance, in
+the relevant ordering, between complying and breaching:
+\[
+  \mathrm{Force}_p(\MUST\,K)\;=\;\rank_{\ppref}(\text{comply}) - \rank_{\ppref}(\text{breach}).
+\]
+That force is a utility gap with a firing threshold is the economics of deterrence
+\src{Becker 1968; Shavell 2003} and of qualitative decision theory \src{Pearl 1993}; we
+concede the cardinal idea. Our version is \emph{ordinal} (a rank-difference over a
+Kratzer preorder, not an expected utility) and \emph{party-indexed} against a paired
+$\plaw$, so that the sign of the gap and the divergence of
+Section~\ref{sec:holmeshart} are one phenomenon. The two pathological signs are then not
+anomalies but predictions of the schema:
+\begin{itemize}[noitemsep,topsep=2pt]
+  \item \textbf{Gap $\le 0$ --- ``a fine is a price.''} When the sanction fails to push
+  breach below compliance in $\ppref$, the ``must'' has no force; the rule is read as a
+  price \src{Gneezy \& Rustichini 2000; Cooter 1984}. This corrects a tempting but
+  insufficient test: force is not the \emph{magnitude} of the penalty but the
+  \emph{gap} it induces, and framing or motivational crowding-out can move the gap
+  without changing the magnitude.
+  \item \textbf{Gap $<0$ --- inversion.} When the sanction \emph{raises} the rank of
+  breach, the ``must'' inverts into a ``want to.'' Consider a protester chained to a
+  railing, told ``unchain yourself or I will arrest you and you will spend the night in
+  jail,'' who replies: ``you must arrest me---I came for the protest and my lodging just
+  fell through.'' Jail, the intended sanction, is the protester's $\ppref$-good; the
+  cancellation of his lodging is the (non-temporal) $\MAY\!\to\!\MUST$ collapse that
+  makes arrest the unique remaining route to a bed. The episode also exhibits a
+  Hohfeldian wrinkle the bare relation must accommodate: the act that is necessary for
+  the protester's goal can be performed only by \emph{another} party, so ``you must
+  arrest me'' is not an obligation he bears but a dependency on the officer's agency.
+\end{itemize}
+
+\subsection{Where the reduction is faithful}
+\label{sec:faithful}
+
+The ``bounded'' in bounded deontics is, finally, the boundary of the reduction's own
+validity. Compile-time verification of the bounded \MUST{} is available exactly when
+three conditions hold together: the family $\mathcal{G}$ of goals is \emph{closed}
+(statically enumerable, so the property is a closed formula); the defeasible ordering on
+rules is \emph{acyclic and transparent} (conflicts are resolvable where the law
+genuinely prioritises---\textsc{subject to}/\textsc{notwithstanding}---yet genuine gaps
+are left visible rather than silently broken); and the fact base is \emph{closed}. When
+any of the three fails, the obligation falls to runtime for a correspondingly different
+reason. The most important failure is the first: a goal supplied by the agent at
+runtime---the anankastic ``if you want $J$''---leaves the formula open until that goal is
+injected, which is also why the agent's $\ppref$, often private until revealed (as the
+protester's was), is a runtime quantity whereas $\plaw$ is known in advance. Beyond these
+structural limits lies a \emph{semantic} one: where the operative ordering is not the
+agent's at all---Hart's internal point of view, or a categorical norm that resists the
+``or else what?'' probe---the teleological reading ceases to be the faithful one, and the
+reduction marks its own edge.
+
+\subsection{Multi-party escalation (a note)}
+\label{sec:atl}
+
+Section~\ref{sec:holmeshart}'s second party invites a strategic reading: against an
+adversary who may withhold the act one needs, the relevant question is not ``is $K$ on
+every path?'' but ``what must $p$ do to \emph{force} $J$?''---an alternating-time
+ability $\langle\!\langle p\rangle\!\rangle\,\mathsf{F}\,J$ \src{Alur, Henzinger \&
+Kupferman 2002}. Obligation as such a strategic ability is \src{Wooldridge \& van der
+Hoek 2005}, and our cooperative $\nect$ is the one-player (dominator) special case. We
+flag this only to be honest about its status: as a standalone it is a recombination of
+known parts, and we treat it as a direction for separate work rather than a claim here.

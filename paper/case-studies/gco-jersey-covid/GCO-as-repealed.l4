@@ -1,0 +1,359 @@
+§ `Covid-19 (Gathering Control) (Jersey) Order 2020 - as last in force (repealed)`
+-- Source: R&O.166/2020 as amended (R&O.189/2020, R&O.1/2021, R&O.5/2021, R&O.11/2021, L.6/2021)
+-- Official page: https://www.jerseylaw.je/laws/current/ro_166_2020
+-- Status: repealed. Parallel skeleton with GCO-first-version.l4 to make diffs easy to spot.
+-- DIFFS vs first enacted are called out with -- DIFF: markers.
+
+§§ `1 Interpretation - domain model`
+
+DECLARE VenueKind IS ONE OF
+    Indoor
+    Outdoor
+
+DECLARE CeremonyOfficersRole IS ONE OF
+    `persons constituting the marriage`
+    `persons constituting the civil partnership`
+    `persons constituting the funeral officers`
+    `not a wedding civil partnership or funeral`
+
+DECLARE Gathering HAS
+    `number of persons taking part`                                IS A NUMBER
+    `takes place indoors`                                          IS A BOOLEAN
+    `takes place outdoors`                                         IS A BOOLEAN
+        MEANS NOT `takes place indoors`
+    `venue kind`                                                   IS A VenueKind
+        MEANS IF `takes place indoors` THEN Indoor ELSE Outdoor
+    `is a school group of pupils and staff at school premises`     IS A BOOLEAN
+    `is a wedding, civil partnership ceremony or funeral`          IS A BOOLEAN
+    `ceremony officers role`                                       IS A CeremonyOfficersRole
+    `number of ceremony officers`                                  IS A NUMBER
+    `number of guests`                                             IS A NUMBER
+    `total of officers and guests`                                 IS A NUMBER
+        MEANS `number of ceremony officers` PLUS `number of guests`
+    `is for the purposes of work`                                  IS A BOOLEAN
+
+DECLARE PubliclyAccessiblePremisesGathering HAS
+    `number of persons gathering in the indoor areas`              IS A NUMBER
+    `premises are publicly accessible`                             IS A BOOLEAN
+    `the person is responsible for the premises`                   IS A BOOLEAN
+    `the person allowed the gathering`                             IS A BOOLEAN
+
+DECLARE Participant HAS
+    `name`                                                         IS A STRING
+    `is a critical worker as defined in guidance published by the Minister for Health and Social Services` IS A BOOLEAN
+    `fails to take part by reason of force majeure as a critical worker` IS A BOOLEAN
+        MEANS `is a critical worker as defined in guidance published by the Minister for Health and Social Services`
+
+DECLARE ResponsiblePerson HAS
+    `name`                                                         IS A STRING
+    `is an official from Visit Jersey escorting a pre-arranged automotive tour of the island for news and travel journalists who are guests of the Jersey Government` IS A BOOLEAN
+    `fails to prevent the gathering by reason of force majeure as a holiday industrial tour guide` IS A BOOLEAN
+        MEANS `is an official from Visit Jersey escorting a pre-arranged automotive tour of the island for news and travel journalists who are guests of the Jersey Government`
+
+DECLARE Article3Situation HAS
+    gathering                                                      IS A Gathering
+    participant                                                    IS A Participant
+
+DECLARE Article7Situation HAS
+    gathering                                                      IS A PubliclyAccessiblePremisesGathering
+    responsible                                                    IS A ResponsiblePerson
+
+§§ `3 Restriction on gatherings - as last in force`
+-- DIFF: first enacted flat 10-person cap at any premises.
+-- Last in force splits venue kind (amended by R&O.189/2020 and L.6/2021):
+--   Art.3(1) outdoor gathering of more than 20 people
+--   Art.3(2) indoor gathering of more than 10 people
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 3 outdoor size limit is exceeded` g IF
+        g's `takes place outdoors`
+    AND g's `number of persons taking part` GREATER THAN 20
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 3 indoor size limit is exceeded` g IF
+        g's `takes place indoors`
+    AND g's `number of persons taking part` GREATER THAN 10
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 3 size limit is exceeded` g IF
+        `Article 3 outdoor size limit is exceeded` g
+    OR  `Article 3 indoor size limit is exceeded` g
+
+§§ `4 Exception - school group of pupils`
+-- Unchanged from first enacted.
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 4 school-group exception applies` g IF
+    g's `is a school group of pupils and staff at school premises`
+
+§§ `5 Exception - wedding, civil partnership or funeral`
+-- DIFF: first enacted single "must not exceed 20" total.
+-- Last in force (post R&O.11/2021 etc.):
+--   Art.5(1)  may gather in numbers that would otherwise breach Art.3(1) or (2)
+--   Art.5(1A) outdoor: officers + guests must not exceed 20 people in total
+--   Art.5(1B) indoor:  officers + guests must not exceed 20 people in total
+-- Both (1A) and (1B) end at the same numeric roof in the final consolidated text;
+-- they are kept separate so a later re-tightening of either limb is easy to re-encode.
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 5 wedding funeral exception is available` g IF
+    g's `is a wedding, civil partnership ceremony or funeral`
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 5 outdoor size cap is respected` g IF
+        g's `takes place outdoors`
+    AND g's `total of officers and guests` AT MOST 20
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 5 indoor size cap is respected` g IF
+        g's `takes place indoors`
+    AND g's `total of officers and guests` AT MOST 20
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 5 size cap is respected` g IF
+        `Article 5 outdoor size cap is respected` g
+    OR  `Article 5 indoor size cap is respected` g
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 5 wedding funeral exception applies` g IF
+        `Article 5 wedding funeral exception is available` g
+    AND `Article 5 size cap is respected` g
+
+§§ `6 Exception - work`
+-- Unchanged from first enacted.
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `Article 6 work exception applies` g IF
+    g's `is for the purposes of work`
+
+§§ `3 read with 4, 5 and 6 - restricted gathering`
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `an Article 3 exception applies` g IF
+        `Article 4 school-group exception applies` g
+    OR  `Article 5 wedding funeral exception applies` g
+    OR  `Article 6 work exception applies` g
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `the gathering is a restricted gathering under Article 3` g IF
+        `Article 3 size limit is exceeded` g
+    AND NOT `an Article 3 exception applies` g
+
+GIVEN g IS A Gathering
+GIVETH A BOOLEAN
+DECIDE `a person must not take part in the gathering under Article 3` g IF
+    `the gathering is a restricted gathering under Article 3` g
+
+§§ `7 Restriction on gatherings in publicly accessible premises`
+-- Unchanged in substance from first enacted: indoor more than 10.
+
+GIVEN p IS A PubliclyAccessiblePremisesGathering
+GIVETH A BOOLEAN
+DECIDE `Article 7 size limit is exceeded` p IF
+    p's `number of persons gathering in the indoor areas` GREATER THAN 10
+
+GIVEN p IS A PubliclyAccessiblePremisesGathering
+GIVETH A BOOLEAN
+DECIDE `the responsible person must not allow the gathering under Article 7` p IF
+        p's `premises are publicly accessible`
+    AND p's `the person is responsible for the premises`
+    AND `Article 7 size limit is exceeded` p
+
+§§ `9 Offences and penalties`
+
+@export Whether the participant commits an Article 3 offence (taking part in a restricted gathering, subject to the critical-worker force-majeure defence)
+GIVEN s IS A Article3Situation @desc Situation under Art.3: the gathering facts plus the participant's critical-worker status
+GIVETH A BOOLEAN
+DECIDE `the person commits an Article 3 offence` IF
+        `the gathering is a restricted gathering under Article 3` (s's gathering)
+    AND NOT s's participant's `fails to take part by reason of force majeure as a critical worker`
+
+@export Whether the responsible person commits an Article 7 offence (allowing an oversize indoor gathering on publicly accessible premises, subject to the Visit Jersey tour-guide force-majeure defence)
+GIVEN s IS A Article7Situation @desc Situation under Art.7: the premises gathering facts plus the responsible person's tour-guide status
+GIVETH A BOOLEAN
+DECIDE `the person commits an Article 7 offence` IF
+        `the responsible person must not allow the gathering under Article 7` (s's gathering)
+    AND s's gathering's `the person allowed the gathering`
+    AND NOT s's responsible's `fails to prevent the gathering by reason of force majeure as a holiday industrial tour guide`
+
+@export The maximum fine in pounds for an Article 3 or Article 7 offence under this Order (level 2 on the standard scale: 1000)
+GIVEN has_committed_offence IS A BOOLEAN @desc TRUE if the person has committed an Art.3 or Art.7 offence
+GIVETH A NUMBER
+DECIDE `Article 9 maximum fine in pounds` IS
+    IF has_committed_offence THEN 1000 ELSE 0
+
+@export Whether a person must not take part in the gathering under Article 3 (size limit exceeded and no school / wedding or funeral / work exception)
+GIVEN g IS A Gathering @desc The gathering: size, indoor or outdoor, and which if any of the Art.4-6 exception predicates hold
+GIVETH A BOOLEAN
+DECIDE `a person must not take part under Article 3` IF
+    `a person must not take part in the gathering under Article 3` g
+
+@export Whether the responsible person must not allow the gathering under Article 7
+GIVEN p IS A PubliclyAccessiblePremisesGathering @desc Publicly accessible premises facts: indoor headcount, responsibility, and whether allowed
+GIVETH A BOOLEAN
+DECIDE `a responsible person must not allow under Article 7` IF
+    `the responsible person must not allow the gathering under Article 7` p
+
+§§ `test cases - as last in force`
+
+`ordinary indoor of 11` MEANS Gathering WITH
+    `number of persons taking part`                            IS 11
+    `takes place indoors`                                      IS TRUE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
+    `number of ceremony officers`                              IS 0
+    `number of guests`                                         IS 0
+    `is for the purposes of work`                              IS FALSE
+
+-- DIFF: outdoor of 11 was prohibited under first enacted (flat 10); lawful under last in force (outdoor rooftop 20)
+`ordinary outdoor of 11` MEANS Gathering WITH
+    `number of persons taking part`                            IS 11
+    `takes place indoors`                                      IS FALSE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
+    `number of ceremony officers`                              IS 0
+    `number of guests`                                         IS 0
+    `is for the purposes of work`                              IS FALSE
+
+`ordinary outdoor of 21` MEANS Gathering WITH
+    `number of persons taking part`                            IS 21
+    `takes place indoors`                                      IS FALSE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
+    `number of ceremony officers`                              IS 0
+    `number of guests`                                         IS 0
+    `is for the purposes of work`                              IS FALSE
+
+`school of 30` MEANS Gathering WITH
+    `number of persons taking part`                            IS 30
+    `takes place indoors`                                      IS TRUE
+    `is a school group of pupils and staff at school premises` IS TRUE
+    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
+    `number of ceremony officers`                              IS 0
+    `number of guests`                                         IS 0
+    `is for the purposes of work`                              IS FALSE
+
+`wedding of 2 officers and 18 guests` MEANS Gathering WITH
+    `number of persons taking part`                            IS 20
+    `takes place indoors`                                      IS TRUE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS TRUE
+    `ceremony officers role`                                   IS `persons constituting the marriage`
+    `number of ceremony officers`                              IS 2
+    `number of guests`                                         IS 18
+    `is for the purposes of work`                              IS FALSE
+
+`wedding of 2 officers and 19 guests over cap` MEANS Gathering WITH
+    `number of persons taking part`                            IS 21
+    `takes place indoors`                                      IS TRUE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS TRUE
+    `ceremony officers role`                                   IS `persons constituting the marriage`
+    `number of ceremony officers`                              IS 2
+    `number of guests`                                         IS 19
+    `is for the purposes of work`                              IS FALSE
+
+`outdoor wedding of 2 officers and 18 guests` MEANS Gathering WITH
+    `number of persons taking part`                            IS 20
+    `takes place indoors`                                      IS FALSE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS TRUE
+    `ceremony officers role`                                   IS `persons constituting the marriage`
+    `number of ceremony officers`                              IS 2
+    `number of guests`                                         IS 18
+    `is for the purposes of work`                              IS FALSE
+
+`worksite of 25` MEANS Gathering WITH
+    `number of persons taking part`                            IS 25
+    `takes place indoors`                                      IS TRUE
+    `is a school group of pupils and staff at school premises` IS FALSE
+    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
+    `number of ceremony officers`                              IS 0
+    `number of guests`                                         IS 0
+    `is for the purposes of work`                              IS TRUE
+
+`pub indoor of 12` MEANS PubliclyAccessiblePremisesGathering WITH
+    `number of persons gathering in the indoor areas` IS 12
+    `premises are publicly accessible`               IS TRUE
+    `the person is responsible for the premises`     IS TRUE
+    `the person allowed the gathering`               IS TRUE
+
+`pub indoor of 10` MEANS PubliclyAccessiblePremisesGathering WITH
+    `number of persons gathering in the indoor areas` IS 10
+    `premises are publicly accessible`               IS TRUE
+    `the person is responsible for the premises`     IS TRUE
+    `the person allowed the gathering`               IS TRUE
+
+`ordinary participant` MEANS Participant WITH
+    `name` IS "Pat"
+    `is a critical worker as defined in guidance published by the Minister for Health and Social Services` IS FALSE
+
+`critical worker participant` MEANS Participant WITH
+    `name` IS "Chris"
+    `is a critical worker as defined in guidance published by the Minister for Health and Social Services` IS TRUE
+
+`ordinary landlord` MEANS ResponsiblePerson WITH
+    `name` IS "Les"
+    `is an official from Visit Jersey escorting a pre-arranged automotive tour of the island for news and travel journalists who are guests of the Jersey Government` IS FALSE
+
+`visit jersey official` MEANS ResponsiblePerson WITH
+    `name` IS "Vic"
+    `is an official from Visit Jersey escorting a pre-arranged automotive tour of the island for news and travel journalists who are guests of the Jersey Government` IS TRUE
+
+`Pat at ordinary indoor of 11` MEANS Article3Situation WITH
+    gathering   IS `ordinary indoor of 11`
+    participant IS `ordinary participant`
+
+`Chris critical worker at ordinary indoor of 11` MEANS Article3Situation WITH
+    gathering   IS `ordinary indoor of 11`
+    participant IS `critical worker participant`
+
+`Pat at ordinary outdoor of 21` MEANS Article3Situation WITH
+    gathering   IS `ordinary outdoor of 21`
+    participant IS `ordinary participant`
+
+`Les allows pub indoor of 12` MEANS Article7Situation WITH
+    gathering   IS `pub indoor of 12`
+    responsible IS `ordinary landlord`
+
+`Vic tour guide allows pub indoor of 12` MEANS Article7Situation WITH
+    gathering   IS `pub indoor of 12`
+    responsible IS `visit jersey official`
+
+#ASSERT `a person must not take part under Article 3` `ordinary indoor of 11`
+#ASSERT NOT (`a person must not take part under Article 3` `ordinary outdoor of 11`)
+#ASSERT `a person must not take part under Article 3` `ordinary outdoor of 21`
+#ASSERT NOT (`a person must not take part under Article 3` `school of 30`)
+#ASSERT NOT (`a person must not take part under Article 3` `wedding of 2 officers and 18 guests`)
+#ASSERT `a person must not take part under Article 3` `wedding of 2 officers and 19 guests over cap`
+#ASSERT NOT (`a person must not take part under Article 3` `outdoor wedding of 2 officers and 18 guests`)
+#ASSERT NOT (`a person must not take part under Article 3` `worksite of 25`)
+
+#ASSERT `a responsible person must not allow under Article 7` `pub indoor of 12`
+#ASSERT NOT (`a responsible person must not allow under Article 7` `pub indoor of 10`)
+
+#ASSERT `the person commits an Article 3 offence` `Pat at ordinary indoor of 11`
+#ASSERT NOT (`the person commits an Article 3 offence` `Chris critical worker at ordinary indoor of 11`)
+#ASSERT `the person commits an Article 3 offence` `Pat at ordinary outdoor of 21`
+#ASSERT `the person commits an Article 7 offence` `Les allows pub indoor of 12`
+#ASSERT NOT (`the person commits an Article 7 offence` `Vic tour guide allows pub indoor of 12`)
+
+#ASSERT `Article 9 maximum fine in pounds` TRUE EQUALS 1000
+#ASSERT `Article 9 maximum fine in pounds` FALSE EQUALS 0

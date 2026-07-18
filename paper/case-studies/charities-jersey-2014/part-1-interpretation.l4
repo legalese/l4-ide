@@ -1,0 +1,506 @@
+IMPORT prelude
+
+§ `Charities (Jersey) Law 2014 — Part 1 — Interpretation (Articles 1-2)`
+
+-- ===========================================================================
+-- PART 1 — INTERPRETATION. Articles 1 and 2.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+--
+-- This file carries the *constitutive* definitions the rest of the Law leans on:
+--   Art 2(1)  "entity"            — a 11-limb DISJUNCTION, (a),(b),(ba),(c)-(j)
+--   Art 2(3)  "Jersey entity"     — (a) within (a)-(h); or (b) a (1)(i) body
+--                                    governed by Jersey law with a Jersey governor
+--   Art 2(7)  "governor"          — a per-entity-type definition, (a)-(e)
+--   Art 2(8)  "relevant unincorporated entity"
+--   Art 2(9)  the two governor construction rules
+--   Art 2(10) "misconduct"        — (a) contravention limbs (i)-(iv);
+--                                    (b) offence limbs (i)-(vi)
+--
+-- ENCODING STYLE — INERT. The verbatim statutory words ride inline as bare
+-- strings (inert: identity of their context — TRUE under AND, FALSE under OR),
+-- with `...` as AND-sugar and `..` as OR-sugar. Layout IS the bracketing. Only
+-- the operative atoms are lifted to BOOLEANs. Read the left margin and you are
+-- reading Article 2.
+--
+-- MODELLING NOTE — CHECKBOXES, NOT AN ENUM. Article 2(1)'s sub-paragraphs are
+-- modelled as independent BOOLEAN flags rather than a mutually-exclusive enum,
+-- because the Law itself contemplates OVERLAP: Article 8(3)(a)(i) requires the
+-- register to note, "in the case of an entity falling within one of
+-- sub-paragraphs (f) to (j) ... whether it ALSO falls within sub-paragraph (a)"
+-- — i.e. a company (f) that is also, taken together with others, the trustee of
+-- a trust (a). An enum could not represent that. Sub-paragraph (b) is likewise
+-- expressly a subset of (a) ("without prejudice to the generality of
+-- sub-paragraph (a)").
+--
+-- >>> INTERPRETATION CALL — THE (ba) GAP. See `Article 2(3)` below. Article
+--     2(3)(a) makes an entity a "Jersey entity" if it "falls within any of
+--     sub-paragraphs (a) to (h) of paragraph (1)". Sub-paragraph (ba) was
+--     INSERTED (by the Charities (Amendment) (Jersey) Law) between (b) and (c).
+--     Does the range "(a) to (h)" carry (ba) with it? We read it as YES —
+--     positionally (ba) lies inside the range, and the contrary reading is
+--     absurd: a (ba) entity is BY DEFINITION "established under the law of
+--     Jersey" (Art 2(1)(ba)(ii)), yet on the narrow reading it could never be a
+--     "Jersey entity", and so a Jersey-established NPO body corporate, even once
+--     registered, could never lawfully call itself a "Jersey charity"
+--     (Art 23(3)(b)). We encode the purposive reading and flag the drafting gap.
+-- ===========================================================================
+
+§§ `Article 2(1) — the domain: what can be an "entity"`
+
+DECLARE Entity HAS
+    name                                                            IS A STRING
+
+    -- Article 2(1) — the sub-paragraphs. Independent checkboxes; see the note above.
+    `(a) the trustees of a trust, taken together`                   IS A BOOLEAN
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS A BOOLEAN
+    `(c) an incorporated 1862 association`                          IS A BOOLEAN
+    `(d) a foundation`                                              IS A BOOLEAN
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS A BOOLEAN
+    `(f) a company`                                                 IS A BOOLEAN
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS A BOOLEAN
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS A BOOLEAN
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS A BOOLEAN
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS A BOOLEAN
+
+    -- Article 2(1)(ba) — the three conjuncts of the inserted limb. Note that
+    -- (ba)(iii) is DERIVED, not asked: it is `NOT (falls within (c) to (h))`.
+    `is a body corporate`                                           IS A BOOLEAN
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS A BOOLEAN
+    `(ba)(ii) is established under the law of Jersey`                IS A BOOLEAN
+
+    -- Article 2(3)(b) — the extra facts that make a (1)(i) body a Jersey entity.
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS A BOOLEAN
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS A BOOLEAN
+
+    -- Article 2(8) — the extra facts that make a (1)(i) body a "relevant
+    -- unincorporated entity", which in turn drives the Art 2(7)(d) governor test.
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS A BOOLEAN
+
+    -- Article 2(1) is itself extensible: "(2) The Minister may by Order add
+    -- sub-paragraphs to paragraph (1)." A catch-all, DELIBERATELY NOT a disjunct
+    -- of `is an entity` below — an off-list body yields FALSE until the Order is
+    -- made and this model is amended.
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS A BOOLEAN
+
+§§ `Article 2(1)(ba) — a body corporate that is a Jersey NPO and is not within (c) to (h)`
+
+-- (ba)(iii) is a NEGATIVE limb over the *other* sub-paragraphs, so we name the
+-- disjunction it negates first.
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`falls within any of sub-paragraphs (c) to (h)` e MEANS
+        "(c) an incorporated 1862 association;"
+    ..  e's `(c) an incorporated 1862 association`
+    ..  "(d) a foundation;"
+    ..  e's `(d) a foundation`
+    ..  "(e) a body corporate established - (i) by an enactment, (ii) by Act of the States, or (iii) by Royal Charter, in relation to Jersey;"
+    ..  e's `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`
+    ..  "(f) a company;"
+    ..  e's `(f) a company`
+    ..  "(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991;"
+    ..  e's `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`
+    ..  "(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as such Act or Order is extended to or applicable in Jersey;"
+    ..  e's `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`
+
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` e MEANS
+        "(ba) a body corporate that -"
+    ... e's `is a body corporate`
+    AND "(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008;"
+    ... e's `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`
+    AND "(ii) is established under the law of Jersey; and"
+    ... e's `(ba)(ii) is established under the law of Jersey`
+    AND "(iii) does not fall within any of sub-paragraphs (c) to (h);"
+    ... NOT `falls within any of sub-paragraphs (c) to (h)` e
+
+§§ `Article 2(1) — "entity" means any of (a), (b), (ba), (c) to (j)`
+
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`is an entity within Article 2(1)` e MEANS
+        "In this Law, unless the context otherwise requires, 'entity' means -"
+    ..  "(a) the person or persons, taken together, who are the trustees of a trust;"
+    ..  e's `(a) the trustees of a trust, taken together`
+    ..  "(b) without prejudice to the generality of sub-paragraph (a), the person or persons, taken together, who are the fideicommissaires of a court-approved fideicommis;"
+    ..  e's `(b) the fideicommissaires of a court-approved fideicommis, taken together`
+    ..  `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` e
+    ..  `falls within any of sub-paragraphs (c) to (h)` e
+    ..  "(i) the persons, taken together, who constitute for the time being an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust;"
+    ..  e's `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`
+    ..  "(j) an entity that is substantially similar to an entity mentioned in any of sub-paragraphs (a) to (h), but is established under the law of a jurisdiction other than Jersey."
+    ..  e's `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`
+    -- Article 2(2): "The Minister may by Order add sub-paragraphs to paragraph (1)."
+    -- The `falls within a sub-paragraph added ... by Order` flag is DELIBERATELY not
+    -- a disjunct: until such an Order is made and this model amended, an off-list
+    -- body is not an entity.
+
+§§ `Article 2(3) — "Jersey entity"`
+
+-- The range "(a) to (h)". See the INTERPRETATION CALL in the header: we read the
+-- inserted sub-paragraph (ba) as lying WITHIN the range, because a (ba) entity is
+-- by definition established under the law of Jersey, and the contrary reading
+-- would deny "Jersey charity" status (Art 23(3)(b)) to every Jersey NPO body
+-- corporate. Flip the `..  \`(ba) — ...\` e` line out of this disjunction to test
+-- the narrow reading.
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`falls within any of sub-paragraphs (a) to (h)` e MEANS
+        "(a) the person or persons, taken together, who are the trustees of a trust;"
+    ..  e's `(a) the trustees of a trust, taken together`
+    ..  "(b) ... the fideicommissaires of a court-approved fideicommis;"
+    ..  e's `(b) the fideicommissaires of a court-approved fideicommis, taken together`
+    ..  `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` e   -- see INTERPRETATION CALL
+    ..  `falls within any of sub-paragraphs (c) to (h)` e
+
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`is a Jersey entity` e MEANS
+        "For the purposes of this Law, an entity is a 'Jersey entity' if -"
+    ..  "(a) it falls within any of sub-paragraphs (a) to (h) of paragraph (1); or"
+    ..  `falls within any of sub-paragraphs (a) to (h)` e
+    ..      "(b) it is an unincorporated body or association of persons falling within paragraph (1)(i), in respect of which -"
+        ... e's `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`
+        AND "(i) the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey, and"
+        ... e's `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`
+        AND "(ii) at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)."
+        ... e's `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`
+
+§§ `Article 2(8) — "relevant unincorporated entity"`
+
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`is a relevant unincorporated entity` e MEANS
+        "For the purpose of paragraph (7)(d) a relevant unincorporated entity is an unincorporated body or association of persons that -"
+    ... "(a) falls within paragraph (1)(i); and"
+    ... e's `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`
+    AND "(b) has a constitution that conforms to a model that - (i) is published for the purpose by the Commissioner, and (ii) provides for the entity to have a management committee."
+    ... e's `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`
+
+§§ `Article 2(7) — "governor"`
+
+DECLARE Officer HAS
+    name                                                            IS A STRING
+    -- (7)(a)
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS A BOOLEAN
+    -- (7)(b)
+    `is a member of the council of the foundation`                  IS A BOOLEAN
+    -- (7)(c)
+    `is a director of the company`                                  IS A BOOLEAN
+    -- (7)(d)
+    `is a member of the management committee of the entity`         IS A BOOLEAN
+    -- (7)(e)
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS A BOOLEAN
+    -- (9)(a) — the "merely on behalf of another" carve-out
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS A BOOLEAN
+
+-- The (7)(a) case: "in the case of a trust or fideicommis". An entity is a trust
+-- or fideicommis if it falls within (1)(a) or (1)(b).
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`entity is a trust or fideicommis` e MEANS
+        e's `(a) the trustees of a trust, taken together`
+    ..  e's `(b) the fideicommissaires of a court-approved fideicommis, taken together`
+
+-- (7)(e) is the residual case — "in any other case" — so it bites only where none
+-- of the (7)(a)-(d) cases does. That makes "any other case" an OPERATIVE computed
+-- limb, not scaffolding.
+GIVEN e IS AN Entity
+GIVETH A BOOLEAN
+`entity falls within one of the cases in Article 2(7)(a) to (d)` e MEANS
+        `entity is a trust or fideicommis` e
+    ..  e's `(d) a foundation`
+    ..  e's `(f) a company`
+    ..  `is a relevant unincorporated entity` e
+
+GIVEN p IS AN Officer
+      e IS AN Entity
+GIVETH A BOOLEAN
+`is a governor of` p e MEANS
+        "In this Law, unless the context otherwise requires, 'governor' in relation to an entity means -"
+    ..      "(a) in the case of a trust or fideicommis, a trustee or fideicommissaire of the trust or fideicommis;"
+        ... `entity is a trust or fideicommis` e
+        AND p's `is a trustee or fideicommissaire of the trust or fideicommis`
+    ..      "(b) in the case of a foundation, a member of the council of the foundation;"
+        ... e's `(d) a foundation`
+        AND p's `is a member of the council of the foundation`
+    ..      "(c) in the case of a company, a director of the company;"
+        ... e's `(f) a company`
+        AND p's `is a director of the company`
+    ..      "(d) in the case of a relevant unincorporated entity, a person who is a member of the management committee of the entity; or"
+        ... `is a relevant unincorporated entity` e
+        AND p's `is a member of the management committee of the entity`
+    ..      "(e) in any other case, a person who, under the constitution of the entity, has the general control and management of the administration of the entity."
+        ... NOT `entity falls within one of the cases in Article 2(7)(a) to (d)` e
+        AND p's `under the constitution of the entity, has the general control and management of the administration of the entity`
+        AND "(9)(a) a person is not a governor merely by virtue of exercising general control and management on behalf of another person who has the general control and management in that other person's own right under the constitution of the entity; and"
+        ... NOT p's `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`
+        -- "(9)(b) a person is a governor whether that person has that general control
+        --  and management alone or as one of a number of governors." — carried inert:
+        --  it adds no condition, it removes one (no exclusivity requirement).
+
+§§ `Article 2(10) — "misconduct"`
+
+DECLARE MisconductAllegation HAS
+    -- (10)(a) — a CONTRAVENTION by the registered charity or by any of its governors
+    `the actor is the registered charity or one of its governors`   IS A BOOLEAN
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS A BOOLEAN
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS A BOOLEAN
+    `(a)(iii) contravention of a provision of a required steps notice`  IS A BOOLEAN
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS A BOOLEAN
+
+    -- (10)(b) — the COMMISSION OF AN OFFENCE by ANY person, in relation to a
+    -- registered charity, an excepted foreign charity (Art 22), or a foreign
+    -- equivalent of a registered charity.
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS A BOOLEAN
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS A BOOLEAN
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS A BOOLEAN
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS A BOOLEAN
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS A BOOLEAN
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS A BOOLEAN
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS A BOOLEAN
+
+GIVEN m IS A MisconductAllegation
+GIVETH A BOOLEAN
+`(a) — a contravention by the charity or a governor` m MEANS
+        "(a) a contravention, by a registered charity or by any of its governors, of a provision -"
+    ... m's `the actor is the registered charity or one of its governors`
+    AND     "(i) of this Law, or of any enactment under this Law,"
+        ..  m's `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`
+        ..  "(ii) of the constitution of the registered charity, or of the constitutional Law of the charity,"
+        ..  m's `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`
+        ..  "(iii) of a required steps notice, or"
+        ..  m's `(a)(iii) contravention of a provision of a required steps notice`
+        ..  "(iv) of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law; or"
+        ..  m's `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`
+
+GIVEN m IS A MisconductAllegation
+GIVETH A BOOLEAN
+`(b) — the commission of an offence in relation to a charity` m MEANS
+        "(b) the commission by any person, in relation a registered charity or to an excepted foreign charity (within the meaning of Article 22) or to an entity equivalent to a registered charity under the law of a jurisdiction other than Jersey, of an offence -"
+    ... m's `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`
+    AND     "(i) under the constitutional Law of that charity or other entity,"
+        ..  m's `(b)(i) an offence under the constitutional Law of that charity or other entity`
+        ..  "(ii) under the Financial Services (Jersey) Law 1998, the Banking Business (Jersey) Law 1991, the Collective Investment Funds (Jersey) Law 1988, the Insurance Business (Jersey) Law 1996, any Regulation or Order made under any of those Laws, or the Alternative Investment Funds (Jersey) Regulations 2012,"
+        ..  m's `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`
+        ..  "(iii) under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009,"
+        ..  m's `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`
+        ..  "(iv) under any other enactment, being an offence relating to money laundering or terrorist financing,"
+        ..  m's `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`
+        ..  "(v) under any other enactment or under customary law, being an offence involving deception or dishonesty, or"
+        ..  m's `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`
+        ..  "(vi) under the law of a jurisdiction other than Jersey, being an offence similar to any of those listed in clauses (i) to (v)."
+        ..  m's `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`
+
+GIVEN m IS A MisconductAllegation
+GIVETH A BOOLEAN
+`is misconduct` m MEANS
+        "In this Law, unless the context otherwise requires, 'misconduct' means -"
+    ..  `(a) — a contravention by the charity or a governor` m
+    ..  `(b) — the commission of an offence in relation to a charity` m
+
+§ `Tests — Part 1`
+
+§§ `A Jersey company: an entity (f), a Jersey entity, its director is a governor`
+
+`Jersey Heritage Ltd` MEANS Entity WITH
+    name                                                            IS "Jersey Heritage Ltd"
+    `(a) the trustees of a trust, taken together`                   IS FALSE
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS FALSE
+    `(c) an incorporated 1862 association`                          IS FALSE
+    `(d) a foundation`                                              IS FALSE
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS FALSE
+    `(f) a company`                                                 IS TRUE
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS FALSE
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
+    `is a body corporate`                                           IS TRUE
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(ba)(ii) is established under the law of Jersey`                IS TRUE
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
+
+#ASSERT `is an entity within Article 2(1)` `Jersey Heritage Ltd`
+#ASSERT `is a Jersey entity` `Jersey Heritage Ltd`
+-- A company IS within (c) to (h), so the (ba) limb is knocked out by (ba)(iii).
+#ASSERT `falls within any of sub-paragraphs (c) to (h)` `Jersey Heritage Ltd`
+#ASSERT NOT `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` `Jersey Heritage Ltd`
+
+`Ms Le Brun, a director` MEANS Officer WITH
+    name                                                            IS "Ms Le Brun"
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `is a member of the council of the foundation`                  IS FALSE
+    `is a director of the company`                                  IS TRUE
+    `is a member of the management committee of the entity`         IS FALSE
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+
+#ASSERT `is a governor of` `Ms Le Brun, a director` `Jersey Heritage Ltd`
+
+§§ `The (ba) limb — a Jersey NPO body corporate that is NOT a company/foundation/etc.`
+
+`Grands Vaux Mutual, a Jersey NPO body corporate` MEANS Entity WITH
+    name                                                            IS "Grands Vaux Mutual"
+    `(a) the trustees of a trust, taken together`                   IS FALSE
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS FALSE
+    `(c) an incorporated 1862 association`                          IS FALSE
+    `(d) a foundation`                                              IS FALSE
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS FALSE
+    `(f) a company`                                                 IS FALSE
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS FALSE
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
+    `is a body corporate`                                           IS TRUE
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS TRUE
+    `(ba)(ii) is established under the law of Jersey`                IS TRUE
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
+
+#ASSERT `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` `Grands Vaux Mutual, a Jersey NPO body corporate`
+#ASSERT `is an entity within Article 2(1)` `Grands Vaux Mutual, a Jersey NPO body corporate`
+-- >>> THE (ba) GAP, made executable. On our purposive reading this is TRUE.
+--     On the narrow reading of "(a) to (h)" (which excludes the inserted (ba)),
+--     it would be FALSE — and this body could never call itself a "Jersey
+--     charity" (Art 23(3)(b)) however impeccably Jersey it is.
+#ASSERT `is a Jersey entity` `Grands Vaux Mutual, a Jersey NPO body corporate`
+
+§§ `An unincorporated association: a Jersey entity only via Article 2(3)(b)'s two extra limbs`
+
+`St Ouen Angling Club` MEANS Entity WITH
+    name                                                            IS "St Ouen Angling Club"
+    `(a) the trustees of a trust, taken together`                   IS FALSE
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS FALSE
+    `(c) an incorporated 1862 association`                          IS FALSE
+    `(d) a foundation`                                              IS FALSE
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS FALSE
+    `(f) a company`                                                 IS FALSE
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS FALSE
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS TRUE
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
+    `is a body corporate`                                           IS FALSE
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(ba)(ii) is established under the law of Jersey`                IS FALSE
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS TRUE
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS TRUE
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS TRUE
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
+
+#ASSERT `is an entity within Article 2(1)` `St Ouen Angling Club`
+-- Not within (a) to (h): it qualifies only through Article 2(3)(b).
+#ASSERT NOT `falls within any of sub-paragraphs (a) to (h)` `St Ouen Angling Club`
+#ASSERT `is a Jersey entity` `St Ouen Angling Club`
+#ASSERT `is a relevant unincorporated entity` `St Ouen Angling Club`
+
+-- Because it IS a relevant unincorporated entity, the governor test runs through
+-- Art 2(7)(d) — management committee — and NOT through the residual (7)(e) case.
+`Mr Renouf, on the management committee` MEANS Officer WITH
+    name                                                            IS "Mr Renouf"
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `is a member of the council of the foundation`                  IS FALSE
+    `is a director of the company`                                  IS FALSE
+    `is a member of the management committee of the entity`         IS TRUE
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+
+#ASSERT `is a governor of` `Mr Renouf, on the management committee` `St Ouen Angling Club`
+
+§§ `Article 2(9)(a) — the delegate who is NOT a governor`
+
+-- A (1)(j) foreign entity: none of the (7)(a)-(d) cases applies, so the residual
+-- (7)(e) case governs — and (9)(a) then excludes the person who exercises general
+-- control and management merely ON BEHALF OF the person who holds it in their own right.
+`Guernsey Trust Co (a foreign entity)` MEANS Entity WITH
+    name                                                            IS "Guernsey Trust Co"
+    `(a) the trustees of a trust, taken together`                   IS FALSE
+    `(b) the fideicommissaires of a court-approved fideicommis, taken together`  IS FALSE
+    `(c) an incorporated 1862 association`                          IS FALSE
+    `(d) a foundation`                                              IS FALSE
+    `(e) a body corporate established by an enactment, by Act of the States, or by Royal Charter in relation to Jersey`  IS FALSE
+    `(f) a company`                                                 IS FALSE
+    `(g) a body incorporated under, but not by, any enactment other than the Companies (Jersey) Law 1991`  IS FALSE
+    `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
+    `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
+    `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS TRUE
+    `is a body corporate`                                           IS TRUE
+    `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(ba)(ii) is established under the law of Jersey`                IS FALSE
+    `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
+    `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
+    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
+
+#ASSERT `is an entity within Article 2(1)` `Guernsey Trust Co (a foreign entity)`
+-- (j) is NOT within "(a) to (h)", and it is not a (1)(i) body, so: not a Jersey entity.
+#ASSERT NOT `is a Jersey entity` `Guernsey Trust Co (a foreign entity)`
+#ASSERT NOT `entity falls within one of the cases in Article 2(7)(a) to (d)` `Guernsey Trust Co (a foreign entity)`
+
+`Mr Ozouf, who holds control in his own right` MEANS Officer WITH
+    name                                                            IS "Mr Ozouf"
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `is a member of the council of the foundation`                  IS FALSE
+    `is a director of the company`                                  IS FALSE
+    `is a member of the management committee of the entity`         IS FALSE
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+
+`Ms Perchard, his delegate` MEANS Officer WITH
+    name                                                            IS "Ms Perchard"
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `is a member of the council of the foundation`                  IS FALSE
+    `is a director of the company`                                  IS FALSE
+    `is a member of the management committee of the entity`         IS FALSE
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS TRUE
+
+#ASSERT `is a governor of` `Mr Ozouf, who holds control in his own right` `Guernsey Trust Co (a foreign entity)`
+-- Article 2(9)(a) bites: the delegate is NOT a governor.
+#ASSERT NOT `is a governor of` `Ms Perchard, his delegate` `Guernsey Trust Co (a foreign entity)`
+
+§§ `Article 2(10) — misconduct`
+
+`breach of a required steps notice by the charity` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS TRUE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS FALSE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS TRUE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS FALSE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS FALSE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS FALSE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+#ASSERT `(a) — a contravention by the charity or a governor` `breach of a required steps notice by the charity`
+#ASSERT `is misconduct` `breach of a required steps notice by the charity`
+
+-- A money-laundering offence by a THIRD PARTY (not the charity, not a governor) in
+-- relation to the charity: limb (a) fails on its chapeau — but limb (b) does not
+-- require the actor to be the charity or a governor ("the commission BY ANY PERSON").
+`money laundering by an outsider, in relation to the charity` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS FALSE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS FALSE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS FALSE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS TRUE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS TRUE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS FALSE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+#ASSERT NOT `(a) — a contravention by the charity or a governor` `money laundering by an outsider, in relation to the charity`
+#ASSERT `(b) — the commission of an offence in relation to a charity` `money laundering by an outsider, in relation to the charity`
+#ASSERT `is misconduct` `money laundering by an outsider, in relation to the charity`
