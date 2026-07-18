@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+set-operators-nested.l4:19:1-27:
+  TRUE
+set-operators-nested.l4:24:1-44:
+  2
+set-operators-nested.l4:26:1-44:
+  1
+set-operators-nested.l4:29:1-43:
+  FALSE
+set-operators-nested.l4:32:1-76:
+  0
+set-operators-nested.l4:43:1-32:
+  TRUE
+set-operators-nested.l4:46:1-19:
+  FALSE

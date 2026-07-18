@@ -1,0 +1,52 @@
+IMPORT prelude
+
+§ `Set operations`
+
+-- "residents of New York and New Jersey may apply"
+`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+`new jerseyans` MEANS setFromList (LIST "carol")
+
+-- term-level AND on sets is union: three people are eligible
+`eligible` MEANS `new yorkers` AND `new jerseyans`
+#EVAL setSize `eligible`                                   -- 3
+#EVAL "carol" `is in` `eligible`                           -- TRUE
+
+-- sentence-level AND on booleans is still conjunction
+#EVAL TRUE AND FALSE                                       -- FALSE
+
+§§ `The canonical vocabulary`
+
+#EVAL setSize (`new yorkers` UNION `new jerseyans`)        -- 3
+#EVAL setSize (`new yorkers` INTERSECT `new jerseyans`)    -- 0
+
+-- difference: LESS wears backticks (bare LESS starts LESS THAN);
+-- WITHOUT is the bare-spelling alias
+`all employees` MEANS setFromList (LIST "dilbert", "alice", "wally", "asok")
+`on probation`  MEANS setFromList (LIST "asok")
+#EVAL setSize (`all employees` `LESS` `on probation`)      -- 3
+#EVAL setSize (`all employees` WITHOUT `on probation`)     -- 3
+
+§§ `PLUS and MINUS: bare, with real precedence`
+
+a1 MEANS setFromList (LIST 1, 2, 3)
+b1 MEANS setFromList (LIST 2, 3, 4)
+
+#EVAL setSize (a1 PLUS b1)                                 -- 4  (union)
+#EVAL setSize (a1 MINUS b1)                                -- 1  (difference)
+-- chains need no parentheses, but beware: not a group!
+#EVAL setToList (a1 PLUS b1 MINUS b1)                      -- LIST 1, not a1
+
+§§ `Equality is extensional — via set equals`
+
+#EVAL (setFromList (LIST 2, 1, 1)) `set equals` (setFromList (LIST 1, 2))   -- TRUE
+
+§§ `Enums make good elements`
+
+DECLARE State IS ONE OF NY, NJ, CT
+
+`the tri-state universe` MEANS setFromList (LIST NY, NJ, CT)
+`eligible states`        MEANS setFromList (LIST NY, NJ)
+
+#EVAL CT `is in` `eligible states`                         -- FALSE
+-- absolute complement, since the enum universe is finite
+#EVAL setToList (`the tri-state universe` WITHOUT `eligible states`)   -- LIST CT

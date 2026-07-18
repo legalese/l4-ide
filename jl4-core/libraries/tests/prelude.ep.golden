@@ -1126,3 +1126,170 @@ mapSnd MEANS pmap
 -- Note: This is fmap specialized to List of Pairs
 mapPairs MEANS fmap
 
+
+
+§§ `Sets`
+
+-- A SET OF a is a collection in which order and duplicates are irrelevant.
+-- Backed by a LIST OF a (cf. PAIR, Dictionary). Observers are
+-- quotient-respecting ONE LEVEL DEEP: membership, subset, `set equals`,
+-- and setSize ignore duplicates and order among the elements, so a
+-- raw-constructed SET with duplicated elements is observationally
+-- identical to its deduplicated form. setFromList dedups as an
+-- optimization, not a load-bearing invariant.
+--
+-- KNOWN LIMIT (adversarial review 2026-07-18): ELEMENT comparison is the
+-- builtin structural equality, so the quotient does NOT compose. A
+-- SET OF SET OF a compares its inner sets by representation: {{1,2}} and
+-- {{2,1}} are different elements, {{1,2}} INTERSECT {{2,1}} is empty, and
+-- setSize counts spellings, not extensions. Likewise any container
+-- wrapping a SET (a record field, PAIR, LIST, MAYBE) compares the wrapped
+-- set structurally under bare EQUALS, silently — the __EQUALS__ ambiguity
+-- guard below fires only when both operands are directly SET-typed. See
+-- examples/ok/set-operators-nested.l4, which pins this behavior, and
+-- SET-OPERATORS-SPEC Phase 4 for the planned lint.
+DECLARE SET OF a
+  HAS elements IS A LIST OF a
+
+-- Set: emptySet (the set with no elements)
+GIVEN a IS A TYPE
+GIVETH A SET OF a
+emptySet MEANS SET WITH elements IS EMPTY
+
+-- Set: setFromList (build a set from a list; duplicates discarded)
+GIVEN a IS A TYPE
+      xs IS A LIST OF a
+GIVETH A SET OF a
+setFromList xs @nlg the set of the items of %xs%
+  MEANS SET WITH elements IS nub xs
+
+-- Set: setToList (the distinct elements, as a list)
+GIVEN a IS A TYPE
+      s IS A SET OF a
+GIVETH A LIST OF a
+setToList s @nlg the distinct elements of %s%
+  MEANS nub (s's elements)
+
+-- Set: setSize (the number of distinct elements)
+GIVEN a IS A TYPE
+      s IS A SET OF a
+GIVETH A NUMBER
+setSize s @nlg the number of distinct elements of %s%
+  MEANS count (nub (s's elements))
+
+-- Set: membership. The disjunctive core of set-union:
+-- x `is in` (p UNION q) exactly when x `is in` p OR x `is in` q.
+GIVEN a IS A TYPE
+      x IS AN a
+      s IS A SET OF a
+GIVETH A BOOLEAN
+x `is in` s @nlg %x% is one of %s%
+  MEANS elem x (s's elements)
+
+-- Set: subset
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A BOOLEAN
+p `is subset of` q @nlg every element of %p% is also in %q%
+  MEANS all (GIVEN x YIELD x `is in` q) (p's elements)
+
+-- Set: extensional equality — mutual subset; order and duplicates invisible.
+-- This is the blessed spelling. Writing bare EQUALS on two SETs is an
+-- ambiguity error (the builtin __EQUALS__ is fully polymorphic and the
+-- checker has no specificity preference), which is deliberate detection:
+-- structural equality on sets would be silently order-sensitive.
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A BOOLEAN
+p `set equals` q @nlg %p% and %q% have the same elements
+  MEANS (p `is subset of` q) AND (q `is subset of` p)
+
+-- Set: UNION ("the members of p and of q")
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p UNION q @nlg the union of %p% and %q%
+  MEANS setFromList (append (p's elements) (q's elements))
+
+-- Set: INTERSECT ("those in both p and q")
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p INTERSECT q @nlg the elements common to %p% and %q%
+  MEANS setFromList (filter (GIVEN x YIELD x `is in` q) (p's elements))
+
+-- Set: difference. `LESS` is the drafting canon ("all employees LESS those
+-- on probation") but requires backticks at call sites because bare LESS is
+-- a lexer keyword (the start of LESS THAN). WITHOUT is the bare-spelling
+-- alias for running text.
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p `LESS` q @nlg the elements of %p% not in %q%
+  MEANS setFromList (filter (GIVEN x YIELD NOT (x `is in` q)) (p's elements))
+
+-- Set: WITHOUT (bare alias for `LESS`)
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+p WITHOUT q @nlg the elements of %p% not in %q%
+  MEANS p `LESS` q
+
+-- Set operator overloads.
+-- PLUS/MINUS ride the arithmetic keyword operators, so `p + q` and
+-- `p - q` on sets are bare AND precedence-correct (prio 6, left-assoc).
+-- Caution: sets form a join semilattice, not a group —
+-- (p PLUS q) MINUS q is NOT p in general.
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+`__PLUS__` MEANS p UNION q
+
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+`__MINUS__` MEANS p `LESS` q
+
+-- Term-level AND/OR on sets both mean UNION: "residents of NY and NJ" and
+-- "residents of NY or NJ" denote the same eligible population. The
+-- type-directed dispatch (same word, different types, different
+-- operations) is in the spirit of Partee & Rooth (1983); the union
+-- READING is L4's chosen resolution of an ambiguity the authorities leave
+-- open — no authority holds that nominal "and" denotes union (see
+-- SET-OPERATORS-SPEC §9.3, §9.5, §10.6). Sentence-level AND on BOOLEANs
+-- stays conjunction.
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+`__AND__` MEANS p UNION q
+
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A SET OF a
+`__OR__` MEANS p UNION q
+
+-- Set equality overload: makes bare EQUALS on two SETs an AMBIGUITY error
+-- rather than silently order-sensitive structural equality. The builtin
+-- __EQUALS__ (FOR ALL A) always also matches, and the checker prefers
+-- neither, so this overload's job is to force the drafter to an explicit
+-- `set equals`. SCOPE: the guard fires only when both operands are
+-- directly SET-typed — sets reached through records, pairs, lists, MAYBE,
+-- or generic functions compare structurally with no diagnostic (see the
+-- KNOWN LIMIT note in the section header). If the checker ever gains a
+-- specificity preference, bare EQUALS on sets resolves here and becomes
+-- extensional — the intended endgame (SET-OPERATORS-SPEC §D6).
+GIVEN a IS A TYPE
+      p IS A SET OF a
+      q IS A SET OF a
+GIVETH A BOOLEAN
+`__EQUALS__` MEANS p `set equals` q

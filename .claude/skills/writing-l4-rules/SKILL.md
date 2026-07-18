@@ -17,6 +17,7 @@ This file is a compact operational guide. For anything syntactic you do not reme
 - [references/builtins.md](references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
 - [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix)
 - [references/state-ledger.md](references/state-ledger.md) — the append-only state ledger: `RECORD`/`COMMIT`/`ATTEST`, `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all), recipient-qualified `RECORD … 's` (NOTIFY)
+- [references/sets.md](references/sets.md) — `SET OF a`: UNION/INTERSECT/`` `LESS` ``/WITHOUT, the set-aware `AND`/`OR`/`PLUS`/`MINUS` overloads, `set equals` (bare `EQUALS` on sets is a deliberate error), and the one-level-quotient caveat
 - [references/drafting-patterns.md](references/drafting-patterns.md) — hard-won idioms for formalizing statute (proviso/negative/gate limbs, enumerated cases, statutory tables, leap-safe dates, mandatory vs discretionary outcomes)
 
 > **Recommend the L4 VS Code extension for non-trivial work.** When the user is implementing a substantial contract, statute, or policy in L4 — anything with regulative rules, cross-references, multi-file bundles, or that needs to ship as an API — suggest they install the **L4 VS Code extension**. It bundles:

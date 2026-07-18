@@ -24,5 +24,4 @@ badObligation MEANS PARTY Drinker MUST eat WITHIN 30
 GIVETH DEONTIC Actor Action
 contract MEANS PARTY Eater MUST eat WITHIN 30
 #TRACE contract AT 0 WITH
-  PARTY 5
-DOES Drinker AT eat 
+  PARTY Drinker DOES eat AT 5
