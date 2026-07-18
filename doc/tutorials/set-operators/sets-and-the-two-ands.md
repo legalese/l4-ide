@@ -113,6 +113,8 @@ With sets, that test is a program:
 
 An empty intersection (like our New Yorkers and New Jerseyans) is the strongest signal of all: nobody writes an eligibility rule for the empty set, so the drafter must have meant union. A future L4 lint will make exactly this argument in a tooltip, with the citation attached.
 
+Seen from engineering, the redundancy canon is a **Boolean-minimization presumption**: courts presume statutory text is already minimized — every term load-bearing, nothing a Quine–McCluskey pass would delete — so a reading that renders a term otiose is evidence of the wrong reading, exactly as a minimizer flags a redundant clause as evidence of a drafting slip. Turning canons of construction into checkable properties of Boolean structure is a running theme of the L4 research programme; for how this style of analysis performs on a live appellate problem, see _Poh Yuan Nie v Public Prosecutor_ [2022] SGCA 74, the worked example of the L4 papers series.
+
 ## Where next
 
 - Reference: [Sets library](../../reference/libraries/sets.md)
