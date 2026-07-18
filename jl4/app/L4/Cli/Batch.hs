@@ -26,6 +26,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
+import Data.Char (isAlpha, isAlphaNum)
 import Data.Text.Encoding (decodeUtf8)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
@@ -132,8 +133,9 @@ batchCmd opts = do
       params = extractParamsFromExport exportFn
 
   -- Step 3: for each input, generate wrapper, eval, emit one NDJSON line.
-  anyFailure <- fmap or $ forM (zip [1 :: Int ..] inputs) \(idx, input) -> do
-    let wrapperCode     = generateBatchWrapper exportFn.exportName params input
+  anyFailure <- fmap or $ forM (zip [1 :: Int ..] inputs) \(idx, rawInput) -> do
+    let input           = coerceInputTypes params rawInput
+        wrapperCode     = generateBatchWrapper exportFn.exportName params input
         combinedProgram = filteredSource <> wrapperCode
         virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
     (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
@@ -179,6 +181,26 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
           HashMap.toList record
   other -> Left ("Unsupported format: " ++ Text.unpack other)
 
+-- | CSV cells always arrive as strings. Where the target parameter is
+-- declared as a NUMBER or BOOLEAN, re-type the string value so JSONDECODE
+-- in the generated wrapper accepts it. Values that don't parse are left
+-- untouched so the decode error points at the actual offending cell.
+coerceInputTypes :: [(Text, Maybe (Type' Resolved))] -> Aeson.Value -> Aeson.Value
+coerceInputTypes params (Aeson.Object obj) =
+    Aeson.Object (KeyMap.fromList (map coerceField (KeyMap.toList obj)))
+  where
+    paramTypes = [(n, maybe "" prettyLayout mty) | (n, mty) <- params]
+    coerceField (k, v) = (k, coerceValue (List.lookup (Key.toText k) paramTypes) v)
+    coerceValue (Just "NUMBER") (Aeson.String s)
+      | Right n@(Aeson.Number _) <- Aeson.eitherDecode' (Text.Lazy.Encoding.encodeUtf8 (Text.Lazy.fromStrict s)) = n
+    coerceValue (Just "BOOLEAN") (Aeson.String s) =
+      case Text.toLower (Text.strip s) of
+        "true"  -> Aeson.Bool True
+        "false" -> Aeson.Bool False
+        _       -> Aeson.String s
+    coerceValue _ v = v
+coerceInputTypes _ v = v
+
 ----------------------------------------------------------------------------
 -- Wrapper code generation
 ----------------------------------------------------------------------------
@@ -194,7 +216,7 @@ generateBatchWrapper funName params inputJson
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
         , ""
-        , "#EVAL " <> funName
+        , "#EVAL " <> quoteIdent funName
         ]
   | otherwise =
       Text.unlines
@@ -218,7 +240,7 @@ generateInputRecord params = Text.unlines $
     formatField (idx, (name, mty)) =
       let fieldIndent = if idx == 0 then "  " else ", "
           tyText      = maybe "A NUMBER" prettyLayout mty
-      in fieldIndent <> name <> " IS " <> tyText
+      in fieldIndent <> quoteIdent name <> " IS " <> tyText
 
 generateDecoder :: Text
 generateDecoder = Text.unlines
@@ -245,8 +267,20 @@ generateEvalDirective funName params = Text.unlines
   , "    WHEN LEFT error THEN NOTHING"
   ]
   where
-    functionCall = funName <> " " <> Text.unwords (map mkArgAccess params)
-    mkArgAccess (name, _) = "(args's " <> name <> ")"
+    functionCall = quoteIdent funName <> " " <> Text.unwords (map mkArgAccess params)
+    mkArgAccess (name, _) = "(args's " <> quoteIdent name <> ")"
+
+-- | Quote an identifier in backticks when it isn't a plain identifier
+-- (e.g. exported names and parameters written in natural language with
+-- spaces), so the generated wrapper parses.
+quoteIdent :: Text -> Text
+quoteIdent name
+  | isPlain   = name
+  | otherwise = "`" <> name <> "`"
+  where
+    isPlain = case Text.uncons name of
+      Just (c, _) -> isAlpha c && Text.all (\x -> isAlphaNum x || x == '_') name
+      Nothing     -> False
 
 extractParamsFromExport :: ExportedFunction -> [(Text, Maybe (Type' Resolved))]
 extractParamsFromExport ef =

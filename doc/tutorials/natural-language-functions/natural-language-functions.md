@@ -3,6 +3,10 @@
 This tutorial shows how to define and call functions that read like natural language. A function is the equivalent of a rule in L4.
 L4's **mixfix operators** let you write code that mirrors the structure of legal prose.
 
+**Prerequisites:** Basic understanding of L4 functions ([Your First L4 File](../getting-started/first-l4-file.md)) and familiarity with the GIVEN and MEANS keywords ([MEANS](../../reference/functions/MEANS.md))
+
+---
+
 ## Overview
 
 Traditional programming languages use **prefix notation** where the function name comes first:
@@ -20,11 +24,6 @@ L4 supports multiple calling patterns that read more naturally:
 | **Infix**   | ``3 `plus` 5``                       | "3 plus 5"                       |
 | **Postfix** | `` 50 `percent` ``                   | "50 percent"                     |
 | **Mixfix**  | ``alice `is eligible for` medicare`` | "alice is eligible for medicare" |
-
-## Prerequisites
-
-- Basic understanding of L4 functions (see [Your First L4 File](../getting-started/first-l4-file.md))
-- Familiarity with GIVEN and MEANS keywords (see [MEANS](../../reference/functions/MEANS.md))
 
 ## Infix functions
 

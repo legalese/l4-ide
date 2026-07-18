@@ -40,13 +40,12 @@ Learn L4 from scratch. No prior programming experience required.
 
 - Module 0: Introduction - What is L4?
 - Module 1: Your First Legal Rule
-- Module 2: Legal Entities and Types
+- Module 2: Legal Entities and Relationships
 - Module 3: Control Flow
-- Module 4: Functions
-- Module 5: Regulative Rules (Obligations & Permissions)
-- Module 6: Capstone Project
-
-**Time:** ~4-6 hours total
+- Module 4: Decision Logic
+- Module 5: Functions
+- Module 6: Regulative Rules (Obligations & Permissions)
+- Module 7: Capstone Project
 
 ### [Advanced Course](courses/advanced/README.md)
 
@@ -67,18 +66,22 @@ Task-focused guides for specific goals:
 
 ### Getting Started
 
-- [Your First L4 File](tutorials/getting-started/first-l4-file.md) - Create, run, test (15 min)
-- [Encoding Legislation](tutorials/getting-started/encoding-legislation.md) - Turn legal text into L4 (30 min)
-- [Wedding Vows Example](tutorials/getting-started/wedding-vows.md) - Fun intro to regulative rules (20 min)
-- [Common Patterns](tutorials/getting-started/common-patterns.md) - Quick reference (30 min)
+- [Your First L4 File](tutorials/getting-started/first-l4-file.md) - Create, run, test
+- [Using the l4 CLI](tutorials/getting-started/l4-cli.md) - Install and drive the command-line tools
+- [Testing Your Rules](tutorials/getting-started/testing-your-rules.md) - #EVAL, #CHECK, #ASSERT, and #TRACE
+- [Debugging Type Errors](tutorials/getting-started/debugging-type-errors.md) - Read and fix common compiler errors
+- [Encoding Legislation](tutorials/getting-started/encoding-legislation.md) - Turn legal text into L4
+- [Wedding Vows Example](tutorials/getting-started/wedding-vows.md) - Fun intro to regulative rules
+- [Version Control for Rules](tutorials/getting-started/version-control-for-rules.md) - Git workflow for legal rules
 
 ### Deployment and Legalese Cloud
 
-- [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md) - Deploy L4 rules as REST APIs and use with WebMCP (30 min)
-- [OpenAI- and Anthropic-Compatible AI APIs](tutorials/legalese-cloud/openai-compatible-api.md) - Chat with a deployment's rules from any OpenAI or Anthropic client (10 min)
-- [MCP Server](tutorials/legalese-cloud/mcp-server.md) - Expose deployed rules as Model Context Protocol tools (10 min)
-- [WebMCP Embed Script](tutorials/legalese-cloud/webmcp-embed.md) - Serve your rules from your own website (5 min)
-- [RESTful OpenAPI Specification](tutorials/legalese-cloud/openapi-spec.md) - Generate REST clients from the spec (10 min)
+- [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md) - Deploy L4 rules as REST APIs and use with WebMCP
+- [Using Rules from Claude](tutorials/legalese-cloud/using-rules-from-claude.md) - End-to-end: deployed rules called from Claude and Cursor via MCP
+- [OpenAI- and Anthropic-Compatible AI APIs](tutorials/legalese-cloud/openai-compatible-api.md) - Chat with a deployment's rules from any OpenAI or Anthropic client
+- [MCP Server](tutorials/legalese-cloud/mcp-server.md) - Expose deployed rules as Model Context Protocol tools
+- [WebMCP Embed Script](tutorials/legalese-cloud/webmcp-embed.md) - Serve your rules from your own website
+- [RESTful OpenAPI Specification](tutorials/legalese-cloud/openapi-spec.md) - Generate REST clients from the spec
 
 ### LLM Integration
 
@@ -96,9 +99,14 @@ Look up specific features:
 - **[Syntax Reference](reference/syntax/README.md)** - Complete syntax guide
 - **[Types](reference/types/README.md)** - L4 Types
 - **[Functions](reference/functions/README.md)** - Functions as rules
+- **[Control Flow](reference/control-flow/README.md)** - IF and CONSIDER
 - **[Regulative](reference/regulative/README.md)** - Regulative language
+- **[Built-ins](reference/builtins/README.md)** - Built-in functions
 - **[Libraries](reference/libraries/README.md)** - Standard library
 - **[Operators](reference/operators/README.md)** - Operators and precedence
+- **[Patterns](reference/patterns/README.md)** - Common and advanced encoding patterns
+- **[Errors](reference/errors/README.md)** - Troubleshooting compiler diagnostics
+- **[Cheat Sheet](reference/cheat-sheet.md)** - One-page syntax summary
 
 [View full reference →](reference/README.md)
 
@@ -109,8 +117,12 @@ Look up specific features:
 Understand the "why" behind L4:
 
 - **[Design Principles](concepts/language-design/principles.md)** - Why L4 works this way
+- **[Linguistic Syntax](concepts/language-design/linguistic-syntax.md)** - How L4 reads like legal English
 - **[Regulative Rules](concepts/legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
+- **[Constitutive vs Regulative Rules](concepts/legal-modeling/constitutive-vs-regulative.md)** - Defining vs directing
+- **[Default Reasoning](concepts/legal-modeling/default-reasoning.md)** - Exceptions and defeasibility with UNLESS
 - **[Algebraic Types](concepts/type-system/algebraic-types.md)** - L4's type system
+- **[Exhaustiveness](concepts/type-system/exhaustiveness.md)** - Totality as a legal-safety property
 
 [View all concepts →](concepts/README.md)
 

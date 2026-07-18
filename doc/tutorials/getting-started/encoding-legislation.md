@@ -341,6 +341,6 @@ NOT (`is public house` OR `is hotel`)
 
 ## Next Steps
 
-- [Common Patterns](common-patterns.md) - More L4 patterns
+- [Common Patterns](../../reference/patterns/common-patterns.md) - More L4 patterns
 - [Foundation Course Module 1](../../courses/foundation/module-1-first-rule.md) - Deep dive on legal rules
 - [LLM Integration](../llm-integration/llm-getting-started.md) - LLM-assisted encoding

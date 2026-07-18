@@ -1,14 +1,16 @@
 # Tutorials - Summary
 
 - [Tutorials Home](README.md)
-- [Tutorial Suggestions](tutorial-suggestions.md)
 
 ## Getting Started
 
 - [Your First L4 File](getting-started/first-l4-file.md)
+- [Using the l4 CLI](getting-started/l4-cli.md)
+- [Testing Your Rules](getting-started/testing-your-rules.md)
+- [Debugging Type Errors](getting-started/debugging-type-errors.md)
+- [Version Control for Rules](getting-started/version-control-for-rules.md)
 - [Encoding Legislation](getting-started/encoding-legislation.md)
 - [Wedding Vows](getting-started/wedding-vows.md)
-- [Common Patterns](getting-started/common-patterns.md)
 
 ## Deployment
 
@@ -18,6 +20,7 @@
 
 - [OpenAI- and Anthropic-Compatible AI APIs](legalese-cloud/openai-compatible-api.md)
 - [MCP Server](legalese-cloud/mcp-server.md)
+- [Using Your Rules from Claude](legalese-cloud/using-rules-from-claude.md)
 - [Install as Agent Plugin](legalese-cloud/agent-plugin.md)
 - [Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)
 - [WebMCP Embed Script](legalese-cloud/webmcp-embed.md)

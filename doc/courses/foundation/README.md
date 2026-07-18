@@ -13,8 +13,6 @@ This course takes you from zero to writing your first legal rules in L4. You'll 
 
 **Prerequisites:** Basic familiarity with legal concepts. No programming experience required.
 
-**Time:** Approximately 4-6 hours total
-
 ---
 
 ## Modules
@@ -27,8 +25,6 @@ What is L4 and why use it?
 - How L4 differs from traditional legal drafting
 - Setting up your environment
 
-**Time:** 15 minutes
-
 ---
 
 ### [Module 1: Your First Legal Rule](module-1-first-rule.md)
@@ -40,11 +36,9 @@ Write a simple legal obligation in L4.
 - Setting deadlines with WITHIN
 - Consequences: HENCE and LEST
 
-**Time:** 45 minutes
-
 ---
 
-### [Module 2: Legal Entities](module-2-entities.md)
+### [Module 2: Legal Entities and Relationships](module-2-entities.md)
 
 Model structured legal entities and relationships.
 
@@ -53,8 +47,6 @@ Model structured legal entities and relationships.
 - Connecting multiple entities
 - Record field access
 
-**Time:** 60 minutes
-
 ---
 
 ### [Module 3: Control Flow](module-3-control-flow.md)
@@ -62,11 +54,10 @@ Model structured legal entities and relationships.
 Handle conditional logic and pattern matching.
 
 - IF/THEN/ELSE expressions
+- Multi-way decisions with BRANCH
 - Pattern matching with CONSIDER
 - Working with lists
 - Boolean logic and operators
-
-**Time:** 45 minutes
 
 ---
 
@@ -78,12 +69,22 @@ Express constitutive rules - legal determinations of facts, eligibility, and cla
 - Eligibility determinations with DECIDE
 - Computations and definitions with MEANS
 - Breaking down complex logic with WHERE
-
-**Time:** 60 minutes
+- Optional values with MAYBE and working with dates
 
 ---
 
-### [Module 5: Regulative Rules](module-5-regulative.md)
+### [Module 5: Functions](module-5-functions.md)
+
+Define reusable functions.
+
+- Function signatures with GIVEN and GIVETH
+- Local definitions with WHERE
+- Recursive functions
+- Higher-order functions: map, filter, foldl
+
+---
+
+### [Module 6: Regulative Rules](module-6-regulative.md)
 
 Model obligations, permissions, and prohibitions.
 
@@ -92,11 +93,9 @@ Model obligations, permissions, and prohibitions.
 - Chaining obligations with HENCE/LEST
 - Testing with #TRACE
 
-**Time:** 60 minutes
-
 ---
 
-### [Module 6: Putting It Together](module-6-capstone.md)
+### [Module 7: Putting It Together](module-7-capstone.md)
 
 Build a complete legal model.
 
@@ -104,8 +103,6 @@ Build a complete legal model.
 - Best practices
 - Common patterns
 - Next steps
-
-**Time:** 45 minutes
 
 ---
 
@@ -115,7 +112,7 @@ Build a complete legal model.
 Module 0 ──► Module 1 ──► Module 2 ──► Module 3
                                            │
                                            ▼
-              Module 6 ◄── Module 5 ◄── Module 4
+Module 7 ◄── Module 6 ◄── Module 5 ◄── Module 4
 ```
 
 Each module builds on the previous ones. Complete them in order for the best learning experience.

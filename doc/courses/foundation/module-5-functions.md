@@ -1,4 +1,6 @@
-# Module 4: Functions
+# Module 5: Functions
+
+**Prerequisites:** Modules 1–4
 
 In this module, you'll learn how to define reusable functions in L4.
 
@@ -16,9 +18,9 @@ By the end of this module, you will be able to:
 
 ## Function Basics
 
-This is the complete working examples to work along.
+This is the complete working example to work along.
 
-[module-4-examples.l4](module-4-examples.l4)
+[module-5-examples.l4](module-5-examples.l4)
 
 ### The Structure of a Function
 
@@ -69,12 +71,13 @@ The `GIVETH` clause declares what type the function returns:
 List parameters with `GIVEN`, separated by newlines or commas:
 
 ```l4
-GIVEN firstName IS A STRING
-      lastName IS A STRING
-      age IS A NUMBER
-GIVETH A Person
-`create person` MEANS Person firstName lastName age
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`the difference of` MEANS x - y
 ```
+
+The order of the parameters is the order in which callers supply arguments.
 
 ### Polymorphic Functions
 
@@ -109,34 +112,40 @@ GIVETH A NUMBER
 
 ```l4
 -- Arguments separated by spaces
-#EVAL `add` 3 5       -- Result: 8
+#EVAL `the sum of x and y` 3 5       -- Result: 8
 ```
 
 ---
 
 ## Local Definitions with WHERE
 
-Use `WHERE` to define helper values and functions:
+Use `WHERE` to define helper values and functions. (`EXPONENT base power` is L4's built-in exponentiation function.)
 
 ```l4
-GIVEN principal IS A NUMBER
-      rate IS A NUMBER
-      years IS A NUMBER
+GIVEN `the principal` IS A NUMBER
+      `the annual rate` IS A NUMBER
+      `the years` IS A NUMBER
 GIVETH A NUMBER
 `the compound interest` MEANS
-    principal * (factor ^ years)
+    `the principal` * EXPONENT `the growth factor` `the years`
     WHERE
-        factor MEANS 1 + rate
+        `the growth factor` MEANS 1 + `the annual rate`
 ```
 
 ### Multiple Local Definitions
 
 ```l4
+GIVEN `the loan amount` IS A NUMBER
+      `the annual rate` IS A NUMBER
+      `the term in months` IS A NUMBER
+GIVETH A NUMBER
 `the monthly payment` MEANS
-    loan * (monthlyRate * compoundFactor) / (compoundFactor - 1)
+    `the loan amount` *
+    (`the monthly rate` * `the compound factor`) /
+    (`the compound factor` - 1)
     WHERE
-        monthlyRate MEANS annualRate / 12
-        compoundFactor MEANS (1 + monthlyRate) ^ months
+        `the monthly rate` MEANS `the annual rate` / 12
+        `the compound factor` MEANS EXPONENT (1 + `the monthly rate`) `the term in months`
 ```
 
 ---
@@ -161,13 +170,17 @@ GIVETH A NUMBER
 ### List Recursion
 
 ```l4
-GIVEN xs IS A LIST OF NUMBER
+GIVEN numbers IS A LIST OF NUMBER
 GIVETH A NUMBER
-`the sum of` MEANS
-    CONSIDER xs
+`the sum of the list` MEANS
+    CONSIDER numbers
     WHEN EMPTY THEN 0
-    WHEN x FOLLOWED BY rest THEN x + `the sum of` rest
+    WHEN x FOLLOWED BY rest THEN x + `the sum of the list` rest
+
+#EVAL `the sum of the list` (LIST 1, 2, 3, 4, 5)  -- Result: 15
 ```
+
+The `CONSIDER` walks the list: an empty list sums to 0; otherwise add the first element to the sum of the rest.
 
 ---
 
@@ -191,6 +204,23 @@ filter (GIVEN n YIELD n > 0) (LIST -1, 2, -3, 4)
 -- Result: LIST 2, 4
 ```
 
+Multi-parameter lambdas separate their parameters with commas: `GIVEN acc, n YIELD acc + n`.
+
+### Folding a List into One Value
+
+`foldl` combines a whole list into a single result, starting from an initial value:
+
+```l4
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A NUMBER
+`the total of` MEANS
+    foldl (GIVEN acc, n YIELD acc + n) 0 numbers
+
+#EVAL `the total of` (LIST 1, 2, 3, 4, 5)  -- Result: 15
+```
+
+Use `foldl` (fold from the left) or `foldr` (fold from the right) from the prelude.
+
 ---
 
 ## Exercises
@@ -199,17 +229,80 @@ filter (GIVEN n YIELD n > 0) (LIST -1, 2, -3, 4)
 
 Write a function that calculates the area of a rectangle.
 
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the width` IS A NUMBER
+      `the height` IS A NUMBER
+GIVETH A NUMBER
+`the area of the rectangle` MEANS
+    `the width` * `the height`
+
+#EVAL `the area of the rectangle` 4 5
+```
+
+</details>
+
 ### Exercise 2: Function with WHERE
 
 Write a function that calculates the area of a circle using π ≈ 3.14159.
+
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN `the radius` IS A NUMBER
+GIVETH A NUMBER
+`the area of the circle` MEANS
+    pi * `the radius` * `the radius`
+    WHERE
+        pi MEANS 3.14159
+
+#EVAL `the area of the circle` 10
+```
+
+</details>
 
 ### Exercise 3: Recursive Function
 
 Write a recursive function to calculate the sum of a list of numbers.
 
+<details>
+<summary>Solution</summary>
+
+```l4
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A NUMBER
+`the sum of the list` MEANS
+    CONSIDER numbers
+    WHEN EMPTY THEN 0
+    WHEN x FOLLOWED BY rest THEN x + `the sum of the list` rest
+
+#EVAL `the sum of the list` (LIST 1, 2, 3, 4, 5)
+```
+
+</details>
+
 ### Exercise 4: Higher-Order Function
 
 Use `filter` to get all numbers greater than 10 from a list. (Remember to `IMPORT prelude`.)
+
+<details>
+<summary>Solution</summary>
+
+```l4
+IMPORT prelude
+
+GIVEN numbers IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`the numbers above ten` MEANS
+    filter (GIVEN n YIELD n > 10) numbers
+
+#EVAL `the numbers above ten` (LIST 5, 15, 8, 22, 10)
+```
+
+</details>
 
 ---
 
@@ -235,13 +328,13 @@ GIVETH A NUMBER
 GIVEN x IS A NUMBER
       y IS A NUMBER
 GIVETH A NUMBER
-`subtract` MEANS x - y
+`the difference of` MEANS x - y
 
 -- ❌ Wrong: Gets 3 - 10 = -7, not 10 - 3
-#EVAL `subtract` 3 10
+#EVAL `the difference of` 3 10
 
 -- ✅ Right: Match the order in GIVEN
-#EVAL `subtract` 10 3  -- Gets 10 - 3 = 7
+#EVAL `the difference of` 10 3  -- Gets 10 - 3 = 7
 ```
 
 ### 3. Missing Parentheses in Function Calls
@@ -262,13 +355,15 @@ f (g x)
 | -------------------- | ------------------------------------------ |
 | Function definition  | `GIVEN params GIVETH Type name MEANS expr` |
 | Decision function    | `DECIDE name IF condition`                 |
-| Local definitions    | `expr WHERE localDef MEANS value`          |
+| Local definitions    | `expr WHERE helper MEANS value`            |
 | Recursion            | Function calls itself in definition        |
 | Lambda               | `GIVEN x YIELD expression`                 |
-| Function application | `functionName arg1 arg2`                   |
+| Multi-param lambda   | `GIVEN acc, x YIELD expression`            |
+| Fold                 | `foldl (GIVEN acc, x YIELD ...) start xs`  |
+| Function application | `` `function name` arg1 arg2 ``            |
 
 ---
 
 ## What's Next?
 
-In [Module 5: Regulative Rules](module-5-regulative.md), you'll learn how to model legal obligations, permissions, and prohibitions using L4's deontic constructs.
+In [Module 6: Regulative Rules](module-6-regulative.md), you'll learn how to model legal obligations, permissions, and prohibitions using L4's deontic constructs.

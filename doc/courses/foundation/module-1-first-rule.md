@@ -1,5 +1,7 @@
 # Module 1: Your First Legal Rule
 
+**Prerequisites:** Module 0
+
 In this module, you'll write your first legal rule in L4—a simple legal obligation with conditions, deadlines, and consequences.
 
 ## Learning Objectives
@@ -23,34 +25,35 @@ Let's start with something every lawyer understands: a simple legal obligation. 
 In L4, we write this as:
 
 ```l4
-GIVEN charity IS A RegisteredCharity
-`The annual return obligation` MEANS
-    PARTY charity
-    MUST `file annual return`
+GIVEN charity IS A `Registered Charity`
+`the annual return obligation` MEANS
+    PARTY `the charity`
+    MUST `file the annual return`
 ```
 
 Let's break this down:
 
-| Code                                       | Meaning                                    |
-| ------------------------------------------ | ------------------------------------------ |
-| `GIVEN charity IS A RegisteredCharity`     | This rule applies to registered charities  |
-| `` `The annual return obligation` MEANS `` | The name of this rule                      |
-| `PARTY charity`                            | The charity is the one with the obligation |
-| `MUST`                                     | This creates a legal obligation            |
-| `` `file annual return` ``                 | This is what they must do                  |
+| Code                                        | Meaning                                    |
+| ------------------------------------------- | ------------------------------------------ |
+| ``GIVEN charity IS A `Registered Charity``` | This rule applies to registered charities  |
+| `` `the annual return obligation` MEANS ``  | The name of this rule                      |
+| `` PARTY `the charity` ``                   | The charity is the one with the obligation |
+| `MUST`                                      | This creates a legal obligation            |
+| `` `file the annual return` ``              | This is what they must do                  |
 
 ### Backtick Names
 
-Notice the backticks around `file annual return`. In L4, backticks let you use spaces and special characters in names. These are called **quoted identifiers**.
+Notice the backticks around `file the annual return`. In L4, backticks let you use spaces and special characters in names. These are called **quoted identifiers**.
 
 ```l4
--- These are equivalent ways to name things:
-fileReturn          -- camelCase (no spaces)
-`file return`       -- quoted identifier (with spaces)
-`file annual return`  -- more descriptive
+-- Without backticks, names cannot contain spaces:
+return              -- a single word
+-- With backticks, names read like natural language:
+`file the return`         -- quoted identifier (with spaces)
+`file the annual return`  -- more descriptive
 ```
 
-Use backticks when you want names that read like natural language.
+Use backticks liberally, so your names read like natural language.
 
 ---
 
@@ -58,11 +61,24 @@ Use backticks when you want names that read like natural language.
 
 Write a rule that says "A solicitor must maintain client confidentiality."
 
-Hint: You'll need to:
+Every obligation needs to know **who** can act and **what** they can do. Copy this scaffold for now—`DECLARE` is taught fully in Module 2, and `DEONTIC` (the type of obligations) in Module 6:
 
-1. Define a `DECLARE` for the Solicitor type
-2. Define `DECLARE` for the Actor and Action types
-3. Use `PARTY ... MUST ...` to create the obligation
+```l4
+DECLARE Party IS ONE OF
+    `the solicitor`
+    `the client`
+
+DECLARE Action IS ONE OF
+    `maintain client confidentiality`
+
+GIVETH A DEONTIC Party Action
+`the confidentiality obligation` MEANS
+    -- your PARTY ... MUST ... goes here
+    PARTY `the solicitor`
+    MUST `maintain client confidentiality`
+```
+
+Your job: read the scaffold and make sure the `PARTY ... MUST ...` part matches the rule in plain English. Then try changing the action name or adding a second action to the `Action` list.
 
 ---
 
@@ -71,20 +87,21 @@ Hint: You'll need to:
 Real legal rules have conditions. Let's add one:
 
 ```l4
-IF charity's status EQUALS Active
-    PARTY charity
-    MUST `file annual return`
+IF charity's `the status` EQUALS Active
+THEN PARTY `the charity`
+     MUST `file the annual return`
+ELSE FULFILLED
 ```
 
-The `IF` keyword adds a condition that must be true for the obligation to apply.
+The `IF` keyword adds a condition that must be true for the obligation to apply. The `ELSE FULFILLED` says: if the condition doesn't hold, there is nothing to do.
 
 ### Multiple Conditions
 
 Use `AND` and `OR` for multiple conditions:
 
 ```l4
-IF charity's status EQUALS Active
-   AND charity's income > 10000
+IF charity's `the status` EQUALS Active
+   AND charity's `the annual income` > 10000
 ```
 
 ### Accessing Fields
@@ -92,8 +109,8 @@ IF charity's status EQUALS Active
 The `'s` syntax accesses fields of a record:
 
 ```l4
-charity's status      -- the status field of charity
-charity's income      -- the income field of charity
+charity's `the status`         -- the status field of charity
+charity's `the annual income`  -- the annual income field of charity
 ```
 
 ---
@@ -103,8 +120,8 @@ charity's income      -- the income field of charity
 Legal obligations usually have deadlines. Use `WITHIN`:
 
 ```l4
-PARTY charity
-MUST `file annual return`
+PARTY `the charity`
+MUST `file the annual return`
 WITHIN 60
 ```
 
@@ -117,8 +134,8 @@ WITHIN 60
 What happens when someone complies or doesn't comply? Use `HENCE` and `LEST`:
 
 ```l4
-PARTY charity
-MUST `file annual return`
+PARTY `the charity`
+MUST `file the annual return`
 WITHIN 60
 HENCE FULFILLED
 LEST BREACH
@@ -134,12 +151,12 @@ LEST BREACH
 `HENCE` can trigger another obligation:
 
 ```l4
-PARTY seller
-MUST `deliver goods`
+PARTY `the seller`
+MUST `deliver the goods`
 WITHIN 14
 HENCE
-    PARTY buyer
-    MUST `pay invoice`
+    PARTY `the buyer`
+    MUST `pay the invoice` 1000
     WITHIN 30
     HENCE FULFILLED
     LEST BREACH
@@ -169,17 +186,19 @@ When a function returns an obligation (not just a value), we use `GIVETH A DEONT
 - `GIVETH A NUMBER` - returns a number
 - `GIVETH A DEONTIC Actor Action` - returns an obligation (specifying actor and action types)
 
+Don't worry about mastering `DEONTIC` yet—copy the pattern for now; it is taught fully in Module 6.
+
 ---
 
 ## Testing with #EVAL
 
-Use `#EVAL` to test expressions:
+Use `#EVAL` to test expressions. These examples use the `Animal Welfare Society` test charity defined in [module-1-examples.l4](module-1-examples.l4):
 
 ```l4
-#EVAL testCharity's name
+#EVAL `Animal Welfare Society`'s `the name`
 -- Result: "Animal Welfare Society"
 
-#EVAL testCharity's status EQUALS Active
+#EVAL `Animal Welfare Society`'s `the status` EQUALS Active
 -- Result: TRUE
 ```
 
@@ -192,8 +211,8 @@ In VS Code with the L4 extension, hover over `#EVAL` to see the result.
 For regulative rules (obligations), use `#TRACE` to simulate scenarios:
 
 ```l4
-#TRACE `annual return obligation` testCharity AT 0 WITH
-    PARTY testCharity DOES `file annual return` AT 30
+#TRACE `the annual return obligation` `Animal Welfare Society` AT 0 WITH
+    PARTY `the charity` DOES `file the annual return` AT 30
 ```
 
 This simulates:
@@ -211,31 +230,31 @@ The result shows whether the obligation was `FULFILLED` or `BREACH`.
 
 ```l4
 -- ❌ Wrong: Type not declared
-GIVEN charity IS A RegisteredCharity
+GIVEN charity IS A `Registered Charity`
 
 -- ✅ Right: Declare the type first
-DECLARE RegisteredCharity
-    HAS name IS A STRING
+DECLARE `Registered Charity`
+    HAS `the name` IS A STRING
 ```
 
 ### 2. Wrong Field Access
 
 ```l4
 -- ❌ Wrong: Missing 's
-IF charity status EQUALS Active
+IF charity `the status` EQUALS Active
 
 -- ✅ Right: Use 's for field access
-IF charity's status EQUALS Active
+IF charity's `the status` EQUALS Active
 ```
 
 ### 3. Missing Backticks for Multi-Word Names
 
 ```l4
 -- ❌ Wrong: Spaces without backticks
-MUST file annual return
+MUST file the annual return
 
 -- ✅ Right: Use backticks
-MUST `file annual return`
+MUST `file the annual return`
 ```
 
 ## Exercises
@@ -244,13 +263,98 @@ MUST `file annual return`
 
 Write an L4 rule for: "An employee must submit a timesheet every week."
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Employment Party` IS ONE OF
+    `the employee`
+    `the employer`
+
+DECLARE `Employment Action` IS ONE OF
+    `submit the timesheet`
+
+GIVETH A DEONTIC `Employment Party` `Employment Action`
+`the timesheet obligation` MEANS
+    PARTY `the employee`
+    MUST `submit the timesheet`
+    WITHIN 7
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `the timesheet obligation` AT 0 WITH
+    PARTY `the employee` DOES `submit the timesheet` AT 5
+```
+
+</details>
+
 ### Exercise 2: Conditional Obligation
 
 Write an L4 rule for: "If a tenant is more than 14 days late on rent, the landlord may issue an eviction notice."
 
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Tenancy Party` IS ONE OF
+    `the landlord`
+    `the tenant`
+
+DECLARE `Tenancy Action` IS ONE OF
+    `issue an eviction notice`
+
+GIVEN `the days the rent is late` IS A NUMBER
+GIVETH A DEONTIC `Tenancy Party` `Tenancy Action`
+`the eviction permission` MEANS
+    IF `the days the rent is late` > 14
+    THEN PARTY `the landlord`
+         MAY `issue an eviction notice`
+         HENCE FULFILLED
+    ELSE FULFILLED
+
+#TRACE `the eviction permission` 20 AT 0 WITH
+    PARTY `the landlord` DOES `issue an eviction notice` AT 1
+```
+
+Note the `MAY`: the landlord is permitted to act, but not obliged. You'll meet `MAY` again in Module 6.
+
+</details>
+
 ### Exercise 3: Chained Obligations
 
 Write L4 rules for: "The seller must deliver goods within 14 days. If delivered, the buyer must pay within 30 days."
+
+<details>
+<summary>Solution</summary>
+
+```l4
+DECLARE `Sale Party` IS ONE OF
+    `the seller`
+    `the buyer`
+
+DECLARE `Sale Action` IS ONE OF
+    `deliver the goods`
+    `pay the invoice`
+
+GIVETH A DEONTIC `Sale Party` `Sale Action`
+`the sale agreement` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE
+        PARTY `the buyer`
+        MUST `pay the invoice`
+        WITHIN 30
+        HENCE FULFILLED
+        LEST BREACH
+    LEST BREACH
+
+#TRACE `the sale agreement` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 10
+    PARTY `the buyer` DOES `pay the invoice` AT 25
+```
+
+</details>
 
 ---
 
@@ -273,4 +377,4 @@ In this module, you learned:
 
 ## What's Next?
 
-In [Module 2: Legal Entities](module-2-entities.md), you'll learn how to model complex legal entities with proper types, including records, enums, and relationships between entities.
+In [Module 2: Legal Entities and Relationships](module-2-entities.md), you'll learn how to model complex legal entities with proper types, including records, enums, and relationships between entities.

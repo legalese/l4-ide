@@ -1,6 +1,6 @@
 # WebMCP Embed Script
 
-Drop a single `<script>` tag into your website so visitors' AI assistants can evaluate your deployed rules directly in the browser, via [WebMCP](https://modelcontextprotocol.io).
+Drop a single `<script>` tag into your website so visitors' AI assistants can evaluate your deployed rules directly in the browser, via [WebMCP](https://webmachinelearning.github.io/webmcp/).
 
 **Prerequisites:** A deployment ([Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md)) and the ability to edit your site's HTML
 
@@ -41,13 +41,29 @@ The VS Code **Integrate** dialog pre-fills the correct `src` for your connection
 
 ### Attributes
 
-| Attribute      | Meaning                                                               |
-| -------------- | --------------------------------------------------------------------- |
-| `src`          | The WebMCP loader served by Legalese Cloud / your jl4-service         |
-| `data-org`     | Your organization slug on Legalese Cloud. Unnecessary for jl4-service |
-| `data-scope`   | Which pages the tools are offered on (`*` = the whole site)           |
-| `data-tools`   | `auto` registers every exported rule; or a comma-separated allow-list |
-| `data-api-key` | A Legalese Cloud API key authorizing rule evaluation                  |
+| Attribute      | Meaning                                                                    |
+| -------------- | -------------------------------------------------------------------------- |
+| `src`          | The WebMCP loader served by Legalese Cloud / your jl4-service              |
+| `data-org`     | Your organization slug on Legalese Cloud (hosted snippet only, see below)  |
+| `data-scope`   | Which deployments the tools cover (`*` = all, `insurance-premium/*` = one) |
+| `data-tools`   | Comma-separated list of tool **categories** to register (default: `auto`)  |
+| `data-api-key` | A Legalese Cloud API key authorizing rule evaluation                       |
+
+### Tool categories (`data-tools`)
+
+`data-tools` is **not** a per-rule allow-list — it selects which categories of tools the script registers:
+
+| Category     | Registers                                                                        |
+| ------------ | -------------------------------------------------------------------------------- |
+| `rules`      | One tool per exported rule (direct evaluation)                                   |
+| `rule-tools` | The discovery tools `search_rules`, `get_rule_schema`, `evaluate_rule`           |
+| `file-tools` | `list_files`, `read_file`, `search_identifier`, `search_text` (browse L4 source) |
+| `auto`       | `rules` if the scope has at most 10 exported rules, otherwise `rule-tools`       |
+| `all`        | `rules` + `rule-tools` + `file-tools`                                            |
+
+You can combine categories, e.g. `data-tools="rules,file-tools"`.
+
+> **Note:** the self-hosted `embed.js` reads only `data-api-key`, `data-scope`, and `data-tools`. `data-org` applies to the hosted Legalese Cloud snippet only — a self-hosted service already knows its own deployments.
 
 ## Getting an API Key
 
