@@ -66,19 +66,58 @@ IMPORT prelude
 #ASSERT max (JUST 3) (JUST 5) EQUALS JUST 5
 #ASSERT min (JUST 3) (JUST 5) EQUALS JUST 3
 
-§§ `NOTHING is currently incomparable`
+§§ `NOTHING means absent, not incomparable`
 
--- Recorded, not endorsed. Ordering on MAYBE NUMBER is not total: every
--- comparison involving NOTHING is FALSE, including NOTHING <= NOTHING. So
--- `max`/`min` fall through to their ELSE branch and return their second
--- argument whenever NOTHING is involved, and an extremum over a list
--- containing NOTHING is order-dependent. These #EVALs exist so that a future
--- change to MAYBE ordering shows up as a golden diff rather than passing
--- unnoticed.
+-- The MAYBE overloads of `max`/`min` pattern-match on their arguments rather
+-- than comparing them with `<=`/`>=`. That distinction is the whole point of
+-- this section: comparison against NOTHING is FALSE (including
+-- NOTHING <= NOTHING), so a comparison-based `min` treated NOTHING as winning
+-- every comparison and then let a later JUST displace it — which made
+-- `minimum` over a list containing NOTHING return neither the minimum nor
+-- NOTHING, but whichever JUST happened to come last.
+--
+-- Under the pattern-matching definitions NOTHING reads as "no value here" and
+-- the other operand wins, so an extremum over a list skips the NOTHINGs and is
+-- no longer order-dependent. A list with nothing left to compare — empty, or
+-- all NOTHING — yields NOTHING.
+--
+-- Both #EVAL and #ASSERT are kept: the #EVALs keep any future change to MAYBE
+-- ordering visible as a golden diff, and the #ASSERTs make a regression fail
+-- the suite outright rather than only churning a golden.
 
 #EVAL max (JUST 3) NOTHING
 #EVAL max NOTHING (JUST 3)
 #EVAL min (JUST 3) NOTHING
 #EVAL min NOTHING (JUST 3)
+#ASSERT max (JUST 3) NOTHING EQUALS JUST 3
+#ASSERT max NOTHING (JUST 3) EQUALS JUST 3
+#ASSERT min (JUST 3) NOTHING EQUALS JUST 3
+#ASSERT min NOTHING (JUST 3) EQUALS JUST 3
+
+-- The interior NOTHING is the case that was wrong: `minimum` returned JUST 5,
+-- the last JUST in the list, rather than JUST 3.
 #EVAL maximum (LIST (JUST 3), NOTHING, (JUST 5))
 #EVAL minimum (LIST (JUST 3), NOTHING, (JUST 5))
+#ASSERT maximum (LIST (JUST 3), NOTHING, (JUST 5)) EQUALS JUST 5
+#ASSERT minimum (LIST (JUST 3), NOTHING, (JUST 5)) EQUALS JUST 3
+
+-- NOTHING in every other position, so no single placement can pass by accident.
+#ASSERT minimum (LIST NOTHING, (JUST 3), (JUST 5)) EQUALS JUST 3
+#ASSERT minimum (LIST (JUST 3), (JUST 5), NOTHING) EQUALS JUST 3
+#ASSERT maximum (LIST NOTHING, (JUST 3), (JUST 5)) EQUALS JUST 5
+#ASSERT maximum (LIST (JUST 3), (JUST 5), NOTHING) EQUALS JUST 5
+
+-- Nothing left to compare. The empty list needs a typed binding: bare EMPTY
+-- does not say which `minimum` overload is meant.
+GIVETH A LIST OF MAYBE NUMBER
+`no numbers` MEANS EMPTY
+
+GIVETH A LIST OF MAYBE NUMBER
+`all nothing` MEANS LIST NOTHING, NOTHING
+
+#EVAL minimum `no numbers`
+#EVAL minimum `all nothing`
+#ASSERT minimum `no numbers` EQUALS NOTHING
+#ASSERT maximum `no numbers` EQUALS NOTHING
+#ASSERT minimum `all nothing` EQUALS NOTHING
+#ASSERT maximum `all nothing` EQUALS NOTHING

@@ -36,5 +36,21 @@
 `max` with `NOTHING` and `JUST` with 3
 `min` with `JUST` with 3 and `NOTHING`
 `min` with `NOTHING` and `JUST` with 3
+`max` with `JUST` with 3 and `NOTHING` is equal to `JUST` with 3
+`max` with `NOTHING` and `JUST` with 3 is equal to `JUST` with 3
+`min` with `JUST` with 3 and `NOTHING` is equal to `JUST` with 3
+`min` with `NOTHING` and `JUST` with 3 is equal to `JUST` with 3
 `maximum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5
 `minimum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5
+`maximum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5 is equal to `JUST` with 5
+`minimum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5 is equal to `JUST` with 3
+`minimum` with list of `NOTHING`, `JUST` with 3 and `JUST` with 5 is equal to `JUST` with 3
+`minimum` with list of `JUST` with 3, `JUST` with 5 and `NOTHING` is equal to `JUST` with 3
+`maximum` with list of `NOTHING`, `JUST` with 3 and `JUST` with 5 is equal to `JUST` with 5
+`maximum` with list of `JUST` with 3, `JUST` with 5 and `NOTHING` is equal to `JUST` with 5
+`minimum` with `no numbers`
+`minimum` with `all nothing`
+`minimum` with `no numbers` is equal to `NOTHING`
+`maximum` with `no numbers` is equal to `NOTHING`
+`minimum` with `all nothing` is equal to `NOTHING`
+`maximum` with `all nothing` is equal to `NOTHING`

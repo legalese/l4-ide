@@ -371,7 +371,13 @@ GIVEN
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 min x y @nlg the lesser of %x% and %y%
-  MEANS IF x <= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a <= b THEN x ELSE y
 
 GIVEN
   list IS A LIST OF MAYBE NUMBER
@@ -397,7 +403,13 @@ GIVEN
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 max x y @nlg the greater of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a >= b THEN x ELSE y
 
 
 §§ `Ranges, Sorting & Search`
