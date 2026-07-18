@@ -377,7 +377,12 @@ data TSpaces
 data TLiterals
   = TIntLit       !Text !Integer
   | TRationalLit  !Text !Rational
-  | TStringLit    !Text
+  | TStringLit    !Text !Text
+  -- ^ @TStringLit raw decoded@. The first field is the verbatim source slice
+  -- (including quotes and any escapes as written); the second is the decoded
+  -- value. Keeping the raw slice — mirroring 'TIntLit'/'TRationalLit' — lets
+  -- exactprint reproduce the source byte-for-byte instead of re-escaping
+  -- non-ASCII characters through 'showLitString'.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -477,9 +482,12 @@ blockComment =
   where
     inner = blockComment <|> Text.singleton <$> anySingle
 
-stringLiteral :: Lexer Text
+-- | Lex a string literal, returning @(raw, decoded)@: the verbatim source
+-- slice (quotes included) and the escape-decoded value. 'Megaparsec.match'
+-- captures the raw slice so exactprint can reproduce it exactly.
+stringLiteral :: Lexer (Text, Text)
 stringLiteral =
-  char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"'))
+  Megaparsec.match (char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"')))
 
 -- | A quoted identifier between backticks.
 quoted :: Lexer Text
@@ -564,7 +572,7 @@ literalPayload :: Lexer TLiterals
 literalPayload = asum
   [ uncurry TRationalLit <$> try rationalLiteral
   , uncurry TIntLit      <$> try integerLiteral
-  , TStringLit           <$> stringLiteral
+  , uncurry TStringLit   <$> stringLiteral
   ]
 
 identifiersPayload :: Lexer TIdentifiers
@@ -1062,7 +1070,7 @@ displayTokenType = \case
   TLiterals lit -> case lit of
     TIntLit t _i      -> t
     TRationalLit t _i -> t
-    TStringLit s      -> showStringLit s
+    TStringLit raw _  -> raw
   TAnnotations ann -> case ann of
     TNlg t ty         -> toNlgAnno t ty
     TRef t ty         -> toRefAnno t ty

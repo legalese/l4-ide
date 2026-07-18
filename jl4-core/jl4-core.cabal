@@ -173,6 +173,7 @@ test-suite jl4-core-test
     UnifySpec
     MixfixParserSpec
     EventExactPrintSpec
+    FormatFidelitySpec
     PatternMatchParserSpec
     BulletParserSpec
     UUID5Spec

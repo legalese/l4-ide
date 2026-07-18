@@ -14,7 +14,7 @@
 -- so the ambient serial difference below is 1857 days (and 0 days under
 -- AS OF SYSTEM TIME 2020-01-01).
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 x MEANS 1 DIVIDED BY (DATE_SERIAL TODAY MINUS DATE_SERIAL (DATE_FROM_DMY 1 1 2020))
 

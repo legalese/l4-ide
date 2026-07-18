@@ -15,7 +15,7 @@
 -- directives evaluate after all module decls; it is covered by the
 -- validFor unit tests in TemporalContextSpec.)
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 ----------------------------------------------------------------------------
 -- Case 1: inside-to-outside (forced under the override first)

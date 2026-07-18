@@ -13,7 +13,7 @@
 -- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z,
 -- so ambient DATE_SERIAL TODAY = 739646; serial of 2000-01-01 = 730484.
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 past MEANS DATE_SERIAL (DATE_FROM_DMY 1 1 2000)
 

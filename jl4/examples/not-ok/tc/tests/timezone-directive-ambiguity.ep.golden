@@ -8,4 +8,4 @@ GIVEN p IS A BOOLEAN
 DECIDE foo OF p
   IF p
 
-foo TRUE
+TIMEZONE IS foo TRUE
