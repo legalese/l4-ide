@@ -4,8 +4,10 @@ IMPORT prelude
 
 -- The acceptance test of SET-OPERATORS-SPEC.md §5: the same token AND,
 -- disambiguated by type. Term-level AND on SETs is the lattice join (union);
--- sentence-level AND on BOOLEANs stays conjunction. Partee & Rooth (1983),
--- implemented.
+-- sentence-level AND on BOOLEANs stays conjunction. The type-directed
+-- dispatch is in the spirit of Partee & Rooth (1983); the union reading is
+-- L4's chosen resolution, not a claim any authority holds that "and"
+-- denotes union (SET-OPERATORS-SPEC §9.3, §10.6).
 
 §§ `Term-level AND: union`
 
