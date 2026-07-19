@@ -1187,7 +1187,16 @@ lowerDeclare (MkDeclare _ _ appForm typeDecl) = do
 
     EnumDecl _ variants -> do
       let variantInfos = zipWith (\(MkConDecl _ n _) i -> (resolvedName n, i)) variants [0..]
-      modify' $ \s -> s { typeEnv = registerEnum name variantInfos s.typeEnv }
+          -- A variant that carries fields (@… HAS f IS …@) makes this an
+          -- enum-with-data: construction discards the payload (bare tag), so
+          -- the value cannot be marshalled across the ABI (see
+          -- 'refusesDataEnumReturn' at the export boundary).
+          hasPayload = any (\(MkConDecl _ _ fields) -> not (null fields)) variants
+      modify' $ \s -> s
+        { typeEnv =
+            (if hasPayload then registerDataEnum name else id)
+              (registerEnum name variantInfos s.typeEnv)
+        }
 
     SynonymDecl _ _ -> pure ()  -- Type synonyms are erased
   where
@@ -1216,6 +1225,25 @@ traceResultKindForL4Type t = case t of
     | resolvedName n `elem` ["BOOLEAN", "boolean"] -> 1
     | resolvedName n `elem` ["STRING", "string"]   -> 2
   _ -> 3
+
+-- | The head type name of a function's GIVETH return type, when it is a
+-- named type application (@GIVETH A Rev@ → @Just "Rev"@). Returns 'Nothing'
+-- for functions without a GIVETH or with a non-application return type.
+givethTypeName :: TypeSig Resolved -> Maybe Text
+givethTypeName (MkTypeSig _ _ (Just (MkGivethSig _ ty))) = case ty of
+  TyApp _ n _ -> Just (resolvedName n)
+  _           -> Nothing
+givethTypeName _ = Nothing
+
+-- | Diagnostic for refusing to export a function that returns an
+-- enum-with-data value (the payload cannot survive the bare-tag ABI
+-- representation — see the call site in 'lowerDecide').
+dataEnumReturnReason :: Text -> Text
+dataEnumReturnReason tyName =
+  "export returns the enum-with-data type " <> tyName
+    <> ", which the WASM backend lowers as a bare enum tag (the constructor "
+    <> "payload is discarded), so the value cannot be marshalled across the "
+    <> "ABI without silently losing data"
 
 -- | Emit @__l4_trace_enter(nodeId)@ — a void runtime call. The lowering
 -- passes nodeId as a plain @arith.constant@ f64 value (not a bit-cast),
@@ -1258,7 +1286,7 @@ _emitTracePopArgPaths =
   emit $ funcCall [] "__l4_trace_pop_arg_paths" [] [] []
 
 lowerDecide :: Decide Resolved -> LowerM ()
-lowerDecide (MkDecide _ typeSig appForm body) = do
+lowerDecide decide@(MkDecide _ typeSig appForm body) = do
   env <- gets (.typeEnv)
   funcName <- symbolFor (appFormHead' appForm)
   let givenParams = appFormParams appForm
@@ -1284,6 +1312,20 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
     { currentFunction = Just funcName
     , pendingDecide = Set.insert rawDecideName oldPending
     }
+  -- Fail-closed at the ABI boundary: an @\@export@ whose GIVETH return type
+  -- is an enum-with-data (@ONE OF … HAS …@) cannot be marshalled faithfully.
+  -- Construction lowers such a constructor to a BARE enum tag — the payload
+  -- is discarded (see 'lowerExpr') — so the WASM return carries only the tag
+  -- while jl4-service returns the full @{ "CTOR": { field: … } }@ value: a
+  -- SILENT WRONG at @supported:true@ (e.g. @mk rev 5@ → WASM @0@ vs service
+  -- @{"RIGHT":{"rv":5}}@). Refuse so the export ships @supported:false@ and
+  -- the proxy routes it to the reference evaluator. Nullary enums (bare tag
+  -- IS the whole value) and records (fields marshalled via 'lookupRecordFields')
+  -- are faithful and stay supported.
+  case givethTypeName typeSig of
+    Just retName | isDataEnum retName env, Export.isExportedDecide decide ->
+      () <$ markUnsupported (dataEnumReturnReason retName)
+    _ -> pure ()
   -- If this DECIDE is @export-decorated and references ASSUMEs, those
   -- ASSUMEs become additional ABI parameters (see 'collectExportAssumeArgs').
   -- They're appended after the GIVEN params so existing call sites for

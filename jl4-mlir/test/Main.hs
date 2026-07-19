@@ -63,6 +63,7 @@ main = do
     , test "string CONSIDER emits __l4_str_eq" testStringPatternStrEq
     , test "EITHER CONSIDER → supported dispatch" testEitherConsiderSupported
     , test "user LEFT/RIGHT enum → supported:false" testUserEitherShadowUnsupported
+    , test "enum-with-data return → supported:false" testDataEnumReturnUnsupported
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
@@ -881,6 +882,45 @@ testUserEitherShadowUnsupported = do
             && T.isInfixOf "payload-carrying user constructor" json
       unless ok $
         putStrLn $ "\n    expected supported:false for the user LEFT/RIGHT enum. got:\n    "
+          <> T.unpack (T.take 700 json)
+      pure ok
+  where
+    unless b act = if b then pure () else act
+
+-- | Fail-closed guard for the enum-with-data ABI-return silent-wrong. An
+-- @\@export@ whose GIVETH return type is a payload-carrying enum
+-- (@ONE OF … HAS …@) cannot be marshalled across the f64 ABI: construction
+-- lowers a constructor like @RIGHT n@ to a BARE enum tag (the payload is
+-- discarded), so the WASM return carries only the tag while jl4-service
+-- returns the full @{"RIGHT":{"rv":n}}@ value — a SILENT WRONG at
+-- @supported:true@ (@mk rev 5@ → WASM @0@ vs service @{"RIGHT":{"rv":5}}@).
+-- The export must therefore ship @supported:false@ so the proxy routes it to
+-- the reference evaluator. This is name-independent (not a LEFT/RIGHT
+-- artefact); nullary enums and records marshal faithfully and stay supported.
+testDataEnumReturnUnsupported :: IO Bool
+testDataEnumReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Res IS ONE OF"
+        , "  FOO HAS fv IS A NUMBER"
+        , "  BAR HAS bv IS A NUMBER"
+        , ""
+        , "@export make res"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Res"
+        , "`make res` MEANS"
+        , "  IF n GREATER THAN 0 THEN FOO n ELSE BAR n"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "enum-with-data type" json
+      unless ok $
+        putStrLn $ "\n    expected supported:false for the enum-with-data return. got:\n    "
           <> T.unpack (T.take 700 json)
       pure ok
   where

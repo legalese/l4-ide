@@ -137,23 +137,31 @@ good manners to admit to.
   `either-adv.l4` (order-swap, payload-compared-after-bind, payload==tag-const,
   nested EITHER-of-EITHER; all branch-crossing) are **byte-identical**. Haskell
   `cabal test jl4-mlir` = **35/35**. The assigned blocker is resolved.
-- ⚠️ **OPEN / OUT-OF-LANE — enum-with-data ABI return silent-wrong (pre-existing,
-  NOT ledger #10).** A separate probe `either-ret.l4` (`GIVETH A Rev` where
-  `Rev IS ONE OF RIGHT HAS rv …; LEFT HAS lv …`, returned across the ABI) is a
-  `differs` at `supported:true`: jl4-service returns `{RIGHT:{rv:5}}`, WASM
-  returns the bare tag `0`. Root cause is the CONSTRUCTION `lookupEnumTag` arm
-  (`Lower.hs` ~1849–1851) that lowers an enum-with-data constructor to a bare
-  f64 tag, **discarding the payload** — this arm dates to the initial jl4-mlir
-  commit `13dd5419` (Apr 2026) and is UNCHANGED by ledger #10. A Lo/Hi-named
-  control (`HI HAS hv …; LO HAS lv …`) reproduces the identical `differs`, so
-  the divergence is **name-agnostic** (not a LEFT/RIGHT collision) and affects
-  ALL enum-with-data returns. A fail-closed fix (mark such exports
-  `supported:false`) is blocked here because `TypeEnv.EnumInfo = [(Text,Integer)]`
-  (`Types.hs:66`) records only (variant,tag) and cannot distinguish an
-  enum-with-data variant from a nullary one — so gating requires enriching
-  `EnumInfo` with per-variant arities, a corpus-wide change (nullary-enum
-  returns are common and currently byte-identical) that belongs in its own lane.
-  `either-ret.l4` is committed as documentation, kept OUT of the gated corpus.
+- ✅ **RESOLVED — enum-with-data ABI return silent-wrong (pre-existing, NOT
+  ledger #10, fixed fail-closed in this lane).** The probe `either-ret.l4`
+  (`GIVETH A Rev` where `Rev IS ONE OF RIGHT HAS rv …; LEFT HAS lv …`, returned
+  across the ABI) was a `differs` at `supported:true`: jl4-service returns
+  `{RIGHT:{rv:5}}`, WASM returned the bare tag `0`. Root cause is the
+  CONSTRUCTION `lookupEnumTag` arm (`Lower.hs` ~1849–1851) that lowers an
+  enum-with-data constructor to a bare f64 tag, **discarding the payload** —
+  this arm dates to the initial jl4-mlir commit `13dd5419` (Apr 2026) and is
+  UNCHANGED by ledger #10. A Lo/Hi-named control reproduces the identical
+  `differs`, so the divergence is **name-agnostic** (not a LEFT/RIGHT collision)
+  and affects ALL enum-with-data returns. **Fix:** the earlier "blocked because
+  `EnumInfo` can't distinguish enum-with-data from nullary" claim was wrong — no
+  `EnumInfo` change is needed. Added a `dataEnums :: Set Text` to `TypeEnv`
+  (`Types.hs`), populated in `lowerDeclare` when any variant's `MkConDecl` field
+  list is non-empty, and a check in `lowerDecide`: an `@export` whose GIVETH
+  head type `isDataEnum` now **REFUSES** (`supported:false` → routes to the
+  reference evaluator) via `dataEnumReturnReason`. Verified name-agnostic:
+  `either-ret::mk-rev` and a Foo/Bar control both flip `differs → refused`.
+  **Nullary-enum returns and record returns are UNTOUCHED** and stay
+  byte-identical (a Grade `Lo`/`Hi` return and a `Pair HAS a,b` return both
+  verified byte-identical after the fix), so zero corpus regression: gated
+  Tier-2 stays **79 byte-identical, 0 differs**. Guarded by Haskell
+  `enum-with-data return → supported:false` (`cabal test jl4-mlir` = **36/36**);
+  `either-ret.l4` now refuses (kept out of the gated corpus, same as the
+  shadow fixtures).
 
 ---
 

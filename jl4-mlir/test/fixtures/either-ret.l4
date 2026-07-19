@@ -1,8 +1,10 @@
--- Silent-wrong hunt: return a USER enum-with-data across the ABI.
--- Construction lowers RIGHT n / LEFT n to a BARE tag (payload discarded).
--- The CONSIDER-destructure path refuses, but returning the value does NOT
--- go through testPatternTy. Does this export ship supported:true with the
--- payload lost (WASM disagrees with jl4-service)?
+-- Return a USER enum-with-data across the ABI. Construction lowers RIGHT n /
+-- LEFT n to a BARE tag (payload discarded), so the WASM return would carry
+-- only the tag while jl4-service returns {"RIGHT":{"rv":n}} — a silent wrong
+-- at supported:true. FIXED (fail-closed): an @export whose GIVETH type is an
+-- enum-with-data now REFUSES (supported:false → routes to the reference
+-- evaluator), so this fixture is now `refused-unsupported`, NOT `differs`.
+-- Kept OUT of the gated corpus (it refuses entirely, like either-shadow).
 IMPORT prelude
 
 DECLARE Rev IS ONE OF

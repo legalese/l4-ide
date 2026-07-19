@@ -386,6 +386,19 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
     enums are untouched. Full corpus still **104 byte-identical, 0 differs**.
     Guard: Haskell `user LEFT/RIGHT enum → supported:false` + committed
     `either-shadow{,2}.l4` (kept out of the gated corpus — they refuse fully).
+  - ⚠️→✅ **Sibling silent-wrong: enum-with-data ABI RETURN.** Surfaced by the
+    same shadow hunt (`either-ret.l4`): an `@export` `GIVETH A Rev` (returning a
+    `ONE OF … HAS …` value) shipped `supported:true` but returned the bare tag
+    `0` while jl4-service returns `{"RIGHT":{"rv":5}}` — payload silently lost.
+    Pre-existing (construction `lookupEnumTag` arm dates to `13dd5419`, NOT
+    ledger #10) and name-agnostic (a Foo/Bar control reproduces it). Fixed
+    fail-closed: added `dataEnums :: Set Text` to `TypeEnv` (populated in
+    `lowerDeclare` when a `MkConDecl` carries fields) + a `lowerDecide` check
+    (`givethTypeName` + `isDataEnum` → `dataEnumReturnReason`) so such exports
+    **REFUSE** (`supported:false`). Nullary-enum and record returns are
+    untouched and stay byte-identical (verified), so gated Tier-2 is unchanged
+    (**79 byte-identical, 0 differs**). Guard: Haskell
+    `enum-with-data return → supported:false`; `either-ret.l4` now refuses.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
