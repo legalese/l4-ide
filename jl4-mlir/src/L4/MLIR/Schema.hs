@@ -784,6 +784,38 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- correct (right-answer-preserving) outcome, per the refuse-vs-silent-wrong
       -- bias.
       deonticExtractionFailed = isDeonticFn && isNothing deonticContract_
+
+      -- Fail-closed ABI guard (the enum-with-data refusal, raised to the
+      -- altitude where it is actually decidable). The JS runtime unmarshals a
+      -- WASM return one of two ways: from 'returnSchema' (records / enums /
+      -- lists / optionals whose parts are all decodable), or — for a plain
+      -- scalar — from the display 'returnType' string. A return type that is
+      -- NEITHER has no faithful decoding: e.g. an enum-with-data
+      -- (@ONE OF … HAS …@), or any record / list / optional that transitively
+      -- contains one, for which 'typeToRetSchema' returns 'Nothing'. The WASM
+      -- side lowers such constructors to a bare tag / pointer f64, so serving
+      -- the raw return at @supported:true@ silently drops the payload (Iron
+      -- Rule 2 — the cardinal sin). Refuse instead, so the export ships
+      -- @supported:false@ and routes to the reference evaluator. This subsumes
+      -- the older syntactic-GIVETH guard, which keyed on the written return
+      -- type and thus missed inferred returns (no GIVETH) and enum-with-data
+      -- nested inside a record / list / optional head. Peeling Forall / Fun
+      -- mirrors 'returnTypeDisplay', so an inferred scalar return arriving
+      -- Fun-wrapped is still recognised as a scalar and stays supported.
+      -- Exemptions: deontic returns (decoded via 'deonticContract' — and
+      -- guarded separately by 'deonticExtractionFailed' above) and an
+      -- unknown return type (@exportReturnType = Nothing@ — behaviour
+      -- unchanged; we cannot decide what we cannot see).
+      unmarshallableReturn = case peelReturnType <$> ef.exportReturnType of
+        Just ty
+          | not isDeonticFn
+          , isNothing (typeToRetSchema declares Set.empty ty)
+          -> Just (unmarshallableReturnReason (returnTypeDisplay (Just ty)))
+        _ -> Nothing
+
+      -- The two schema-build refusal guards compose disjointly: the
+      -- deontic-extraction guard fires only when 'isDeonticFn', the
+      -- unmarshallable-return guard only when not.
       (supported_, unsupportedReason_)
         | deonticExtractionFailed =
             ( False
@@ -796,6 +828,7 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
                    \Interpreting it would risk a wrong answer, so the WASM backend \
                    \refuses and routes to the jl4-service fallback."
             )
+        | Just reason <- unmarshallableReturn = (False, Just reason)
         | otherwise = (True, Nothing)
   in FunctionExport
        { apiName     = sanitizeFunctionName name
@@ -806,9 +839,11 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable unless the DEONTIC-extraction guard above
-       -- already refused; 'applyDiagnostics' additionally downgrades
-       -- functions the lowering flagged as unsupported.
+       -- Assume compilable unless a schema-build guard above already
+       -- refused (DEONTIC extraction failure, or an unmarshallable ABI
+       -- return); 'applyDiagnostics' additionally downgrades functions
+       -- the lowering flagged as unsupported (that pass only ever
+       -- downgrades, never re-upgrades).
        , supported   = supported_
        , unsupportedReason = unsupportedReason_
        , traceMeta   = Just traceMeta_
@@ -1890,6 +1925,27 @@ genericDeonticParam desc = (emptyParam "object") { parameterDescription = desc }
 -- ---------------------------------------------------------------------------
 -- Return-type display
 -- ---------------------------------------------------------------------------
+
+-- | Peel the wrappers an inferred return type arrives in — a 'Forall'
+-- (typechecker generalisation) or a residual 'Fun' return (partial
+-- application) — down to the underlying return type. Mirrors the peeling
+-- in 'returnTypeDisplay' so the fail-closed ABI guard in 'buildExport'
+-- sees the same core type the display string does (e.g. a scalar hidden
+-- under a 'Fun' stays recognised as a scalar and is not refused).
+peelReturnType :: Type' Resolved -> Type' Resolved
+peelReturnType (Forall _ _ inner) = peelReturnType inner
+peelReturnType (Fun _ _ ret)      = peelReturnType ret
+peelReturnType ty                 = ty
+
+-- | Diagnostic for an @\@export@ whose return type cannot be marshalled
+-- across the WASM ABI (see the guard in 'buildExport').
+unmarshallableReturnReason :: Text -> Text
+unmarshallableReturnReason disp =
+  "export return type " <> disp <> " cannot be marshalled across the WASM "
+    <> "ABI: it is an enum-with-data (or a record / list / optional "
+    <> "transitively containing one), which the backend lowers as a bare "
+    <> "enum tag / pointer, so the WASM return would silently lose the "
+    <> "constructor payload"
 
 returnTypeDisplay :: Maybe (Type' Resolved) -> Text
 returnTypeDisplay Nothing = "unknown"

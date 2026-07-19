@@ -23,8 +23,6 @@ module L4.MLIR.Types
   , emptyTypeEnv
   , registerRecord
   , registerEnum
-  , registerDataEnum
-  , isDataEnum
   , lookupRecordFields
   , lookupEnumVariants
   ) where
@@ -33,8 +31,6 @@ import L4.MLIR.IR
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import L4.Syntax (Type', Resolved)
 
 -- | L4 NUMBER → f64 (64-bit IEEE 754 double).
@@ -74,33 +70,17 @@ type EnumInfo = [(Text, Integer)]
 data TypeEnv = TypeEnv
   { records :: Map Text RecordInfo
   , enums   :: Map Text EnumInfo
-    -- | Names of @DECLARE … IS ONE OF@ enums with at least one
-    -- payload-carrying variant (@… HAS field IS …@). Construction lowers
-    -- such a constructor to a BARE enum tag (the payload is discarded — see
-    -- 'lowerExpr'), so an enum-with-data value cannot be faithfully
-    -- marshalled across the f64 ABI. Used to fail-close exports that would
-    -- return one (the payload would be silently lost otherwise).
-  , dataEnums :: Set Text
   }
   deriving stock (Show)
 
 emptyTypeEnv :: TypeEnv
-emptyTypeEnv = TypeEnv Map.empty Map.empty Set.empty
+emptyTypeEnv = TypeEnv Map.empty Map.empty
 
 registerRecord :: Text -> RecordInfo -> TypeEnv -> TypeEnv
 registerRecord name fields env = env { records = Map.insert name fields env.records }
 
 registerEnum :: Text -> EnumInfo -> TypeEnv -> TypeEnv
 registerEnum name variants env = env { enums = Map.insert name variants env.enums }
-
--- | Mark an enum type as payload-carrying (enum-with-data). Idempotent.
-registerDataEnum :: Text -> TypeEnv -> TypeEnv
-registerDataEnum name env = env { dataEnums = Set.insert name env.dataEnums }
-
--- | True iff @name@ is a user enum with at least one payload-carrying
--- variant (registered via 'registerDataEnum').
-isDataEnum :: Text -> TypeEnv -> Bool
-isDataEnum name env = Set.member name env.dataEnums
 
 lookupRecordFields :: Text -> TypeEnv -> Maybe RecordInfo
 lookupRecordFields name env = Map.lookup name env.records

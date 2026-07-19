@@ -149,19 +149,36 @@ good manners to admit to.
   `differs`, so the divergence is **name-agnostic** (not a LEFT/RIGHT collision)
   and affects ALL enum-with-data returns. **Fix:** the earlier "blocked because
   `EnumInfo` can't distinguish enum-with-data from nullary" claim was wrong — no
-  `EnumInfo` change is needed. Added a `dataEnums :: Set Text` to `TypeEnv`
-  (`Types.hs`), populated in `lowerDeclare` when any variant's `MkConDecl` field
-  list is non-empty, and a check in `lowerDecide`: an `@export` whose GIVETH
-  head type `isDataEnum` now **REFUSES** (`supported:false` → routes to the
-  reference evaluator) via `dataEnumReturnReason`. Verified name-agnostic:
-  `either-ret::mk-rev` and a Foo/Bar control both flip `differs → refused`.
-  **Nullary-enum returns and record returns are UNTOUCHED** and stay
-  byte-identical (a Grade `Lo`/`Hi` return and a `Pair HAS a,b` return both
-  verified byte-identical after the fix), so zero corpus regression: gated
-  Tier-2 stays **79 byte-identical, 0 differs**. Guarded by Haskell
-  `enum-with-data return → supported:false` (`cabal test jl4-mlir` = **36/36**);
-  `either-ret.l4` now refuses (kept out of the gated corpus, same as the
-  shadow fixtures).
+  `EnumInfo` change is needed. **First cut (commit `8ab7b531`) was REFUTED as
+  too narrow** — it keyed the refusal on the *syntactic* GIVETH head type
+  (`givethTypeName`/`isDataEnum` in `lowerDecide`), which misses every
+  enum-with-data that is not the bare written return type: a RECORD field of
+  enum-with-data (`Wrapper HAS inner IS A Rev`), a `MAYBE`/`LIST OF`
+  enum-with-data, and an INFERRED return with no `GIVETH` at all — all four
+  crossed the ABI at `supported:true` and lost their payload (raw pointer bits
+  / `{"JUST":[0]}` / bare tag).
+  **Corrected fix (this pass) raises the guard to the altitude where it is
+  actually decidable — `buildExport` in `Schema.hs`.** The JS runtime decodes a
+  WASM return either from `returnSchema` (records/enums/lists/optionals whose
+  parts are all decodable) or, for a plain scalar, from the display `returnType`
+  string. `typeToRetSchema` **already** returns `Nothing` for an enum-with-data
+  and propagates that `Nothing` up through any enclosing record/list/optional.
+  So the guard is now: a non-deontic `@export` whose (Forall/Fun-peeled)
+  `exportReturnType` yields `typeToRetSchema = Nothing` ships `supported:false`
+  with `unmarshallableReturnReason`. This keys on the ENRICHED return type, so
+  inferred returns and nested enum-with-data are all caught. The old
+  `dataEnums`/`isDataEnum`/`givethTypeName`/`dataEnumReturnReason` machinery is
+  **removed** (fully subsumed). **Nullary-enum returns, scalar records, and
+  lists of scalars/nullary-enums are UNTOUCHED** (they still produce a schema)
+  and stay byte-identical (Colour/Pair/NUMBER/`LIST Colour` controls all verified
+  `supported:true`). Fixtures `either-ret-record`, `either-ret-maybe`,
+  `either-ret-inferred` capture the four refuted probes; all refuse. Guarded by
+  four Haskell tests (the original `enum-with-data return` plus record-of /
+  MAYBE / inferred variants); `cabal test jl4-mlir` = **39/39**. Fixtures parity
+  (`test/fixtures/*.l4`) = **122 byte-identical, 7 refused, 0 differs, 0
+  wasm-error — PARITY OK**. (The 3 refusal fixtures' `*.cases.json`, which
+  curated compute-inputs for functions that correctly refuse, were removed —
+  they tripped the corpus-collapse guard by design.)
 
 ---
 

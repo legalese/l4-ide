@@ -1,0 +1,10 @@
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  FOO HAS fv IS A NUMBER
+  BAR HAS bv IS A NUMBER
+
+@export mk rev noret
+GIVEN n IS A NUMBER
+`mk rev noret` MEANS
+  IF n GREATER THAN 0 THEN FOO n ELSE BAR n

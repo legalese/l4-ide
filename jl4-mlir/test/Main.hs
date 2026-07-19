@@ -64,6 +64,9 @@ main = do
     , test "EITHER CONSIDER → supported dispatch" testEitherConsiderSupported
     , test "user LEFT/RIGHT enum → supported:false" testUserEitherShadowUnsupported
     , test "enum-with-data return → supported:false" testDataEnumReturnUnsupported
+    , test "record-of-enum-with-data return → supported:false" testRecordOfDataEnumReturnUnsupported
+    , test "MAYBE enum-with-data return → supported:false" testMaybeDataEnumReturnUnsupported
+    , test "inferred (no GIVETH) enum-with-data return → supported:false" testInferredDataEnumReturnUnsupported
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
@@ -918,13 +921,100 @@ testDataEnumReturnUnsupported = do
       pure False
     Right json -> do
       let ok = T.isInfixOf "\"supported\":false" json
-            && T.isInfixOf "enum-with-data type" json
+            && T.isInfixOf "enum-with-data" json
+            && T.isInfixOf "cannot be marshalled" json
       unless ok $
         putStrLn $ "\n    expected supported:false for the enum-with-data return. got:\n    "
           <> T.unpack (T.take 700 json)
       pure ok
   where
     unless b act = if b then pure () else act
+
+-- | Regression: the fail-closed ABI-return guard keys on the ENRICHED
+-- return type (via 'typeToRetSchema'), not the written GIVETH head type,
+-- so an enum-with-data nested inside the return type is caught too. Here
+-- the export returns a RECORD one of whose fields is an enum-with-data:
+-- 'typeToRetSchema' returns 'Nothing' for the whole record, and the
+-- export must refuse (a syntactic-GIVETH check would see only @Wrapper@,
+-- a record, and wave it through — the original blocker).
+testRecordOfDataEnumReturnUnsupported :: IO Bool
+testRecordOfDataEnumReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Rev IS ONE OF"
+        , "  RIGHT HAS rv IS A NUMBER"
+        , "  LEFT HAS lv IS A NUMBER"
+        , ""
+        , "DECLARE Wrapper HAS"
+        , "  inner IS A Rev"
+        , "  note IS A NUMBER"
+        , ""
+        , "@export mk wrapper"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Wrapper"
+        , "`mk wrapper` MEANS"
+        , "  Wrapper WITH"
+        , "    inner IS (IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n)"
+        , "    note IS n"
+        ]
+  expectUnsupportedMarshal "record-of-enum-with-data" src
+
+-- | Regression: an enum-with-data wrapped in @MAYBE@ (or @LIST OF@) also
+-- yields @typeToRetSchema = Nothing@ and must refuse. Before the fix the
+-- MAYBE envelope decoded fine but the payload collapsed to a bare tag —
+-- well-formed-looking JSON that silently lost data.
+testMaybeDataEnumReturnUnsupported :: IO Bool
+testMaybeDataEnumReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Rev IS ONE OF"
+        , "  FOO HAS fv IS A NUMBER"
+        , "  BAR HAS bv IS A NUMBER"
+        , ""
+        , "@export mk revmaybe"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A MAYBE Rev"
+        , "`mk revmaybe` MEANS JUST (FOO n)"
+        ]
+  expectUnsupportedMarshal "MAYBE enum-with-data" src
+
+-- | Regression: an export with NO explicit @GIVETH@ whose body's inferred
+-- type is an enum-with-data. The old syntactic-GIVETH guard saw no GIVETH
+-- and waved it through; the enriched-return guard sees the inferred @Rev@
+-- and refuses.
+testInferredDataEnumReturnUnsupported :: IO Bool
+testInferredDataEnumReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Rev IS ONE OF"
+        , "  FOO HAS fv IS A NUMBER"
+        , "  BAR HAS bv IS A NUMBER"
+        , ""
+        , "@export mk rev noret"
+        , "GIVEN n IS A NUMBER"
+        , "`mk rev noret` MEANS"
+        , "  IF n GREATER THAN 0 THEN FOO n ELSE BAR n"
+        ]
+  expectUnsupportedMarshal "inferred enum-with-data" src
+
+-- | Shared assertion for the ABI-return refusal tests: schema must carry
+-- @supported:false@ with the marshalling diagnostic.
+expectUnsupportedMarshal :: String -> T.Text -> IO Bool
+expectUnsupportedMarshal label src =
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    [" <> label <> "] typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "cannot be marshalled" json
+      if ok then pure True else do
+        putStrLn $ "\n    [" <> label <> "] expected supported:false. got:\n    "
+          <> T.unpack (T.take 700 json)
+        pure False
 
 -- | A CONSIDER whose WHEN guard is a computed expression (@EXACTLY
 -- <expr>@, parsed to 'PatExpr') cannot be evaluated as a guard by the

@@ -1,0 +1,17 @@
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  RIGHT HAS rv IS A NUMBER
+  LEFT HAS lv IS A NUMBER
+
+DECLARE Wrapper HAS
+  inner IS A Rev
+  note IS A NUMBER
+
+@export mk wrapper
+GIVEN n IS A NUMBER
+GIVETH A Wrapper
+`mk wrapper` MEANS
+  Wrapper WITH
+    inner IS (IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n)
+    note IS n

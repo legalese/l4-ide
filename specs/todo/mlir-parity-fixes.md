@@ -391,14 +391,23 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
     `ONE OF … HAS …` value) shipped `supported:true` but returned the bare tag
     `0` while jl4-service returns `{"RIGHT":{"rv":5}}` — payload silently lost.
     Pre-existing (construction `lookupEnumTag` arm dates to `13dd5419`, NOT
-    ledger #10) and name-agnostic (a Foo/Bar control reproduces it). Fixed
-    fail-closed: added `dataEnums :: Set Text` to `TypeEnv` (populated in
-    `lowerDeclare` when a `MkConDecl` carries fields) + a `lowerDecide` check
-    (`givethTypeName` + `isDataEnum` → `dataEnumReturnReason`) so such exports
-    **REFUSE** (`supported:false`). Nullary-enum and record returns are
-    untouched and stay byte-identical (verified), so gated Tier-2 is unchanged
-    (**79 byte-identical, 0 differs**). Guard: Haskell
-    `enum-with-data return → supported:false`; `either-ret.l4` now refuses.
+    ledger #10) and name-agnostic (a Foo/Bar control reproduces it). The first
+    fix (`8ab7b531`, syntactic-GIVETH `dataEnums`/`isDataEnum` guard in
+    `lowerDecide`) was **REFUTED as too narrow**: it missed enum-with-data
+    nested in a record field, inside `MAYBE`/`LIST OF`, and inferred returns
+    with no `GIVETH` — four reachable `supported:true` silent-wrongs.
+    **Corrected fail-closed at the right altitude** (`buildExport`, `Schema.hs`):
+    a non-deontic `@export` whose Forall/Fun-peeled `exportReturnType` yields
+    `typeToRetSchema = Nothing` (which already covers enum-with-data and any
+    record/list/optional transitively containing one) ships `supported:false`
+    with `unmarshallableReturnReason`. Keys on the ENRICHED return type, so all
+    four probes refuse. Old `dataEnums`/`givethTypeName`/`dataEnumReturnReason`
+    machinery removed (subsumed). Nullary-enum, scalar-record, and
+    list-of-scalar returns still produce a schema and stay byte-identical
+    (verified). Guards: four Haskell tests (enum-with-data + record-of / MAYBE /
+    inferred variants, `cabal test jl4-mlir` = **39/39**) and fixtures
+    `either-ret{,-record,-maybe,-inferred}.l4` (all refuse). Fixtures parity =
+    **122 byte-identical, 7 refused, 0 differs, 0 wasm-error — PARITY OK**.
 - ⬜ **Fractional decimal input fidelity** — both host paths round fractional
   NUMBER inputs through IEEE Double before the exact-rational core
   (Marshal.hs:85; wasm-server.mjs:239). Preserve decimal text into
