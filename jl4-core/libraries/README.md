@@ -36,7 +36,9 @@ overrides work; machine-global locations (5–6) rank _below_ it so a stray
 symlink can't silently shadow the stdlib the binary was built with. When
 several _differing_ copies of a module are visible at once, the resolver emits
 a warning naming all of them (symlinks dereferenced) and the one chosen. See
-`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` for the design history.
+`doc/reference/libraries/resolution.md` for the full dev-vs-prod guide
+(including the history that forced this design), and
+`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` for the design analysis.
 
 ## Editing these files? Read this first (the staleness gotcha)
 
