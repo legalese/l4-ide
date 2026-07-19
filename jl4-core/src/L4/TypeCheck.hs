@@ -3135,63 +3135,102 @@ rebuildMixfixAppAnno origAnn funcName args =
 -- with itself) report a 'FixityReassociationClash'; grouping then recovers
 -- left-associatively so that checking can continue past the error.
 tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Maybe (Expr Name))
-tryReassociateFixityChain ann headOp es = case splitChain es of
-  Nothing -> pure Nothing
-  Just (x0, x1, pairs) -> do
-    registry <- asks (.mixfixRegistry)
-    -- If the pre-existing mixfix matcher already gives this exact flat shape a
-    -- meaning, that interpretation predates fixity declarations and keeps
-    -- priority — we must never steal it. Checking one canonical name (the
-    -- alternating '_ op1 _ op2 _') is not enough: the same flat App
-    -- '[x0, x1, App op2 [], x2, ...]' can also match a registered pattern with
-    -- consecutive param slots (e.g. '_ op1 _ _ _', where the nullary operator
-    -- marker is consumed as an ordinary argument) or a keyword-first pattern.
-    -- So we dry-run the actual matcher over the original shape and decline if
-    -- it engages at all. 'tryMatchMixfixCall' only reads the environment and
-    -- registry (it returns match errors rather than raising them), so this
-    -- has no checking side effects.
-    existingMatch <- tryMatchMixfixCall headOp es
-    let allOps = headOp : map fst pairs
-        operands = x0 : x1 : map snd pairs
-        opFixities = map (\ op -> (op, chainOperatorFixity registry op)) allOps
-        conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
-        declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
-    if | any (isDeclaredChainOperator registry) operands ->
-           pure Nothing
-       | Just _ <- existingMatch ->
-           pure Nothing
-       | ((op, fs) : _) <- conflicts -> do
-           addError (FixityConflict (rawName op) fs)
-           pure Nothing
-       | length declared /= length allOps ->
-           -- at least one operator has no (complete) fixity declaration
-           pure Nothing
-       | otherwise -> do
-           let (reassociated, mClash) = shuntChain declared operands
-           case mClash of
-             Just (fxL, fxR) -> addError (FixityReassociationClash ann.range fxL fxR)
-             Nothing -> pure ()
-           -- Rebuild the root annotation from the original one, mirroring
-           -- the needsAnnoRebuild path of the App case: the root keeps the
-           -- original source range and extension, with the two-hole payload
-           -- the generic ToConcreteNodes instance for App expects.
-           pure $ Just $ case reassociated of
-             App _ rootOp rootArgs -> App (rebuildMixfixAppAnno ann rootOp rootArgs) rootOp rootArgs
-             other -> other
+tryReassociateFixityChain ann headOp es = do
+  registry <- asks (.mixfixRegistry)
+  case normalizeChain registry headOp es of
+    Nothing -> pure Nothing
+    Just (operands, allOps) -> do
+      -- If the pre-existing mixfix matcher already gives this exact flat shape a
+      -- meaning, that interpretation predates fixity declarations and keeps
+      -- priority — we must never steal it. Checking one canonical name (the
+      -- alternating '_ op1 _ op2 _') is not enough: the same flat App can also
+      -- match a registered pattern with consecutive param slots (e.g.
+      -- '_ op1 _ _ _', where the nullary operator marker is consumed as an
+      -- ordinary argument) or a keyword-first pattern. So we dry-run the actual
+      -- matcher over the original shape and decline if it engages at all.
+      -- 'tryMatchMixfixCall' only reads the environment and registry (it returns
+      -- match errors rather than raising them), so this has no checking side
+      -- effects.
+      existingMatch <- tryMatchMixfixCall headOp es
+      let opFixities = map (\ op -> (op, chainOperatorFixity registry op)) allOps
+          conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
+          declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
+      if | any (isDeclaredChainOperator registry) operands ->
+             pure Nothing
+         | Just _ <- existingMatch ->
+             pure Nothing
+         | ((op, fs) : _) <- conflicts -> do
+             addError (FixityConflict (rawName op) fs)
+             pure Nothing
+         | length declared /= length allOps ->
+             -- at least one operator has no (complete) fixity declaration
+             pure Nothing
+         | otherwise -> do
+             let (reassociated, mClash) = shuntChain declared operands
+             case mClash of
+               Just (fxL, fxR) -> addError (FixityReassociationClash ann.range fxL fxR)
+               Nothing -> pure ()
+             -- Rebuild the root annotation from the original one, mirroring
+             -- the needsAnnoRebuild path of the App case: the root keeps the
+             -- original source range and extension, with the two-hole payload
+             -- the generic ToConcreteNodes instance for App expects.
+             pure $ Just $ case reassociated of
+               App _ rootOp rootArgs -> App (rebuildMixfixAppAnno ann rootOp rootArgs) rootOp rootArgs
+               other -> other
   where
-    -- The flat chain shape: [x0, x1, marker2, x2, marker3, x3, ...].
-    -- Returns the first two operands and (operator, operand) pairs, with each
-    -- operator 'Name' carrying the marker's source annotation (so hover and
-    -- error ranges point at the operator token).
-    splitChain :: [Expr Name] -> Maybe (Expr Name, Expr Name, [(Name, Expr Name)])
-    splitChain (x0 : x1 : rest@(_ : _)) = (x0, x1,) <$> goPairs rest
-      where
-        goPairs [] = Just []
-        goPairs (m : y : more) = do
-          opName <- markerName m
-          ((opName, y) :) <$> goPairs more
-        goPairs _ = Nothing
-    splitChain _ = Nothing
+    -- The parser lays an unparenthesized binary-operator chain out in ONE of
+    -- two flat shapes, depending on how the first operand parsed:
+    --
+    --   operator-head (e.g. literal first operand):
+    --     App op1 [x0, x1, App op2 [], x2, ...]     -- headOp = op1
+    --
+    --   operand-head (e.g. bare identifier first operand, which juxtaposition-
+    --   parses so the operator lands in the argument list as a marker):
+    --     App e0 [Var op1, e1, Var op2, e2, ...]    -- headOp = e0
+    --
+    -- Both denote the same chain 'e0 op1 e1 op2 e2 ...'. Normalize either into
+    -- (operands, operators) with @length operands == length operators + 1@, or
+    -- 'Nothing' when the argument list is not a clean alternating chain. A chain
+    -- of only ONE operator is a single binary application, not a chain to
+    -- re-associate: we require at least TWO operators (else a plain @a op b@ —
+    -- including the nested binaries this pass itself produces — would loop back
+    -- through inference forever).
+    normalizeChain :: MixfixRegistry -> Name -> [Expr Name] -> Maybe ([Expr Name], [Name])
+    normalizeChain registry hd args = do
+      (operands, ops) <- case args of
+        (m0 : rest)
+          | Just op0 <- markerName m0
+          , isRegisteredBinaryOperator registry op0 -> do
+              -- operand-head: hd is the first operand; rest alternates
+              -- operand, marker, operand, marker, ...
+              (operands, ops) <- alternatingOperandFirst rest
+              pure (App (getAnno hd) hd [] : operands, op0 : ops)
+        (x0 : x1 : rest) -> do
+          -- operator-head: hd is the first operator; rest alternates
+          -- marker, operand, marker, operand, ...
+          (ops, operands) <- alternatingOperatorFirst rest
+          pure (x0 : x1 : operands, hd : ops)
+        _ -> Nothing
+      guard (length ops >= 2)
+      pure (operands, ops)
+
+    -- rest of an operand-head chain: [e1, marker2, e2, marker3, e3, ...]
+    alternatingOperandFirst :: [Expr Name] -> Maybe ([Expr Name], [Name])
+    alternatingOperandFirst [] = Just ([], [])
+    alternatingOperandFirst [e] = Just ([e], [])
+    alternatingOperandFirst (e : m : more) = do
+      op <- markerName m
+      (operands, ops) <- alternatingOperandFirst more
+      pure (e : operands, op : ops)
+
+    -- rest of an operator-head chain: [marker2, x2, marker3, x3, ...]
+    alternatingOperatorFirst :: [Expr Name] -> Maybe ([Name], [Expr Name])
+    alternatingOperatorFirst [] = Just ([], [])
+    alternatingOperatorFirst (m : x : more) = do
+      op <- markerName m
+      (ops, operands) <- alternatingOperatorFirst more
+      pure (op : ops, x : operands)
+    alternatingOperatorFirst _ = Nothing
 
     markerName :: Expr Name -> Maybe Name
     markerName (App a n []) = Just (setAnno a n)
@@ -3206,6 +3245,18 @@ tryReassociateFixityChain ann headOp es = case splitChain es of
       Just n -> case chainOperatorFixity registry n of
         ChainOpUndeclared -> False
         _ -> True
+
+-- | Is @name@ registered as a binary infix operator @_ name _@ (regardless of
+-- whether it declares a fixity)? Used to distinguish an operator marker from an
+-- ordinary operand when normalizing a flat chain.
+isRegisteredBinaryOperator :: MixfixRegistry -> Name -> Bool
+isRegisteredBinaryOperator registry n =
+  not $ null
+    [ ()
+    | sig <- lookupByCanonicalName (buildCanonicalNameFromKeywords True [rawName n]) registry
+    , Just info <- [sig.mixfixInfo]
+    , isBinaryInfixPattern info
+    ]
 
 -- | The fixity status of one operator occurring in a flat chain.
 data ChainOpFixity
