@@ -416,6 +416,45 @@ MOD 7`, `(Day d) MOD 7`; full corpus 124 → **130 byte-identical, no
   vs Lower.hs:2531-2536) — they disagree on the App head; "kept verbatim so
   they agree" comment is now false. Re-unify (shared helper) before a
   non-filtered helper trips it.
+- ✅ **Ledger #12 — code-point semantics for the index-carrying string builtins**
+  (commit `198a1a38`). `__l4_string_length` / `__l4_index_of` / `__l4_char_at` /
+  `__l4_substring` used JS-native ops (UTF-16 code **units**) where jl4-service
+  is `Data.Text` (Unicode code **points**): any astral char (≥ U+10000) silently
+  diverged at `supported:true` — `STRINGLENGTH "😀"` = 2 vs 1, unit-offset
+  `INDEXOF`, `CHARAT` returning half a surrogate pair. `SUBSTRING` additionally
+  read arg 3 as an END INDEX (JS semantics) instead of a LENGTH
+  (`Text.take len . Text.drop start`) — wrong for any `start > 0` even on ASCII
+  (`SUBSTRING "hello" 1 3` → `"el"` vs `"ell"`). All four now convert through
+  code points with the reference's clamping (negative start → 0, `len <= 0` →
+  `""`, oob `CHARAT` → `""`). Guards: `coverage-report/str-index-probe.{l4,cases.json}`
+  (26/26 byte-identical live) + intrinsic-level JS unit tests (suite 89/89).
+  Post-fix boards: Tier-2 97+0; extended sweep **227 byte-identical, 0 differs,
+  0 wasm-error, 5 honest refusals**.
+- ⬜ **Out-of-lane asymmetry inventory** (found by lane hunters; none is a
+  silent wrong at `supported:true` — triaged, not chased):
+  - **Lone surrogate in input JSON** — service 400s; WASM's UTF-8 encoder
+    substitutes U+FFFD and answers. Loud-vs-lossy input validation gap. Fix
+    direction: reject unpaired surrogates at marshalling (400-equivalent).
+  - **Fractional NUMBER as string index** — reference floors; WASM `numToInt`
+    throws loudly (fail-loud, never wrong). Decide: floor to match, or keep
+    loud.
+  - **Empty-needle `REPLACE`** — `Data.Text.replace` errors (service 5xx); JS
+    `split/join` intersperses the replacement. Divergent error shape only;
+    align by erroring on an empty needle if it ever matters.
+  - **Invalid-enum event party (deontic)** — service 422s an event whose party
+    fails enum validation; the WASM deontic interpreter accepts it and can
+    fabricate a residual OBLIGATION. The one remaining fabricate-vs-refuse gap
+    in the deontic path; fix = validate event parties against the declared
+    enum before interpreting.
+  - **`trace=full` NUL rendering** — trace envelopes differ on embedded NUL;
+    the trace sub-matrix is not a gate (JS trace pool is a one-node stub).
+  - **§-section first-export drop** — the first `@export` in a `§`-sectioned
+    file is emitted as a helper. Probes work around it with a sacrificial
+    leading export; root-cause it in the frontend section walker someday.
+  - **Scalar-name-colliding user types** — a user `DECLARE` colliding with a
+    scalar builtin name confuses schema typing (pre-existing, also
+    service-side; ledger-#7's `unfoldSynonymType` fixed only the SynonymDecl
+    slice of this).
 
 ### Verification (the meta-fix)
 

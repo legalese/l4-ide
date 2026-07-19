@@ -21,34 +21,32 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 
 | Outcome               | Cells | Meaning                                                        |
 | --------------------- | ----: | -------------------------------------------------------------- |
-| `byte-identical`      |   133 | WASM response == jl4-service, byte-for-byte                    |
+| `byte-identical`      |   227 | WASM response == jl4-service, byte-for-byte                    |
 | `differs`             |     0 | (was 2 — `factorial` fixed by `enrichParamTypes`)              |
 | `wasm-error`          |     0 | (was 3 — the `is-a-weekday` crash class is gone)               |
 | `refused-unsupported` |     5 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
-> **Update (ledger #7 fixed — full re-sweep pending):** `britishcitizen5` no
-> longer refuses. With `__l4_str_cmp` + synonym unfolding (see
-> `../PARITY-HUNT-LOG.md` §Still-open item 3), its ordered STRING comparisons
-> compile natively; a curated `britishcitizen5.cases.json` (5 branch-crossing
-> cells) is **5/5 byte-identical**, and a new `str-ordering-probe` fixture pins
-> the code-point-vs-code-unit unicode trap. The two `britishcitizen5` cells move
-> `refused` → `byte-identical`; the headline totals below predate this fix and
-> will be refreshed on the next full extended-corpus sweep.
-
-**133 of 133 real comparisons (100%) are byte-identical — the extended-corpus gate
-passes (`PARITY OK`).** Zero silent divergences, zero WASM crashes; the 5
+**227 of 227 real comparisons (100%) are byte-identical — the extended sweep
+passes (`PARITY OK`).** This is the post-merge board: the three adversarial-lane
+fix sets (#7 string ordering + NUL, #8 fail-closed deontic, #10 EITHER
+`CONSIDER`) plus the ledger-#12 code-point string-builtin fix, measured over the
+coverage.json corpus + `list-probe` + `either-probe` + the four
+`coverage-report/` probes (`str-nul`, `str-index`, `provided`, `deadline`).
+`britishcitizen5` no longer refuses — its 5 curated branch-crossing cells are
+byte-identical natively. Zero silent divergences, zero WASM crashes; the 5
 `refused` cells are correct behaviour (the backend declines and routes to the
-fallback), not failures: `britishcitizen5::is-British-citizen` ×2 (no
-string-ordering builtin — **now fixed, see update above**),
-`ceo-performance-award` (deontic, needs event cases),
-`orchestrator::evaluateClaim` (now refuses for its legitimate IO dependency —
-`callClaudeWithKey` does a `POST`; the earlier `CONSIDER RIGHT/LEFT` ctor gap is
-fixed, see PARITY-HUNT-LOG ledger #10 and the `either-probe` fixture), and
-`mixfix-garden-path::tax-on` (exported same-arity collision — refuses **by
-design**). The claim is bounded by the corpus and its curated cases — "no known
-divergences" is the honest phrasing, and the trivial-input-masking section of
-`../PARITY-HUNT-LOG.md` explains why the two statements differ.
+fallback), not failures: `ceo-performance-award` (unextractable deontic —
+PROVIDED guard + helper-call IF guard), `orchestrator::evaluateClaim` (legitimate
+IO dependency — `callClaudeWithKey` does a `POST` — plus an unmarshallable
+return type), `mixfix-garden-path::tax-on` (exported same-arity collision —
+refuses **by design**), and `provided-probe`/`deadline-probe` (pinned fail-closed
+deontic-extraction refusals; their curated cases are parked as
+`.cases.json.pending` so the corpus-collapse guard stays quiet — the
+ceo-performance-award convention). The claim is bounded by the corpus and its
+curated cases — "no known divergences" is the honest phrasing, and the
+trivial-input-masking section of `../PARITY-HUNT-LOG.md` explains why the two
+statements differ.
 
 Movement across the campaign's last three steps:
 
@@ -247,10 +245,21 @@ NUMBER`, nested records. Mirrors the file's own `#ASSERT`ed fixtures
 ```sh
 export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 node jl4-mlir/scripts/parity-harness.mjs --out /tmp/parity \
-  $(python3 -c "import json;print(' '.join(r['file'] for r in json.load(open('jl4-mlir/coverage-report/coverage.json'))['perFile'] if r['outcome'] in ('clean','has-unsupported')))")
+  $(python3 -c "import json;print(' '.join(r['file'] for r in json.load(open('jl4-mlir/coverage-report/coverage.json'))['perFile'] if r['outcome'] in ('clean','has-unsupported')))") \
+  jl4-mlir/test/fixtures/list-probe.l4 \
+  jl4-mlir/test/fixtures/either-probe.l4 \
+  jl4-mlir/coverage-report/provided-probe.l4 \
+  jl4-mlir/coverage-report/deadline-probe.l4 \
+  jl4-mlir/coverage-report/str-nul-probe.l4 \
+  jl4-mlir/coverage-report/str-index-probe.l4
 ```
 
-(The extended-corpus gate now **passes** — 133 byte-identical, 0 differs, 5
-refused, exit 0. The committed CI Tier-2 gate runs `test.l4` + `datetime-probe` +
-`list-probe` + `desc.l4` + the 3 deontic fixtures — **68 byte-identical, 0
-refused, exit 0**; `intrinsics-probe` is manual-corpus only.)
+(The extended sweep now **passes** — 227 byte-identical, 0 differs, 0
+wasm-error, 5 honest refusals, exit 0. Do NOT add
+`jl4-mlir/test/fixtures/list-ret-probe.l4` to a sweep: its curated case keys are
+deliberately **armed tripwires** for the day LIST returns compile natively —
+today its three exports refuse, so including the file fires the corpus-collapse
+guard, loudly and by design. The committed CI Tier-2 gate runs `test.l4` +
+`datetime-probe` + `list-probe` + `either-probe` + `desc.l4` + the 3 deontic
+fixtures — **97 byte-identical, 0 refused, exit 0**; `intrinsics-probe` is
+manual-corpus only.)

@@ -1,6 +1,6 @@
 # The parity hunt — session log & reviewer's guide
 
-A narrative companion to the five `mlir-review` commits below. The commit messages
+A narrative companion to the key `mlir-review` commits below. The commit messages
 say _what_ each fix does; this says _why the bugs existed_, _how they were found_,
 _what was tried and rejected_, and _what is still open_. Read this first, then the
 commits.
@@ -13,6 +13,8 @@ commits.
 | `a68195f2` | call-graph diagnostic propagation → prelude `go` collision  |
 | `8e33fbdc` | Finding 1 — bare-head param enrichment (fixes `factorial`)  |
 | `62f5f909` | bundle-wide L4 type map (clears #6; `is-a-weekday` compiles) |
+| (lanes)    | three adversarial-workflow lanes, merged: #7 str-ordering + NUL, #8 fail-closed deontic, #10 EITHER `CONSIDER` |
+| `198a1a38` | code-point STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING (clears #12) |
 
 Findings + matrices: [`coverage-report/PARITY-COVERAGE.md`](./coverage-report/PARITY-COVERAGE.md).
 Per-item fix tracker: [`../specs/todo/mlir-parity-fixes.md`](../specs/todo/mlir-parity-fixes.md).
@@ -45,14 +47,23 @@ ship; a 🔴 is not.
 | 9   | **`factorial`** — bare-head param typed `{"type":"object"}` → returns `1` | ✅    | `enrichParamTypes` (Export.hs)      | `desc.cases.json` — **CI Tier-2** (+ Haskell)       |
 | 10  | **`orchestrator` helpers** — `CONSIDER` ctor `RIGHT`/`LEFT` (EITHER) unresolved | ✅ | `either-consider` LEFT/RIGHT lowering | `either-probe.cases.json` — **CI Tier-2** (+ Haskell) |
 | 11  | **`mixfix-garden-path::tax-on`** — _exported_ same-arity collision        | 🟡    | **by design** (see below)           | Haskell `overload collision → supported:false`      |
+| 12  | **STRINGLENGTH/INDEXOF/CHARAT/SUBSTRING** — UTF-16 code-unit semantics; SUBSTRING read arg 3 as an end index | ✅ | `198a1a38` (runtime code-point conversion) | `str-index-probe.cases.json` (+ JS unit tests) |
 
-**There are no remaining 🔴s.** With #9 fixed, the extended corpus gate passed for the
-first time (130 byte-identical, 6 honest refusals); with #6 fixed it stands at
-**133 byte-identical, 0 differs, 0 wasm-error, 5 honest refusals**. With #10 fixed the
-new `either-probe` fixture joins CI Tier-2, which is now **83 byte-identical, 0 refused**
-(68 prior + 15 EITHER). The extended-corpus tally is unchanged — `orchestrator::evaluateClaim`
-was and remains one of the 5 refusals, but for the legitimate IO reason (`POST`), not the
-`CONSIDER` ctor gap, which is now closed. Every known divergence either computes correctly or refuses
+**There are no remaining 🔴s.** Post-merge (all three lanes on the rebased branch) +
+the #12 fix, the boards stand at:
+
+- **CI Tier-2**: **97 byte-identical, 0 refused** (`test` 30 + `datetime-probe` 14 +
+  `list-probe` 12 + `either-probe` 15 + `desc` 4 + `deontic-sale` 12 +
+  `deontic-seatbelt` 7 + `deontic-breach` 3).
+- **Extended sweep** (coverage.json corpus + list/either probes + the four
+  coverage-report probes): **227 byte-identical, 0 differs, 0 wasm-error, 5 honest
+  refusals** — `ceo-performance-award` (unextractable deontic, #8),
+  `mixfix-garden-path::tax-on` (by design, #11), `orchestrator::evaluateClaim`
+  (IO `POST` + unmarshallable return), and `provided-probe`/`deadline-probe`
+  (fail-closed deontic extraction, pinned refusals). Haskell suite 47/47; JS runtime
+  unit suite 89/89.
+
+Every known divergence either computes correctly or refuses
 honestly and routes to the fallback. (That claim is bounded by the corpus and the
 curated cases — the thesis below explains why "no known reds" and "no reds" are
 different statements.)
@@ -431,6 +442,48 @@ but note those need a jl4-service events-codegen fix too: `CodeGen.hs:431`
 (`fnLiteralToL4ExprWithType`) can't encode a sum-type-with-fields action
 (`maintain eligible service status <Service Status>`), rendering it as the invalid
 `Award Action WITH <ctor> IS …`.
+
+### Ledger #12 — the out-of-lane silent-wrong: index-carrying string builtins
+
+Found by a lane's hunter but outside every lane's scope, and left standing at the
+merge as the last known 🔴-class defect — fixed in `198a1a38` rather than shipped.
+The four index-carrying string intrinsics (`__l4_string_length`, `__l4_index_of`,
+`__l4_char_at`, `__l4_substring`) used JS-native string ops, which count UTF-16
+code **units**; jl4-service is `Data.Text`, which counts Unicode code **points**.
+Every astral-plane character (≥ U+10000 — any emoji) made the two silently disagree
+at `supported:true`: `STRINGLENGTH "😀"` returned 2, `INDEXOF`/`CHARAT` reported
+unit offsets (CHARAT could return **half a surrogate pair**), and slicing could cut
+an emoji in two. `SUBSTRING` was worse — it read its third argument as an end index
+(JS `.substring` semantics) where the reference is
+`Text.take len (Text.drop start s)`: wrong for any `start > 0` on **pure ASCII**
+(`SUBSTRING "hello" 1 3` → `"el"`, service says `"ell"`). All four now convert
+through code points; `str-index-probe.{l4,cases.json}` pins the whole matrix
+(26/26 byte-identical) alongside intrinsic-level JS unit tests.
+
+### Out-of-lane asymmetries — noted, triaged, not chased
+
+Catalogued during the lanes' hunts; none is a silent wrong answer at
+`supported:true`. Tracked with detail in
+[`../specs/todo/mlir-parity-fixes.md`](../specs/todo/mlir-parity-fixes.md):
+
+- **Lone surrogate in input JSON** — service 400s; WASM substitutes U+FFFD and
+  answers. Loud-vs-lossy input-validation gap, not a computed divergence.
+- **Fractional NUMBER as string index** — reference floors; WASM's `numToInt`
+  throws loudly. Fail-loud, never wrong.
+- **Empty-needle `REPLACE`** — `Data.Text.replace` errors on an empty needle
+  (service 5xx); JS `split/join` intersperses. Divergent error-shape, service errors
+  first.
+- **`trace=full` NUL rendering** — trace envelopes differ on embedded NUL; the
+  trace sub-matrix is not a gate (62/165 trace-identical is expected, the JS trace
+  pool is a one-node stub).
+- **§-section first-export drop** — the first `@export` in a `§`-sectioned file is
+  emitted as a helper (frontend/schema quirk). Worked around by convention: probes
+  lead with a sacrificial export.
+- **Invalid-enum event party (deontic)** — service 422s an event whose party fails
+  enum validation; the WASM interpreter fabricates a residual OBLIGATION. The one
+  remaining fabricate-vs-refuse gap in the deontic path.
+- **Scalar-name-colliding user types** — a user `DECLARE` whose name collides with
+  a scalar builtin confuses schema typing (pre-existing, service-side too).
 
 ## What a reviewer should actually check
 
