@@ -22,19 +22,19 @@
 
 Three interlocking ideas surface, in order:
 
-1. **Letter/spirit ≅ implementation/property.** A program *executes*; a
-   specification *judges*. Letter → transition relation / FSM; spirit →
+1. **Letter/spirit ≅ implementation/property.** A program _executes_; a
+   specification _judges_. Letter → transition relation / FSM; spirit →
    invariant / LTL-CTL formula. "The spirit is what survives refactoring."
 2. **"Squeezing out the deontics"** (with **Oliver Goodenough**). Compiling
    `O(p)` into a costed transition loses something: Gneezy & Rustichini's
-   *A Fine is a Price* (the daycare fine that turns a norm into a price) vs.
-   Saki's Lady Carlotta running the compiler *backwards* (epistemic→deontic type
+   _A Fine is a Price_ (the daycare fine that turns a norm into a price) vs.
+   Saki's Lady Carlotta running the compiler _backwards_ (epistemic→deontic type
    error). A finite-state machine "does not naturally have guilt. Or excuse. Or
    justification. Or good faith. Or abuse of rights."
 3. **Bounded deontics.** Every "must" is indexed to a (possibly implicit)
-   **goal term**, exposed by the vernacular probe *"or else what, huh?"* Make the
+   **goal term**, exposed by the vernacular probe _"or else what, huh?"_ Make the
    goal explicit (`Must(p, g)` / `Goal(g) ⇒ Must(p)`) and the obligation compiles
-   into LTL maintenance/reachability properties — a deflationary, *teleological*
+   into LTL maintenance/reachability properties — a deflationary, _teleological_
    account that sidesteps the classic deontic paradoxes. Honest edge case:
    intrinsic/constitutional norms ("you must not torture").
 
@@ -43,10 +43,10 @@ Three interlocking ideas surface, in order:
 ## Transcript
 
 **Meng (voice):** "I understand that one of the classic texts, one of the classic
-recent texts in programming language theory, is the text *Types and Programming
-Languages*. Can you tell me about this book?"
+recent texts in programming language theory, is the text _Types and Programming
+Languages_. Can you tell me about this book?"
 
-**ChatGPT:** *Types and Programming Languages* (often abbreviated as TAPL) is a
+**ChatGPT:** _Types and Programming Languages_ (often abbreviated as TAPL) is a
 well-known book by Benjamin C. Pierce. It's considered a cornerstone in
 programming language theory. The book systematically introduces the theory of
 type systems and how they apply to programming languages. It covers everything
@@ -69,18 +69,18 @@ programming?"
 **ChatGPT:** Before 2002, there were definitely important works on type theory,
 but they were scattered across papers or more specialized texts. Some of the
 foundations were laid by logicians like Alonzo Church and Haskell Curry, and key
-ideas about types were explored in the 1970s and 1980s. Books like *The Lambda
-Calculus: Its Syntax and Semantics* by Barendregt and Milner's work on type
+ideas about types were explored in the 1970s and 1980s. Books like _The Lambda
+Calculus: Its Syntax and Semantics_ by Barendregt and Milner's work on type
 polymorphism were hugely influential. But there wasn't a single, comprehensive
-text that pulled all these strands together. *Types and Programming Languages*
+text that pulled all these strands together. _Types and Programming Languages_
 really filled that gap by creating a unified and modern presentation of the field.
 
 **Meng (voice):** "In contrast, I assume, to books like The Dragon Book, which
 focused much more on the nuts and bolts of writing a compiler, but that Dragon
 Book did talk about types, didn't it?"
 
-**ChatGPT:** Yes, absolutely. The "Dragon Book" — officially *Compilers:
-Principles, Techniques, and Tools* — does discuss type checking, but it's in the
+**ChatGPT:** Yes, absolutely. The "Dragon Book" — officially _Compilers:
+Principles, Techniques, and Tools_ — does discuss type checking, but it's in the
 context of a broader compiler design pipeline. It covers lexical analysis,
 parsing, optimization, and code generation, with types appearing as one piece of
 ensuring correctness. In contrast, TAPL is laser-focused on type theory itself —
@@ -93,18 +93,18 @@ behind them.
 way that is just as accessible?"
 
 **ChatGPT:** One more recent book that people often find accessible is
-*Programming Languages: Application and Interpretation* by Shriram Krishnamurthi.
+_Programming Languages: Application and Interpretation_ by Shriram Krishnamurthi.
 It explores types and language design, but in a more hands-on, interpreter-building
-way. Another approachable one is *Types and Programming Languages, The Next 700
-Pages*, which is a modern, evolving follow-up project online. While TAPL remains a
+way. Another approachable one is _Types and Programming Languages, The Next 700
+Pages_, which is a modern, evolving follow-up project online. While TAPL remains a
 classic, these newer resources emphasize interactive learning, often blending
 theory and practice in a more project-based, incremental style.
 
 **Meng (voice):** "The next 700 pages is a playful reference to the next 700
 programming languages."
 
-**ChatGPT:** Exactly! That's a playful nod to Peter Landin's famous paper *The
-Next 700 Programming Languages*. It's a bit of an inside joke in the programming
+**ChatGPT:** Exactly! That's a playful nod to Peter Landin's famous paper _The
+Next 700 Programming Languages_. It's a bit of an inside joke in the programming
 languages community. Landin's paper talked about the future of language design,
 and "The Next 700 Pages" plays with that idea — suggesting there's always more to
 explore when it comes to types and languages!
@@ -122,24 +122,24 @@ versus implementation.
 The phrase "the letter and the spirit" naturally evokes law, but in computing it
 points toward something like:
 
-| Legal notion | Computing notion |
-| --- | --- |
-| Letter of the law | Executable program |
+| Legal notion      | Computing notion                |
+| ----------------- | ------------------------------- |
+| Letter of the law | Executable program              |
 | Spirit of the law | Temporal/property specification |
-| Legal text | Source code |
-| Jurisprudence | Program verification |
-| Compliance | Satisfaction relation |
+| Legal text        | Source code                     |
+| Jurisprudence     | Program verification            |
+| Compliance        | Satisfaction relation           |
 
 A program executes. A specification judges. That's a fundamentally asymmetric
 relationship.
 
 In model checking, the program is a transition system and the LTL/CTL formula is
-not another program. It is a statement *about* programs. For example: "Every
+not another program. It is a statement _about_ programs. For example: "Every
 request is eventually followed by a response." In LTL: `G(request -> F(response))`.
 This is not a competing implementation. It lives at a different semantic level.
 
-The implementation says: *Here is what happens.* The temporal formula says: *Here
-is what ought to happen.* And suddenly we're very close to law.
+The implementation says: _Here is what happens._ The temporal formula says: _Here
+is what ought to happen._ And suddenly we're very close to law.
 
 A statute might say: "A tenant who gives notice shall receive the deposit within
 thirty days." That is not a procedure for returning deposits. It is a property
@@ -155,7 +155,7 @@ often expressed as constraints on the interpretation of the letter.
 That's surprisingly close to what happens in formal methods. Consider a protocol
 implementation. The code may literally say `if timeout then resend`, but the
 property we care about is "Messages are eventually delivered." The property
-explains *why* the code exists. The code is one witness. The property is the
+explains _why_ the code exists. The code is one witness. The property is the
 intent.
 
 In fact, if I were looking for a computational analogue of "the spirit of the
@@ -174,9 +174,9 @@ while attempting to preserve the underlying normative objective.
 
 This may actually connect back to Van Roy in an unexpected way. His decomposition
 of languages into concepts is one move up from language tribes. Your "letter and
-spirit" distinction is arguably another move up. Van Roy asks: *What concepts
-constitute a language?* You are asking: *What properties constitute a conceptually
-correct realization of those concepts?* At that point we're not classifying
+spirit" distinction is arguably another move up. Van Roy asks: _What concepts
+constitute a language?_ You are asking: _What properties constitute a conceptually
+correct realization of those concepts?_ At that point we're not classifying
 programs anymore. We're classifying the relationship between programs and their
 intended meanings. And that's where temporal logic, deontic logic, contracts,
 legal drafting, and formal verification all start to look like members of the
@@ -205,11 +205,11 @@ terms, it sounds like transforming "Alice ought to do X" into "If Alice does not
 do X, transition to state Y." The obligation disappears and only the state machine
 remains.
 
-That's exactly the concern in the *A Fine is a Price* example. The daycare
+That's exactly the concern in the _A Fine is a Price_ example. The daycare
 operator believes they are strengthening the norm "Parents must collect children
 on time" by adding a sanction "Late pickup costs $10." But the famous result is
 that many parents appear to reinterpret the rule as "Late pickup is available for
-purchase at $10." The deontic *ought not* has been compiled into *may, with fee*,
+purchase at $10." The deontic _ought not_ has been compiled into _may, with fee_,
 and something important is lost in translation. The normative statement has been
 lowered into an operational semantics. The resulting machine behaves differently
 because the parents are no longer evaluating their actions against a social norm
@@ -227,8 +227,8 @@ it were `□ₒ p` (deontic necessity). The joke works because English uses the 
 modal verb for both.
 
 What's interesting is that both examples involve a transformation between
-modalities. The daycare transforms *obligation* into *costed transition*; Lady
-Carlotta transforms *inference* into *obligation*. In each case, the surface
+modalities. The daycare transforms _obligation_ into _costed transition_; Lady
+Carlotta transforms _inference_ into _obligation_. In each case, the surface
 language remains intact but the underlying modality changes.
 
 That observation makes me wonder whether "squeezing out the deontics" is really a
@@ -245,13 +245,13 @@ components because machines are good at state transitions. What is difficult is
 preserving the deontic component. After all, a finite-state machine has states and
 transitions. It does not naturally have guilt. Or excuse. Or justification. Or
 good faith. Or abuse of rights. Those are not state transitions; they are
-evaluations *of* state transitions.
+evaluations _of_ state transitions.
 
 Which brings us back to your "letter and spirit" distinction. The spirit may be
 precisely what remains after you've squeezed out all the operational content. Or,
 put differently: the letter tells you what transitions are allowed; the deontics
 tell you which transitions are admirable, blameworthy, excused, required, or
-forbidden; the spirit tells you *why* those evaluations exist. A purely
+forbidden; the spirit tells you _why_ those evaluations exist. A purely
 operational rendering of a contract risks collapsing all three levels into one.
 
 The daycare's mistake was to assume that a sanction and an obligation are
@@ -338,6 +338,6 @@ enough.
 
 In that sense, bounded deontics reminds me of Van Roy's move: take something that
 appears primitive and indivisible, crack it open, and reveal the smaller structure
-inside. Van Roy asks: *What concepts are hidden inside a paradigm?* Bounded
-deontics asks: *What goals are hidden inside an obligation?* And the answer to both
+inside. Van Roy asks: _What concepts are hidden inside a paradigm?_ Bounded
+deontics asks: _What goals are hidden inside an obligation?_ And the answer to both
 questions is often: more than people realize.

@@ -8,7 +8,7 @@
 
 We took the [Charities (Jersey) Law 2014](https://www.jerseylaw.je/laws/current/l_41_2014) — all 43 Articles
 and both Schedules — and rewrote it in **L4**, a programming language designed for law. Not a summary of the
-Law, not a flowchart *about* the Law: a line-by-line rendering in which the words of the Law and the logic of
+Law, not a flowchart _about_ the Law: a line-by-line rendering in which the words of the Law and the logic of
 the Law sit in the same file, side by side, and the logic **runs**.
 
 The result is twelve files, about 12,800 lines, carrying **754 assertions** — worked examples that the machine
@@ -17,7 +17,7 @@ re-checks every time the model is touched. All 754 pass.
 We are not claiming to have found errors in your Law. We are claiming something more modest and, we think,
 more useful: that **formalisation is a reading technique**. It forces a reader to answer questions the prose
 lets them walk past. This report is mostly a list of the questions it forced us to answer, and how we answered
-them — because *those* are the places where a drafter's eye is worth more than ours.
+them — because _those_ are the places where a drafter's eye is worth more than ours.
 
 There are about twenty of them. Roughly four are, we think, worth your actual attention. One of them concerns
 an amendment that came into force on 16 October 2025.
@@ -49,21 +49,21 @@ ln -sf /path/to/l4-ide/jl4-core/libraries/{prelude,daydate}.l4 ~/.local/share/jl
 
 ### The corpus
 
-| File | Articles | Lines | Worked examples |
-|---|---|---:|---:|
-| `charities-common.l4` | shared vocabulary | 80 | — |
-| `part-1-interpretation.l4` | 1–2 — entity, Jersey entity, governor, misconduct | 506 | 23 |
-| `part-2-commissioner.l4` | 3–4 — establishment; general functions | 580 | 26 |
-| `part-3-charity-test.l4` | 5–7 — **the charity test** | 719 | 35 |
-| `part-4-register-and-application.l4` | 8–12 — the register; **the registration test**; names | 2,065 | 114 |
-| `part-4-effects-and-deregistration.l4` | 13–17 — effects; court powers; deregistration | 1,833 | 92 |
-| `part-5-governors.l4` | 18–20 — duties; reportable matters; disqualification | 1,533 | 96 |
-| `part-6-use-of-terms.l4` | 21–25 — "charity", "Jersey charity"; the offences | 1,228 | 112 |
-| `part-7-information.l4` | 26–31 — information; required steps notices; disclosure | 1,679 | 107 |
-| `part-8-appeals.l4` | 32–36 — the tribunal; standing; grounds of appeal | 1,272 | 85 |
-| `part-9-final.l4` | 37–43 — corporate liability; savings; citation | 705 | 30 |
-| `schedules-1-and-2.l4` | Schedules 1–2 — the Commissioner; the Tribunal | 562 | 34 |
-| | | **12,762** | **754** |
+| File                                   | Articles                                                |      Lines | Worked examples |
+| -------------------------------------- | ------------------------------------------------------- | ---------: | --------------: |
+| `charities-common.l4`                  | shared vocabulary                                       |         80 |               — |
+| `part-1-interpretation.l4`             | 1–2 — entity, Jersey entity, governor, misconduct       |        506 |              23 |
+| `part-2-commissioner.l4`               | 3–4 — establishment; general functions                  |        580 |              26 |
+| `part-3-charity-test.l4`               | 5–7 — **the charity test**                              |        719 |              35 |
+| `part-4-register-and-application.l4`   | 8–12 — the register; **the registration test**; names   |      2,065 |             114 |
+| `part-4-effects-and-deregistration.l4` | 13–17 — effects; court powers; deregistration           |      1,833 |              92 |
+| `part-5-governors.l4`                  | 18–20 — duties; reportable matters; disqualification    |      1,533 |              96 |
+| `part-6-use-of-terms.l4`               | 21–25 — "charity", "Jersey charity"; the offences       |      1,228 |             112 |
+| `part-7-information.l4`                | 26–31 — information; required steps notices; disclosure |      1,679 |             107 |
+| `part-8-appeals.l4`                    | 32–36 — the tribunal; standing; grounds of appeal       |      1,272 |              85 |
+| `part-9-final.l4`                      | 37–43 — corporate liability; savings; citation          |        705 |              30 |
+| `schedules-1-and-2.l4`                 | Schedules 1–2 — the Commissioner; the Tribunal          |        562 |              34 |
+|                                        |                                                         | **12,762** |         **754** |
 
 Source: the **Official Consolidated Version**, showing the law from **16 October 2025** to Current.
 
@@ -72,7 +72,7 @@ Source: the **Official Consolidated Version**, showing the law from **16 October
 ## 2. The method: the Act stays in the file
 
 The obvious way to formalise a statute is to read it, understand it, and then write code that does what you
-understood. The result is a program that is *about* the Act. Six months later nobody can tell whether it is
+understood. The result is a program that is _about_ the Act. Six months later nobody can tell whether it is
 still faithful, because the Act is in one document and the logic is in another, and the only thing joining them
 is somebody's memory.
 
@@ -103,10 +103,10 @@ and, one level down, limb (a):
 ```
 
 Read down the left margin and you are reading Article 2(10)(a). The quoted lines are the Act. The lines
-beginning `m's` are the *facts* — the things you would have to establish about a case. The `AND` and the `..`
+beginning `m's` are the _facts_ — the things you would have to establish about a case. The `AND` and the `..`
 are the logic.
 
-You may reasonably ask: if those quoted lines are just the Act sitting there, what are they *doing*? How does
+You may reasonably ask: if those quoted lines are just the Act sitting there, what are they _doing_? How does
 the machine not choke on them?
 
 > ### 📘 Sidebar 1 — "Inert" text, and why a quoted line is safe
@@ -119,10 +119,10 @@ the machine not choke on them?
 > `1 × X = X`. Zero is the identity for addition. TRUE is the identity for AND.)
 >
 > So: a quoted line of the Act, dropped into an `AND` chain, is treated as TRUE. Dropped into an `OR` chain, it
-> is treated as FALSE. **Either way it cannot change the answer.** It is *inert*. It rides along in the file,
+> is treated as FALSE. **Either way it cannot change the answer.** It is _inert_. It rides along in the file,
 > in full view, next to the logic it describes — and it is guaranteed not to interfere with it.
 >
-> That is what lets the Act and the code be *the same document*. The prose is not a comment that might drift
+> That is what lets the Act and the code be _the same document_. The prose is not a comment that might drift
 > out of date; it is not a separate mapping table; it is in the expression itself, and the expression still
 > computes the right answer.
 >
@@ -143,13 +143,13 @@ next to it, and we would rather the eye rest on the words of the Act than on our
 >
 > Consider a provision of the form:
 >
-> > *(a) X, (b) Y, or (c) Z, and (d) W.*
+> > _(a) X, (b) Y, or (c) Z, and (d) W._
 >
 > Does `(d)` attach to `(c)` alone, or to the whole of `(a) or (b) or (c)`? English cannot tell you. Commas
-> cannot tell you. In *Chew v The Queen*, the High Court of Australia divided 5–1–1 on precisely this kind of
+> cannot tell you. In _Chew v The Queen_, the High Court of Australia divided 5–1–1 on precisely this kind of
 > question — where a comma bound in a criminal provision. Three judges, three readings, one comma.
 >
-> In L4 the question **cannot be left open**. The *indentation* determines the grouping:
+> In L4 the question **cannot be left open**. The _indentation_ determines the grouping:
 >
 > ```l4
 >         a
@@ -167,7 +167,7 @@ next to it, and we would rather the eye rest on the words of the Act than on our
 >         AND d        -- (d) attaches to (c) only
 > ```
 >
-> The encoder **must** commit. And having committed, the commitment is *visible* — a reader can see it, and
+> The encoder **must** commit. And having committed, the commitment is _visible_ — a reader can see it, and
 > disagree with it, at a glance.
 >
 > We think this is the single most valuable thing formalisation does for a drafter. It does not resolve
@@ -178,7 +178,7 @@ next to it, and we would rather the eye rest on the words of the Act than on our
 
 ## 3. Naming the world before you can say anything about it
 
-Before you can ask "is this entity a Jersey entity?", something has to say what an entity *is* — what facts one
+Before you can ask "is this entity a Jersey entity?", something has to say what an entity _is_ — what facts one
 has, what questions can sensibly be asked of it. In L4 that is a `DECLARE`.
 
 > ### 📘 Sidebar 3 — `DECLARE` is your interpretation Article, made executable
@@ -196,7 +196,7 @@ has, what questions can sensibly be asked of it. In L4 that is a `DECLARE`.
 > sub-paragraph of Article 2(1) it comes from. A `BOOLEAN` is simply a fact that is either true or false.
 >
 > The machine will now refuse to let anyone ask a question of an Entity that the Entity has no answer to. If you
-> mistype a field name, or ask whether a *purpose* is a company, it is an error before the thing ever runs. This
+> mistype a field name, or ask whether a _purpose_ is a company, it is an error before the thing ever runs. This
 > is a **type system**, and it is doing for your definitions what a good interpretation Article does for your
 > substantive provisions: fixing the vocabulary once, so the rest can rely on it.
 >
@@ -212,17 +212,17 @@ exactly one of these, like a dropdown menu.
 
 That would be wrong, and Article 8(3)(a)(i) proves it. It requires the register to note, "in the case of an
 entity falling within one of sub-paragraphs (f) to (j) ... **whether it also falls within sub-paragraph (a)**".
-A company (f) that is *also*, taken together with others, the trustee of a trust (a). The Law expressly
-contemplates the overlap. Sub-paragraph (b) is likewise expressly a *subset* of (a) ("without prejudice to the
+A company (f) that is _also_, taken together with others, the trustee of a trust (a). The Law expressly
+contemplates the overlap. Sub-paragraph (b) is likewise expressly a _subset_ of (a) ("without prejudice to the
 generality of sub-paragraph (a)").
 
 > ### 📘 Sidebar 4 — Checkboxes vs radio buttons
 >
-> A **radio button** (in logic, an *enumeration*) says: exactly one of these, and no more. A **checkbox** says:
+> A **radio button** (in logic, an _enumeration_) says: exactly one of these, and no more. A **checkbox** says:
 > any combination of these, including several at once, or none.
 >
 > Getting this wrong is one of the commonest ways a formalisation quietly diverges from its statute — and once
-> you have chosen a radio button, the overlapping case cannot even be *expressed*, so it never shows up in
+> you have chosen a radio button, the overlapping case cannot even be _expressed_, so it never shows up in
 > testing. The model does not report the problem. It simply has no way to say the true thing.
 >
 > Article 2(1) is checkboxes. We encoded checkboxes. If Article 8(3)(a)(i) had not existed we might have got
@@ -234,14 +234,14 @@ generality of sub-paragraph (a)").
 
 Legislation does two quite different things, and it is worth having different tools for them.
 
-**Constitutive rules** say what things *are*. "An entity meets the charity test if…". "A reportable matter in
+**Constitutive rules** say what things _are_. "An entity meets the charity test if…". "A reportable matter in
 relation to a person is the fact that the person…". These are definitions, tests, classifications. They are
 true or false of a state of affairs, and the natural machinery for them is the AND/OR tree you have been
 looking at.
 
-**Regulative rules** say what people must *do*. "The Commissioner must register the applicant…". "A person must
+**Regulative rules** say what people must _do_. "The Commissioner must register the applicant…". "A person must
 not act as a governor…". "A registered charity must promptly report…". These are not true or false; they are
-*complied with* or *breached*, and they unfold over time.
+_complied with_ or _breached_, and they unfold over time.
 
 L4 has separate machinery for the second kind.
 
@@ -256,14 +256,14 @@ L4 has separate machinery for the second kind.
 > The three are distinguished by **what happens when nothing happens** — which is exactly how a lawyer
 > distinguishes a duty from a power from a prohibition, and it is pleasing that it falls out so cleanly:
 >
-> | | if the party does it | if the party does nothing |
-> |---|---|---|
-> | **MUST** (duty) | fulfilled | **breach** |
-> | **MAY** (power) | fulfilled | fulfilled — *no breach* |
-> | **SHANT** (prohibition) | **breach** | fulfilled |
+> |                         | if the party does it | if the party does nothing |
+> | ----------------------- | -------------------- | ------------------------- |
+> | **MUST** (duty)         | fulfilled            | **breach**                |
+> | **MAY** (power)         | fulfilled            | fulfilled — _no breach_   |
+> | **SHANT** (prohibition) | **breach**           | fulfilled                 |
 >
 > That middle row is the whole of what makes a power discretionary. A court that declines to make an order it
-> *may* make has done nothing wrong. A Commissioner who declines to make a decision she *must* make has.
+> _may_ make has done nothing wrong. A Commissioner who declines to make a decision she _must_ make has.
 >
 > This means that when we write `MAY` rather than `MUST`, we are making a substantive legal claim, and the
 > model will behave differently. We have tried to get every one of them right, and to say so where the statute
@@ -294,10 +294,10 @@ The `WITHIN 30` is a deadline in days. This raises an honesty problem which we a
 > HENCE FULFILLED
 > ```
 >
-> The chain has *residuated* — the fulfilled steps have fallen away, and what is left is precisely the
+> The chain has _residuated_ — the fulfilled steps have fallen away, and what is left is precisely the
 > outstanding duty, sitting on the person who owes it. Nobody had to reason about this. The model did.
 >
-> This is the closest thing we have to a compliance dashboard that is *derived from the Act itself* rather than
+> This is the closest thing we have to a compliance dashboard that is _derived from the Act itself_ rather than
 > written alongside it.
 
 ---
@@ -307,14 +307,14 @@ The `WITHIN 30` is a deadline in days. This raises an honesty problem which we a
 Part 3 is the heart of the Law, and it is a good showcase, because it is not a simple conjunction. It is a
 three-storey **defeasible** structure, and the storeys fight each other.
 
-- **Article 5(1)** — the positive test: all purposes charitable or ancillary, *and* public benefit provided.
+- **Article 5(1)** — the positive test: all purposes charitable or ancillary, _and_ public benefit provided.
 - **Article 5(2)** — a **defeater**: an entity that "otherwise meets the charity test, **nevertheless does not
   meet that test, despite paragraph (1)**", if its constitution lets a Minister or a States member direct it.
 - **Article 5(3)** — a **defeater on the defeater**: the Minister may by Order disapply 5(2).
 
 > ### 📘 Sidebar 7 — Defeasibility, and why "despite paragraph (1)" is a technical instruction
 >
-> Most logic is *monotonic*: once you have proved something, more facts cannot un-prove it. Law is not like
+> Most logic is _monotonic_: once you have proved something, more facts cannot un-prove it. Law is not like
 > that. Law is full of provisions that say, in effect, "everything I just told you — never mind, in this case."
 >
 > Article 5(2) is exactly that. It does not add a condition to the test in 5(1); it **subtracts an entity that
@@ -333,8 +333,8 @@ three-storey **defeasible** structure, and the storeys fight each other.
 >     AND NOT c's `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity`
 > ```
 >
-> Read it aloud: *the test is met if the positive test is met and the knock-out does not bite; and the knock-out
-> bites if the government-control condition holds and no Order disapplies it.* Three storeys, three lines.
+> Read it aloud: _the test is met if the positive test is met and the knock-out does not bite; and the knock-out
+> bites if the government-control condition holds and no Order disapplies it._ Three storeys, three lines.
 >
 > A drafter will recognise this shape immediately — it is a proviso to a proviso. What formalisation adds is
 > that the nesting is now **unambiguous and testable**. In the test suite, the same quango fails the charity
@@ -346,13 +346,13 @@ Article 6(5) says the purpose of advancing a political party is "**neither** a c
 purpose ancillary or incidental to a charitable purpose, **irrespective of** whether it would otherwise fall
 within paragraph (1) or Article 5(1)(a)(ii)".
 
-Both limbs are load-bearing, and formalisation makes it obvious *why*. Article 5(1)(a) admits a purpose if it is
+Both limbs are load-bearing, and formalisation makes it obvious _why_. Article 5(1)(a) admits a purpose if it is
 **either** charitable **or** merely ancillary. If Article 6(5) had killed only the first, a charity could dress
 up its campaigning as "purely incidental" to its school and walk straight through the second gate. The second
 limb of 6(5) is an **anti-laundering provision**, and it is doing real work.
 
 We encoded it as two separate subtractions, at both gates, and the test suite contains exactly that evasion —
-a purpose that *would* fall within head (b) (education), *is* pleaded as merely incidental, and is nonetheless
+a purpose that _would_ fall within head (b) (education), _is_ pleaded as merely incidental, and is nonetheless
 excluded:
 
 ```l4
@@ -361,11 +361,11 @@ excluded:
 #ASSERT NOT `is a purpose purely ancillary ...` `campaigning ...`    -- ...and gate 2 is shut
 ```
 
-Whoever drafted 6(5) had thought about the evasion. It is nice to be able to *show* that.
+Whoever drafted 6(5) had thought about the evasion. It is nice to be able to _show_ that.
 
 ### Article 7(3)(b) — hortatory in form, operative in substance
 
-Article 7(3) reads like an instruction about how to *reason*: "The person determining the question must not —
+Article 7(3) reads like an instruction about how to _reason_: "The person determining the question must not —
 (a) presume any particular charitable purpose to be for the public benefit; or (b) treat one particular natural
 person or a group of identified natural persons as being a section of the public…".
 
@@ -373,7 +373,7 @@ You could easily read all of that as a direction to the decision-maker and nothi
 ends: "**and accordingly must not treat an entity that benefits only such a person or persons as providing
 public benefit**."
 
-That is not a direction about *how* to think. That is a conclusion the determiner is **forbidden to reach**.
+That is not a direction about _how_ to think. That is a conclusion the determiner is **forbidden to reach**.
 It therefore changes the truth value of Article 5(1)(b), and it must be lifted into the logic — which we did.
 7(2) and 7(3)(a), by contrast, genuinely do constrain reasoning without dictating the answer, and we carry
 those as duties on the determiner instead.
@@ -390,8 +390,8 @@ attention. Every one is flagged in the source with a `>>>` marker at the site, a
 worked example attached.
 
 To be clear about our standing: we are not Jersey lawyers, we have no view on the policy, and several of these
-will have obvious answers that we simply do not know. They are offered as *questions raised by a machine that
-was not allowed to skim*.
+will have obvious answers that we simply do not know. They are offered as _questions raised by a machine that
+was not allowed to skim_.
 
 ---
 
@@ -407,11 +407,11 @@ was not allowed to skim*.
 **Does the range "(a) to (h)" carry the newly inserted (ba)?**
 
 If it does not, then a body corporate that is **by definition established under the law of Jersey** (that is
-what Article 2(1)(ba)(ii) *says*) is **not a "Jersey entity"**. And since Article 23(3)(b) requires a "Jersey
+what Article 2(1)(ba)(ii) _says_) is **not a "Jersey entity"**. And since Article 23(3)(b) requires a "Jersey
 charity" to be a Jersey entity, such a body — however impeccably Jersey, however properly registered — **could
 never lawfully call itself a "Jersey charity"**. It would commit an offence under Article 23(1) if it tried.
 
-That cannot be the intention. We encoded the purposive reading — (ba) is *inside* the range — and flagged it.
+That cannot be the intention. We encoded the purposive reading — (ba) is _inside_ the range — and flagged it.
 But the two readings are **one line apart** in our file:
 
 ```l4
@@ -430,10 +430,10 @@ Delete the marked line and this assertion fails:
 #ASSERT `is a Jersey entity` `Grands Vaux Mutual, a Jersey NPO body corporate`
 ```
 
-This is what we mean by formalisation as a reading technique. The gap is not subtle *once you are forced to
-compute the range*. It is very easy to miss when reading, because "(a) to (h)" looks like it obviously includes
-everything between (a) and (h), and (ba) *is* between (a) and (h) — positionally. It is only when you have to
-decide whether a *lettered range* enumerates *positions* or *labels* that the question becomes visible at all.
+This is what we mean by formalisation as a reading technique. The gap is not subtle _once you are forced to
+compute the range_. It is very easy to miss when reading, because "(a) to (h)" looks like it obviously includes
+everything between (a) and (h), and (ba) _is_ between (a) and (h) — positionally. It is only when you have to
+decide whether a _lettered range_ enumerates _positions_ or _labels_ that the question becomes visible at all.
 
 **Our question for you:** is this worth a tidying amendment to Article 2(3)(a)?
 
@@ -457,12 +457,12 @@ So consider an applicant who **fails the gate** — an incomplete application, s
 with Article 19(5) (the governors' declarations). Read literally:
 
 - 11(4) does not bite, because the gate is not passed, so there is **no duty to register**; and
-- 11(5) does not bite either, because 11(5) is triggered by *not being satisfied of (a)–(f)*, and the
+- 11(5) does not bite either, because 11(5) is triggered by _not being satisfied of (a)–(f)_, and the
   Commissioner never reached that question — so there is **no duty to refuse**.
 
 The Commissioner is simply not seized of a decidable application. In practice this is probably fine and is
-probably closed by the Order under Article 11(8)(a) and the Regulations under Article 11(3). But *the Law itself
-does not say so*, and the applicant is left in a state the Law does not name — with, incidentally, nothing to
+probably closed by the Order under Article 11(8)(a) and the Regulations under Article 11(3). But _the Law itself
+does not say so_, and the applicant is left in a state the Law does not name — with, incidentally, nothing to
 appeal against under Article 33(1)(a), which requires "a decision … to refuse to register".
 
 We encoded **both** readings, side by side, and let the reader choose:
@@ -472,12 +472,12 @@ We encoded **both** readings, side by side, and let the reader choose:
 - `Article 11(4) and 11(5) — the registration decision (the literal three-way reading)` — gate-failure yields
   **no duty at all**.
 
-**Our question for you:** is the three-way reading intended? If not, would "*If the Commissioner is not so
-satisfied, or the applicant does not so comply,*" close it?
+**Our question for you:** is the three-way reading intended? If not, would "_If the Commissioner is not so
+satisfied, or the applicant does not so comply,_" close it?
 
 ---
 
-### 🟠 Finding 3 — Article 33(5): "at both times" — over *what*?
+### 🟠 Finding 3 — Article 33(5): "at both times" — over _what_?
 
 Article 33(5) lets a third party appeal against someone else's registration, but only on the ground that —
 
@@ -487,13 +487,13 @@ Article 33(5) lets a third party appeal against someone else's registration, but
 
 Where does "at both times" bind? Two readings, and they are not equivalent:
 
-- **Ground-wise** (we adopted this): *one ground* must subsist at both times.
+- **Ground-wise** (we adopted this): _one ground_ must subsist at both times.
   `( (a)@application AND (a)@appeal ) OR ( (b)@application AND (b)@appeal )`
-- **Time-wise**: *some* ground at each time — but it may be a **different** ground at each.
+- **Time-wise**: _some_ ground at each time — but it may be a **different** ground at each.
   `( (a) OR (b) )@application AND ( (a) OR (b) )@appeal`
 
 On the time-wise reading, the ground may **shape-shift**: an appellant could say "it failed the charity test
-when it was registered, and its *name* is objectionable now", and have standing, though **no single complaint
+when it was registered, and its _name_ is objectionable now", and have standing, though **no single complaint
 ever held at both times**. That seems unlikely to be intended, so we took the ground-wise reading — but we
 encoded both, and there is a scenario in the test suite where the two give **opposite answers**.
 
@@ -501,32 +501,32 @@ The ground-wise reading has a consequence worth surfacing on its own: a charity 
 the appeal is heard **defeats the challenge entirely**. The rival who was right all along, about a charity that
 genuinely should not have been registered, loses — because the charity fixed its purposes in the meantime. That
 may be exactly the policy you want (it rewards remediation, and the register is about the present). But it
-should be a policy you *chose*.
+should be a policy you _chose_.
 
 There is a second, smaller question in the same paragraph. Limb (b) opens "**if** the appellant has an interest
 in the registered name". Is that "if" a **condition on limb (b)** (so an appellant with no interest in the name
 simply cannot use limb (b)), or is it a **material implication** in the logician's sense? Because if it is the
-latter, then an appellant with **no interest in the name at all** satisfies it *vacuously* — and could challenge
+latter, then an appellant with **no interest in the name at all** satisfies it _vacuously_ — and could challenge
 any registration on limb (b). We read it as a condition. See Sidebar 8.
 
 ---
 
 ### 🟠 Finding 4 — Article 18(4)(a) read with Article 2(10)(b): the defrauded governor
 
-Article 18(4) says when *a governor* engages in misconduct. Limb (a): "the governor contravenes a provision, **or
+Article 18(4) says when _a governor_ engages in misconduct. Limb (a): "the governor contravenes a provision, **or
 commits an offence, mentioned in Article 2(10)**".
 
 Now look at what Article 2(10)(b) is. It is the commission, **by any person**, of certain offences in relation to
-the charity. *By any person.* Not by the governor. Not by the charity. **Any person** — including a total
+the charity. _By any person._ Not by the governor. Not by the charity. **Any person** — including a total
 stranger who defrauds the charity.
 
 Compose the two naively — as a machine will, if you let it — and you get: an outsider defrauds the charity;
-that is "an offence mentioned in Article 2(10)"; and therefore *the governor* "engages in misconduct" under
+that is "an offence mentioned in Article 2(10)"; and therefore _the governor_ "engages in misconduct" under
 Article 18(4)(a). The governor is now liable to a required steps notice (Article 27(1)(c)) and to disqualification
 (Article 20), **for having been the victim of a fraud**.
 
 That is obviously not intended, and no court would reach it. But the reason no court would reach it is that a
-human reader silently supplies the attribution — "*the governor* contravenes … or commits". We had to supply it
+human reader silently supplies the attribution — "_the governor_ contravenes … or commits". We had to supply it
 explicitly, as a conjunct, and flag it:
 
 ```l4
@@ -538,7 +538,7 @@ explicitly, as a conjunct, and flag it:
 
 Both cases are tested — the outsider's fraud (not attributed) and the governor's own fraud (attributed).
 
-**This is the class of finding we think formalisation is best at.** Nothing is *wrong* here. The provision works.
+**This is the class of finding we think formalisation is best at.** Nothing is _wrong_ here. The provision works.
 But it works because of something a reader supplies, and that unstated something is now written down.
 
 ---
@@ -559,7 +559,7 @@ Article 21(1) prohibits any entity that is not a registered charity from **refer
 registered by the Commissioner**.
 
 So **Article 21(1) bites on every excepted foreign charity, always, by definition.** Article 22 licenses the word
-*"charity"*. It never licenses a claim of *registration*. They are different prohibitions and the exception
+_"charity"_. It never licenses a claim of _registration_. They are different prohibitions and the exception
 reaches only one of them. Oxfam GB, operating in Jersey as a textbook excepted foreign charity, may call itself a
 charity — and commits an offence the moment it says it is registered with the Jersey Commissioner.
 
@@ -582,7 +582,7 @@ an assertion failed.
 The trichotomy is gone, and so is "wrong". A decision that is **wrong on the law but not unreasonable** is
 squarely within Article 34(1) and squarely **outside** Article 35(1). The tribunal can hear it; the court cannot.
 
-The only route to the court on a pure point of law is Article 35(3) — the tribunal *may* refer a point of law.
+The only route to the court on a pure point of law is Article 35(3) — the tribunal _may_ refer a point of law.
 That key is in the **tribunal's** hand, not the litigant's. A tribunal that is confidently, reasonably, and
 comprehensively wrong about the law, and declines to refer, is the end of the road.
 
@@ -616,7 +616,7 @@ policy question.
 ### 🟡 Finding 8 — Article 8(4): the charity run from a spare bedroom
 
 Article 11(4)(d) requires an applicant to **have** a principal address in Jersey "within the meaning of Article
-8(4)". Article 8(4) tells you *which* address that is, by a three-limb cascade:
+8(4)". Article 8(4) tells you _which_ address that is, by a three-limb cascade:
 
 - (a) if the entity must have a registered office / business address in Jersey — that address;
 - (b) if not — the main Jersey premises from which it is managed, **"unless the premises are a private dwelling
@@ -625,11 +625,11 @@ Article 11(4)(d) requires an applicant to **have** a principal address in Jersey
 
 The sting is in limb (b). If the charity's only Jersey premises **is** a private dwelling house, limb (b) yields
 **no address at all** — and the cascade falls through to limb (c). So a small charity run from someone's spare
-bedroom still *has* a principal address, and can still be registered, provided some governor has a Jersey
+bedroom still _has_ a principal address, and can still be registered, provided some governor has a Jersey
 address. Limb (c) catches it.
 
 We flag this only because the drafting invites the opposite reading on a quick pass — "not a private dwelling
-house" looks like a *disqualification*, and it is really a *routing instruction*. It is tested both ways.
+house" looks like a _disqualification_, and it is really a _routing instruction_. It is tested both ways.
 
 ---
 
@@ -640,21 +640,21 @@ The remaining flagged calls, in one line each. All are in the source with `>>>` 
 - **Sch 1 para 4(3) — three decisions cannot be delegated.** Registration (Art 11), refusal to deregister
   (Art 15(3)) and deregistration (Art 16) may not be exercised by staff, **however fully the Commissioner
   purports to authorise it**. The authorisation is irrelevant, and we made that computable: a clerk signing off
-  a registration is *ultra vires* even with the Commissioner's blessing.
+  a registration is _ultra vires_ even with the Commissioner's blessing.
 - **Art 20(5) — passing the test is not the same as having the power.** A 20-year disqualification against a
-  person the court is satisfied is unfit on *both* Article 20(4) grounds passes the 20(4) gate and is *still*
+  person the court is satisfied is unfit on _both_ Article 20(4) grounds passes the 20(4) gate and is _still_
   ultra vires, because 20(5) caps the period at 15 years. The trace of the court purporting to make it collapses
   to FULFILLED — there is no power there to exercise.
 - **Art 28(3) — severability.** A required steps notice served on an organized religious charity is "invalid **to
   the extent that**" it requires a governor's removal. We refused to collapse that to one valid/invalid flag, and
-  validated each *requirement* separately. The same notice yields
+  validated each _requirement_ separately. The same notice yields
   `["removal of the governor", "the other steps"]` for an ordinary charity and `["the other steps"]` for an
   organized religious one. The removal is severed; the rest stands and remains enforceable.
 - **Art 26(8) — privilege subtracts, it does not excuse.** Privileged material was never validly "required", so
   the requirement never existed. You therefore commit no offence by withholding it **even with no reasonable
   excuse** — a different mechanism from the Art 26(7) "without reasonable excuse" defence sitting beside it.
 - **Arts 17(4) and 36(4) — the "merely" rhyme.** Both provide that a past act is not rendered an offence
-  "**merely** by virtue of" a retrospective operation. The load-bearing word is *merely*: an act that was
+  "**merely** by virtue of" a retrospective operation. The load-bearing word is _merely_: an act that was
   independently criminal stays criminal. The saving is not an amnesty. Both encoded as named safety properties
   and tested against an independently criminal act.
 - **Art 9(6) — satisfaction lifts a prohibition; it does not create a duty.** "Must not enter … unless
@@ -666,12 +666,12 @@ The remaining flagged calls, in one line each. All are in the source with `>>>` 
   absence.
 - **Art 14(1) — the court cannot act of its own motion.** "on an application by the Commissioner or the Attorney
   General" is read as a conjunct, not scene-setting.
-- **Art 19(1)(a) — "being misconduct that led to the service of a required steps notice"** read as *restrictive*,
+- **Art 19(1)(a) — "being misconduct that led to the service of a required steps notice"** read as _restrictive_,
   not appositive: bare misconduct with no notice is not a reportable matter.
 - **Art 19(10)'s "unless"** read as a conjunction: permission **and** compliance with its conditions. A governor
   with permission who breaches its conditions is inside the prohibition.
 - **Art 13(13) and Art 18(3) — "to the extent that"** appears twice more, and in neither case does the Law
-  provide a calculus of *degree*. We collapsed each to a single boolean and said so.
+  provide a calculus of _degree_. We collapsed each to a single boolean and said so.
 
 ---
 
@@ -687,24 +687,24 @@ This section is the honest one.
 >
 > This is not a bug; it is what "all" means, and it is what your Law says. The exclusion happens instead at
 > Article 5(1)(b): with no purposes, there are no purposes to which it can "give effect", so no public benefit is
-> provided *in consequence*. We tested exactly this, and it is worth knowing **which limb is load-bearing** for
+> provided _in consequence_. We tested exactly this, and it is worth knowing **which limb is load-bearing** for
 > the empty case — because if you ever amended 5(1)(b), you would be amending the only thing keeping empty shells
 > off the register.
 >
 > **(2) The proviso is an implication, and implications are vacuously satisfied.** "If X, then Y" — a limb that
-> only *bites* when X holds — is written `(NOT X) OR Y`. When X is false, the whole limb is **true**, i.e.
+> only _bites_ when X holds — is written `(NOT X) OR Y`. When X is false, the whole limb is **true**, i.e.
 > satisfied. That is correct, and it is also a trap: a limb that is "satisfied" because it never applied looks
 > exactly like a limb that is "satisfied" because it was complied with. Article 33(5)(b)'s "if the appellant has
 > an interest in the registered name" is precisely this shape, which is why we had to decide (Finding 3) whether
 > it is a condition or an implication. On the implication reading, an appellant with **no** interest in the name
-> satisfies limb (b) *for free*.
+> satisfies limb (b) _for free_.
 >
-> **(3) "Not proved" is not "proved not".** A model that says `NOT (misconduct m)` is saying *the facts as
-> pleaded do not make out misconduct* — not *this person is innocent*. Everything in this corpus is relative to
+> **(3) "Not proved" is not "proved not".** A model that says `NOT (misconduct m)` is saying _the facts as
+> pleaded do not make out misconduct_ — not _this person is innocent_. Everything in this corpus is relative to
 > the facts you feed it. It answers "on these facts, does the provision bite?", never "what happened?".
 >
 > **(4) An identity element is not nothing.** Sidebar 1's trick — that quoted prose is TRUE under AND and FALSE
-> under OR — is genuinely load-bearing. If you paste an inert line into the *wrong* kind of chain, it still does
+> under OR — is genuinely load-bearing. If you paste an inert line into the _wrong_ kind of chain, it still does
 > not change the answer. That is the whole point. But it means you cannot tell, by looking at an inert line alone,
 > which chain it is in. **The indentation is the only thing that tells you** — which is Sidebar 2 again, from the
 > other side.
@@ -715,7 +715,7 @@ the worked examples read like worked examples. A drafter can review all of that 
 is.
 
 But the four items in Sidebar 8 are **irreducible**. They are not artefacts of L4; they would arise in any formal
-treatment, including a rigorously careful prose one. Vacuous truth is *in your Law already* — "all of its
+treatment, including a rigorously careful prose one. Vacuous truth is _in your Law already_ — "all of its
 purposes", with no purposes — whether or not anyone formalises it. All formalisation did was make somebody
 notice.
 
@@ -736,7 +736,7 @@ We did not want to launder a guess into something that looks like a statutory fi
 
 - **Every deadline that is not in the Law is a flagged placeholder.** It carries a `>>>` marker at the site,
   saying so in terms. There are roughly forty of them. `grep '>>>' *.l4` will list them all.
-- **Every deadline that *is* in the Law is encoded, tested, and tested at its boundary.** Schedule 1 para 4(9)'s
+- **Every deadline that _is_ in the Law is encoded, tested, and tested at its boundary.** Schedule 1 para 4(9)'s
   four-month report longstop (4 months passes; 5 fails; **4 exactly** passes). Article 20(5)'s 15-year
   disqualification cap (15 lawful; 20 ultra vires). Schedule 2 para 1(1)'s "at least 4 and no more than 8"
   tribunal members (3 fails; 4 passes; 8 passes; 9 fails). Article 26(5)'s "the **longer** of one year and, if
@@ -762,7 +762,7 @@ having no operative logic — so that the corpus has **no silent gaps**. A reade
 Article 13(8), (9), (10) and (12) exactly where they belong, quoted in full, and explicitly marked as carrying no
 logic. That is the honest representation of "this provision does not decide anything by itself".
 
-Where a power's *output* matters to a live rule — "any other circumstance **prescribed by the Minister by Order**"
+Where a power's _output_ matters to a live rule — "any other circumstance **prescribed by the Minister by Order**"
 in Article 16(1)(d) — we expose the output as a single boolean, so the disjunct stays live and the model does not
 quietly under-approximate the Law.
 
@@ -778,21 +778,21 @@ Since the process is part of what you asked about:
    charity test) and got them typechecking and passing, because those two files define the vocabulary and the
    central test that everything else refers to. They became the house style.
 3. **Fan out.** With a validated exemplar in hand, seven parallel agents took the remaining Parts, each given the
-   exact source line-range, the shared vocabulary, the two exemplars, and a hard requirement: *your file must
-   typecheck and every assertion must pass, or the task has failed*.
+   exact source line-range, the shared vocabulary, the two exemplars, and a hard requirement: _your file must
+   typecheck and every assertion must pass, or the task has failed_.
 4. **Verify independently.** We re-ran `l4 check` and `l4 run` on every file ourselves rather than trusting the
    reports. 754 assertions, 0 failures.
 
 Two things went wrong, and both are instructive.
 
 - One agent's first-draft **traces silently disagreed with their own comments**. It had written comments claiming
-  a duty was breached, but the trace residuated to a *standing duty* instead, because the event stream stopped
-  *inside* the deadline window rather than passing it. It caught this itself, probed the semantics on a scratch
+  a duty was breached, but the trace residuated to a _standing duty_ instead, because the event stream stopped
+  _inside_ the deadline window rather than passing it. It caught this itself, probed the semantics on a scratch
   file, and fixed the traces. **A comment that lies about its trace is worse than no comment**, and this is a
   hazard specific to the regulative layer that we now know to watch for.
 - Another agent asserted that an excepted foreign charity commits no Article 21 offence. The assertion **failed**,
   and that failure is Finding 5. It is the clearest single demonstration in the project of what the 754 assertions
-  are actually *for*: they are not decoration, and they are not documentation. They are the part of the system
+  are actually _for_: they are not decoration, and they are not documentation. They are the part of the system
   that can tell you that you are wrong.
 
 ---
@@ -803,7 +803,7 @@ Two things went wrong, and both are instructive.
   obvious answers we don't know.
 - **It is not a substitute for the Law.** It is a reading of it, with its interpretive commitments written down
   instead of assumed. Where we chose, we said so, and you can flip the choice and re-run.
-- **It does not decide facts.** Every model here answers "*on these facts*, does the provision bite?" It has
+- **It does not decide facts.** Every model here answers "_on these facts_, does the provision bite?" It has
   nothing to say about what happened.
 - **It is not finished.** The obvious next step is a single top-level entry point — feed in an application, get
   back "registered / refused, and here is the chain of Articles that got you there, with citations". Every part

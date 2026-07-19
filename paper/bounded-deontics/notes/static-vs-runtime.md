@@ -1,7 +1,7 @@
 # Bounded deontics: the static/runtime frontier (design note)
 
 > Spitballing note, 2026-06-24, Meng + Claude. Captures the line of thought about
-> *quantifying* the goal-index discipline and what makes the strong (compile-time)
+> _quantifying_ the goal-index discipline and what makes the strong (compile-time)
 > vs weak (runtime) form. Companion to `related-work.md` and the source transcript.
 > Status: working theory, nothing here is validated against the evaluator yet.
 
@@ -12,15 +12,15 @@
 > verification. If ∃ then a weak form requiring runtime evaluation. The strong form
 > probably requires stratification, where rules are ordered defeasibly."
 
-The intuition is right in spirit. The refinements below are about *what* is being
-quantified and *why* it gates static vs dynamic.
+The intuition is right in spirit. The refinements below are about _what_ is being
+quantified and _why_ it gates static vs dynamic.
 
 ## 1. What is actually quantified: totality of the goal-resolution map
 
 > **SUPERSEDED (2026-06-24, Meng):** the "map `goal : Deontic → GoalTerm`" framing
-> below is **too tightly coupled** — the goal-relativized "must" is a *derived
-> many-to-many relation* over the transition system, not a per-obligation index.
-> See `spec-delta.md` § "CORRECTION". Axis (a) below should read "**goal *set*
+> below is **too tightly coupled** — the goal-relativized "must" is a _derived
+> many-to-many relation_ over the transition system, not a per-obligation index.
+> See `spec-delta.md` § "CORRECTION". Axis (a) below should read "**goal _set_
 > closed**", not "goal map total". The rest of the lattice (axes b, c; the
 > inversion; detect≠resolve) survives unchanged.
 
@@ -34,7 +34,7 @@ The relevant object is the map
   "for the purposes of L4 it is sufficient to interpret implicit goals to explicit").
 - **Weak form** = the map is **partial**: some goal terms are holes filled only later.
 
-So the quantifier sits on the *totality of `goal`*, not on a raw "∀ deontics."
+So the quantifier sits on the _totality of `goal`_, not on a raw "∀ deontics."
 This is the same discipline as L4's constitutive layer (total typed functions):
 goal-indexing pushes a slice of each obligation **down** into the constitutive
 layer, and the strong form is exactly "that slice is total." ∀ buys compile-time
@@ -60,11 +60,11 @@ model-check**.
 
 ### Sharper statement of strong vs weak
 
-- **∀ (closed formula) → compile-time *verification* is possible** (model-check all
+- **∀ (closed formula) → compile-time _verification_ is possible** (model-check all
   traces; a deontic double-bind MUST-p ∧ SHANT-p shows up as an **unsat core**).
-  Runtime *monitoring* of the live trace is still available too — strong form gives
+  Runtime _monitoring_ of the live trace is still available too — strong form gives
   **both**.
-- **∃ (open formula) → runtime only**, because the property isn't even *determined*
+- **∃ (open formula) → runtime only**, because the property isn't even _determined_
   until the missing goal is injected at runtime (the anankastic "if you want X").
   Weak form gives **monitoring only**.
 
@@ -73,11 +73,11 @@ The point is formula-**closedness**, not "static vs also-runtime."
 ## 3. The inversion (a paper-worthy tension)
 
 Which obligations are inherently **∃**? The genuinely **instrumental / anankastic**
-ones — "you must take the A train *if you want to go to Harlem*" — because the goal
+ones — "you must take the A train _if you want to go to Harlem_" — because the goal
 is a **runtime input the agent supplies** (Yan & He's `O_G`).
 
-Which are **∀**? The **categorical** ones — *once we accept the bounded-deontics
-fiction* of assigning them a constant background goal ("…to maintain civic order").
+Which are **∀**? The **categorical** ones — _once we accept the bounded-deontics
+fiction_ of assigning them a constant background goal ("…to maintain civic order").
 
 So the norms that were the philosophical **problem** cases (torture; categorical
 imperatives; the breakdown zone of the reduction in `related-work.md` Strand 3)
@@ -85,7 +85,7 @@ become the computationally **easy** cases (static constant goal), while the clea
 instrumental obligations are the **hard** cases for static verification.
 
 **Faithfulness and staticness pull in opposite directions**, and the frontier
-between them is — recursively — the "bound" in *bounded* deontics. Publishable on
+between them is — recursively — the "bound" in _bounded_ deontics. Publishable on
 its own.
 
 ## 4. Stratification: yes, but detect ≠ resolve
@@ -97,13 +97,14 @@ logic / Kratzerian semantics / priority rules). Acyclicity is exactly the soundn
 gate the PROLEG transpiler already requires (`exception` ↔ `AND NOT` is sound only
 if the signed dependency graph **stratifies**).
 
-**Caveat that bites:** a *complete* stratification defeats the verification payoff.
+**Caveat that bites:** a _complete_ stratification defeats the verification payoff.
 If every conflict has a tie-breaker, the model checker never **reports** the
 double-bind — the priority silently resolves the collision we wanted to surface as
 a loophole / unsat core. This is the **detect ≠ resolve seam** (Poh Yuan Nie ¶28;
 the PROLEG burden ledger).
 
 So the target is **transparent partial stratification**:
+
 - resolve exactly where the law genuinely prioritizes (lex specialis / lex posterior
   — L4's `SUBJECT TO` / `NOTWITHSTANDING` machinery), and
 - deliberately **leave true gaps unresolved**, so verification can find them.
@@ -119,7 +120,8 @@ Strong / compile-time corner = **all three** of:
     (b) order acyclic & transparent — conflicts resolvable, but gaps preserved
     (c) factbase closed          — facts known statically
 
-Every *other* corner peels off to runtime for a **different reason**:
+Every _other_ corner peels off to runtime for a **different reason**:
+
 - ¬(a): a free goal variable awaits runtime injection (anankastic / instrumental).
 - ¬(b): unresolved or cyclic priority → either a detected conflict (good, the
   verification output) or a needed runtime tie-breaker.
@@ -148,7 +150,7 @@ Where do **anankastic** obligations sit on the lattice? They look like they
 straddle: ∃ in the goal axis (goal is supplied), yet once the agent commits to the
 goal the residual obligation may be ∀-closed and statically checkable. Candidate
 reading: anankastics are **partial-evaluation seams** — runtime goal-injection
-*specializes* an open formula into a closed one, after which static verification
+_specializes_ an open formula into a closed one, after which static verification
 resumes. If so, the strong/weak split isn't a property of an obligation but of a
-*phase* (pre- vs post-goal-commitment), and bounded deontics is really about
+_phase_ (pre- vs post-goal-commitment), and bounded deontics is really about
 **staging** the verification.

@@ -1,0 +1,5 @@
+-- A deliberate project-local override of the stdlib `prelude`, used by the
+-- LIBRARY-RESOLUTION-SHADOW-SPEC CLI tests. It defines a marker that the real
+-- (embedded) prelude does not have, so `main.l4` typechecks only if THIS copy
+-- won resolution: project-scoped copies must outrank the embedded stdlib.
+`shadow marker` MEANS TRUE

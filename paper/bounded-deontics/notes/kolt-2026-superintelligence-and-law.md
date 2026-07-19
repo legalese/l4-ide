@@ -6,23 +6,24 @@
 
 ## Corrected metadata
 
-- **Title:** *Superintelligence and Law*
+- **Title:** _Superintelligence and Law_
 - **Author:** **Noam Kolt** — SOLE author (Asst. Prof., Hebrew University of Jerusalem,
   Faculty of Law + School of CS; Governance of AI Lab; affil. Schwartz Reisman / U
   Toronto / Institute for Law & AI). **NOT "Kolt et al."; NOT Anthropic** — Anthropic
-  appears only as a cited *example* (Claude Code, Claude's Constitution).
-- **Venue:** *Harvard Journal of Law & Technology* (forthcoming). This draft: 25 Feb 2026.
+  appears only as a cited _example_ (Claude Code, Claude's Constitution).
+- **Venue:** _Harvard Journal of Law & Technology_ (forthcoming). This draft: 25 Feb 2026.
 - arXiv:2603.28669.
 
 ## Why it matters to us (Part III.A "Theory", pp. 11–14)
 
 Kolt frames legal-compliance theory as two clusters and applies them to AI agents:
+
 - **Instrumental** = Austin's sanctions-based theory ("legal duty = the infliction of
   an 'evil' for non-compliance") → echoed in **Holmes's "bad man"** ("look at the law
   as a bad man who cares only for the material consequences and cares nothing for an
   ethical rule"). An AI agent is, in effect, the perfect Holmesian bad man.
 - **Normative** = **Hart's internal point of view**: subjects "do not merely record
-  and predict behaviour conforming to rules — like Holmes' bad man — but *use* the
+  and predict behaviour conforming to rules — like Holmes' bad man — but _use_ the
   rules as standards for the appraisal of their own and others' behaviour."
 - **Letter vs spirit (our §1!):** an agent with an internal point of view "might seek
   to more broadly respect the **spirit of the law** … rather than (only) the
@@ -50,16 +51,16 @@ Kolt frames legal-compliance theory as two clusters and applies them to AI agent
 
 ## Adjacent cites it surfaces (worth chasing)
 
-- Bryan Casey, *Amoral Machines, or: How Roboticists Can Learn to Stop Worrying and
-  Love the Law*, 111 Nw. U. L. Rev. 1347 (2017). [advocates a Holmesian approach]
-- Cullen O'Keefe et al., *Law-Following AI: Designing AI Agents to Obey Human Laws*,
+- Bryan Casey, _Amoral Machines, or: How Roboticists Can Learn to Stop Worrying and
+  Love the Law_, 111 Nw. U. L. Rev. 1347 (2017). [advocates a Holmesian approach]
+- Cullen O'Keefe et al., _Law-Following AI: Designing AI Agents to Obey Human Laws_,
   94 Fordham L. Rev. 58 (2025).
-- Elina Nerantzi & Giovanni **Sartor**, *"Hard AI Crime": The Deterrence Turn*, 44
+- Elina Nerantzi & Giovanni **Sartor**, _"Hard AI Crime": The Deterrence Turn_, 44
   Oxford J. Legal Stud. 673 (2024). [Sartor — already in Meng's orbit]
-- Scott J. Shapiro, *What Is the Internal Point of View?*, 75 Fordham L. Rev. 1157
+- Scott J. Shapiro, _What Is the Internal Point of View?_, 75 Fordham L. Rev. 1157
   (2006). [confirms the C3 must-cite from the workflow]
-- Lemley & Casey, *Remedies for Robots*, 86 U. Chi. L. Rev. 1311 (2019); Tom R. Tyler,
-  *Why People Obey the Law* (2nd ed. 2006).
+- Lemley & Casey, _Remedies for Robots_, 86 U. Chi. L. Rev. 1311 (2019); Tom R. Tyler,
+  _Why People Obey the Law_ (2nd ed. 2006).
 
 ## Verdict
 

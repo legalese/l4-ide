@@ -14,32 +14,32 @@ runs; install the tool to turn a SKIP into a PASS.
 
 ## The four artifacts
 
-| # | Claim in the essay | Script | Engine |
-|---|---|---|---|
-| 1 | The four readings of "dishonest" classify the forged-degree case as `TRUE,FALSE,TRUE,TRUE`; Explanation 1 is otiose under the applicants' reading (GD [18],[28],[30],[32]) | `cheating-415-poh-yuan-nie.l4` | the **L4** evaluator |
-| 2 | Surplusage is a *theorem*: under the applicants' reading concealment is a don't-care across the whole no-property region (proved); the counterexample class is found, not supplied | `cheating-415-surplusage.z3.py` | **Z3** (SAT/SMT) |
-| 3 | The "dishonest concealment" literal **vanishes** from the minimised formula under the applicants' reading | `cheating-415-espresso.py` | **Espresso** (or Quine–McCluskey) |
-| 4 | The argument draws — the otiose clause is a dead rung | `cheating-415-ladder.py` → `cheating-415-ladder.svg` | hand-rolled SVG |
+| #   | Claim in the essay                                                                                                                                                                 | Script                                               | Engine                            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------- |
+| 1   | The four readings of "dishonest" classify the forged-degree case as `TRUE,FALSE,TRUE,TRUE`; Explanation 1 is otiose under the applicants' reading (GD [18],[28],[30],[32])         | `cheating-415-poh-yuan-nie.l4`                       | the **L4** evaluator              |
+| 2   | Surplusage is a _theorem_: under the applicants' reading concealment is a don't-care across the whole no-property region (proved); the counterexample class is found, not supplied | `cheating-415-surplusage.z3.py`                      | **Z3** (SAT/SMT)                  |
+| 3   | The "dishonest concealment" literal **vanishes** from the minimised formula under the applicants' reading                                                                          | `cheating-415-espresso.py`                           | **Espresso** (or Quine–McCluskey) |
+| 4   | The argument draws — the otiose clause is a dead rung                                                                                                                              | `cheating-415-ladder.py` → `cheating-415-ladder.svg` | hand-rolled SVG                   |
 
-The `.l4` is the **model**; everything else reasons over the *same* propositional
+The `.l4` is the **model**; everything else reasons over the _same_ propositional
 encoding of s 415 (2008). Steps 2 and 3 are independent decision procedures that
-agree — Z3 *proves* the don't-care, Espresso *eliminates* it.
+agree — Z3 _proves_ the don't-care, Espresso _eliminates_ it.
 
 ---
 
 ## Prerequisites
 
-| Tool | Needed for | Install | Used here |
-|---|---|---|---|
-| `python3` | steps 2–4 | (system) | 3.x |
-| `l4` | step 1 | `github.com/smucclaw/l4-ide` (or the VS Code extension's *Install L4 CLI*) | jl4 CLI |
-| `uv` *or* global `z3` | step 2 | `astral.sh/uv` — then z3 is fetched per-run via `uv run --with z3-solver` | uv 0.9.x; z3 4.16.0 |
-| `espresso` | step 3 *(optional)* | `./build-espresso.sh` — clone + `make` of the modern rehost | classabbyamp/espresso-logic @ `8526513` |
-| `rsvg-convert` | step 4 *(optional, for PNG)* | `brew install librsvg` | 2.61.x |
+| Tool                  | Needed for                   | Install                                                                    | Used here                               |
+| --------------------- | ---------------------------- | -------------------------------------------------------------------------- | --------------------------------------- |
+| `python3`             | steps 2–4                    | (system)                                                                   | 3.x                                     |
+| `l4`                  | step 1                       | `github.com/smucclaw/l4-ide` (or the VS Code extension's _Install L4 CLI_) | jl4 CLI                                 |
+| `uv` _or_ global `z3` | step 2                       | `astral.sh/uv` — then z3 is fetched per-run via `uv run --with z3-solver`  | uv 0.9.x; z3 4.16.0                     |
+| `espresso`            | step 3 _(optional)_          | `./build-espresso.sh` — clone + `make` of the modern rehost                | classabbyamp/espresso-logic @ `8526513` |
+| `rsvg-convert`        | step 4 _(optional, for PNG)_ | `brew install librsvg`                                                     | 2.61.x                                  |
 
 **Step 3 needs nothing.** If the `espresso` binary is absent, the script falls
 back to a bundled, exact **Quine–McCluskey** minimiser (Python stdlib only) and
-prints which engine it used. When `espresso` *is* present, the script runs it
+prints which engine it used. When `espresso` _is_ present, the script runs it
 **and** cross-checks its result against Quine–McCluskey, asserting the two agree
 on which literals survive — so "the literal vanishes" does not rest on one tool.
 
@@ -78,11 +78,11 @@ python3 cheating-415-ladder.py                   # regenerate the figure
 
 ## Provenance
 
-- **Case text**: *Poh Yuan Nie v Public Prosecutor* [2022] SGCA 74, Grounds of
+- **Case text**: _Poh Yuan Nie v Public Prosecutor_ [2022] SGCA 74, Grounds of
   Decision (Sundaresh Menon CJ, Judith Prakash JCA, Steven Chong JCA, 21 Nov
   2022). Bracketed `[n]` are the court's paragraph numbers. Statute: Penal Code
   (Cap 224, **2008** Rev Ed) — two limbs + Explanations 1–3.
 - **Model of record**: `cheating-415-poh-yuan-nie.l4` (canonical copy in the
   `l4-ide` repo, `jl4/ok/inert/`).
-- All four scripts encode the *same* eleven boolean atoms and two readings; the
+- All four scripts encode the _same_ eleven boolean atoms and two readings; the
   cross-engine agreement (L4 ≈ Z3 ≈ Espresso ≈ Quine–McCluskey) is itself a check.

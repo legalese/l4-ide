@@ -7,8 +7,8 @@
 
 ## The kill: the FCA basket query is provably wrong
 
-The pitched payoff — "the concept lattice answers *what minimal set of acts am I
-bound to perform for this basket of goals*" — does not hold.
+The pitched payoff — "the concept lattice answers _what minimal set of acts am I
+bound to perform for this basket of goals_" — does not hold.
 
 - FCA intent-derivation of a basket `Y` computes the **column-intersection**
   `Y' = ∩_{J∈Y} Nec(J)`, which is neither the union of per-goal necessities nor the
@@ -18,8 +18,8 @@ bound to perform for this basket of goals*" — does not hold.
   `Nec(J₂)={b,c}`, so FCA gives `{a,c} ∩ {b,c} = {c}`, while the correct joint bound
   is `{a,b,c}`. FCA **under-reports** the obligations — the dangerous direction for
   compliance.
-- **Root cause (structural):** necessity is *non-local* — it depends on which paths
-  achieve the goals *jointly* — and per-cell incidence projects that away. Necessity
+- **Root cause (structural):** necessity is _non-local_ — it depends on which paths
+  achieve the goals _jointly_ — and per-cell incidence projects that away. Necessity
   **does not compose across goal-conjunction**; the lattice cannot answer the exact
   question it was introduced to answer.
 
@@ -32,18 +32,19 @@ The single-goal necessity core is sound and algorithmic:
 - **MAY** K = `s ⊨ EF J` (a path to J exists).
 - **MUST** K (for J) = K dominates J.
 - **may→must** = the step where the last alternative path lapses and a previously
-  avoidable action *enters* the dominator set. Computable near-linearly via
+  avoidable action _enters_ the dominator set. Computable near-linearly via
   **Lengauer–Tarjan** dominators.
 
-This is a *better* §5 than the FCA framing: MUST gets a precise, citable, computable
+This is a _better_ §5 than the FCA framing: MUST gets a precise, citable, computable
 definition, and it stands with no FCA apparatus. It is the differentiation from Yan &
 He (derived relation over a transition system, not a goal index on the obligation).
 
 ## What is salvageable for a journal paper (the parked strand)
 
 Two candidate contributions, lead with the counterexample either way:
+
 1. **A non-compositionality theorem** — the concept lattice over `(Action×Goal,
-   nec_s)` is sound but *provably lossy* w.r.t. joint-goal necessity (the intent
+nec_s)` is sound but _provably lossy_ w.r.t. joint-goal necessity (the intent
    derivation = intersection, invariant to whether goals interact). A clean negative/
    structural result.
 2. **The correct construction** — basket-indexed / **triadic FCA** context (the
@@ -53,9 +54,9 @@ Two candidate contributions, lead with the counterexample either way:
 ## Open risks / things to fix before any revival
 
 - **DEFINITIONAL (live):** the bug-vs-feature status hinges on the unstated meaning
-  of "I want this basket." If *independent per-goal discharge* → the intersection is
+  of "I want this basket." If _independent per-goal discharge_ → the intersection is
   correct but the lattice is decorative (just intersecting precomputed dominator
-  sets). If *joint-goal reachability* → the bug is fatal. Verdict robust because the
+  sets). If _joint-goal reachability_ → the bug is fatal. Verdict robust because the
   lattice over-promises under **either** reading. A journal paper must FIX basket
   semantics up front.
 - **Thin salvage:** the co-necessity reading ("acts forced in common across many
@@ -63,16 +64,16 @@ Two candidate contributions, lead with the counterexample either way:
   work the CTL/reachability reasoner doesn't already do (reviewers will say so).
 - **Tractability:** hitting-set/transversal is output-exponential — don't silently
   swap a lossy-but-cheap lattice for an exact-but-intractable hypergraph.
-- **Temporal apparatus:** `nec` is irreducibly state-indexed → a *family* `{L(s)}`,
+- **Temporal apparatus:** `nec` is irreducibly state-indexed → a _family_ `{L(s)}`,
   not one lattice. TCA prior art (Lehmann–Wille 1995; Wolff 2001) does NOT directly
-  license the deadline-crossing picture (Wolff moves an object through a *fixed*
+  license the deadline-crossing picture (Wolff moves an object through a _fixed_
   lattice; here the incidence relation itself changes per state) — needs a Conceptual
   Time System construction.
 - **may→must monotonicity is mis-stated:** the ascending-chain ("increment IS the
   deadline") holds only for **cumulative whole-trace** necessity, NOT the
   **from-here-onward** `nec` we defined (a forced act, once performed, drops out of
   future necessity). Fix this conflation before any monotone-trajectory claim.
-  *(Action item: also correct in `static-vs-runtime.md` and `illustrations.md`.)*
+  _(Action item: also correct in `static-vs-runtime.md` and `illustrations.md`.)_
 - **Prior-art gaps:** add **Kowalski & Satoh, "Obligation as Optimal Goal
   Satisfaction" (J. Phil. Logic 2018)** — closest goal-relativized-obligation
   neighbour (and it's Satoh). Pre-empt **Triadic Concept Analysis** and
@@ -85,7 +86,7 @@ Two candidate contributions, lead with the counterexample either way:
 
 ## Chosen illustration (confirmed, but DECOUPLED from FCA)
 
-**UCC Art. 9 / PPSA perfection** carries §5's `nec` / may→must story — *not* a concept
+**UCC Art. 9 / PPSA perfection** carries §5's `nec` / may→must story — _not_ a concept
 lattice (its disjunctive file-OR-possess structure flattens the lattice; goal axis
 collapses to perfected/unperfected + a priority rank). Sketch: deposit account, goal =
 priority over a control-creditor → control is the only path → `(control, J) ∈ nec` =

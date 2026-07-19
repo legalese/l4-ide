@@ -159,9 +159,12 @@ test-suite jl4-lsp-test
   main-is: Spec.hs
   other-modules:
     HoverDisplaySpec
+    LibraryResolutionSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    directory,
+    filepath,
     hspec,
     jl4-core,
     jl4-lsp,

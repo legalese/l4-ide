@@ -25,6 +25,9 @@ Core libraries are located in the [jl4-core/libraries/](https://github.com/legal
 
 ---
 
+How `IMPORT` locates a library on disk — and how to work with dev vs prod
+preludes — is covered in [Library Resolution](resolution.md).
+
 ## Using Libraries
 
 Libraries require explicit import:

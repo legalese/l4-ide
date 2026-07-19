@@ -20,7 +20,9 @@ import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
-  ( createDirectoryIfMissing
+  ( canonicalizePath
+  , createDirectoryIfMissing
+  , createFileLink
   , doesFileExist
   , getTemporaryDirectory
   , removeFile
@@ -134,25 +136,30 @@ runL4WithEnv mEnv bin args = do
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
 
--- | Run l4 with library resolution forced onto the embedded-library fallback.
---
--- We drop @JL4_LIBRARY_PATH@ (so 'resolveLibraryFromFilesystem' reports
--- @hasExplicitPath = False@ and the resolver is *allowed* to fall back to the
--- built-in embedded libraries) and point @XDG_DATA_HOME@ at a fresh empty
--- directory (so no user-level @~/.local/share/jl4/libraries@ store on the
--- runner masks the embedded path). This is the exact regime issue #906 is
--- about — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
-runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
-runL4EmbeddedOnly bin args = do
+-- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
+-- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
+-- @hasExplicitPath = False@ and the resolver consults the embedded stdlib and
+-- the ambient tiers). This is the dev regime the LIBRARY-RESOLUTION-SHADOW
+-- tests exercise — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
+runL4WithXdgHome :: FilePath -> FilePath -> [String] -> IO Output
+runL4WithXdgHome xdgHome bin args = do
   parentEnv <- getEnvironment
-  tmp <- getTemporaryDirectory
-  let emptyXdg = tmp </> "l4-embedded-only-xdg"
-  createDirectoryIfMissing True emptyXdg
   let childEnv =
-        ("XDG_DATA_HOME", emptyXdg)
+        ("XDG_DATA_HOME", xdgHome)
           : filter (\(k, _) -> k /= "JL4_LIBRARY_PATH" && k /= "XDG_DATA_HOME")
                    parentEnv
   runL4WithEnv (Just childEnv) bin args
+
+-- | Run l4 with library resolution forced onto the embedded-library fallback:
+-- no @JL4_LIBRARY_PATH@, and an /empty/ XDG store (so no user-level
+-- @~/.local/share/jl4/libraries@ on the runner interferes). This is the exact
+-- regime issue #906 is about.
+runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
+runL4EmbeddedOnly bin args = do
+  tmp <- getTemporaryDirectory
+  let emptyXdg = tmp </> "l4-embedded-only-xdg"
+  createDirectoryIfMissing True emptyXdg
+  runL4WithXdgHome emptyXdg bin args
 
 -- | Assert the CLI exited 0 with a given substring on stdout.
 expectOk :: FilePath -> [String] -> String -> IO ()
@@ -273,6 +280,15 @@ cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 embeddedDiamondEntry :: FilePath
 embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 
+-- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
+-- project-scoped copy (embedded must win over a poisoned XDG store), and a
+-- companion with a project-local prelude override (which must win over the
+-- embedded stdlib).
+shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
+shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
+shadowSiblingEntry  = fixtureDir </> "library-shadow" </> "sibling-wins"  </> "main.l4"
+shadowExtraEntry    = fixtureDir </> "library-shadow" </> "xdg-extra"     </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -288,7 +304,8 @@ main = do
        , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
-       , embeddedDiamondEntry ] \fp -> do
+       , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
+       , shadowExtraEntry ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -619,6 +636,81 @@ spec bin = do
           "Expected the embedded-fallback diamond to check clean, but l4 exited "
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
+
+  -- Regression tests for LIBRARY-RESOLUTION-SHADOW-SPEC (Option B′ ordering +
+  -- Option E shadow warning). All run in the dev regime: JL4_LIBRARY_PATH
+  -- unset, XDG_DATA_HOME pointed at a fabricated store. The incident being
+  -- guarded against (§3.1 of the spec): a machine-global XDG symlink silently
+  -- shadowing the stdlib the binary was built with.
+  describe "l4 library resolution shadow (B′)" $ do
+    let mkXdgStore name libFileName mkLib = do
+          tmp <- getTemporaryDirectory
+          let xdgHome = tmp </> name
+              store = xdgHome </> "jl4" </> "libraries"
+          removePathForcibly xdgHome
+          createDirectoryIfMissing True store
+          _ <- mkLib (store </> libFileName)
+          pure xdgHome
+        poison = "this is not L4 at all ("
+
+    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-poison" "prelude.l4" \p -> writeFile p poison
+      Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded prelude to outrank the poisoned XDG copy, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+      -- Option E: two differing copies were visible; the warning names them
+      -- and the chosen one, at a priority the CLI actually prints.
+      serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
+      serr `shouldSatisfy` ("[chosen]" `isInfixOf`)
+      serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
+      serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
+
+    it "dereferences symlinks when naming the shadowed copy" $ do
+      tmp <- getTemporaryDirectory
+      let target = tmp </> "l4-shadow-poison-target.l4"
+      writeFile target poison
+      realTarget <- canonicalizePath target
+      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> createFileLink target p
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
+      code `shouldBe` ExitSuccess
+      -- The warning must print the symlink's real target, so a reader can see
+      -- WHICH checkout/file a machine-global entry actually points at.
+      serr `shouldSatisfy` (realTarget `isInfixOf`)
+
+    it "a project-local prelude override still outranks the embedded stdlib" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-empty" "unused.txt" \_ -> pure ()
+      Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowSiblingEntry]
+      -- main.l4 uses `shadow marker`, defined only in the fixture's local
+      -- prelude.l4 — this checks clean iff the project-scoped copy won.
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+    it "identical copies do not warn (content gate, non-embedded module)" $ do
+      -- `shadow-extra` is NOT an embedded module; it exists beside the
+      -- importing file AND in the XDG store, byte-identical. Two sources, one
+      -- content: the Option E warning must stay silent.
+      localCopy <- readFile (fixtureDir </> "library-shadow" </> "xdg-extra" </> "shadow-extra.l4")
+      xdgHome <- mkXdgStore "l4-shadow-xdg-identical" "shadow-extra.l4" \p -> writeFile p localCopy
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
+
+    it "differing copies of the same non-embedded module do warn" $ do
+      xdgHome <- mkXdgStore "l4-shadow-xdg-differing" "shadow-extra.l4" \p ->
+        writeFile p "`something else entirely` MEANS TRUE\n"
+      Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
+      -- The project-scoped copy wins either way; the differing ambient copy
+      -- must be called out.
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("Multiple differing copies of module `shadow-extra`" `isInfixOf`)
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

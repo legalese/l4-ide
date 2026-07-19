@@ -16,6 +16,54 @@ This directory contains the standard libraries for L4, providing common function
 - **holdings.l4** - Financial holdings and ownership structures
 - **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
 
+## How `IMPORT` finds these files (resolution order)
+
+The libraries reach a running binary by two routes: an **embedded copy**
+(a Template Haskell splice in `L4.API.EmbeddedLibraries` compiles this whole
+directory into the binary at build time, so an installed `jl4`/`l4` works with
+no checkout on disk) and a **filesystem search**. A bare `IMPORT prelude`
+resolves in this priority order (first hit wins):
+
+1. `$JL4_LIBRARY_PATH/<mod>.l4` — explicit operator override
+2. `<project root>/<mod>.l4`
+3. `<directory of the importing file>/<mod>.l4`
+4. the **embedded copy** (skipped entirely when `JL4_LIBRARY_PATH` is set)
+5. `~/.local/share/jl4/libraries/<mod>.l4` (XDG data dir)
+6. `<exeDir>/../../libraries/<mod>.l4` (VSCode extension bundle)
+
+Project-scoped locations (1–3) outrank the embedded copy so intentional
+overrides work; machine-global locations (5–6) rank _below_ it so a stray
+symlink can't silently shadow the stdlib the binary was built with. When
+several _differing_ copies of a module are visible at once, the resolver emits
+a warning naming all of them (symlinks dereferenced) and the one chosen. See
+`doc/reference/libraries/resolution.md` for the full dev-vs-prod guide
+(including the history that forced this design), and
+`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` for the design analysis.
+
+## Editing these files? Read this first (the staleness gotcha)
+
+The embedded copy is frozen at **build** time, from whatever directory the TH
+splice resolved _then_ — usually the Cabal datadir (`~/.cabal/share/…`), not
+your checkout. Consequently:
+
+- Editing `jl4-core/libraries/*.l4` in a worktree does **not** re-embed on a
+  plain `cabal build`. The binary keeps serving the old stdlib and your edit
+  "mysteriously" doesn't take effect.
+- The reliable way to develop stdlib changes is to pin the resolver at your
+  worktree:
+
+  ```sh
+  export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"
+  ```
+
+  which outranks every other source, including the (possibly stale) embed.
+
+- To actually refresh the embed, make a real content change to
+  `L4.API.EmbeddedLibraries` (or its TH module), or clean-rebuild `jl4-core`.
+
+Note: the local test suites want `JL4_LIBRARY_PATH` set anyway (CI exports
+it), so the pin above is the normal dev configuration.
+
 ## Important: Understanding DATE vs Date
 
 **TL;DR:** `DATE` is the type, `Date` is the constructor function. They're different things with confusingly similar names.

@@ -20,14 +20,26 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 
 ## Tier-2
 
-| Spec                              | Verdict               | Branch                   | Status                                    | PR                                                |
-| --------------------------------- | --------------------- | ------------------------ | ----------------------------------------- | ------------------------------------------------- |
-| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`   | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
-| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing` | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
-| L4-VERSIONING                     | ⚠️ premise superseded | —                        | ⏸️ HELD — awaiting scope decision         | —                                                 |
-| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                        | ⏭️ not implementable                      | —                                                 |
+| Spec                              | Verdict               | Branch                           | Status                                    | PR                                                |
+| --------------------------------- | --------------------- | -------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`           | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
+| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing`         | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
+| L4-VERSIONING                     | ⚠️ premise superseded | —                                | ⏸️ HELD — awaiting scope decision         | —                                                 |
+| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                                | ⏭️ not implementable                      | —                                                 |
+| LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR                | —                                                 |
+
+> **LIBRARY-RESOLUTION-SHADOW** (classified Tier-2: DX/infra, low-risk, high-annoyance).
+> `IMPORT` resolution searches ambient/global filesystem locations (XDG data dir, VSCode
+> bundle) **above** the binary's own hermetic embedded stdlib, so during multi-worktree dev
+> an XDG symlink into one checkout silently shadows edits made in another — with no
+> diagnostic (the `@infixl` prelude incident; second occurrence of "XDG library shadow").
+> Spec: `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`. Recommended path: Stage 1 = visible
+> canonicalized logging + de-dup the two resolvers (`GetMixfixRegistry` vs `GetImports`);
+> Stage 2 = surgical precedence flip (embedded above the two ambient locations, project-scoped
+> overrides still above embedded) + ambiguity warning. Design sketch only — implementer
+> should build against the spec's §8 acceptance criteria; anchors at `jl4-lsp/src/LSP/L4/Rules.hs:252-478`.
 
 ## Live lanes in ../l4wt/ (do NOT duplicate)
 
