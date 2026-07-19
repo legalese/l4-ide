@@ -6,13 +6,13 @@
 ## Title candidates
 
 - **"Deontics as Domination"** (front-runner, recorded 2026-07-18). The pun carries
-  the paper's technical core exactly: a `MUST` precondition *is* the **graph
+  the paper's technical core exactly: a `MUST` precondition _is_ the **graph
   dominator** of any LTS leading to a desired goal — every path to the goal passes
   through the obligated act (§5). Doubles as the jurisprudential hook — obligation as
-  a relation of *domination* (Austin/Holmes command-and-sanction; the "or else what?"
+  a relation of _domination_ (Austin/Holmes command-and-sanction; the "or else what?"
   probe). Reads on both registers, which is the whole thesis in two words.
-  - Possible subtitle: *"Goal-bounded obligation as necessity in a transition system"*
-    (or *"…as dominator-necessity over a transition system"*).
+  - Possible subtitle: _"Goal-bounded obligation as necessity in a transition system"_
+    (or _"…as dominator-necessity over a transition system"_).
 - Fallbacks: "Bounded Deontics" (the working label; descriptive, less pointed);
   "Or Else What? Goal-Bounded Obligation and its Verification."
 
@@ -22,6 +22,7 @@ Bounded Deontics is **one facet of a planned series** of papers, each aimed at a
 different venue, that compose to describe the whole L4 vision (cf. the ICAIL paper,
 PROLEG/burden-of-proof, ladder diagrams, state-as-ledger, Poh Yuan Nie). Decisions
 that follow from this:
+
 - We need NOT cram everything into one paper; strands that overflow (e.g. the
   FCA/concept-lattice idea, the full tooling/compiler story) can become their own
   facets.
@@ -33,7 +34,7 @@ The deontic "must" of law and contract is not primitive but **goal-bounded**, an
 the bounded reading the goal-relativized obligation is a **derived, many-to-many
 necessity relation over a transition system** — which (a) reconstructs Anderson's
 sanction reduction with the right data model, (b) keeps the object level goal-free
-(letter/spirit), and (c) yields a verification story whose *domain of validity* —
+(letter/spirit), and (c) yields a verification story whose _domain of validity_ —
 the "bound" — is itself the contribution.
 
 ## Contribution claims (what is actually new)
@@ -41,28 +42,28 @@ the "bound" — is itself the contribution.
 > **Posture (from the `bounded-deontics-s6-priorart` deep-research pass — see
 > `notes/s6-priorart-verdict.md`): a UNIFICATION, not new primitives.** Every
 > ingredient is prior art and is conceded by name; the contribution is the
-> *composition* + the *jurisprudential reading*. Claims below in descending strength.
+> _composition_ + the _jurisprudential reading_. Claims below in descending strength.
 
 1. **(C3, strongest) The Holmes+Hart unification.** ONE divergence between `⪯_law`
    (normative) and `⪯_p` (the agent's, read **descriptively** as a behaviour-predictor)
-   is *both* Holmes's bad man (where they diverge) and Hart's internal point of view
-   (where they collapse), with sanctions as the realignment operation. *Concede the
+   is _both_ Holmes's bad man (where they diverge) and Hart's internal point of view
+   (where they collapse), with sanctions as the realignment operation. _Concede the
    Hart-half formal precedent to **Silk 2019**; claim the Holmes+Hart unification +
-   descriptive `⪯_p` + composition with the dominator-necessity.*
+   descriptive `⪯_p` + composition with the dominator-necessity._
 2. **(C2) Party-indexed ordering ∘ a graph-DOMINATOR necessity.** The composition's
    necessity is a **dominator** (on every path), not Bellman-optimal action / best
-   world / causal intervention — the form no neighbour has. *Concede the party-indexed
+   world / causal intervention — the form no neighbour has. _Concede the party-indexed
    ordering and the composition idea (Condoravdi–Lauer; Shea-Blymyer & Abbas 2022);
-   claim the dominator form.* Also the **derived-relation** stance vs. Yan & He's
+   claim the dominator form._ Also the **derived-relation** stance vs. Yan & He's
    coupled `O_G`.
 3. **(C5) Sign-toggled liveness/safety.** A single party-indexed `⪯_p` whose **sign**
-   on an outcome routes the *same* dominator to its liveness pole (`EF J`, pursue) or
-   safety pole (`AG¬S`, avoid). *Concede the sanction/goal duality (Anderson;
-   Kowalski–Satoh 2018); claim the sign-selector + temporal split.*
+   on an outcome routes the _same_ dominator to its liveness pole (`EF J`, pursue) or
+   safety pole (`AG¬S`, avoid). _Concede the sanction/goal duality (Anderson;
+   Kowalski–Satoh 2018); claim the sign-selector + temporal split._
 4. **(C4) Ordinal, party-indexed force-gap.** `Force(MUST_p K)` = rank-difference over
    a Kratzer preorder, paired against `⪯_law` so sign + the C3 divergence fall out of
-   one schema. *Concede the cardinal gap (Pearl 1993; Becker/Shavell); claim the
-   ordinal deontic-native form; present fine-is-a-price as the legal sign-reading.*
+   one schema. _Concede the cardinal gap (Pearl 1993; Becker/Shavell); claim the
+   ordinal deontic-native form; present fine-is-a-price as the legal sign-reading._
 5. **The engineering instantiation** in L4: goal-free CNL object syntax + compile to a
    violation-automaton/LTL semantics + loophole/race-condition verification. (No
    neighbour builds this.)
@@ -70,10 +71,10 @@ the "bound" — is itself the contribution.
    and the multi-party/ATL escalation (C6) is openly **recombination** of NATL\* +
    our C1/C2 deltas, framed as a future facet, not an independent claim.
 
-*CONCEDED OUTRIGHT (state by name, do not claim): C1 dominator MUST = planning
+_CONCEDED OUTRIGHT (state by name, do not claim): C1 dominator MUST = planning
 **landmarks** (Hoffmann/Porteous/Sebastia 2004; LM-cut 2009) + Lengauer–Tarjan;
 C6 obligation-as-strategic-ability = **NATL\*** (Wooldridge & van der Hoek 2005);
-CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).*
+CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`)._
 
 ## Section outline
 
@@ -88,7 +89,7 @@ CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).
    Holmes "bad man" → Hart "obliged vs obligation"; Gneezy-Rustichini / Frey /
    Cooter.
 3. **The object level (the letter).** `DO … HENCE … LEST`; MUST/MAY/SHANT as sugar;
-   `BREACH`/`FULFILLED` = Meyer's *neutral* violation marker; Hvitved-CSL
+   `BREACH`/`FULFILLED` = Meyer's _neutral_ violation marker; Hvitved-CSL
    composition. **Goal-free by design.** (Harvested from the spec.)
 4. **The sorter: constitutive must-be vs regulative deontic.** Searle; the two-level
    architecture as the gate; only regulative deontics enter the bounded analysis.
@@ -98,12 +99,12 @@ CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).
    reachability graph (every path to J passes through K) = a CTL dominator /
    minimal-cut set, near-linear via Lengauer–Tarjan; many-to-many; `WITHIN` deadlines
    (and, non-temporally, alternative-path elimination) as the `may→must` event = the
-   step where an avoidable action enters the dominator set. *Formal core; the
-   differentiation from Yan & He.* **Concede the construct to planning landmarks**
-   (Hoffmann et al. 2004 / LM-cut) + Lengauer–Tarjan; claim only the *deontic reading*.
+   step where an avoidable action enters the dominator set. _Formal core; the
+   differentiation from Yan & He._ **Concede the construct to planning landmarks**
+   (Hoffmann et al. 2004 / LM-cut) + Lengauer–Tarjan; claim only the _deontic reading_.
    Disambiguate from **Horty's** decision-theoretic "dominance" (homonym) and LAMA
    "reasonable orderings". **Caveat to honour:** the monotone-growth of the necessary
-   set holds for *cumulative whole-trace* necessity, NOT the *from-here-onward* `nec`
+   set holds for _cumulative whole-trace_ necessity, NOT the _from-here-onward_ `nec`
    (a performed act drops out of future necessity) — do not conflate. No concept
    lattice in v1.
 6. **The boundary — two orderings (the paper's center of gravity).** Concede-then-
@@ -112,20 +113,20 @@ CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).
    liveness/safety duality (C5); the ordinal force-gap with fine-is-a-price /
    protestor as gap-sign cases (C4). Then the static/runtime lattice (goal-set closed;
    order acyclic & transparent; factbase closed); anankastic inversion + partial-
-   evaluation staging; Hart's internal point of view + crowding-out as the *semantic*
+   evaluation staging; Hart's internal point of view + crowding-out as the _semantic_
    (not magnitude) limit — correcting the spec's penalty-size test. See
    `notes/per-party-ordering.md` + `notes/s6-priorart-verdict.md`.
 7. **Verification & tooling.** Compile-time: model-check the closed form, double-bind
    = unsat core (loophole / deontic-temporal race condition; TLA+/UPPAAL/SPIN/NuSMV
    lineage). Runtime: monitoring the live event-sourced trace. Transparent partial
    stratification via `SUBJECT TO` / `NOTWITHSTANDING`. **Worked example (confirmed):
-   UCC Art. 9 / PPSA perfection**, carrying the `nec` / may→must story — *decoupled
-   from FCA* (its disjunctive file-OR-possess structure flattens any lattice). Sketch:
+   UCC Art. 9 / PPSA perfection**, carrying the `nec` / may→must story — _decoupled
+   from FCA_ (its disjunctive file-OR-possess structure flattens any lattice). Sketch:
    deposit account → control is the only path to priority → MUST; ordinary goods →
    file OR possess → MAY; may→must when the claimant/collateral field changes
    (non-temporal). **Wills Act formalities** stays the constitutive foil for §4's
    sorter. Demote holder-in-due-course / contract-formation / standing (degenerate).
-   *NOT the gov race-condition pilot* (temporal/concurrency, wrong fit).
+   _NOT the gov race-condition pilot_ (temporal/concurrency, wrong fit).
 8. **Discussion / limitations.** Anankastic compositionality is a known open problem
    (do NOT claim to solve). Categorical norms and the contestable "all oughts are
    hypothetical." Cooperative-parties assumption.
@@ -133,19 +134,19 @@ CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).
 
 ## Venue scoping
 
-| Venue | Fit | Cadence | Notes |
-| --- | --- | --- | --- |
-| **DEON** (Deontic Logic & Normative Systems) | **Best** for the theory core (§§5–6) | biennial — *verify next cycle* | The audience that knows Anderson/Meyer/Kratzer; where the boundary/derived-relation claims land hardest. |
-| **ProLaLa** (Programming Languages & the Law, POPL workshop) | **Best** for the tooling half (§§3,7) | annual, w/ POPL (Jan) | On-brand for L4; PL+law crowd; lighter theory bar. |
-| **JURIX** (Legal Knowledge & Information Systems) | Strong all-rounder | annual (Dec) | Applied AI&Law; good if we want annual + legal framing. |
-| **ICAIL** | Possible but **avoid clash** | biennial (Jun) | Home of the main L4 paper; differentiate to avoid self-overlap. |
-| **Journal** (AI & Law; J. Logic & Computation) | For the full-length version | rolling | If the FCA/concept-lattice strand matures. |
+| Venue                                                        | Fit                                   | Cadence                        | Notes                                                                                                    |
+| ------------------------------------------------------------ | ------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| **DEON** (Deontic Logic & Normative Systems)                 | **Best** for the theory core (§§5–6)  | biennial — _verify next cycle_ | The audience that knows Anderson/Meyer/Kratzer; where the boundary/derived-relation claims land hardest. |
+| **ProLaLa** (Programming Languages & the Law, POPL workshop) | **Best** for the tooling half (§§3,7) | annual, w/ POPL (Jan)          | On-brand for L4; PL+law crowd; lighter theory bar.                                                       |
+| **JURIX** (Legal Knowledge & Information Systems)            | Strong all-rounder                    | annual (Dec)                   | Applied AI&Law; good if we want annual + legal framing.                                                  |
+| **ICAIL**                                                    | Possible but **avoid clash**          | biennial (Jun)                 | Home of the main L4 paper; differentiate to avoid self-overlap.                                          |
+| **Journal** (AI & Law; J. Logic & Computation)               | For the full-length version           | rolling                        | If the FCA/concept-lattice strand matures.                                                               |
 
 **DECIDED: JURIX** (Meng attends regularly, has colleagues there; it comfortably
 carries both the theory and the applied/tooling framing, so no venue-driven split is
-forced). Format to confirm against the current CFP: IOS Press *Frontiers in AI and
-Applications*, long papers ~10pp / short ~6pp, typically **December** conference with
-**~September** submission. DEON / ProLaLa remain candidates for *later facets* in the
+forced). Format to confirm against the current CFP: IOS Press _Frontiers in AI and
+Applications_, long papers ~10pp / short ~6pp, typically **December** conference with
+**~September** submission. DEON / ProLaLa remain candidates for _later facets_ in the
 series, not this paper.
 
 **Co-authors:** Oliver Goodenough (the "squeezing out the deontics" framing is jointly
@@ -164,7 +165,7 @@ his) pencilled. Consider Ken Satoh only if a PROLEG/defeasibility angle grows.
 ## Immediate next actions
 
 - [x] **INTEGRITY — DONE:** "Superintelligence and Law" VERIFIED from the PDF = **Noam
-      Kolt** (sole author), *Harv. J.L. & Tech.* forthcoming (25 Feb 2026) — NOT "Kolt
+      Kolt** (sole author), _Harv. J.L. & Tech._ forthcoming (25 Feb 2026) — NOT "Kolt
       et al."/Anthropic. Promoted to a cited **C3/§1 framing neighbour** (its Part III.A
       pairs Holmes-bad-man vs Hart-internal-POV and ties internal POV to letter-vs-
       spirit). See `notes/kolt-2026-superintelligence-and-law.md`.
@@ -180,7 +181,6 @@ his) pencilled. Consider Ken Satoh only if a PROLEG/defeasibility angle grows.
       already added Kowalski & Satoh 2018, Silk 2019, Shea-Blymyer & Abbas 2022.
 - [ ] Sweep un-exhausted adjacent lines (Horty stit/default; Boella–van der Torre NMAS
       games; Casali–Godo–Sierra graded DL; van der Hoek NTL) for closer C3/C4/C5.
-- [ ] Google Scholar pass (still blocked on extension perms); verify `[verify]` cites
-      + metadata (Pearl UAI pages, Kowalski–Satoh JPL pages, DEON/ICAPS pagination).
+- [ ] Google Scholar pass (still blocked on extension perms); verify `[verify]` cites + metadata (Pearl UAI pages, Kowalski–Satoh JPL pages, DEON/ICAPS pagination).
 - [ ] Draft §5 (`nec` + dominator MUST, conceded to landmarks, deontic reading claimed)
       then §6 (concede-then-claim, C3-led). No FCA lattice figure.

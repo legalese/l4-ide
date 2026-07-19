@@ -17,26 +17,26 @@ Hohfeld's eight jural relations are not eight primitives but **two layers of
 deontics**: the first-order square (right/duty, privilege/no-right) is ordinary
 party-indexed `MAY`/`MUST`/`SHANT`; the second-order square (power/liability,
 immunity/disability) is just **operators over the first-order layer** — a power is a
-`MAY` whose *argument is another party's deontic position*.
+`MAY` whose _argument is another party's deontic position_.
 
 ## The central move: the mapping is FORCED, not chosen
 
 Once we admit the CS notion of **higher-order formulas** (functions that take/return
 functions; quantification over relations), Hohfeld's structure falls out as the
-corresponding type/function hierarchy. We do not *encode* the square — the square
-*is* the hierarchy. That is the paper's claim to non-triviality: not "powers are
+corresponding type/function hierarchy. We do not _encode_ the square — the square
+_is_ the hierarchy. That is the paper's claim to non-triviality: not "powers are
 higher-order" (old news — Hohfeld, Hart, Kelsen all say so informally) but that the
 higher-order reading is the **canonical** one, and that reading it off mechanically
 buys real things (verification, a jurisprudential unification, an executable
 instantiation).
 
-| Hohfeld | CS higher-order structure |
-| --- | --- |
-| first-order relation (right/duty; privilege/no-right) | a **value** — `DeonticPosition`, i.e. party-indexed `MAY`/`MUST`/`SHANT` |
-| **power** | a **function** `DeonticPosition -> DeonticPosition` (arrest = `person: MAY leave  |->  SHANT leave`) |
-| **correlative** (power <-> liability) | the **two ends of one arrow** — empowered party = domain, liable party = codomain; one arrow under two projections, not two facts |
-| **opposite / jural negation** (immunity, disability) | **negation at that order** — disability = ¬power, immunity = ¬liability, exactly as no-right/privilege negate at first order |
-| **power to confer powers** (Kelsen *Stufenbau*, Hart secondary rules) | genuine **higher-order function** `(DP->DP) -> (DP->DP)` — the empowerment tower is currying |
+| Hohfeld                                                               | CS higher-order structure                                                                                                         |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| first-order relation (right/duty; privilege/no-right)                 | a **value** — `DeonticPosition`, i.e. party-indexed `MAY`/`MUST`/`SHANT`                                                          |
+| **power**                                                             | a **function** `DeonticPosition -> DeonticPosition` (arrest = `person: MAY leave                                                  | -> SHANT leave`) |
+| **correlative** (power <-> liability)                                 | the **two ends of one arrow** — empowered party = domain, liable party = codomain; one arrow under two projections, not two facts |
+| **opposite / jural negation** (immunity, disability)                  | **negation at that order** — disability = ¬power, immunity = ¬liability, exactly as no-right/privilege negate at first order      |
+| **power to confer powers** (Kelsen _Stufenbau_, Hart secondary rules) | genuine **higher-order function** `(DP->DP) -> (DP->DP)` — the empowerment tower is currying                                      |
 
 ### The canonical illustration
 
@@ -66,7 +66,7 @@ PARTY parliament MAY
 ## Two payoffs that fall straight out
 
 **1. Hohfeld's own axes stop being mnemonic and become structural.** He drew
-correlatives and opposites as a square because he *saw* the symmetry but had no
+correlatives and opposites as a square because he _saw_ the symmetry but had no
 calculus for it. The calculus is: correlative = the domain/codomain duality of an
 arrow; opposite = negation at the appropriate order; and the "first-order /
 second-order" that commentators pin on him is literally **the order of the function
@@ -84,19 +84,19 @@ one level up (this facet).
 
 ## Honest caveat to state up front (strengthens the L4 claim, doesn't weaken it)
 
-A power is **not a pure function** `DP -> DP`. Exercising it is a *guarded update on
-the normative store* (event-sourced, cf. state-as-ledger), conditioned by
+A power is **not a pure function** `DP -> DP`. Exercising it is a _guarded update on
+the normative store_ (event-sourced, cf. state-as-ledger), conditioned by
 `PROVIDED …`. The faithful type is closer to a **guarded update in a normative-state
 monad** — `DP -> Maybe DP`, or `NormState -> NormState` — than a total function.
-Stating this plainly pre-empts the first referee objection and it *strengthens* the
+Stating this plainly pre-empts the first referee objection and it _strengthens_ the
 executable-instantiation claim: L4 actually runs these updates against a live
 factbase, which a pure-logic account does not.
 
 ## Place in the series (the order-theoretic tower)
 
-- **Facet 2 — Bounded Deontics ("Deontics as Domination"):** the *first-order* story.
+- **Facet 2 — Bounded Deontics ("Deontics as Domination"):** the _first-order_ story.
   `MUST K (for goal J)` = K **dominates** J in the reachability graph.
-- **This facet — Hohfeld, higher-order:** the *second-order* story. Powers = functions
+- **This facet — Hohfeld, higher-order:** the _second-order_ story. Powers = functions
   from deontic positions to deontic positions; the empowerment chain = currying.
 - Shared spine: the ∀/∃ → static/runtime lattice, reused one order up.
 
@@ -111,7 +111,7 @@ of the second-order square. To map before drafting:
 - **Makinson 1986** on formalising Hohfeld.
 - **Sergot's (n)C+ / `norg`**; **Governatori & Rotolo** on defeasible normative-position
   change; dynamic / update deontic logic (**Meyer**; **van der Meyden**).
-- **Kelsen** *Stufenbau*; **Hart** secondary rules (rules of change/recognition/
+- **Kelsen** _Stufenbau_; **Hart** secondary rules (rules of change/recognition/
   adjudication); **Raz** basic vs chained normative powers — the jurisprudential lineage
   (already surveyed in `HOMOICONICITY-SPEC.md`).
 - Lindahl / Sartor on normative positions; Herrestad & Krogh on obligation-agency.

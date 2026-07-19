@@ -22,7 +22,7 @@
 >   retains full reporting.
 > - **Option E gate is content equality**, not path canonicalization: an XDG
 >   symlink pointing at byte-identical sources is harmless and stays silent;
->   canonicalization is used for *display* (the warning prints each symlink's
+>   canonicalization is used for _display_ (the warning prints each symlink's
 >   real target). Warned once per configuration per session.
 > - **§6 (bundle dir)** left open: B′ keeps the bundle as an ambient tier
 >   below the embed, so nothing forces the question yet.
@@ -74,19 +74,19 @@ cannot drift from the code that consumes it. In the current ordering it is the
 All in `jl4-lsp/src/LSP/L4/Rules.hs` unless noted. Line numbers are as of this
 branch's HEAD; treat them as starting points, not guarantees.
 
-| What | Location |
-| --- | --- |
-| `data LibraryResolution { resolvedPath, searchedPaths, hasExplicitPath }` | `Rules.hs:236-240` |
-| `resolveLibraryFromFilesystem` (the single filesystem resolver) | `Rules.hs:252-289` |
-| priority list assembly (`envPaths <> [rootPath, relPath] <> discoverPaths`) | `Rules.hs:277` |
-| `discoverPaths = [xdgPath, bundledPath]` | `Rules.hs:266-275` |
-| **Resolver #1** — inline `resolveImportUri` inside `GetMixfixRegistry` | `Rules.hs:336-374` |
-| **Resolver #2** — `mkImportPath` inside `GetImports` | `Rules.hs:431-478` |
-| `hasExplicitPath` gate on the embedded fallback | `Rules.hs:367`, `Rules.hs:462` |
-| `LogImportResolution` log payload | `Rules.hs:218`, `Rules.hs:233` |
-| Embedded-library lookup (TH-compiled stdlib) | `jl4-core/src/L4/API/EmbeddedLibraries.hs` |
-| TH embed + `addDependentFile` (build-time datadir) | `jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:34-46` |
-| CLI check path (uses the same `jl4Rules`) | `jl4-lsp/src/LSP/L4/Oneshot.hs:56` |
+| What                                                                        | Location                                            |
+| --------------------------------------------------------------------------- | --------------------------------------------------- |
+| `data LibraryResolution { resolvedPath, searchedPaths, hasExplicitPath }`   | `Rules.hs:236-240`                                  |
+| `resolveLibraryFromFilesystem` (the single filesystem resolver)             | `Rules.hs:252-289`                                  |
+| priority list assembly (`envPaths <> [rootPath, relPath] <> discoverPaths`) | `Rules.hs:277`                                      |
+| `discoverPaths = [xdgPath, bundledPath]`                                    | `Rules.hs:266-275`                                  |
+| **Resolver #1** — inline `resolveImportUri` inside `GetMixfixRegistry`      | `Rules.hs:336-374`                                  |
+| **Resolver #2** — `mkImportPath` inside `GetImports`                        | `Rules.hs:431-478`                                  |
+| `hasExplicitPath` gate on the embedded fallback                             | `Rules.hs:367`, `Rules.hs:462`                      |
+| `LogImportResolution` log payload                                           | `Rules.hs:218`, `Rules.hs:233`                      |
+| Embedded-library lookup (TH-compiled stdlib)                                | `jl4-core/src/L4/API/EmbeddedLibraries.hs`          |
+| TH embed + `addDependentFile` (build-time datadir)                          | `jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:34-46` |
+| CLI check path (uses the same `jl4Rules`)                                   | `jl4-lsp/src/LSP/L4/Oneshot.hs:56`                  |
 
 ### 2.1 The actual resolution order (correcting a common miscount)
 
@@ -118,9 +118,9 @@ Note two things the folklore gets wrong:
 ## 3. The problem
 
 The ordering runs **every filesystem location — including the two ambient/global
-ones — above the binary's own hermetic embedded copy.** For a *deployed* binary
-with no checkout, that is fine. For *development with multiple checkouts or git
-worktrees*, it inverts what you want:
+ones — above the binary's own hermetic embedded copy.** For a _deployed_ binary
+with no checkout, that is fine. For _development with multiple checkouts or git
+worktrees_, it inverts what you want:
 
 - The XDG entry (`~/.local/share/jl4/libraries/`) is, on dev machines, commonly a
   **symlink into one checkout** — a convenience so an installed `jl4` "just works"
@@ -224,11 +224,11 @@ Make the silent shadow a **visible** one, without changing precedence at all.
 - Mirror the same logging into the `GetMixfixRegistry` resolver so parser-hint
   resolution is no longer silent.
 
-| | |
-| --- | --- |
-| **Pros** | ~One-line-per-site; would have surfaced **both** incidents immediately; zero behavior change; unblocks diagnosis of any future shadow. |
-| **Cons** | Does not prevent the wrong file from loading — only makes it observable. Noise if over-logged (mitigate: log winner at a visible level, full candidate list at `Debug`). |
-| **Effort** | Low. |
+|            |                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Pros**   | ~One-line-per-site; would have surfaced **both** incidents immediately; zero behavior change; unblocks diagnosis of any future shadow.                                   |
+| **Cons**   | Does not prevent the wrong file from loading — only makes it observable. Noise if over-logged (mitigate: log winner at a visible level, full candidate list at `Debug`). |
+| **Effort** | Low.                                                                                                                                                                     |
 
 ### Option B — Full precedence flip (embedded wins unless overridden)
 
@@ -236,11 +236,11 @@ Make the embedded copy the **default** source. Consult filesystem locations only
 when `JL4_LIBRARY_PATH` is explicitly set (ambient filesystem lookup becomes
 opt-out-by-default).
 
-| | |
-| --- | --- |
-| **Pros** | Hermetic by default: the binary always uses the stdlib it was built with; cross-checkout contamination impossible without an explicit opt-in. |
-| **Cons** | Breaks the legitimate **project-local override** and **sibling file** cases (steps 2.ii/2.iii) that devs rely on — you would have to set `JL4_LIBRARY_PATH` to import a locally-modified `prelude`. Also, per §3.4, embedded may itself be stale, so this can mask worktree edits differently. **Deployment question to resolve:** does the VSCode bundle still need `<exeDir>/../../libraries` at all if the full stdlib is embedded? (Investigate: if the embed already carries the complete stdlib at build time, the bundled `libraries/` dir may be removable, collapsing step 2.v — see §6.) |
-| **Effort** | Low-medium (reorder + settle the bundle question). |
+|            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros**   | Hermetic by default: the binary always uses the stdlib it was built with; cross-checkout contamination impossible without an explicit opt-in.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Cons**   | Breaks the legitimate **project-local override** and **sibling file** cases (steps 2.ii/2.iii) that devs rely on — you would have to set `JL4_LIBRARY_PATH` to import a locally-modified `prelude`. Also, per §3.4, embedded may itself be stale, so this can mask worktree edits differently. **Deployment question to resolve:** does the VSCode bundle still need `<exeDir>/../../libraries` at all if the full stdlib is embedded? (Investigate: if the embed already carries the complete stdlib at build time, the bundled `libraries/` dir may be removable, collapsing step 2.v — see §6.) |
+| **Effort** | Low-medium (reorder + settle the bundle question).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### Option B′ — Surgical precedence flip (RECOMMENDED core; see §5)
 
@@ -251,11 +251,11 @@ importer-relative 2.iii) **above** embedded.
 Resulting order: `JL4_LIBRARY_PATH → root → importer-relative → EMBEDDED →
 XDG → bundle`.
 
-| | |
-| --- | --- |
-| **Pros** | Preserves every **intentional** override (explicit env var, project-root lib, sibling file) while making a machine-global symlink no longer able to shadow the binary's own stdlib. Directly kills the incident class: a bare `IMPORT prelude` with no local copy now gets the hermetic embedded copy, not a random other checkout. |
-| **Cons** | A dev who *wants* the XDG symlink to win for a bare import must now set `JL4_LIBRARY_PATH` (this is arguably correct — it makes the override conscious). Slightly more nuanced than a blanket flip. |
-| **Effort** | Low (reorder `allPaths` assembly + place the embedded check between project-scoped and ambient tiers; today embedded lives outside `resolveLibraryFromFilesystem`, so this means threading the embedded lookup into the priority list or splitting the ambient tier out — note this for the implementer). |
+|            |                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros**   | Preserves every **intentional** override (explicit env var, project-root lib, sibling file) while making a machine-global symlink no longer able to shadow the binary's own stdlib. Directly kills the incident class: a bare `IMPORT prelude` with no local copy now gets the hermetic embedded copy, not a random other checkout. |
+| **Cons**   | A dev who _wants_ the XDG symlink to win for a bare import must now set `JL4_LIBRARY_PATH` (this is arguably correct — it makes the override conscious). Slightly more nuanced than a blanket flip.                                                                                                                                 |
+| **Effort** | Low (reorder `allPaths` assembly + place the embedded check between project-scoped and ambient tiers; today embedded lives outside `resolveLibraryFromFilesystem`, so this means threading the embedded lookup into the priority list or splitting the ambient tier out — note this for the implementer).                           |
 
 ### Option C — Explicit `--library-path` CLI flag
 
@@ -263,11 +263,11 @@ Add a `--library-path DIR` flag (repeatable) to the `l4` CLI that mirrors
 `JL4_LIBRARY_PATH`, so overriding library resolution from the command line is always
 a conscious act (and scriptable in tests without mutating the environment).
 
-| | |
-| --- | --- |
-| **Pros** | Makes override explicit and per-invocation; good for reproducible tests and CI; complements B/B′'s "overrides are opt-in" stance. |
-| **Cons** | New surface area; must agree on precedence between flag and env var (suggest: flag > env var > everything). |
-| **Effort** | Low-medium. |
+|            |                                                                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros**   | Makes override explicit and per-invocation; good for reproducible tests and CI; complements B/B′'s "overrides are opt-in" stance. |
+| **Cons**   | New surface area; must agree on precedence between flag and env var (suggest: flag > env var > everything).                       |
+| **Effort** | Low-medium.                                                                                                                       |
 
 ### Option D — De-duplicate the two resolvers
 
@@ -275,24 +275,24 @@ Factor the VFS-candidate construction, filesystem resolution, and embedded-fallb
 into **one** shared helper used by both `GetMixfixRegistry` and `GetImports`, so
 parser-hint resolution and typecheck resolution can never pick different sources.
 
-| | |
-| --- | --- |
-| **Pros** | Eliminates the drift hazard in §3.3 permanently; single place to apply A/B/B′/E; removes copy-paste. |
-| **Cons** | Touches both rules; needs care that the mixfix path (which only needs a URI) and the imports path (which needs range + searched-paths for diagnostics) share a return shape. |
-| **Effort** | Medium. |
+|            |                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros**   | Eliminates the drift hazard in §3.3 permanently; single place to apply A/B/B′/E; removes copy-paste.                                                                         |
+| **Cons**   | Touches both rules; needs care that the mixfix path (which only needs a URI) and the imports path (which needs range + searched-paths for diagnostics) share a return shape. |
+| **Effort** | Medium.                                                                                                                                                                      |
 
 ### Option E — Ambiguity diagnostic (defense in depth)
 
 When **more than one** resolution source for the same module name exists (e.g. an
-XDG copy *and* a root copy *and* the embedded copy), emit a **warning** naming all
+XDG copy _and_ a root copy _and_ the embedded copy), emit a **warning** naming all
 candidates and the one chosen. Cheap once A/D exist (the ordered candidate list is
 already in hand).
 
-| | |
-| --- | --- |
-| **Pros** | Turns "silently picked one of several" into an explicit, actionable warning; the true root-cause signal for the incident class. |
-| **Cons** | Could be noisy in normal dev where an XDG symlink legitimately coexists with the embed — gate to "sources resolve to **different real paths** after canonicalization," and consider warn-once-per-module. |
-| **Effort** | Low (given A + D). |
+|            |                                                                                                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros**   | Turns "silently picked one of several" into an explicit, actionable warning; the true root-cause signal for the incident class.                                                                           |
+| **Cons**   | Could be noisy in normal dev where an XDG symlink legitimately coexists with the embed — gate to "sources resolve to **different real paths** after canonicalization," and consider warn-once-per-module. |
+| **Effort** | Low (given A + D).                                                                                                                                                                                        |
 
 ---
 
@@ -313,7 +313,7 @@ Stage the work; ship value early.
   additive and can land separately.
 
 - **Leave the B-vs-B′ call to Meng.** If the project decides it wants
-  *fully hermetic-by-default* resolution (nothing off-binary without an explicit
+  _fully hermetic-by-default_ resolution (nothing off-binary without an explicit
   env var/flag), go to **Option B** and resolve the bundle question in §6. B′ is the
   recommended default because it keeps the project-local override working, which is
   a real dev affordance, not just an ambient accident.
@@ -333,7 +333,7 @@ the full stdlib at build time. Investigate whether the bundle can drop the on-di
 
 - If **yes**, step 2.v disappears, the VSCode deployment simplifies, and Option B
   collapses toward "embedded + explicit override only."
-- If **no** (e.g. the bundle intentionally ships a *newer* stdlib than the embedded
+- If **no** (e.g. the bundle intentionally ships a _newer_ stdlib than the embedded
   binary, or ships extra non-embedded libraries), then 2.v must stay — and that is
   an argument for keeping it **above** embedded for the bundle case specifically,
   which B′ would need to special-case or accept.
@@ -397,10 +397,10 @@ ambient tier is one path or two.
   only XDG symlink, nothing on disk}. Assert the winning index and that
   canonicalization dereferences the symlink.
 - **Regression (`.l4` corpus):** an `ok/` fixture that `IMPORT`s a library whose
-  **only** on-disk copy is a symlink to a *different* content than the embed, run
+  **only** on-disk copy is a symlink to a _different_ content than the embed, run
   with `JL4_LIBRARY_PATH` unset; assert it typechecks against the embedded copy and
   the log names the embed. A companion fixture with a root-local override asserts the
   override wins.
-- **Two-resolver parity:** a fixture using cross-module **mixfix** *and* a normal
+- **Two-resolver parity:** a fixture using cross-module **mixfix** _and_ a normal
   typecheck dependency on the same imported module; assert both resolvers log the
   same real path (guards §3.3).

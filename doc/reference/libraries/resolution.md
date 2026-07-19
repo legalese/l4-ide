@@ -1,6 +1,6 @@
 # Library Resolution: How `IMPORT` Finds Files, and How to Work with Dev vs Prod Preludes
 
-When an L4 file says `IMPORT prelude`, the toolchain has to find *a* file
+When an L4 file says `IMPORT prelude`, the toolchain has to find _a_ file
 called `prelude` — but on a developer's machine there may be **several**: one
 compiled into the binary, one in each git worktree, one in a machine-global
 store, one shipped inside the VSCode extension. This page explains, in order:
@@ -11,7 +11,7 @@ store, one shipped inside the VSCode extension. This page explains, in order:
 4. [the embed-staleness gotcha](#the-embed-staleness-gotcha) (why `cabal build`
    doesn't pick up your prelude edit)
 5. [the shadow saga](#the-shadow-saga-how-we-got-here) — the two incidents that
-   forced this design, preserved so future devs understand *why* the rules are
+   forced this design, preserved so future devs understand _why_ the rules are
    what they are
 
 The design analysis behind all of this lives in
@@ -23,26 +23,26 @@ The design analysis behind all of this lives in
 
 For a bare module name `<mod>`, resolution tries, **first match wins**:
 
-| # | Tier | Location | Who it serves |
-|---|------|----------|---------------|
-| 0 | VFS | in-memory files (`project:/<mod>.l4`, importer-relative, root) | web IDE / Monaco / unsaved editor buffers |
-| 1 | **env override** | `$JL4_LIBRARY_PATH/<mod>.l4` | operators and stdlib developers taking explicit control |
-| 2 | **project root** | `<root>/<mod>.l4` | a project that ships its own copy of a library |
-| 3 | **importer-relative** | `<dir of importing file>/<mod>.l4` | multi-file projects; local overrides beside the code |
-| 4 | **embedded** | compiled into the binary at build time | everyone else — this is the default stdlib |
-| 5 | XDG store | `~/.local/share/jl4/libraries/<mod>.l4` | machine-global *extra* libraries the embed doesn't carry |
-| 6 | VSCode bundle | `<exeDir>/../../libraries/<mod>.l4` | the packaged extension, for non-embedded extras |
+| #   | Tier                  | Location                                                       | Who it serves                                            |
+| --- | --------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| 0   | VFS                   | in-memory files (`project:/<mod>.l4`, importer-relative, root) | web IDE / Monaco / unsaved editor buffers                |
+| 1   | **env override**      | `$JL4_LIBRARY_PATH/<mod>.l4`                                   | operators and stdlib developers taking explicit control  |
+| 2   | **project root**      | `<root>/<mod>.l4`                                              | a project that ships its own copy of a library           |
+| 3   | **importer-relative** | `<dir of importing file>/<mod>.l4`                             | multi-file projects; local overrides beside the code     |
+| 4   | **embedded**          | compiled into the binary at build time                         | everyone else — this is the default stdlib               |
+| 5   | XDG store             | `~/.local/share/jl4/libraries/<mod>.l4`                        | machine-global _extra_ libraries the embed doesn't carry |
+| 6   | VSCode bundle         | `<exeDir>/../../libraries/<mod>.l4`                            | the packaged extension, for non-embedded extras          |
 
 Three rules of thumb fall out of the table:
 
 - **Project-scoped beats embedded.** If you put a `prelude.l4` in your project
   root or beside the importing file, you get it. Overriding the stdlib is a
-  conscious, visible act — the file is *in your project*.
+  conscious, visible act — the file is _in your project_.
 - **Embedded beats ambient.** A machine-global file (XDG, bundle) can never
   silently replace the stdlib your binary was built with. Ambient tiers only
   serve modules the embed does not carry.
 - **`JL4_LIBRARY_PATH` is absolute.** When it is set, the embedded copy is not
-  consulted *at all* — the operator has taken full control of the library
+  consulted _at all_ — the operator has taken full control of the library
   store. (The ambient tiers are still searched after it, for extras.)
 
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
@@ -70,13 +70,13 @@ export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"
 
 This is **the** reliable way to see your stdlib edits take effect, because of
 the [embed-staleness gotcha](#the-embed-staleness-gotcha) below: a plain
-`cabal build` does *not* refresh the embedded copy, so without the pin your
+`cabal build` does _not_ refresh the embedded copy, so without the pin your
 freshly-edited prelude loses to the stale embed on every bare `IMPORT`.
 
 Do **not** try to accomplish this with symlinks in
 `~/.local/share/jl4/libraries/` pointing into a checkout. That was the old
 convenience and it is exactly what caused the incidents below: with several
-worktrees, a machine-global symlink points at *one* of them and silently lies
+worktrees, a machine-global symlink points at _one_ of them and silently lies
 to all the others. Since the B′ reordering it also no longer works for stdlib
 modules (the embed outranks it) — the env var is both safer and the only
 supported mechanism.
@@ -96,12 +96,12 @@ supported mechanism.
 The embedded copy is the source of truth for a deployed binary. The VSCode
 extension additionally ships `libraries/*.l4` next to the bundled binary
 (tier 6); since the embed already carries the full stdlib, that directory only
-matters for libraries *not* in the embed. (Whether it can be dropped entirely
+matters for libraries _not_ in the embed. (Whether it can be dropped entirely
 is an open question — see §6 of the spec.)
 
 ### I want machine-global extra libraries
 
-`~/.local/share/jl4/libraries/` is still searched — *below* the embed. Use it
+`~/.local/share/jl4/libraries/` is still searched — _below_ the embed. Use it
 for third-party or personal libraries that are not part of the stdlib. Do not
 use it to shadow stdlib modules; it can't anymore, and if a differing copy of
 any module sits there you'll get a warning (next section).
@@ -131,7 +131,7 @@ Debug | [Import Resolution] Candidate order for prelude: [1] project root: /work
 **The shadow warning**, at Warning priority — the one you must never ignore.
 It fires (once per session per configuration) when more than one copy of a
 module is visible **and their contents differ**; byte-identical copies stay
-silent. Symlinks are dereferenced so you can see *which checkout* an entry
+silent. Symlinks are dereferenced so you can see _which checkout_ an entry
 really points at:
 
 ```
@@ -151,7 +151,7 @@ runs.
 1. Run `l4 check` on the importing file and read stderr. A shadow warning
    tells you immediately that two differing copies exist and which one won.
 2. No warning? Then only one copy is visible — check the winner line to see
-   *which* one, and remember the embed-staleness gotcha: the embedded copy may
+   _which_ one, and remember the embed-staleness gotcha: the embedded copy may
    be older than your checkout.
 3. When in doubt, `export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"` and
    re-run. If behaviour changes, you were not loading the file you thought.
@@ -162,7 +162,7 @@ runs.
 
 The embedded stdlib is captured at **build** time by a Template Haskell splice
 (`L4.API.EmbeddedLibraries`). The splice asks Cabal for the `jl4-core` datadir
-*at compile time* and reads `libraries/*.l4` from there — commonly a path like
+_at compile time_ and reads `libraries/*.l4` from there — commonly a path like
 `~/.cabal/share/…/jl4-core-*/libraries`, **not** your checkout. The
 `addDependentFile` recompilation hook tracks that same build-time path.
 
@@ -190,13 +190,13 @@ is, and why the warning exists.
 **The setup (early 2026).** Two well-intentioned commits gave a deployed
 binary ways to find the stdlib without a checkout: the VSCode bundle path
 (`8c796c24`, 2026-01-10) and the XDG + env-var search (`7d763367`,
-2026-02-05). Both filesystem tiers were placed *above* the embedded copy,
+2026-02-05). Both filesystem tiers were placed _above_ the embedded copy,
 which became the last resort. Separately, on dev machines it became customary
 to symlink `~/.local/share/jl4/libraries/*.l4` into a checkout so an installed
 binary would "just work" against the working tree.
 
 **The trap.** This repository's development convention uses many parallel git
-worktrees. A machine-global symlink points into exactly *one* of them. In
+worktrees. A machine-global symlink points into exactly _one_ of them. In
 every other worktree, a bare `IMPORT prelude` (no project-local copy — the
 normal case for corpus files) fell through root and importer-relative tiers
 and landed on the XDG symlink: the resolver loaded **another checkout's
@@ -207,7 +207,7 @@ all.
 
 **Incident 1 (2026-07).** During the CONSIDER-exhaustiveness work, library
 changes appeared to have no effect; the XDG store was found to be shadowing
-the worktree and was *moved aside by hand* (`libraries.stale-2026-07-03`). A
+the worktree and was _moved aside by hand_ (`libraries.stale-2026-07-03`). A
 hand-move fixes one machine once; the next worktree recreates the hazard.
 
 **Incident 2 (2026-07-18).** A session added `@infixl` fixity annotations to
@@ -224,7 +224,7 @@ loaded the file containing the annotations.
 2. **Silence** — one of the two resolvers logged nothing, the other logged at
    a filtered priority, and neither dereferenced symlinks.
 3. **Duplication** — parser-hint resolution and import resolution were
-   copy-pasted twins that could drift into loading *different* files for the
+   copy-pasted twins that could drift into loading _different_ files for the
    same import.
 
 **The fix (2026-07-19).** Implemented in `jl4-lsp/src/LSP/L4/Rules.hs`:
@@ -232,7 +232,7 @@ loaded the file containing the annotations.
 - **One resolver** (`resolveImportShared`) shared by both rules — parse and
   typecheck can never disagree about which file a module is.
 - **The B′ reorder** — embedded moved above XDG/bundle; project-scoped tiers
-  and the env override kept above embedded, so every *intentional* override
+  and the env override kept above embedded, so every _intentional_ override
   still works. (The fully-hermetic alternative — nothing off-binary without
   an env var — was rejected because project-local overrides are a real
   affordance, not an accident.)
@@ -242,7 +242,7 @@ loaded the file containing the annotations.
 - **Visible logging** — winner + candidate table as shown above; the CLI
   passes Warning-level resolution lines through to stderr.
 
-**The moral.** If a resolver consults global state, the global state *will*
+**The moral.** If a resolver consults global state, the global state _will_
 eventually be wrong, and the failure will be attributed to whatever code the
 victim happened to be editing. Hermetic-by-default with conscious, visible
 overrides — and a loud message when two sources disagree — is the only

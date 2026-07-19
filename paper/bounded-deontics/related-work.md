@@ -15,7 +15,7 @@ temporal logic — is **not novel**. It is a named, central move in three largel
 separate literatures (philosophical deontic logic, linguistic modal semantics,
 and analytic jurisprudence), the earliest being **Anderson (1958)**. The term
 "bounded deontics" itself appears unused (no exact hits), but the paper must
-foreground that it is *reconstructing* a well-known reduction, not inventing it.
+foreground that it is _reconstructing_ a well-known reduction, not inventing it.
 
 The defensible contribution is therefore **not** the reduction but (a) its
 **engineering instantiation** in a typed, executable legal DSL (L4) with a real
@@ -30,16 +30,16 @@ where the reduction is faithful vs. where it breaks (the "bounded" in the name).
 This is the closest prior art and the spine of the citation story.
 
 - **Anderson, A. R. (1958), "A Reduction of Deontic Logic to Alethic Modal
-  Logic," *Mind* 67(265): 100–103.** `Oφ ↔ □(¬φ → S)`, where `S` is a propositional
+  Logic," _Mind_ 67(265): 100–103.** `Oφ ↔ □(¬φ → S)`, where `S` is a propositional
   **sanction/penalty constant** ("the sanction is invoked"), with the axiom `¬□S`.
-  This is "or else what?" formalized: an obligation *is* the necessity that breach
+  This is "or else what?" formalized: an obligation _is_ the necessity that breach
   entails the sanction. **The direct ancestor of bounded deontics.** (DOI
   10.1093/mind/lxvii.265.100.)
 - **Kanger, S.** — a parallel reduction using a constant `Q` ("what morality
   prescribes"). `[verify exact ref]` Usually paired with Anderson as the
   "Anderson–Kanger" reduction.
 - **Meyer, J.-J. Ch. (1988), "A Different Approach to Deontic Logic: Deontic Logic
-  Viewed as a Variant of Dynamic Logic," *Notre Dame J. Formal Logic* 29(1).**
+  Viewed as a Variant of Dynamic Logic," _Notre Dame J. Formal Logic_ 29(1).**
   Dynamic Deontic Logic (DDL). Enriches PDL with a **violation atom `V`**:
   `Fα ↔ [α]V` (an action is forbidden iff every execution leads to a violation
   state); `Pα ↔ ⟨α⟩¬V`. **This is exactly "squeeze the deontic into a state
@@ -59,10 +59,10 @@ This is the closest prior art and the spine of the citation story.
 ## Strand 2 — Linguistic semantics: modality is already goal-relative
 
 - **Kratzer, A.** ("What 'must' and 'can' must and can mean," 1977; "The Notional
-  Category of Modality," 1981; *Modals and Conditionals*, 2012). The dominant
+  Category of Modality," 1981; _Modals and Conditionals_, 2012). The dominant
   theory: a modal is interpreted relative to a **modal base** + an **ordering
-  source** (a set of goals/norms). A deontic "must" is necessity *relative to a
-  goal-providing ordering source* — i.e. **never an unindexed primitive.** Bounded
+  source** (a set of goals/norms). A deontic "must" is necessity _relative to a
+  goal-providing ordering source_ — i.e. **never an unindexed primitive.** Bounded
   deontics is, semantically, Kratzerian relativization. Foreground this: in
   mainstream semantics our central claim is the default, not a discovery.
 - **Anankastic conditionals** — "If you want to go to Harlem, you must take the A
@@ -70,20 +70,20 @@ This is the closest prior art and the spine of the citation story.
   "What to Do If You Want to Go to Harlem"**; **Sæbø (2001)**; **Huitink (2008
   diss.; "Anankastic Conditionals and Salient Goals")**; **Condoravdi & Lauer
   (2016)** (object to all prior semantics); **Phillips-Brown, "Anankastic
-  Conditionals Are Still a Mystery."** Meng's "I must return the book *if I want to
-  avoid a fine*" is a textbook anankastic conditional. Open problem there: a
+  Conditionals Are Still a Mystery."** Meng's "I must return the book _if I want to
+  avoid a fine_" is a textbook anankastic conditional. Open problem there: a
   **compositional** semantics (what does "want" contribute?) — a known hard nut we
-  should *not* claim to have cracked.
+  should _not_ claim to have cracked.
 - **Yan, J. & He, Q. (2025), "A Logic for Instrumental Obligation"
-  (arXiv:2505.06824).** *Most direct contemporary overlap (≈1 yr old).*
+  (arXiv:2505.06824).** _Most direct contemporary overlap (≈1 yr old)._
   Goal-indexed obligations `O_G(φ)`; the goal **restricts the ordering** used to
-  interpret the obligation (ideal worlds *consistent with the agent's goal*);
+  interpret the obligation (ideal worlds _consistent with the agent's goal_);
   Kratzer-style ordering sources; explicitly positioned **between hypothetical and
   categorical** obligation. We must engage this head-on and differentiate (they
   formalize the instrumental case; our angle is executable tooling + the boundary).
 - **Kowalski, R. & Satoh, K. (2018), "Obligation as Optimal Goal Satisfaction,"
-  *J. Philosophical Logic* 47.** *(Added 2026-06-24 — flagged by the FCA workflow as
-  a missing close neighbour; and it's **Satoh**.)* The nearest goal-relativized-
+  _J. Philosophical Logic_ 47.** _(Added 2026-06-24 — flagged by the FCA workflow as
+  a missing close neighbour; and it's **Satoh**.)_ The nearest goal-relativized-
   obligation account: obligation defined via optimal satisfaction of goals. Differentiate:
   ours is a **derived many-to-many necessity relation over a transition system**
   (`MUST` = dominator/cut), theirs a **preference order over FOL models**.
@@ -95,22 +95,22 @@ This is the closest prior art and the spine of the citation story.
 
 ## Strand 3 — Jurisprudence: the sanction/prediction lineage and its standard refutation
 
-- **Bentham; Austin, *The Province of Jurisprudence Determined* (1832).** Command
+- **Bentham; Austin, _The Province of Jurisprudence Determined_ (1832).** Command
   theory: law = command backed by **sanction**. "Or else what?" = Austin's sanction.
 - **Holmes, O. W. (1897), "The Path of the Law," 10 Harv. L. Rev. 457.** The **"bad
   man"**, to whom a duty is "a prophecy that if he does certain things he will be
   subjected to disagreeable consequences by way of imprisonment or compulsory
   payment of money." The bad man treats law as an **amoral state machine of
-  sanctions** — i.e. he *is* the Gneezy–Rustichini daycare parent. Prediction
+  sanctions** — i.e. he _is_ the Gneezy–Rustichini daycare parent. Prediction
   theory of law.
-- **Hart, H. L. A. (1961), *The Concept of Law*.** The canonical critique:
+- **Hart, H. L. A. (1961), _The Concept of Law_.** The canonical critique:
   **"being obliged" (gunman/sanction) vs "having an obligation" (the internal
   point of view).** Squeezing out the deontics = collapsing Hart's distinction.
   So the behavioral economics below is a 20th-/21st-c. empirical confirmation of
   Hart's conceptual objection.
-- **Kant, *Groundwork* (1785).** Hypothetical ("Don't steal if you want to stay
+- **Kant, _Groundwork_ (1785).** Hypothetical ("Don't steal if you want to stay
   out of jail") vs **categorical** ("Don't steal") imperative. Bounded deontics =
-  the contested thesis that *all* legal oughts are hypothetical imperatives
+  the contested thesis that _all_ legal oughts are hypothetical imperatives
   (carry a goal index); the **torture** edge case is a categorical imperative
   resisting the index. This is the philosophical fault line of the whole paper.
 
@@ -118,25 +118,25 @@ This is the closest prior art and the spine of the citation story.
 
 Empirical/economic confirmation that `Obligation(A,X) ≠ Price(A,X,$10)`:
 
-- **Gneezy, U. & Rustichini, A. (2000), "A Fine is a Price," *J. Legal Studies*
+- **Gneezy, U. & Rustichini, A. (2000), "A Fine is a Price," _J. Legal Studies_
   29(1).**
-- **Frey, B. & Jegen, R. (2001), "Motivation Crowding Theory," *J. Economic
-  Surveys* 15(5)**; Frey, "How Intrinsic Motivation Is Crowded Out and In."
-- **Cooter, R., "Expressive Law and Economics"** (1998, *J. Legal Studies*);
+- **Frey, B. & Jegen, R. (2001), "Motivation Crowding Theory," _J. Economic
+  Surveys_ 15(5)**; Frey, "How Intrinsic Motivation Is Crowded Out and In."
+- **Cooter, R., "Expressive Law and Economics"** (1998, _J. Legal Studies_);
   **Bohnet & Cooter (2003), "Expressive Law: Framing or Equilibrium Selection?"**;
   **Bohnet, Frey & Huck (2001), "More Order with Less Law."**
 
 ## Strand 5 — Cautionary counterpoint to the LTL plank
 
 - **"Thou Shalt is not You Will"** (arXiv:1404.1685) `[verify author — poss. J.
-  Broersen]`. Argues norms are **not** just "what will always be true"; the naive
+Broersen]`. Argues norms are **not** just "what will always be true"; the naive
   O="always"/P="eventually" translation into LTL fails. Reinforces that our
   compile target needs Anderson/Meyer **violation markers**, not naive LTL.
 - **"Expressibility of Norms in Temporal Logic"** (arXiv:1608.06787).
 - **Ågotnes, van der Hoek & Wooldridge — Normative Temporal Logic** (a CTL
   generalization for temporal norms). `[verify]`
-- Compliance/runtime-verification-of-norms literature (Giordano et al., *Temporal
-  Deontic Action Logic ... in ASP*, ICAIL 2013) — bounded model checking of
+- Compliance/runtime-verification-of-norms literature (Giordano et al., _Temporal
+  Deontic Action Logic ... in ASP_, ICAIL 2013) — bounded model checking of
   deontic constraints, close to our verification story.
 
 ---
@@ -148,7 +148,7 @@ From the `bounded-deontics-s6-priorart` workflow; full adjudication in
 
 - **C1 dominator MUST = planning landmarks.** Hoffmann, Porteous & Sebastia (2004,
   JAIR 22); Helmert & Domshlak (2009, LM-cut); Lengauer & Tarjan (1979, dominators).
-  *Closeness 5/5 — concede the construct outright.* DISAMBIGUATE from **Horty (2001)**
+  _Closeness 5/5 — concede the construct outright._ DISAMBIGUATE from **Horty (2001)**
   decision-theoretic "dominance" (homonym) and LAMA "reasonable orderings" (Richter &
   Westphal 2010).
 - **C2 composition neighbours.** Shea-Blymyer & Abbas (2022, AIES — agent ordering +
@@ -181,7 +181,7 @@ Harv. J.L. & Tech. forthcoming, 25 Feb 2026 — promoted to a cited C3/§1 neigh
 
 1. **Concede the reduction up front.** Lead with Anderson 1958 → Meyer 1988 →
    contextualized sanctions; say plainly we reconstruct, not invent.
-2. **Claim the boundary, not the idea.** The "bounded" = the *domain of validity*
+2. **Claim the boundary, not the idea.** The "bounded" = the _domain of validity_
    of the reduction. Characterize the faithful zone (cooperative/instrumental
    norms) vs. the breakdown zone (Hart's internal POV, categorical imperatives,
    crowding-out). Yan & He formalize the inside; we map the edge.
@@ -196,7 +196,7 @@ Harv. J.L. & Tech. forthcoming, 25 Feb 2026 — promoted to a cited C3/§1 neigh
 ## Still TODO (scholarship)
 
 - The promised **Google Scholar** pass (citation counts, who cites Anderson/Meyer
-  for *legal/contract* execution specifically, recent DEON/JURIX/ICAIL work).
+  for _legal/contract_ execution specifically, recent DEON/JURIX/ICAIL work).
 - Verify all `[verify]` items against primary sources; confirm Anderson/Meyer
   page numbers; confirm the "Thou Shalt is not You Will" author.
 - Check **DEON** (Deontic Logic and Normative Systems) proceedings 2020–2024 for

@@ -20,15 +20,15 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 
 ## Tier-2
 
-| Spec                              | Verdict               | Branch                   | Status                                    | PR                                                |
-| --------------------------------- | --------------------- | ------------------------ | ----------------------------------------- | ------------------------------------------------- |
-| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`   | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
-| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing` | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
-| L4-VERSIONING                     | ⚠️ premise superseded | —                        | ⏸️ HELD — awaiting scope decision         | —                                                 |
-| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                        | ⏭️ not implementable                      | —                                                 |
-| LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR         | —                                                 |
+| Spec                              | Verdict               | Branch                           | Status                                    | PR                                                |
+| --------------------------------- | --------------------- | -------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`           | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
+| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing`         | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
+| L4-VERSIONING                     | ⚠️ premise superseded | —                                | ⏸️ HELD — awaiting scope decision         | —                                                 |
+| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                                | ⏭️ not implementable                      | —                                                 |
+| LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR                | —                                                 |
 
 > **LIBRARY-RESOLUTION-SHADOW** (classified Tier-2: DX/infra, low-risk, high-annoyance).
 > `IMPORT` resolution searches ambient/global filesystem locations (XDG data dir, VSCode
