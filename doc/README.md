@@ -2,7 +2,7 @@
 
 # L4 Language Documentation
 
-Welcome to the L4 language documentation. L4 is a domain-specific language for law that enables computer-readable formalizations of contracts, legislation, and regulations.
+L4 is a domain-specific language for law that enables computer-readable formalizations of contracts, legislation, and regulations.
 
 ---
 
@@ -13,7 +13,7 @@ New to L4? Start here:
 1. **[Get L4](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)** - Download the L4 VS Code extension with Legalese AI and MCP tools
 2. **[Your First L4 File](tutorials/getting-started/first-l4-file.md)** - Hands-on in 15 minutes
 3. **[Composing L4 with AI](tutorials/llm-integration/composing-l4-with-ai.md)** - Draft L4 from prose using Legalese AI
-4. **[Foundation Course](courses/foundation/README.md)** - Learn L4 systematically
+4. **[Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md)** - Deploy L4 rules as REST APIs and use with MCP
 
 ---
 
@@ -74,11 +74,11 @@ Task-focused guides for specific goals:
 
 ### Deployment and Legalese Cloud
 
-- [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md) - Deploy L4 rules as REST APIs and use with WebMCP (30 min)
-- [OpenAI- and Anthropic-Compatible AI APIs](tutorials/legalese-cloud/openai-compatible-api.md) - Chat with a deployment's rules from any OpenAI or Anthropic client (10 min)
-- [MCP Server](tutorials/legalese-cloud/mcp-server.md) - Expose deployed rules as Model Context Protocol tools (10 min)
-- [WebMCP Embed Script](tutorials/legalese-cloud/webmcp-embed.md) - Serve your rules from your own website (5 min)
-- [RESTful OpenAPI Specification](tutorials/legalese-cloud/openapi-spec.md) - Generate REST clients from the spec (10 min)
+- [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md) - Deploy L4 rules as REST APIs and use with MCP
+- [OpenAI- and Anthropic-Compatible AI APIs](tutorials/legalese-cloud/openai-compatible-api.md) - Chat with a deployment's rules from any OpenAI or Anthropic client
+- [MCP Server](tutorials/legalese-cloud/mcp-server.md) - Expose deployed rules as Model Context Protocol tools
+- [WebMCP Embed Script](tutorials/legalese-cloud/webmcp-embed.md) - Serve your rules from your own website
+- [RESTful OpenAPI Specification](tutorials/legalese-cloud/openapi-spec.md) - Generate REST clients from the spec
 
 ### LLM Integration
 

@@ -8,12 +8,14 @@
 - [Overview](reference/README.md)
 - [Types](reference/types/README.md)
 - [Functions](reference/functions/README.md)
-- [Control-Flow](reference/control-flow/README.md)
+- [Control Flow](reference/control-flow/README.md)
 - [Operators](reference/operators/README.md)
 - [Syntax](reference/syntax/README.md)
 - [Regulative](reference/regulative/README.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
+- [Patterns](reference/patterns/README.md)
+- [Errors and Troubleshooting](reference/errors/README.md)
 
 ## Courses
 
@@ -24,15 +26,7 @@
 ## Tutorials
 
 - [Overview](tutorials/README.md)
-- [Getting Started](tutorials/getting-started/first-l4-file.md)
-- [LLM Integration](tutorials/llm-integration/llm-getting-started.md)
-- [Exporting Rules for Deployment](tutorials/deploying-rules/exporting-rules-for-deployment.md)
-- [Natural Language Functions](tutorials/natural-language-functions/natural-language-functions.md)
-- [Optimising for Natural Language Generation with @nlg](tutorials/natural-language-functions/optimising-natural-language-generation.md)
 
 ## Concepts
 
 - [Overview](concepts/README.md)
-- [Language Design](concepts/language-design/principles.md)
-- [Legal Modeling](concepts/legal-modeling/regulative-rules.md)
-- [Type System](concepts/type-system/algebraic-types.md)
