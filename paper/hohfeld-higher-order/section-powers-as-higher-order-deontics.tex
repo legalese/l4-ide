@@ -155,9 +155,42 @@ $\mathsf{EF}\,\textit{changed}$. An \emph{immunity} is its universal dual---\emp
 power of any party reaches my position---which is a safety property,
 $\mathsf{AG}\,\lnot\textit{changed}$, and is exactly the kind of closed,
 statically checkable guarantee the type system and model checker are built to
-certify. Thus power sits with liveness, $\exists$, and runtime; immunity sits with
+certify.\footnote{The electrical reading is not wholly frivolous. Ever since Shannon
+unified Boolean algebra with switching circuits \src{Shannon 1938}, logic and
+circuitry have shared a vocabulary, and the deontic second order slots into it: a
+power is the discharge of a stored \emph{potential} (the sense in which Fitch called
+the power modalities ``capacitative,'' from the same \emph{potestas} as
+``potestative''), and the liable party who conducts a change, the party who contests
+it, and the immune party who blocks it are a \emph{conductor}, a \emph{resistor}, and
+an \emph{insulator}---an open circuit admitting no change, which is why immunity reads
+as the safety property $\AG\lnot\textit{changed}$. All three describe whether a
+state-change signal propagates. The conceit bottoms out at estoppel, a diode passing
+current one way only.} Thus power sits with liveness, $\exists$, and runtime; immunity sits with
 safety, $\forall$, and static verification---the same $\forall/\exists$ axis that
 Section~\ref{sec:boundary} draws through the first-order layer. The two orders are
 not two theories but one, read at two altitudes; and the value of the typed,
 model-checked instantiation is that it makes the second altitude carry its weight
 as an object one can compile and check, rather than only reason about.
+
+% =====================================================================
+% PUN / PARALLEL CANDIDATES -- Shannon's logic<->circuits unification, ported to
+% the deontic second order. RAW MENU to WINNOW in a future pass (per MW). The
+% load-bearing ones are already in the footnote above (immunity = insulator =
+% AG not-changed; power = discharge of stored potential; conductor/resistor/
+% insulator = liability/contest/immunity; estoppel = diode). The rest are kept
+% here for selection, none yet endorsed:
+%   * potestative / potential / potestas -- shared etymological root of "power".
+%   * capacitor: Fitch's "capacitative" modality stores legal potential until an
+%     act discharges it; a limitation period is the RC time-constant -- the
+%     potential bleeds off if you never close the switch (exercise the power).
+%   * Ohm's law, jurisprudential: enough potential (authority = voltage) drives the
+%     change through the party's resistance, V=IR; a futile objection is high
+%     impedance; overruled resistance dissipates as heat = costs on the loser.
+%   * liability = conductance; immunity = high impedance / open circuit; a power in
+%     force = a "live" wire; an officer is "charged" with powers they "discharge".
+%   * representation & mandate (Gelati et al.) = a transformer: couples one party's
+%     circuit to another and steps the authority up or down.
+%   * co-objectors = resistors in series/parallel; a procedural bypass = a short
+%     circuit; defeating a claim = grounding it out.
+% Patron saint: Shannon 1938, "A Symbolic Analysis of Relay and Switching Circuits."
+% =====================================================================
