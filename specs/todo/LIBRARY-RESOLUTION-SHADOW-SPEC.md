@@ -1,12 +1,33 @@
 # Library Resolution Shadow Specification
 
-> **Status: TODO** — design sketch only, not yet implemented. Targets `unstable`
-> per repo convention. Branch `docs/library-resolution-shadow`. No PR yet.
-> This document specifies a **DX/infra fix** to L4's `IMPORT` library-resolution
-> ordering; it does **not** contain the Haskell patch. A follow-up session should
-> implement against the acceptance criteria in §8 and the anchors in §2.
+> **Status: IMPLEMENTED on this branch (2026-07-19)** — Stage 1 (Option A
+> visibility + Option D resolver de-dup) and Stage 2 (Option B′ surgical
+> precedence flip + Option E shadow warning) are implemented in
+> `jl4-lsp/src/LSP/L4/Rules.hs` (`resolveLibrary` + `resolveImportShared`, the
+> single code path now shared by `GetMixfixRegistry` and `GetImports`), with
+> the §3.4 staleness caveat documented in `jl4-core/libraries/README.md` and
+> inline in `EmbeddedLibraries/TH.hs`. Targets `unstable` per repo convention.
+>
+> Implementation notes / deliberate deviations:
+>
+> - **Option C (`--library-path` flag) deferred** — additive, can land
+>   separately (§4C).
+> - **Dev-regime gating:** the candidate-order Debug line, the canonicalized
+>   winner detail, and the Option E shadow warning are emitted only when
+>   `JL4_LIBRARY_PATH` is **unset**. With the env var set the operator has
+>   already taken explicit control, and the golden suites pin the variable —
+>   their captured logs must stay machine-independent, while the ambient
+>   XDG/bundle state this reporting exposes is precisely the machine-dependent
+>   part. The incident class (§3.1) lives entirely in the unset regime, which
+>   retains full reporting.
+> - **Option E gate is content equality**, not path canonicalization: an XDG
+>   symlink pointing at byte-identical sources is harmless and stays silent;
+>   canonicalization is used for *display* (the warning prints each symlink's
+>   real target). Warned once per configuration per session.
+> - **§6 (bundle dir)** left open: B′ keeps the bundle as an ambient tier
+>   below the embed, so nothing forces the question yet.
 
-**Status:** Proposed (2026-07)
+**Status:** Implemented on branch (2026-07)
 **Author:** Meng Wong, with analysis from Claude
 **Date:** 2026-07-19
 **Branch:** `docs/library-resolution-shadow`
