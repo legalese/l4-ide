@@ -16,4 +16,4 @@ File: set-equals-ambiguous.l4
     The options are:
 
       `__EQUALS__` (predefined) of type FOR ALL A FUNCTION FROM A AND A TO BOOLEAN
-      `__EQUALS__` (defined at prelude.l4:1295:1-13) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO BOOLEAN
+      `__EQUALS__` (defined at prelude.l4:1302:1-13) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO BOOLEAN
