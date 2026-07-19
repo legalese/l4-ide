@@ -65,6 +65,29 @@
         { "party": "the buyer", "action": "pay the invoice", "at": 7 },
         { "party": "the buyer", "action": "pay the invoice", "at": 7 }
       ]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the buyer", "action": "pay the invoice", "at": 30 },
+        { "party": "the seller", "action": "deliver the goods", "at": 5 }
+      ]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the seller", "action": "deliver the goods", "at": 5 },
+        { "party": "the buyer", "action": "pay the invoice", "at": 30 }
+      ]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the seller", "action": "deliver the goods", "at": 15 }
+      ]
     }
   ]
 }
