@@ -1808,3 +1808,5 @@ chain latently broken, and would not give bare `a UNION b` from the prelude. Wit
 cause is gone, so the Phase 3d annotations on `mengwong/set-operators-phase3d` become live once
 #131 lands on `unstable` and that branch rebases onto it. Recommend: land #131, rebase phase3d,
 drop the "currently INERT" in-code notes on the prelude set operators, and PR phase3d.
+
+**DONE (2026-07-19): all of the above executed.** #131 landed on `unstable` (`735433e7`); `mengwong/set-operators-phase3d` rebased onto it; bare prelude chains verified re-associating (`aa UNION bb INTERSECT cc` = `aa UNION (bb INTERSECT cc)`, INTERSECT@7 > UNION@6); inert notes dropped; acceptance golden `jl4/examples/ok/set-operators-precedence.l4` added (each bare chain paired with its parenthesized reading); full suite 1481/0. Shipped as **PR [legalese/l4-ide#133](https://github.com/legalese/l4-ide/pull/133)**. Phase 3d COMPLETE; sets stay in the prelude (option (b) rejected).
