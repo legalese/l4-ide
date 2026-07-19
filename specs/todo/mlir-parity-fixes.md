@@ -127,7 +127,7 @@ Files: `README.md`, `FEATURE-PARITY-PLAN.md`, `SOLIDITY-BACKEND-PLAN.md`.
     PROVIDED guard`, `deontic computed deadline`, `deontic literal deadline`
     (positive control) — Haskell 34→37. Shipped corpus unchanged (8 byte-identical
     + 1 refused, parityFails 0); the two adversarial probes
-    (`scratch-probe/provided-probe.l4`, `scratch-probe2/deadline-probe.l4`) that
+    (`jl4-mlir/coverage-report/provided-probe.l4`, `jl4-mlir/coverage-report/deadline-probe.l4`) that
     previously shipped `supported:true` silent-wrongs now both refuse.
 - ✅ **`lowerCmp` InfoMap-miss fallback** — DONE (commit `65c94608`). Root cause
   was deeper than the review: `tcdInfoMap` isn't run through the typechecker's

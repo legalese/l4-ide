@@ -1,5 +1,17 @@
 {
-  "three numbers": [ { "n": 10 } ],
-  "three colours": [ { "n": 1 } ],
-  "mk bag": [ { "n": 10 } ]
+  "three-numbers": [
+    {
+      "n": 10
+    }
+  ],
+  "three-colours": [
+    {
+      "n": 1
+    }
+  ],
+  "mk-bag": [
+    {
+      "n": 10
+    }
+  ]
 }
