@@ -67,6 +67,10 @@ main = do
     , test "record-of-enum-with-data return → supported:false" testRecordOfDataEnumReturnUnsupported
     , test "MAYBE enum-with-data return → supported:false" testMaybeDataEnumReturnUnsupported
     , test "inferred (no GIVETH) enum-with-data return → supported:false" testInferredDataEnumReturnUnsupported
+    , test "LIST OF NUMBER return → supported:false" testListOfScalarReturnUnsupported
+    , test "LIST OF nullary-enum return → supported:false" testListOfEnumReturnUnsupported
+    , test "record-with-list-field return → supported:false" testRecordWithListFieldReturnUnsupported
+    , test "decodable record (scalar+enum) return → supported:true" testDecodableRecordReturnSupported
     , test "EXACTLY CONSIDER → supported:false"  testPatExprUnsupported
     , test "overload collision → supported:false" testOverloadCollisionUnsupported
     , test "same-arity overloads → distinct symbols" testOverloadSameArityDispatch
@@ -999,6 +1003,98 @@ testInferredDataEnumReturnUnsupported = do
         , "  IF n GREATER THAN 0 THEN FOO n ELSE BAR n"
         ]
   expectUnsupportedMarshal "inferred enum-with-data" src
+
+-- | Blocker regression (refutation): a @LIST OF NUMBER@ return decodes fine
+-- in NEITHER the schema path (the production 'unmarshalWithSchema' has no list
+-- case → returns @undefined@) NOR the scalar fallback (it then ships raw f64
+-- pointer bits). Before the fix 'typeToRetSchema' returned @Just (RSList …)@,
+-- so the guard passed it at supported:true — a silent wrong. Must refuse.
+testListOfScalarReturnUnsupported :: IO Bool
+testListOfScalarReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "@export three numbers"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A LIST OF NUMBER"
+        , "`three numbers` MEANS LIST n, n PLUS 1, n PLUS 2"
+        ]
+  expectUnsupportedMarshal "LIST OF NUMBER" src
+
+-- | Blocker regression: a @LIST OF@ nullary-enum return. The enum itself is
+-- decodable (RSEnum), but the enclosing list is not — the guard must look
+-- INSIDE the list, not just at its element schema.
+testListOfEnumReturnUnsupported :: IO Bool
+testListOfEnumReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Colour IS ONE OF Red, Green, Blue"
+        , ""
+        , "@export three colours"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A LIST OF Colour"
+        , "`three colours` MEANS LIST Blue, Green, Red"
+        ]
+  expectUnsupportedMarshal "LIST OF nullary-enum" src
+
+-- | Blocker regression (MOST realistic): a record whose field is a list.
+-- 'unmarshalRecord' decodes the record envelope but the list field collapses
+-- to @null@ — well-formed-looking JSON that silently loses the list. The
+-- guard must recurse into record fields, not just the top-level return.
+testRecordWithListFieldReturnUnsupported :: IO Bool
+testRecordWithListFieldReturnUnsupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Bag HAS"
+        , "  items IS A LIST OF NUMBER"
+        , "  label IS A NUMBER"
+        , ""
+        , "@export mk bag"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Bag"
+        , "`mk bag` MEANS"
+        , "  Bag WITH"
+        , "    items IS (LIST n, n PLUS 1, n PLUS 2)"
+        , "    label IS n"
+        ]
+  expectUnsupportedMarshal "record-with-list-field" src
+
+-- | Positive control (guards against over-refusal): a record whose fields are
+-- all list-free decodables — a scalar and a nullary-enum — stays
+-- @supported:true@. Proves the new list guard is TARGETED at lists and does
+-- not flip every record/enum return to unsupported.
+testDecodableRecordReturnSupported :: IO Bool
+testDecodableRecordReturnSupported = do
+  let src = T.unlines
+        [ "IMPORT prelude"
+        , ""
+        , "DECLARE Colour IS ONE OF Red, Green, Blue"
+        , ""
+        , "DECLARE Tag HAS"
+        , "  hue IS A Colour"
+        , "  n IS A NUMBER"
+        , ""
+        , "@export mk tag"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Tag"
+        , "`mk tag` MEANS"
+        , "  Tag WITH"
+        , "    hue IS Blue"
+        , "    n IS n"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    [decodable-record] typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":true" json
+            && not (T.isInfixOf "\"supported\":false" json)
+      if ok then pure True else do
+        putStrLn $ "\n    [decodable-record] expected supported:true. got:\n    "
+          <> T.unpack (T.take 700 json)
+        pure False
 
 -- | Shared assertion for the ABI-return refusal tests: schema must carry
 -- @supported:false@ with the marshalling diagnostic.

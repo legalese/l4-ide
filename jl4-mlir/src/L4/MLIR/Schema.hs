@@ -806,10 +806,23 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- guarded separately by 'deonticExtractionFailed' above) and an
       -- unknown return type (@exportReturnType = Nothing@ — behaviour
       -- unchanged; we cannot decide what we cannot see).
+      -- A return whose schema the production decoder cannot walk is
+      -- unmarshallable. 'typeToRetSchema = Nothing' covers enum-with-data
+      -- and anything transitively containing it. An 'RSList' anywhere in an
+      -- OTHERWISE-decodable schema is ALSO unmarshallable: the production
+      -- decoder 'unmarshalWithSchema' (jl4-runtime.mjs) has no list case —
+      -- it returns @undefined@ for @kind:"list"@, so a LIST-OF-scalar return
+      -- falls through to a raw-scalar decode (ships the f64 pointer bits) and
+      -- a record's list field decodes to @null@, silently dropping the list
+      -- (Iron Rule 2 — the cardinal sin). Refuse both so they route to the
+      -- reference evaluator. (The trace walker 'walkWasmValue' DOES decode
+      -- lists, so we leave 'typeToRetSchema'/'returnSchema' list-aware for
+      -- trace purposes and gate only here, at the serving-decodability
+      -- altitude.)
       unmarshallableReturn = case peelReturnType <$> ef.exportReturnType of
         Just ty
           | not isDeonticFn
-          , isNothing (typeToRetSchema declares Set.empty ty)
+          , retUndecodable (typeToRetSchema declares Set.empty ty)
           -> Just (unmarshallableReturnReason (returnTypeDisplay (Just ty)))
         _ -> Nothing
 
@@ -1937,15 +1950,38 @@ peelReturnType (Forall _ _ inner) = peelReturnType inner
 peelReturnType (Fun _ _ ret)      = peelReturnType ret
 peelReturnType ty                 = ty
 
+-- | Whether a return schema is UNdecodable by the production runtime
+-- decoder ('unmarshalWithSchema' in jl4-runtime.mjs), used by the
+-- fail-closed ABI guard in 'buildExport'. 'Nothing' (enum-with-data and
+-- anything transitively containing it) is undecodable; so is any schema
+-- with an 'RSList' anywhere, because that decoder has no list case and
+-- silently drops the list (returns raw pointer bits / @null@). Keep this in
+-- lockstep with the runtime's decode capabilities.
+retUndecodable :: Maybe RetSchema -> Bool
+retUndecodable Nothing  = True
+retUndecodable (Just s) = retSchemaHasList s
+
+-- | Does a return schema contain an 'RSList' at any depth (top level, inside
+-- a MAYBE, or in a record field)? The production return decoder cannot walk
+-- lists, so such a return must not ship @supported:true@.
+retSchemaHasList :: RetSchema -> Bool
+retSchemaHasList = \case
+  RSList _         -> True
+  RSMaybe inner    -> retSchemaHasList inner
+  RSRecord _ _ fs  -> any retSchemaHasList (Map.elems fs)
+  RSEnum _ _       -> False
+  RSScalar _       -> False
+
 -- | Diagnostic for an @\@export@ whose return type cannot be marshalled
 -- across the WASM ABI (see the guard in 'buildExport').
 unmarshallableReturnReason :: Text -> Text
 unmarshallableReturnReason disp =
   "export return type " <> disp <> " cannot be marshalled across the WASM "
-    <> "ABI: it is an enum-with-data (or a record / list / optional "
-    <> "transitively containing one), which the backend lowers as a bare "
-    <> "enum tag / pointer, so the WASM return would silently lose the "
-    <> "constructor payload"
+    <> "ABI: it is a list, or an enum-with-data, or a record / list / "
+    <> "optional transitively containing one — shapes the production runtime "
+    <> "decoder cannot walk (an enum-with-data lowers to a bare tag / "
+    <> "pointer; a list has no decoder case), so the WASM return would "
+    <> "silently lose the payload"
 
 returnTypeDisplay :: Maybe (Type' Resolved) -> Text
 returnTypeDisplay Nothing = "unknown"
