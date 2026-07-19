@@ -198,6 +198,75 @@ const c = env.__l4_str_concat(box("a"), box("b"));
 eq("concat then len", env.__l4_str_len(c), 2);
 eq("concat then eq", env.__l4_str_eq(c, box("ab")), 1);
 
+// --- index-carrying string builtins are code-POINT, not code-unit ---
+// jl4-service is Data.Text (counts/indexes by Unicode code point); naive
+// JS .length/.indexOf/.charAt/.substring count UTF-16 code units. "😀"
+// (U+1F600) is one code point but two units, so every astral case below
+// is branch-crossing between the two semantics.
+const ratEq = (name, gotHandle, wantDecimal) =>
+  eq(name, env.__l4_rat_cmp(gotHandle, num(wantDecimal)), 0);
+// STRINGLENGTH — Text.length.
+ratEq("strlen astral is 1", env.__l4_string_length(box("😀")), "1");
+ratEq("strlen mixed", env.__l4_string_length(box("a😀b")), "3");
+ratEq("strlen ascii control", env.__l4_string_length(box("hello")), "5");
+ratEq("strlen empty", env.__l4_string_length(box("")), "0");
+// INDEXOF — prefix length in code points; not-found → -1; empty → 0.
+ratEq("indexof after astral", env.__l4_index_of(box("😀x"), box("x")), "1");
+ratEq(
+  "indexof after two astrals",
+  env.__l4_index_of(box("a😀b😀c"), box("c")),
+  "4",
+);
+ratEq(
+  "indexof ascii control",
+  env.__l4_index_of(box("hello world"), box("world")),
+  "6",
+);
+ratEq("indexof not found", env.__l4_index_of(box("abc"), box("z")), "-1");
+ratEq("indexof empty needle", env.__l4_index_of(box("abc"), box("")), "0");
+// CHARAT — Text.index by code point; out of bounds (either side) → "".
+eq("charat after astral", unbox(env.__l4_char_at(box("😀x"), num("1"))), "x");
+eq(
+  "charat astral itself (no surrogate split)",
+  unbox(env.__l4_char_at(box("a😀b"), num("1"))),
+  "😀",
+);
+eq("charat oob", unbox(env.__l4_char_at(box("hello"), num("5"))), "");
+eq("charat negative", unbox(env.__l4_char_at(box("hello"), num("-1"))), "");
+// SUBSTRING(s, start, len) — Text.take len (Text.drop start s): the
+// third arg is a LENGTH, not an end index (JS .substring("hello",1,3)
+// gives "el" — wrong), and both counts are code points.
+eq(
+  "substring third arg is a length",
+  unbox(env.__l4_substring(box("hello"), num("1"), num("3"))),
+  "ell",
+);
+eq(
+  "substring astral (code-point slicing)",
+  unbox(env.__l4_substring(box("😀😀x"), num("1"), num("2"))),
+  "😀x",
+);
+eq(
+  "substring negative start clamps to 0",
+  unbox(env.__l4_substring(box("hello"), num("-2"), num("3"))),
+  "hel",
+);
+eq(
+  "substring zero len",
+  unbox(env.__l4_substring(box("hello"), num("0"), num("0"))),
+  "",
+);
+eq(
+  "substring negative len",
+  unbox(env.__l4_substring(box("hello"), num("2"), num("-1"))),
+  "",
+);
+eq(
+  "substring len overrun clamps",
+  unbox(env.__l4_substring(box("hello"), num("3"), num("99"))),
+  "lo",
+);
+
 // --- M5 slice 2B: makeTracePool stack semantics ---
 // enter/exit pairs build a tree; exit on an empty stack saves the popped
 // frame as `root`. Mirrors what `<fn>$trace` codegen produces around the

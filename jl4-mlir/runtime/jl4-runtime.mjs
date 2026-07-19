@@ -3013,8 +3013,16 @@ export function createRuntime(opts) {
       __l4_is_integer: (xF) => (isInteger(ratUnbox(xF)) ? 1 : 0),
       // String intrinsics (all string args arrive as f64-bitcast pointers).
       // STRINGLENGTH / INDEXOF return NUMBER → handle.
+      //
+      // INDEXING UNIT: jl4-service is Data.Text, which counts/indexes by
+      // Unicode CODE POINT. JS native .length / .indexOf / .charAt /
+      // .substring count UTF-16 code UNITS — for astral-plane chars
+      // (>= U+10000, stored as surrogate pairs) the two disagree
+      // (STRINGLENGTH "😀" must be 1, not 2) and unit-based slicing can
+      // split a surrogate pair in half. Every index-carrying builtin below
+      // therefore converts through code points, never raw units.
       __l4_string_length: (sF) =>
-        ratFromInt(readCString(Number(f64ToU64(sF))).length),
+        ratFromInt([...readCString(Number(f64ToU64(sF)))].length),
       __l4_to_upper: (sF) =>
         u64ToF64(writeString(readCString(Number(f64ToU64(sF))).toUpperCase())),
       __l4_to_lower: (sF) =>
@@ -3039,29 +3047,42 @@ export function createRuntime(opts) {
         )
           ? 1
           : 0,
-      __l4_index_of: (hF, nF) =>
-        ratFromInt(
-          readCString(Number(f64ToU64(hF))).indexOf(
-            readCString(Number(f64ToU64(nF))),
-          ),
-        ),
-      __l4_char_at: (sF, iH) =>
-        u64ToF64(
+      // Code-point index: JS indexOf yields a UNIT index; the reference
+      // (Text.breakOn + Text.length of the prefix) yields a code-POINT
+      // index. Convert by measuring the matched prefix in code points.
+      // Empty needle → 0 and not-found → -1 agree on both sides.
+      __l4_index_of: (hF, nF) => {
+        const h = readCString(Number(f64ToU64(hF)));
+        const unitIdx = h.indexOf(readCString(Number(f64ToU64(nF))));
+        return ratFromInt(
+          unitIdx < 0 ? -1 : [...h.slice(0, unitIdx)].length,
+        );
+      },
+      // CHARAT indexes by code point (Text.index); out of bounds → ""
+      // (reference: i < 0 || i >= Text.length → empty string).
+      __l4_char_at: (sF, iH) => {
+        const points = [...readCString(Number(f64ToU64(sF)))];
+        const i = Number(numToInt(iH, "CHARAT"));
+        return u64ToF64(
+          writeString(i < 0 || i >= points.length ? "" : points[i]),
+        );
+      },
+      // SUBSTRING(s, start, len) is take-len-after-drop-start
+      // (Text.take len (Text.drop start s)) — the third argument is a
+      // LENGTH, not an end index (JS .substring treats it as an end
+      // index — wrong for any start > 0), and both are code-point
+      // counts. Text.drop clamps a negative start to 0; Text.take of a
+      // non-positive length is "".
+      __l4_substring: (sF, iH, jH) => {
+        const points = [...readCString(Number(f64ToU64(sF)))];
+        const start = Math.max(0, Number(numToInt(iH, "SUBSTRING")));
+        const len = Number(numToInt(jH, "SUBSTRING"));
+        return u64ToF64(
           writeString(
-            readCString(Number(f64ToU64(sF))).charAt(
-              Number(numToInt(iH, "CHARAT")),
-            ),
+            len <= 0 ? "" : points.slice(start, start + len).join(""),
           ),
-        ),
-      __l4_substring: (sF, iH, jH) =>
-        u64ToF64(
-          writeString(
-            readCString(Number(f64ToU64(sF))).substring(
-              Number(numToInt(iH, "SUBSTRING")),
-              Number(numToInt(jH, "SUBSTRING")),
-            ),
-          ),
-        ),
+        );
+      },
       __l4_replace: (sF, aF, bF) => {
         const s = readCString(Number(f64ToU64(sF)));
         const a = readCString(Number(f64ToU64(aF)));
