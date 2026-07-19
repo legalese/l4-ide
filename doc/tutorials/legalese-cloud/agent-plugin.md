@@ -25,7 +25,7 @@ Everything is templated deterministically from the deployment's metadata — the
 
 ## Install
 
-In the L4 VS Code extension, open **Deployments → Integrate → Install as AI agent plugin** and pick a target:
+In the L4 VS Code extension, open the deployment's **Integrate** dialog (Deployments tab → **Integrate**). Its **Install as AI agent skill** section has an **Install as Skill** dropdown to pick a target harness, plus a download button for the raw zip:
 
 ### Add to Claude Code
 
@@ -35,7 +35,7 @@ Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` and registers t
 
 Writes the skill to `~/.claude/skills/{orgSlug}-{deploymentId}/` (VS Code Chat reads this path natively per the [Agent Skills spec](https://code.visualstudio.com/docs/copilot/customization/agent-skills)) and adds an entry to VS Code's user-level `mcp.json`. Reload the window to pick it up.
 
-### Download Zip (⤓)
+### Download plugin zip (⤓)
 
 Saves the raw plugin zip to disk. Useful for:
 
@@ -45,13 +45,15 @@ Saves the raw plugin zip to disk. Useful for:
 
 ## Endpoint
 
-The same bundle is also served directly from the MCP host, with two URL aliases:
+The same bundle is also served directly from the MCP host:
 
 ```
 GET https://mcp.legalese.cloud/{orgSlug}/{deploymentId}/.plugin
 ```
 
-Both return identical bytes; pick whichever name reads better in your tooling. Authenticated with the same WorkOS session or API key as the MCP endpoint itself.
+It is authenticated with the same session or API key as the MCP endpoint itself. (The sibling `.skill` route on the same host is a different surface — the skills-CLI / [agentskills.io](https://agentskills.io) discovery format, not the plugin zip; see [the Skills Marketplace](./agent-marketplace.md).)
+
+This endpoint is hosted on Legalese Cloud only — a self-hosted `jl4-service` does not serve `.plugin`, which is why the install section only appears when the extension is connected to Legalese Cloud.
 
 ## Authentication
 

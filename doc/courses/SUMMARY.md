@@ -9,9 +9,10 @@
 - [M1: Your First Legal Rule](foundation/module-1-first-rule.md)
 - [M2: Legal Entities and Relationships](foundation/module-2-entities.md)
 - [M3: Control Flow](foundation/module-3-control-flow.md)
-- [M4: Functions](foundation/module-4-functions.md)
-- [M5: Regulative Rules](foundation/module-5-regulative.md)
-- [M6: Putting It Together](foundation/module-6-capstone.md)
+- [M4: Decision Logic](foundation/module-4-decision-logic.md)
+- [M5: Functions](foundation/module-5-functions.md)
+- [M6: Regulative Rules](foundation/module-6-regulative.md)
+- [M7: Putting It Together](foundation/module-7-capstone.md)
 
 ## Advanced
 

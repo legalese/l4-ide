@@ -55,13 +55,13 @@ Deadlines relative to events:
 -- "Within 30 days of receiving notice"
 GIVEN party IS A Actor
       action IS A Action
-      triggerDate IS A NUMBER  -- Day number when trigger occurred
-      dayLimit IS A NUMBER
+      `the trigger date` IS A NUMBER  -- Day number when trigger occurred
+      `the day limit` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `obligation after trigger` MEANS
     PARTY party
     MUST action
-    WITHIN (triggerDate + dayLimit)
+    WITHIN (`the trigger date` + `the day limit`)
     HENCE FULFILLED
     LEST BREACH
 ```
@@ -72,13 +72,13 @@ Vague statutory language requires interpretation:
 
 ```l4
 -- Common interpretations of "as soon as practicable"
-DECLARE PracticableDeadline IS ONE OF
+DECLARE `Practicable Deadline` IS ONE OF
     Immediate  -- Within 24 hours
     Prompt     -- Within 7 days
     Reasonable -- Within 14 days
     Extended   -- Within 30 days
 
-GIVEN timing IS A PracticableDeadline
+GIVEN timing IS A `Practicable Deadline`
 GIVETH A NUMBER
 `practicable days` MEANS
     CONSIDER timing
@@ -92,13 +92,13 @@ GIVETH A NUMBER
 
 ```l4
 -- Rough conversion: 5 business days ≈ 7 calendar days
-GIVEN businessDays IS A NUMBER
+GIVEN `business days` IS A NUMBER
 GIVETH A NUMBER
 `to calendar days` MEANS
-    (businessDays * 7) / 5
+    (`business days` * 7) / 5
 
 -- 10 business days
-deadline MEANS `to calendar days` 10  -- ≈ 14 calendar days
+`ten business days` MEANS `to calendar days` 10  -- ≈ 14 calendar days
 ```
 
 ---
@@ -118,8 +118,8 @@ Many regulations follow a notice-and-cure pattern:
 GIVEN regulator IS A Actor
       regulated IS A Actor
       violation IS A STRING
-      curePeriod IS A NUMBER
-      consequenceAction IS A Action
+      `the cure period` IS A NUMBER
+      `the consequence` IS A Action
 GIVETH A DEONTIC Actor Action
 `notice and cure` MEANS
     PARTY regulator
@@ -127,11 +127,11 @@ GIVETH A DEONTIC Actor Action
     HENCE
         PARTY regulated
         MUST `cure violation`
-        WITHIN curePeriod
+        WITHIN `the cure period`
         HENCE FULFILLED
         LEST
             PARTY regulator
-            MAY consequenceAction
+            MAY `the consequence`
             HENCE BREACH BY regulated BECAUSE "failed to cure violation"
     -- If notice not issued, no further action required
 ```
@@ -143,37 +143,39 @@ From the Jersey Charities Law:
 ```l4
 -- Article 27: Required Steps Notice procedure
 
-DECLARE RequiredStepsNotice
-    HAS noticeId IS A STRING
-        issuedDate IS A NUMBER
-        steps IS A LIST OF STRING
-        deadline IS A NUMBER
+DECLARE `Required Steps Notice`
+    HAS `the notice id` IS A STRING
+        `the issued date` IS A NUMBER
+        `the steps` IS A LIST OF STRING
+        `the deadline` IS A NUMBER
 
-GIVEN charity IS A RegisteredCharity
-      notice IS A RequiredStepsNotice
+GIVEN charity IS A `Registered Charity`
+      notice IS A `Required Steps Notice`
 GIVETH A DEONTIC Actor Action
 `required steps procedure` MEANS
     -- Commissioner issues notice
-    PARTY CommissionerActor
+    PARTY `the Commissioner`
     MUST `serve Required Steps Notice`
+    WITHIN 30
     HENCE (
         -- Charity must comply
-        PARTY CharityActor charity
+        PARTY `the charity` charity
         MUST `take required steps` notice
-        WITHIN notice's deadline
+        WITHIN notice's `the deadline`
         HENCE
             -- If complied, Commissioner MUST publish
-            PARTY CommissionerActor
+            PARTY `the Commissioner`
             MUST `publish compliance`
             WITHIN 14
             HENCE FULFILLED
-            LEST BREACH BY CommissionerActor BECAUSE "failed to publish compliance"
+            LEST BREACH BY `the Commissioner` BECAUSE "failed to publish compliance"
         LEST
             -- If not complied, Commissioner MAY deregister
-            PARTY CommissionerActor
+            PARTY `the Commissioner`
             MAY `deregister charity`
+            HENCE BREACH BY (`the charity` charity) BECAUSE "failed to take required steps"
         )
-    LEST BREACH BY CommissionerActor BECAUSE "failed to serve notice"
+    LEST BREACH BY `the Commissioner` BECAUSE "failed to serve notice"
 ```
 
 ---
@@ -186,25 +188,25 @@ Appeals are a special pattern: they suspend the original decision and create a n
 
 ```l4
 -- Standard appeal pattern
-DECLARE AppealOutcome IS ONE OF
-    AppealAllowed
-    AppealDismissed
-    AppealPartiallyAllowed HAS modifications IS A STRING
+DECLARE `Appeal Outcome` IS ONE OF
+    `appeal allowed`
+    `appeal dismissed`
+    `appeal partially allowed` HAS `the modifications` IS A STRING
 
 GIVEN appellant IS A Actor
-      appealDeadline IS A NUMBER
+      `the appeal deadline` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `right to appeal` MEANS
     PARTY appellant
     MAY `lodge appeal`
-    WITHIN appealDeadline
+    WITHIN `the appeal deadline`
     HENCE
         -- Appeal body must decide
-        PARTY AppealBody
+        PARTY `the appeal body`
         MUST `determine appeal`
         WITHIN 90  -- Typical statutory deadline
         HENCE FULFILLED
-        LEST BREACH BY AppealBody BECAUSE "failed to determine appeal in time"
+        LEST BREACH BY `the appeal body` BECAUSE "failed to determine appeal in time"
 ```
 
 ### Appeal with Suspension Effect
@@ -213,19 +215,19 @@ GIVETH A DEONTIC Actor Action
 -- Appeal suspends the original decision
 GIVEN decision IS A Decision
       appellant IS A Actor
-      appealDeadline IS A NUMBER
+      `the appeal deadline` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `suspensive appeal` MEANS
     PARTY appellant
     MAY `lodge appeal against` decision
-    WITHIN appealDeadline
+    WITHIN `the appeal deadline`
     HENCE
         -- Appeal must be determined
-        PARTY AppealBody
+        PARTY `the appeal body`
         MUST `determine appeal against` decision
         WITHIN 90
         HENCE FULFILLED
-        LEST BREACH BY AppealBody BECAUSE "failed to determine appeal"
+        LEST BREACH BY `the appeal body` BECAUSE "failed to determine appeal"
 ```
 
 ### Real Example: Charity Decision Appeals
@@ -233,15 +235,15 @@ GIVETH A DEONTIC Actor Action
 ```l4
 -- Article 33: Appeal Commissioner decision to Royal Court
 
-GIVEN charity IS A RegisteredCharity
-      decision IS A CommissionerDecision
+GIVEN charity IS A `Registered Charity`
+      decision IS A `Commissioner Decision`
 GIVETH A DEONTIC Actor Action
 `appeal commissioner decision` MEANS
-    PARTY CharityActor charity
+    PARTY `the charity` charity
     MAY `hear appeal` decision
     WITHIN 21  -- 21 days from notification
     HENCE
-        PARTY RoyalCourt
+        PARTY `the Royal Court`
         MUST `hear appeal` decision
         -- No statutory deadline for hearing in original law
         HENCE CONSIDER `court decision`
@@ -249,9 +251,9 @@ GIVETH A DEONTIC Actor Action
                     `original decision takes effect`
                 WHEN Quashed THEN
                     `decision has no effect`
-                WHEN Varied newDecision THEN
-                    `varied decision takes effect` newDecision
-        LEST BREACH BY RoyalCourt BECAUSE "failed to hear appeal"
+                WHEN Varied `the new decision` THEN
+                    `varied decision takes effect` `the new decision`
+        LEST BREACH BY `the Royal Court` BECAUSE "failed to hear appeal"
 ```
 
 ---
@@ -269,7 +271,7 @@ GIVEN subject IS A Actor
 GIVETH A DEONTIC Actor Action
 `escalation chain` MEANS
     -- Level 1: Warning
-    PARTY RegulatoryBody
+    PARTY `the regulator`
     MAY `issue warning`
     HENCE
         PARTY subject
@@ -278,7 +280,7 @@ GIVETH A DEONTIC Actor Action
         HENCE FULFILLED
         LEST
             -- Level 2: Fine
-            PARTY RegulatoryBody
+            PARTY `the regulator`
             MAY `impose fine`
             HENCE
                 PARTY subject
@@ -287,7 +289,7 @@ GIVETH A DEONTIC Actor Action
                 HENCE FULFILLED
                 LEST
                     -- Level 3: Suspension
-                    PARTY RegulatoryBody
+                    PARTY `the regulator`
                     MAY `suspend registration`
                     HENCE
                         PARTY subject
@@ -296,7 +298,7 @@ GIVETH A DEONTIC Actor Action
                         HENCE FULFILLED
                         LEST
                             -- Level 4: Removal
-                            PARTY RegulatoryBody
+                            PARTY `the regulator`
                             MUST `remove from register`
                             HENCE BREACH
 ```
@@ -310,17 +312,17 @@ GIVEN violation IS A Violation
       subject IS A Actor
 GIVETH A DEONTIC Actor Action
 `enforcement response` MEANS
-    IF violation's severity EQUALS Critical
+    IF violation's `the severity` EQUALS Critical
     THEN
         -- Immediate suspension for critical violations
-        PARTY RegulatoryBody
+        PARTY `the regulator`
         MUST `suspend immediately`
         HENCE FULFILLED
-        LEST BREACH BY RegulatoryBody BECAUSE "failed to suspend critical violation"
-    ELSE IF violation's severity EQUALS Serious
+        LEST BREACH BY `the regulator` BECAUSE "failed to suspend critical violation"
+    ELSE IF violation's `the severity` EQUALS Serious
          THEN
              -- Skip warning for serious violations, go straight to fine
-             PARTY RegulatoryBody
+             PARTY `the regulator`
              MAY `impose fine`
              HENCE
                  PARTY subject
@@ -343,25 +345,25 @@ Grace periods delay consequences:
 -- Payment with grace period before late fee applies
 GIVEN debtor IS A Actor
       amount IS A NUMBER
-      dueDate IS A NUMBER
-      gracePeriod IS A NUMBER
-      lateFeePct IS A NUMBER
+      `the due date` IS A NUMBER
+      `the grace period` IS A NUMBER
+      `the late fee rate` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `payment with grace` MEANS
     PARTY debtor
     MUST `pay` amount
-    WITHIN dueDate
+    WITHIN `the due date`
     HENCE FULFILLED
     LEST
         -- Grace period with late fee
         PARTY debtor
-        MUST `pay with late fee` lateAmount
-        WITHIN graceDeadline
+        MUST `pay with late fee` `the late amount`
+        WITHIN `the grace deadline`
         HENCE FULFILLED
         LEST BREACH BY debtor BECAUSE "failed to pay within grace period"
     WHERE
-        lateAmount MEANS amount * (1 + lateFeePct)
-        graceDeadline MEANS dueDate + gracePeriod
+        `the late amount` MEANS amount * (1 + `the late fee rate`)
+        `the grace deadline` MEANS `the due date` + `the grace period`
 ```
 
 ---
@@ -385,29 +387,29 @@ Encode this procedure:
 
 ```l4
 -- Separate party type for licence procedures
-DECLARE LicenceParty IS ONE OF
+DECLARE `Licence Party` IS ONE OF
     Holder HAS `the holder name` IS A STRING
 
 -- Licence actions
-DECLARE LicenceAction IS ONE OF
+DECLARE `Licence Action` IS ONE OF
     `apply for renewal`
     `apply with late fee`
     `apply for reinstatement`
     `lodge licence appeal`
 
-GIVEN holder IS A LicenceParty
-      expiryDate IS A NUMBER
-GIVETH A DEONTIC LicenceParty LicenceAction
+GIVEN holder IS A `Licence Party`
+      `the expiry date` IS A NUMBER
+GIVETH A DEONTIC `Licence Party` `Licence Action`
 `licence renewal procedure` MEANS
     PARTY holder
     MUST `apply for renewal`
-    WITHIN (expiryDate - 30)  -- 30 days before expiry
+    WITHIN (`the expiry date` - 30)  -- 30 days before expiry
     HENCE FULFILLED
     LEST
         -- Grace period with late fee
         PARTY holder
         MUST `apply with late fee`
-        WITHIN (expiryDate - 30 + 14)  -- 14 day grace period
+        WITHIN (`the expiry date` - 30 + 14)  -- 14 day grace period
         HENCE FULFILLED
         LEST
             -- Reinstatement period after suspension

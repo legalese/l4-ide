@@ -77,8 +77,14 @@ runCmd opts = do
       -- The LSP rule publishes #EVAL results as Information-severity
       -- diagnostics via the logger, so a file with passing `#EVAL`s still
       -- produces non-empty `errs` — treating that as failure would be a
-      -- false positive.
-      overallOk = typecheckOk
+      -- false positive. A directive that crashed during evaluation
+      -- (e.g. a CONSIDER hole) is a real failure, though.
+      evalOk = all
+        (\r -> case r.result of
+          Reduction (Left _) -> False
+          _                  -> True)
+        evalResults
+      overallOk = typecheckOk && evalOk
 
   if opts.runJsonOut
     then do

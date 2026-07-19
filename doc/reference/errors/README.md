@@ -23,9 +23,12 @@ If you already know what error you are looking at, use the table of contents bel
   - [Undefined field access](#undefined-field-access)
   - [Function arity mismatch](#function-arity-mismatch)
   - [APPEND vs append](#append-vs-append)
+- [Compiler Warnings](#compiler-warnings)
+  - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
+  - [Redundant pattern match branch](#redundant-pattern-match-branch)
 - [Runtime Errors](#runtime-errors)
   - [Circular definition](#circular-definition)
-  - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
+  - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
   - [DEONTIC rule does not execute](#deontic-rule-does-not-execute)
 - [Common Gotchas](#common-gotchas)
   - [Equality uses single equals](#equality-uses-single-equals)
@@ -338,6 +341,47 @@ CONCAT "hello", " world"
 
 ---
 
+## Compiler Warnings
+
+Warnings do not stop compilation, but they flag code that is likely to fail at runtime or that contains dead branches.
+
+### Non-exhaustive pattern match
+
+**Warning message:** pattern matches are missing (the warning lists the uncovered branches)
+
+**What you wrote:**
+
+```l4
+CONSIDER status
+WHEN Active THEN "running"
+WHEN Closed THEN "stopped"
+```
+
+**What went wrong:** The CONSIDER expression does not cover all possible constructors of the scrutinee's type. If `status` could be `Suspended` (or any other constructor you did not list), there is no branch to handle it. This is a **compile-time warning** (not an error): the program still compiles and runs, but evaluating the match on an uncovered value raises a runtime error (see [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)).
+
+**How to fix it:** Either cover all constructors explicitly or add an OTHERWISE branch:
+
+```l4
+CONSIDER status
+WHEN Active THEN "running"
+WHEN Closed THEN "stopped"
+OTHERWISE "unknown"
+```
+
+**Note:** Exhaustiveness analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE — these types have effectively infinite value sets, so the analysis (designed for algebraic data types with a finite constructor set) does not apply. Matches on such values get no warning even when incomplete; use OTHERWISE to be safe. BOOLEAN is analysed normally, and the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions; the builtin container types MAYBE, EITHER, and LIST are not yet analysed. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
+
+---
+
+### Redundant pattern match branch
+
+**Warning message:** pattern match branches are redundant (the warning lists the unreachable branches)
+
+**What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
+
+**How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+
+---
+
 ## Runtime Errors
 
 Runtime errors occur when the code is well-formed and well-typed but does something problematic during evaluation.
@@ -366,28 +410,21 @@ If you did not intend recursion, you probably meant to reference a different var
 
 ---
 
-### Non-exhaustive pattern match
+### Non-exhaustive patterns at runtime
 
-**Error message:** `Warning: pattern match may not be exhaustive`
+**Error message:**
 
-**What you wrote:**
-
-```l4
-CONSIDER status
-WHEN Active THEN "running"
-WHEN Closed THEN "stopped"
+```
+The value
+  Withdrawn
+reached a CONSIDER that has no branch for it.
+Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+The typechecker's exhaustiveness warning lists all missing branches.
 ```
 
-**What went wrong:** The CONSIDER expression does not cover all possible values of the type. If `status` could be `Suspended` (or any other constructor you did not list), there is no branch to handle it.
+**What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the compile-time warning was ignored, or the value escaped the analysis — in particular matches on NUMBER, STRING, or DATE scrutinees, for which exhaustiveness checking is skipped (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match) under Compiler Warnings). A directive that crashes this way makes `l4 run` exit non-zero.
 
-**How to fix it:** Either cover all constructors explicitly or add an OTHERWISE branch:
-
-```l4
-CONSIDER status
-WHEN Active THEN "running"
-WHEN Closed THEN "stopped"
-OTHERWISE "unknown"
-```
+**How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
 
 ---
 

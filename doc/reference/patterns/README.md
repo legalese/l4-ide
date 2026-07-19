@@ -1,8 +1,8 @@
 # L4 Advanced Patterns Reference
 
-Advanced and intermediate L4 patterns for structuring complex rules, calculations, and contracts. This page covers patterns beyond the basics found in the [Common Patterns tutorial](../../tutorials/getting-started/common-patterns.md).
+Advanced and intermediate L4 patterns for structuring complex rules, calculations, and contracts. This page covers patterns beyond the basics found in the [Common Patterns](common-patterns.md) reference.
 
-For basic patterns (simple records, predicates, list operations, conditionals, simple obligations), see the [Common Patterns](../../tutorials/getting-started/common-patterns.md) page.
+For basic patterns (simple records, predicates, list operations, conditionals, simple obligations), see the [Common Patterns](common-patterns.md) page.
 
 ---
 
@@ -118,6 +118,7 @@ mom and dad `have a baby named` kid MEANS
 - Parameters can appear before, between, or after the function's identifier words.
 - Backtick-quoted identifiers can contain spaces, allowing multi-word function names.
 - Useful for legal predicates that follow natural phrasing, e.g. `person `is entitled to` benefit`.
+- See [Functions Reference: Mixfix Function Definitions](../functions/README.md#mixfix-function-definitions) for how the typechecker's mixfix registry resolves these patterns and derives document headings from them.
 
 ---
 
@@ -373,7 +374,7 @@ factorial MEANS
 **Notes:**
 
 - Always include a base case to prevent infinite recursion.
-- Recursive definitions work naturally with pattern matching on lists (see [Common Patterns: List Pattern Matching](../../tutorials/getting-started/common-patterns.md)).
+- Recursive definitions work naturally with pattern matching on lists (see [Common Patterns: List Patterns](common-patterns.md#list-patterns)).
 - The evaluator supports lazy evaluation, but infinite recursion without a base case will still diverge.
 
 ---
@@ -412,7 +413,7 @@ all (GIVEN g YIELD g's age >= 18) (charity's governors)
 
 ## See Also
 
-- **[Common Patterns](../../tutorials/getting-started/common-patterns.md)** -- Basic patterns (records, predicates, lists, conditionals, simple obligations)
+- **[Common Patterns](common-patterns.md)** -- Basic patterns (records, predicates, lists, conditionals, simple obligations)
 - **[Functions Reference](../functions/README.md)** -- GIVEN, GIVETH, DECIDE, MEANS, WHERE, LET
 - **[Operators Reference](../operators/README.md)** -- AND, OR, NOT, UNLESS, IMPLIES, ellipsis operators
 - **[Syntax Reference](../syntax/README.md)** -- Layout rules, backtick identifiers, ditto marks, annotations

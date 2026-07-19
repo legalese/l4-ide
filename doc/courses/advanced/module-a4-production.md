@@ -95,11 +95,11 @@ Test individual functions:
 #EVAL `is adult` (Person "Test" 100)   -- TRUE (well above)
 
 -- Test calculations
-#EVAL `monthly payment` (LoanTerms (USD 10000) 0.12 12)
+#EVAL `monthly payment` (`Loan Terms` (USD 10000) 0.12 12)
 -- Expected: approximately $888.49
 
 -- Test with edge values
-#EVAL `monthly payment` (LoanTerms (USD 0) 0.12 12)
+#EVAL `monthly payment` (`Loan Terms` (USD 0) 0.12 12)
 -- Expected: $0 (no principal)
 ```
 
@@ -113,7 +113,7 @@ Test complete workflows:
 §§ `Happy Paths`
 
 -- Complete successful workflow
-#TRACE `complete procedure` testInput AT 0 WITH
+#TRACE `complete procedure` `the test input` AT 0 WITH
     PARTY Actor1 DOES Action1 AT 5
     PARTY Actor2 DOES Action2 AT 15
     PARTY Actor1 DOES Action3 AT 25
@@ -122,18 +122,18 @@ Test complete workflows:
 §§ `Edge Cases`
 
 -- Boundary timing
-#TRACE `time-sensitive rule` testInput AT 0 WITH
+#TRACE `time-sensitive rule` `the test input` AT 0 WITH
     PARTY Actor1 DOES Action1 AT 14  -- Exactly at deadline
 -- Expected: FULFILLED (just in time)
 
-#TRACE `time-sensitive rule` testInput AT 0 WITH
+#TRACE `time-sensitive rule` `the test input` AT 0 WITH
     PARTY Actor1 DOES Action1 AT 15  -- One day late
 -- Expected: BREACH or enters late path
 
 §§ `Failure Scenarios`
 
 -- Missing required action
-#TRACE `required action rule` testInput AT 0 WITH
+#TRACE `required action rule` `the test input` AT 0 WITH
     -- No actions performed
 -- Expected: BREACH (timeout)
 ```
@@ -146,12 +146,12 @@ Create reusable test data:
 § `Test Data Factory`
 
 -- Valid test entities
-validPerson MEANS Person "Valid Person" 30 FALSE (LIST)
-validCharity MEANS RegisteredCharity "Test Charity" "CH999" Active ...
+`a valid person` MEANS Person "Valid Person" 30 FALSE (LIST)
+`a valid charity` MEANS `Registered Charity` "Test Charity" "CH999" Active ...
 
 -- Invalid test entities
-underagePerson MEANS Person "Minor" 16 FALSE (LIST)
-bankruptPerson MEANS Person "Bankrupt" 40 TRUE (LIST)
+`an underage person` MEANS Person "Minor" 16 FALSE (LIST)
+`a bankrupt person` MEANS Person "Bankrupt" 40 TRUE (LIST)
 
 -- Parameterized test data
 GIVEN age IS A NUMBER
@@ -184,16 +184,16 @@ When in doubt, add parentheses:
 
 ```l4
 -- ❌ Ambiguous
-length charity's governors > 0
+length charity's `the governors` > 0
 
 -- ✅ Clear
-length (charity's governors) > 0
+length (charity's `the governors`) > 0
 
 -- ❌ Ambiguous
-all (GIVEN g YIELD g's age >= 18) charity's governors
+all (GIVEN g YIELD g's `the age` >= 18) charity's `the governors`
 
 -- ✅ Clear
-all (GIVEN g YIELD g's age >= 18) (charity's governors)
+all (GIVEN g YIELD g's `the age` >= 18) (charity's `the governors`)
 ```
 
 ### Debug with #EVAL
@@ -202,12 +202,12 @@ Isolate problems by evaluating sub-expressions:
 
 ```l4
 -- Full expression fails
-#EVAL `complex function` complexInput
+#EVAL `complex function` `the complex input`
 
 -- Debug by breaking apart
-#EVAL complexInput                           -- Check input is valid
-#EVAL complexInput's field1                  -- Check field access
-#EVAL `helper function` (complexInput's field1)  -- Check helper
+#EVAL `the complex input`                           -- Check input is valid
+#EVAL `the complex input`'s `the first field`       -- Check field access
+#EVAL `helper function` (`the complex input`'s `the first field`)  -- Check helper
 ```
 
 ### Trace Intermediate Values
@@ -215,18 +215,18 @@ Isolate problems by evaluating sub-expressions:
 Use WHERE to name and inspect intermediate values:
 
 ```l4
-GIVEN x IS A SomeType
+GIVEN x IS A `Some Type`
 GIVETH A Result
 `debug me` MEANS
-    finalResult
+    `the final result`
     WHERE
         step1 MEANS `first operation` x
         step2 MEANS `second operation` step1
         step3 MEANS `third operation` step2
-        finalResult MEANS `final operation` step3
+        `the final result` MEANS `final operation` step3
 
 -- Debug by evaluating each step
-#EVAL step1 WHERE step1 MEANS `first operation` testInput
+#EVAL step1 WHERE step1 MEANS `first operation` `the test input`
 #EVAL step2 WHERE ... -- and so on
 ```
 
@@ -240,33 +240,61 @@ L4 supports JSON encoding and decoding for integration:
 
 ```l4
 -- Encode a record to JSON
-#EVAL JSONENCODE myCharity
+#EVAL JSONENCODE `my charity`
 
 -- Decode JSON to a record
-GIVEN jsonString IS A STRING
-GIVETH A MAYBE RegisteredCharity
-`parse charity` MEANS JSONDECODE jsonString
+GIVEN `the JSON string` IS A STRING
+GIVETH A MAYBE `Registered Charity`
+`parse charity` MEANS JSONDECODE `the JSON string`
 ```
 
-### REST API Integration
+### Marking Rules for Deployment
 
-`jl4-service` provides a multi-tenant REST API. Deploy a bundle of `.l4` files
-as a zip and call the resulting endpoints:
+Rules become API endpoints only when you mark them. Place `@export` directly
+above a rule to expose it, add `@desc` to parameters so API consumers know
+what each input means, and use `@export default` for the rule that should be
+used when no rule name is specified:
+
+```l4
+@export Check whether a person is eligible
+GIVEN person IS A Person @desc The person to check
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF
+    person's `the age` >= 21
+    AND NOT person's `is bankrupt`
+```
+
+### Deploying to Legalese Cloud
+
+Deploy from the VS Code extension: open the **L4 sidebar**, switch to the
+**Deploy** tab, review the preview of exported rules, and click **Deploy**.
+The extension uploads your file to Legalese Cloud, which compiles it and
+serves the exported rules as a REST API:
 
 ```bash
-# Start the service
-cabal run jl4-service
+# List the functions in a deployment
+curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions
 
-# Deploy a bundle (myfile.l4 zipped as bundle.zip)
-curl -X POST http://localhost:8080/deployments/myapp \
-  -H "Content-Type: application/zip" \
-  --data-binary @bundle.zip
-
-# Call a function in the deployment
-curl -X POST http://localhost:8080/deployments/myapp/functions/is%20eligible/evaluation \
+# Evaluate a function
+curl -X POST https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions/is-eligible/evaluation \
   -H "Content-Type: application/json" \
-  -d '{"arguments": {"person": {"name": "Test", "age": 25}}}'
+  -d '{"arguments": {"person": {"the-age": 25, "is-bankrupt": false}}}'
+
+# Ask which inputs still affect the outcome (interactive query plans)
+curl -X POST https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions/is-eligible/query-plan \
+  -H "Content-Type: application/json" \
+  -d '{"arguments": {}}'
 ```
+
+Note the naming: function names in URLs and property names in JSON bodies are
+sanitized — spaces become hyphens — so the rule `is eligible` is addressed as
+`is-eligible`, and the field `the age` as `the-age`.
+
+AI agents can call the same deployed rules through the built-in MCP server at
+`https://mcp.legalese.cloud/{orgSlug}/{deploymentId}`.
+
+For the complete walkthrough, see
+[Exporting Rules for Deployment](../../tutorials/deploying-rules/exporting-rules-for-deployment.md).
 
 ### Web Form Generation
 
@@ -275,11 +303,15 @@ L4 can generate web forms from type definitions:
 ```l4
 -- Types become form fields
 DECLARE Application
-    HAS name IS A STRING          -- Text input
-        age IS A NUMBER           -- Number input
-        status IS A Status        -- Dropdown
-        purposes IS A LIST OF Purpose  -- Multi-select
+    HAS `the name` IS A STRING          -- Text input
+        `the age` IS A NUMBER           -- Number input
+        `the status` IS A Status        -- Dropdown
+        `the purposes` IS A LIST OF Purpose  -- Multi-select
 ```
+
+> **Self-hosting note:** a self-hosted `jl4-service` serves the same
+> data-plane API from your own host, e.g.
+> `http://localhost:PORT/deployments/{deploymentId}/functions/...`.
 
 ---
 
@@ -315,7 +347,7 @@ GIVETH A NUMBER
     WHEN x FOLLOWED BY rest THEN x + `my sum` rest
 
 -- ✅ Use prelude
-`my sum` MEANS fold (GIVEN a b YIELD a + b) 0 xs
+`my sum` MEANS foldl (GIVEN acc, x YIELD acc + x) 0 xs
 ```
 
 ### Limit Trace Depth
@@ -329,9 +361,9 @@ When testing with #TRACE, limit scenario complexity:
 
 -- ✅ Test with shorter period
 #TRACE `loan contract with` 3 AT 0 WITH  -- 3 payments
-    PARTY Borrower DOES `pay` AT 30
-    PARTY Borrower DOES `pay` AT 60
-    PARTY Borrower DOES `pay` AT 90
+    PARTY `the borrower` DOES `pay` AT 30
+    PARTY `the borrower` DOES `pay` AT 60
+    PARTY `the borrower` DOES `pay` AT 90
 ```
 
 ---
@@ -363,22 +395,69 @@ Before deploying L4 code:
 
 ### Integration
 
-- [ ] JSON schema generated if needed
-- [ ] API endpoints documented
+- [ ] Rules marked with `@export` and parameters described with `@desc`
+- [ ] Deploy tab preview shows the expected rules
 - [ ] Input validation confirmed
 - [ ] Error responses defined
 
 ---
 
+## Exercise: Test a Rule Thoroughly
+
+Take this eligibility rule: a person qualifies if they are at least 21 years
+old and not bankrupt. Build a test data factory, write unit tests covering
+both sides of the age boundary, and replace a manual recursion with a prelude
+fold.
+
+<details>
+<summary>Solution</summary>
+
+```l4
+IMPORT prelude
+
+DECLARE Person
+    HAS `the name` IS A STRING
+        `the age` IS A NUMBER
+        `is bankrupt` IS A BOOLEAN
+
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF
+    person's `the age` >= 21
+    AND NOT person's `is bankrupt`
+
+-- Test data factory
+GIVEN age IS A NUMBER
+GIVETH A Person
+`person with age` MEANS Person "Test" age FALSE
+
+-- Boundary tests
+#EVAL `is eligible` (`person with age` 20)        -- FALSE (below boundary)
+#EVAL `is eligible` (`person with age` 21)        -- TRUE (at boundary)
+#EVAL `is eligible` (`person with age` 22)        -- TRUE (above boundary)
+#EVAL `is eligible` (Person "Bankrupt" 40 TRUE)   -- FALSE (bankrupt)
+
+-- Prelude fold instead of manual recursion
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`total of` MEANS foldl (GIVEN acc, x YIELD acc + x) 0 xs
+
+#EVAL `total of` (LIST 1, 2, 3)   -- 6
+```
+
+</details>
+
+---
+
 ## Summary
 
-| Area             | Best Practice                                  |
-| ---------------- | ---------------------------------------------- |
-| **Organization** | Split into files by domain, use sections       |
-| **Testing**      | Unit tests (#EVAL), integration tests (#TRACE) |
-| **Debugging**    | Isolate with #EVAL, use parentheses            |
-| **Integration**  | JSON for data exchange, REST API for services  |
-| **Performance**  | Prefer formulas over recursion, use prelude    |
+| Area             | Best Practice                                               |
+| ---------------- | ----------------------------------------------------------- |
+| **Organization** | Split into files by domain, use sections                    |
+| **Testing**      | Unit tests (#EVAL), integration tests (#TRACE)              |
+| **Debugging**    | Isolate with #EVAL, use parentheses                         |
+| **Integration**  | JSON for data exchange, `@export` + Legalese Cloud for APIs |
+| **Performance**  | Prefer formulas over recursion, use prelude                 |
 
 ---
 
@@ -400,4 +479,4 @@ You've finished the Advanced Course. You now know how to:
 ### Get Help
 
 - **GitHub Issues**: Report bugs or ask questions
-- **Example Code**: Study `jl4/examples/` and `jl4/experiments/`
+- **Example Code**: Study `jl4/examples/legal/` and the `module-a*-examples.l4` files in this course

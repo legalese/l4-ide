@@ -35,10 +35,12 @@ _More topics planned: Layout Sensitivity, Scope_
 Representing legal concepts in code
 
 - **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
+- **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
+- **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
 
-**Key Ideas:** Deontic modalities, legal rules as code, contract patterns
+**Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility
 
-_More topics planned: Deontic Logic, Contract Composition, Constitutive vs Regulative_
+_More topics planned: Deontic Logic, Contract Composition_
 
 ---
 
@@ -47,6 +49,7 @@ _More topics planned: Deontic Logic, Contract Composition, Constitutive vs Regul
 How L4's type system works
 
 - **[Algebraic Types](type-system/algebraic-types.md)** - Sum types and product types
+- **[Exhaustiveness](type-system/exhaustiveness.md)** - Totality as a legal-safety property: every case of a determination handled
 
 **Key Ideas:** Type safety, algebraic data types, functional programming influence
 
@@ -70,11 +73,3 @@ _More topics planned: Maybe and Nothing, Type Inference_
 
 - Concepts provide vocabulary for discussing L4 design
 - Reference concepts when proposing changes or new features
-
----
-
-## Further Reading
-
-### Academic Papers
-
-- Coming soon: Links to papers on L4's theoretical foundations
