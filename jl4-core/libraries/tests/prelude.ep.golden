@@ -1207,6 +1207,9 @@ p `set equals` q @nlg %p% and %q% have the same elements
   MEANS (p `is subset of` q) AND (q `is subset of` p)
 
 -- Set: UNION ("the members of p and of q")
+-- @infixl 6 mirrors PLUS: union is the additive join, left-associative,
+-- so bare `a UNION b UNION c` groups as `(a UNION b) UNION c`.
+@infixl 6
 GIVEN a IS A TYPE
       p IS A SET OF a
       q IS A SET OF a
@@ -1215,6 +1218,9 @@ p UNION q @nlg the union of %p% and %q%
   MEANS setFromList (append (p's elements) (q's elements))
 
 -- Set: INTERSECT ("those in both p and q")
+-- @infixl 7 mirrors TIMES: intersection binds tighter than union, so
+-- `a UNION b INTERSECT c` groups as `a UNION (b INTERSECT c)`.
+@infixl 7
 GIVEN a IS A TYPE
       p IS A SET OF a
       q IS A SET OF a
@@ -1233,7 +1239,8 @@ GIVETH A SET OF a
 p `LESS` q @nlg the elements of %p% not in %q%
   MEANS setFromList (filter (GIVEN x YIELD NOT (x `is in` q)) (p's elements))
 
--- Set: WITHOUT (bare alias for `LESS`)
+-- Set: WITHOUT (bare alias for `LESS`; @infixl 6, mirrors MINUS).
+@infixl 6
 GIVEN a IS A TYPE
       p IS A SET OF a
       q IS A SET OF a
