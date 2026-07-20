@@ -152,11 +152,12 @@ real him**, whose input validates anything the model produces. Loop him in early
   the L4 wheelhouse (temporal/defeasible deontic, isomorphism, rule-extraction). Caveats logged
   (in-corpus incoming only; DEON under-ranks). Details `data/PHASE2-FINDINGS.md`; `scripts/prerank.py`.
 - [x] **Phase 3 — Abstract filter** — 16× Sonnet judge fan-out over all 1,758 (independent of
-  pre-rank). **keep 717** (core 479 + adj 238); **tight-core 250** (ICAIL 134/JURIX 114/DEON 2)
-  after trust filter. Two-signal cross-check paid off: 78 pre-rank top-150 CUT (CBR cluster),
-  261 judge-core rescued from the tail (DEON+recent). **DEON provisional** (223 title-only →
-  `deon-provisional.json`). CNL thinnest facet (19) → lean on Wyner. Details
-  `data/PHASE3-FINDINGS.md` + `PHASE3-SHORTLIST.md`; scripts prep/merge/finalize + rubric.
+  pre-rank). **keep 713**; **tight-core 327** (ICAIL 134/JURIX 114/**DEON 79** after backfill).
+  Two-signal cross-check paid off: 78 pre-rank top-150 CUT (CBR cluster), 261 judge-core rescued
+  from the tail. **DEON backfill DONE** — 122/122 abstracts from SpringerLink → re-judged →
+  DEON tight-core 2→79 (details `PHASE3-FINDINGS.md`). Remaining DEON-provisional 142 (no-DOI).
+  CNL thinnest facet (19) → lean on Wyner. `PHASE3-SHORTLIST.md`; scripts prep/merge/finalize/
+  deon_abstracts + rubric.
 - [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights) — *next*
 - [ ] **Phase 5 — Deep-read + synthesize** (annotated bibliography keyed to facets)
 - [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;

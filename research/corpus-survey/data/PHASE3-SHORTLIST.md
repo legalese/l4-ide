@@ -1,10 +1,10 @@
 # Phase 3 tight-core shortlist — facet buckets
 
-Trustworthy core = relevance **core** + confidence ≥ med + has abstract = **250 papers**.
+Trustworthy core = relevance **core** + confidence ≥ med + has abstract = **327 papers**.
 (Full keep-set is 717; DEON-provisional title-only keeps are in `deon-provisional.json`.)
 Papers can appear under >1 facet. Within each facet, top ~12 by citation count.
 
-## intro (ICAIL) — languages/DSLs/rules-as-code for law  (130)
+## intro (ICAIL) — languages/DSLs/rules-as-code for law  (132)
 
 - **A Language for Legal Discourse I: Basic Features** — L. Thorne McCarty, ICAIL 1989 (cites 157, prior-art) · [OA]  
   _Foundational language for legal discourse with deep conceptual models_
@@ -31,12 +31,16 @@ Papers can appear under >1 facet. Within each facet, top ~12 by citation count.
 - **An Executable Specification of an Argumentation Protocol** — Alexander Artikis, Marek J. Sergot et al., ICAIL 2003 (cites 39, prior-art)  
   _Executable specification of a normative argumentation protocol in action language C+, run via CCALC_
 
-## bounded-deontics (JURIX) — deontic/defeasible/temporal norms  (105)
+## bounded-deontics (JURIX) — deontic/defeasible/temporal norms  (180)
 
 - **Temporalised Normative Positions in Defeasible Logic** — Guido Governatori, Antonino Rotolo et al., ICAIL 2005 (cites 144, prior-art) · [OA]  
   _Temporalised deontic normative positions in defeasible logic; core deontic-temporal formalism._
 - **Permissions and Obligations in Hierarchical Normative Systems** — Guido Boella, Leendert W. N. van der Torre, ICAIL 2003 (cites 111, prior-art)  
   _Weak/strong permission in hierarchical normative systems via input/output logic._
+- **Designing a Deontic Logic of Deadlines** — Jan M. Broersen, Frank Dignum et al., DEON 2004 (cites 104, prior-art) · [OA]  
+  _Dyadic deadline-obligation operator formalized in CTL branching-time models; directly relevant to deadlines._
+- **Defeasible Logic: Agency, Intention and Obligation** — Guido Governatori, Antonino Rotolo, DEON 2004 (cites 82, prior-art) · [OA]  
+  _Computationally-oriented defeasible multi-modal logic combining agency, intention, obligation._
 - **OASIS LegalRuleML** — Tara Athan, Harold Boley et al., ICAIL 2013 (cites 78, prior-art)  
   _OASIS LegalRuleML core: deontic operators, defeasibility, legal-source markup._
 - **Obligations Directed from Bearers to Counterparts** — Henning Herrestad, Christen Krogh, ICAIL 1995 (cites 66, prior-art) · [OA]  
@@ -45,18 +49,14 @@ Papers can appear under >1 facet. Within each facet, top ~12 by citation count.
   _Discusses role of deontic logic and deep models in legal expert systems_
 - **Legal Ontology for Modelling GDPR Concepts and Norms** — Monica Palmirani, Michele Martoni et al., JURIX 2018 (cites 58, prior-art) · [OA]  
   _PrOnto GDPR ontology using LegalRuleML/defeasible logic for rights and duties_
+- **A Modal Approach to Intentions, Commitments and Obligations: Intention plus Commitment Yields Obligation** — Frank Dignum, John-Jules Ch. Meyer et al., DEON 1996 (cites 56, prior-art) · [OA]  
+  _Modal framework deriving obligation from intention plus commitment; agent-theoretic normative reasoning._
 - **Thou shalt is not you will** — Guido Governatori, ICAIL 2015 (cites 51, contrasts) · [OA]  
   _CTD/permission paradox arguing temporal logic ill-suited to norms; bears on deontic-as-LTL question._
+- **Must I Do What I Ought? (Or Will the Least I Can Do Do?)** — Paul McNamara, DEON 1996 (cites 47, prior-art) · [OA]  
+  _Foundational distinction between 'must' and 'ought'; challenges standard deontic-logic presuppositions._
 - **Modelling Legal Knowledge for GDPR Compliance Checking** — Monica Palmirani, Guido Governatori, JURIX 2018 (cites 45, prior-art) · [OA]  
   _GDPR compliance checking via BPMN + Regorous defeasible-logic engine_
-- **Variants of temporal defeasible logics for modelling norm modifications** — Guido Governatori, Antonino Rotolo et al., ICAIL 2007 (cites 41, prior-art) · [OA]  
-  _Temporal defeasible logic variants for norm modification persistence vs blocking._
-- **The Structure of Norm Conditions and Nonmonotonic Reasoning in Law** — Giovanni Sartor, ICAIL 1991 (cites 35, prior-art)  
-  _Foundational structure-of-norm-conditions analysis; formalism adequacy for rules/exceptions (OCR-garbled abstract)._
-- **Towards a Logical Formalization of Responsibility** — Laurence Cholvy, Frédéric Cuppens et al., ICAIL 1997 (cites 32, prior-art) · [OA]  
-  _Logical framework combining deontic logic with action logic to formalize responsibility_
-- **Deontic defeasible reasoning in legal interpretation: two options for modelling interpretive arguments** — Antonino Rotolo, Guido Governatori et al., ICAIL 2015 (cites 31, prior-art)  
-  _Deontic defeasible logic for modelling interpretive-canon argumentation._
 
 ## determinacy-frontier (Cambridge CLS) — ambiguity/interpretation limits  (54)
 
@@ -112,7 +112,7 @@ Papers can appear under >1 facet. Within each facet, top ~12 by citation count.
 - **An Interactive Natural Language Interface for PROLEG** — Ha-Thanh Nguyen, Fumihito Nishino et al., JURIX 2022 (cites 4, prior-art) · [OA]  
   _Natural-language interface translating input facts into PROLEG Prolog reasoning syntax._
 
-## fm-in-law (ProLaLa) — verification/model-checking/theorem-proving  (43)
+## fm-in-law (ProLaLa) — verification/model-checking/theorem-proving  (54)
 
 - **Logic-Based Regulation Compliance-Assistance** — Shawn Kerrigan, Kincho H. Law, ICAIL 2003 (cites 84, prior-art)  
   _First-order predicate-calculus regulation compliance-assistance system (environmental regulations)_
@@ -120,21 +120,21 @@ Papers can appear under >1 facet. Within each facet, top ~12 by citation count.
   _CTD/permission paradox arguing temporal logic ill-suited to norms; bears on deontic-as-LTL question._
 - **An Executable Specification of an Argumentation Protocol** — Alexander Artikis, Marek J. Sergot et al., ICAIL 2003 (cites 39, prior-art)  
   _Executable specification of a normative argumentation protocol in action language C+, run via CCALC_
+- **Reasoning about Conditions and Exceptions to Laws in Regulatory Conformance Checking** — Nikhil Dinesh, Aravind K. Joshi et al., DEON 2008 (cites 35, prior-art)  
+  _Trace-checking framework for regulatory conformance handling conditions and exceptions to laws._
 - **Regorous: a business process compliance checker** — Guido Governatori, Sidney Shek, ICAIL 2013 (cites 29, example)  
   _Regorous: compliance-by-design business-process compliance checker tool._
 - **An Algorithm for Business Process Compliance** — Guido Governatori, Antonino Rotolo, JURIX 2008 (cites 23, prior-art)  
   _Algorithm for checking business-process compliance against business rules_
+- **Strategic Deontic Temporal Logic as a Reduction to ATL, with an Application to Chisholm&apos;s Scenario** — Jan M. Broersen, DEON 2006 (cites 19, prior-art) · [OA]  
+  _Strategic deontic temporal logic reduced to ATL; directly resolves Chisholm's contrary-to-duty paradox._
 - **A model-based approach to the automatic revision of secondary legislation** — Tingting Li, Tina Balke et al., ICAIL 2013 (cites 19, prior-art) · [OA]  
   _Formal model + ASP/ILP for detecting and revising legal conflicts in secondary legislation._
 - **Traffic Rules Encoding Using Defeasible Deontic Logic** — Hanif Bhuiyan, Guido Governatori et al., JURIX 2020 (cites 18, prior-art) · [OA]  
   _Defeasible Deontic Logic encoding of AV traffic rules with compliance assessment_
+- **Automatic Verification of Deontic Properties of Multi-agent Systems** — Franco Raimondi, Alessio Lomuscio, DEON 2004 (cites 18, prior-art)  
+  _OBDD-based model-checking algorithm verifying deontic/epistemic properties of multiagent systems._
+- **Social Laws in Alternating Time** — Michael J. Wooldridge, DEON 2004 (cites 17, prior-art)  
+  _Frames social-law effectiveness/synthesis as ATL model-checking problems; precedent for verification-as-bug-finding._
 - **Temporal deontic action logic for the verification of compliance to norms in ASP** — Laura Giordano, Alberto Martelli et al., ICAIL 2013 (cites 15, prior-art)  
   _Deontic temporal ASP logic verifying business-process compliance via bounded model checking._
-- **Automated Legal Assessment in OWL 2** — Saskia van de Ven, Joost Breuker et al., JURIX 2008 (cites 15, prior-art)  
-  _HARNESS: OWL-DL reasoning (sound & complete) for automated legal assessment of norm compliance_
-- **An Empirical Approach to the Semantic Representation of Laws** — Adam Z. Wyner, Johan Bos et al., JURIX 2012 (cites 14, prior-art) · [OA]  
-  _State-of-art automatic translation of laws to machine-readable formal representation_
-- **Towards compliance checking in reified I/O logic via SHACL** — Livio Robaldo, ICAIL 2021 (cites 13, method-to-borrow) · [OA]  
-  _Reified I/O logic norm compliance checking via SHACL constraint validation._
-- **Model Checking Legal Documents** — Daniel Gorín, Sergio Mera et al., JURIX 2010 (cites 9, prior-art)  
-  _FormaLex toolset uses off-the-shelf LTL model checkers for automatic analysis of legislative drafts_

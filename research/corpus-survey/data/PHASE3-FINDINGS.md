@@ -61,10 +61,27 @@ discriminates. Keep both columns in the shortlist so Phase 4/5 can see where the
 - Judge calls are single-pass, single-model. High-value borderline cases (esp. the 78 cut
   pre-rank favourites and the CNL facet) deserve a second look in Phase 5 deep-read.
 
+## UPDATE — DEON abstract backfill DONE (2026-07-21)
+
+Recovered **122/122** missing DEON abstracts from **SpringerLink** chapter landing pages
+(`dc.description` meta — free metadata; only the PDF is paywalled; Crossref/OpenAlex/S2 had none).
+Merged into `enriched.json` (DEON abstracts 3 → 125) and **re-judged the 122 on real abstracts**
+(2 Sonnet judges; verdicts overlay the original title-only ones via `merge_phase3.py`).
+
+Effect:
+- **Tight-core 250 → 327** (DEON **2 → 79**; ICAIL/JURIX unchanged at 134/114).
+- **bounded-deontics** tight-core facet 105 → **180**; fm-in-law 43 → 54.
+- Keep-set 717 → 713: the re-judge **cut ~11** DEON papers titles had falsely kept — deontic logic
+  applied to security/access-control, pure modal axiomatics/completeness, and non-legal domains.
+- Still-provisional DEON: **142** (the no-DOI early-edition / workshop papers SpringerLink can't
+  reach by DOI). Lower priority; parked in `deon-provisional.json`.
+
+DEON is now trustworthy where it has DOIs. Script: `scripts/deon_abstracts.py` +
+`scripts/update_and_prep_deon.py`.
+
 ## Next
 
-- **Phase 4 — acquire the tight core (250)** open-first: ~40% ICAIL / ~60% JURIX already have an
+- **Phase 4 — acquire the tight core (327)** open-first: ~40% ICAIL / ~60% JURIX already carry an
   OA url in `enriched.json`; paywalled residue sparingly (§5).
-- **DEON backfill** (optional, before trusting DEON): pull abstracts from Springer LNCS TOCs for
-  the DOI-bearing DEON years, then re-judge `deon-provisional.json`.
-- **CNL widening**: fold Wyner W0 + a LegalRuleML/ACE sweep into the CNL bucket.
+- **CNL widening**: CNL is still the thinnest facet (19) — fold Wyner W0 + a LegalRuleML/ACE sweep
+  into the CNL bucket rather than rely on the venue corpus alone.

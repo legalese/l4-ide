@@ -13,7 +13,7 @@
    "Layman E. Allen"
   ],
   "url": "https://dblp.org/rec/conf/deon/Allen96",
-  "abstract": null,
+  "abstract": "The Hohfeldian fundamental legal conceptions that deal with solely deontic LEGAL RELATIONS, the duty/privilege and right/no-right pairs, require not only an adequate definition of agency for the person who is obligated or permitted to act, but also the same of...",
   "tldr": "The agency concept of DONE-BY is being brought into closer conformity with Belnap’s emerging stit logic, with the modifications of deontic logic accompanying such changes.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -72,7 +72,7 @@
    "Giovanni Sartor"
   ],
   "url": "https://dblp.org/rec/conf/deon/ArtosiGS96",
-  "abstract": null,
+  "abstract": "In this paper we describe an algorithmic framework for a multi-modal logic arising from the combination of the system of modal (epistemic) logic devised by Meyer and van der Hoek for dealing with nonmonotonic reasoning with a deontic logic of the Jones and...",
   "tldr": "It is argued that this system of modal (epistemic) logic devised by Meyer and van der Hoek is particularly well-suited for mechanizing nonmonotonic forms of inference in a monotonic multimodal setting.",
   "oa_url": "https://espace.library.uq.edu.au/view/UQ:9610/DEON96.pdf",
   "oa_is_oa": false,
@@ -118,7 +118,7 @@
    "Mark A. Brown"
   ],
   "url": "https://dblp.org/rec/conf/deon/Brown96",
-  "abstract": null,
+  "abstract": "This paper investigates diachronic deontic logic, based on models with forward-branching time. Using such models, supplemented by a choice function to model human agency, and an obligation function to introduce normative features, it is possible to develop a rich...",
   "tldr": "This paper investigates diachronic deontic logic, based on models with forward-branching time, and finds that it is possible to develop a rich language with tense logic, since and until operators, and operators expressing action, ability, and obligation.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -165,7 +165,7 @@
    "Robert Demolombe"
   ],
   "url": "https://dblp.org/rec/conf/deon/CuppensD96",
-  "abstract": null,
+  "abstract": "This paper presents a deontic logic Σ for reasoning about permission or prohibition to know some parts of the databjase content in the context of a multilevel confidentiality policy. The most important logical features in the definition of a multilevel policy...",
   "tldr": "This paper presents a deontic logic Σ for reasoning about permission or prohibition to know some parts of the databjase content in the context of a multilevel confidentiality policy.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -206,7 +206,7 @@
    "Ruurd Kuiper"
   ],
   "url": "https://dblp.org/rec/conf/deon/DignumMWK96",
-  "abstract": null,
+  "abstract": "In this paper we introduce some new operators into our framework that make it possible to reason about decisions and commitments to do actions. In our framework, a decision leads to an intention to do an action. The decision in itself does not change the state of the...",
   "tldr": "It is shown that some situations that could formerly not be expressed easily in deontic logic can be described in a natural way using the extended logic described in this paper.",
   "oa_url": "https://ris.utwente.nl/ws/files/6139830/dignum96modal.pdf",
   "oa_is_oa": true,
@@ -257,7 +257,7 @@
    "John F. Horty"
   ],
   "url": "https://dblp.org/rec/conf/deon/Horty96",
-  "abstract": null,
+  "abstract": "The purpose of this paper is to explore a new deontic operator for representing what an agent ought to do; the operator is cast against the background of a modal treatment of action developed by Nuel Belnap and Michael Perloff, which itself relies on Arthur...",
   "tldr": "A new deontic operator for representing what an agent ought to do is explored, which is cast against the background of a modal treatment of action developed by Nuel Belnap and Michael Perloff, which itself relies on Arthur Prior’s indeterministic tense logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -312,7 +312,7 @@
    "Arnold A. Johanson"
   ],
   "url": "https://dblp.org/rec/conf/deon/Johanson96",
-  "abstract": null,
+  "abstract": "This paper exploits the properties of adjointness to develop a theory of norms. The adjoints are a pair of mappings between two logics, one called IMP, a logic of imperatives, and another called PROP, which is ordinary logic. In particular, L is a mapping form Prop...",
   "tldr": "This paper exploits the properties of adjointness to develop a theory of norms, a pair of mappings between two logics, one called IMP, a logic of imperatives, and another called PROP, which is ordinary logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -353,7 +353,7 @@
    "Henning Herrestad"
   ],
   "url": "https://dblp.org/rec/conf/deon/KroghH96",
-  "abstract": null,
+  "abstract": "The contribution of this paper lies in the analysis of the relationship between impersonal and personal deontic notions, keeping them as close to standard deontic logic as possible. In doing so, we offer arguments against reducing both personal notions to impersonal...",
   "tldr": "The contribution of this paper lies in the analysis of the relationship between impersonal and personal deontic notions, keeping them as close to standardDeontic logic as possible.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -409,7 +409,7 @@
    "Paul McNamara"
   ],
   "url": "https://dblp.org/rec/conf/deon/McNamara96",
-  "abstract": null,
+  "abstract": "Some key pre-theoretic semantic and pragmatic phenomena that support a negative answer to the main title question are identified and a conclusion of some significance is drawn: a pervasive bipartisan presupposition of twentieth century ethical theory and deontic...",
   "tldr": "A pervasive bipartisan presupposition of twentieth century ethical theory and deontic logic is false; an intuitive model-theoretic framework for “must” and “ought” is hypothesized and it is shown how this hypothesis helps to explain and predict all the pre- theoretic phenomena previously observed.",
   "oa_url": "https://philpapers.org/archive/MCNMID.pdf",
   "oa_is_oa": false,
@@ -464,7 +464,7 @@
    "Frank Dignum"
   ],
   "url": "https://dblp.org/rec/conf/deon/RoyakkersD96",
-  "abstract": null,
+  "abstract": "The last few years several defeasible deontic reasoning formalisms are developed as a way to solve the problem of deontic inconsistency. However, these formalisms are unable to deal with some very common forms of deontic reasoning, since e.g. their expressiveness is...",
   "tldr": "A priority hierarchy of legal rules is established to solve the problem of deontic conflicts and a mechanism to reason about nonmonotonicity of legal rules over the priority hierarchy is given.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -500,7 +500,7 @@
    "José Carmo"
   ],
   "url": "https://dblp.org/rec/conf/deon/SantosC96",
-  "abstract": null,
+  "abstract": "In this paper a new action concept is proposed, within the same tradition of the logical characterization of act descriptions as employed by Kanger, Pörn and Lindhal. The concept sums up a successful goal oriented social activity into a unique assertion...",
   "tldr": "A new action concept is proposed, within the same tradition of the logical characterization of act descriptions as employed by Kanger, Porn and Lindhal, that sums up a successful goal oriented social activity into a unique assertion referring to the agent who has initiated it.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -550,7 +550,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/TanT96",
-  "abstract": null,
+  "abstract": "In this paper we propose a semantics for dyadic deontic logic with an explicit preference ordering between worlds, representing different degrees of ideality. We argue that this ideality ordering can be used in two ways to evaluate formulas, which we call ordering...",
   "tldr": "This paper argues that an explicit preference ordering between worlds, representing different degrees of ideality, can be used in two ways to evaluate formulas, which it is argued are ordering and minimizing.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -608,7 +608,7 @@
    "Lennart Åqvist"
   ],
   "url": "https://dblp.org/rec/conf/deon/Aqvist04",
-  "abstract": null,
+  "abstract": "We consider three infinite hierarchies of what I call ”two-dimensional temporal logics with explicit realization operators”, viz. (i) one without historical or deontic modalities, (ii) one with historical but without deontic modalities, and (iii) one with...",
   "tldr": "Sound and complete axiomatizations are obtained for all three hierarchies relative to a simplified version of the finite co-ordinate-system semantics given for so-called T × W logic of historical necessity in Aqvist (1999).",
   "oa_url": "",
   "oa_is_oa": false,
@@ -655,7 +655,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/BoellaT04",
-  "abstract": null,
+  "abstract": "In this paper we consider the relation between desires and obligations in normative multiagent systems. We introduce a model of their relation based on what we call the social delegation cycle, which explains the creation of norms from agent desires in three steps....",
   "tldr": "A model of the relation between desires and obligations in normative multiagent systems based on what is called the social delegation cycle, which explains the creation of norms from agent desires in three steps is introduced.",
   "oa_url": "http://www.di.unito.it/~guido/articoli/LNCS/51-deon04.pdf",
   "oa_is_oa": false,
@@ -712,7 +712,7 @@
    "John-Jules Ch. Meyer"
   ],
   "url": "https://dblp.org/rec/conf/deon/BroersenDDM04",
-  "abstract": null,
+  "abstract": "This paper studies the logic of a dyadic modal operator for being obliged to meet a condition ρ before a condition δ becomes true. Starting from basic intuitions we arrive at a simple semantics for deadline obligations in terms of branching time models. We...",
   "tldr": "This paper studies the logic of a dyadic modal operator for being obliged to meet a condition ρ before a condition δ becomes true, and shows that this notion of deadline obligation can be characterized in the branching time logic CTL.",
   "oa_url": "https://dspace.library.uu.nl/handle/1874/11502",
   "oa_is_oa": true,
@@ -763,7 +763,7 @@
    "Mark A. Brown"
   ],
   "url": "https://dblp.org/rec/conf/deon/Brown04",
-  "abstract": null,
+  "abstract": "Many obligations can be seen as arising from contractual arrangements (or from situations resembling contractual arrangements) among agents. My obligation to repay you the $100 I borrowed is associated with a simple (quite possibly tacit and informal) contractual...",
   "tldr": null,
   "oa_url": "",
   "oa_is_oa": false,
@@ -787,7 +787,7 @@
    "Andreas Herzig"
   ],
   "url": "https://dblp.org/rec/conf/deon/DemolombeH04",
-  "abstract": null,
+  "abstract": "Obligation change raises the ”frame problem” which is to characterise what obligations remain unchanged after an action has been performed. Many general solutions have been proposed but even if they are attractive from a thoretical point of view they have...",
   "tldr": "Obligation change raises the ”frame problem” which is to characterise what obligations remain unchanged after an action has been performed.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -830,7 +830,7 @@
    "Lou Goble"
   ],
   "url": "https://dblp.org/rec/conf/deon/Goble04",
-  "abstract": null,
+  "abstract": "In this paper I propose a simple modification of standard deontic logic that will enable the system to accommodate deontic dilemmas without inconsistency and without deontic explosion, while at the same time preserving the range of genuinely valid inferences. The...",
   "tldr": "A simple modification of standard deontic logic is proposed that will enable the system to accommodateDeontic dilemmas without inconsistency and without deontics explosion, while at the same time preserving the range of genuinely valid inferences.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -896,7 +896,7 @@
    "Antonino Rotolo"
   ],
   "url": "https://dblp.org/rec/conf/deon/GovernatoriR04",
-  "abstract": null,
+  "abstract": "We propose a computationally oriented non-monotonic multi-modal logic arising from the combination of agency, intention and obligation. We argue about the defeasible nature of these notions and then we show how to represent and reason with them in the setting of...",
   "tldr": "A computationally oriented non-monotonic multi-modal logic arising from the combination of agency, intention and obligation is proposed and shown how to represent and reason with them in the setting of defeasible logic.",
   "oa_url": "http://espace.library.uq.edu.au/view/UQ:9638/deon04.pdf",
   "oa_is_oa": false,
@@ -955,7 +955,7 @@
    "John-Jules Ch. Meyer"
   ],
   "url": "https://dblp.org/rec/conf/deon/GrossiDRM04",
-  "abstract": null,
+  "abstract": "This work addresses the issue of obligations directed to groups of agents. Our main concern consists in providing a formal analysis of the structure connecting collective obligations to individual ones: which individual agent in a group should be held responsible if...",
   "tldr": "This work addresses the issue of obligations directed to groups of agents with a formal analysis of the structure connecting collective obligations to individual ones, and provides a formal account of the notion of coordination, intended as management of interdependencies among agents’ activities.",
   "oa_url": "https://dspace.library.uu.nl/bitstream/handle/1874/19701/dignum_04_collective.pdf?sequence=1&isAllowed=y",
   "oa_is_oa": false,
@@ -997,7 +997,7 @@
    "Jörg Hansen"
   ],
   "url": "https://dblp.org/rec/conf/deon/Hansen04",
-  "abstract": null,
+  "abstract": "Often a set of imperatives or norms seems satisfiable from the outset, but conflicts arise when ways to fulfill all are ruled out by unfortunate circumstances. Semantic methods to handle normative conflicts were devised by B. van Fraassen and J. F. Horty, but these...",
   "tldr": null,
   "oa_url": null,
   "oa_is_oa": false,
@@ -1073,7 +1073,7 @@
    "Michael J. Wooldridge"
   ],
   "url": "https://dblp.org/rec/conf/deon/JamrogaHW04",
-  "abstract": null,
+  "abstract": "In this paper, we combine deontic logic with Alternating-time Temporal Logic (ATL) into a framework that makes it possible to model and reason about obligations and abilities of agents. The way both frameworks are combined is technically straightforward: we add...",
   "tldr": "This paper combines deontic logic with Alternating-time Temporal Logic into a framework that makes it possible to model and reason about obligations and abilities of agents.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1119,7 +1119,7 @@
    "Andrew J. I. Jones"
   ],
   "url": "https://dblp.org/rec/conf/deon/Jones04",
-  "abstract": null,
+  "abstract": "This paper is a preliminary investigation into the application of the formal-logical theory of normative positions to the characterisation of normative-informational positions, pertaining to rules that are meant to regulate the supply of information.",
   "tldr": "This paper is a preliminary investigation into the application of the formal-logical theory of normative positions to the characterisation of normative-informational positions, pertaining to rules that are meant to regulate the supply of information.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1156,7 +1156,7 @@
    "Andrei Kouznetsov"
   ],
   "url": "https://dblp.org/rec/conf/deon/Kouznetsov04",
-  "abstract": null,
+  "abstract": "We use non-Kripkean quasi-matrix semantics for the formalization of the systems S\n                        3d\n                        , S\n                        3dp\n                         and S\n                        3dq\n                         of deontic logic....",
   "tldr": "Non-Kripkean quasi-matrix semantics is used for the formalization of the systems S 3d, S 3dp and S 3dq of deontic logic, which allows to consider deontics dilemmas without classical contradictions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1198,7 +1198,7 @@
    "Filipe Santos"
   ],
   "url": "https://dblp.org/rec/conf/deon/PachecoS04",
-  "abstract": null,
+  "abstract": "In an organizational context the norms that apply to an agent depend on the roles he holds in the organization. The deontic characterization of structural roles is defined when the organization is created. But an organization is not a static entity. Among the dynamic...",
   "tldr": "It is argued that the concept of ”agent in a role” is relevant to understand delegation and a deontic and action modal logic is used to specify this concept.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1244,7 +1244,7 @@
    "Alessio Lomuscio"
   ],
   "url": "https://dblp.org/rec/conf/deon/RaimondiL04",
-  "abstract": null,
+  "abstract": "We present an algorithm and its implementation for the verification of correct behaviour and epistemic states in multiagent systems. The verification is performed via model checking techniques based on obdd’s. We test our implementation by means of a...",
   "tldr": "An algorithm and its implementation for the verification of correct behaviour and epistemic states in multiagent systems is presented and tested by means of a communication example: the bit transmission problem with faults.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1298,7 +1298,7 @@
    "Jan M. Broersen"
   ],
   "url": "https://dblp.org/rec/conf/deon/TorreHDB04",
-  "abstract": null,
+  "abstract": "In this paper we investigate the specification and verification of information systems with an organizational structure. Such systems are modelled as a normative multiagent system. To this end we use KBDIOCTL, an extension of BDICTL in which obligations and...",
   "tldr": "This paper uses KBDIOCTL, an extension of BDICTL in which obligations and permissions are represented by directed modal operators, and illustrates how the logic can be used by introducing and discussing various properties of normative systems and individual agents which can be rep- resented in the logic.",
   "oa_url": "https://dspace.library.uu.nl/handle/1874/19965",
   "oa_is_oa": true,
@@ -1359,7 +1359,7 @@
    "Michael J. Wooldridge"
   ],
   "url": "https://dblp.org/rec/conf/deon/Wooldridge04",
-  "abstract": null,
+  "abstract": "Since it was first proposed by Moses, Shoham, and Tennenholtz, the social laws paradigm has proved to be one of the most compelling approaches to the offline coordination of multiagent systems. In this paper, we make three key contributions to the theory and practice...",
   "tldr": "It is shown that the effectiveness, feasibility, and synthesis problems for social laws may naturally be framed as atl model checking problems, and that as a consequence, existing atl model checkers may be applied to these problems.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1382,7 +1382,7 @@
    "Adam Zachary Wyner"
   ],
   "url": "https://dblp.org/rec/conf/deon/Wyner04",
-  "abstract": null,
+  "abstract": "We consider the logical representation of obligations on stative expressions such as The yard must be clean in the context of legal contract formation, execution, and monitoring (cf. Wyner ([28])). In a contract, the expression may understood as an obligation to...",
   "tldr": "This analysis considers the logical representation of obligations on stative expressions such as The yard must be clean in the context of legal contract formation, execution, and monitoring and introduces polynormativity, which contrasts with the binormativity of standard DAL or alethic logic plus a violation proposition.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1485,7 +1485,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/BoellaT06",
-  "abstract": null,
+  "abstract": "Logical architectures combine several logics into a more complex logical system. In this paper we study a logical architecture using input/output operations corresponding to the functionality of logical components. We illustrate how the architectural approach can be...",
   "tldr": "This paper studies a logical architecture using input/output operations corresponding to the functionality of logical components and illustrates how the architectural approach can be used to develop a logic of a normative system based on logics of counts-as conditionals, institutional constraints, obligations and permissions.",
   "oa_url": "http://link.springer.com/chapter/10.1007/11786849_5",
   "oa_is_oa": true,
@@ -1536,7 +1536,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/BoellaT06a",
-  "abstract": null,
+  "abstract": "In this paper we reconsider the definition of counts-as relations in normative multiagent systems: counts-as relations do not always provide directly an abstract interpretation of brute facts in terms of institutional facts. We argue that in many cases the inference...",
   "tldr": "The definition of counts-as relations in normative multiagent systems is reconsidered and it is argued that in many cases the inference of institutional facts from brutefacts is the result of actions of agents acting on behalf of the normative systems and who are in charge of recognizing which institutional facts follow from brute facts.",
   "oa_url": "http://link.springer.com/chapter/10.1007/11786849_6",
   "oa_is_oa": true,
@@ -1591,7 +1591,7 @@
    "Jan M. Broersen"
   ],
   "url": "https://dblp.org/rec/conf/deon/Broersen06",
-  "abstract": null,
+  "abstract": "In this paper we extend earlier work on deontic deadlines in CTL to the framework of alternating time temporal logic (ATL). The resulting setting enables us to model several concepts discussed in the deontic logic literature. Among the issues discussed are:...",
   "tldr": "This paper extends earlier work on deontic deadlines in CTL to the framework of alternating time temporal logic (ATL), and defines the logic as a reduction to ATL, demonstrating the applicability of the logic by discussing a possible solution to Chisholm's paradox.",
   "oa_url": "https://dspace.library.uu.nl/handle/1874/19972",
   "oa_is_oa": true,
@@ -1638,7 +1638,7 @@
    "Mark A. Brown"
   ],
   "url": "https://dblp.org/rec/conf/deon/Brown06",
-  "abstract": null,
+  "abstract": "Supplementing an account of actions offered by Horty and Belnap [8] makes it more suitable for use in deontic logic. I introduce a new tense operator, for a while in the immediate future, provide for action terms as well as action formulas, and introduce an intention...",
   "tldr": "A new tense operator is introduced, for a while in the immediate future, provide for action terms as well as action formulas, and an intention function is introduced into the authors' models to explore means/ends relations involving actions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1678,7 +1678,7 @@
    "Mamoun Filali"
   ],
   "url": "https://dblp.org/rec/conf/deon/BrunelBF06",
-  "abstract": null,
+  "abstract": "This paper studies a logic that combines deontic and temporal aspects. We first present a state/event temporal formalism and define a deontic extension of it. Then, we study the interaction between the temporal dimension and the deontic dimension. We present some...",
   "tldr": "This paper studies a logic that combines deontic and temporal aspects and defines a specific operator to express this notion of obligation with deadline and presents some logical properties.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1733,7 +1733,7 @@
    "José Carmo"
   ],
   "url": "https://dblp.org/rec/conf/deon/Carmo06",
-  "abstract": null,
+  "abstract": "An organization may be thesubject of obligations and be responsible for not fulfilling its obligations. And in order for an organization to fulfill its obligations, it must act. But an organization cannot act directly, so someone must act on its behalf (usually some...",
   "tldr": "An organization may be thesubject of obligations and be responsible for not fulfilling its obligations, but an organization cannot act directly, so someone must act on its behalf and this must be known by the “external world” (by the agents that interact with the organization).",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1757,7 +1757,7 @@
    "Vincent Louis"
   ],
   "url": "https://dblp.org/rec/conf/deon/DemolombeL06",
-  "abstract": null,
+  "abstract": "A general logical framework is presented to represent speech acts that have institutional effects. It is based on the concepts of the Speech Act Theory and takes the form of the FIPA Agent Communication Language. The most important feature is that the illocutionary...",
   "tldr": "A general logical framework is presented to represent speech acts that have institutional effects based on the concepts of the Speech Act Theory and takes the form of the FIPA Agent Communication Language.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1820,7 +1820,7 @@
    "Frank Dignum"
   ],
   "url": "https://dblp.org/rec/conf/deon/Dignum06",
-  "abstract": null,
+  "abstract": "The term Electronic Institution seems to be well accepted in the agent community and to a certain extent also in the e-commerce research community. However, a search for a definition of an electronic institution does not yield any results on the Internet. This is...",
   "tldr": "The term Electronic Institution seems to be well accepted in the agent community and to a certain extent also in the e-commerce research community, but a search for a definition of an electronic institution does not yield any results on the Internet.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1863,7 +1863,7 @@
    "Frank Dignum"
   ],
   "url": "https://dblp.org/rec/conf/deon/GrossiMD06",
-  "abstract": null,
+  "abstract": "By making use of modal logic techniques, the paper disentangles two semantically different readings of statements of the type X counts as Y in context C (the classificatory and the constitutive readings) showing that, in fact, ‘counts-as is said in many...",
   "tldr": "Modal logic techniques are used to disentangles two semantically different readings of statements of the type X counts as Y in context C showing that, in fact, ‘counts-as is said in many ways'.",
   "oa_url": "https://dspace.library.uu.nl/handle/1874/19680",
   "oa_is_oa": true,
@@ -1915,7 +1915,7 @@
    "Lambèr M. M. Royakkers"
   ],
   "url": "https://dblp.org/rec/conf/deon/HughesR06",
-  "abstract": null,
+  "abstract": "This paper studies long-term norms concerning actions. In Meyer’s Propositional Deontic Logic (PD\n                        \n                  e\n                \n                        L), only immediate duties can be expressed, however, often one has duties of...",
   "tldr": "This paper has provided a new analysis of the long-term obligation by introducing a new atomic proposition I (indebtedness) to represent the condition that an agent has some unfulfilled obligation.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -1952,7 +1952,7 @@
    "Steven O. Kimbrough"
   ],
   "url": "https://dblp.org/rec/conf/deon/JonesK06",
-  "abstract": null,
+  "abstract": "The paper outlines an approach to the formal representation of signalling conventions, emphasising the prominent role played therein by a particular type of normative modality. It is then argued that, in terms of inferencing related to this modality, a solution can...",
   "tldr": "The paper indicates the importance of the normative modality in understanding a closely related issue: reasoning about trust in communication scenarios; this facilitates a clear formal articulation of the role of a Trusted Third Party in trade communication.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2008,7 +2008,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/KaciT06",
-  "abstract": null,
+  "abstract": "In this paper we are interested in non-monotonic extensions of Bengt Hansson’s standard dyadic deontic logic 3, known as DSDL3. We study specificity principles for DSDL3 with both controllable and uncontrollable propositions. We introduce an algorithm for...",
   "tldr": "This paper introduces ways to combine algorithms for minimal and maximal specificity for DSDL3 with controllable and uncontrollable propositions, based on ‘optimistic' and ‘pessimistic' reasoning respectively.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2054,7 +2054,7 @@
    "Allard M. Tamminga"
   ],
   "url": "https://dblp.org/rec/conf/deon/KooiT06",
-  "abstract": null,
+  "abstract": "Extending John Horty’s multi-agent deontic logic to moral reasoning with subjective utilities, we provide a language and semantics to study moral reasoning with sentences like ‘Group...",
   "tldr": "This work provides a language and semantics to study moral reasoning with sentences like ‘Group ${\\ensuremath{\\mathcal{G}}}$ of agents ought see to it that φ in the interest of group${\\ensuresuremath{F}}}$'.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2094,7 +2094,7 @@
    "Jan Odelstad"
   ],
   "url": "https://dblp.org/rec/conf/deon/LindahlO06",
-  "abstract": null,
+  "abstract": "In legal theory, a well-known idea is that an intermediate concept like “ownership” joins a set of legal consequences to a set of legal grounds. In our paper, we attempt to make the idea of a joining between grounds and consequences more precise by using...",
   "tldr": "This paper attempts to make the idea of a joining between grounds and consequences more precise by using an algebraic representation of normative systems earlier developed by the authors by introducing a more rigorous framework and developing the formal theory.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2132,7 +2132,7 @@
    "Gert-Jan C. Lokhorst"
   ],
   "url": "https://dblp.org/rec/conf/deon/Lokhorst06",
-  "abstract": null,
+  "abstract": "Several systems of monadic deontic logic are defined in terms of systems of alethic modal logic with a propositional constant. When the universal propositional quantifier is added to these systems, the propositional constant becomes definable in terms of the deontic...",
   "tldr": "Several systems of monadic deontic logic are defined in terms of systems of alethic modal logic with a propositional constant when the universal propositional quantifier is added to these systems, and the meaning of this constant becomes clearer and it becomes easy to axiomatize the deontics fragments of the alethics modal systems.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2170,7 +2170,7 @@
    "Bozena Wozna"
   ],
   "url": "https://dblp.org/rec/conf/deon/LomuscioW06",
-  "abstract": null,
+  "abstract": "We solve the problem left open in [5] by providing a complete axiomatisation of deontic interpreted systems on a language that includes full CTL as well as the K\n                  i\n                , O\n                  i\n                 and...",
   "tldr": "This work solves the problem left open in [5] by providing a complete axiomatisation of deontic interpreted systems on a language that includes full CTL as well as the Ki, Oi and ${\\mathcal{\\widehat{\\rm {K}}}}^j_i$ modalities.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2207,7 +2207,7 @@
    "Thomas Müller"
   ],
   "url": "https://dblp.org/rec/conf/deon/Muller06",
-  "abstract": null,
+  "abstract": "We aim at an adequate formal description of the dynamics of commitments and trust by transferring insights about actual human practices to a formal setting. Our framework is based on Belnap’s theory of agents and choices in branching time (stit theory) and his...",
   "tldr": "This framework is based on Belnap's theory of agents and choices in branching time and his analysis of commitments in terms of strategies and can define a stringency ordering on an agent's possible strategies and overall trustworthiness of an agent can be defined by averaging over single case assessments.",
   "oa_url": "https://kops.uni-konstanz.de/server/api/core/bitstreams/1a0cb9fa-fb60-499c-a6f0-dda8871ddee1/content",
   "oa_is_oa": true,
@@ -2242,7 +2242,7 @@
    "Paolo Petta"
   ],
   "url": "https://dblp.org/rec/conf/deon/Petta06",
-  "abstract": null,
+  "abstract": "Research in logic-based multi-agent modelling has been pushing steadily the boundaries of the domain models adopted, while associated enquiries on the relations between constituent entities contribute in turn to an improved understanding of the underlying domain as...",
   "tldr": "A view of the domain of human emotions as informed in particular by cognitive appraisal theories and situated cognition research is developed that illustrates the role of emotions within the coordination of action and (different kinds of) cognition in social scenarios and tries to clarify the nature of processes and concepts involved.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2277,7 +2277,7 @@
    "Robert Craven"
   ],
   "url": "https://dblp.org/rec/conf/deon/SergotC06",
-  "abstract": null,
+  "abstract": "The action language \n                  \n                    \n                  \n                  ${\\mathcal{C}}+$\n                 of Giunchiglia, Lee, Lifschitz, McCain, and Turner is a formalism for specifying and reasoning about the effects of actions and the...",
   "tldr": "The deontic component of n, an extended form of the action language of Giunchiglia, Lee, Lifschitz, McCain, and Turner, provides a means of specifying the permitted states of a transition system and its permitted (acceptable, legal) transitions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2319,7 +2319,7 @@
    "Adam Zachary Wyner"
   ],
   "url": "https://dblp.org/rec/conf/deon/Wyner06",
-  "abstract": null,
+  "abstract": "In order to provide an implemented language of deontic concepts on complex actions for the purposes of social simulation, we consider the logical representation of obligations, sequences of actions, and the Contrary to Duty (CTD) Paradox. We show that approaches...",
   "tldr": "In a theory of deontic specifications on actions, it is shown that articulated, compositional, and productive markers for violation and fulfillment are key to address the problems identified and the theorical arguments inform the Abstract Contract Calculator.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2378,7 +2378,7 @@
    "Martín Abadi"
   ],
   "url": "https://dblp.org/rec/conf/deon/Abadi08",
-  "abstract": null,
+  "abstract": "In this paper we investigate the design space of access control logics. Specifically, we consider several possible axioms for the common operator says. Some of the axioms come from modal logic and programming-language theory; others are suggested by ideas from...",
   "tldr": "This paper considers several possible axioms for the common operator says , some of which come from modal logic and programming-language theory; others are suggested by ideas from security, such as delegation of authority and the Principle of Least Privilege.",
   "oa_url": "http://www.cse.ucsc.edu/~abadi/Papers/least-privilege-submit.pdf",
   "oa_is_oa": false,
@@ -2427,7 +2427,7 @@
    "Ross J. Anderson"
   ],
   "url": "https://dblp.org/rec/conf/deon/Anderson08",
-  "abstract": null,
+  "abstract": "The economics of information security has recently become a thriving and fastmoving discipline. As distributed systems are assembled from machines belonging to principals with divergent interests, incentives are becoming as important to dependability as technical...",
   "tldr": "The promise of this research program is a novel framework for analyzing information security problems - one that is both principled and effective.",
   "oa_url": "https://link.springer.com/content/pdf/10.1007/978-3-540-74143-5_5.pdf",
   "oa_is_oa": false,
@@ -2450,7 +2450,7 @@
    "Nuel Belnap"
   ],
   "url": "https://dblp.org/rec/conf/deon/Belnap08",
-  "abstract": null,
+  "abstract": "The idea of norms presupposes agency, and agency presupposes an indeterministic causal order (so that “ought” does not imply “is”). So much can be modeled in “branching time with agents and choices” (BTAC). The seriously...",
   "tldr": "The idea of norms presupposes agency, and agency presupposes an indeterministic causal order (so that \"ought\" does not imply \"is\") in \"branching time with agents and choices\" (BTAC).",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2473,7 +2473,7 @@
    "Jan M. Broersen"
   ],
   "url": "https://dblp.org/rec/conf/deon/Broersen08",
-  "abstract": null,
+  "abstract": "Within a STIT framework, this paper presents a logical study of the interaction between ‘ought-to-do’, and an epistemic notion of ‘knowingly doing’. We start out with some motivating examples concerning the interaction between action,...",
   "tldr": "This paper presents a complete temporal STIT logic including operators for action, obligation and knowledge, and uses the logic to analyze the examples and discuss open problems.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2540,7 +2540,7 @@
    "Paolo Turrini"
   ],
   "url": "https://dblp.org/rec/conf/deon/BroersenMMT08",
-  "abstract": null,
+  "abstract": "The paper discusses the interaction properties between preference and choice of coalitions in a strategic interaction. A language is presented to talk about the conflict between coalitionally optimal and socially optimal choices. Norms are seen as social...",
   "tldr": "The paper discusses the interaction properties between preference and choice of coalitions in a strategic interaction and a language is presented to talk about the conflict between coalitionally optimal and socially optimal choices.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2582,7 +2582,7 @@
    "Mark A. Brown"
   ],
   "url": "https://dblp.org/rec/conf/deon/Brown08",
-  "abstract": null,
+  "abstract": "A logic of action is essential for many treatments of normative concerns, but most treatments either ignore the role of agents, as in PDL, or omit all possibility of naming actions, as in various versions of stit theory. Moreover, most treatments of either type do...",
   "tldr": "This paper explores an account of actions as a species of events, with events interpreted against a background of the logic of branching time, and offers some prospect of a deontic logic which integrates tunsollen(ought to do) into a system of sein sollen (ought to be).",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2623,7 +2623,7 @@
    "T. S. E. Maibaum"
   ],
   "url": "https://dblp.org/rec/conf/deon/CastroM08",
-  "abstract": null,
+  "abstract": "In [1] and [2] we have introduced a novel deontic action logic for reasoning about fault-tolerance. In this paper we present a tableaux method for this logic; this proof system is sound and complete, and because the logic has the usual boolean operators on actions,...",
   "tldr": "This paper presents a tableaux method for a novel deontic action logic for reasoning about fault-tolerance that is sound and complete, and also allows us to deal successfully with action complement and parallel execution of actions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2678,7 +2678,7 @@
    "Frédéric Cuppens"
   ],
   "url": "https://dblp.org/rec/conf/deon/Cuppens-BoulahiaC08",
-  "abstract": null,
+  "abstract": "The security policy of an information system may include a wide range of different requirements. The literature has primarily focused on access and information flow control requirements and more recently on authentication and usage control requirements. Specifying...",
   "tldr": "This paper analyzes how intrusion detection requirements may be specified to face known intrusions but also new intrusions and suggests an approach based on assigning priority to activation contexts of security requirements.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2742,7 +2742,7 @@
    "Lluís Godo"
   ],
   "url": "https://dblp.org/rec/conf/deon/DellundeG08",
-  "abstract": null,
+  "abstract": "In this paper we define a framework to introduce gradedness in Deontic logics through the use of fuzzy modalities. By way of example, we instantiate the framework to Standard Deontic logic (SDL) formulas. Given a deontic formula Φ ∈ SDL, our...",
   "tldr": "A framework to introduce gradedness in Deontic logics through the use of fuzzy modalities is defined and sound and complete axiomatisations for these logics are presented.",
   "oa_url": "http://www.iiia.csic.es/files/pdfs/1659.pdf",
   "oa_is_oa": false,
@@ -2806,7 +2806,7 @@
    "Oleg Sokolsky"
   ],
   "url": "https://dblp.org/rec/conf/deon/DineshJLS08",
-  "abstract": null,
+  "abstract": "This paper considers the problem of checking whether an organization conforms to a body of regulation. Conformance is cast as a trace checking question – the regulation is represented in a logic that is evaluated against an abstract trace or run representing...",
   "tldr": "This paper focuses on a problem in designing a logic to represent regulation, and motivates the need for a formal representation of regulation to accomodate references between statements to allow statements to refer to others.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -2907,7 +2907,7 @@
    "Antonino Rotolo"
   ],
   "url": "https://dblp.org/rec/conf/deon/GovernatoriR08",
-  "abstract": null,
+  "abstract": "In this paper we investigate how to model legal abrogation and annulment in Defeasible Logic. We examine some options that embed in this setting, and similar rule-based systems, ideas from belief and base revision. In both cases, our conclusion is negative, which...",
   "tldr": "This paper investigates how to model legal abrogation and annulment in Defeasible Logic and concludes that the conclusion is negative, which suggests to adopt a different logical model.",
   "oa_url": "http://espace.library.uq.edu.au/view/UQ:134084/part1.pdf",
   "oa_is_oa": false,
@@ -2950,7 +2950,7 @@
    "Davide Grossi"
   ],
   "url": "https://dblp.org/rec/conf/deon/Grossi08",
-  "abstract": null,
+  "abstract": "The paper proposes a formal analysis of the ascriptive view of norms as resulting from pulling together Anderson’s reductionist approach, the analysis of counts-as, and a novel modal approach to the formal representation of languages in logic. This unifying...",
   "tldr": "The paper proposes a formal analysis of the ascriptive view of norms as resulting from pulling together Anderson's reductionist approach, the analysis of counts-as, and a novel modal approach to the formal representation of languages in logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3011,7 +3011,7 @@
    "Joris Hulstijn"
   ],
   "url": "https://dblp.org/rec/conf/deon/Hulstijn08",
-  "abstract": null,
+  "abstract": "Åqvist’s paradox of epistemic obligation can be solved, if we use knowledge-wh instead of knowledge-that in specifications of the ‘need to know’: the knowledge which an agent in a certain organisational role is required to have. Knowledge-wh is...",
   "tldr": "It is shown how knowledge-wh can be formalised in a logic of questions, which is combined with standard deontic logic to represent epistemic obligations, and demonstrated that under the new interpretation, the paradox can be derived.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3069,7 +3069,7 @@
    "Yao-Hua Tan"
   ],
   "url": "https://dblp.org/rec/conf/deon/HulstijnLT08",
-  "abstract": null,
+  "abstract": "Norms are implemented by administrative procedures. This paper addresses the delegation of control in administrative procedures. Instead of having to check all details, a controlling actor can trust the data provided by other actors, provided they can demonstrate to...",
   "tldr": "A conceptual analysis of situations in which control has been delegated is provided, based on an analysis of the dependencies between activities performed by the actors involved and on evidence documents.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3119,7 +3119,7 @@
    "Jan Odelstad"
   ],
   "url": "https://dblp.org/rec/conf/deon/LindahlO08",
-  "abstract": null,
+  "abstract": "Writing a contract of a specific content is a ground for purchase, purchase is a ground for ownership, ownership is a ground for power to dispose. Also power to dispose is a consequence of ownership, ownership is a consequence of purchase. etc. The paper presents a...",
   "tldr": "The paper presents a continuation of the authors' previous algebraic representation on ground - consequence chains in normative systems, analyzes different kinds of \"implicative closeness\" between grounds and consequences in chains of legal concepts, in particular combinations of \"weakest ground\", \"strongest consequence\" and \"minimal joining\".",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3159,7 +3159,7 @@
    "Robert Demolombe"
   ],
   "url": "https://dblp.org/rec/conf/deon/LoriniD08",
-  "abstract": null,
+  "abstract": "In this paper we present a logical model of trust in which trust is conceived as an expectation of the truster about some properties of the trustee. A general typology of trust is presented. We distinguish trust in the trustee’s action from trust in the...",
   "tldr": "A logical model of trust in which trust is conceived as an expectation of the truster about some properties of the trustee is presented and a general typology of trust is presented.",
   "oa_url": "https://hal.science/hal-03672521",
   "oa_is_oa": true,
@@ -3210,7 +3210,7 @@
    "Paul McNamara"
   ],
   "url": "https://dblp.org/rec/conf/deon/McNamara08",
-  "abstract": null,
+  "abstract": "Continuing prior work ([1, 2]), I integrate a simple system for personal obligation with a system for aretaic (agent-evaluative) appraisal. I then explore various relationships between definable aretaic statuses such as praiseworthiness and blameworthiness and...",
   "tldr": "This work integrates a simple system for personal obligation with a system for aretaic (agent-evaluative) appraisal, and explores various relationships between definable areTAic statuses such as praiseworthiness and blameworthness and deontic status such as obligatoriness and impermissibility.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3254,7 +3254,7 @@
    "Xavier Parent"
   ],
   "url": "https://dblp.org/rec/conf/deon/Parent08",
-  "abstract": null,
+  "abstract": "Åqvist’s dyadic deontic logic G, which aims at providing an axiomatic characterization of Hansson’s seminal system DSDL3 for conditional obligation, is shown to be strongly complete with respect to its intended modelling.",
   "tldr": "Aqvist's dyadic deontic logic G, which aims at providing an axiomatic characterization of Hansson's seminal system DSDL3 for conditional obligation, is shown to be strongly complete with respect to its intended modelling.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3311,7 +3311,7 @@
    "Audun Stolpe"
   ],
   "url": "https://dblp.org/rec/conf/deon/Stolpe08",
-  "abstract": null,
+  "abstract": "The problem of deriving implicit norms from explicitly given ones is at the heart of normative reasoning. In abstracto the problem is that of formalizing a plausible consequence relation taking norms to norms. I argue that any such relation should allow norms to be...",
   "tldr": "It is argued that any such relation should allow norms to be chained, even when the consequent of one is strictly stronger than the antecedent of another--i.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3349,7 +3349,7 @@
    "Uri J. Schild"
   ],
   "url": "https://dblp.org/rec/conf/deon/AbrahamGS10",
-  "abstract": null,
+  "abstract": "This paper examines the deontic logic of the Talmud. We shall find, by looking at examples, that at first approximation we need deontic logic with several connectives:...",
   "tldr": null,
   "oa_url": "http://orbilu.uni.lu/handle/10993/15940",
   "oa_is_oa": true,
@@ -3384,7 +3384,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/AucherBT10",
-  "abstract": null,
+  "abstract": "Privacy policies are often defined in terms of permitted messages. Instead, in this paper we derive dynamically the permitted messages from static privacy policies defined in terms of permitted and obligatory knowledge. With this new approach, we do not have to...",
   "tldr": "This paper derives dynamically the permitted messages from static privacy policies defined in terms of permitted and obligatory knowledge using a multi-modal logic introduced by Cuppens and Demolombe with update operators modeling the dynamics of both knowledge and privacy policies.",
   "oa_url": "https://inria.hal.science/inria-00556079",
   "oa_is_oa": true,
@@ -3440,7 +3440,7 @@
    "Fenrong Liu"
   ],
   "url": "https://dblp.org/rec/conf/deon/BenthemGL10",
-  "abstract": null,
+  "abstract": "This paper looks at deontic logic as resulting from both a betterness ordering on states (i.e., a ‘deontic preference’) and a priority ordering on properties (i.e., a ‘law’ explicitly representing a standard of behavior). The correspondence...",
   "tldr": "This paper looks at deontic logic as resulting from both a betterness ordering on states and a priority ordering on properties, thereby providing a new analysis of norm change as 'betterness change'.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3495,7 +3495,7 @@
    "Yao-Hua Tan"
   ],
   "url": "https://dblp.org/rec/conf/deon/BurgemeestreHT10",
-  "abstract": null,
+  "abstract": "Compliance is often achieved ‘by design’ through a coherent system of controls consisting of information systems and procedures . This system-based control requires a new approach to auditing in which companies must demonstrate to the regulator that they...",
   "tldr": null,
   "oa_url": null,
   "oa_is_oa": false,
@@ -3571,7 +3571,7 @@
    "Daniel Villatoro"
   ],
   "url": "https://dblp.org/rec/conf/deon/ConteAV10",
-  "abstract": null,
+  "abstract": "In this presentation, advances in modeling the mental dynamics of norms will be presented. In particular, the process from norm-adoption, possibly yielding new normative goals, to different forms of norm compliance will be focused upon, including norm...",
   "tldr": "In this presentation, advances in modeling the mental dynamics of norms, including norm internalization, will be presented, and a rich cognitive model of different types, degrees and factors of internalization is shown.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3594,7 +3594,7 @@
    "Robert Demolombe"
   ],
   "url": "https://dblp.org/rec/conf/deon/Demolombe10",
-  "abstract": null,
+  "abstract": "The paper presents a logical framework for the integration of interactions between institutional agents, human agents and software agents. It is shown, through a case study, that the relationships between actions performed by these three kinds of agents are defined...",
   "tldr": "A logical framework for the integration of interactions between institutional agents, human agents and software agents is presented and it is shown that the relationships between actions performed by these three kinds of agents are defined in terms of the Searle's \"counts as\" concept.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3660,7 +3660,7 @@
    "Giovanni Sartor"
   ],
   "url": "https://dblp.org/rec/conf/deon/DungS10",
-  "abstract": null,
+  "abstract": "We provide a logical analysis of private international law, the body of law establishing when courts of a country should decide a case (jurisdiction) and what legal system they should apply to this purpose (choice of law). A formal model of the resulting interaction...",
   "tldr": "A logical analysis of private international law is provided, the body of law establishing when courts of a country should decide a case and what legal system they should apply to this purpose and a formal model of the resulting interaction among multiple legal systems is proposed based on modular argumentation.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3705,7 +3705,7 @@
    "Richard Evans"
   ],
   "url": "https://dblp.org/rec/conf/deon/Evans10",
-  "abstract": null,
+  "abstract": "This paper introduces Exclusion Logic - a simple modal logic without negation or disjunction. We show that this logic has an efficient decision procedure. We describe how Exclusion Logic can be used as a deontic logic. We compare this deontic logic with Standard...",
   "tldr": "This paper introduces Exclusion Logic - a simple modal logic without negation or disjunction that has an efficient decision procedure and compares this deontic logic with Standard Deontic Logic and with more syntactically restricted logics.",
   "oa_url": "https://philpapers.org/archive/EVAIEL.pdf",
   "oa_is_oa": false,
@@ -3741,7 +3741,7 @@
    "Mark Reynolds"
   ],
   "url": "https://dblp.org/rec/conf/deon/FrenchMR10",
-  "abstract": null,
+  "abstract": "RoCTL* was proposed to model and specify the robustness of reactive systems. RoCTL* extended CTL* with the addition of Obligatory and Robustly operators, which quantify over failure-free paths and paths with one more failure respectively. This paper gives an...",
   "tldr": "This paper gives an axiomatisation for all the operators of RoCTL* with the exception of the Until operator; this fragment is able to express similar contrary-to-duty obligations to the full Ro CTL* logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3788,7 +3788,7 @@
    "Gert-Jan C. Lokhorst"
   ],
   "url": "https://dblp.org/rec/conf/deon/Lokhorst10",
-  "abstract": null,
+  "abstract": "In 1926, Ernst Mally proposed the first system of deontic logic. His system turned out to be unacceptable. How can it be repaired? We discuss several proposals to reformulate it in terms of strict implication, relevant implication and strict relevant implication.",
   "tldr": "This work discusses several proposals to reformulate Ernst Mally's first system of deontic logic in terms of strict implication, relevant implication and strict relevant implication.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3832,7 +3832,7 @@
    "Emiliano Lorini"
   ],
   "url": "https://dblp.org/rec/conf/deon/Lorini10",
-  "abstract": null,
+  "abstract": "The aim of this work is to propose a model-theoretic semantics and a complete logic for the dynamics of commitments. In the first part of the article, a formalization of the concept of social commitment in STIT logic is presented. STIT is one of the most prominent...",
   "tldr": "The aim of this work is to propose a model-theoretic semantics and a complete logic for the dynamics of commitments that is used to develop an axiomatic and semantic analysis of commitment change in multi-agent systems.",
   "oa_url": "https://hal.archives-ouvertes.fr/hal-03672504/file/DEON_Lorini_CameraReady.pdf",
   "oa_is_oa": false,
@@ -3891,7 +3891,7 @@
    "Rosja Mastop"
   ],
   "url": "https://dblp.org/rec/conf/deon/Mastop10",
-  "abstract": null,
+  "abstract": "Sometimes it is impossible to attribute responsibility to individuals when something goes wrong, or right, especially when many different agents are involved. Moral norms may dictate that certain events are not to happen, but responsibility can only be attributed to...",
   "tldr": "This contribution presents a logical analysis of the problem of many hands in the framework of XSTIT with intentions, as developed by Jan Broersen, in terms of an inference from the existence of a norm and the fact that all agents are acting responsibly to the conclusion that the norm is obeyed.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -3931,7 +3931,7 @@
    "Frederik Van De Putte"
   ],
   "url": "https://dblp.org/rec/conf/deon/MeheusBP10",
-  "abstract": null,
+  "abstract": "In this paper, we present an adaptive logic for deontic conflicts, called P2.1\n              \n                r\n              , that is based on Goble’s logic SDL\n              a\n              P\n              e—a bimodal extension of Goble’s logic P...",
   "tldr": "An adaptive logic for deontic conflicts, called P2.1r, that is based on Goble's logic SDLaPe--a bimodal extension of Goble’s logic P that invalidates aggregation for all prima facie obligations, which leads to a richer consequence set thanSDLaPe.",
   "oa_url": "https://biblio.ugent.be/publication/1854791",
   "oa_is_oa": true,
@@ -4014,7 +4014,7 @@
    "Guillaume Piolle"
   ],
   "url": "https://dblp.org/rec/conf/deon/Piolle10",
-  "abstract": null,
+  "abstract": "We propose a normal modal deontic logic based on a dyadic operator, similar in structure to the temporal “until”. By bringing significant expressiveness to the logic, it allows both the definition of a monadic desirability operator similar to the SDL...",
   "tldr": "This work proposes a normal modal deontic logic based on a dyadic operator, similar in structure to the temporal \"until\", which allows both the definition of a monadic desirability operator similar to the SDL obligation, and the expression of the relative level ofDesirability of target formulae.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4080,7 +4080,7 @@
    "Antonino Rotolo"
   ],
   "url": "https://dblp.org/rec/conf/deon/Rotolo10",
-  "abstract": null,
+  "abstract": "In earlier works, we used Defeasible Logic to argue that techniques from belief and base revision encounter a number of difficulties in modelling legal dynamics. In particular, we showed that these techniques are not suitable when legal changes are retroactive. This...",
   "tldr": "It is shown that, under some restrictions, ideas from base revision, if applied to Defeasible Logic or to similar rule-based systems, can indeed capture some significant aspects of annulments, abrogations, and derogations.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4116,7 +4116,7 @@
    "Marek J. Sergot"
   ],
   "url": "https://dblp.org/rec/conf/deon/Sergot10",
-  "abstract": null,
+  "abstract": "This presentation has two parts. The technical part concerns the logic of expressions of the form ‘agent x brings it about that A’, or ‘agent x is responsible for its being the case that A’, or more generally, ‘the group of agents G...",
   "tldr": "The account generalises naturally to talking about the collective actions of groups of agents: several different forms of (unwitting) collective agency can be identified.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4139,7 +4139,7 @@
    "Audun Stolpe"
   ],
   "url": "https://dblp.org/rec/conf/deon/Stolpe10",
-  "abstract": null,
+  "abstract": "We show that a recently developed theory of positive permission based on the notion of derogation is hampered by a triviality result that indicates a problem with the underlying full-meet contraction operation. We suggest a solution that presupposes a particular...",
   "tldr": "It is shown that a recently developed theory of positive permission based on the notion of derogation is hampered by a triviality result that indicates a problem with the underlying full-meet contraction operation, and a solution is suggested that presupposes a particular normal form for codes of norms, adapted from the theory of relevance through propositional letter sharing.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4187,7 +4187,7 @@
    "Michele Taruffo"
   ],
   "url": "https://dblp.org/rec/conf/deon/Taruffo10",
-  "abstract": null,
+  "abstract": "The starting point of the following remarks is that a fundamental aspect of judicial decisions (mainly in trial courts but often also in appellate courts) is the judgment about the facts in issue. In a sense, actually, judicial decisions derive from a sort of...",
   "tldr": "The starting point of the following remarks is that a fundamental aspect of judicial decisions is the judgment about the facts in issue, and the factual dimension of such decisions is no less important since no decision is just if it is based upon the wrong facts.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4214,7 +4214,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/Torre10",
-  "abstract": null,
+  "abstract": "To decide which norms can be removed from a system, we need to know when a norm is redundant. After shifting the focus of attention in deontic logic from detachment of obligations and permissions to deontic redundancy, I discuss in this paper five benchmark examples...",
   "tldr": "This paper discusses in this paper five benchmark examples of deontic redundancy in reasoning about permissions, intermediate concepts and constitutive norms,deontic dilemmas, temporalDeontic reasoning and contrary-to-duty reasoning.",
   "oa_url": "http://link.springer.com/chapter/10.1007/978-3-642-14183-6_4",
   "oa_is_oa": true,
@@ -4291,7 +4291,7 @@
    "Piotr Kulicki"
   ],
   "url": "https://dblp.org/rec/conf/deon/TrypuzK10",
-  "abstract": null,
+  "abstract": "The aim of the present paper is to provide a metalogical systematisation in the area of deontic action logic based on Boolean algebra. Differences among the systems in question lie in two aspects: the level of closedness of a deontic action logic and the possibility...",
   "tldr": "The aim of the present paper is to provide a metalogical systematisation in the area of deontic action logic based on Boolean algebra with an axiomatic characterisation of obligation with an adequate class of models.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4340,7 +4340,7 @@
    "John-Jules Ch. Meyer"
   ],
   "url": "https://dblp.org/rec/conf/deon/TurriniGBM10",
-  "abstract": null,
+  "abstract": "The purpose of this contribution is to set up a language to evaluate the results of concerted action among interdependent agents against predetermined properties that we can recognise as desirable from a deontic point of view. Unlike the standard view of logics to...",
   "tldr": "The purpose of this contribution is to set up a language to evaluate the results of concerted action among interdependent agents against predetermined properties that the authors can recognise as desirable from a deontic point of view.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4398,7 +4398,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/BroersenGT12",
-  "abstract": null,
+  "abstract": "Norm change is one of the main challenges for normative reasoning. This discussion paper presents some novel informal and semi-formal ideas regarding the nature and formalization of norm change. First, we contrast the second-order nature of norm change with the...",
   "tldr": "This discussion paper presents some novel informal and semi-formal ideas regarding the nature and formalization of norm change, and presents a semantical two dimensional view on change.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4452,7 +4452,7 @@
    "Robert Demolombe"
   ],
   "url": "https://dblp.org/rec/conf/deon/Demolombe12",
-  "abstract": null,
+  "abstract": "The formal definition of causality raises non trivial issues in the case of several agents acting together. Several action operators are defined in the semantics of a multi modal logic. The approach which is proposed is an extension to several agents of the...",
   "tldr": "The proposed approach is an extension to several agents of the \"bringing it about\" operators of the STIT operators which holds the property of non monotonicity with respect to sets of agents.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4505,7 +4505,7 @@
    "Dov M. Gabbay"
   ],
   "url": "https://dblp.org/rec/conf/deon/Gabbay12",
-  "abstract": null,
+  "abstract": "We consider a generalised Chisholm set of contrary to duty obligations (CTD) of the form \n\n                \n                  \n                \n                $$ O q_0 $$\n               and for i = 0,…, n we have the CTD is...",
   "tldr": "A representation of this problem in a variation of standard deontic logic that is TSDL, with the standard temporal operator $\\lozenge$, the deontics obligation operator O, and the past operator Y for \"yesterday\" is offered, which is free of the above paradoxes.",
   "oa_url": "https://orbilu.uni.lu/handle/10993/26116",
   "oa_is_oa": true,
@@ -4570,7 +4570,7 @@
    "José Júlio Alferes"
   ],
   "url": "https://dblp.org/rec/conf/deon/GoncalvesA12",
-  "abstract": null,
+  "abstract": "Parametrized logic programs, for which a syntax and natural declarative semantics have been recently defined, are very expressive logic programs under the stable model semantics (also usually called answer set programs) in which complex formulas of a given parameter...",
   "tldr": "This embedding not only shows how to recast input-out logic in this extension of answer set programming, but also sheds light on how to extend input-output logic with some interesting non-monotonic features.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4617,7 +4617,7 @@
    "Erica Calardo"
   ],
   "url": "https://dblp.org/rec/conf/deon/GovernatoriRC12",
-  "abstract": null,
+  "abstract": "Defeasible Deontic Logic is a simple and computationally efficient approach for the representation of normative reasoning. Traditionally defeasible logics are defined proof theoretically based on the proof conditions for the logic. While several logic programming,...",
   "tldr": "This paper addresses the issue of possible world semantics for (modal) defeasible logics and defines proof theoretically based on the proof conditions for the logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4674,7 +4674,7 @@
    "Nicolas Troquard"
   ],
   "url": "https://dblp.org/rec/conf/deon/HerzigLLT12",
-  "abstract": null,
+  "abstract": "In this article, we propose a Dynamic Logic of Propositional Control DL-PC in which the concept of ‘seeing to it that’ (abbreviated stit) as studied by Belnap, Horty and others can be expressed; more precisely, we capture the concept of the so-called...",
   "tldr": "A Dynamic Logic of Propositional Control DL-PC is proposed in which the concept of 'seeing to it that' (abbreviated stit) as studied by Belnap, Horty and others can be expressed; more precisely, the so-called ChellasStit theory and the deliberatibe stit theory are captured.",
   "oa_url": "http://www.irit.fr/~Andreas.Herzig/P/Deon12.pdf",
   "oa_is_oa": false,
@@ -4740,7 +4740,7 @@
    "Louwe B. Kuijer"
   ],
   "url": "https://dblp.org/rec/conf/deon/Kuijer12",
-  "abstract": null,
+  "abstract": "In this paper I show that one cannot faithfully represent contrary-to-duty obligations in logics with sanction semantics. In order to do so I first provide a number of desiderata that a logic should satisfy in order to represent contrary-to-duty obligations using...",
   "tldr": "It is shown that one cannot faithfully represent contrary-to-duty obligations in logics with sanction semantics and that when dropping any one of the desiderata there is a logic that satisfies all others and can represent some contrary- to- Duty obligations faithfully.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4777,7 +4777,7 @@
    "Robert Trypuz"
   ],
   "url": "https://dblp.org/rec/conf/deon/KulickiT12",
-  "abstract": null,
+  "abstract": "We start our investigations from the deontic action model defined in multi-situation settings. Then we discuss the validity of formulas constructed in a language with a finite number of basic actions, parallel and sequential compositions of actions, a free choice...",
   "tldr": "The main achievements of the paper are definitions of metalogical counterparts of deontic operators and interpretation function of actions taking into account their terminating and non- terminating executions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4816,7 +4816,7 @@
    "Emiliano Lorini"
   ],
   "url": "https://dblp.org/rec/conf/deon/Lorini12",
-  "abstract": null,
+  "abstract": "The aim of this work is to provide a logical analysis of moral agency. Although this concept has been extensively studied in social philosophy and in social sciences, it has been far less studied in the field of deontic logic and multi-agent systems (MASs). We...",
   "tldr": "Different aspects of moral agency such as the distinction between desires and moral values and the concept of moral agent are discussed, formalized in a variant of STIT logic with explicit actions.",
   "oa_url": "https://hal.science/hal-03671073",
   "oa_is_oa": true,
@@ -4878,7 +4878,7 @@
    "Giovanni Sartor"
   ],
   "url": "https://dblp.org/rec/conf/deon/RiveretRS12",
-  "abstract": null,
+  "abstract": "This paper proposes a new simulation approach for investigating phenomena such as norm emergence and internalization in large groups of learning agents. We define a probabilistic defeasible logic instantiating Dung’s argumentation framework. Rules of this logic...",
   "tldr": "A probabilistic defeasible logic instantiating Dung's argumentation framework is defined and rules of this logic are attached to probabilities and describe the agents' minds and behaviour to allow agents to adapt to their environment.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4922,7 +4922,7 @@
    "Norbert Gratzl"
   ],
   "url": "https://dblp.org/rec/conf/deon/RoyAG12",
-  "abstract": null,
+  "abstract": "This paper studies the following interpretation of obligations: A person i ought to do A in a situation S just in case everything else i may (and can) do in S is consistent with A. In such a case A can be called the weakest permission that i has in S. We show that,...",
   "tldr": "It is shown that practical, rational recommendations in games provide a natural, concrete application of an understanding of obligations and permissions, and that it gives rise to an interesting interplay between deontic and alethic notions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -4968,7 +4968,7 @@
    "Mathieu Beirlaen"
   ],
   "url": "https://dblp.org/rec/conf/deon/StrasserB12",
-  "abstract": null,
+  "abstract": "We present a refinement of Anderson’s reduction of deontic logic to modal logic with only alethic modalities. The refined proposal contextualizes the Andersonian sanction constant s by replacing it with a unary sanction operator S that is dependent on the...",
   "tldr": "A refinement of Anderson's reduction of deontic logic to modal logic with only alethic modalities provides novel insights in various central 'paradoxes' in deontics logic such as the Ross paradox, the paradox of the good Samaritan, and Forrester's 'gentle murderer' paradox.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5020,7 +5020,7 @@
    "Serena Villata"
   ],
   "url": "https://dblp.org/rec/conf/deon/TosattoBTV12",
-  "abstract": null,
+  "abstract": "Abstract normative systems allow to reason with norms even when their content is not detailed. In this paper, we propose a our preliminary results to visualize abstract normative systems, in such a way that we are able to reason with institutional facts, obligations...",
   "tldr": "Preliminary results to visualize abstract normative systems, in such a way that they are able to reason with institutional facts, obligations and permissions are proposed.",
   "oa_url": "http://link.springer.com/chapter/10.1007%2F978-3-642-31570-1_2",
   "oa_is_oa": true,
@@ -5060,7 +5060,7 @@
    "Paolo Turrini"
   ],
   "url": "https://dblp.org/rec/conf/deon/Turrini12",
-  "abstract": null,
+  "abstract": "Deontic logic has extensively been used to reason about what a player (or coalition) should do when confronted with several choices at its disposal while being aware of its opponents’ possibilities. So far this line of research, inspired by Horty’s...",
   "tldr": "This work would like to extend the scope of this account to include contractual aspects of coalitional choices, arguing that deontic logic can be used as a comprehensive reasoning tool for the normative aspects of game theory.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5105,7 +5105,7 @@
    "Olivier Roy"
   ],
   "url": "https://dblp.org/rec/conf/deon/AnglbergerDR14",
-  "abstract": null,
+  "abstract": "The open reading of permission (OR) states that an action α is permitted iff every execution of α is normatively OK. Free Choice Permission (FCP) is the notorious principle turning permission of disjunction into conjunction of permissions P(ϕ ∨...",
   "tldr": "It is proved that first-order logic version of OR, the open reading of permission, implies FCP, and alternative views of disjunctive actions which violate this principle are presented, which block the undesired implication.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5160,7 +5160,7 @@
    "Robert Shanklin"
   ],
   "url": "https://dblp.org/rec/conf/deon/BjornssonS14",
-  "abstract": null,
+  "abstract": "This paper concerns the semantic difference between strong and weak necessity modals. First we identify a number of explananda: their well-known intuitive difference in strength between ‘must’ and ‘ought’ as well as differences in connections...",
   "tldr": "It is suggested that the difference between ’ought’ and ’must’ lies in how they relate to scalar and binary standards and given independently plausible assumptions about how standards are provided by context, this explains the relevant differences discussed.",
   "oa_url": "https://philpapers.org/archive/BJRMOA.pdf",
   "oa_is_oa": true,
@@ -5206,7 +5206,7 @@
    "Antonino Rotolo"
   ],
   "url": "https://dblp.org/rec/conf/deon/CalardoGR14",
-  "abstract": null,
+  "abstract": "In [8] the authors developed a logical system based on the definition of a new non-classical connective ⊗ capturing the notion of reparative obligation. The system proved to be appropriate for handling well-known contrary-to-duty paradoxes but no...",
   "tldr": "A suitable possible-world semantics is defined for the logical system based on the definition of a new non-classical connective capturing the notion of reparative obligation and is a preference-based non-normal one extending and generalizing semantics for classical modal logics.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5259,7 +5259,7 @@
    "Richmond H. Thomason"
   ],
   "url": "https://dblp.org/rec/conf/deon/CroixT14",
-  "abstract": null,
+  "abstract": "Since it was presented in 1963, Chisholm’s paradox has attracted constant attention in the deontic logic literature, but without the emergence of any definitive solution. We claim this is due to its having no single solution. The paradox actually presents many...",
   "tldr": "This work proposes a linguistically motivated logical solution to Chisholm’s paradox, and explains the relation of the solution to the problem of contrary-to-duty obligations.",
   "oa_url": "https://philpapers.org/archive/SAICPA-2.pdf",
   "oa_is_oa": false,
@@ -5313,7 +5313,7 @@
    "Federico L. G. Faroldi"
   ],
   "url": "https://dblp.org/rec/conf/deon/Faroldi14",
-  "abstract": null,
+  "abstract": "In this paper I provide some linguistic evidence to the thesis that responsibility judgments are normative. I present an argument from negation, since the negation of descriptive judgments is structurally different from the negation of normative judgments. In...",
   "tldr": "Some linguistic evidence is provided to provide some linguistic evidence to the thesis that responsibility judgments are normative.",
   "oa_url": "https://philpapers.org/archive/FARDOR-3.pdf",
   "oa_is_oa": true,
@@ -5367,7 +5367,7 @@
    "Melissa Fusco"
   ],
   "url": "https://dblp.org/rec/conf/deon/Fusco14",
-  "abstract": null,
+  "abstract": "Ross’s puzzle (Ross, 1941) and the paradox of Free Choice Permission (Kamp, 1973), puzzles involving disjunction under deontic operators, have received wide discussion in recent work in natural language semantics. First, I contrast two opposed modal...",
   "tldr": "A contrast of two opposed modal views—call them the “box-diamond” theory and EU theory—that form two poles of the contemporary debate is compared, and an axiomatization of obligation and permissibility is presented—of ‘ought’ and ‘may’—that is neutral between the two theories.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5420,7 +5420,7 @@
    "Zohreh Baniasadi"
   ],
   "url": "https://dblp.org/rec/conf/deon/GabbayRSTB14",
-  "abstract": null,
+  "abstract": "A linguistic analysis of deontic paradoxes can be used to further develop deontic logic. In this paper we provide a Beth-Reichenbach semantics to analyze deontic paradoxes, and we illustrate it on the single agent decision problem of the miners scenario. We also...",
   "tldr": "A Beth-Reichenbach semantics to analyze deontic paradoxes is provided and illustrated on the single agent decision problem of the miners scenario and extensions with reactive arrows and actions are introduced which can be used to give a linguistic interpretation of multi-agent dialogues.",
   "oa_url": "https://orbilu.uni.lu/handle/10993/26837",
   "oa_is_oa": true,
@@ -5464,7 +5464,7 @@
    "Sven Ove Hansson"
   ],
   "url": "https://dblp.org/rec/conf/deon/Hansson14",
-  "abstract": null,
+  "abstract": "It is commonly assumed that deontic logic concerns “the” logic of normative concepts. However, a close look at actual usage shows that the structural patterns of deontic notions differ between different usages. Some of these differences are difficult to...",
   "tldr": null,
   "oa_url": "",
   "oa_is_oa": false,
@@ -5514,7 +5514,7 @@
    "Andrew J. I. Jones"
   ],
   "url": "https://dblp.org/rec/conf/deon/Jones14",
-  "abstract": null,
+  "abstract": "Ingmar Pörn died at his home in Finland in February 2014, at the age of 78. During his academic career, Pörn carried out research in a number of areas of Philosophy, including significant contributions to the logics of action, interaction and norms, on...",
   "tldr": "During his academic career, Porn carried out research in a number of areas of Philosophy, including significant contributions to the logics of action, interaction and norms, on which this note will focus.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5557,7 +5557,7 @@
    "Alessandra Marra"
   ],
   "url": "https://dblp.org/rec/conf/deon/Marra14",
-  "abstract": null,
+  "abstract": "Traditional approaches in deontic logic have focused on the so-called reportative reading of obligation sentences, by providing truth-functional semantics based on a primitive ideality order between possible worlds. Those approaches, however, do not take into account...",
   "tldr": "A dynamic, non truth-functional semantics for necessity deontic modals is developed, in which the ideality relations among possible worlds can be updated, and it is proven that the semantics solves several of the classicDeontic paradoxes.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5604,7 +5604,7 @@
    "Eugenio Orlandelli"
   ],
   "url": "https://dblp.org/rec/conf/deon/Orlandelli14",
-  "abstract": null,
+  "abstract": "Sequent calculi for normal and non-normal deontic logics are introduced. For these calculi we prove that weakening and contraction are height-preserving admissible, and we give a syntactic proof of the admissibility of cut. This yields that the subformula property...",
   "tldr": "It is shown that these calculi are equivalent to the axiomatic ones, and therefore that they are sound and complete w.r.t. neighborhood semantics, a major step in the development of the proof theory of deontic logics.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5644,7 +5644,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/ParentT14",
-  "abstract": null,
+  "abstract": "Makinson and van der Torre [13] introduce a number of input/output (I/O) logics to reason about conditional norms. The key idea is to make obligations relative to a given set of conditional norms. The meaning of the normative concepts is, then, given in terms of a...",
   "tldr": "This work extends Stolpe’s account of I/O logics to include systems without the rule of weakening of the output (or principle of inheritance), and shows how to inject a new form of cumulative transitivity which it thinks is more suitable for normative reasoning.",
   "oa_url": "http://orbilu.uni.lu/handle/10993/24914",
   "oa_is_oa": true,
@@ -5688,7 +5688,7 @@
    "Olivier Roy"
   ],
   "url": "https://dblp.org/rec/conf/deon/RechenauerR14",
-  "abstract": null,
+  "abstract": "In this paper we use fixed-point modal logic to study the logical properties of justified norms in Scanlonian contractualism. We show a natural connection between Scanlon’s test for justifiability and the computation of the smallest fixed point; we rebut a...",
   "tldr": "A natural connection between Scanlon’s test for justifiability and the computation of the smallest fixed point is shown and the resulting justification operator is not a normal modality, and the epistemic component often left implicit in the justification procedure is explored.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5725,7 +5725,7 @@
    "Jeremy Pitt"
   ],
   "url": "https://dblp.org/rec/conf/deon/RiveretABP14",
-  "abstract": null,
+  "abstract": "Norms are commonly understood as guides for the conduct of autonomous agents, thereby easing their individual decision-making and coordination. However, their study exhibits a polarity between (i) norms as behavioural patterns emerging from repeated agents’...",
   "tldr": "This paper attempts to build a bridge between these two conceptual poles of norms: it takes the form of a mental function for prescriptive transfiguration allowing reinforced learning agents to express their learning experiences into prescriptions.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5762,7 +5762,7 @@
    "Justin Snedegar"
   ],
   "url": "https://dblp.org/rec/conf/deon/Snedegar14",
-  "abstract": null,
+  "abstract": "Contrastivism about ‘ought’ holds that ‘ought’ claims are relativized, at least implicitly, to sets of mutually exclusive but not necessarily jointly exhaustive alternatives. This kind of theory can solve puzzles that face other linguistic...",
   "tldr": "This paper investigates the extent to which a contrastivist can solve puzzles that face other linguistic theories of ‘ ought’, via the rejection or severe restriction of principles that let us make inferences between ‘ought’ claims.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5808,7 +5808,7 @@
    "Ofer Arieli"
   ],
   "url": "https://dblp.org/rec/conf/deon/StrasserA14",
-  "abstract": null,
+  "abstract": "In this paper we present an argumentative approach to normative reasoning. Special attention is paid to deontic conflicts, contrary-to-duty and specificity cases. These are modeled by means of argumentative attacks. For this, we adopt a recently proposed framework...",
   "tldr": "An argumentative approach to normative reasoning is presented, which adopts a recently proposed framework for logical argumentation in which arguments are generated by a sequent calculus of a given base logic, and uses standard deontic logic as the authors' base logic.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5869,7 +5869,7 @@
    "Leendert W. N. van der Torre"
   ],
   "url": "https://dblp.org/rec/conf/deon/SunT14",
-  "abstract": null,
+  "abstract": "In this paper we study three semantics to combine constitutive and regulative norms. In the first semantics, called the simple-minded semantics, the output of the constitutive norms are intermediate facts used as input for the regulative norms. The second method is...",
   "tldr": "This paper refine these three so-called abstract semantics such that the obligations are labeled with the intermediate facts used to derive them, and presents complete axiomatisations for the abstract and refined versions of the three semantics.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5918,7 +5918,7 @@
    "Pierre Kelsen"
   ],
   "url": "https://dblp.org/rec/conf/deon/TosattoGK14",
-  "abstract": null,
+  "abstract": "Regulations, through the use of obligations and permissions, are widely used in modern society to define acceptable behaviours. Thus it is indeed important that these regulations do not conflict with each other and contain contradicting obligations. In the present...",
   "tldr": "A new semantics for the obligations capable of representing and reasoning about them in dynamic settings is introduced and used to identify the necessary and sufficient conditions to identify conflicting obligations.",
   "oa_url": "",
   "oa_is_oa": false,
@@ -5973,7 +5973,7 @@
    "Piotr Kulicki"
   ],
   "url": "https://dblp.org/rec/conf/deon/TrypuzK14",
-  "abstract": null,
+  "abstract": "Deontic considerations are usually conducted in one of the following contexts: (i) general norms expressed in: legal documents, regulations or implicitly present in society in the form of moral or social rules; (ii) specific norms, i.e., duties of particular agents...",
   "tldr": "The paper starts from presenting a simple deontic logic of actions and a simpleDeontic Logic of states and combines them to provide a unified logic of general norms to discuss the way in which specific norms can be introduced into the system.",
   "oa_url": "",
   "oa_is_oa": false,

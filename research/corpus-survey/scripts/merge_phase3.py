@@ -37,6 +37,19 @@ if missing:
         print(f"   chunk-{i:02d}: {why}")
     print(f"   have {len(verdicts)} verdicts; proceeding with what exists.\n")
 
+# ---- overlay: DEON re-judge on recovered abstracts (overrides original title-only verdicts) ----
+DEON_SP = os.path.join(os.path.dirname(SP), "phase3", "deon")
+deon_manifest = os.path.join(DEON_SP, "manifest.json")
+if os.path.exists(deon_manifest):
+    overlaid = 0
+    for m in json.load(open(deon_manifest)):
+        if os.path.exists(m["out"]):
+            for v in json.load(open(m["out"])):
+                if v.get("key"):
+                    verdicts[v["key"]] = v
+                    overlaid += 1
+    print(f"DEON overlay: {overlaid} verdicts re-judged on recovered abstracts (override title-only).\n")
+
 # ---- join ----
 rows = []
 for key, v in verdicts.items():
