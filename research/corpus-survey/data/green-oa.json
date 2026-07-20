@@ -1918,5 +1918,47 @@
   "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220485",
   "host": "publisher",
   "version": "publishedVersion"
+ },
+ "conf/jurix/ZuurmondBKW23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230992",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/KaczmarczykLS24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241275",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/NevelBV91": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/112646.112681",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/HalpernF25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Westermann25": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/3769126.3769196?download=true",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/EcobichonCDM25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/MatkovicMG25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
  }
 }

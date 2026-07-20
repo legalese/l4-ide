@@ -168,9 +168,14 @@ real him**, whose input validates anything the model produces. Loop him in early
   synthesis (not abstract reproduction). Scripts prep_phase5 + SYNTH brief.
 - [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;
   154 works 1991–2025, 2,152 cites. Script `scripts/wyner_harvest.py`.
-- [~] **W1 — Wyner interest map** — seed built (`interest-map.json`: venues/concepts/coauthors/
-  most-cited). Narrative synthesis still to write.
-- [ ] **W2 — Wyner persona rehearsal** (guardrails §7)
+- [x] **W1 — Wyner interest map** — `dossiers/wyner/W1-interest-map.md`: career arc (2006→2025),
+  7 threads (argumentation theory+mining, legal CBR, CNL, LegalRuleML, rule-extraction, KR/NLP,
+  field-stewardship), collaboration structure, and the 6 seams intersecting L4's CNL paper.
+  Data-hygiene caveat flagged (OpenAlex namesake merge → 154 is an upper bound).
+- [x] **W2 — Wyner persona rehearsal** — `dossiers/wyner/W2-persona.md`: clearly-SYNTHETIC,
+  corpus-grounded pre-mortem for the co-authored CNL paper — his likely value-priors + 7
+  anticipated probes with prep, working-style notes, guardrails (never attributed to real Adam;
+  loop him in early; his answers replace the model).
 - [~] **MULL sub-corpus** — issue-level skeleton captured; **article-level harvest blocked** by
   JSTOR SPA + MCP read-redaction (`data/MULL-STATUS.md`). Deferred to on-demand acquisition.
 
@@ -188,6 +193,13 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-21** — **Wyner W1 + W2 COMPLETE.** W1 interest map (`dossiers/wyner/W1-interest-map.md`)
+  — 7 threads, collaboration nucleus (Bench-Capon/Atkinson), 6 L4-intersection seams; namesake
+  data-hygiene caveat noted. W2 persona rehearsal (`dossiers/wyner/W2-persona.md`) — clearly
+  synthetic, corpus-grounded pre-mortem for the co-authored CNL paper (value-priors + 7 anticipated
+  probes + prep), with hard guardrails (never attributed to the real Adam; validate with him; his
+  answers replace the model). **Original-ask items ALL complete.** Optional remainders only:
+  DEON no-DOI tail, on-demand full-text, and turning `bib/*.md` into per-paper related-work drafts.
 - **2026-07-21** — **Phase 4 + Phase 5 COMPLETE.** Phase 4 acquisition audit: 327 tight-core →
   179 OA-url / 148 paywalled; fixed the landing-page problem (OpenAlex pdf_url + arXiv) → 110
   direct urls; green-OA sweep via Unpaywall over residue. **Sci-Hub declined** (user asked; it
