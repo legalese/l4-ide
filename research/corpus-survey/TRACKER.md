@@ -158,8 +158,14 @@ real him**, whose input validates anything the model produces. Loop him in early
   DEON tight-core 2→79 (details `PHASE3-FINDINGS.md`). Remaining DEON-provisional 142 (no-DOI).
   CNL thinnest facet (19) → lean on Wyner. `PHASE3-SHORTLIST.md`; scripts prep/merge/finalize/
   deon_abstracts + rubric.
-- [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights) — *next*
-- [ ] **Phase 5 — Deep-read + synthesize** (annotated bibliography keyed to facets)
+- [x] **Phase 4 — Acquire survivors** — audit of 327 tight-core: 179 OA-url, 148 paywalled;
+  direct-PDF resolution (OpenAlex pdf_url + arXiv) → 110 direct urls; **green-OA sweep** via
+  Unpaywall over the residue (running/adds legit author copies). Sci-Hub declined (§5).
+  `acquire-plan.csv`; PDFs gitignored. Full-text pulled on-demand for deep reads.
+- [x] **Phase 5 — Deep-read + synthesize** — facet-mapped **annotated bibliography**
+  (`data/PHASE5-BIBLIOGRAPHY.md`, ~13k words; per-facet `bib/*.md`). 5 synthesis agents over the
+  327 tight-core → sub-themes + fresh anchor annotations + "L4's opening" gap per facet. Original
+  synthesis (not abstract reproduction). Scripts prep_phase5 + SYNTH brief.
 - [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;
   154 works 1991–2025, 2,152 cites. Script `scripts/wyner_harvest.py`.
 - [~] **W1 — Wyner interest map** — seed built (`interest-map.json`: venues/concepts/coauthors/
@@ -182,6 +188,15 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-21** — **Phase 4 + Phase 5 COMPLETE.** Phase 4 acquisition audit: 327 tight-core →
+  179 OA-url / 148 paywalled; fixed the landing-page problem (OpenAlex pdf_url + arXiv) → 110
+  direct urls; green-OA sweep via Unpaywall over residue. **Sci-Hub declined** (user asked; it
+  redistributes paywalled papers without authorization → §5 "with rights" line). Full-text pulled
+  on-demand; abstracts (which we hold for all 327) carry synthesis. Phase 5: 5 Sonnet synthesis
+  agents → facet-mapped **annotated bibliography** `data/PHASE5-BIBLIOGRAPHY.md` (~13k words,
+  per-facet `bib/*.md`): sub-themes, original anchor annotations, must-cite lists, and each facet's
+  "L4's opening" wedge. **Main pipeline (P0–P5) DONE.** Remaining: Wyner W1/W2; optional DEON
+  no-DOI tail + paywalled full-text on demand.
 - **2026-07-20** — **Phase 3 COMPLETE (Sonnet abstract filter, full corpus).** 16× Sonnet judges
   (independent of pre-rank) over all 1,758 → keep 717 (core 479/adj 238); tight-core **250** after
   trust filter (core+conf≥med+abstract). Methodological win: the independent judge cut 78 of the

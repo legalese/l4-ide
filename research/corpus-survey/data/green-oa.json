@@ -1,0 +1,1922 @@
+{
+ "conf/icail/GovernatoriRS05": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Governatori15": {
+  "is_oa": true,
+  "pdf_url": "https://arxiv.org/pdf/1404.1685",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/GovernatoriRRPS07": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/RotoloGS15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/WynerP11": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/WittHGB21": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/Bench-CaponG09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GovernatoriR20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200853",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/GovernatoriDHO01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GovernatoriR23": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/GovernatoriORC22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220447",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/ZurekA13": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/Sartor93": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/158976.159001",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/AthanBGPPW13": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Bench-CaponRRS87": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/41735.41757",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/GovernatoriRC12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GovernatoriROS13": {
+  "is_oa": true,
+  "pdf_url": "http://hdl.handle.net/10072/58750",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/MalerbaRG16": {
+  "is_oa": true,
+  "pdf_url": "http://hdl.handle.net/11585/602591",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/SartorWMR14": {
+  "is_oa": true,
+  "pdf_url": "https://scholar.uwindsor.ca/cgi/viewcontent.cgi?article=1032&context=crrarpub",
+  "host": null,
+  "version": "submittedVersion"
+ },
+ "conf/jurix/GovernatoriORS11": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GiordanoMD13": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GovernatoriLRVG13": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/ParentT17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/GovernatoriR25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/RotoloFG25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/GovernatoriM19": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/GovernatoriR19a": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SmithRS10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PereiraTLMRT17": {
+  "is_oa": true,
+  "pdf_url": "https://inria.hal.science/hal-01672343v1/document",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/GovernatoriR04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Bench-CaponM16": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Governatori15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/GovernatoriR08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Bench-Capon93": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PalmiraniGC11": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GovernatoriORS12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/BatsakisBGTA18": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/IslamG15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GovernatoriO21": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "submittedVersion"
+ },
+ "conf/jurix/PalmiraniGC10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/RotoloVG13": {
+  "is_oa": true,
+  "pdf_url": "https://inria.hal.science/hal-00907879/document",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/TosattoGK14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/CiabattoniPS23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230953",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/GovernatoriS13": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Maranhao17": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Gordon89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74035",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/BoelleT03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/CristaniOR17": {
+  "is_oa": true,
+  "pdf_url": "http://hdl.handle.net/11585/626954",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/CalardoGR14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Sartor91": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GovernatoriH15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/LibalP19": {
+  "is_oa": true,
+  "pdf_url": "https://arxiv.org/pdf/1810.09993",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/Rotolo10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GandonGV17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/BhuiyanGBDIR20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200844",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/Gordon87": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/HerrestadK95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222243",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/PontSWS25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/GovernatoriR08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/MuthuriBHCH17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/Araszkiewicz22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220443",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/WattGW23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230954",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/Bench-Capon89": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/NazarenkoLW16": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/CiabattoniPS21": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210330",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/FrancesconiG19": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/WynerGLLN17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AzzopardiPS18": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/Wyner06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GovernatoriP25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/MaranhaoS19": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/WaltonMS14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Wyner04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/AraszkiewiczFZ23": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/FacianoMSICUGRM17": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/ArtosiGS96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/AtkinsonCBD21": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PoulinBFM93": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/158976.158988",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SatohKNT09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Routen89": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/McCarty89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74037",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/HendersonB17": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PontGSC25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PalmiraniG18": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/WynerBBQ12": {
+  "is_oa": true,
+  "pdf_url": "http://hdl.handle.net/2318/1698231",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/DikM24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241233",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/DikM25": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/LiepinaLLPS25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/ChircopPS22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220460",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Baldoni0S19": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/BroersenDDM04": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/CanavottoH23": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/3594536.3595148",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/CalegariCLOS19": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AraszkiewiczZ17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/BoellaT05": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/JohnsonM91": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/112646.112660",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/TorreT97": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PrisacariuS09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Araszkiewicz13": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/RisslandS89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74021",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/St-VincentPB95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222224",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Liebwald13": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/NeufeldCT24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241239",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PalmiraniMRBR18": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PaceSS15": {
+  "is_oa": true,
+  "pdf_url": "https://www.um.edu.mt/library/oar//handle/123456789/27636",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/AllenT07": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/KharrazLS21": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210336",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/GovernatoriR24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241273",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SartorGPR025": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/ZinBSF25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PaceS11": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/BurgemeestreHT09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Prakken17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SilenoBE14": {
+  "is_oa": true,
+  "pdf_url": "https://pure.uva.nl/ws/files/38829899/154586_JURIX2014.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/MaiLVNSS25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/BreukerH91": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/TiscorniaT97": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/261618.261633",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/Stolpe10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Xia0BL25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Belzer87": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/41735.41753",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Araszkiewicz25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SasdelliS25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Pace20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200852",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/0002MST23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230947",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/AllenS91": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/ServantezLSAKGH23": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Bench-Capon14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/CastelfranchiT03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/DellundeG08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GrossiMD05": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/XuJ23": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/AllenS97": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/261618.261623",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/SchildH93": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/AzzopardiPS14": {
+  "is_oa": true,
+  "pdf_url": "https://www.um.edu.mt/library/oar/bitstream/123456789/24153/1/jurix2014.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/CholvyCS97": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/261618.261658",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/BenthemGL10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/KroghH96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/SantosP03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/AbrahamGS10": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/Yoshino95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222257",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/GorinMS10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/RantaLSW22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220473",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PascucciS21": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210333",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/PaceS12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/LoriniS15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/DoesburgE19": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Jones87": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/41735.41754",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/Gabbay08": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/LiuSE20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200872",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/AllenS95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222245",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/SergotKB91": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/StrasserA14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/MartinekC05": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/SchildZ05": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/VenBHW08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/ArtikisSP03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Broersen06": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/Smith93": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/PetersW15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/DoesburgE16": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GrabmairA09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Meessen23": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/3594536.3595160",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Engers01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/KerriganL03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Lauritsen91": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/112646.112659",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AraszkiewiczZ15": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/Gabbay12": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/KharrazSL24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241260",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/LanevePS24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241237",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/DongTY25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/CholvyC95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222241",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/WinkelsH95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222202",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/CastroM08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Wooldridge04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/GoncalvesA12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Kowalski89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74016",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Araszkiewicz15": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/RotoloS21": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Goble04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/BoellaT06": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/TamargoMRG17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Araszkiewicz23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230952",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/ZurekMKE22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220479",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/DignumMWK96": {
+  "is_oa": true,
+  "pdf_url": "https://ris.utwente.nl/ws/files/6139830/dignum96modal.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/PachecoS04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Sherman87": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/EngersB03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/ThompsonPS16": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/AzzopardiP24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241251",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/Marra14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/DaskalopuluS95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222130",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/NittaSSYXOTKS95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222260",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/BiagioliG08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/StratulatCE01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/JanatianWTSB23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230962",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/KooiT06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Libal22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220482",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Dupre23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230994",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/AgnoloniF11": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/GrossiMD06": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/RoyAG12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Hansen04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/KaciT06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/FrenchMR10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/DineshJLS08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/AraszkiewiczFZ21": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210331",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AzzopardiGP16": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "acceptedVersion"
+ },
+ "conf/deon/BroersenGT12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/LawniczakB25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/MarkovichR21": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210340",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/Morris21": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/BoellaT06a": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/SergotC06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Hoek10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/HanauerNP23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230949",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Araszkiewicz24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241229",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AliSE25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/FerrignoBYR25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/LiBVPS13": {
+  "is_oa": true,
+  "pdf_url": "https://purehost.bath.ac.uk/ws/files/17548286/icail_CRC_submitted.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/ParentT14": {
+  "is_oa": true,
+  "pdf_url": "http://orbilu.uni.lu/handle/10993/24914",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/TanT96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/GrossiDRM04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/BuchananFLSSTU10": {
+  "is_oa": true,
+  "pdf_url": "https://napier-surface.worktribe.com/207914/1/Jurix2010Schafer.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/WestermannB23": {
+  "is_oa": true,
+  "pdf_url": "http://arxiv.org/pdf/2308.02032v1",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/DemolombeH04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Torre10": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/TrypuzK10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Allen96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/LomuscioW06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/NguyenFNS22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220453",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/Broersen08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/SunT14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/BoellaFL01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Sanders91": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/112646.112663",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SatohB020": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200884",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/MeheusBP10": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/Parent10": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/BrunelBF06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/RaimondiL04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Godfrey25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/SilenoBE19": {
+  "is_oa": true,
+  "pdf_url": "http://hdl.handle.net/11245.1/45719d64-e5ac-4a7e-92fd-ebc73d7784fb",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/BrasilG03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/ZhengXV18": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/GabbayRSTB14": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/LindahlO06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/SatohTK21": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/RoyakkersD96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Kuijer12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/KulickiT12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/SimonG89": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Jones04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/StrasserB12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Brown06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/McNamara96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Loui95": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/222092.222099",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/Kimbrough01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Dik25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/Robaldo21": {
+  "is_oa": true,
+  "pdf_url": "https://cronfa.swan.ac.uk/Record/cronfa56727/Download/56727__19747__f61cb7fc6dc9481f959390a34cc038c0.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/Brown96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/DayalHJM93": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/158976.158997",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/JamrogaHW04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Horty96": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/GreenleafM93": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Evans10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/EngersD15": {
+  "is_oa": true,
+  "pdf_url": "https://pure.uva.nl/ws/files/2740128/170690_At_Your_Service_On_the_Definition_of_Services_from_Sources_of_Law_published_version_.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/LiBVPS13": {
+  "is_oa": true,
+  "pdf_url": "http://opus.bath.ac.uk/42600/1/jurix_abstract.pdf",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/Aqvist04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/HanifCSEUWZ23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230987",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/LoveG05": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/AlchourronM89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74036",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/GreenleafMKCC97": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/GhoshA20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200882",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/LindahlO08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Prakken12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/MeerHA03": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/PaceS13": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/deon/TorreHDB04": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/icail/Branting01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Leff01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Hansson14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Fungwacharakorn20": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA200849",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/CarlsonG23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230957",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/PetheRK89": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/74014.74038",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/deon/TrypuzK14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Mador-HaimH23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230969",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/BilliPS24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241230",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/BilliPPS25": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/icail/ZinNSSN23": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/BiagioliMT87": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/41735.41762",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/NguyenNFS22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220484",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/Brown04": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Carmo06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/CambroneroLP17": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/AdrianBDEGHKLMP24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241269",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/Bouche-PillonAC24": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241231",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/deon/HughesR06": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/AllenCMG01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/SteenhuisW24": {
+  "is_oa": true,
+  "pdf_url": null,
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/jurix/NguyenGTSS23": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230991",
+  "host": "publisher",
+  "version": "publishedVersion"
+ },
+ "conf/icail/SurdenGL07": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/CroixT14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/AnglbergerDR14": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/VanthienenR93": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Brown08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Grossi08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Turrini12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Woodin01": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/TakanoNOS10": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/McCarty15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/AraszkiewiczS12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/BuchananFLSSTU12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/HerzigLLT12": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/MinskyR87": {
+  "is_oa": true,
+  "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/41735.41755",
+  "host": null,
+  "version": "publishedVersion"
+ },
+ "conf/jurix/ForheczKMS09": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/CapuzzimatiVBB15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/Markovich15": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/deon/Belnap08": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/icail/Fisher97": {
+  "is_oa": false,
+  "pdf_url": null,
+  "host": null,
+  "version": null
+ },
+ "conf/jurix/SilenoBE15": {
+  "is_oa": true,
+  "pdf_url": "https://dare.uva.nl/personal/pure/en/publications/bridging-representations-of-laws-of-implementations-and-of-behaviours(7485e39d-7136-4aec-8612-459c95a43578).html",
+  "host": "repository",
+  "version": "submittedVersion"
+ },
+ "conf/jurix/NishiokaMS22": {
+  "is_oa": true,
+  "pdf_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA220485",
+  "host": "publisher",
+  "version": "publishedVersion"
+ }
+}
