@@ -42,7 +42,34 @@ Est. total ~26 issues, ~120–180 items (many short notes / letters / bibliograp
 - (Prior session, likely later Jurimetrics-era) "Normalized Legal Drafting and the Query Method"
   — JSTOR `stable/42892477` (Allen & Engholm lineage).
 
-## Blocker (why article-level TOC isn't harvested)
+## Acquired on-demand (2026-07-20, via user's authenticated JSTOR clicks)
+
+Downloaded to `/Volumes/Downloads` (kept there — © ABA, not committed to git). Identities
+confirmed from each PDF's own first-page citation block:
+
+| Stable ID | Item | Cite | Note |
+|-----------|------|------|------|
+| 29760800 | Front Matter | MULL 1(1) 1959 | issue front matter |
+| 29760801 | Mechanization of a Tax Code — Patricia A. James | MULL 1(1) 1959, pp.1–3 | |
+| **29760802** | **Propositional Calculi — Layman E. Allen** | MULL 1(1) 1959, pp.4–14 | **foundational** |
+| 29760804 | Bibliography | MULL 1(1) 1959, pp.17–24 | |
+| 29760943 | Front Matter | MULL **4(3)** 1963 | cross-vol straggler |
+| 29760860 | Readers' Letters… — Clore Warne & Reed C. Lawlor | MULL **2(4)** 1960, pp.150–157 | cross-vol straggler |
+
+**Vol.1 No.1 is NOT complete:** the "Related" feed is a mixed recommendation list, not a TOC.
+Missing from 1(1): `29760803` (≈ pp.15–16) and `29760805`+ (pp.25–52). But see the ID-sequence
+unblock below.
+
+## KEY UNBLOCK — stable IDs are sequential within an issue
+
+The acquired IDs (…800 front / …801 pp.1–3 / …802 pp.4–14 / …804 pp.17–24) prove JSTOR assigns
+**contiguous stable IDs per issue in reading order**. So the whole of MULL 1(1) is ≈
+`29760800`–`2976081x`, and later issues continue contiguously. This means a complete MULL index
+does **not** require the blocked SPA TOC: enumerate stable IDs, download each (user-authenticated),
+and read the citation off each PDF's own first page (`Source:` line). The SPA read-redaction is
+bypassed entirely because the metadata rides inside the PDF, not the page DOM.
+
+## Blocker (why the *automated* article-level TOC scrape failed)
 
 JSTOR serves this as a client-rendered SPA and lazy-loads each decade via a clean endpoint:
 `GET /journal/moduseloglaw/decade/<b64 year-range token>` (1950s token observed:

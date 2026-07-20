@@ -147,8 +147,11 @@ real him**, whose input validates anything the model produces. Loop him in early
   S2 1,476/1,515. Abstracts 76% / TLDRs 68% / OA-url 43%. **True OA ≫ DBLP flag** (ICAIL
   1.7%→39%, JURIX 20%→60%). **DEON abstract hole logged** (3/238 — Phase-3 risk). Details in
   `data/PHASE1-FINDINGS.md`; script `scripts/enrich.py`.
-- [ ] **Phase 2 — Cheap pre-rank** (citation-graph proximity to known cluster) — *next*
-- [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50")
+- [x] **Phase 2 — Cheap pre-rank** — `data/prerank.{json,csv}` (no LLM). Cluster = 6 authors →
+  1,771 works; 223 seeds in corpus; 576 cite the cluster; 560 have facet-vocab. Top of ranking is
+  the L4 wheelhouse (temporal/defeasible deontic, isomorphism, rule-extraction). Caveats logged
+  (in-corpus incoming only; DEON under-ranks). Details `data/PHASE2-FINDINGS.md`; `scripts/prerank.py`.
+- [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50") — *next*
 - [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights)
 - [ ] **Phase 5 — Deep-read + synthesize** (annotated bibliography keyed to facets)
 - [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;
@@ -173,6 +176,15 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-20** — **Phase 2 COMPLETE (citation-graph pre-rank, no LLM).** Built cluster
+  work-set (6 authors → 1,771 works); scored all 1,758 papers on cluster proximity + facet vocab
+  → `data/prerank.{json,csv}`. 223 seeds; top of ranking = temporal/defeasible deontic logic,
+  isomorphism, rule-extraction (the L4 wheelhouse). Composite intentionally weights relevance over
+  fame. Caveats: in-corpus incoming edges only; DEON under-ranks (thin signal) → Phase 3 handles
+  DEON specially. **MULL on-demand acquisition** (user-driven JSTOR clicks) got 3 genuine Vol.1
+  No.1 items incl. **Allen "Propositional Calculi" (stable 29760802)** + 2 cross-vol stragglers;
+  discovered **stable IDs are sequential per issue** → unblocks a full MULL harvest without the SPA
+  (`data/MULL-STATUS.md`). Next: **Phase 3** Sonnet abstract filter + "50" recall check.
 - **2026-07-20** — **Phase 1 COMPLETE + Wyner W0 COMPLETE.** Enriched all 1,758 papers via
   OpenAlex + Semantic Scholar → `data/enriched.json` (abstracts 76%, TLDRs 68%, OA-url 43%).
   Big finding: true OA far exceeds the DBLP flag (ICAIL 1.7%→39%, JURIX 20%→60%) — Phase-4
