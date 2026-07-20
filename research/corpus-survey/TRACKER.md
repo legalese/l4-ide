@@ -151,8 +151,13 @@ real him**, whose input validates anything the model produces. Loop him in early
   1,771 works; 223 seeds in corpus; 576 cite the cluster; 560 have facet-vocab. Top of ranking is
   the L4 wheelhouse (temporal/defeasible deontic, isomorphism, rule-extraction). Caveats logged
   (in-corpus incoming only; DEON under-ranks). Details `data/PHASE2-FINDINGS.md`; `scripts/prerank.py`.
-- [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50") — *next*
-- [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights)
+- [x] **Phase 3 — Abstract filter** — 16× Sonnet judge fan-out over all 1,758 (independent of
+  pre-rank). **keep 717** (core 479 + adj 238); **tight-core 250** (ICAIL 134/JURIX 114/DEON 2)
+  after trust filter. Two-signal cross-check paid off: 78 pre-rank top-150 CUT (CBR cluster),
+  261 judge-core rescued from the tail (DEON+recent). **DEON provisional** (223 title-only →
+  `deon-provisional.json`). CNL thinnest facet (19) → lean on Wyner. Details
+  `data/PHASE3-FINDINGS.md` + `PHASE3-SHORTLIST.md`; scripts prep/merge/finalize + rubric.
+- [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights) — *next*
 - [ ] **Phase 5 — Deep-read + synthesize** (annotated bibliography keyed to facets)
 - [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;
   154 works 1991–2025, 2,152 cites. Script `scripts/wyner_harvest.py`.
@@ -176,6 +181,15 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-20** — **Phase 3 COMPLETE (Sonnet abstract filter, full corpus).** 16× Sonnet judges
+  (independent of pre-rank) over all 1,758 → keep 717 (core 479/adj 238); tight-core **250** after
+  trust filter (core+conf≥med+abstract). Methodological win: the independent judge cut 78 of the
+  pre-rank top-150 (Bench-Capon/Atkinson CBR-factors cluster = graph false-positives) and rescued
+  261 judge-core papers the pre-rank buried (DEON no-abstract + 2025 low-citation). Seed retention
+  45% = judge correctly rejecting off-topic cluster papers (feature, not recall miss). **DEON
+  provisional** (223 title-only keeps, `deon-provisional.json`) — the Phase-1 abstract hole, as
+  predicted. CNL facet thinnest (19) → lean on Wyner W0 + a LegalRuleML/ACE sweep. Next: **Phase 4**
+  acquire the 250 tight-core (open-first).
 - **2026-07-20** — **Phase 2 COMPLETE (citation-graph pre-rank, no LLM).** Built cluster
   work-set (6 authors → 1,771 works); scored all 1,758 papers on cluster proximity + facet vocab
   → `data/prerank.{json,csv}`. 223 seeds; top of ranking = temporal/defeasible deontic logic,

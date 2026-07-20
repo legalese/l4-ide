@@ -1,0 +1,3369 @@
+[
+ {
+  "key": "conf/deon/GovernatoriRC12",
+  "year": 2012,
+  "title": "Possible World Semantics for Defeasible Deontic Logic",
+  "authors": [
+   "Guido Governatori",
+   "Antonino Rotolo",
+   "Erica Calardo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Possible-world semantics for Defeasible Deontic Logic (abstract empty; DEON venue/title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_4"
+ },
+ {
+  "key": "conf/deon/GovernatoriR04",
+  "year": 2004,
+  "title": "Defeasible Logic: Agency, Intention and Obligation",
+  "authors": [
+   "Guido Governatori",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Defeasible logic of agency/intention/obligation (abstract empty; DEON venue clear).",
+  "oa_url": "http://espace.library.uq.edu.au/view/UQ:9638/deon04.pdf",
+  "doi": "10.1007/978-3-540-25927-5_8"
+ },
+ {
+  "key": "conf/deon/GovernatoriR08",
+  "year": 2008,
+  "title": "Changing Legal Systems: Abrogation and Annulment Part I: Revision of Defeasible Theories",
+  "authors": [
+   "Guido Governatori",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Abrogation/annulment revision of defeasible legal theories (abstract empty, title clear).",
+  "oa_url": "http://espace.library.uq.edu.au/view/UQ:134084/part1.pdf",
+  "doi": "10.1007/978-3-540-70525-3_2"
+ },
+ {
+  "key": "conf/deon/TosattoGK14",
+  "year": 2014,
+  "title": "Detecting Deontic Conflicts in Dynamic Settings",
+  "authors": [
+   "Silvano Colombo Tosatto",
+   "Guido Governatori",
+   "Pierre Kelsen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Detecting deontic conflicts in dynamic settings (abstract empty; DEON venue/title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_6"
+ },
+ {
+  "key": "conf/deon/CalardoGR14",
+  "year": 2014,
+  "title": "A Preference-Based Semantics for CTD Reasoning",
+  "authors": [
+   "Erica Calardo",
+   "Guido Governatori",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Preference-based possible-world semantics for CTD reasoning (abstract empty; DEON title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_5"
+ },
+ {
+  "key": "conf/deon/Wyner06",
+  "year": 2006,
+  "title": "Sequences, Obligations, and the Contrary-to-Duty Paradox",
+  "authors": [
+   "Adam Zachary Wyner"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic action logic addressing sequences, obligations and contrary-to-duty paradox; abstract empty but title squarely on-facet",
+  "oa_url": "",
+  "doi": "10.1007/11786849_21"
+ },
+ {
+  "key": "conf/deon/Wyner04",
+  "year": 2004,
+  "title": "Maintaining Obligations on Stative Expressions in a Deontic Action Logic",
+  "authors": [
+   "Adam Zachary Wyner"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic action logic for obligations on stative expressions in contract formation/execution/monitoring; abstract empty but title squarely on-facet",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_17"
+ },
+ {
+  "key": "conf/deon/ArtosiGS96",
+  "year": 1996,
+  "title": "Towards a Computational Treatment of Deontic Defeasibility",
+  "authors": [
+   "Alberto Artosi",
+   "Guido Governatori",
+   "Giovanni Sartor"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Computational treatment of deontic defeasibility via modal epistemic logic; abstract empty but title squarely on-facet",
+  "oa_url": "https://espace.library.uq.edu.au/view/UQ:9610/DEON96.pdf",
+  "doi": "10.1007/978-1-4471-1488-8_2"
+ },
+ {
+  "key": "conf/deon/BroersenDDM04",
+  "year": 2004,
+  "title": "Designing a Deontic Logic of Deadlines",
+  "authors": [
+   "Jan M. Broersen",
+   "Frank Dignum",
+   "Virginia Dignum",
+   "John-Jules Ch. Meyer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dyadic deadline-obligation operator characterized in branching-time logic CTL",
+  "oa_url": "https://dspace.library.uu.nl/handle/1874/11502",
+  "doi": "10.1007/978-3-540-25927-5_5"
+ },
+ {
+  "key": "conf/deon/Piolle10",
+  "year": 2010,
+  "title": "A Dyadic Operator for the Gradation of Desirability",
+  "authors": [
+   "Guillaume Piolle"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dyadic deontic operator grading desirability, extending SDL obligation",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_5"
+ },
+ {
+  "key": "conf/deon/Stolpe10",
+  "year": 2010,
+  "title": "Relevance, Derogation and Permission",
+  "authors": [
+   "Audun Stolpe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Derogation-based positive permission theory; triviality result and fix, DEON venue",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_9"
+ },
+ {
+  "key": "conf/deon/DellundeG08",
+  "year": 2008,
+  "title": "Introducing Grades in Deontic Logics",
+  "authors": [
+   "Pilar Dellunde",
+   "Lluís Godo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on graded/fuzzy deontic logics (empty abstract, title/venue clear)",
+  "oa_url": "http://www.iiia.csic.es/files/pdfs/1659.pdf",
+  "doi": "10.1007/978-3-540-70525-3_19"
+ },
+ {
+  "key": "conf/deon/BenthemGL10",
+  "year": 2010,
+  "title": "Deontics = Betterness + Priority",
+  "authors": [
+   "Johan van Benthem",
+   "Davide Grossi",
+   "Fenrong Liu"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON theory paper decomposing deontics into betterness+priority orderings (empty abstract)",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_6"
+ },
+ {
+  "key": "conf/deon/KroghH96",
+  "year": 1996,
+  "title": "Getting Personal: Some Notes on the Relationship Between Personal and Impersonal Obligation",
+  "authors": [
+   "Christen Krogh",
+   "Henning Herrestad"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON analysis of personal vs impersonal obligation notions (empty abstract)",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_8"
+ },
+ {
+  "key": "conf/deon/AbrahamGS10",
+  "year": 2010,
+  "title": "Obligations and Prohibitions in Talmudic Deontic Logic",
+  "authors": [
+   "Michael Abraham",
+   "Dov M. Gabbay",
+   "Uri J. Schild"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on Talmudic deontic logic of obligations/prohibitions (empty abstract)",
+  "oa_url": "http://orbilu.uni.lu/handle/10993/15940",
+  "doi": "10.1007/978-3-642-14183-6_13"
+ },
+ {
+  "key": "conf/deon/StrasserA14",
+  "year": 2014,
+  "title": "Sequent-Based Argumentation for Normative Reasoning",
+  "authors": [
+   "Christian Straßer",
+   "Ofer Arieli"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Sequent-based logical argumentation using standard deontic logic as base logic (empty abstract)",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_17"
+ },
+ {
+  "key": "conf/deon/Broersen06",
+  "year": 2006,
+  "title": "Strategic Deontic Temporal Logic as a Reduction to ATL, with an Application to Chisholm&apos;s Scenario",
+  "authors": [
+   "Jan M. Broersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Strategic deontic temporal logic reduced to ATL, applied to Chisholm's paradox (empty abstract)",
+  "oa_url": "https://dspace.library.uu.nl/handle/1874/19972",
+  "doi": "10.1007/11786849_7"
+ },
+ {
+  "key": "conf/deon/Gabbay12",
+  "year": 2012,
+  "title": "Temporal Deontic Logic for the Generalised Chisholm Set of Contrary to Duty Obligations",
+  "authors": [
+   "Dov M. Gabbay"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Temporal deontic logic (TSDL) resolving generalized Chisholm contrary-to-duty paradoxes (empty abstract)",
+  "oa_url": "https://orbilu.uni.lu/handle/10993/26116",
+  "doi": "10.1007/978-3-642-31570-1_7"
+ },
+ {
+  "key": "conf/deon/CastroM08",
+  "year": 2008,
+  "title": "A Tableaux System for Deontic Action Logic",
+  "authors": [
+   "Pablo F. Castro",
+   "T. S. E. Maibaum"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Tableaux proof system for deontic action logic, fault-tolerance reasoning",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_4"
+ },
+ {
+  "key": "conf/deon/Wooldridge04",
+  "year": 2004,
+  "title": "Social Laws in Alternating Time",
+  "authors": [
+   "Michael J. Wooldridge"
+  ],
+  "facets": [
+   "fm-in-law",
+   "bounded-deontics"
+  ],
+  "why": "Frames social-law effectiveness/synthesis as ATL model-checking problems",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_2"
+ },
+ {
+  "key": "conf/deon/GoncalvesA12",
+  "year": 2012,
+  "title": "An Embedding of Input-Output Logic in Deontic Logic Programs",
+  "authors": [
+   "Ricardo Gonçalves",
+   "José Júlio Alferes"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Embeds input-output logic into deontic logic programs (ASP-like)",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_5"
+ },
+ {
+  "key": "conf/deon/Goble04",
+  "year": 2004,
+  "title": "A Proposal for Dealing with Deontic Dilemmas",
+  "authors": [
+   "Lou Goble"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modifies SDL to accommodate deontic dilemmas without explosion",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_7"
+ },
+ {
+  "key": "conf/deon/BoellaT06",
+  "year": 2006,
+  "title": "A Logical Architecture of a Normative System",
+  "authors": [
+   "Guido Boella",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Input/output-logic architecture for counts-as, obligations, permissions",
+  "oa_url": "http://link.springer.com/chapter/10.1007/11786849_5",
+  "doi": "10.1007/11786849_5"
+ },
+ {
+  "key": "conf/deon/DignumMWK96",
+  "year": 1996,
+  "title": "A Modal Approach to Intentions, Commitments and Obligations: Intention plus Commitment Yields Obligation",
+  "authors": [
+   "Frank Dignum",
+   "John-Jules Ch. Meyer",
+   "Roel J. Wieringa",
+   "Ruurd Kuiper"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modal logic deriving obligation from intention plus commitment",
+  "oa_url": "https://ris.utwente.nl/ws/files/6139830/dignum96modal.pdf",
+  "doi": "10.1007/978-1-4471-1488-8_5"
+ },
+ {
+  "key": "conf/deon/PachecoS04",
+  "year": 2004,
+  "title": "Delegation in a Role-Based Organization",
+  "authors": [
+   "Olga Pacheco",
+   "Filipe Santos"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic and action modal logic for delegation among role-playing agents",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_14"
+ },
+ {
+  "key": "conf/deon/SantosC96",
+  "year": 1996,
+  "title": "Indirect Action, Influence and Responsibility",
+  "authors": [
+   "Filipe Santos",
+   "José Carmo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Action-logic concept of indirect action/influence/responsibility (Kanger tradition)",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_11"
+ },
+ {
+  "key": "conf/deon/Marra14",
+  "year": 2014,
+  "title": "For a Dynamic Semantics of Necessity Deontic Modals",
+  "authors": [
+   "Alessandra Marra"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dynamic non-truth-functional semantics resolving deontic-modal paradoxes",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_10"
+ },
+ {
+  "key": "conf/deon/KooiT06",
+  "year": 2006,
+  "title": "Conflicting Obligations in Multi-agent Deontic Logic",
+  "authors": [
+   "Barteld P. Kooi",
+   "Allard M. Tamminga"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Multi-agent deontic logic for group obligations",
+  "oa_url": "",
+  "doi": "10.1007/11786849_15"
+ },
+ {
+  "key": "conf/deon/GrossiMD06",
+  "year": 2006,
+  "title": "Counts-as: Classification or Constitution? An Answer Using Modal Logic",
+  "authors": [
+   "Davide Grossi",
+   "John-Jules Ch. Meyer",
+   "Frank Dignum"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modal-logic disambiguation of counts-as (classificatory vs constitutive)",
+  "oa_url": "https://dspace.library.uu.nl/handle/1874/19680",
+  "doi": "10.1007/11786849_11"
+ },
+ {
+  "key": "conf/deon/RoyAG12",
+  "year": 2012,
+  "title": "The Logic of Obligation as Weakest Permission - (Short Version)",
+  "authors": [
+   "Olivier Roy",
+   "Albert J. J. Anglberger",
+   "Norbert Gratzl"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: obligation defined as weakest permission, core deontic logic theory.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_10"
+ },
+ {
+  "key": "conf/deon/Demolombe10",
+  "year": 2010,
+  "title": "Relationships between Actions Performed by Institutional Agents, Human Agents or Software Agents",
+  "authors": [
+   "Robert Demolombe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON logic of institutional/human/software agent actions via counts-as concept.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_19"
+ },
+ {
+  "key": "conf/deon/Hansen04",
+  "year": 2004,
+  "title": "Conflicting Imperatives and Dyadic Deontic Logic",
+  "authors": [
+   "Jörg Hansen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on conflicting imperatives and dyadic deontic logic (CTD-adjacent).",
+  "oa_url": null,
+  "doi": "10.1007/978-3-540-25927-5_10"
+ },
+ {
+  "key": "conf/deon/KaciT06",
+  "year": 2006,
+  "title": "Permissions and Uncontrollable Propositions in DSDL3: Non-monotonicity and Algorithms",
+  "authors": [
+   "Souhila Kaci",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on permissions/uncontrollable propositions in DSDL3.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_14"
+ },
+ {
+  "key": "conf/deon/FrenchMR10",
+  "year": 2010,
+  "title": "Axioms for Obligation and Robustness with Temporal Logic",
+  "authors": [
+   "Tim French",
+   "John Christopher McCabe-Dansted",
+   "Mark Reynolds"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Temporal-logic axiomatization of contrary-to-duty obligations (RoCTL*).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_7"
+ },
+ {
+  "key": "conf/deon/DineshJLS08",
+  "year": 2008,
+  "title": "Reasoning about Conditions and Exceptions to Laws in Regulatory Conformance Checking",
+  "authors": [
+   "Nikhil Dinesh",
+   "Aravind K. Joshi",
+   "Insup Lee",
+   "Oleg Sokolsky"
+  ],
+  "facets": [
+   "fm-in-law",
+   "intro"
+  ],
+  "why": "DEON paper: formal representation of regulation for conformance/conflict checking.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_10"
+ },
+ {
+  "key": "conf/deon/McNamara08",
+  "year": 2008,
+  "title": "Praise, Blame, Obligation, and Beyond: Toward a Framework for Classical Supererogation and Kin",
+  "authors": [
+   "Paul McNamara"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on obligation/supererogation framework (praise/blame).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_18"
+ },
+ {
+  "key": "conf/deon/BroersenGT12",
+  "year": 2012,
+  "title": "Discussion Paper: Changing Norms Is Changing Obligation Change",
+  "authors": [
+   "Jan M. Broersen",
+   "Dov M. Gabbay",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON discussion paper on formalizing norm/obligation change.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_14"
+ },
+ {
+  "key": "conf/deon/BoellaT06a",
+  "year": 2006,
+  "title": "Delegation of Power in Normative Multiagent Systems",
+  "authors": [
+   "Guido Boella",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on delegation of power / counts-as in normative multiagent systems.",
+  "oa_url": "http://link.springer.com/chapter/10.1007/11786849_6",
+  "doi": "10.1007/11786849_6"
+ },
+ {
+  "key": "conf/deon/SergotC06",
+  "year": 2006,
+  "title": "The Deontic Component of Action Language nC+",
+  "authors": [
+   "Marek J. Sergot",
+   "Robert Craven"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "DEON paper: deontic component of action language nC+ for permitted transitions.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_19"
+ },
+ {
+  "key": "conf/deon/Wang025",
+  "year": 2025,
+  "title": "Connecting Free-Choice Permission with Obligation and Prohibition by Not Doing It",
+  "authors": [
+   "Zilu Wang",
+   "Yanjing Wang"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON 2025 paper on free-choice permission/obligation/prohibition logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/ParentT14",
+  "year": 2014,
+  "title": "&quot;Sing and Dance!&quot; - Input/Output Logics without Weakening",
+  "authors": [
+   "Xavier Parent",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: input/output logics without weakening for normative reasoning.",
+  "oa_url": "http://orbilu.uni.lu/handle/10993/24914",
+  "doi": "10.1007/978-3-319-08615-6_12"
+ },
+ {
+  "key": "conf/deon/Cuppens-BoulahiaC08",
+  "year": 2008,
+  "title": "Specifying Intrusion Detection and Reaction Policies: An Application of Deontic Logic",
+  "authors": [
+   "Nora Cuppens-Boulahia",
+   "Frédéric Cuppens"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "DEON paper applying deontic logic to intrusion-detection/reaction policy specification.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_7"
+ },
+ {
+  "key": "conf/deon/Parent08",
+  "year": 2008,
+  "title": "On the Strong Completeness of Åqvist&apos;s Dyadic Deontic Logic G",
+  "authors": [
+   "Xavier Parent"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on completeness of Aqvist's dyadic deontic logic G.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_15"
+ },
+ {
+  "key": "conf/deon/TanT96",
+  "year": 1996,
+  "title": "How to Combine Ordering and Minimizing in a Deontic Logic Based on Preferences",
+  "authors": [
+   "Yao-Hua Tan",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: preference-based deontic logic combining ordering and minimizing.",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_12"
+ },
+ {
+  "key": "conf/deon/CuppensD96",
+  "year": 1996,
+  "title": "A Deontic Logic for Reasoning about Confidentiality",
+  "authors": [
+   "Frédéric Cuppens",
+   "Robert Demolombe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: deontic logic for confidentiality permission/prohibition.",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_4"
+ },
+ {
+  "key": "conf/deon/GrossiDRM04",
+  "year": 2004,
+  "title": "Collective Obligations and Agents: Who Gets the Blame?",
+  "authors": [
+   "Davide Grossi",
+   "Frank Dignum",
+   "Lambèr M. M. Royakkers",
+   "John-Jules Ch. Meyer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on collective obligations and blame attribution among agents.",
+  "oa_url": "https://dspace.library.uu.nl/bitstream/handle/1874/19701/dignum_04_collective.pdf?sequence=1&isAllowed=y",
+  "doi": "10.1007/978-3-540-25927-5_9"
+ },
+ {
+  "key": "conf/deon/Stolpe08",
+  "year": 2008,
+  "title": "Normative Consequence: The Problem of Keeping It Whilst Giving It up",
+  "authors": [
+   "Audun Stolpe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on normative-consequence relations and norm chaining.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_14"
+ },
+ {
+  "key": "conf/deon/DemolombeH04",
+  "year": 2004,
+  "title": "Obligation Change in Dependence Logic and Situation Calculus",
+  "authors": [
+   "Robert Demolombe",
+   "Andreas Herzig"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: obligation change formalized via dependence logic/situation calculus.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_6"
+ },
+ {
+  "key": "conf/deon/Kouznetsov04",
+  "year": 2004,
+  "title": "Quasi-matrix Deontic Logic",
+  "authors": [
+   "Andrei Kouznetsov"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Quasi-matrix semantics for deontic logic handling dilemmas without contradiction (no abstract, title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_13"
+ },
+ {
+  "key": "conf/deon/Torre10",
+  "year": 2010,
+  "title": "Deontic Redundancy: A Fundamental Challenge for Deontic Logic",
+  "authors": [
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Benchmark deontic-redundancy cases: permissions, dilemmas, temporal & contrary-to-duty reasoning (no abstract).",
+  "oa_url": "http://link.springer.com/chapter/10.1007/978-3-642-14183-6_4",
+  "doi": "10.1007/978-3-642-14183-6_4"
+ },
+ {
+  "key": "conf/deon/TrypuzK10",
+  "year": 2010,
+  "title": "Towards Metalogical Systematisation of Deontic Action Logics Based on Boolean Algebra",
+  "authors": [
+   "Robert Trypuz",
+   "Piotr Kulicki"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Metalogical systematisation of deontic action logics via Boolean algebra (no abstract, title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_11"
+ },
+ {
+  "key": "conf/deon/TosattoBTV12",
+  "year": 2012,
+  "title": "Visualizing Normative Systems: An Abstract Approach",
+  "authors": [
+   "Silvano Colombo Tosatto",
+   "Guido Boella",
+   "Leendert W. N. van der Torre",
+   "Serena Villata"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Visualizing abstract normative systems reasoning with obligations/permissions (no abstract, title/tldr clear).",
+  "oa_url": "http://link.springer.com/chapter/10.1007%2F978-3-642-31570-1_2",
+  "doi": "10.1007/978-3-642-31570-1_2"
+ },
+ {
+  "key": "conf/deon/Allen96",
+  "year": 1996,
+  "title": "From the Fundamental Legal Conceptions of Hohfeld to Legal Relations: Refining the Enrichment of Solely Deontic Legal Relations",
+  "authors": [
+   "Layman E. Allen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Hohfeld's legal conceptions refined via deontic logic and stit logic (no abstract, title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_1"
+ },
+ {
+  "key": "conf/deon/BroersenMMT08",
+  "year": 2008,
+  "title": "A Deontic Logic for Socially Optimal Norms",
+  "authors": [
+   "Jan M. Broersen",
+   "Rosja Mastop",
+   "John-Jules Ch. Meyer",
+   "Paolo Turrini"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic of socially-optimal norms, coalition preference/choice interaction (no abstract, title clear).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_17"
+ },
+ {
+  "key": "conf/deon/LomuscioW06",
+  "year": 2006,
+  "title": "A Complete and Decidable Axiomatisation for Deontic Interpreted Systems",
+  "authors": [
+   "Alessio Lomuscio",
+   "Bozena Wozna"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Complete decidable axiomatisation of deontic interpreted systems with CTL/epistemic modalities.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_20"
+ },
+ {
+  "key": "conf/deon/Sergot10",
+  "year": 2010,
+  "title": "Norms, Action and Agency in Multi-agent Systems",
+  "authors": [
+   "Marek J. Sergot"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Norms, action and agency in multi-agent systems, collective agency generalization (deontic action theory).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_2"
+ },
+ {
+  "key": "conf/deon/Broersen08",
+  "year": 2008,
+  "title": "A Logical Analysis of the Interaction between &apos;Obligation-to-do&apos; and &apos;Knowingly Doing&apos;",
+  "authors": [
+   "Jan M. Broersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Temporal STIT logic combining action, obligation-to-do and knowingly-doing operators (no abstract).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_12"
+ },
+ {
+  "key": "conf/deon/SunT14",
+  "year": 2014,
+  "title": "Combining Constitutive and Regulative Norms in Input/Output Logic",
+  "authors": [
+   "Xin Sun",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Combines constitutive/regulative norms in input/output logic with labeled abstract semantics (no abstract).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_18"
+ },
+ {
+  "key": "conf/deon/MeheusBP10",
+  "year": 2010,
+  "title": "Avoiding Deontic Explosion by Contextually Restricting Aggregation",
+  "authors": [
+   "Joke Meheus",
+   "Mathieu Beirlaen",
+   "Frederik Van De Putte"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Adaptive logic P2.1r avoiding deontic explosion via contextually restricted aggregation (no abstract).",
+  "oa_url": "https://biblio.ugent.be/publication/1854791",
+  "doi": "10.1007/978-3-642-14183-6_12"
+ },
+ {
+  "key": "conf/deon/BrunelBF06",
+  "year": 2006,
+  "title": "A State/Event Temporal Deontic Logic",
+  "authors": [
+   "Julien Brunel",
+   "Jean-Paul Bodeveix",
+   "Mamoun Filali"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "State/event temporal deontic logic with obligation-with-deadline operator and logical properties (no abstract).",
+  "oa_url": "",
+  "doi": "10.1007/11786849_9"
+ },
+ {
+  "key": "conf/deon/RaimondiL04",
+  "year": 2004,
+  "title": "Automatic Verification of Deontic Properties of Multi-agent Systems",
+  "authors": [
+   "Franco Raimondi",
+   "Alessio Lomuscio"
+  ],
+  "facets": [
+   "fm-in-law",
+   "bounded-deontics"
+  ],
+  "why": "Algorithm/implementation for automatic verification of deontic properties in multi-agent systems.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_15"
+ },
+ {
+  "key": "conf/deon/GabbayRSTB14",
+  "year": 2014,
+  "title": "Toward a Linguistic Interpretation of Deontic Paradoxes - Beth-Reichenbach Semantics Approach for a New Analysis of the Miners Scenario",
+  "authors": [
+   "Dov M. Gabbay",
+   "Livio Robaldo",
+   "Xin Sun",
+   "Leendert W. N. van der Torre",
+   "Zohreh Baniasadi"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Beth-Reichenbach semantics analyzing deontic paradoxes via the classic miners contrary-to-duty scenario.",
+  "oa_url": "https://orbilu.uni.lu/handle/10993/26837",
+  "doi": "10.1007/978-3-319-08615-6_9"
+ },
+ {
+  "key": "conf/deon/LindahlO06",
+  "year": 2006,
+  "title": "Intermediate Concepts in Normative Systems",
+  "authors": [
+   "Lars Lindahl",
+   "Jan Odelstad"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Algebraic representation joining grounds/consequences for intermediate concepts in normative systems.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_16"
+ },
+ {
+  "key": "conf/deon/RoyakkersD96",
+  "year": 1996,
+  "title": "Defeasible Reasoning with Legal Rules",
+  "authors": [
+   "Lambèr M. M. Royakkers",
+   "Frank Dignum"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Priority hierarchy resolving deontic conflicts and nonmonotonic reasoning over legal rules (no abstract).",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_10"
+ },
+ {
+  "key": "conf/deon/Kuijer12",
+  "year": 2012,
+  "title": "Sanction Semantics and Contrary-to-Duty Obligations",
+  "authors": [
+   "Louwe B. Kuijer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Shows sanction semantics cannot faithfully represent contrary-to-duty obligations under standard desiderata.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_6"
+ },
+ {
+  "key": "conf/deon/KulickiT12",
+  "year": 2012,
+  "title": "A Deontic Action Logic with Sequential Composition of Actions",
+  "authors": [
+   "Piotr Kulicki",
+   "Robert Trypuz"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic action logic defining metalogical operators for sequential composition/terminating action execution.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_13"
+ },
+ {
+  "key": "conf/deon/Jones04",
+  "year": 2004,
+  "title": "On Normative-Informational Positions",
+  "authors": [
+   "Andrew J. I. Jones"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Formal theory of normative-informational positions regulating information supply.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_12"
+ },
+ {
+  "key": "conf/deon/StrasserB12",
+  "year": 2012,
+  "title": "An Andersonian Deontic Logic with Contextualized Sanctions",
+  "authors": [
+   "Christian Straßer",
+   "Mathieu Beirlaen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Andersonian reduction of deontic logic addressing Ross/Samaritan paradoxes.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_11"
+ },
+ {
+  "key": "conf/deon/Brown06",
+  "year": 2006,
+  "title": "Acting with an End in Sight",
+  "authors": [
+   "Mark A. Brown"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Tense/action logic with intention function for means-ends deontic reasoning.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_8"
+ },
+ {
+  "key": "conf/deon/McNamara96",
+  "year": 1996,
+  "title": "Must I Do What I Ought? (Or Will the Least I Can Do Do?)",
+  "authors": [
+   "Paul McNamara"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Model-theoretic framework distinguishing 'must' from 'ought' in deontic logic.",
+  "oa_url": "https://philpapers.org/archive/MCNMID.pdf",
+  "doi": "10.1007/978-1-4471-1488-8_9"
+ },
+ {
+  "key": "conf/deon/AnglbergerFK16",
+  "year": 2016,
+  "title": "An Exact Truthmaker Semantics for Permission and Obligation",
+  "authors": [
+   "Albert J. J. Anglberger",
+   "Federico L. G. Faroldi",
+   "Johannes Korbmacher"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Exact truthmaker semantics for permission and obligation; core deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Berislav16",
+  "year": 2016,
+  "title": "Deontic Logic as a Study of Conditions of Rationality in Norm-related Activities",
+  "authors": [
+   "Zarnic Berislav"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic as rationality conditions in norm-related activities.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Avendano-MejiaT21",
+  "year": 2021,
+  "title": "The Roles of Authority and Norm-Addressees in Deontic Puzzles",
+  "authors": [
+   "Edgar Avendano-Mejia",
+   "Yolanda Torres-Falcon"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Roles of authority and norm-addressees in deontic puzzles.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Goranko21",
+  "year": 2021,
+  "title": "How Deontic Logic Ought to Be: Towards a Many-Sorted Framework for Normative Reasoning",
+  "authors": [
+   "Valentin Goranko"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Many-sorted framework proposal for deontic logic / normative reasoning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GovernatoriR21",
+  "year": 2021,
+  "title": "Is Free Choice Permission Admissible in Classical Deontic Logic?",
+  "authors": [
+   "Guido Governatori",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Free choice permission admissibility in classical deontic logic (Governatori).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GovernatoriTR21",
+  "year": 2021,
+  "title": "A Defeasible Deontic Logic for Pragmatic Oddity",
+  "authors": [
+   "Guido Governatori",
+   "Silvano Colombo Tosatto",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Defeasible deontic logic addressing the pragmatic-oddity paradox.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/MaranhaoS21",
+  "year": 2021,
+  "title": "Interpretive Normative Systems",
+  "authors": [
+   "Juliano Maranhão",
+   "Giovanni Sartor"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "determinacy-frontier"
+  ],
+  "why": "Interpretive normative systems; bridges deontic logic and statutory interpretation (Sartor).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CiabattoniDF23",
+  "year": 2023,
+  "title": "Disambiguating Permissions: A Contribution from Mimamsa",
+  "authors": [
+   "Agata Ciabattoni",
+   "Josephine Dik",
+   "Elisa Freschi"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "determinacy-frontier"
+  ],
+  "why": "Disambiguating permission norms via Mimamsa hermeneutics; ambiguity in deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/PichlerP23",
+  "year": 2023,
+  "title": "Perspectival Obligation and Extensionality in an Alethic-Deontic Setting",
+  "authors": [
+   "Dominik Pichler",
+   "Xavier Parent"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Perspectival obligation and extensionality in an alethic-deontic logic setting.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Wit23",
+  "year": 2023,
+  "title": "Rule rather than Exception: Defeasible Probabilistic Dyadic Deontic Logic",
+  "authors": [
+   "Vincent de Wit"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Defeasible probabilistic dyadic deontic logic; norms as rule versus exception.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Abbas25",
+  "year": 2025,
+  "title": "From Act Obligations to Knowledge Obligations",
+  "authors": [
+   "Houssam Abbas"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "From act obligations to knowledge obligations; deontic logic extension.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/ScheutzL25",
+  "year": 2025,
+  "title": "Using Simple Deontic Constraints for Fast Norm-Conforming Reinforcement Learning",
+  "authors": [
+   "Matthias Scheutz",
+   "Daniel Little"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Simple deontic constraints applied to norm-conforming reinforcement learning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Snedegar14",
+  "year": 2014,
+  "title": "Deontic Reasoning Across Contexts",
+  "authors": [
+   "Justin Snedegar"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Contrastivist deontic reasoning across contexts; resolving 'ought' inference puzzles.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_16"
+ },
+ {
+  "key": "conf/deon/Hulstijn08",
+  "year": 2008,
+  "title": "Need to Know: Questions and the Paradox of Epistemic Obligation",
+  "authors": [
+   "Joris Hulstijn"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Epistemic obligation formalized via logic of questions combined with deontic logic.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_11"
+ },
+ {
+  "key": "conf/deon/BoellaT04",
+  "year": 2004,
+  "title": "Delta: The Social Delegation Cycle",
+  "authors": [
+   "Guido Boella",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Social delegation cycle modeling desires-to-obligations creation of norms.",
+  "oa_url": "http://www.di.unito.it/~guido/articoli/LNCS/51-deon04.pdf",
+  "doi": "10.1007/978-3-540-25927-5_4"
+ },
+ {
+  "key": "conf/deon/Lorini12",
+  "year": 2012,
+  "title": "On the Logical Foundations of Moral Agency",
+  "authors": [
+   "Emiliano Lorini"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "STIT-logic variant formalizing moral agency, desires versus moral values.",
+  "oa_url": "https://hal.science/hal-03671073",
+  "doi": "10.1007/978-3-642-31570-1_8"
+ },
+ {
+  "key": "conf/deon/Brown96",
+  "year": 1996,
+  "title": "Doing as We Ought: Towards a Logic of Simply Dischargeable Obligations",
+  "authors": [
+   "Mark A. Brown"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Diachronic deontic logic with tense operators for dischargeable obligations.",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_3"
+ },
+ {
+  "key": "conf/deon/JamrogaHW04",
+  "year": 2004,
+  "title": "On Obligations and Abilities",
+  "authors": [
+   "Wojciech Jamroga",
+   "Wiebe van der Hoek",
+   "Michael J. Wooldridge"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Combines deontic logic with Alternating-time Temporal Logic for obligations/abilities.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_11"
+ },
+ {
+  "key": "conf/deon/Abadi08",
+  "year": 2008,
+  "title": "Variations in Access Control Logic",
+  "authors": [
+   "Martín Abadi"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Access-control logic ('says' operator) for delegation/authority; permission-logic relative.",
+  "oa_url": "http://www.cse.ucsc.edu/~abadi/Papers/least-privilege-submit.pdf",
+  "doi": "10.1007/978-3-540-70525-3_9"
+ },
+ {
+  "key": "conf/deon/Horty96",
+  "year": 1996,
+  "title": "Combining Agency and Obligation (Preliminary Version)",
+  "authors": [
+   "John F. Horty"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Classic ought-to-do deontic operator combined with STIT/tense-logic agency.",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_6"
+ },
+ {
+  "key": "conf/deon/Evans10",
+  "year": 2010,
+  "title": "Introducing Exclusion Logic as a Deontic Logic",
+  "authors": [
+   "Richard Evans"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Exclusion Logic: new deontic logic with efficient decision procedure vs SDL.",
+  "oa_url": "https://philpapers.org/archive/EVAIEL.pdf",
+  "doi": "10.1007/978-3-642-14183-6_14"
+ },
+ {
+  "key": "conf/deon/Orlandelli14",
+  "year": 2014,
+  "title": "Proof Analysis in Deontic Logics",
+  "authors": [
+   "Eugenio Orlandelli"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Proof-theoretic calculi for deontic logics, sound/complete via neighborhood semantics.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_11"
+ },
+ {
+  "key": "conf/deon/Aqvist04",
+  "year": 2004,
+  "title": "Combinations of Tense and Deontic Modality",
+  "authors": [
+   "Lennart Åqvist"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: combines tense logic with deontic modality, temporal normative reasoning.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_3"
+ },
+ {
+  "key": "conf/deon/LindahlO08",
+  "year": 2008,
+  "title": "Strata of Intervenient Concepts in Normative Systems",
+  "authors": [
+   "Lars Lindahl",
+   "Jan Odelstad"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: algebraic ground-consequence chains among normative/legal concepts.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_16"
+ },
+ {
+  "key": "conf/deon/AucherBT10",
+  "year": 2010,
+  "title": "Privacy Policies with Modal Logic: The Dynamic Turn",
+  "authors": [
+   "Guillaume Aucher",
+   "Guido Boella",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: dynamic multi-modal logic deriving permitted messages from privacy policies.",
+  "oa_url": "https://inria.hal.science/inria-00556079",
+  "doi": "10.1007/978-3-642-14183-6_15"
+ },
+ {
+  "key": "conf/deon/TorreHDB04",
+  "year": 2004,
+  "title": "Specifying Multiagent Organizations",
+  "authors": [
+   "Leendert W. N. van der Torre",
+   "Joris Hulstijn",
+   "Mehdi Dastani",
+   "Jan M. Broersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: BDICTL obligations/permissions as directed modal operators for multiagent orgs.",
+  "oa_url": "https://dspace.library.uu.nl/handle/1874/19965",
+  "doi": "10.1007/978-3-540-25927-5_16"
+ },
+ {
+  "key": "conf/deon/Johanson96",
+  "year": 1996,
+  "title": "The Logic of Normative Systems",
+  "authors": [
+   "Arnold A. Johanson"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: adjointness-based logic of norms (IMP/PROP mappings).",
+  "oa_url": "",
+  "doi": "10.1007/978-1-4471-1488-8_7"
+ },
+ {
+  "key": "conf/deon/JonesK06",
+  "year": 2006,
+  "title": "On the Normative Aspect of Signalling Conventions",
+  "authors": [
+   "Andrew J. I. Jones",
+   "Steven O. Kimbrough"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: normative modality in signalling conventions, trust/Trusted-Third-Party reasoning.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_13"
+ },
+ {
+  "key": "conf/deon/Faroldi14",
+  "year": 2014,
+  "title": "Denial of Responsibility and Normative Negation",
+  "authors": [
+   "Federico L. G. Faroldi"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: responsibility denial and normative negation; deontic logic, no abstract.",
+  "oa_url": "https://philpapers.org/archive/FARDOR-3.pdf",
+  "doi": "10.1007/978-3-319-08615-6_7"
+ },
+ {
+  "key": "conf/deon/Fusco14",
+  "year": 2014,
+  "title": "Factoring Disjunction Out of Deontic Modal Puzzles",
+  "authors": [
+   "Melissa Fusco"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: axiomatizing obligation/permissibility, factoring disjunction out of deontic puzzles.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_8"
+ },
+ {
+  "key": "conf/deon/Hansson14",
+  "year": 2014,
+  "title": "Deontic Diversity",
+  "authors": [
+   "Sven Ove Hansson"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper 'Deontic Diversity'; no abstract/tldr, venue-inferred deontic logic topic.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_2"
+ },
+ {
+  "key": "conf/deon/Lokhorst06",
+  "year": 2006,
+  "title": "Propositional Quantifiers in Deontic Logic",
+  "authors": [
+   "Gert-Jan C. Lokhorst"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: propositional quantifiers added to monadic deontic logic systems.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_17"
+ },
+ {
+  "key": "conf/deon/TrypuzK14",
+  "year": 2014,
+  "title": "A Deontic Logic of Actions and States",
+  "authors": [
+   "Robert Trypuz",
+   "Piotr Kulicki"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON: unified deontic logic of actions and states for general norms.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_19"
+ },
+ {
+  "key": "conf/deon/DemolombeL06",
+  "year": 2006,
+  "title": "Speech Acts with Institutional Effects in Agent Societies",
+  "authors": [
+   "Robert Demolombe",
+   "Vincent Louis"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logical framework for speech acts with institutional/normative effects in agent societies.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_10"
+ },
+ {
+  "key": "conf/deon/TurriniGBM10",
+  "year": 2010,
+  "title": "Forbidding Undesirable Agreements: A Dependence-Based Approach to the Regulation of Multi-agent Systems",
+  "authors": [
+   "Paolo Turrini",
+   "Davide Grossi",
+   "Jan M. Broersen",
+   "John-Jules Ch. Meyer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dependence-based deontic regulation evaluating multi-agent agreements against desirable properties.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_22"
+ },
+ {
+  "key": "conf/deon/Brown04",
+  "year": 2004,
+  "title": "Obligation, Contracts, and Negotiation",
+  "authors": [
+   "Mark A. Brown"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on obligation, contracts, and negotiation (title-only, no abstract).",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-25927-5_1"
+ },
+ {
+  "key": "conf/deon/Carmo06",
+  "year": 2006,
+  "title": "Roles, Counts-as and Deontic and Action Logics",
+  "authors": [
+   "José Carmo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Roles, counts-as, and deontic/action logics for institutional obligation.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_1"
+ },
+ {
+  "key": "conf/deon/BeirlaenS16",
+  "year": 2016,
+  "title": "A Structured Argumentation Framework for Detaching Conditional Obligations",
+  "authors": [
+   "Mathieu Beirlaen",
+   "Christian Straßer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Structured argumentation framework for detaching conditional obligations.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GiordaniC16",
+  "year": 2016,
+  "title": "Basic Action Deontic Logic",
+  "authors": [
+   "Alessandro Giordani",
+   "Ilaria Canavotto"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Basic Action Deontic Logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GovernatoriOCR16",
+  "year": 2016,
+  "title": "Sequence Semantics for Norms and Obligations",
+  "authors": [
+   "Guido Governatori",
+   "Francesco Olivieri",
+   "Erica Calardo",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Sequence semantics for norms and obligations, by defeasible-deontic-logic authority Governatori.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/PetersonK16",
+  "year": 2016,
+  "title": "Conditional Normative Reasoning with Substructural Logics",
+  "authors": [
+   "Clayton Peterson",
+   "Piotr Kulicki"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Conditional normative reasoning using substructural logics.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Putte16",
+  "year": 2016,
+  "title": "Coarse Deontic Logic (short version)",
+  "authors": [
+   "Frederik Van De Putte"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Coarse Deontic Logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0001B18",
+  "year": 2018,
+  "title": "A Formalization of Kant&apos;s Second Formulation of the Categorical Imperative",
+  "authors": [
+   "Felix Lindner",
+   "Martin Mose Bentzen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Formalization of Kant's categorical imperative in deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/BenzmullerFP18",
+  "year": 2018,
+  "title": "A Dyadic Deontic Logic in HOL",
+  "authors": [
+   "Christoph Benzmüller",
+   "Ali Farjami",
+   "Xavier Parent"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Dyadic deontic logic mechanized in Higher-Order Logic via a theorem prover.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CanavottoG18",
+  "year": 2018,
+  "title": "Normative Conflicts in a Dynamic Logic of Norms and Codes",
+  "authors": [
+   "Ilaria Canavotto",
+   "Alessandro Giordani"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Normative conflicts within a dynamic logic of norms and codes.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CiabattoniGL18",
+  "year": 2018,
+  "title": "Resolving Conflicting Obligations in M={I}M={A}S={A}: a Sequent-based Approach",
+  "authors": [
+   "Agata Ciabattoni",
+   "Francesca Gulisano",
+   "Björn Lellmann"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Sequent-based proof system for resolving conflicting obligations.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Ju18",
+  "year": 2018,
+  "title": "S5 as a Deontic Logic",
+  "authors": [
+   "Fengkui Ju"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "S5 modal logic characterized as a deontic logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/MaranhaoS18",
+  "year": 2018,
+  "title": "Contraction of Combined Normative Sets",
+  "authors": [
+   "Juliano Maranhão",
+   "Edelcio Gonçalves de Souza"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Belief-contraction operations on combined normative sets.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/PutteFM18",
+  "year": 2018,
+  "title": "How to Take Heroin (if at all). Holistic Detachment in Deontic Logic",
+  "authors": [
+   "Frederik Van De Putte",
+   "Stefan Frijters",
+   "Joke Meheus"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Holistic detachment in deontic logic, a classic contrary-to-duty puzzle.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0002L21",
+  "year": 2021,
+  "title": "The Varieties of Ought-Implies-Can and Deontic STIT Logic",
+  "authors": [
+   "Kees van Berkel",
+   "Tim S. Lyon"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Ought-implies-can varieties analyzed via deontic STIT logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CastroCFA21",
+  "year": 2021,
+  "title": "Deontic Action Logics via Algebra",
+  "authors": [
+   "Pablo F. Castro",
+   "Valentin Cassano",
+   "Raul Fervari",
+   "Carlos Areces"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic action logics developed via algebraic methods.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/FaroldiG21",
+  "year": 2021,
+  "title": "Impossible and Conflicting Obligations in Justification Logic",
+  "authors": [
+   "Federico L. G. Faroldi",
+   "Meghdad Ghari"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Impossible and conflicting obligations analyzed in justification logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/FrijtersC21",
+  "year": 2021,
+  "title": "The Manchester Twins: Conflicts Between Directed Obligations",
+  "authors": [
+   "Stef Frijters",
+   "Thijs De Coninck"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Conflicts between directed obligations ('Manchester Twins' puzzle).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Giordani21",
+  "year": 2021,
+  "title": "Reason-Based Deontic Logic",
+  "authors": [
+   "Alessandro Giordani"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reason-based deontic logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Lang21",
+  "year": 2021,
+  "title": "A Reduction in Violation Logic",
+  "authors": [
+   "Timo Lang"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reduction technique in violation logic, directly on the violation/reparation topic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Nygren21",
+  "year": 2021,
+  "title": "Deontic Logic Based on Inquisitive Semantics",
+  "authors": [
+   "Karl Nygren"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic grounded in inquisitive semantics.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/OlszewskiPT21",
+  "year": 2021,
+  "title": "Input/Output Logic With a Consistency Check - the Case of Permission",
+  "authors": [
+   "Maya Olszewski",
+   "Xavier Parent",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Input/output logic with a consistency check for permission norms.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/SawasakiS21",
+  "year": 2021,
+  "title": "Term-Sequence-Dyadic Deontic Logic",
+  "authors": [
+   "Takahiro Sawasaki",
+   "Katsuhiko Sano"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Term-sequence-dyadic deontic logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Canavotto23",
+  "year": 2023,
+  "title": "Inconsistent Precedents and Deontic Logic",
+  "authors": [
+   "Ilaria Canavotto"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic treatment of inconsistent legal precedents.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DongDLMTZ23",
+  "year": 2023,
+  "title": "Rights and Practical Reasoning in Deontic Logic",
+  "authors": [
+   "Huimin Dong",
+   "Dragan Doder",
+   "Xu Li",
+   "Réka Markovich",
+   "Leendert van der Torre",
+   "Marc van Zee"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Rights and practical reasoning formalized in deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Frijters23",
+  "year": 2023,
+  "title": "An Andersonian-Kangerian Reduction of Term-Modal Deontic Logics",
+  "authors": [
+   "Stef Frijters"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Andersonian-Kangerian reduction of term-modal deontic logics.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Gonzalez23",
+  "year": 2023,
+  "title": "Deontic Logic in a Hierarchical Framework",
+  "authors": [
+   "Rodrigo Mena González"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic in a hierarchical framework (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/JuN23",
+  "year": 2023,
+  "title": "Normative Properties of Sequential Actions",
+  "authors": [
+   "Fengkui Ju",
+   "Karl Nygren"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Normative properties of sequential actions (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KnoksS23",
+  "year": 2023,
+  "title": "Beyond Reasons and Obligations: A Dual-Role Approach to Reasons and Supererogation",
+  "authors": [
+   "Aleks Knoks",
+   "David Streit"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dual-role account of reasons, obligations, and supererogation.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/PavlovicP23",
+  "year": 2023,
+  "title": "Proof Theory for Admissibility in Two-Player (Deontic) Games",
+  "authors": [
+   "Edi Pavlovic",
+   "Frederik Van De Putte"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Proof theory for admissibility in two-player deontic games.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/WangW23",
+  "year": 2023,
+  "title": "Strong Permission Bundled: First Steps",
+  "authors": [
+   "Zilu Wang",
+   "Yanjing Wang"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Strong permission bundling, first steps (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0002S25",
+  "year": 2025,
+  "title": "Reasoning With and About Normative Conflicts",
+  "authors": [
+   "Kees van Berkel",
+   "Christian Straßer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reasoning with and about normative conflicts (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CabalarM25",
+  "year": 2025,
+  "title": "deolingo: Extending Answer Set Programming with Deontic Reasoning",
+  "authors": [
+   "Pedro Cabalar",
+   "Ovidio Manteiga"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "deolingo: Answer Set Programming extended with executable deontic reasoning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CiabattoniU025",
+  "year": 2025,
+  "title": "Deontic Explanations in Åqvist&apos;s Systems",
+  "authors": [
+   "Agata Ciabattoni",
+   "Blaz Istenic Urh",
+   "Xavier Parent"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic explanations within Åqvist's dyadic deontic logic systems.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DikM25",
+  "year": 2025,
+  "title": "When Judges Go Wrong: Modeling Discretion and the Duty of Care",
+  "authors": [
+   "Josephine Dik",
+   "Réka Markovich"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "determinacy-frontier"
+  ],
+  "why": "Modeling judicial discretion and duty-of-care failures ('When Judges Go Wrong').",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DikP25",
+  "year": 2025,
+  "title": "Navigating Permission and Exceptions: A First-Order Perspective",
+  "authors": [
+   "Josephine Dik",
+   "Dominik Pichler"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "First-order treatment of permission and exceptions (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DomenicoFMPPTW25",
+  "year": 2025,
+  "title": "Normative Implications",
+  "authors": [
+   "Andrea De Domenico",
+   "Ali Farjami",
+   "Krishna Manoorkar",
+   "Alessandra Palmigiano",
+   "Mattia Panettiere",
+   "Apostolos Tzimoulis",
+   "Xiaolong Wang"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Normative implications in deontic logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Egre0S25",
+  "year": 2025,
+  "title": "Trivalent Semantics for Conditional Obligations",
+  "authors": [
+   "Paul Égré",
+   "Lorenzo Rossi",
+   "Jan Sprenger"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Trivalent semantics for conditional obligations (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GesselG25",
+  "year": 2025,
+  "title": "Formalizing flint: A Logic of Preconditions and Consequences of Actions",
+  "authors": [
+   "Thom van Gessel",
+   "Frank Goossens"
+  ],
+  "facets": [
+   "intro",
+   "bounded-deontics"
+  ],
+  "why": "Formalizing 'flint', a rules-as-code logic of action preconditions/consequences.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GovernatoriR25",
+  "year": 2025,
+  "title": "Deontic Argumentation",
+  "authors": [
+   "Guido Governatori",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic argumentation, by defeasible-deontic-logic authority Governatori (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Graff25",
+  "year": 2025,
+  "title": "Is Moral Particularism a Problem for Rule-Based Artificial Normative Systems?",
+  "authors": [
+   "Joris Graff"
+  ],
+  "facets": [
+   "determinacy-frontier",
+   "bounded-deontics"
+  ],
+  "why": "Whether moral particularism undermines rule-based normative systems; limits of formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Knoks25",
+  "year": 2025,
+  "title": "Reasons Against, Balancing, and Defeasible Logic",
+  "authors": [
+   "Aleks Knoks"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reasons against, balancing, and defeasible logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Kramer25",
+  "year": 2025,
+  "title": "Reasons and the Logic of Obligation",
+  "authors": [
+   "Stephan Krämer"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reasons and the logic of obligation (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/RousselF25",
+  "year": 2025,
+  "title": "Quantified Deontic STIT Logic",
+  "authors": [
+   "Edward Roussel",
+   "Stef Frijters"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Quantified deontic STIT logic (title-only).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Solda25",
+  "year": 2025,
+  "title": "Integrating Action Choices and Well-Founded Semantics for Deontic Planning",
+  "authors": [
+   "Davide Soldà"
+  ],
+  "facets": [
+   "bounded-deontics",
+   "fm-in-law"
+  ],
+  "why": "Well-founded semantics integrated with action choices for deontic planning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/HughesR06",
+  "year": 2006,
+  "title": "Don&apos;t Ever Do That! Long-Term Duties in PDeL",
+  "authors": [
+   "Jesse Hughes",
+   "Lambèr M. M. Royakkers"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on long-term duties in propositional deontic logic (PDeL); core deontic-logic prior art",
+  "oa_url": "",
+  "doi": "10.1007/11786849_12"
+ },
+ {
+  "key": "conf/deon/Mastop10",
+  "year": 2010,
+  "title": "Characterising Responsibility in Organisational Structures: The Problem of Many Hands",
+  "authors": [
+   "Rosja Mastop"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper: XSTIT deontic logic analysis of many-hands responsibility in organisations",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_20"
+ },
+ {
+  "key": "conf/deon/CroixT14",
+  "year": 2014,
+  "title": "Chisholm&apos;s Paradox and Conditional Oughts",
+  "authors": [
+   "Catharine Saint Croix",
+   "Richmond H. Thomason"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on Chisholm's Paradox and conditional oughts; canonical contrary-to-duty deontic logic problem",
+  "oa_url": "https://philpapers.org/archive/SAICPA-2.pdf",
+  "doi": "10.1007/978-3-319-08615-6_15"
+ },
+ {
+  "key": "conf/deon/AnglbergerDR14",
+  "year": 2014,
+  "title": "Open Reading without Free Choice",
+  "authors": [
+   "Albert J. J. Anglberger",
+   "Huimin Dong",
+   "Olivier Roy"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "DEON paper on open reading of permission and free-choice principle; core deontic-logic prior art",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_3"
+ },
+ {
+  "key": "conf/deon/Brown08",
+  "year": 2008,
+  "title": "Acting, Events and Actions",
+  "authors": [
+   "Mark A. Brown"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic logic of action/events integrating tunsollen into sein sollen.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_3"
+ },
+ {
+  "key": "conf/deon/Grossi08",
+  "year": 2008,
+  "title": "Pushing Anderson&apos;s Envelope: The Modal Logic of Ascription",
+  "authors": [
+   "Davide Grossi"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modal logic of ascription extending Anderson's reductionist deontic logic.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_20"
+ },
+ {
+  "key": "conf/deon/Dignum06",
+  "year": 2006,
+  "title": "Norms and Electronic Institutions",
+  "authors": [
+   "Frank Dignum"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Norms and electronic institutions; normative multi-agent systems.",
+  "oa_url": "",
+  "doi": "10.1007/11786849_2"
+ },
+ {
+  "key": "conf/deon/Turrini12",
+  "year": 2012,
+  "title": "Agreements as Norms",
+  "authors": [
+   "Paolo Turrini"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontic-logic treatment of agreements/contracts as norms in game theory.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_3"
+ },
+ {
+  "key": "conf/deon/Lorini10",
+  "year": 2010,
+  "title": "A Logical Analysis of Commitment Dynamics",
+  "authors": [
+   "Emiliano Lorini"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logic of commitment dynamics/change in multi-agent systems.",
+  "oa_url": "https://hal.archives-ouvertes.fr/hal-03672504/file/DEON_Lorini_CameraReady.pdf",
+  "doi": "10.1007/978-3-642-14183-6_21"
+ },
+ {
+  "key": "conf/deon/BjornssonS14",
+  "year": 2014,
+  "title": "&apos;Must&apos;, &apos;Ought&apos; and the Structure of Standards",
+  "authors": [
+   "Gunnar Björnsson",
+   "Robert Shanklin"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modal semantics distinguishing 'must' and 'ought' via scalar/binary standards.",
+  "oa_url": "https://philpapers.org/archive/BJRMOA.pdf",
+  "doi": "10.1007/978-3-319-08615-6_4"
+ },
+ {
+  "key": "conf/deon/Lokhorst10",
+  "year": 2010,
+  "title": "Where Did Mally Go Wrong?",
+  "authors": [
+   "Gert-Jan C. Lokhorst"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reformulating Mally's deontic-logic system via strict/relevant implication.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_18"
+ },
+ {
+  "key": "conf/deon/Demolombe12",
+  "year": 2012,
+  "title": "Causality in the Context of Multiple Agents",
+  "authors": [
+   "Robert Demolombe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Multi-agent 'bringing it about' (STIT-style) causality logic extension.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_1"
+ },
+ {
+  "key": "conf/deon/HerzigLLT12",
+  "year": 2012,
+  "title": "A Computationally Grounded Dynamic Logic of Agency, with an Application to Legal Actions",
+  "authors": [
+   "Andreas Herzig",
+   "Tiago de Lima",
+   "Emiliano Lorini",
+   "Nicolas Troquard"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Computationally grounded dynamic logic of agency (STIT), applied to legal actions.",
+  "oa_url": "http://www.irit.fr/~Andreas.Herzig/P/Deon12.pdf",
+  "doi": "10.1007/978-3-642-31570-1_12"
+ },
+ {
+  "key": "conf/deon/Belnap08",
+  "year": 2008,
+  "title": "Norms in Branching Space-Times",
+  "authors": [
+   "Nuel Belnap"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Foundational branching-time framework grounding norms/obligation in indeterministic agency and choice",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_1"
+ },
+ {
+  "key": "conf/deon/AmbrossioPT16",
+  "year": 2016,
+  "title": "Cumulative aggregation",
+  "authors": [
+   "Diego Agustín Ambrossio",
+   "Xavier Parent",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Parent/van der Torre deontic-logic aggregation work; likely I/O-logic norm aggregation.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DyrkolbotnPB16",
+  "year": 2016,
+  "title": "Arguments, Responsibilities and Moral Dilemmas in Abductive Default Logic",
+  "authors": [
+   "Sjur Kristoffer Dyrkolbotn",
+   "Truls Pedersen",
+   "Jan M. Broersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Responsibilities and moral dilemmas in abductive default logic; contrary-to-duty-style conflict.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KulickiT16",
+  "year": 2016,
+  "title": "Multivalued Logics for Conflicting Norms",
+  "authors": [
+   "Piotr Kulicki",
+   "Robert Trypuz"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Multivalued logics for handling conflicting norms; core deontic-conflict formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/LiaoOTV16",
+  "year": 2016,
+  "title": "Prioritized Norms and Defaults in Formal Argumentation",
+  "authors": [
+   "Beishui Liao",
+   "Nir Oren",
+   "Leendert W. N. van der Torre",
+   "Serena Villata"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Prioritized norms and defaults in formal argumentation; defeasible deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Marra16",
+  "year": 2016,
+  "title": "Objective Oughts and a Puzzle about Futurity",
+  "authors": [
+   "Alessandra Marra"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Objective oughts and futurity; temporal normative reasoning, deontic modal core topic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Mullins16",
+  "year": 2016,
+  "title": "Rights in Default Logic",
+  "authors": [
+   "Robert Mullins"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Rights formalized in default logic; Hohfeldian normative-position formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Silk16",
+  "year": 2016,
+  "title": "Update Semantics for Weak Necessity Modals",
+  "authors": [
+   "Alex Silk"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Update semantics for weak necessity modals; deontic modal ('must/should') formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/ArmgardtLS18",
+  "year": 2018,
+  "title": "Reasoning about Conditions in STIT Logic",
+  "authors": [
+   "Matthias Armgardt",
+   "Emiliano Lorini",
+   "Giovanni Sartor"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "STIT logic reasoning about conditions; Sartor co-author, agency/deontic formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/BroersenA18",
+  "year": 2018,
+  "title": "Knowledge and Subjective Oughts in STIT Logic",
+  "authors": [
+   "Jan M. Broersen",
+   "Aldo Iván Ramírez Abarca"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Knowledge and subjective oughts in STIT logic; core deontic-agency formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Gilton18",
+  "year": 2018,
+  "title": "A Look at Chisholm&apos;s Ethics of Requirement",
+  "authors": [
+   "Marian J. R. Gilton"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Chisholm's Ethics of Requirement; classic contrary-to-duty paradox in deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Giordani18",
+  "year": 2018,
+  "title": "Ability and Responsibility in General Action Logic",
+  "authors": [
+   "Alessandro Giordani"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Ability and responsibility in general action logic; normative-position formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KulickiT18",
+  "year": 2018,
+  "title": "Epistemic Oughts in STIT Semantics (Abbreviated Version)",
+  "authors": [
+   "John F. Horty"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Epistemic oughts in STIT semantics; deontic modal/agency logic (Horty).",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Mandelkern18",
+  "year": 2018,
+  "title": "You Must! Maybe You Won&apos;t",
+  "authors": [
+   "Matthew Mandelkern"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "'You Must!' analyzes deontic 'must' modal semantics directly.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/ParentT18",
+  "year": 2018,
+  "title": "I/O Logics with a Consistency Check",
+  "authors": [
+   "Xavier Parent",
+   "Leendert W. N. van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Input/output logics with consistency check; core deontic-logic framework.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Porello18",
+  "year": 2018,
+  "title": "A Logic for Reasoning about Group Norms",
+  "authors": [
+   "Daniele Porello"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logic for reasoning about group norms; normative-system formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0002CFGO21",
+  "year": 2021,
+  "title": "The Gentle Murder Paradox in Sanskrit Philosophy",
+  "authors": [
+   "Kees van Berkel",
+   "Agata Ciabattoni",
+   "Elisa Freschi",
+   "Francesca Gulisano",
+   "Maya Olszewski"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Gentle Murder Paradox (classic contrary-to-duty case) applied in Sanskrit philosophy.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0002GT21",
+  "year": 2021,
+  "title": "If You Want to Smoke, Don&apos;t Buy Cigarettes: Near-Anankastics, Contexts, and Hyper Modality",
+  "authors": [
+   "Kees van Berkel",
+   "Dov M. Gabbay",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Near-anankastic conditionals and hyper modality; directly relevant anankastics prior-art.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CiabattoniL21",
+  "year": 2021,
+  "title": "Sequent Rules for Reasoning and Conflict Resolution in Conditional Norms",
+  "authors": [
+   "Agata Ciabattoni",
+   "Björn Lellmann"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Sequent proof rules for conflict resolution in conditional norms; core deontic proof theory.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/DalmonteGO21",
+  "year": 2021,
+  "title": "Proof Systems for the Logics of Bringing-It-About",
+  "authors": [
+   "Tiziano Dalmonte",
+   "Charles Grellois",
+   "Nicola Olivetti"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Proof systems for logics of bringing-it-about; STIT-style agency/deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GlavanicovaP21",
+  "year": 2021,
+  "title": "Axiomatizing Norms Across Time and the &apos;Paradox of the Court&apos;",
+  "authors": [
+   "Daniela Glavanicová",
+   "Matteo Pascucci"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Axiomatizing norms across time; temporal normative reasoning, paradox of the court.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Steen21",
+  "year": 2021,
+  "title": "Goal-Directed Decision Procedures for Input/Output Logics",
+  "authors": [
+   "Alexander Steen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Goal-directed decision procedures for input/output logics; core deontic-logic tooling.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/StrasserP21",
+  "year": 2021,
+  "title": "Prioritized Defaults and Formal Argumentation",
+  "authors": [
+   "Christian Straßer",
+   "Pere Pardo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Prioritized defaults and formal argumentation; defeasible deontic-logic framework.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/CiabattoniOPRR23",
+  "year": 2023,
+  "title": "Analytic Proof Theory for Åqvist&apos;s System F",
+  "authors": [
+   "Agata Ciabattoni",
+   "Nicola Olivetti",
+   "Xavier Parent",
+   "Revantha Ramanayake",
+   "Dmitry Rozplokhas"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Analytic proof theory for Åqvist's System F, a canonical dyadic deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/FaroldiP23",
+  "year": 2023,
+  "title": "All-Things-Considered Ought via Reasons in Justification Logic",
+  "authors": [
+   "Federico L. G. Faroldi",
+   "Tudor Protopopescu"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "All-things-considered ought via reasons in justification logic; core deontic reasoning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KnoksT23",
+  "year": 2023,
+  "title": "Reason-Based Detachment",
+  "authors": [
+   "Aleks Knoks",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reason-based detachment; core defeasible/factual detachment operator in deontic logic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/McNamara23",
+  "year": 2023,
+  "title": "Extensions and Variations of the DWE Framework",
+  "authors": [
+   "Paul McNamara"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "McNamara (leading deontic logician) extends the DWE deontic-logic framework.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/SilenoPM23",
+  "year": 2023,
+  "title": "Allowed, or Enabled, That is the Question",
+  "authors": [
+   "Giovanni Sileno",
+   "Matteo Pascucci",
+   "Réka Markovich"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Distinguishes 'allowed' vs 'enabled'; core permission/normative-position analysis.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/0037YT25",
+  "year": 2025,
+  "title": "Rational Monotony in Input/Output Logic",
+  "authors": [
+   "Xu Li",
+   "Liuwen Yu",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Rational monotony in input/output logic; core deontic-logic technical result.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Broersen25",
+  "year": 2025,
+  "title": "Reconsidering the Formalisation of Backward Looking Responsibility",
+  "authors": [
+   "Jan M. Broersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Reconsiders formalization of backward-looking responsibility; normative-position/violation topic.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Hopkins25",
+  "year": 2025,
+  "title": "Input/Output Logic via Neighborhood Semantics",
+  "authors": [
+   "Brandon Hopkins"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Input/output logic via neighborhood semantics; core deontic-logic technical paper.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KhaitovichH25",
+  "year": 2025,
+  "title": "Modal Logic for Agent-Based Legal Classifications",
+  "authors": [
+   "Daniil Khaitovich",
+   "Lorenz Hornung"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Modal logic for agent-based legal classifications; deontic modal logic applied to law.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/SilvaS25",
+  "year": 2025,
+  "title": "Two Semantic Approaches For Non-Dilemmatic Situations",
+  "authors": [
+   "Mahan Vaz Silva",
+   "Daniel Skurt"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Two semantic approaches for non-dilemmatic situations; deontic-dilemma resolution.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/WenL25",
+  "year": 2025,
+  "title": "A Contrastive Semantics for Iffy Oughts",
+  "authors": [
+   "Xuefeng Wen",
+   "Yanan Liu"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Contrastive semantics for 'iffy oughts'; conditional deontic modal formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/WitKT25",
+  "year": 2025,
+  "title": "Toward a Principle-Based Analysis of Dual-Scale Detachment",
+  "authors": [
+   "Vincent de Wit",
+   "Aleks Knoks",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Principle-based analysis of dual-scale detachment; deontic detachment operator.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Zhang25",
+  "year": 2025,
+  "title": "Ought to Do Based on Action and Belief",
+  "authors": [
+   "Qiaoyang Zhang"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Ought-to-do based on action and belief; core deontic modal formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Rotolo10",
+  "year": 2010,
+  "title": "Retroactive Legal Changes and Revision Theory in Defeasible Logic",
+  "authors": [
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Defeasible-logic revision theory for retroactive legal change (annulment/abrogation/derogation); abstract empty but title clear",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-14183-6_10"
+ },
+ {
+  "key": "conf/deon/RiveretRS12",
+  "year": 2012,
+  "title": "Norms and Learning in Probabilistic Logic-Based Agents",
+  "authors": [
+   "Régis Riveret",
+   "Antonino Rotolo",
+   "Giovanni Sartor"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Probabilistic defeasible logic for norms in learning agents; abstract empty but title/venue clear",
+  "oa_url": "",
+  "doi": "10.1007/978-3-642-31570-1_9"
+ },
+ {
+  "key": "conf/deon/RiveretABP14",
+  "year": 2014,
+  "title": "Self-governance by Transfiguration: From Learning to Prescriptions",
+  "authors": [
+   "Régis Riveret",
+   "Alexander Artikis",
+   "Dídac Busquets",
+   "Jeremy Pitt"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Bridges reinforcement-learning experience into normative prescriptions",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_14"
+ },
+ {
+  "key": "conf/deon/LoriniD08",
+  "year": 2008,
+  "title": "Trust and Norms in the Context of Computer Security: A Logical Formalization",
+  "authors": [
+   "Emiliano Lorini",
+   "Robert Demolombe"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logical formalization of trust and norms for computer security context.",
+  "oa_url": "https://hal.science/hal-03672521",
+  "doi": "10.1007/978-3-540-70525-3_6"
+ },
+ {
+  "key": "conf/deon/AlcarazNN25",
+  "year": 2025,
+  "title": "Norm Avoidance and Reinforcement Learning: Definitions and Analysis",
+  "authors": [
+   "Benoît Alcaraz",
+   "Emery A. Neufeld",
+   "Amro Najjar"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Norm avoidance framed within reinforcement-learning agents; deontic-adjacent application.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/MakarovaA25",
+  "year": 2025,
+  "title": "Deontically Constrained Policy Improvement in Reinforcement Learning Agents",
+  "authors": [
+   "Alena Makarova",
+   "Houssam Abbas"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Deontically constrained policy improvement for reinforcement-learning agents.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Muller06",
+  "year": 2006,
+  "title": "A Question of Trust: Assessing the Fulfillment of Commitments in Terms of Strategies",
+  "authors": [
+   "Thomas Müller"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "STIT-based framework for commitment fulfillment strategies and trustworthiness; normative-position adjacent.",
+  "oa_url": "https://kops.uni-konstanz.de/server/api/core/bitstreams/1a0cb9fa-fb60-499c-a6f0-dda8871ddee1/content",
+  "doi": "10.1007/11786849_18"
+ },
+ {
+  "key": "conf/deon/HulstijnLT08",
+  "year": 2008,
+  "title": "Delegation of Control in Administrative Procedures",
+  "authors": [
+   "Joris Hulstijn",
+   "Jianwei Liu",
+   "Yao-Hua Tan"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Analyzes delegation of control in administrative procedures via activity dependencies and evidence.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-540-70525-3_8"
+ },
+ {
+  "key": "conf/deon/RechenauerR14",
+  "year": 2014,
+  "title": "The Logical Structure of Scanlon&apos;s Contractualism",
+  "authors": [
+   "Martin Rechenauer",
+   "Olivier Roy"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Formalizes logical structure of Scanlon's contractualism via fixed-point justification operator.",
+  "oa_url": "",
+  "doi": "10.1007/978-3-319-08615-6_13"
+ },
+ {
+  "key": "conf/deon/DyrkolbotnP16",
+  "year": 2016,
+  "title": "Argumentation Frameworks with Justified Attacks",
+  "authors": [
+   "Sjur Kristoffer Dyrkolbotn",
+   "Truls Pedersen"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Argumentation frameworks with justified attacks; general defeasible-argumentation formalism at DEON.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GovernatoriORRV18",
+  "year": 2018,
+  "title": "Dialogues on Moral Theories",
+  "authors": [
+   "Guido Governatori",
+   "Francesco Olivieri",
+   "Régis Riveret",
+   "Antonino Rotolo",
+   "Serena Villata"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Governatori (defeasible-logic-for-law scholar) on dialogues over moral theories.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/KulickiTM18",
+  "year": 2018,
+  "title": "Towards a Formal Ethics for Autonomous Cars",
+  "authors": [
+   "Piotr Kulicki",
+   "Robert Trypuz",
+   "Michael P. Musielewicz"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Formal ethics framework for autonomous cars; normative-logic application, not law-specific.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/ConinckP21",
+  "year": 2021,
+  "title": "The Original Position: A Logical Analysis",
+  "authors": [
+   "Thijs De Coninck",
+   "Frederik Van De Putte"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logical analysis of Rawls' Original Position; formalized normative theory, ethics-adjacent.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Knoks21",
+  "year": 2021,
+  "title": "Moral Principles: Hedged, Contributory, Mixed",
+  "authors": [
+   "Aleks Knoks"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Taxonomy of moral principles (hedged/contributory/mixed); normative-theory formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/MarkovichR21",
+  "year": 2021,
+  "title": "A Logical Analysis of Freedom of Thought",
+  "authors": [
+   "Réka Markovich",
+   "Olivier Roy"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Logical analysis of freedom of thought; rights-style normative-position formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Schuster21",
+  "year": 2021,
+  "title": "Forms and Norms of Indecision in Argumentation Theory",
+  "authors": [
+   "Daniela Schuster"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Forms/norms of indecision in argumentation theory; normative argumentation.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/Graff23",
+  "year": 2023,
+  "title": "Numeric Default Logic as a Framework for Ethical AI",
+  "authors": [
+   "Joris Graff"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Numeric default logic framework for ethical AI; defeasible normative reasoning.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/HulstijnT23",
+  "year": 2023,
+  "title": "What Should I Do and Why?",
+  "authors": [
+   "Joris Hulstijn",
+   "Leendert van der Torre"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "'What should I do and why?' practical-reasoning oughts with explanation angle.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/LiM23",
+  "year": 2023,
+  "title": "A Dynamic Logic of the Right to Know",
+  "authors": [
+   "Xu Li",
+   "Réka Markovich"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Dynamic logic of the right to know; rights formalization.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/MarkovichR23",
+  "year": 2023,
+  "title": "Conceptual and Logical Analysis of the Right to Know",
+  "authors": [
+   "Réka Markovich",
+   "Olivier Roy"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Conceptual/logical analysis of the right to know; rights-normative-position formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/SchusterBP23",
+  "year": 2023,
+  "title": "On Floating Conclusions",
+  "authors": [
+   "Daniela Schuster",
+   "Jan M. Broersen",
+   "Henry Prakken"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "On floating conclusions in defeasible/nonmonotonic reasoning; Broersen/Prakken co-authors.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/FerrignoR25",
+  "year": 2025,
+  "title": "Bridging AI Risk Assessment and Rights Promotion and Protection: A Semantic Model",
+  "authors": [
+   "Beatrice Ferrigno",
+   "Antonino Rotolo"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Semantic model bridging AI risk assessment and rights protection; rights formalism.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/GiordaniS25",
+  "year": 2025,
+  "title": "A Truthmaker Semantics for Reason-Based Conditionals",
+  "authors": [
+   "Alessandro Giordani",
+   "Vita Saitta"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Truthmaker semantics for reason-based conditionals; relevant to defeasible norms.",
+  "oa_url": null,
+  "doi": null
+ },
+ {
+  "key": "conf/deon/McNamara25",
+  "year": 2025,
+  "title": "Extending Recent Modifications of the DWE Framework",
+  "authors": [
+   "Paul McNamara"
+  ],
+  "facets": [
+   "bounded-deontics"
+  ],
+  "why": "Extends recent modifications of the DWE deontic-logic framework further.",
+  "oa_url": null,
+  "doi": null
+ }
+]
