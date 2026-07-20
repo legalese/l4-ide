@@ -1,0 +1,2080 @@
+<?xml version="1.0"?>
+<dblpperson name="Adam Z. Wyner" pid="73/3639" n="129">
+<person key="homepages/73/3639" mdate="2024-09-06">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<url>https://azwyner.info/</url>
+<url>https://www.swansea.ac.uk/staff/law/adamwyner/</url>
+<url>https://www.linkedin.com/in/adam-wyner-legaltech</url>
+<url>https://orcid.org/0000-0002-2958-3428</url>
+<url>https://www.wikidata.org/entity/Q56447899</url>
+<url>https://zbmath.org/authors/?q=ai:wyner.adam-zachary</url>
+<note type="affiliation">Swansea University, Department of Computer Science and School of Law, UK</note>
+</person>
+<homonyms n="1">
+<h f="w/Wyner:Adam"><name>Adam Wyner</name>
+</h>
+</homonyms>
+<r><inproceedings key="conf/icail/AraszkiewiczZWE25" mdate="2026-02-03">
+<author orcid="0000-0003-2524-3976" pid="06/9512">Michal Araszkiewicz</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3699-8303" pid="46/1348">Tom M. van Engers</author>
+<title>Tipping the Scales: Balancing Principles.</title>
+<pages>258-267</pages>
+<year>2025</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/3769126.3769208</ee>
+<crossref>conf/icail/2025</crossref>
+<url>db/conf/icail/icail2025.html#AraszkiewiczZWE25</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/PontSWS25" mdate="2026-02-01">
+<author orcid="0000-0001-7837-5505" pid="276/4944">Thiago Raulino Dal Pont</author>
+<author orcid="0000-0001-6355-851X" pid="281/2743">Galileo Sartor</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<title>You Take the High Road, and I'll Take the Low Road: Large Language Models Logical English and the Highway Code.</title>
+<pages>337-347</pages>
+<year>2025</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/3769126.3769254</ee>
+<crossref>conf/icail/2025</crossref>
+<url>db/conf/icail/icail2025.html#PontSWS25</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/iclp/SartorW25" mdate="2026-03-09">
+<author pid="281/2743">Galileo Sartor</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Teaching Prolog and Logic Programming with Jupyter Notebooks.</title>
+<pages>6</pages>
+<year>2025</year>
+<booktitle>ICLP Workshops</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-4117/PEG-Short-1.pdf</ee>
+<crossref>conf/iclp/2025w</crossref>
+<url>db/conf/iclp/iclp2025w.html#SartorW25</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/iclp/SartorW25a" mdate="2026-03-09">
+<author pid="281/2743">Galileo Sartor</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>A Legal Logic Programming Framework for Autonomous Vehicles.</title>
+<pages>11</pages>
+<year>2025</year>
+<booktitle>ICLP Workshops</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-4117/LPLR2025_paper_2.pdf</ee>
+<crossref>conf/iclp/2025w</crossref>
+<url>db/conf/iclp/iclp2025w.html#SartorW25a</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/SartorGPR025" mdate="2026-02-20">
+<author pid="281/2743">Galileo Sartor</author>
+<author pid="g/GuidoGovernatori">Guido Governatori</author>
+<author pid="277/2619">Giuseppe Pisano</author>
+<author pid="89/4715">Antonino Rotolo</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Plans and Diversions EA.</title>
+<pages>433-435</pages>
+<year>2025</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/FAIA251629</ee>
+<crossref>conf/jurix/2025</crossref>
+<url>db/conf/jurix/jurix2025.html#SartorGPR025</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/iclp/2025w" mdate="2026-03-09">
+<editor pid="227/1498">Damiano Azzolini</editor>
+<editor pid="70/7127">Sotirios Batsakis</editor>
+<editor pid="299/0282">Manuel Alejandro Borroto Santana</editor>
+<editor pid="229/6261">Pierangela Bruno</editor>
+<editor pid="169/0421">Laura Andrea Cecchi</editor>
+<editor pid="136/1503">Jorge Fandinno</editor>
+<editor pid="150/8127">Markus Hecher</editor>
+<editor pid="m/MarcoMaratea">Marco Maratea</editor>
+<editor pid="03/305">Jos&#233; F. Morales 0001</editor>
+<editor pid="249/2841">Brais Mu&#241;iz</editor>
+<editor pid="p/EmmanuelPapadakis">Emmanuel Papadakis 0001</editor>
+<editor pid="41/5768">Livio Robaldo</editor>
+<editor pid="s/LucianoSerafini">Luciano Serafini</editor>
+<editor pid="220/4461">Fabrizio Lo Scudo</editor>
+<editor pid="116/9321">Ilias Tachmazidis</editor>
+<editor pid="208/2233">Alice Tarzariol</editor>
+<editor pid="13/7563">Mauro Vallati</editor>
+<editor pid="73/3639">Adam Wyner 0001</editor>
+<title>Joint Proceedings of the Workshops and Doctoral Consortium of the 41st International Conference on Logic Programming (ICLP-WS-DC 2025) co-located with 41st International Conference on Logic Programming (ICLP 2025), Rende, Italy, September 9-13, 2025.</title>
+<booktitle>ICLP Workshops</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<year>2025</year>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>4117</volume>
+<ee type="oa">https://ceur-ws.org/Vol-4117</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-4117-x</ee>
+<url>db/conf/iclp/iclp2025w.html</url>
+</proceedings>
+</r>
+<r><article key="journals/information/AnimRW24" mdate="2026-01-02">
+<author pid="377/7218">Joseph K. Anim</author>
+<author orcid="0000-0003-4713-8990" pid="41/5768">Livio Robaldo</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>A SHACL-Based Approach for Enhancing Automated Compliance Checking with RDF Data.</title>
+<pages>759</pages>
+<year>2024</year>
+<volume>15</volume>
+<journal>Inf.</journal>
+<number>12</number>
+<ee type="oa">https://doi.org/10.3390/info15120759</ee>
+<url>db/journals/information/information15.html#AnimRW24</url>
+<stream>streams/journals/information</stream>
+</article>
+</r>
+<r><inproceedings key="conf/coin-ws/WynerZS24" mdate="2025-04-01">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<author orcid="0000-0002-8157-4932" pid="331/0825">Dorota Stachura-Zurek</author>
+<title>Towards a Formalisation of Value-Based Actions and Consequentialist Ethics.</title>
+<pages>15-31</pages>
+<year>2024</year>
+<booktitle>COINE</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-82039-7_2</ee>
+<crossref>conf/coin-ws/2024</crossref>
+<url>db/conf/coin-ws/coine2024.html#WynerZS24</url>
+<stream>streams/conf/coin-ws</stream>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/comma/WallnerWZ24" mdate="2026-02-23">
+<author orcid="0000-0002-3051-1966" pid="15/10093">Johannes P. Wallner</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<title>Value-Based Reasoning in ASPIC<sup>+</sup>.</title>
+<pages>325-336</pages>
+<year>2024</year>
+<booktitle>COMMA</booktitle>
+<ee>https://doi.org/10.3233/FAIA240332</ee>
+<crossref>conf/comma/2024</crossref>
+<url>db/conf/comma/comma2024.html#WallnerWZ24</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/ZurekWB24" mdate="2025-03-03">
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Values and Factor Ascription Arguments.</title>
+<pages>239-248</pages>
+<year>2024</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/FAIA241249</ee>
+<crossref>conf/jurix/2024</crossref>
+<url>db/conf/jurix/jurix2024.html#ZurekWB24</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/kesamsta/ZurekWE24" mdate="2026-06-03">
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="46/1348">Tom M. van Engers</author>
+<title>The Model of Benevolence for Trust in Multi-agent System.</title>
+<pages>17-27</pages>
+<year>2024</year>
+<booktitle>KES-AMSTA</booktitle>
+<ee>https://doi.org/10.1007/978-981-97-6469-3_2</ee>
+<crossref>conf/kesamsta/2024</crossref>
+<url>db/conf/kesamsta/kesamsta2024.html#ZurekWE24</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/vale/WynerZ24" mdate="2025-04-08">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<title>Satisfaction in Negotiation by Structured Values and Propositions.</title>
+<pages>176-192</pages>
+<year>2024</year>
+<booktitle>VALE</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-85463-7_11</ee>
+<crossref>conf/vale/2024</crossref>
+<url>db/conf/vale/vale2024.html#WynerZ24</url>
+<stream>streams/conf/vale</stream>
+</inproceedings>
+</r>
+<r><inproceedings key="journals/corr/abs-2502-09216" mdate="2025-10-14">
+<author orcid="0000-0001-6355-851X" pid="281/2743">Galileo Sartor</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="00/5919">Giuseppe Contissa</author>
+<title>Mind the Gaps: Logical English, Prolog, and Multi-agent Systems for Autonomous Vehicles.</title>
+<booktitle>ICLP</booktitle>
+<year>2024</year>
+<pages>111-124</pages>
+<crossref>journals/corr/abs-2502-08453</crossref>
+<ee type="oa">https://doi.org/10.4204/EPTCS.416.9</ee>
+<ee type="oa">https://doi.org/10.48550/arXiv.2502.09216</ee>
+<month>February</month>
+<url>db/series/eptcs/eptcs416.html#abs-2502-09216</url>
+<stream>streams/journals/corr</stream>
+</inproceedings>
+</r>
+<r><article publtype="informal" key="journals/corr/abs-2403-16719" mdate="2025-03-03">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<author orcid="0000-0002-8157-4932" pid="331/0825">Dorota Stachura-Zurek</author>
+<title>Towards a Formalisation of Value-based Actions and Consequentialist Ethics.</title>
+<year>2024</year>
+<volume>abs/2403.16719</volume>
+<journal>CoRR</journal>
+<ee type="oa">https://doi.org/10.48550/arXiv.2403.16719</ee>
+<url>db/journals/corr/corr2403.html#abs-2403-16719</url>
+</article>
+</r>
+<r><article key="journals/ail/BhattacharyaPGGW23" mdate="2023-02-06">
+<author pid="136/5747">Paheli Bhattacharya</author>
+<author pid="254/1100">Shounak Paul</author>
+<author pid="74/10289">Kripabandhu Ghosh</author>
+<author pid="06/900-1">Saptarshi Ghosh 0001</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>DeepRhole: deep learning for rhetorical role labeling of sentences in legal case documents.</title>
+<pages>53-90</pages>
+<year>2023</year>
+<month>March</month>
+<volume>31</volume>
+<journal>Artif. Intell. Law</journal>
+<number>1</number>
+<ee>https://doi.org/10.1007/s10506-021-09304-5</ee>
+<url>db/journals/ail/ail31.html#BhattacharyaPGGW23</url>
+</article>
+</r>
+<r><inproceedings key="conf/icail/LiepinaWSL23" mdate="2023-09-24">
+<author orcid="0000-0002-2417-3219" pid="215/8283">Ruta Liepina</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author orcid="0000-0001-7083-3487" pid="206/7577">Francesca Lagioia</author>
+<title>Argumentation Schemes for Legal Presumption of Causality.</title>
+<pages>157-166</pages>
+<year>2023</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/3594536.3595130</ee>
+<crossref>conf/icail/2023</crossref>
+<url>db/conf/icail/icail2023.html#LiepinaWSL23</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jsai/AnimRW23" mdate="2024-06-12">
+<author pid="377/7218">Joseph K. Anim</author>
+<author pid="41/5768">Livio Robaldo</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Compliance Checking in the Energy Domain via W3C Standards.</title>
+<pages>3-18</pages>
+<year>2023</year>
+<booktitle>JSAI-isAI Workshops</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-60511-6_1</ee>
+<crossref>conf/jsai/2023w</crossref>
+<url>db/conf/jsai/jsai2023w.html#AnimRW23</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerZ23" mdate="2024-02-05">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<title>On Legal Teleological Reasoning.</title>
+<pages>83-88</pages>
+<year>2023</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/FAIA230948</ee>
+<crossref>conf/jurix/2023</crossref>
+<url>db/conf/jurix/jurix2023.html#WynerZ23</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/vale/WynerZ23" mdate="2024-09-08">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Wyner 0001</author>
+<author orcid="0000-0002-9129-3157" pid="68/7168">Tomasz Zurek</author>
+<title>Towards a Formalisation of Motivated Reasoning and the Roots of Conflict.</title>
+<pages>28-45</pages>
+<year>2023</year>
+<booktitle>VALE</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-58202-8_3</ee>
+<crossref>conf/vale/2023</crossref>
+<url>db/conf/vale/vale2023.html#WynerZ23</url>
+<stream>streams/conf/vale</stream>
+</inproceedings>
+</r>
+<r><proceedings key="conf/iclp/2023w" mdate="2023-12-18">
+<editor pid="167/4968">Joaqu&#237;n Arias</editor>
+<editor pid="70/7127">Sotiris Batsakis</editor>
+<editor pid="f/WolfgangFaber">Wolfgang Faber 0001</editor>
+<editor pid="g/GopalGupta">Gopal Gupta 0001</editor>
+<editor pid="225/2520">Francesco Pacenza</editor>
+<editor pid="p/EmmanuelPapadakis-2">Emmanuel Papadakis 0002</editor>
+<editor pid="41/5768">Livio Robaldo</editor>
+<editor pid="304/6973">Kilian R&#252;ckschlo&#223;</editor>
+<editor pid="188/5746">Elmer Salazar</editor>
+<editor pid="135/9950">Zeynep G. Saribatur</editor>
+<editor pid="116/9321">Ilias Tachmazidis</editor>
+<editor pid="277/0522">Felix Weitk&#228;mper</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<title>Proceedings of the International Conference on Logic Programming 2023 Workshops co-located with the 39th International Conference on Logic Programming (ICLP 2023), London, United Kingdom, July 9th and 10th, 2023.</title>
+<booktitle>ICLP Workshops</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<year>2023</year>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>3437</volume>
+<ee type="oa">https://ceur-ws.org/Vol-3437</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-3437-4</ee>
+<url>db/conf/iclp/iclp2023w.html</url>
+</proceedings>
+</r>
+<r><article key="journals/ail/SartorAABEFPSSW22" mdate="2024-05-07">
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author pid="06/9512">Michal Araszkiewicz</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author pid="47/4875">Floris Bex</author>
+<author pid="46/1348">Tom M. van Engers</author>
+<author pid="87/612">Enrico Francesconi</author>
+<author pid="64/5549">Henry Prakken</author>
+<author pid="122/5519">Giovanni Sileno</author>
+<author pid="21/2419">Frank Schilder</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Thirty years of Artificial Intelligence and Law: the second decade.</title>
+<pages>521-557</pages>
+<year>2022</year>
+<volume>30</volume>
+<journal>Artif. Intell. Law</journal>
+<number>4</number>
+<ee>https://doi.org/10.1007/s10506-022-09326-7</ee>
+<url>db/journals/ail/ail30.html#SartorAABEFPSSW22</url>
+</article>
+</r>
+<r><article key="journals/ail/SartorAABEFPSSW22a" mdate="2024-05-07">
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author pid="06/9512">Michal Araszkiewicz</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author pid="47/4875">Floris Bex</author>
+<author pid="46/1348">Tom M. van Engers</author>
+<author pid="87/612">Enrico Francesconi</author>
+<author pid="64/5549">Henry Prakken</author>
+<author pid="122/5519">Giovanni Sileno</author>
+<author pid="21/2419">Frank Schilder</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Correction: thirty years of Artificial Intelligence and Law: the second decade.</title>
+<pages>559</pages>
+<year>2022</year>
+<volume>30</volume>
+<journal>Artif. Intell. Law</journal>
+<number>4</number>
+<ee>https://doi.org/10.1007/s10506-022-09333-8</ee>
+<url>db/journals/ail/ail30.html#SartorAABEFPSSW22a</url>
+</article>
+</r>
+<r><article key="journals/ail/VillataAABBCW22" mdate="2023-02-03">
+<author pid="84/5009">Serena Villata</author>
+<author pid="06/9512">Michal Araszkiewicz</author>
+<author pid="39/1439">Kevin D. Ashley</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="b/KarlBranting">Luther Karl Branting</author>
+<author pid="w/JackGConrad">Jack G. Conrad</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Thirty years of artificial intelligence and law: the third decade.</title>
+<pages>561-591</pages>
+<year>2022</year>
+<volume>30</volume>
+<journal>Artif. Intell. Law</journal>
+<number>4</number>
+<ee type="oa">https://doi.org/10.1007/s10506-022-09327-6</ee>
+<url>db/journals/ail/ail30.html#VillataAABBCW22</url>
+</article>
+</r>
+<r><inproceedings key="conf/comma/ZurekW22" mdate="2023-03-10">
+<author pid="68/7168">Tomasz Zurek</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Towards a Formal Framework for Motivated Argumentation and the Roots of Conflict.</title>
+<pages>39-50</pages>
+<year>2022</year>
+<booktitle>CMNA@COMMA</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-3205/paper5.pdf</ee>
+<crossref>conf/comma/2022cmna</crossref>
+<url>db/conf/comma/cmna2022.html#ZurekW22</url>
+</inproceedings>
+</r>
+<r><article key="journals/dint/PanEBW21" mdate="2025-11-02">
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="230/0663">Elspeth Edelstein</author>
+<author pid="258/5215">Patrik Bansky</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>A Knowledge Graph Based Approach to Social Science Surveys.</title>
+<pages>477-506</pages>
+<year>2021</year>
+<volume>3</volume>
+<journal>Data Intell.</journal>
+<number>4</number>
+<ee type="oa">https://doi.org/10.1162/dint_a_00107</ee>
+<ee>https://www.wikidata.org/entity/Q131766378</ee>
+<url>db/journals/dint/dint3.html#PanEBW21</url>
+</article>
+</r>
+<r><inproceedings key="conf/automotiveUI/EdwardsWCRDBWJC21" mdate="2023-02-03">
+<author orcid="0000-0003-1487-9207" pid="234/7569">Justin Edwards</author>
+<author pid="121/1109">Philipp Wintersberger</author>
+<author pid="225/3501">Leigh Clark</author>
+<author orcid="0000-0003-1545-5377" pid="269/2024">Daniel Rough</author>
+<author pid="48/7823">Philip R. Doyle</author>
+<author pid="190/0169">Victoria A. Banks</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="89/89">Christian P. Janssen</author>
+<author pid="49/7687">Benjamin R. Cowan</author>
+<title>CUI @ Auto-UI: Exploring the Fortunate and Unfortunate Futures of Conversational Automotive User Interfaces.</title>
+<pages>186-189</pages>
+<year>2021</year>
+<booktitle>AutomotiveUI (adjunct)</booktitle>
+<ee>https://doi.org/10.1145/3473682.3479717</ee>
+<crossref>conf/automotiveUI/2021a</crossref>
+<url>db/conf/automotiveUI/automotiveUI2021a.html#EdwardsWCRDBWJC21</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/NazarenkoLW21" mdate="2023-02-03">
+<author pid="43/5516">Adeline Nazarenko</author>
+<author pid="16/5677">Fran&#231;ois L&#233;vy</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>A Pragmatic Approach to Semantic Annotation for Search of Legal Texts - An Experiment on GDPR.</title>
+<pages>23-32</pages>
+<year>2021</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/FAIA210313</ee>
+<crossref>conf/jurix/2021</crossref>
+<url>db/conf/jurix/jurix2021.html#NazarenkoLW21</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/icail/2021" mdate="2021-08-02">
+<editor pid="19/5709">Juliano Maranh&#227;o</editor>
+<editor pid="73/3639">Adam Zachary Wyner</editor>
+<title>ICAIL '21: Eighteenth International Conference for Artificial Intelligence and Law, S&#227;o Paulo Brazil, June 21 - 25, 2021</title>
+<publisher>ACM</publisher>
+<booktitle>ICAIL</booktitle>
+<year>2021</year>
+<isbn>978-1-4503-8526-8</isbn>
+<ee>https://doi.org/10.1145/3462757</ee>
+<url>db/conf/icail/icail2021.html</url>
+</proceedings>
+</r>
+<r><proceedings key="conf/icail/2021asail" mdate="2023-03-10">
+<editor pid="39/1439">Kevin D. Ashley</editor>
+<editor pid="17/6670">Katie Atkinson</editor>
+<editor pid="b/KarlBranting">Luther Karl Branting</editor>
+<editor pid="87/612">Enrico Francesconi</editor>
+<editor pid="09/1651">Matthias Grabmair</editor>
+<editor pid="90/5632">Vern R. Walker</editor>
+<editor pid="154/7820">Bernhard Waltl</editor>
+<editor pid="73/3639">Adam Zachary Wyner</editor>
+<editor pid="w/JackGConrad">Jack G. Conrad</editor>
+<editor pid="71/43">Jeremy Pickens</editor>
+<editor pid="04/6962">Jason R. Baron</editor>
+<editor pid="52/8918">Hans Henseler</editor>
+<editor pid="309/7474">Daniel W. Linna Jr.</editor>
+<editor pid="44/7570">Jyothi K. Vinjumur</editor>
+<title>Joint Proceedings of the Workshops on Automated Semantic Analysis of Information in Legal Text (ASAIL 2021) &#38; AI and Intelligent Assistance for Legal Professionals in the Digital Workplace (LegalAIIA 2021) held online in conjunction with 18th International Conference on Artificial Intelligence and Law (ICAIL 2021), S&#227;o Paolo, Brazil (held online), June 21 &#38; 25, 2021.</title>
+<booktitle>ASAIL/LegalAIIA@ICAIL</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>2888</volume>
+<year>2021</year>
+<ee type="oa">https://ceur-ws.org/Vol-2888</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-2888-5</ee>
+<url>db/conf/icail/asail2021.html</url>
+</proceedings>
+</r>
+<r><article publtype="informal" key="journals/corr/abs-2110-10285" mdate="2023-02-03">
+<author pid="234/7569">Justin Edwards</author>
+<author pid="121/1109">Philipp Wintersberger</author>
+<author pid="225/3501">Leigh Clark</author>
+<author pid="269/2024">Daniel Rough</author>
+<author pid="48/7823">Philip R. Doyle</author>
+<author pid="190/0169">Victoria A. Banks</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="89/89">Christian P. Janssen</author>
+<author pid="49/7687">Benjamin R. Cowan</author>
+<title>CUI @ Auto-UI: Exploring the Fortunate and Unfortunate Futures of Conversational Automotive User Interfaces.</title>
+<year>2021</year>
+<volume>abs/2110.10285</volume>
+<journal>CoRR</journal>
+<ee type="oa">https://arxiv.org/abs/2110.10285</ee>
+<url>db/journals/corr/corr2110.html#abs-2110-10285</url>
+</article>
+</r>
+<r><article key="journals/ail/LiepinaSW20" mdate="2025-01-19">
+<author orcid="0000-0002-2417-3219" pid="215/8283">Ruta Liepina</author>
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Wyner 0001</author>
+<title>Arguing about causes in law: a semi-formal framework for causal arguments.</title>
+<pages>69-89</pages>
+<year>2020</year>
+<volume>28</volume>
+<journal>Artif. Intell. Law</journal>
+<number>1</number>
+<ee>https://doi.org/10.1007/s10506-019-09246-z</ee>
+<ee>https://www.wikidata.org/entity/Q128286832</ee>
+<url>db/journals/ail/ail28.html#LiepinaSW20</url>
+</article>
+</r>
+<r><article key="journals/fcsc/IbekeLWB20" mdate="2026-05-05">
+<author pid="167/1183">Ebuka Ibeke</author>
+<author orcid="0000-0003-3454-2468" pid="11/7536-2">Chenghua Lin 0002</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author orcid="0000-0003-4014-313X" pid="201/1401">Mohamad Hardyman Barawi</author>
+<title>A unified latent variable model for contrastive opinion mining.</title>
+<pages>404-416</pages>
+<year>2020</year>
+<volume>14</volume>
+<journal>Frontiers Comput. Sci.</journal>
+<number>2</number>
+<ee>https://doi.org/10.1007/s11704-018-7073-5</ee>
+<ee>https://www.wikidata.org/entity/Q127310869</ee>
+<url>db/journals/fcsc/fcsc14.html#IbekeLWB20</url>
+</article>
+</r>
+<r><article key="journals/ngc/EdelsteinPSW20" mdate="2023-02-03">
+<author pid="230/0663">Elspeth Edelstein</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="230/0732">Ricardo Soares</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Knowledge-Driven Intelligent Survey Systems Towards Open Science.</title>
+<pages>397-421</pages>
+<year>2020</year>
+<volume>38</volume>
+<journal>New Gener. Comput.</journal>
+<number>3</number>
+<ee type="oa">https://doi.org/10.1007/s00354-020-00087-y</ee>
+<url>db/journals/ngc/ngc38.html#EdelsteinPSW20</url>
+</article>
+</r>
+<r><proceedings key="conf/jurix/2020asail" mdate="2023-03-10">
+<editor pid="39/1439">Kevin D. Ashley</editor>
+<editor pid="17/6670">Katie Atkinson</editor>
+<editor pid="b/KarlBranting">Luther Karl Branting</editor>
+<editor pid="87/612">Enrico Francesconi</editor>
+<editor pid="09/1651">Matthias Grabmair</editor>
+<editor pid="90/5632">Vern R. Walker</editor>
+<editor pid="154/7820">Bernhard Waltl</editor>
+<editor pid="73/3639">Adam Zachary Wyner</editor>
+<title>Proceedings of the Fourth Workshop on Automated Semantic Analysis of Information in Legal Text held online in conjunction with the 33rd International Conference on Legal Knowledge and Information Systems, ASAIL@JURIX 2020, December 9, 2020.</title>
+<booktitle>ASAIL@JURIX</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>2764</volume>
+<year>2020</year>
+<ee type="oa">https://ceur-ws.org/Vol-2764</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-2764-1</ee>
+<url>db/conf/jurix/asail2020.html</url>
+</proceedings>
+</r>
+<r><article key="journals/ail/RobaldoVWG19" mdate="2023-02-03">
+<author orcid="0000-0003-4713-8990" pid="41/5768">Livio Robaldo</author>
+<author pid="84/5009">Serena Villata</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="09/1651">Matthias Grabmair</author>
+<title>Introduction for artificial intelligence and law: special issue &#34;natural language processing for legal texts&#34;.</title>
+<pages>113-115</pages>
+<year>2019</year>
+<volume>27</volume>
+<journal>Artif. Intell. Law</journal>
+<number>2</number>
+<ee type="oa">https://doi.org/10.1007/s10506-019-09251-2</ee>
+<url>db/journals/ail/ail27.html#RobaldoVWG19</url>
+</article>
+</r>
+<r><article key="journals/ijar/StrassWD19" mdate="2025-01-19">
+<author pid="52/4232">Hannes Strass</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author orcid="0000-0001-6342-0756" pid="134/6314">Martin Diller</author>
+<title><i>EMIL</i>: Extracting Meaning from Inconsistent Language: Towards argumentation using a controlled natural language interface.</title>
+<pages>55-84</pages>
+<year>2019</year>
+<volume>112</volume>
+<journal>Int. J. Approx. Reason.</journal>
+<ee>https://doi.org/10.1016/j.ijar.2019.04.010</ee>
+<ee>https://www.wikidata.org/entity/Q127894396</ee>
+<url>db/journals/ijar/ijar112.html#StrassWD19</url>
+</article>
+</r>
+<r><article key="journals/ngc/FaweiPKW19" mdate="2025-01-19">
+<author orcid="0000-0001-6445-0375" pid="171/3791">Biralatei Fawei</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="40/6032">Martin J. Kollingbaum</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>A Semi-automated Ontology Construction for Legal Question Answering.</title>
+<pages>453-478</pages>
+<year>2019</year>
+<volume>37</volume>
+<journal>New Gener. Comput.</journal>
+<number>4</number>
+<ee type="oa">https://doi.org/10.1007/s00354-019-00070-2</ee>
+<ee>https://www.wikidata.org/entity/Q127287797</ee>
+<url>db/journals/ngc/ngc37.html#FaweiPKW19</url>
+</article>
+</r>
+<r><inproceedings key="conf/icail/LiepinaSW19" mdate="2024-10-06">
+<author orcid="0000-0002-2417-3219" pid="215/8283">Ruta Liepina</author>
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Evaluation of Causal Arguments in Law: the Case of Overdetermination.</title>
+<pages>214-218</pages>
+<year>2019</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/3322640.3326698</ee>
+<crossref>conf/icail/2019</crossref>
+<url>db/conf/icail/icail2019.html#LiepinaSW19</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/iwcs/DillerWS19" mdate="2023-03-21">
+<author orcid="0000-0001-6342-0756" pid="134/6314">Martin Diller</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="52/4232">Hannes Strass</author>
+<title>Making Sense of Conflicting (Defeasible) Rules in the Controlled Natural Language ACE: Design of a System with Support for Existential Quantification Using Skolemization.</title>
+<pages>32-37</pages>
+<year>2019</year>
+<booktitle>IWCS (2)</booktitle>
+<ee type="oa">https://doi.org/10.18653/v1/w19-0505</ee>
+<ee type="oa">https://aclanthology.org/W19-0505/</ee>
+<crossref>conf/iwcs/2019-2</crossref>
+<url>db/conf/iwcs/iwcs2019-2.html#DillerWS19</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jist/BanskyEPW19" mdate="2025-11-02">
+<author pid="258/5215">Patrik Bansky</author>
+<author pid="230/0663">Elspeth Edelstein</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>A Dynamic and Informative Intelligent Survey System Based on Knowledge Graph.</title>
+<pages>226-241</pages>
+<year>2019</year>
+<booktitle>JIST</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-41407-8_15</ee>
+<ee>https://www.wikidata.org/entity/Q134487851</ee>
+<crossref>conf/jist/2019</crossref>
+<url>db/conf/jist/jist2019.html#BanskyEPW19</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/BhattacharyaPG019" mdate="2023-02-03">
+<author pid="136/5747">Paheli Bhattacharya</author>
+<author pid="254/1100">Shounak Paul</author>
+<author pid="74/10289">Kripabandhu Ghosh</author>
+<author pid="06/900-1">Saptarshi Ghosh 0001</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Identification of Rhetorical Roles of Sentences in Indian Legal Judgments.</title>
+<pages>3-12</pages>
+<year>2019</year>
+<booktitle>JURIX</booktitle>
+<ee type="oa">https://doi.org/10.3233/FAIA190301</ee>
+<crossref>conf/jurix/2019</crossref>
+<url>db/conf/jurix/jurix2019.html#BhattacharyaPG019</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/icail/2019asail" mdate="2023-03-10">
+<editor pid="39/1439">Kevin D. Ashley</editor>
+<editor pid="17/6670">Katie Atkinson</editor>
+<editor pid="b/KarlBranting">Luther Karl Branting</editor>
+<editor pid="87/612">Enrico Francesconi</editor>
+<editor pid="09/1651">Matthias Grabmair</editor>
+<editor pid="154/7820">Bernhard Waltl</editor>
+<editor pid="90/5632">Vern R. Walker</editor>
+<editor pid="73/3639">Adam Zachary Wyner</editor>
+<title>Proceedings of the Third Workshop on Automated Semantic Analysis of Information in Legal Texts co-located with the 17th International Conference on Artificial Intelligence and Law (ICAIL 2019), Montreal, QC, Canada, June 21, 2019.</title>
+<booktitle>ASAIL@ICAIL</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>2385</volume>
+<year>2019</year>
+<ee type="oa">https://ceur-ws.org/Vol-2385</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-2385-8</ee>
+<url>db/conf/icail/asail2019.html</url>
+</proceedings>
+</r>
+<r><article publtype="informal" key="journals/corr/abs-1911-05405" mdate="2023-02-03">
+<author pid="136/5747">Paheli Bhattacharya</author>
+<author pid="254/1100">Shounak Paul</author>
+<author pid="74/10289">Kripabandhu Ghosh</author>
+<author pid="06/900-1">Saptarshi Ghosh 0001</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Identification of Rhetorical Roles of Sentences in Indian Legal Judgments.</title>
+<year>2019</year>
+<volume>abs/1911.05405</volume>
+<journal>CoRR</journal>
+<ee type="oa">http://arxiv.org/abs/1911.05405</ee>
+<url>db/journals/corr/corr1911.html#abs-1911-05405</url>
+</article>
+</r>
+<r><inproceedings key="conf/jist/SoaresEPW18" mdate="2025-11-02">
+<author pid="230/0732">Ricardo Soares</author>
+<author pid="230/0663">Elspeth Edelstein</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Knowledge Driven Intelligent Survey Systems for Linguists.</title>
+<pages>3-18</pages>
+<year>2018</year>
+<booktitle>JIST</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-04284-4_1</ee>
+<ee>https://www.wikidata.org/entity/Q134487847</ee>
+<crossref>conf/jist/2018</crossref>
+<url>db/conf/jist/jist2018.html#SoaresEPW18</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jist/FaweiPKW18" mdate="2025-11-02">
+<author pid="171/3791">Biralatei Fawei</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="40/6032">Martin J. Kollingbaum</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>A Methodology for a Criminal Law and Procedure Ontology for Legal Question Answering.</title>
+<pages>198-214</pages>
+<year>2018</year>
+<booktitle>JIST</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-04284-4_14</ee>
+<ee>https://www.wikidata.org/entity/Q134487850</ee>
+<crossref>conf/jist/2018</crossref>
+<url>db/conf/jist/jist2018.html#FaweiPKW18</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/MorganPSWW18" mdate="2023-09-18">
+<author orcid="0000-0003-3719-362X" pid="231/7717">Jay Paul Morgan</author>
+<author pid="142/3870">Adeline Paiement</author>
+<author pid="75/6874">Monika Seisenberger</author>
+<author pid="84/909">Jane Williams</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>A Chatbot Framework for the Children's Legal Centre.</title>
+<pages>205-209</pages>
+<year>2018</year>
+<booktitle>JURIX</booktitle>
+<ee type="oa">https://doi.org/10.3233/978-1-61499-935-5-205</ee>
+<crossref>conf/jurix/2018</crossref>
+<url>db/conf/jurix/jurix2018.html#MorganPSWW18</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/lrec/NazarenkoLW18" mdate="2019-08-19">
+<author pid="43/5516">Adeline Nazarenko</author>
+<author pid="16/5677">Fran&#231;ois L&#233;vy</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>An Annotation Language for Semantic Search of Legal Sources.</title>
+<year>2018</year>
+<booktitle>LREC</booktitle>
+<crossref>conf/lrec/2018</crossref>
+<url>db/conf/lrec/lrec2018.html#NazarenkoLW18</url>
+<ee type="oa">http://www.lrec-conf.org/proceedings/lrec2018/summaries/728.html</ee>
+</inproceedings>
+</r>
+<r><proceedings key="conf/cnl/2018" mdate="2023-02-03">
+<editor pid="04/285-1">Brian Davis 0001</editor>
+<editor pid="42/559">C. Maria Keet</editor>
+<editor pid="73/3639">Adam Wyner 0001</editor>
+<title>Controlled Natural Language - Proceedings of the Sixth International Workshop, CNL 2018, Maynooth, Co. Kildare, Ireland, August 27-28, 2018</title>
+<publisher>IOS Press</publisher>
+<year>2018</year>
+<booktitle>CNL</booktitle>
+<series href="db/series/faia/index.html">Frontiers in Artificial Intelligence and Applications</series>
+<volume>304</volume>
+<isbn>978-1-61499-903-4</isbn>
+<isbn>978-1-61499-904-1</isbn>
+<url>db/conf/cnl/cnl2018.html</url>
+</proceedings>
+</r>
+<r><proceedings key="conf/icail/2017asail" mdate="2023-03-10">
+<editor pid="39/1439">Kevin D. Ashley</editor>
+<editor pid="17/6670">Katie Atkinson</editor>
+<editor pid="b/KarlBranting">Luther Karl Branting</editor>
+<editor pid="87/612">Enrico Francesconi</editor>
+<editor pid="09/1651">Matthias Grabmair</editor>
+<editor pid="78/765">Marc Lauritsen</editor>
+<editor pid="90/5632">Vern R. Walker</editor>
+<editor pid="73/3639">Adam Zachary Wyner</editor>
+<title>Proceedings of the Second Workshop on Automated Semantic Analysis of Information in Legal Texts co-located with the 16th International Conference on Artificial Intelligence and Law (ICAIL 2017), London, UK, June 16, 2017.</title>
+<booktitle>ASAIL@ICAIL</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>2143</volume>
+<year>2018</year>
+<ee type="oa">https://ceur-ws.org/Vol-2143</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-2143-0</ee>
+<url>db/conf/icail/asail2017.html</url>
+</proceedings>
+</r>
+<r><article key="journals/ail/ShulayevaSW17" mdate="2018-11-30">
+<author pid="197/6364">Olga Shulayeva</author>
+<author orcid="0000-0003-0796-8826" pid="95/3737">Advaith Siddharthan</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Zachary Wyner</author>
+<title>Recognizing cited facts and principles in legal judgements.</title>
+<pages>107-126</pages>
+<year>2017</year>
+<volume>25</volume>
+<journal>Artif. Intell. Law</journal>
+<number>1</number>
+<ee type="oa">https://doi.org/10.1007/s10506-017-9197-6</ee>
+<ee>https://www.wikidata.org/entity/Q57727079</ee>
+<url>db/journals/ail/ail25.html#ShulayevaSW17</url>
+</article>
+</r>
+<r><inproceedings key="conf/aaai/StrassW17" mdate="2025-12-10">
+<author pid="52/4232">Hannes Strass</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>On Automated Defeasible Reasoning with Controlled Natural Language and Argumentation.</title>
+<year>2017</year>
+<booktitle>AAAI Workshops</booktitle>
+<ee>https://aaai.org/papers/aaaiw-ws0309-17-15108/</ee>
+<crossref>conf/aaai/2017w</crossref>
+<url>db/conf/aaai/aaai2017w.html#StrassW17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/aicol/LiepinaSW17" mdate="2023-02-03">
+<author orcid="0000-0002-2417-3219" pid="215/8283">Ruta Liepina</author>
+<author orcid="0000-0003-2210-0398" pid="06/414">Giovanni Sartor</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<title>Causal Models of Legal Cases.</title>
+<pages>172-186</pages>
+<year>2017</year>
+<booktitle>AICOL</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-00178-0_11</ee>
+<ee>https://www.wikidata.org/entity/Q58196022</ee>
+<crossref>conf/aicol/2017</crossref>
+<url>db/conf/aicol/aicol2017.html#LiepinaSW17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/aicol/FaweiWPK17" mdate="2025-11-02">
+<author pid="171/3791">Biralatei Fawei</author>
+<author pid="73/3639">Adam Wyner 0001</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<author pid="40/6032">Martin J. Kollingbaum</author>
+<title>Using Legal Ontologies with Rules for Legal Textual Entailment.</title>
+<pages>317-324</pages>
+<year>2017</year>
+<booktitle>AICOL</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-00178-0_21</ee>
+<ee>https://www.wikidata.org/entity/Q134487913</ee>
+<crossref>conf/aicol/2017</crossref>
+<url>db/conf/aicol/aicol2017.html#FaweiWPK17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ieaaie/WynerS17" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="52/4232">Hannes Strass</author>
+<title>dARe - Using Argumentation to Explain Conclusions from a Controlled Natural Language Knowledge Base.</title>
+<pages>328-338</pages>
+<year>2017</year>
+<booktitle>IEA/AIE (2)</booktitle>
+<ee>https://doi.org/10.1007/978-3-319-60045-1_35</ee>
+<ee>https://www.wikidata.org/entity/Q57727082</ee>
+<crossref>conf/ieaaie/2017-2</crossref>
+<url>db/conf/ieaaie/ieaaie2017-2.html#WynerS17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ijcnlp/IbekeLWB17" mdate="2026-05-06">
+<author pid="167/1183">Ebuka Ibeke</author>
+<author pid="11/7536-2">Chenghua Lin 0002</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="201/1401">Mohamad Hardyman Barawi</author>
+<title>Extracting and Understanding Contrastive Opinion through Topic Relevant Sentences.</title>
+<pages>395-400</pages>
+<year>2017</year>
+<booktitle>IJCNLP(2)</booktitle>
+<ee type="oa">https://aclanthology.org/I17-2067/</ee>
+<crossref>conf/ijcnlp/2017-2</crossref>
+<url>db/conf/ijcnlp/ijcnlp2017-2.html#IbekeLWB17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/iwcs/DillerWS17" mdate="2021-08-06">
+<author pid="134/6314">Martin Diller</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="52/4232">Hannes Strass</author>
+<title>Defeasible AceRules: A Prototype.</title>
+<year>2017</year>
+<booktitle>IWCS(1)</booktitle>
+<ee type="oa">https://aclanthology.org/W17-6805/</ee>
+<crossref>conf/iwcs/2017-1</crossref>
+<url>db/conf/iwcs/iwcs2017-1.html#DillerWS17</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerGLLN17" mdate="2026-05-20">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="210/4982">Fraser Gough</author>
+<author orcid="0000-0002-3272-3700" pid="16/5677">Fran&#231;ois L&#233;vy</author>
+<author orcid="0009-0007-8268-5937" pid="210/5022">Matt Lynch</author>
+<author pid="43/5516">Adeline Nazarenko</author>
+<title>On Annotation of the Textual Contents of Scottish Legal Instruments.</title>
+<pages>101-106</pages>
+<year>2017</year>
+<booktitle>JURIX</booktitle>
+<ee type="oa">https://doi.org/10.3233/978-1-61499-838-9-101</ee>
+<crossref>conf/jurix/2017</crossref>
+<url>db/conf/jurix/jurix2017.html#WynerGLLN17</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/jurix/2017" mdate="2017-12-09">
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<editor pid="45/4069">Giovanni Casini</editor>
+<title>Legal Knowledge and Information Systems - JURIX 2017: The Thirtieth Annual Conference, Luxembourg, 13-15 December 2017.</title>
+<publisher>IOS Press</publisher>
+<year>2017</year>
+<booktitle>JURIX</booktitle>
+<series href="db/series/faia/index.html">Frontiers in Artificial Intelligence and Applications</series>
+<volume>302</volume>
+<isbn>978-1-61499-837-2</isbn>
+<isbn>978-1-61499-838-9</isbn>
+<url>db/conf/jurix/jurix2017.html</url>
+</proceedings>
+</r>
+<r><article key="journals/argcom/WynerEH16" mdate="2020-12-29">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3699-8303" pid="46/1348">Tom M. van Engers</author>
+<author orcid="0000-0001-5602-7446" pid="23/4530">Anthony Hunter</author>
+<title>Working on the argument pipeline: Through flow issues between natural language argument, instantiated arguments, and argumentation frameworks.</title>
+<pages>69-89</pages>
+<year>2016</year>
+<volume>7</volume>
+<journal>Argument Comput.</journal>
+<number>1</number>
+<ee>https://doi.org/10.3233/AAC-160002</ee>
+<url>db/journals/argcom/argcom7.html#WynerEH16</url>
+</article>
+</r>
+<r><article key="journals/argcom/Wyner16" mdate="2020-09-08">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>A functional perspective on argumentation schemes.</title>
+<pages>113-133</pages>
+<year>2016</year>
+<volume>7</volume>
+<journal>Argument Comput.</journal>
+<number>2-3</number>
+<ee>https://doi.org/10.3233/AAC-160010</ee>
+<ee>https://www.wikidata.org/entity/Q57727084</ee>
+<url>db/journals/argcom/argcom7.html#Wyner16</url>
+</article>
+</r>
+<r><inproceedings key="conf/acl/EganSW16" mdate="2026-07-13">
+<author pid="315/4491">Charlie P. Egan</author>
+<author orcid="0000-0003-0796-8826" pid="95/3737">Advaith Siddharthan</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Summarising the points made in online political debates.</title>
+<year>2016</year>
+<booktitle>ArgMining@ACL</booktitle>
+<ee type="oa">https://doi.org/10.18653/v1/w16-2816</ee>
+<ee type="oa">https://aclanthology.org/W16-2816/</ee>
+<crossref>conf/acl/2016am</crossref>
+<url>db/conf/acl/argmining2016.html#EganSW16</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/acl/MandyaSW16" mdate="2021-08-06">
+<author pid="148/4542">Angrosh Mandya</author>
+<author orcid="0000-0003-0796-8826" pid="95/3737">Advaith Siddharthan</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Scrutable Feature Sets for Stance Classification.</title>
+<year>2016</year>
+<booktitle>ArgMining@ACL</booktitle>
+<ee type="oa">https://doi.org/10.18653/v1/w16-2807</ee>
+<ee type="oa">https://aclanthology.org/W16-2807/</ee>
+<crossref>conf/acl/2016am</crossref>
+<url>db/conf/acl/argmining2016.html#MandyaSW16</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/cnl/WynerNL16" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="43/5516">Adeline Nazarenko</author>
+<author pid="16/5677">Fran&#231;ois L&#233;vy</author>
+<title>Towards a High-Level Controlled Language for Legal Sources on the Semantic Web.</title>
+<pages>92-101</pages>
+<year>2016</year>
+<booktitle>CNL</booktitle>
+<ee>https://doi.org/10.1007/978-3-319-41498-0_9</ee>
+<ee>https://www.wikidata.org/entity/Q57727087</ee>
+<crossref>conf/cnl/2016</crossref>
+<url>db/conf/cnl/cnl2016.html#WynerNL16</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/NazarenkoLW16" mdate="2018-11-02">
+<author pid="43/5516">Adeline Nazarenko</author>
+<author pid="16/5677">Fran&#231;ois L&#233;vy</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Towards a Methodology for Formalizing Legal Texts in LegalRuleML.</title>
+<pages>149-154</pages>
+<year>2016</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-726-9-149</ee>
+<crossref>conf/jurix/2016</crossref>
+<url>db/conf/jurix/jurix2016.html#NazarenkoLW16</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/lrec/FaweiWP16" mdate="2019-08-19">
+<author pid="171/3791">Biralatei Fawei</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<title>Passing a USA National Bar Exam: a First Corpus for Experimentation.</title>
+<year>2016</year>
+<booktitle>LREC</booktitle>
+<ee type="oa">http://www.lrec-conf.org/proceedings/lrec2016/summaries/1160.html</ee>
+<crossref>conf/lrec/2016</crossref>
+<url>db/conf/lrec/lrec2016.html#FaweiWP16</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/lrec/PetersW16" mdate="2019-08-19">
+<author pid="84/163">Wim Peters</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Legal Text Interpretation: Identifying Hohfeldian Relations from Text.</title>
+<year>2016</year>
+<booktitle>LREC</booktitle>
+<ee type="oa">http://www.lrec-conf.org/proceedings/lrec2016/summaries/253.html</ee>
+<crossref>conf/lrec/2016</crossref>
+<url>db/conf/lrec/lrec2016.html#PetersW16</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/cnl/2016" mdate="2022-01-03">
+<editor pid="04/285-1">Brian Davis 0001</editor>
+<editor orcid="0000-0003-0743-6272" pid="52/776">Gordon J. Pace</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<title>Controlled Natural Language - 5th International Workshop, CNL 2016, Aberdeen, UK, July 25-27, 2016, Proceedings</title>
+<booktitle>CNL</booktitle>
+<publisher>Springer</publisher>
+<year>2016</year>
+<series href="db/series/lncs/index.html">Lecture Notes in Computer Science</series>
+<volume>9767</volume>
+<isbn>978-3-319-41497-3</isbn>
+<ee>https://doi.org/10.1007/978-3-319-41498-0</ee>
+<url>db/conf/cnl/cnl2016.html</url>
+</proceedings>
+</r>
+<r><article publtype="informal" key="journals/dagstuhl-reports/CabrioHVW16" mdate="2017-06-07">
+<author pid="35/7561">Elena Cabrio</author>
+<author pid="h/GraemeHirst">Graeme Hirst</author>
+<author pid="84/5009">Serena Villata</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Natural Language Argumentation: Mining, Processing, and Reasoning over Textual Arguments (Dagstuhl Seminar 16161).</title>
+<pages>80-109</pages>
+<year>2016</year>
+<volume>6</volume>
+<journal>Dagstuhl Reports</journal>
+<number>4</number>
+<ee type="oa">https://doi.org/10.4230/DagRep.6.4.80</ee>
+<url>db/journals/dagstuhl-reports/dagstuhl-reports6.html#CabrioHVW16</url>
+</article>
+</r>
+<r><article key="journals/argcom/WynerBDC15" mdate="2023-01-31">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author orcid="0000-0002-6033-3742" pid="d/PaulEDunne">Paul E. Dunne</author>
+<author orcid="0000-0003-0755-0358" pid="97/18">Federico Cerutti 0001</author>
+<title>Senses of 'argument' in instantiated argumentation frameworks.</title>
+<pages>50-72</pages>
+<year>2015</year>
+<volume>6</volume>
+<journal>Argument Comput.</journal>
+<number>1</number>
+<ee>https://doi.org/10.1080/19462166.2014.1002535</ee>
+<ee>https://www.wikidata.org/entity/Q57727091</ee>
+<url>db/journals/argcom/argcom6.html#WynerBDC15</url>
+</article>
+</r>
+<r><article key="journals/logcom/PrakkenWBA15" mdate="2018-11-30">
+<author pid="64/5549">Henry Prakken</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>A formalization of argumentation schemes for legal case-based reasoning in ASPIC+.</title>
+<pages>1141-1166</pages>
+<year>2015</year>
+<volume>25</volume>
+<journal>J. Log. Comput.</journal>
+<number>5</number>
+<ee>https://doi.org/10.1093/logcom/ext010</ee>
+<ee>https://www.wikidata.org/entity/Q57727122</ee>
+<url>db/journals/logcom/logcom25.html#PrakkenWBA15</url>
+</article>
+</r>
+<r><article key="journals/tlsdkcs/Bench-CaponAW15" mdate="2020-05-19">
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Using Argumentation to Structure E-Participation in Policy Making.</title>
+<pages>1-29</pages>
+<year>2015</year>
+<volume>18</volume>
+<journal>Trans. Large Scale Data Knowl. Centered Syst.</journal>
+<ee>https://doi.org/10.1007/978-3-662-46485-4_1</ee>
+<ee>https://www.wikidata.org/entity/Q57727095</ee>
+<crossref>journals/tlsdkcs/2015-18</crossref>
+<url>db/journals/tlsdkcs/tlsdkcs18.html#Bench-CaponAW15</url>
+</article>
+</r>
+<r><article key="journals/widm/LinIWG15" mdate="2026-05-05">
+<author orcid="0000-0003-3454-2468" pid="11/7536-2">Chenghua Lin 0002</author>
+<author pid="167/1183">Ebuka Ibeke</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-1918-6311" pid="66/1072">Frank Guerin</author>
+<title>Sentiment-topic modeling in text mining.</title>
+<pages>246-254</pages>
+<year>2015</year>
+<volume>5</volume>
+<journal>WIREs Data Mining Knowl. Discov.</journal>
+<number>5</number>
+<ee>https://doi.org/10.1002/widm.1161</ee>
+<ee>https://www.wikidata.org/entity/Q57727094</ee>
+<url>db/journals/widm/widm5.html#LinIWG15</url>
+</article>
+</r>
+<r><inproceedings key="conf/jurix/FaweiWP15" mdate="2025-11-02">
+<author pid="171/3791">Biralatei Fawei</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="59/6490">Jeff Z. Pan</author>
+<title>Passing a USA National Bar Exam - a First Experiment.</title>
+<pages>179-180</pages>
+<year>2015</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-609-5-179</ee>
+<ee>https://www.wikidata.org/entity/Q134487841</ee>
+<crossref>conf/jurix/2015</crossref>
+<url>db/conf/jurix/jurix2015.html#FaweiWP15</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/PetersW15" mdate="2018-11-02">
+<author pid="84/163">Wim Peters</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Extracting Hohfeldian Relations from Text.</title>
+<pages>189-190</pages>
+<year>2015</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-609-5-189</ee>
+<crossref>conf/jurix/2015</crossref>
+<url>db/conf/jurix/jurix2015.html#PetersW15</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/naacl/WynerPP15" mdate="2021-08-06">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="84/163">Wim Peters</author>
+<author pid="32/6677">David Price</author>
+<title>Argument Discovery and Extraction with the Argument Workbench.</title>
+<pages>78-83</pages>
+<year>2015</year>
+<booktitle>ArgMining@HLT-NAACL</booktitle>
+<ee type="oa">https://doi.org/10.3115/v1/w15-0510</ee>
+<ee type="oa">https://aclanthology.org/W15-0510/</ee>
+<crossref>conf/naacl/2015am</crossref>
+<url>db/conf/naacl/argmining2015.html#WynerPP15</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/rweb/AthanGPPW15" mdate="2022-01-03">
+<author pid="74/10301">Tara Athan</author>
+<author orcid="0000-0002-9878-2762" pid="g/GuidoGovernatori">Guido Governatori</author>
+<author orcid="0000-0002-8557-8084" pid="26/6137">Monica Palmirani</author>
+<author pid="24/2942">Adrian Paschke</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>LegalRuleML: Design Principles and Foundations.</title>
+<pages>151-188</pages>
+<year>2015</year>
+<booktitle>Reasoning Web</booktitle>
+<ee>https://doi.org/10.1007/978-3-319-21768-0_6</ee>
+<ee>https://www.wikidata.org/entity/Q57727090</ee>
+<crossref>conf/rweb/2015</crossref>
+<url>db/conf/rweb/rweb2015.html#AthanGPPW15</url>
+</inproceedings>
+</r>
+<r><incollection key="books/daglib/p/Wyner15" mdate="2017-05-16">
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>From the Language of Legislation to Executable Logic Programs.</title>
+<pages>409-434</pages>
+<year>2015</year>
+<booktitle>Logic in the Theory and Practice of Lawmaking</booktitle>
+<ee>https://doi.org/10.1007/978-3-319-19575-9_15</ee>
+<crossref>books/daglib/0037616</crossref>
+<url>db/books/collections/AP2015.html#Wyner15</url>
+</incollection>
+</r>
+<r><proceedings key="conf/argnlp/2014" mdate="2023-03-10">
+<editor pid="35/7561">Elena Cabrio</editor>
+<editor pid="84/5009">Serena Villata</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<title>Proceedings of the Workshop on Frontiers and Connections between Argumentation Theory and Natural Language Processing, Forl&#236;-Cesena, Italy, July 21-25, 2014.</title>
+<booktitle>ArgNLP</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>1341</volume>
+<year>2015</year>
+<ee type="oa">https://ceur-ws.org/Vol-1341</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-1341-7</ee>
+<url>db/conf/argnlp/argnlp2014.html</url>
+</proceedings>
+</r>
+<r><inproceedings key="conf/argnlp/Wyner14" mdate="2023-03-10">
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Mining Fine-grained Argument Elements.</title>
+<year>2014</year>
+<booktitle>ArgNLP</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-1341/paper12.pdf</ee>
+<crossref>conf/argnlp/2014</crossref>
+<url>db/conf/argnlp/argnlp2014.html#Wyner14</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/AthanGPPW14" mdate="2023-03-10">
+<author pid="74/10301">Tara Athan</author>
+<author pid="g/GuidoGovernatori">Guido Governatori</author>
+<author orcid="0000-0002-8557-8084" pid="26/6137">Monica Palmirani</author>
+<author pid="24/2942">Adrian Paschke</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Legal Interpretations in LegalRuleML.</title>
+<year>2014</year>
+<booktitle>SW4LAW+DC@JURIX</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-1296/paper2.pdf</ee>
+<crossref>conf/jurix/2014sw4law</crossref>
+<url>db/conf/jurix/sw4law2014.html#AthanGPPW14</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/latech/WynerAMA14" mdate="2021-08-06">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="185/6463">Jackson Armstrong</author>
+<author pid="185/6478">Andrew Mackillop</author>
+<author pid="185/6492">Philip Astley</author>
+<title>Text Analysis of Aberdeen Burgh Records 1530-1531.</title>
+<pages>95-99</pages>
+<year>2014</year>
+<booktitle>LaTeCH@EACL</booktitle>
+<ee type="oa">https://doi.org/10.3115/v1/w14-0614</ee>
+<ee type="oa">https://aclanthology.org/W14-0614/</ee>
+<crossref>conf/latech/2014</crossref>
+<url>db/conf/latech/latech2014.html#WynerAMA14</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/ruleml/2014c" mdate="2023-03-10">
+<editor pid="09/804">Theodore Patkos</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<editor pid="06/5872">Adrian Giurca</editor>
+<title>Proceedings of the RuleML 2014 Challenge and the RuleML 2014 Doctoral Consortium hosted by the 8th International Web Rule Symposium, Challenge+DC@RuleML 2014, Prague, Czech Republic, August 18-20, 2014.</title>
+<booktitle>Challenge+DC@RuleML</booktitle>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>1211</volume>
+<year>2014</year>
+<ee type="oa">https://ceur-ws.org/Vol-1211</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-1211-3</ee>
+<url>db/conf/ruleml/ruleml2014c.html</url>
+</proceedings>
+</r>
+<r><article key="journals/ail/WynerB13" mdate="2018-11-30">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="25/6564">Neil Benn</author>
+<title>Introduction to special issue on modelling policy-making.</title>
+<pages>367-369</pages>
+<year>2013</year>
+<volume>21</volume>
+<journal>Artif. Intell. Law</journal>
+<number>4</number>
+<ee>https://doi.org/10.1007/s10506-013-9148-9</ee>
+<ee>https://www.wikidata.org/entity/Q57727102</ee>
+<url>db/journals/ail/ail21.html#WynerB13</url>
+</article>
+</r>
+<r><inproceedings key="conf/clima/WynerBD13" mdate="2023-11-12">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author orcid="0000-0002-6033-3742" pid="d/PaulEDunne">Paul E. Dunne</author>
+<title>On the Instantiation of Knowledge Bases in Abstract Argumentation Frameworks.</title>
+<pages>34-50</pages>
+<year>2013</year>
+<booktitle>CLIMA</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-40624-9_3</ee>
+<ee>https://www.wikidata.org/entity/Q57727108</ee>
+<crossref>conf/clima/2013</crossref>
+<url>db/conf/clima/clima2013.html#WynerBD13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/AthanBGPPW13" mdate="2018-11-14">
+<author pid="74/10301">Tara Athan</author>
+<author pid="08/422">Harold Boley</author>
+<author orcid="0000-0002-9878-2762" pid="g/GuidoGovernatori">Guido Governatori</author>
+<author pid="26/6137">Monica Palmirani</author>
+<author pid="24/2942">Adrian Paschke</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>OASIS LegalRuleML.</title>
+<pages>3-12</pages>
+<year>2013</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/2514601.2514603</ee>
+<ee>https://www.wikidata.org/entity/Q57727105</ee>
+<crossref>conf/icail/2013</crossref>
+<url>db/conf/icail/icail2013.html#AthanBGPPW13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/Bench-CaponPWA13" mdate="2018-11-14">
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="64/5549">Henry Prakken</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>Argument schemes for reasoning with legal cases using values.</title>
+<pages>13-22</pages>
+<year>2013</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/2514601.2514604</ee>
+<ee>https://www.wikidata.org/entity/Q57727098</ee>
+<crossref>conf/icail/2013</crossref>
+<url>db/conf/icail/icail2013.html#Bench-CaponPWA13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/WardehWAB13" mdate="2018-11-14">
+<author pid="41/4327">Maya Wardeh</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Argumentation based tools for policy-making.</title>
+<pages>249-250</pages>
+<year>2013</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/2514601.2514640</ee>
+<ee>https://www.wikidata.org/entity/Q57727099</ee>
+<crossref>conf/icail/2013</crossref>
+<url>db/conf/icail/icail2013.html#WardehWAB13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/AtkinsonBPW13" mdate="2018-11-02">
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="64/5549">Henry Prakken</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Argumentation Schemes for Reasoning about Factors with Dimensions.</title>
+<pages>39-48</pages>
+<year>2013</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-359-9-39</ee>
+<crossref>conf/jurix/2013</crossref>
+<url>db/conf/jurix/jurix2013.html#AtkinsonBPW13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerPK13" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="84/163">Wim Peters</author>
+<author pid="135/8520">Daniel Katz</author>
+<title>A Case Study on Legal Case Annotation.</title>
+<pages>165-174</pages>
+<year>2013</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-359-9-165</ee>
+<crossref>conf/jurix/2013</crossref>
+<url>db/conf/jurix/jurix2013.html#WynerPK13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ruleml/AthanBGPPW13" mdate="2018-11-14">
+<author pid="74/10301">Tara Athan</author>
+<author pid="08/422">Harold Boley</author>
+<author orcid="0000-0002-9878-2762" pid="g/GuidoGovernatori">Guido Governatori</author>
+<author pid="26/6137">Monica Palmirani</author>
+<author pid="24/2942">Adrian Paschke</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>LegalRuleML: From Metamodel to Use Cases - (A Tutorial).</title>
+<pages>13-18</pages>
+<year>2013</year>
+<booktitle>RuleML</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-39617-5_4</ee>
+<ee>https://www.wikidata.org/entity/Q57727104</ee>
+<crossref>conf/ruleml/2013</crossref>
+<url>db/conf/ruleml/ruleml2013.html#AthanBGPPW13</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ruleml/WynerG13" mdate="2023-03-10">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="g/GuidoGovernatori">Guido Governatori</author>
+<title>A Study on Translating Regulatory Rules from Natural Language to Defeasible Logics.</title>
+<year>2013</year>
+<booktitle>RuleML (2)</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-1004/paper16.pdf</ee>
+<crossref>conf/ruleml/2013-2</crossref>
+<url>db/conf/ruleml/ruleml2013-2.html#WynerG13</url>
+</inproceedings>
+</r>
+<r><proceedings key="conf/ruleml/2013-2" mdate="2023-03-10">
+<editor pid="70/1143">Paul Fodor</editor>
+<editor pid="49/7031">Dumitru Roman</editor>
+<editor pid="94/5032">Darko Anicic</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<editor pid="26/6137">Monica Palmirani</editor>
+<editor pid="69/5088">Davide Sottara</editor>
+<editor pid="16/5677">Fran&#231;ois L&#233;vy</editor>
+<title>Joint Proceedings of the 7th International Rule Challenge, the Special Track on Human Language Technology and the 3rd RuleML Doctoral Consortium, Seattle, USA, July 11 -13, 2013</title>
+<publisher>CEUR-WS.org</publisher>
+<series href="db/series/ceurws/index.html">CEUR Workshop Proceedings</series>
+<volume>1004</volume>
+<year>2013</year>
+<ee type="oa">https://ceur-ws.org/Vol-1004</ee>
+<ee>https://nbn-resolving.org/urn:nbn:de:0074-1004-3</ee>
+<booktitle>RuleML (2)</booktitle>
+<url>db/conf/ruleml/ruleml2013-2.html</url>
+</proceedings>
+</r>
+<r><proceedings key="conf/ruleml/2013" mdate="2019-05-14">
+<editor pid="46/2598">Leora Morgenstern</editor>
+<editor pid="96/1254">Petros S. Stefaneas</editor>
+<editor pid="16/5677">Fran&#231;ois L&#233;vy</editor>
+<editor pid="73/3639">Adam Z. Wyner</editor>
+<editor pid="24/2942">Adrian Paschke</editor>
+<title>Theory, Practice, and Applications of Rules on the Web - 7th International Symposium, RuleML 2013, Seattle, WA, USA, July 11-13, 2013. Proceedings</title>
+<year>2013</year>
+<publisher>Springer</publisher>
+<series href="db/series/lncs/index.html">Lecture Notes in Computer Science</series>
+<volume>8035</volume>
+<ee>https://doi.org/10.1007/978-3-642-39617-5</ee>
+<isbn>978-3-642-39616-8</isbn>
+<booktitle>RuleML</booktitle>
+<url>db/conf/ruleml/ruleml2013.html</url>
+</proceedings>
+</r>
+<r><article key="journals/ail/WynerH12" mdate="2018-11-30">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0001-7076-9083" pid="14/2726">Rinke Hoekstra</author>
+<title>A legal case OWL ontology with an instantiation of Popov v. Hayashi.</title>
+<pages>83-107</pages>
+<year>2012</year>
+<volume>20</volume>
+<journal>Artif. Intell. Law</journal>
+<number>1</number>
+<ee>https://doi.org/10.1007/s10506-012-9119-6</ee>
+<ee>https://www.wikidata.org/entity/Q57727109</ee>
+<url>db/journals/ail/ail20.html#WynerH12</url>
+</article>
+</r>
+<r><article key="journals/ail/Bench-CaponAAABBBBCFGGLLLMPSSTTVWW12" mdate="2022-10-02">
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author orcid="0000-0003-2524-3976" pid="06/9512">Michal Araszkiewicz</author>
+<author pid="39/1439">Kevin D. Ashley</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author pid="47/4875">Floris Bex</author>
+<author pid="50/2577">Filipe Borges</author>
+<author pid="81/2138">Dani&#232;le Bourcier</author>
+<author pid="89/5897">Paul Bourgine</author>
+<author orcid="0000-0001-9114-9385" pid="w/JackGConrad">Jack G. Conrad</author>
+<author pid="87/612">Enrico Francesconi</author>
+<author pid="45/3471">Thomas F. Gordon</author>
+<author orcid="0000-0002-9878-2762" pid="g/GuidoGovernatori">Guido Governatori</author>
+<author orcid="0000-0002-1219-4696" pid="67/6415">Jochen L. Leidner</author>
+<author pid="l/DavidDLewis">David D. Lewis</author>
+<author pid="l/RPLoui">Ronald Prescott Loui</author>
+<author pid="70/5086">L. Thorne McCarty</author>
+<author pid="64/5549">Henry Prakken</author>
+<author pid="21/2419">Frank Schilder</author>
+<author pid="66/72">Erich Schweighofer</author>
+<author pid="81/4502">Paul Thompson</author>
+<author pid="25/1431">Alex Tyrrell</author>
+<author pid="99/3259">Bart Verheij</author>
+<author pid="26/4182">Douglas N. Walton</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>A history of AI and Law in 50 papers: 25 years of the international conference on AI and Law.</title>
+<pages>215-319</pages>
+<year>2012</year>
+<volume>20</volume>
+<journal>Artif. Intell. Law</journal>
+<number>3</number>
+<ee>https://doi.org/10.1007/s10506-012-9131-x</ee>
+<ee>https://www.wikidata.org/entity/Q57722065</ee>
+<url>db/journals/ail/ail20.html#Bench-CaponAAABBBBCFGGLLLMPSSTTVWW12</url>
+</article>
+</r>
+<r><inproceedings key="conf/aamas/WynerAB12" mdate="2016-08-29">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Opinion gathering using a multi-agent systems approach to policy selection.</title>
+<pages>1171-1172</pages>
+<year>2012</year>
+<booktitle>AAMAS</booktitle>
+<ee>http://dl.acm.org/citation.cfm?id=2343904</ee>
+<crossref>conf/atal/2012</crossref>
+<url>db/conf/atal/aamas2012.html#WynerAB12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/at/WynerS12" mdate="2023-03-10">
+<author pid="73/3639">Adam Z. Wyner</author>
+<author pid="85/9514">Jodi Schneider</author>
+<title>Arguing from a Point of View.</title>
+<pages>153-167</pages>
+<year>2012</year>
+<booktitle>AT</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-918/111110153.pdf</ee>
+<crossref>conf/at/2012</crossref>
+<url>db/conf/at/at2012.html#WynerS12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/comma/WynerSAB12" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0002-5098-5667" pid="85/9514">Jodi Schneider</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Semi-Automated Argumentative Analysis of Online Product Reviews.</title>
+<pages>43-50</pages>
+<year>2012</year>
+<booktitle>COMMA</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-111-3-43</ee>
+<crossref>conf/comma/2012</crossref>
+<url>db/conf/comma/comma2012.html#WynerSAB12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/comma/WynerAB12" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Critiquing Justifications for Action Using a Semantic Model: Demonstration.</title>
+<pages>503-504</pages>
+<year>2012</year>
+<booktitle>COMMA</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-111-3-503</ee>
+<crossref>conf/comma/2012</crossref>
+<url>db/conf/comma/comma2012.html#WynerAB12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ekaw/SchneiderDW12" mdate="2021-07-25">
+<author orcid="0000-0002-5098-5667" pid="85/9514">Jodi Schneider</author>
+<author orcid="0000-0002-5759-2655" pid="04/285-1">Brian Davis 0001</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Dimensions of Argumentation in Social Media.</title>
+<pages>21-25</pages>
+<year>2012</year>
+<booktitle>EKAW</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-33876-2_4</ee>
+<ee>https://www.wikidata.org/entity/Q56447898</ee>
+<crossref>conf/ekaw/2012</crossref>
+<url>db/conf/ekaw/ekaw2012.html#SchneiderDW12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ekaw/SchneiderW12" mdate="2023-03-10">
+<author pid="85/9514">Jodi Schneider</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Identifying Consumers' Arguments in Text.</title>
+<pages>31-42</pages>
+<year>2012</year>
+<booktitle>SWAIE</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-925/paper_4.pdf</ee>
+<crossref>conf/ekaw/2012swaie</crossref>
+<url>db/conf/ekaw/swaie2012.html#SchneiderW12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/epart/WynerAB12" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Model Based Critique of Policy Proposals.</title>
+<pages>120-131</pages>
+<year>2012</year>
+<booktitle>ePart</booktitle>
+<ee type="oa">https://doi.org/10.1007/978-3-642-33250-0_11</ee>
+<ee>https://www.wikidata.org/entity/Q57727114</ee>
+<crossref>conf/epart/2012</crossref>
+<url>db/conf/epart/epart2012.html#WynerAB12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/itbam/WynerRHC12" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="80/11131">Luke Riley</author>
+<author orcid="0000-0001-8149-5890" pid="38/3629">Robert Hoehndorf</author>
+<author pid="61/8909">Samuel Croset</author>
+<title>Argumentation to Represent and Reason over Biological Systems.</title>
+<pages>124-138</pages>
+<year>2012</year>
+<booktitle>ITBAM</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-32395-9_10</ee>
+<ee>https://www.wikidata.org/entity/Q56920827</ee>
+<crossref>conf/itbam/2012</crossref>
+<url>db/conf/itbam/itbam2012.html#WynerRHC12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerWBA12" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="41/4327">Maya Wardeh</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>A Model-Based Critique Tool for Policy Deliberation.</title>
+<pages>167-176</pages>
+<year>2012</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-167-0-167</ee>
+<crossref>conf/jurix/2012</crossref>
+<url>db/conf/jurix/jurix2012.html#WynerWBA12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerBBQ12" mdate="2019-10-19">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="56/746">Johan Bos</author>
+<author orcid="0000-0001-8110-6832" pid="86/11425">Valerio Basile</author>
+<author orcid="0000-0002-5086-059X" pid="73/4272">Paulo Quaresma</author>
+<title>An Empirical Approach to the Semantic Representation of Laws.</title>
+<pages>177-180</pages>
+<year>2012</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-61499-167-0-177</ee>
+<crossref>conf/jurix/2012</crossref>
+<url>db/conf/jurix/jurix2012.html#WynerBBQ12</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/epart/WynerAB11" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Towards a Structured Online Consultation Tool.</title>
+<pages>286-297</pages>
+<year>2011</year>
+<booktitle>ePart</booktitle>
+<ee type="oa">https://doi.org/10.1007/978-3-642-23333-3_25</ee>
+<ee>https://www.wikidata.org/entity/Q57727119</ee>
+<crossref>conf/epart/2011</crossref>
+<url>db/conf/epart/epart2011.html#WynerAB11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/WynerBA11" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>Towards formalising argumentation about legal cases.</title>
+<pages>1-10</pages>
+<year>2011</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/2018358.2018359</ee>
+<ee>https://www.wikidata.org/entity/Q57727121</ee>
+<crossref>conf/icail/2011</crossref>
+<url>db/conf/icail/icail2011.html#WynerBA11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/icail/AtkinsonBCW11" mdate="2018-11-14">
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="39/5934">Dan Cartwright</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Semantic models for policy deliberation.</title>
+<pages>81-90</pages>
+<year>2011</year>
+<booktitle>ICAIL</booktitle>
+<ee>https://doi.org/10.1145/2018358.2018369</ee>
+<ee>https://www.wikidata.org/entity/Q57727118</ee>
+<crossref>conf/icail/2011</crossref>
+<url>db/conf/icail/icail2011.html#AtkinsonBCW11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerP11" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="84/163">Wim Peters</author>
+<title>On Rule Extraction from Regulations.</title>
+<pages>113-122</pages>
+<year>2011</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-60750-981-3-113</ee>
+<crossref>conf/jurix/2011</crossref>
+<url>db/conf/jurix/jurix2011.html#WynerP11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/Pulfrey-TaylorHAWB11" mdate="2018-11-02">
+<author pid="66/11075">Sarah Pulfrey-Taylor</author>
+<author pid="00/11076">Emily Henthorn</author>
+<author pid="17/6670">Katie Atkinson</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Populating an Online Consultation Tool.</title>
+<pages>150-154</pages>
+<year>2011</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-60750-981-3-150</ee>
+<crossref>conf/jurix/2011</crossref>
+<url>db/conf/jurix/jurix2011.html#Pulfrey-TaylorHAWB11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/pakdd/WardehCBW11" mdate="2024-05-07">
+<author pid="41/4327">Maya Wardeh</author>
+<author orcid="0000-0003-1026-6649" pid="c/FransCoenen">Frans Coenen</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="73/3639">Adam Z. Wyner</author>
+<title>Multi-agent Based Classification Using Argumentation from Experience.</title>
+<pages>357-369</pages>
+<year>2011</year>
+<booktitle>PAKDD (2)</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-20847-8_30</ee>
+<crossref>conf/pakdd/2011-2</crossref>
+<url>db/conf/pakdd/pakdd2011-2.html#WardehCBW11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/um/Lloyd-KellyW11" mdate="2018-11-14">
+<author pid="64/10946">Martyn Lloyd-Kelly</author>
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<title>Arguing about Emotion.</title>
+<pages>355-367</pages>
+<year>2011</year>
+<booktitle>UMAP Workshops</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-28509-7_33</ee>
+<ee>https://www.wikidata.org/entity/Q57727111</ee>
+<crossref>conf/um/2011w</crossref>
+<url>db/conf/um/umap2011w.html#Lloyd-KellyW11</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/egov/WynerEB10" mdate="2026-02-25">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author orcid="0000-0003-3699-8303" pid="46/1348">Tom M. van Engers</author>
+<author orcid="0000-0001-9016-9894" pid="42/885">Kiavash Bahreini</author>
+<title>From Policy-Making Statements to First-Order Logic.</title>
+<pages>47-61</pages>
+<year>2010</year>
+<booktitle>EGOVIS</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-15172-9_5</ee>
+<ee>https://www.wikidata.org/entity/Q57727128</ee>
+<crossref>conf/egov/2010</crossref>
+<url>db/conf/egov/egovis2010.html#WynerEB10</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/ekaw/WynerE10" mdate="2023-03-10">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="46/1348">Tom M. van Engers</author>
+<title>Web-based Mass Argumentation in Natural Language.</title>
+<year>2010</year>
+<booktitle>EKAW (Posters and Demos)</booktitle>
+<ee type="oa">https://ceur-ws.org/Vol-674/Paper136.pdf</ee>
+<crossref>conf/ekaw/2010pd</crossref>
+<url>db/conf/ekaw/ekaw2010pd.html#WynerE10</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerP10" mdate="2018-11-02">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="84/163">Wim Peters</author>
+<title>Lexical Semantics and Expert Legal Knowledge towards the Identification of Legal Case Factors.</title>
+<pages>127-136</pages>
+<year>2010</year>
+<booktitle>JURIX</booktitle>
+<ee>https://doi.org/10.3233/978-1-60750-682-9-127</ee>
+<crossref>conf/jurix/2010</crossref>
+<url>db/conf/jurix/jurix2010.html#WynerP10</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/lrec/WynerPMM10" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="51/2446">Raquel Mochales Palau</author>
+<author pid="m/MarieFrancineMoens">Marie-Francine Moens</author>
+<author pid="02/985">David Milward</author>
+<title>Approaches to Text Mining Arguments from Legal Cases.</title>
+<pages>60-79</pages>
+<year>2010</year>
+<booktitle>Semantic Processing of Legal Texts</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-12837-0_4</ee>
+<ee>https://www.wikidata.org/entity/Q57727126</ee>
+<crossref>conf/lrec/2010legal</crossref>
+<url>db/conf/lrec/legal2010.html#WynerPMM10</url>
+</inproceedings>
+</r>
+<r><article key="journals/logcom/WynerB09" mdate="2018-11-30">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Zachary Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Modelling Judicial Context in Argumentation Frameworks.</title>
+<pages>941-968</pages>
+<year>2009</year>
+<volume>19</volume>
+<journal>J. Log. Comput.</journal>
+<number>6</number>
+<ee>https://doi.org/10.1093/logcom/exp009</ee>
+<ee>https://www.wikidata.org/entity/Q57727133</ee>
+<url>db/journals/logcom/logcom19.html#WynerB09</url>
+</article>
+</r>
+<r><inproceedings key="conf/aaaifs/WynerBD09" mdate="2026-02-02">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="d/PaulEDunne">Paul E. Dunne</author>
+<title>Instantiating Knowledge Bases in Abstract Argumentation Frameworks.</title>
+<year>2009</year>
+<booktitle>AAAI Fall Symposium: The Uses of Computational Argumentation</booktitle>
+<ee type="archive">http://aaai.org/ocs/index.php/FSS/FSS09/paper/view/940</ee>
+<crossref>conf/aaaifs/2009-6</crossref>
+<url>db/conf/aaaifs/aaaifs2009-06.html#WynerBD09</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/cnl/WynerABDDFHJKK09" mdate="2021-07-25">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Z. Wyner</author>
+<author pid="72/4334">Krasimir Angelov</author>
+<author orcid="0000-0002-3804-2498" pid="08/82">Guntis Barzdins</author>
+<author pid="09/307">Danica Damljanovic</author>
+<author orcid="0000-0002-5759-2655" pid="04/285-1">Brian Davis 0001</author>
+<author pid="f/NorbertEFuchs">Norbert E. Fuchs</author>
+<author pid="72/589">Stefan H&#246;fler</author>
+<author pid="24/8394">Ken Jones</author>
+<author pid="41/5597">Kaarel Kaljurand</author>
+<author orcid="0000-0002-1267-0234" pid="68/6676">Tobias Kuhn</author>
+<title>On Controlled Natural Languages: Properties and Prospects.</title>
+<pages>281-289</pages>
+<year>2009</year>
+<booktitle>CNL</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-14418-9_17</ee>
+<ee>https://www.wikidata.org/entity/Q57402181</ee>
+<crossref>conf/cnl/2009</crossref>
+<url>db/conf/cnl/cnl2009.html#WynerABDDFHJKK09</url>
+</inproceedings>
+</r>
+<r><article key="journals/ail/Wyner08" mdate="2018-11-30">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Zachary Wyner</author>
+<title>An ontology in OWL for legal case-based reasoning.</title>
+<pages>361-387</pages>
+<year>2008</year>
+<volume>16</volume>
+<journal>Artif. Intell. Law</journal>
+<number>4</number>
+<ee>https://doi.org/10.1007/s10506-008-9070-8</ee>
+<ee>https://www.wikidata.org/entity/Q57727136</ee>
+<url>db/journals/ail/ail16.html#Wyner08</url>
+</article>
+</r>
+<r><inproceedings key="conf/comma/WynerB08" mdate="2012-03-14">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Modelling Judicial Context in Argumentation Frameworks.</title>
+<pages>417-428</pages>
+<year>2008</year>
+<booktitle>COMMA</booktitle>
+<crossref>conf/comma/2008</crossref>
+<url>db/conf/comma/comma2008.html#WynerB08</url>
+<ee>http://www.booksonline.iospress.nl/Content/View.aspx?piid=9299</ee>
+</inproceedings>
+</r>
+<r><incollection key="books/ox/08/Wyner08" mdate="2020-05-07">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<title>Towards flexible types with constraints for manner and factive adverbs.</title>
+<pages>249-273</pages>
+<year>2008</year>
+<booktitle>Adjectives and Adverbs</booktitle>
+<crossref>books/ox/08/MK2008</crossref>
+<url>db/books/collections/MK2008.html#Wyner08</url>
+</incollection>
+</r>
+<r><incollection key="series/lncs/WynerBA08" mdate="2024-05-07">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>Three Senses of &#34;Argument&#34;.</title>
+<pages>146-161</pages>
+<year>2008</year>
+<booktitle>Computable Models of the Law, Languages, Dialogues, Games, Ontologies</booktitle>
+<ee>https://doi.org/10.1007/978-3-540-85569-9_10</ee>
+<crossref>series/lncs/4884</crossref>
+<url>db/series/lncs/lncs4884.html#WynerBA08</url>
+</incollection>
+</r>
+<r><inproceedings key="conf/ecsqaru/WynerB07" mdate="2024-05-07">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author orcid="0000-0003-3975-4398" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Towards an Extensible Argumentation System.</title>
+<pages>283-294</pages>
+<year>2007</year>
+<crossref>conf/ecsqaru/2007</crossref>
+<booktitle>ECSQARU</booktitle>
+<ee>https://doi.org/10.1007/978-3-540-75256-1_27</ee>
+<url>db/conf/ecsqaru/ecsqaru2007.html#WynerB07</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerB07" mdate="2012-03-14">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<title>Argument Schemes for Legal Case-based Reasoning.</title>
+<pages>139-149</pages>
+<year>2007</year>
+<booktitle>JURIX</booktitle>
+<crossref>conf/jurix/2007</crossref>
+<url>db/conf/jurix/jurix2007.html#WynerB07</url>
+<ee>http://www.booksonline.iospress.nl/Content/View.aspx?piid=7851</ee>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/jurix/WynerBA07" mdate="2012-03-14">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<author pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</author>
+<author pid="17/6670">Katie Atkinson</author>
+<title>Arguments, Values and Baseballs: Representation of Popov v. Hayashi.</title>
+<pages>151-160</pages>
+<year>2007</year>
+<booktitle>JURIX</booktitle>
+<crossref>conf/jurix/2007</crossref>
+<url>db/conf/jurix/jurix2007.html#WynerBA07</url>
+<ee>http://www.booksonline.iospress.nl/Content/View.aspx?piid=7852</ee>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/dalt/Wyner06" mdate="2017-05-19">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<title>A Functional Program for Agents, Actions, and Deontic Specifications.</title>
+<pages>239-256</pages>
+<year>2006</year>
+<crossref>conf/dalt/2006</crossref>
+<booktitle>DALT</booktitle>
+<ee>https://doi.org/10.1007/11961536_16</ee>
+<url>db/conf/dalt/dalt2006.html#Wyner06</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/deon/Wyner06" mdate="2018-11-14">
+<author orcid="0000-0002-2958-3428" pid="73/3639">Adam Zachary Wyner</author>
+<title>Sequences, Obligations, and the Contrary-to-Duty Paradox.</title>
+<pages>255-271</pages>
+<year>2006</year>
+<crossref>conf/deon/2006</crossref>
+<booktitle>DEON</booktitle>
+<ee>https://doi.org/10.1007/11786849_21</ee>
+<ee>https://www.wikidata.org/entity/Q57727138</ee>
+<url>db/conf/deon/deon2006.html#Wyner06</url>
+</inproceedings>
+</r>
+<r><inproceedings key="conf/deon/Wyner04" mdate="2017-05-21">
+<author pid="73/3639">Adam Zachary Wyner</author>
+<title>Maintaining Obligations on Stative Expressions in a Deontic Action Logic.</title>
+<pages>258-274</pages>
+<ee>https://doi.org/10.1007/978-3-540-25927-5_17</ee>
+<year>2004</year>
+<crossref>conf/deon/2004</crossref>
+<booktitle>DEON</booktitle>
+<url>db/conf/deon/deon2004.html#Wyner04</url>
+</inproceedings>
+</r>
+<coauthors n="165" nc="3">
+<co c="0"><na f="a/Angelov:Krasimir" pid="72/4334">Krasimir Angelov</na></co>
+<co c="0"><na f="a/Anicic:Darko" pid="94/5032">Darko Anicic</na></co>
+<co c="0"><na f="a/Anim:Joseph_K=" pid="377/7218">Joseph K. Anim</na></co>
+<co c="0"><na f="a/Araszkiewicz:Michal" pid="06/9512">Michal Araszkiewicz</na></co>
+<co c="0"><na f="a/Arias:Joaqu=iacute=n" pid="167/4968">Joaqu&#237;n Arias</na></co>
+<co c="2"><na f="a/Armstrong:Jackson" pid="185/6463">Jackson Armstrong</na></co>
+<co c="0"><na f="a/Ashley:Kevin_D=" pid="39/1439">Kevin D. Ashley</na></co>
+<co c="2"><na f="a/Astley:Philip" pid="185/6492">Philip Astley</na></co>
+<co c="0"><na f="a/Athan:Tara" pid="74/10301">Tara Athan</na></co>
+<co c="0"><na f="a/Atkinson:Katie" pid="17/6670">Katie Atkinson</na></co>
+<co c="0"><na f="a/Azzolini:Damiano" pid="227/1498">Damiano Azzolini</na></co>
+<co c="0"><na f="b/Bahreini:Kiavash" pid="42/885">Kiavash Bahreini</na></co>
+<co c="0"><na f="b/Banks:Victoria_A=" pid="190/0169">Victoria A. Banks</na></co>
+<co c="0"><na f="b/Bansky:Patrik" pid="258/5215">Patrik Bansky</na></co>
+<co c="0"><na f="b/Barawi:Mohamad_Hardyman" pid="201/1401">Mohamad Hardyman Barawi</na></co>
+<co c="0"><na f="b/Baron:Jason_R=" pid="04/6962">Jason R. Baron</na></co>
+<co c="0"><na f="b/Barzdins:Guntis" pid="08/82">Guntis Barzdins</na></co>
+<co c="0"><na f="b/Basile:Valerio" pid="86/11425">Valerio Basile</na></co>
+<co c="0" n="2"><na f="b/Batsakis:Sotiris" pid="70/7127">Sotiris Batsakis</na><na>Sotirios Batsakis</na></co>
+<co c="0"><na f="b/Bench=Capon:Trevor_J=_M=" pid="b/TJMBenchCapon">Trevor J. M. Bench-Capon</na></co>
+<co c="-1"><na f="b/Benn:Neil" pid="25/6564">Neil Benn</na></co>
+<co c="0"><na f="b/Bex:Floris" pid="47/4875">Floris Bex</na></co>
+<co c="0"><na f="b/Bhattacharya:Paheli" pid="136/5747">Paheli Bhattacharya</na></co>
+<co c="0"><na f="b/Boley:Harold" pid="08/422">Harold Boley</na></co>
+<co c="0"><na f="b/Borges:Filipe" pid="50/2577">Filipe Borges</na></co>
+<co c="0" n="2"><na f="b/Borroto:Manuel" pid="299/0282">Manuel Borroto</na><na>Manuel Alejandro Borroto Santana</na></co>
+<co c="0"><na f="b/Bos:Johan" pid="56/746">Johan Bos</na></co>
+<co c="0"><na f="b/Bourcier:Dani=egrave=le" pid="81/2138">Dani&#232;le Bourcier</na></co>
+<co c="0"><na f="b/Bourgine:Paul" pid="89/5897">Paul Bourgine</na></co>
+<co c="0" n="2"><na f="b/Branting:Karl" pid="b/KarlBranting">Karl Branting</na><na>Luther Karl Branting</na></co>
+<co c="0"><na f="b/Bruno:Pierangela" pid="229/6261">Pierangela Bruno</na></co>
+<co c="0"><na f="c/Cabrio:Elena" pid="35/7561">Elena Cabrio</na></co>
+<co c="0"><na f="c/Cartwright:Dan" pid="39/5934">Dan Cartwright</na></co>
+<co c="0"><na f="c/Casini:Giovanni" pid="45/4069">Giovanni Casini</na></co>
+<co c="0"><na f="c/Cecchi:Laura_Andrea" pid="169/0421">Laura Andrea Cecchi</na></co>
+<co c="0"><na f="c/Cerutti_0001:Federico" pid="97/18">Federico Cerutti 0001</na></co>
+<co c="0"><na f="c/Clark:Leigh" pid="225/3501">Leigh Clark</na></co>
+<co c="0"><na f="c/Coenen:Frans" pid="c/FransCoenen">Frans Coenen</na></co>
+<co c="0"><na f="c/Conrad:Jack_G=" pid="w/JackGConrad">Jack G. Conrad</na></co>
+<co c="0"><na f="c/Contissa:Giuseppe" pid="00/5919">Giuseppe Contissa</na></co>
+<co c="0"><na f="c/Cowan:Benjamin_R=" pid="49/7687">Benjamin R. Cowan</na></co>
+<co c="0"><na f="c/Croset:Samuel" pid="61/8909">Samuel Croset</na></co>
+<co c="0"><na f="d/Damljanovic:Danica" pid="09/307">Danica Damljanovic</na></co>
+<co c="0"><na f="d/Davis_0001:Brian" pid="04/285-1">Brian Davis 0001</na></co>
+<co c="0"><na f="d/Diller:Martin" pid="134/6314">Martin Diller</na></co>
+<co c="0"><na f="d/Doyle:Philip_R=" pid="48/7823">Philip R. Doyle</na></co>
+<co c="0"><na f="d/Dunne:Paul_E=" pid="d/PaulEDunne">Paul E. Dunne</na></co>
+<co c="0"><na f="e/Edelstein:Elspeth" pid="230/0663">Elspeth Edelstein</na></co>
+<co c="0"><na f="e/Edwards:Justin" pid="234/7569">Justin Edwards</na></co>
+<co c="0"><na f="e/Egan:Charlie_P=" pid="315/4491">Charlie P. Egan</na></co>
+<co c="0"><na f="e/Engers:Tom_M=_van" pid="46/1348">Tom M. van Engers</na></co>
+<co c="0"><na f="f/Faber_0001:Wolfgang" pid="f/WolfgangFaber">Wolfgang Faber 0001</na></co>
+<co c="0"><na f="f/Fandinno:Jorge" pid="136/1503">Jorge Fandinno</na></co>
+<co c="0"><na f="f/Fawei:Biralatei" pid="171/3791">Biralatei Fawei</na></co>
+<co c="0"><na f="f/Fodor:Paul" pid="70/1143">Paul Fodor</na></co>
+<co c="0"><na f="f/Francesconi:Enrico" pid="87/612">Enrico Francesconi</na></co>
+<co c="0"><na f="f/Fuchs:Norbert_E=" pid="f/NorbertEFuchs">Norbert E. Fuchs</na></co>
+<co c="0"><na f="g/Ghosh:Kripabandhu" pid="74/10289">Kripabandhu Ghosh</na></co>
+<co c="0"><na f="g/Ghosh_0001:Saptarshi" pid="06/900-1">Saptarshi Ghosh 0001</na></co>
+<co c="0"><na f="g/Giurca:Adrian" pid="06/5872">Adrian Giurca</na></co>
+<co c="0"><na f="g/Gordon:Thomas_F=" pid="45/3471">Thomas F. Gordon</na></co>
+<co c="0"><na f="g/Gough:Fraser" pid="210/4982">Fraser Gough</na></co>
+<co c="0"><na f="g/Governatori:Guido" pid="g/GuidoGovernatori">Guido Governatori</na></co>
+<co c="0"><na f="g/Grabmair:Matthias" pid="09/1651">Matthias Grabmair</na></co>
+<co c="0"><na f="g/Guerin:Frank" pid="66/1072">Frank Guerin</na></co>
+<co c="0"><na f="g/Gupta_0001:Gopal" pid="g/GopalGupta">Gopal Gupta 0001</na></co>
+<co c="0"><na f="h/Hecher:Markus" pid="150/8127">Markus Hecher</na></co>
+<co c="0"><na f="h/Henseler:Hans" pid="52/8918">Hans Henseler</na></co>
+<co c="0"><na f="h/Henthorn:Emily" pid="00/11076">Emily Henthorn</na></co>
+<co c="0"><na f="h/Hirst:Graeme" pid="h/GraemeHirst">Graeme Hirst</na></co>
+<co c="0"><na f="h/Hoehndorf:Robert" pid="38/3629">Robert Hoehndorf</na></co>
+<co c="0"><na f="h/Hoekstra:Rinke" pid="14/2726">Rinke Hoekstra</na></co>
+<co c="0"><na f="h/H=ouml=fler:Stefan" pid="72/589">Stefan H&#246;fler</na></co>
+<co c="0"><na f="h/Hunter:Anthony" pid="23/4530">Anthony Hunter</na></co>
+<co c="0"><na f="i/Ibeke:Ebuka" pid="167/1183">Ebuka Ibeke</na></co>
+<co c="0"><na f="j/Janssen:Christian_P=" pid="89/89">Christian P. Janssen</na></co>
+<co c="0"><na f="j/Jones:Ken" pid="24/8394">Ken Jones</na></co>
+<co c="0"><na f="k/Kaljurand:Kaarel" pid="41/5597">Kaarel Kaljurand</na></co>
+<co c="0"><na f="k/Katz:Daniel" pid="135/8520">Daniel Katz</na></co>
+<co c="0"><na f="k/Keet:C=_Maria" pid="42/559">C. Maria Keet</na></co>
+<co c="0"><na f="k/Kollingbaum:Martin_J=" pid="40/6032">Martin J. Kollingbaum</na></co>
+<co c="0"><na f="k/Kuhn:Tobias" pid="68/6676">Tobias Kuhn</na></co>
+<co c="0"><na f="l/Lagioia:Francesca" pid="206/7577">Francesca Lagioia</na></co>
+<co c="0"><na f="l/Lauritsen:Marc" pid="78/765">Marc Lauritsen</na></co>
+<co c="0"><na f="l/Leidner:Jochen_L=" pid="67/6415">Jochen L. Leidner</na></co>
+<co c="0"><na f="l/L=eacute=vy:Fran=ccedil=ois" pid="16/5677">Fran&#231;ois L&#233;vy</na></co>
+<co c="0"><na f="l/Lewis:David_D=" pid="l/DavidDLewis">David D. Lewis</na></co>
+<co c="0"><na f="l/Liepina:Ruta" pid="215/8283">Ruta Liepina</na></co>
+<co c="0"><na f="l/Lin_0002:Chenghua" pid="11/7536-2">Chenghua Lin 0002</na></co>
+<co c="0"><na f="l/Linna_Jr=:Daniel_W=" pid="309/7474">Daniel W. Linna Jr.</na></co>
+<co c="0"><na f="l/Lloyd=Kelly:Martyn" pid="64/10946">Martyn Lloyd-Kelly</na></co>
+<co c="0"><na f="l/Loui:Ronald_Prescott" pid="l/RPLoui">Ronald Prescott Loui</na></co>
+<co c="0"><na f="l/Lynch:Matt" pid="210/5022">Matt Lynch</na></co>
+<co c="2"><na f="m/Mackillop:Andrew" pid="185/6478">Andrew Mackillop</na></co>
+<co c="0"><na f="m/Mandya:Angrosh" pid="148/4542">Angrosh Mandya</na></co>
+<co c="0"><na f="m/Maranh=atilde=o:Juliano" pid="19/5709">Juliano Maranh&#227;o</na></co>
+<co c="0"><na f="m/Maratea:Marco" pid="m/MarcoMaratea">Marco Maratea</na></co>
+<co c="0"><na f="m/McCarty:L=_Thorne" pid="70/5086">L. Thorne McCarty</na></co>
+<co c="0"><na f="m/Milward:David" pid="02/985">David Milward</na></co>
+<co c="0"><na f="m/Moens:Marie=Francine" pid="m/MarieFrancineMoens">Marie-Francine Moens</na></co>
+<co c="0"><na f="m/Morales_0001:Jos=eacute=_F=" pid="03/305">Jos&#233; F. Morales 0001</na></co>
+<co c="1"><na f="m/Morgan:Jay_Paul" pid="231/7717">Jay Paul Morgan</na></co>
+<co c="0"><na f="m/Morgenstern:Leora" pid="46/2598">Leora Morgenstern</na></co>
+<co c="0"><na f="m/Mu=ntilde=iz:Brais" pid="249/2841">Brais Mu&#241;iz</na></co>
+<co c="0"><na f="n/Nazarenko:Adeline" pid="43/5516">Adeline Nazarenko</na></co>
+<co c="0"><na f="p/Pace:Gordon_J=" pid="52/776">Gordon J. Pace</na></co>
+<co c="0"><na f="p/Pacenza:Francesco" pid="225/2520">Francesco Pacenza</na></co>
+<co c="1"><na f="p/Paiement:Adeline" pid="142/3870">Adeline Paiement</na></co>
+<co c="0"><na f="p/Palau:Raquel_Mochales" pid="51/2446">Raquel Mochales Palau</na></co>
+<co c="0"><na f="p/Palmirani:Monica" pid="26/6137">Monica Palmirani</na></co>
+<co c="0"><na f="p/Pan:Jeff_Z=" pid="59/6490">Jeff Z. Pan</na></co>
+<co c="0"><na f="p/Papadakis_0001:Emmanuel" pid="p/EmmanuelPapadakis">Emmanuel Papadakis 0001</na></co>
+<co c="0"><na f="p/Papadakis_0002:Emmanuel" pid="p/EmmanuelPapadakis-2">Emmanuel Papadakis 0002</na></co>
+<co c="0"><na f="p/Paschke:Adrian" pid="24/2942">Adrian Paschke</na></co>
+<co c="0"><na f="p/Patkos:Theodore" pid="09/804">Theodore Patkos</na></co>
+<co c="0"><na f="p/Paul:Shounak" pid="254/1100">Shounak Paul</na></co>
+<co c="0"><na f="p/Peters:Wim" pid="84/163">Wim Peters</na></co>
+<co c="0"><na f="p/Pickens:Jeremy" pid="71/43">Jeremy Pickens</na></co>
+<co c="0"><na f="p/Pisano:Giuseppe" pid="277/2619">Giuseppe Pisano</na></co>
+<co c="0"><na f="p/Pont:Thiago_Raulino_Dal" pid="276/4944">Thiago Raulino Dal Pont</na></co>
+<co c="0"><na f="p/Prakken:Henry" pid="64/5549">Henry Prakken</na></co>
+<co c="0"><na f="p/Price:David" pid="32/6677">David Price</na></co>
+<co c="0"><na f="p/Pulfrey=Taylor:Sarah" pid="66/11075">Sarah Pulfrey-Taylor</na></co>
+<co c="0"><na f="q/Quaresma:Paulo" pid="73/4272">Paulo Quaresma</na></co>
+<co c="0"><na f="r/Riley:Luke" pid="80/11131">Luke Riley</na></co>
+<co c="0"><na f="r/Robaldo:Livio" pid="41/5768">Livio Robaldo</na></co>
+<co c="0"><na f="r/Roman:Dumitru" pid="49/7031">Dumitru Roman</na></co>
+<co c="0"><na f="r/Rotolo:Antonino" pid="89/4715">Antonino Rotolo</na></co>
+<co c="0" n="2"><na f="r/Rough:Daniel_J=" pid="269/2024">Daniel J. Rough</na><na>Daniel Rough</na></co>
+<co c="0"><na f="r/R=uuml=ckschlo=szlig=:Kilian" pid="304/6973">Kilian R&#252;ckschlo&#223;</na></co>
+<co c="0"><na f="s/Salazar:Elmer" pid="188/5746">Elmer Salazar</na></co>
+<co c="0"><na f="s/Saribatur:Zeynep_G=" pid="135/9950">Zeynep G. Saribatur</na></co>
+<co c="0"><na f="s/Sartor:Galileo" pid="281/2743">Galileo Sartor</na></co>
+<co c="0"><na f="s/Sartor:Giovanni" pid="06/414">Giovanni Sartor</na></co>
+<co c="0"><na f="s/Schilder:Frank" pid="21/2419">Frank Schilder</na></co>
+<co c="0"><na f="s/Schneider:Jodi" pid="85/9514">Jodi Schneider</na></co>
+<co c="0"><na f="s/Schweighofer:Erich" pid="66/72">Erich Schweighofer</na></co>
+<co c="0"><na f="s/Scudo:Fabrizio_Lo" pid="220/4461">Fabrizio Lo Scudo</na></co>
+<co c="1"><na f="s/Seisenberger:Monika" pid="75/6874">Monika Seisenberger</na></co>
+<co c="0"><na f="s/Serafini:Luciano" pid="s/LucianoSerafini">Luciano Serafini</na></co>
+<co c="0"><na f="s/Shulayeva:Olga" pid="197/6364">Olga Shulayeva</na></co>
+<co c="0"><na f="s/Siddharthan:Advaith" pid="95/3737">Advaith Siddharthan</na></co>
+<co c="0"><na f="s/Sileno:Giovanni" pid="122/5519">Giovanni Sileno</na></co>
+<co c="0"><na f="s/Soares:Ricardo" pid="230/0732">Ricardo Soares</na></co>
+<co c="0"><na f="s/Sottara:Davide" pid="69/5088">Davide Sottara</na></co>
+<co c="0"><na f="s/Stachura=Zurek:Dorota" pid="331/0825">Dorota Stachura-Zurek</na></co>
+<co c="0" n="2"><na f="s/Stefaneas:Petros" pid="96/1254">Petros Stefaneas</na><na>Petros S. Stefaneas</na></co>
+<co c="0"><na f="s/Strass:Hannes" pid="52/4232">Hannes Strass</na></co>
+<co c="0"><na f="t/Tachmazidis:Ilias" pid="116/9321">Ilias Tachmazidis</na></co>
+<co c="0"><na f="t/Tarzariol:Alice" pid="208/2233">Alice Tarzariol</na></co>
+<co c="0"><na f="t/Thompson:Paul" pid="81/4502">Paul Thompson</na></co>
+<co c="0"><na f="t/Tyrrell:Alex" pid="25/1431">Alex Tyrrell</na></co>
+<co c="0"><na f="v/Vallati:Mauro" pid="13/7563">Mauro Vallati</na></co>
+<co c="0"><na f="v/Verheij:Bart" pid="99/3259">Bart Verheij</na></co>
+<co c="0"><na f="v/Villata:Serena" pid="84/5009">Serena Villata</na></co>
+<co c="0"><na f="v/Vinjumur:Jyothi_K=" pid="44/7570">Jyothi K. Vinjumur</na></co>
+<co c="0"><na f="w/Walker:Vern_R=" pid="90/5632">Vern R. Walker</na></co>
+<co c="0"><na f="w/Wallner:Johannes_P=" pid="15/10093">Johannes P. Wallner</na></co>
+<co c="0"><na f="w/Waltl:Bernhard" pid="154/7820">Bernhard Waltl</na></co>
+<co c="0" n="2"><na f="w/Walton:Douglas" pid="26/4182">Douglas Walton</na><na>Douglas N. Walton</na></co>
+<co c="0"><na f="w/Wardeh:Maya" pid="41/4327">Maya Wardeh</na></co>
+<co c="0"><na f="w/Weitk=auml=mper:Felix" pid="277/0522">Felix Weitk&#228;mper</na></co>
+<co c="1"><na f="w/Williams:Jane" pid="84/909">Jane Williams</na></co>
+<co c="0"><na f="w/Wintersberger:Philipp" pid="121/1109">Philipp Wintersberger</na></co>
+<co c="0"><na f="z/Zurek:Tomasz" pid="68/7168">Tomasz Zurek</na></co>
+</coauthors>
+</dblpperson>
+

@@ -1,0 +1,3726 @@
+[
+ {
+  "title": "Front matter",
+  "year": 1991,
+  "type": "paratext",
+  "venue": "Proceedings from Semantics and Linguistic Theory",
+  "doi": "10.3765/salt.v1i0.3237",
+  "cited_by_count": 0,
+  "oa_url": "https://journals.linguisticsociety.org/proceedings/index.php/SALT/article/download/3237/2926",
+  "coauthors": [
+   "Steven K. Moore"
+  ],
+  "concepts": [
+   "Front (military)",
+   "Linguistics",
+   "Philosophy",
+   "Semantics (computer science)",
+   "Cognitive science"
+  ],
+  "abstract": "Proceedings of the 1st Semantics and Linguistic Theory Conference, held April 19-21, 1991 at Cornell University, edited by Steven K. Moore and Adam Zachary Wyner."
+ },
+ {
+  "title": "Proceedings from Semantics and Linguistic Theory III",
+  "year": 1993,
+  "type": "book",
+  "venue": "Medical Entomology and Zoology",
+  "doi": null,
+  "cited_by_count": 5,
+  "oa_url": null,
+  "coauthors": [
+   "Utpal Lahiri"
+  ],
+  "concepts": [
+   "Linguistics",
+   "Semantics (computer science)",
+   "Theoretical linguistics",
+   "Computer science",
+   "Philosophy"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Subject-Oriented Adverbs are Thematically Dependent",
+  "year": 1998,
+  "type": "book-chapter",
+  "venue": "Studies in linguistics and philosophy",
+  "doi": "10.1007/978-94-011-3969-4_14",
+  "cited_by_count": 33,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Subject (documents)",
+   "Linguistics",
+   "Contrast (vision)",
+   "Computer science",
+   "Natural language processing",
+   "Philosophy"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Maintaining Obligations on Stative Expressions in a Deontic Action Logic",
+  "year": 2004,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-540-25927-5_17",
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Deontic logic",
+   "Proposition",
+   "Computer science",
+   "Action (physics)",
+   "Obligation",
+   "Context (archaeology)",
+   "Component (thermodynamics)",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Sequences, Obligations, and the Contrary-to-Duty Paradox",
+  "year": 2006,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/11786849_21",
+  "cited_by_count": 6,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Computer science",
+   "Duty"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A Functional Program for Agents, Actions, and Deontic Specifications",
+  "year": 2006,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/11961536_16",
+  "cited_by_count": 6,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Deontic logic",
+   "Computer science",
+   "Programming language",
+   "Haskell",
+   "Declarative programming",
+   "Process (computing)",
+   "Specification language",
+   "Artificial intelligence",
+   "Functional programming"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A functional program for agents, actions, and deontic specifications",
+  "year": 2006,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Deontic logic",
+   "Computer science",
+   "Programming language",
+   "Haskell",
+   "Specification language",
+   "Declarative programming",
+   "Functional programming",
+   "Artificial intelligence"
+  ],
+  "abstract": "Abstract. We outline elements of the Abstract Contract Calculator, a prototype language implemented in Haskell (a declarative programming language) in which we simulate agents executing abstract actions relative to deontic specifications. The deontic specifications are prohibition, permission, and obligation. The concepts of deontic specifications are derived from Standard Deontic Logic and Dynamic Deontic Logic. The concepts of abstract actions are derived from Dynamic Logic. The logics are declarative, while the implementation is operational. In contrast to other implementations, we have articulated and productive violation and fulfillment markers. Our actions are given with explicit action preconditions and postconditions, and we have deontic specification of complex actions. We implement inference in the Contrary-to-Duty Obligations case, which has been a central problem in Deontic Logic. We also distinguish Contrary-to-Duty Obligations from obligations on sequences, which has not previously been accounted for in the literature. The language can be used to express a range of alternative notions of actions and deontic specification. We use it to to model and simulate multi-agent systems in which the behavior of an agent is guided by deontic specifications on actions. 1"
+ },
+ {
+  "title": "Arguments, Values and Baseballs: Representation of Popov v. Hayashi",
+  "year": 2007,
+  "type": "article",
+  "venue": "International Conference on Legal Knowledge and Information Systems",
+  "doi": null,
+  "cited_by_count": 26,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Representation (politics)",
+   "Computer science",
+   "Outcome (game theory)",
+   "Epistemology",
+   "Argumentation framework",
+   "Mathematics",
+   "Law"
+  ],
+  "abstract": "The first 10 years of a primary health service in the Cape Peninsula are reviewed. The importance of primary care and self-care with regard to health resources is stressed. For such a service to be effective and co-ordinated with hospital specialist services requires the input of specialist expertise, which is timely but not timeless. The results of such paediatric and obstetric specialist input and the \"bait\" of care for current illness to involve patients in preventive and self-care measures are shown."
+ },
+ {
+  "title": "OWL ontology of basic legal concepts (LKIF-Core). Estrella: Deliverable 1.4",
+  "year": 2007,
+  "type": "book",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 17,
+  "oa_url": null,
+  "coauthors": [
+   "Joost Breuker",
+   "Rinke Hoekstra",
+   "van den Berg Kasper",
+   "Rossella Rubino",
+   "Giovanni Sartor",
+   "Monica Palmirani",
+   "Bench Capon Trevor"
+  ],
+  "concepts": [
+   "Deliverable",
+   "Ontology",
+   "Core (optical fiber)",
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Argument Schemes for Legal Case-based Reasoning",
+  "year": 2007,
+  "type": "conference-paper",
+  "venue": "International Conference on Legal Knowledge and Information Systems",
+  "doi": null,
+  "cited_by_count": 53,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argument (complex analysis)",
+   "Computer science",
+   "Argument map",
+   "Set (abstract data type)",
+   "Artificial intelligence",
+   "Epistemology"
+  ],
+  "abstract": "In this paper we use the notion of argument schemes to analyse some leading approaches to case-based reasoning in Law. We identify a set of argument schemes that can express the argument provided by such systems and draw attention to some important differences between the various approaches."
+ },
+ {
+  "title": "OWL ontology of basic legal concepts (LKIF-Core)",
+  "year": 2007,
+  "type": "report",
+  "venue": "UvA-DARE (University of Amsterdam)",
+  "doi": null,
+  "cited_by_count": 32,
+  "oa_url": null,
+  "coauthors": [
+   "Joost Breuker",
+   "Rinke Hoekstra",
+   "Klaas van den Berg",
+   "Rossella Rubino",
+   "Giovanni Sartor",
+   "Monica Palmirani",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Ontology",
+   "Core (optical fiber)",
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards an Extensible Argumentation System",
+  "year": 2007,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-540-75256-1_27",
+  "cited_by_count": 13,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Argument (complex analysis)",
+   "Deliberation",
+   "Context (archaeology)",
+   "Epistemology",
+   "Relation (database)",
+   "Argumentation framework",
+   "Negotiation"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards flexible types with constraints for manner and factive adverbs",
+  "year": 2008,
+  "type": "book-chapter",
+  "venue": null,
+  "doi": "10.1093/oso/9780199211616.003.0010",
+  "cited_by_count": 27,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Adverb",
+   "Linguistics",
+   "Syntax",
+   "Sentence",
+   "Verb",
+   "Interpretation (philosophy)",
+   "Polysemy",
+   "Semantics (computer science)",
+   "Verb phrase",
+   "Philosophy",
+   "Phrase",
+   "Computer science"
+  ],
+  "abstract": "Abstract In this chapter, I discuss the syntax and semantics of so-called Lactive and manner adverbs such as in (1a) and (2a), with their respective paraphrases in (1b) and (2b).(1) a. Stupidly, Bill kissed Jill. b. The fact that Bill kissed Jill was stupid. ( 2) a. Bill kissed Jill passionately. b. The manner in which Bill kissed Jill was passionate. In section 10.2, I provide syntactic and semantic evidence to support the distinction between these two classes. Other factive adverbs are wisely, rndely, and appropriately; other manner adverbs are gently and roughly. For the moment, let us say that stupidly in (1a) is a sentence adverb, while passionately in (2a) is a verb phrase adverb. Some £active adverbs are polysemous between a factive and a manner interpretation (e.g., rudely), but I do not address polysemy in this chapter."
+ },
+ {
+  "title": "An ontology in OWL for legal case-based reasoning",
+  "year": 2008,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-008-9070-8",
+  "cited_by_count": 54,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Computer science",
+   "Ontology",
+   "Web Ontology Language",
+   "Ontology language",
+   "OWL-S",
+   "Semantic Web",
+   "Description logic",
+   "Knowledge representation and reasoning",
+   "Formal ontology",
+   "Representation (politics)",
+   "Novelty",
+   "Semantic Web Rule Language",
+   "Knowledge base",
+   "Natural language processing",
+   "Upper ontology",
+   "Information retrieval",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Modelling Judicial Context in Argumentation Frameworks",
+  "year": 2008,
+  "type": "article",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 2,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Context (archaeology)",
+   "Argument (complex analysis)",
+   "Argumentation framework",
+   "Value (mathematics)",
+   "Epistemology",
+   "Relation (database)",
+   "Computer science",
+   "Preference",
+   "Law and economics"
+  ],
+  "abstract": "Much work using argumentation frameworks treats arguments as entirely abstract, related by a uniform attack relation which always succeeds unless the attacker can itself be defeated. However, this does not seem adequate for legal argumentation. Some proposals have suggested regulating attack relations using preferences or values on arguments and which filter the attack relation, so that some attacks fail and so can be removed from the framework. This does not, however, capture a central feature of legal reasoning: how a decision with respect to the same facts and legal reasoning varies as the judicial context varies. Nor does it capture related context dependent features of legal reasoning, such as how an audience can prefer or value an argument, yet be constrained by precedent or authority not to accept it. Nor does it explain how certain types of attack may not be allowed in a particular procedural context. For this reason, evaluation of the status of arguments within a given framework must be allowed to depend not only on the attack relations along with the preference or value of arguments, but also on the nature of the attacks and the context in which they are made. We present a means to represent these features, enabling us to account for a number of factors currently considered to be beyond the remit of formal argumentation frameworks. We give three examples of the use of approach: appealing a case, overruling a precedent, and rehearing of a case as a civil rather than criminal proceeding."
+ },
+ {
+  "title": "Three Senses of “Argument”",
+  "year": 2008,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-540-85569-9_10",
+  "cited_by_count": 15,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Epistemology",
+   "Relation (database)",
+   "Conflation",
+   "Argument map",
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Instantiating Knowledge Bases in Abstract Argumentation Frameworks",
+  "year": 2009,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 8,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Paul E. Dunne"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Defeasible estate",
+   "Conflation",
+   "Argumentation framework",
+   "Argument (complex analysis)",
+   "Computer science",
+   "Abstraction",
+   "Relation (database)",
+   "Epistemology",
+   "Encoding (memory)",
+   "Theoretical computer science",
+   "Inference",
+   "Cognitive science",
+   "Artificial intelligence"
+  ],
+  "abstract": "Abstract Argumentation Frameworks (AFs) provide a fruitful basis for exploring issues of defeasible reasoning. Their power largely derives from the abstract nature of the arguments within the framework, where arguments are atomic nodes in an undifferentiated relation of attack. This abstraction conceals different conceptions of argument, and concrete instantiations encounter difficulties as a result of conflating these conceptions. We distinguish three distinct senses of the term. We provide an approach to instantiating AFs in which the nodes are restricted to literals and rules, encoding the underlying theory directly. Arguments, in each of the three senses, then emerge from this framework as distinctive structures of nodes and paths. Our framework retains the theoretical and computational benefits of an abstract AF, while keeping notions distinct which are conflated in other approaches to instantiation."
+ },
+ {
+  "title": "Modelling Judicial Context in Argumentation Frameworks",
+  "year": 2009,
+  "type": "article",
+  "venue": "Journal of Logic and Computation",
+  "doi": "10.1093/logcom/exp009",
+  "cited_by_count": 8,
+  "oa_url": "https://academic.oup.com/logcom/article-pdf/19/6/941/2803446/exp009.pdf",
+  "coauthors": [
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Context (archaeology)",
+   "Argument (complex analysis)",
+   "Value (mathematics)",
+   "Relation (database)",
+   "Computer science",
+   "Epistemology",
+   "Argumentation framework",
+   "Preference",
+   "Feature (linguistics)",
+   "Law and economics",
+   "Political science"
+  ],
+  "abstract": "Much work using argumentation frameworks (AFs) treats arguments as entirely abstract, related by a uniform attack relation that always succeeds unless the attacker can itself be defeated. However, this does not seem adequate for legal argumentation. Some proposals have suggested regulating attack relations using preferences or values on arguments and that filter the attack relation, so that, depending on the audience addressed, some attacks fail and so can be removed from the framework. This does not, however, capture a central feature of legal reasoning: how a decision with respect to the same facts and legal reasoning varies as the judicial context varies. Nor does it capture related context-dependent features of legal reasoning, such as how an audience can prefer or value an argument, yet be constrained by precedent or authority not to accept it. Nor does it explain how certain types of attack may not be allowed in a particular procedural context. For this reason, evaluation of the status of arguments within a given framework must be allowed to depend not only on the attack relations along with the preference or value of arguments, but also on the nature of the attacks and the context in which they are made. We present a means to represent these features, enabling us to account for a number of factors currently considered to be beyond the remit of formal AFs. We give several examples of the use of approach including: appealing a case, overruling a precedent and rehearing of a case as a civil rather than criminal proceeding."
+ },
+ {
+  "title": "A Framework for Enriched, Controlled On-line Discussion Forums for e-Government Policy-making",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 21,
+  "oa_url": null,
+  "coauthors": [
+   "Tom van Engers"
+  ],
+  "concepts": [
+   "Computer science",
+   "Argumentation theory",
+   "Ambiguity",
+   "Argument (complex analysis)",
+   "Statement (logic)",
+   "Natural language",
+   "Inference",
+   "Knowledge representation and reasoning",
+   "Information extraction",
+   "Natural language processing"
+  ],
+  "abstract": "The paper motivates and proposes a framework for enriched on-line dis-cussion forums for e-government policy-making, where pro and con state-ments for positions are structured, recorded, represented, and evaluated. The framework builds on current technologies for multi-threaded discus-sion lists by integrating modes, natural language processing, ontologies, and formal argumentation frameworks. With modes other than the stan-dard “reply comment”, users specify the semantic relationship between a new statement and the previous statement; the result is an argument graph. Natural language processing with a controlled language constrains the domain of discourse, eliminates ambiguity and unclarity, allows a log-ical representation of statements, and facilitates information extraction. However, the controlled language is highly expressive and natural. On-tologies represent the knowledge of the domain. Argumentation frame-works evaluate the argument graph and generate sets of consistent state-ments. The output of the system is a rich and articulated representation of a set of policy statements which supports queries, information extrac-tion, and inference."
+ },
+ {
+  "title": "Lexical Semantics and Expert Legal Knowledge towards the Identification of Legal Case Factors",
+  "year": 2010,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-60750-682-9-127",
+  "cited_by_count": 22,
+  "oa_url": null,
+  "coauthors": [
+   "Wim Peters"
+  ],
+  "concepts": [
+   "Identification (biology)",
+   "Natural language processing",
+   "Linguistics",
+   "Computer science",
+   "Semantics (computer science)",
+   "Lexical semantics",
+   "Artificial intelligence"
+  ],
+  "abstract": "Legal case factors are textually represented facts which are represented in reported legal case decisions. Precedent decisions contribute to the decision of a case under consideration. As textually represented facts, factors linguistically encode semantic properties and relationships among the entities which can be leveraged to identify and extract the legal case factors from decisions. We integrate legal and linguistic resources in a text analysis tool with which we annotate textual passages. Using annotations tailored to legal case factors, the legal researcher can rapidly zero in on textual spans which represent specific combinations of factors, participants, and semantic properties which bear on who played what role with respect to a factor. The research reports progress on the development of a tool."
+ },
+ {
+  "title": "Towards Annotating and Extracting Textual Legal Case Factors",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 11,
+  "oa_url": null,
+  "coauthors": [
+   "Wim Peters"
+  ],
+  "concepts": [
+   "Annotation",
+   "Identification (biology)",
+   "Computer science",
+   "Salient",
+   "Natural language processing",
+   "Information extraction",
+   "Artificial intelligence",
+   "Order (exchange)",
+   "Information retrieval"
+  ],
+  "abstract": "Case based reasoning is a crucial aspect of common law practice, where lawyers select precedent cases which they use to argue for or against a decision in a current case. To select the precedents, the relevant facts (the case factors) of precedent cases must be identified; the factors predispose the case decision for one side or the other. As the factors of cases are linguistically expressed, it is useful to provide a means to automate the identification of candidate passages. We outline and report the results of our approach to the identification of legal case factors which follows a bottom-up knowledge heavy strategy and uses the General Architecture for Text Engineering system. Salient lexical items are selected, concept classes of related terms are created, and annotation rules for simple and compound concepts are provided. The annotated concepts can be extracted from the cases, and cases can be classified with respect to the concepts. In addition to supporting extraction of relevant information, the approach has a didactic use in helping to train lawyers to perform close textual analysis. Finally, we carry out an initial collaborative, online annotation exercise using GATE TeamWare in order to develop a gold standard."
+ },
+ {
+  "title": "Web-based Mass Argumentation in Natural Language",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "T.M. van Engers"
+  ],
+  "concepts": [
+   "Computer science",
+   "Argumentation theory",
+   "Natural (archaeology)",
+   "Web application",
+   "World Wide Web",
+   "Natural language processing",
+   "Linguistics"
+  ],
+  "abstract": "We provide a novel framework and implementation which integrates tools to support the acquisition of mass, distribu-tive, incremental, dynamic, argumentative knowledge in nat-ural language. With the Attempto Controlled English (ACE) system, natural language statements are automatically trans-lated to a machine processable form. A discussion forum allows the specication of argumentation theoretic relation-ships among statements. Statements and their relationships are input to a formal, implemented argumentation system, which calculates inferences from asserted premises."
+ },
+ {
+  "title": "Approaches to Text Mining Arguments from Legal Cases",
+  "year": 2010,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-12837-0_4",
+  "cited_by_count": 138,
+  "oa_url": null,
+  "coauthors": [
+   "Raquel Mochales-Palau",
+   "Marie‐Francine Moens",
+   "David Milward"
+  ],
+  "concepts": [
+   "Computer science",
+   "Context (archaeology)",
+   "Identification (biology)",
+   "Natural language processing",
+   "Natural language",
+   "Grammar",
+   "Artificial intelligence",
+   "Natural (archaeology)",
+   "Information retrieval",
+   "Data science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "On Controlled Natural Languages: Properties and Prospects",
+  "year": 2010,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-14418-9_17",
+  "cited_by_count": 63,
+  "oa_url": null,
+  "coauthors": [
+   "Krasimir Angelov",
+   "Guntis Bārzdiņš",
+   "Danica Damljanović",
+   "Brian Davis",
+   "Norbert E. Fuchs",
+   "Stefan Hoefler",
+   "Ken Jones",
+   "Kaarel Kaljurand",
+   "Tobias Kuhn",
+   "Martin Luts",
+   "Jonathan Pool",
+   "Mike Rosner",
+   "Rolf Schwitter",
+   "John F. Sowa"
+  ],
+  "concepts": [
+   "Natural (archaeology)",
+   "Field (mathematics)",
+   "Computer science",
+   "Management science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards Annotating and Extracting Textual Legal Case Elements",
+  "year": 2010,
+  "type": "other",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 16,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Computer science",
+   "Information extraction",
+   "Annotation",
+   "XML",
+   "Information retrieval",
+   "Set (abstract data type)",
+   "Knowledge base",
+   "Legislation",
+   "Natural language",
+   "Legal case",
+   "Natural language processing",
+   "World Wide Web",
+   "Artificial intelligence",
+   "Data science"
+  ],
+  "abstract": "In common law contexts, legal cases are decided with respect to precedents rather than legislation as in civil law contexts. Legal professionals must find, analyse, and reason with and about cases drawn from a set of cases (a case base). A range of particular textual elements of a case may be relevant to query and extract. Commercial providers of legal information allow legal professionals to search a case base by keywords and meta data. However, the case base and the search tools are proprietary, of limited, non-extensible functionality, and are restricted access. Moreover, no provider applies natural language processing techniques to the cases for text analysis, XML annotation, or information acquisition. In this paper, we discuss an initial experiment in developing and applying natural language processing tools to cases to produce annotated text which can then support information extraction."
+ },
+ {
+  "title": "From Policy-Making Statements to First-Order Logic",
+  "year": 2010,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-15172-9_5",
+  "cited_by_count": 14,
+  "oa_url": null,
+  "coauthors": [
+   "Tom van Engers",
+   "Kiavash Bahreini"
+  ],
+  "concepts": [
+   "Computer science",
+   "Ambiguity",
+   "Consistency (knowledge bases)",
+   "Argumentation theory",
+   "Natural language",
+   "Representation (politics)",
+   "Rule of inference",
+   "First-order logic",
+   "Inference",
+   "Natural language processing",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "What do you mean? Arguing for meaning",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "T.M. van Engers"
+  ],
+  "concepts": [
+   "Conceptualization",
+   "Argumentation theory",
+   "Epistemology",
+   "Ontology",
+   "Argument (complex analysis)",
+   "Computer science",
+   "Meaning (existential)"
+  ],
+  "abstract": "Abstract Building ontologies has been proven to be a complex issue in part because a community must commit to the conceptualization that the ontology represents. The community members must align their concepts and co-create. Arguing about a useful conceptualization is therefore an essential part of the process of designing an ontology. Logicians have developed formal argumentation theories, but have not combined formal argumentation with conceptualization. Rather, while conceptualization should play an important role in any argumentation theoretical approach, argumentation theories focus on arguments based on propositional logic and argument structures, which are not sufficient for arguing about domain conceptualization, which requires a more fine-grained logical analysis. In this paper we will explain why conceptualization plays an important role within argumentation and why argumentation support tools, especially if they use Natural Language Processing (NLP), can help in creating domain ontologies."
+ },
+ {
+  "title": "Representing Deontic Concepts for CNLs",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Deontic logic",
+   "Epistemology",
+   "Computer science",
+   "Philosophy"
+  ],
+  "abstract": "The deontic concepts, obligation, permission, and prohibition, express what an individual ought to do, may do, or should not do; they ascribe a property to an action that an individual or collective performs, what we refer to here as deontic specifications. For brevity, we focus on obligation. We can say that the purpose of the concepts is to help"
+ },
+ {
+  "title": "Multi-modal Multi-threaded Online Forums",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Statement (logic)",
+   "Computer science",
+   "Premise",
+   "Modal",
+   "Construct (python library)",
+   "Argument (complex analysis)",
+   "Online discussion",
+   "Parsing",
+   "Problem statement",
+   "Human–computer interaction",
+   "Programming language",
+   "Linguistics",
+   "World Wide Web"
+  ],
+  "abstract": "Abstract. This paper motivates and outlines multi-modal multi-threaded online forums. The basic idea is that rather than a single “reply ” mode as in current multi-threaded online forums, where the user can only indicate that a current input statement is a reply to an existing statement, the user can select from a menu among a range of ways the input statement relates to a particular existing statement. For example, in the menu might be “contradicts”, “is premise of”, “is conclusion of”, or “is an exception to ” relations. From such choices, one can construct an “argument dialogue”. The input statements are parsed and semanti-cally interpreted by the Attempto Controlled Language, ensuring grammatically well-formed statements with first order logic representations. The database of propositions and their relations can be used by further systems. Key words: online forums, argumentation 1"
+ },
+ {
+  "title": "From Arguments in Natural Language to Argumentation Frameworks",
+  "year": 2010,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Argumentation theory",
+   "Rotation formalisms in three dimensions",
+   "Computer science",
+   "Probabilistic argumentation",
+   "Natural language",
+   "Argument (complex analysis)",
+   "Artificial intelligence",
+   "Theoretical computer science",
+   "Natural language processing",
+   "Epistemology"
+  ],
+  "abstract": "For argumentation useful, the means must be found overcome the knowledge acquisition bottleneck between the source material and the translation into and out of an argumentation formalism. As source material is often expressed and understood in natural language, we should consider how to translate natural language arguments. The current state of the art in argumentation does not have any formal translation method. In this paper, we discuss this lacuna. First, there are robust, wide-coverage computational linguistic systems which au-tomatically translate multi-sentential structures into first order logic. In restricted domain of discourse, this can be used to formalise the knowledge base. We then consider how such an approach could be extended to argumentation. We propose two different models of trans-lation based on currently available argumentation formalisms – logic-based and logic graphs. The advantage of the logic-based approach is that the arguments input into the argumentation system are sets of first order logic expressions and what is inferred from them. The consis-tency of each argument is assured; the relationships between the ar-guments in an argumentation framework graph are determined by the logic-based approach. One disadvantage is that each argument cannot have any missing expressions (enthymemes) before it can be used in the argumentation formalism. A second disadvantage is that the the-ory requires a complex system to determine relationships between the arguments, which is particularly relevant as arguments are added over the course of a dialogue. The logic graphs approach allows reasoning to proceed even where there are enthymemes, and it is straightforward to determine the relationships between arguments in the network and"
+ },
+ {
+  "title": "On Rule Extraction from Regulations",
+  "year": 2011,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-60750-981-3-113",
+  "cited_by_count": 84,
+  "oa_url": null,
+  "coauthors": [
+   "Wim Peters"
+  ],
+  "concepts": [
+   "Extraction (chemistry)",
+   "Computer science"
+  ],
+  "abstract": "Rules in regulations such as found in the US Federal Code of Regulations can be expressed using conditional and deontic rules. Identifying and extracting such rules from the language of the source material would be useful for automating rulebook management and translating into an executable logic. The paper presents a linguistically-oriented, rule-based approach, which is in contrast to a machine learning approach. It outlines use cases, discusses the source materials, reviews the methodology, then provides initial results and future steps."
+ },
+ {
+  "title": "Populating an Online Consultation Tool",
+  "year": 2011,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-60750-981-3-150",
+  "cited_by_count": 7,
+  "oa_url": null,
+  "coauthors": [
+   "Sarah Pulfrey-Taylor",
+   "Emily Henthorn",
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Computer science"
+  ],
+  "abstract": "The paper addresses the extraction, formalisation, and presentation of public policy arguments. Arguments are extracted from documents that comment on public policy proposals. Formalising the information from the arguments enables the construction of models and systematic analysis of the arguments. In addition, the arguments are represented in a form suitable for presentation in an online consultation tool. Thus, the forms in the consultation correlate with the formalisation and can be evaluated accordingly. The stages of the process are outlined with reference to a working example."
+ },
+ {
+  "title": "Towards formalising argumentation about legal cases",
+  "year": 2011,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/2018358.2018359",
+  "cited_by_count": 27,
+  "oa_url": "https://zenodo.org/record/3438411",
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Scope (computer science)",
+   "Defeasible reasoning",
+   "Computer science",
+   "Inference",
+   "Defeasible estate",
+   "Style (visual arts)",
+   "Argumentation framework",
+   "Artificial intelligence",
+   "Probabilistic argumentation",
+   "Epistemology",
+   "Software engineering",
+   "Programming language",
+   "Management science"
+  ],
+  "abstract": "In this paper we offer an account of reasoning with legal cases in terms of argumentation schemes. These schemes, and undercutting attacks associated with them, are expressed as defeasible rules of inference that will lend themselves to formalisation within the AS-PIC+ framework. We begin by modelling the style of reasoning with cases developed by Aleven and Ashley in the CATO project, which describes cases using factors, and then extend the account to accommodate the dimensions used in Rissland and Ashley's earlier HYPO project. Some additional scope for argumentation is then identified and formalised."
+ },
+ {
+  "title": "Semantic models for policy deliberation",
+  "year": 2011,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/2018358.2018369",
+  "cited_by_count": 27,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon",
+   "Dan Cartwright"
+  ],
+  "concepts": [
+   "Deliberation",
+   "Computer science",
+   "Argumentation theory",
+   "Semantics (computer science)",
+   "Process (computing)",
+   "Semantic Web",
+   "Management science",
+   "Focus (optics)",
+   "Domain (mathematical analysis)",
+   "Knowledge management",
+   "Analytic reasoning",
+   "Artificial intelligence"
+  ],
+  "abstract": "Semantic models have received little attention in recent years, much of their role having been taken over by developments in ontologies. Ontologies, however, are static, and so have only a limited role in reasoning about domains in which change matters. In this paper, we focus on the domain of policy deliberation, where policy decisions are designed to change things to realise particular social values. We explore how a particular kind of state transition system can be constructed to serve as a semantic model to support reasoning about alternative policy decisions. The policy making process includes stages that support the construction of a model, which can then be exploited in reasoning. The reasoning itself will be driven by a particular argumentation scheme for practical reasoning, and the ways in which arguments based on this scheme can be attacked and evaluated. The evaluation provides alternative policy positions. The semantics underpin a current web-based implementation, designed to solicit structured feedback on policy proposals."
+ },
+ {
+  "title": "Towards a Structured Online Consultation Tool",
+  "year": 2011,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-23333-3_25",
+  "cited_by_count": 13,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007%2F978-3-642-23333-3_25.pdf",
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Component (thermodynamics)",
+   "Construct (python library)",
+   "Online discussion",
+   "Underwriting",
+   "Data science",
+   "Management science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Multi-agent Based Classification Using Argumentation from Experience",
+  "year": 2011,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-20847-8_30",
+  "cited_by_count": 3,
+  "oa_url": null,
+  "coauthors": [
+   "Maya Wardeh",
+   "Frans Coenen",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Class (philosophy)",
+   "Artificial intelligence",
+   "Process (computing)",
+   "Machine learning",
+   "Data mining"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Arguing with emotion",
+  "year": 2011,
+  "type": "other",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Psychology",
+   "Epistemology",
+   "Political science",
+   "Social psychology"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A history of AI and Law in 50 papers: 25 years of the international conference on AI and Law",
+  "year": 2012,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-012-9131-x",
+  "cited_by_count": 164,
+  "oa_url": "http://ruj.uj.edu.pl/xmlui/handle/item/25043",
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Michał Araszkiewicz",
+   "Kevin D. Ashley",
+   "Katie Atkinson",
+   "Floris Bex",
+   "Filipe Borges",
+   "Danièle Bourcier",
+   "Paul Bourgine",
+   "Jack G. Conrad",
+   "Enrico Francesconi",
+   "Thomas F. Gordon",
+   "Guido Governatori",
+   "Jochen L. Leidner",
+   "David Lewis",
+   "Ronald P. Loui",
+   "L. Thorne McCarty",
+   "Henry Prakken",
+   "Frank Schilder",
+   "Erich Schweighofer",
+   "Paul Thompson",
+   "Alex Tyrrell",
+   "Bart Verheij",
+   "Douglas Walton"
+  ],
+  "concepts": [
+   "Context (archaeology)",
+   "Law",
+   "Philosophy of law",
+   "Legal history",
+   "Legal aspects of computing",
+   "Field (mathematics)",
+   "Political science",
+   "Comparative law",
+   "Sociology",
+   "History"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Semi-Automated Argumentative Analysis of Online Product Reviews",
+  "year": 2012,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-111-3-43",
+  "cited_by_count": 71,
+  "oa_url": null,
+  "coauthors": [
+   "Jodi Schneider",
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentative",
+   "Product (mathematics)",
+   "Computer science"
+  ],
+  "abstract": "Argumentation is key to understanding and evaluating many texts. The arguments in the texts must be identified; using current tools, this requires substantial work from human analysts. With a rule-based tool for semi-automatic text analysis support, we facilitate argument identification. The tool highlights potential argumentative sections of a text according to terms indicative of arguments (e.g. &amp;lsquo;suppose&amp;rsquo; or &amp;lsquo;therefore&amp;rsquo;) and domain terminology (e.g. camera names and properties). The information can be used by an analyst to instantiate argumentation schemes and build arguments for and against a proposal. The resulting argumentation framework can then be passed to argument evaluation tools."
+ },
+ {
+  "title": "A legal case OWL ontology with an instantiation of Popov v. Hayashi",
+  "year": 2012,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-012-9119-6",
+  "cited_by_count": 25,
+  "oa_url": null,
+  "coauthors": [
+   "Rinke Hoekstra"
+  ],
+  "concepts": [
+   "Ontology",
+   "Upper ontology",
+   "Computer science",
+   "Suggested Upper Merged Ontology",
+   "Process ontology",
+   "Ontology-based data integration",
+   "OWL-S",
+   "Information retrieval",
+   "Ontology alignment",
+   "Ontology Inference Layer",
+   "Web Ontology Language",
+   "Natural language processing"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "An Empirical Approach to the Semantic Representation of Laws",
+  "year": 2012,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-167-0-177",
+  "cited_by_count": 14,
+  "oa_url": "http://hdl.handle.net/2318/1698231",
+  "coauthors": [
+   "Bos Johan",
+   "Valerio Basile",
+   "Paulo Quaresma"
+  ],
+  "concepts": [
+   "Representation (politics)",
+   "Computer science",
+   "Law",
+   "Law and economics",
+   "Epistemology",
+   "Political science"
+  ],
+  "abstract": "To make legal texts machine processable, the texts may be represented as linked documents, semantically tagged text, or translated to formal representations that can be automatically reasoned with. The paper considers the latter, which is key to testing consistency of laws, drawing inferences, and providing explanations relative to input. To translate laws to a form that can be reasoned with by a computer, sentences must be parsed and formally represented. The paper presents the state-of-the-art in automatic translation of law to a machine readable formal representation, provides corpora, outlines some key problems, and proposes tasks to address the problems."
+ },
+ {
+  "title": "Identifying consumers' arguments in text",
+  "year": 2012,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 12,
+  "oa_url": null,
+  "coauthors": [
+   "Jodi Schneider"
+  ],
+  "concepts": [
+   "Terminology",
+   "Argumentation theory",
+   "Computer science",
+   "Structuring",
+   "Product (mathematics)",
+   "Natural language processing",
+   "Identification (biology)",
+   "Domain (mathematical analysis)",
+   "Information retrieval",
+   "Artificial intelligence",
+   "Linguistics",
+   "Data science"
+  ],
+  "abstract": "Abstract. Product reviews are a corpus of textual data on consumer opinions. While reviews can be sorted by rating, there is limited support to search in the corpus for statements about particular topics, e.g. properties of a product. Moreover, where opinions are justified or criticised, statements in the corpus indicate arguments and counterarguments. Explicitly structuring these statements into arguments could help better understand customers ’ disposition towards a product. We present a semi-automated, rule-based information extraction tool to support the identification of statements and arguments in a corpus, using: argumentation schemes; user, domain, and sentiment terminology; and discourse indicators."
+ },
+ {
+  "title": "Arguing from a point of view",
+  "year": 2012,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 9,
+  "oa_url": null,
+  "coauthors": [
+   "Jodi Schneider"
+  ],
+  "concepts": [
+   "Argumentative",
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Point (geometry)",
+   "Computer science",
+   "Epistemology",
+   "Politics"
+  ],
+  "abstract": "Abstract. Evaluative statements, where some entity has a qualitative attribute, appear widespread in blogs, political discussions, and consumer websites. Such expressions can occur in argumentative settings, where they are the conclusion of an argument. Whether the argument holds depends on the premises that express a user’s point of view. Where different users disagree, arguments may arise. There are several ways to represent users, e.g. by values and other parameters. The paper proposes models and argumentation schemes for evaluative expressions, where the arguments and attacks between arguments are relative to a user’s model. 1"
+ },
+ {
+  "title": "A Model-Based Critique Tool for Policy Deliberation",
+  "year": 2012,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-167-0-167",
+  "cited_by_count": 6,
+  "oa_url": null,
+  "coauthors": [
+   "Maya Wardeh",
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Deliberation",
+   "Computer science",
+   "Political science",
+   "Management science",
+   "Epistemology"
+  ],
+  "abstract": "Domain models have proven useful as the basis for the construction and evaluation of arguments to support deliberation about policy proposals. Using a model provides the means to systematically examine and understand the fine-grained objections that individuals might have about the policy. While in previous approaches, a justification for a policy proposal is presented for critique by the user, here, we reuse the domain model to invert the roles of the citizen and the Government: a policy proposal is elicited from the citizen, and a software agent automatically and systematically critiques it relative to the model and the Government's point of view. Such an approach engages citizens in a critical dialogue about the policy actions, which may lead to a better understanding of the implications of their proposals and that of the Government. A web-based tool that interactively leads users through the critique is presented."
+ },
+ {
+  "title": "Critiquing Justifications for Action Using a Semantic Model: Demonstration",
+  "year": 2012,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-111-3-503",
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Action (physics)",
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Opinion gathering using a multi-agent systems approach to policy selection",
+  "year": 2012,
+  "type": "article",
+  "venue": null,
+  "doi": "10.5555/2343896.2343904",
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "USable",
+   "Selection (genetic algorithm)",
+   "Computer science",
+   "Multi-agent system",
+   "Democracy",
+   "Intelligent agent",
+   "Knowledge management",
+   "Management science",
+   "Data science"
+  ],
+  "abstract": "An important aspect of e-democracy is consultation, in which policy proposals are presented and feedback from citizens is received and assimilated so that these proposals can be refined and made more acceptable to the citizens affected by them. We present an innovative web-based application that uses recent developments in multi-agent systems (MAS) to provide intelligent support for opinion gathering, eliciting a structured critique within a highly usable system."
+ },
+ {
+  "title": "Arguing about Emotion",
+  "year": 2012,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-28509-7_33",
+  "cited_by_count": 27,
+  "oa_url": null,
+  "coauthors": [
+   "Martyn Lloyd-Kelly"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Normative",
+   "Salient",
+   "Computer science",
+   "Epistemology",
+   "Cognitive psychology",
+   "Cognitive science",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Dimensions of Argumentation in Social Media",
+  "year": 2012,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-33876-2_4",
+  "cited_by_count": 9,
+  "oa_url": null,
+  "coauthors": [
+   "Jodi Schneider",
+   "Brian Davis"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Punctuation",
+   "Computer science",
+   "Argument (complex analysis)",
+   "Social media",
+   "Variety (cybernetics)",
+   "Sentiment analysis",
+   "Focus (optics)",
+   "Argumentation framework",
+   "Order (exchange)",
+   "Chart",
+   "Lexicographical order",
+   "Data science",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Model Based Critique of Policy Proposals",
+  "year": 2012,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-33250-0_11",
+  "cited_by_count": 8,
+  "oa_url": "https://inria.hal.science/hal-01541479",
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Code (set theory)",
+   "Action (physics)",
+   "Prolog",
+   "Scheme (mathematics)",
+   "Programming language",
+   "Epistemology",
+   "Operations research",
+   "Management science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Argumentation to Represent and Reason over Biological Systems",
+  "year": 2012,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-32395-9_10",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Luke Riley",
+   "Robert Hoehndorf",
+   "Samuel Croset"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Argument (complex analysis)",
+   "Biological network",
+   "Systems biology",
+   "Modelling biological systems",
+   "Consistency (knowledge bases)",
+   "Process (computing)",
+   "Biological data",
+   "Data science",
+   "Theoretical computer science",
+   "Artificial intelligence",
+   "Cognitive science",
+   "Epistemology"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Opinion Gathering Using a Multi-Agent Systems Approach to Policy Selection (Extended Abstract)",
+  "year": 2012,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "USable",
+   "Selection (genetic algorithm)",
+   "Computer science",
+   "Public opinion",
+   "Multi-agent system",
+   "Management science",
+   "World Wide Web"
+  ],
+  "abstract": "An important aspect of e-democracy is consultation, in which policy proposals are presented and feedback from citizens is received and assimilated so that these proposals can be rened and made more acceptable to the citizens aected by them. We present an innovative web-based application that uses recent developments in multi-agent systems (MAS) to provide intelligent support for opinion gathering, eliciting a structured critique within a highly usable system."
+ },
+ {
+  "title": "A formalization of argumentation schemes for legal case-based reasoning in ASPIC+",
+  "year": 2013,
+  "type": "article",
+  "venue": "Journal of Logic and Computation",
+  "doi": "10.1093/logcom/ext010",
+  "cited_by_count": 80,
+  "oa_url": "https://academic.oup.com/logcom/article-pdf/25/5/1141/5274836/ext010.pdf",
+  "coauthors": [
+   "Henry Prakken",
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Defeasible estate",
+   "Scope (computer science)",
+   "Defeasible reasoning",
+   "Computer science",
+   "Inference",
+   "Artificial intelligence",
+   "Style (visual arts)",
+   "Case-based reasoning",
+   "Epistemology"
+  ],
+  "abstract": "In this article we offer a formal account of reasoning with legal cases in terms of argumentation schemes. These schemes, and undercutting attacks associated with them, are formalized as defeasible rules of inference within the ASPIC+ framework. We begin by modelling the style of reasoning with cases developed by Aleven and Ashley in the CATO project, which describes cases using factors, and then extend the account to accommodate the dimensions used in Rissland and Ashley's earlier HYPO project. Some additional scope for argumentation is then identified and formalized."
+ },
+ {
+  "title": "Argumentation Schemes for Reasoning about Factors with Dimensions",
+  "year": 2013,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-359-9-39",
+  "cited_by_count": 16,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Trevor Bench‐Capon",
+   "Prakken Henry"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Psychology"
+  ],
+  "abstract": "In previous work we presented argumentation schemes to capture the CATO and value based theory construction approaches to reasoning with legal cases with factors. We formalised the schemes with ASPIC+, a formal representation of instantiated argumentation. In ASPIC+ the premises of a scheme may either be a factor provided in a knowledge base or established using a further argumentation scheme. Thus far we have taken the factors associated with cases to be given in the knowledge base. While this is adequate for expressing factor based reasoning, we can further investigate the justifications for the relationship between factors and facts or evidence. In this paper we examine how dimensions as used in the HYPO system can provide grounds on which to argue about which factors should apply to a case. By making this element of the reasoning explicit and subject to argument, we advance our overall account of reasoning with legal cases and make it more robust."
+ },
+ {
+  "title": "A Study on Translating Regulatory Rules from Natural Language to Defeasible Logic",
+  "year": 2013,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 13,
+  "oa_url": null,
+  "coauthors": [
+   "Guido Governatori"
+  ],
+  "concepts": [
+   "Defeasible estate",
+   "Computer science",
+   "Representation (politics)",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Interpretation (philosophy)",
+   "Natural language",
+   "Programming language",
+   "Machine translation",
+   "Defeasible reasoning",
+   "Knowledge representation and reasoning",
+   "Key (lock)",
+   "Theoretical computer science"
+  ],
+  "abstract": "Abstract. Legally binding regulations are expressed in natural language. Yet, we cannot formally or automatically reason with regulations in that form. Defeasible Logic has been used to formally represent the semantic interpretation of regulations; such representations may provide the abstract specification for a machinereadable and processable representation as in LegalRuleML. However, manual translation is prohibitively costly in terms of time, labour, and knowledge. The paper discusses work in progress using the state-of-the-art in automatic translation of a sample of regulatory clauses to a machine readable formal representation and a comparison to correlated Defeasible Logic representations. It outlines some key problems and proposes tasks to address the problems. 1"
+ },
+ {
+  "title": "A Case Study on Legal Case Annotation",
+  "year": 2013,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-359-9-165",
+  "cited_by_count": 14,
+  "oa_url": null,
+  "coauthors": [
+   "Wim Peters",
+   "Daniel Katz"
+  ],
+  "concepts": [
+   "Annotation",
+   "Computer science",
+   "Natural language processing"
+  ],
+  "abstract": "The paper reports the outcomes of a study with law school students to annotate a corpus of legal cases for a variety of annotation types, e.g. citation indices, legal facts, rationale, judgement, cause of action, and others. An online tool is used by a group of annotators that results in an annotated corpus. Differences amongst the annotations are curated, producing a gold standard corpus of annotated texts. The annotations can be extracted with semantic searches of complex queries. There would be many such uses for the development and analysis of such a corpus for both legal education and legal research."
+ },
+ {
+  "title": "From Knowledge Representation to Argumentation in AI, Law and Policy Making. a Festscrift in Honour of Trevor Bench-Capon on the Occasion of His 60th",
+  "year": 2013,
+  "type": "book",
+  "venue": "College Publications eBooks",
+  "doi": null,
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [
+   "Katie Atkinson",
+   "Henry Prakken"
+  ],
+  "concepts": [
+   "Capon",
+   "Honour",
+   "Argumentation theory",
+   "Representation (politics)",
+   "Artificial intelligence",
+   "Law",
+   "Computer science",
+   "Epistemology",
+   "Operations research"
+  ],
+  "abstract": "Trevor Bench-Capon is well recognised as an outstanding figure in Artificial Intelligence and Law, having published extensively over the long course of his career on legal knowledge representation, engineering methods for knowledge-based systems, theoretical and applied argumentation, case-based reasoning, policy-making, reasoning about evidence, and many other related topics. He has deeply influenced many of his colleagues, particularly with his earlier work on principled methods for legal knowledge representation and the engineering of knowledge-based systems, and later with the introduction of values in the study of argumentation. This Festschrift is in honour of Bench-Capon's work and its seminal influence. The articles contained here by his colleagues extensively review, comment on, and extend Bench-Capon's work. As a whole, the volume is a substantive introduction to the main topics and issues to which Bench-Capon has contributed so much."
+ },
+ {
+  "title": "LegalRuleML: from Metamodel to Use Cases - A Tutorial",
+  "year": 2013,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 3,
+  "oa_url": null,
+  "coauthors": [
+   "Tara Athan",
+   "Harold Boley",
+   "Guido Governatori",
+   "Monica Palmirani",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "Metamodeling",
+   "Computer science",
+   "Software engineering",
+   "Programming language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Proceedings of the 7th international conference on Theory, Practice, and Applications of Rules on the Web",
+  "year": 2013,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 2,
+  "oa_url": null,
+  "coauthors": [
+   "Leora Morgenstern",
+   "Petros Stefaneas",
+   "François Lévy",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "Computer science",
+   "World Wide Web",
+   "Political science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "OASIS LegalRuleML",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/2514601.2514603",
+  "cited_by_count": 78,
+  "oa_url": null,
+  "coauthors": [
+   "Tara Athan",
+   "Harold Boley",
+   "Guido Governatori",
+   "Monica Palmirani",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "Deontic logic",
+   "Defeasible reasoning",
+   "Computer science",
+   "Core (optical fiber)",
+   "Syntax",
+   "Programming language",
+   "Software engineering",
+   "Linguistics"
+  ],
+  "abstract": "In this paper we present the motivation, use cases, design principles, abstract syntax, and initial core of LegalRuleML. The LegalRuleML-core is sufficiently rich for expressing legal sources, time, defeasibility, and deontic operators. An example is provided. LegalRuleMLis compared to related work."
+ },
+ {
+  "title": "Argument schemes for reasoning with legal cases using values",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/2514601.2514604",
+  "cited_by_count": 24,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Henry Prakken",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argument (complex analysis)",
+   "Computation",
+   "Set (abstract data type)",
+   "Computer science",
+   "Matching (statistics)",
+   "Theoretical computer science",
+   "Scheme (mathematics)",
+   "Artificial intelligence",
+   "Mathematics"
+  ],
+  "abstract": "Argument schemes can provide a means of explicitly describing reasoning methods in a form that lends itself to computation. The reasoning required to distinguish cases in the manner of CATO has been previously captured as a set of argument schemes. Here we present argument schemes that encapsulate another way of reasoning with cases: using preferences between social values revealed in past decisions to decide cases which have no exact matching precedents when the cases are described in terms of factors. We provide a set of schemes, with variations to capture different ways of comparing sets and varying degrees of promotion of values; we formalise these schemes; and we illustrate them with some examples."
+ },
+ {
+  "title": "Argumentation based tools for policy-making",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/2514601.2514640",
+  "cited_by_count": 17,
+  "oa_url": null,
+  "coauthors": [
+   "Maya Wardeh",
+   "Katie Atkinson",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Variety (cybernetics)",
+   "Government (linguistics)",
+   "State (computer science)",
+   "Public relations",
+   "Public policy",
+   "Political science",
+   "Computer science",
+   "Management science",
+   "Engineering ethics",
+   "Public administration"
+  ],
+  "abstract": "Citizens have a variety of ways to consult with their representatives about policy proposals, seeking justifications, objecting to all or part of it, or making a counter-proposal. For the first, the representative needs only to state a justification. For the second, the representative would want to understand the objections, which may involve asking some questions. For the third, the citizen would have to provide a well formulated proposal that can then be critiqued from the standpoint of the government's own policy proposal. At the end of such a consultation, users will have aired their proposals, understood the implications, and received feedback on how their proposals contrast to that of the government."
+ },
+ {
+  "title": "LegalRuleML: From Metamodel to Use Cases",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-39617-5_4",
+  "cited_by_count": 15,
+  "oa_url": null,
+  "coauthors": [
+   "Tara Athan",
+   "Harold Boley",
+   "Guido Governatori",
+   "Monica Palmirani",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "RuleML",
+   "Computer science",
+   "XML",
+   "Semantics of Business Vocabulary and Business Rules",
+   "Metamodeling",
+   "Programming language",
+   "World Wide Web",
+   "Domain (mathematical analysis)",
+   "Software engineering",
+   "Information retrieval"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "On the Instantiation of Knowledge Bases in Abstract Argumentation Frameworks",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-40624-9_3",
+  "cited_by_count": 10,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Paul E. Dunne"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Defeasible estate",
+   "Argument (complex analysis)",
+   "Argumentation framework",
+   "Conflation",
+   "Abstraction",
+   "Relation (database)",
+   "Epistemology",
+   "Defeasible reasoning",
+   "Encoding (memory)",
+   "Theoretical computer science",
+   "Artificial intelligence",
+   "Cognitive science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Theory, Practice, and Applications of Rules on the Web",
+  "year": 2013,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-642-39617-5",
+  "cited_by_count": 5,
+  "oa_url": null,
+  "coauthors": [
+   "Leora Morgenstern",
+   "Petros Stefaneas",
+   "François Lévy",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "RuleML",
+   "Computer science",
+   "World Wide Web"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Introduction to special issue on modelling policy-making",
+  "year": 2013,
+  "type": "editorial",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-013-9148-9",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Neil Benn"
+  ],
+  "concepts": [
+   "Legal aspects of computing",
+   "Policy making",
+   "Philosophy of law",
+   "Computer science",
+   "Political science",
+   "Law and economics",
+   "Management science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Overview of Trevor Bench-Capon's research",
+  "year": 2013,
+  "type": "book-chapter",
+  "venue": "Data Archiving and Networked Services (DANS)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Henry Prakken",
+   "Karl Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Representation (politics)",
+   "Capon",
+   "Meaning (existential)",
+   "Epistemology",
+   "Focus (optics)",
+   "Knowledge representation and reasoning",
+   "Computer science",
+   "Artificial intelligence",
+   "Sociology"
+  ],
+  "abstract": "across a number of topics in computer science. In this introduction we give a brief overview of his main contributions, with no hope to be complete. Looking at Trevor Bench-Capon’s published work, one main development can be recognised: from knowledge representation to argumentation. In his earlier work, the main focus was on principled knowledge representation (often in logic programming) while the reasoning was secondary in that it followed the meaning of the representations. This focus is apparent from the title of a textbook on AI he wrote in 1990, titled Knowledge Representation: An Approach to Articial Intelligence [6]. In his later work instead the focus was on forms of reasoning that go beyond the meaning of the representations. It is here that the notion of argumentation is central. In Bench-Capon’s published work this shift becomes apparent roughly towards 2000. However, as Bench-Capon himself describes in [11], he has always had an interest in argument (meant to be persuasive) as opposed to proof (meant to be valid). This interest goes back to his years as a philosophy student in Oxford and as a trainee policy maker in the UK civil service. Some traces of this early part of his career can be found in his earlier publications, but that work is mainly on knowledge-based systems, with special emphasis on legal applications. Besides knowledge representation, this earlier work also concerned principled engineering methods for knowledge-based systems, with special emphasis on ontologies, which were a computing concept in their infancy at the time, and on validation and maintenance. This strand of work was very inuential on more practically-oriented work in knowledge-based systems. His later work on argumentation is more foundational in nature since it laid the groundwork for a perspective on practical reasoning that is rooted in ideas from philosophy. Above all, Bench-Capon has put the persuasiveness of arguments and the importance in this respect of societal values on the research agenda of articial intelligence. As can be seen from inspecting his substantial personal bibliography, BenchCapon has a vast collection of collaborators and rarely worked alone. His coauthors span various disciplines, both within and outside of computer science, and as such his collaborative work covers a rich variety of topics. Below we"
+ },
+ {
+  "title": "Legal interpretations in LegalRuleML",
+  "year": 2014,
+  "type": "conference-paper",
+  "venue": "Archivio istituzionale della ricerca (Alma Mater Studiorum Università di Bologna)",
+  "doi": null,
+  "cited_by_count": 4,
+  "oa_url": "http://ceur-ws.org/Vol-1296/paper2.pdf",
+  "coauthors": [
+   "Tara Athan",
+   "Guido Governatori",
+   "Monica Palmirani",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "Interpretation (philosophy)",
+   "Jurisprudence",
+   "Mechanism (biology)",
+   "Subject (documents)",
+   "Legislature",
+   "Epistemology",
+   "Law",
+   "Computer science",
+   "Political science"
+  ],
+  "abstract": "Abstract. Legislative documents are by their own nature subject to interpretation, and interpretations of one document can diverge. In this paper we discuss the mechanism proposed by LegalRuleML to capture alternative interpretations or renderings of a legal source. LegalRuleML allows for mutually incompatible renderings (or interpretations) of a legal source to coexist in the same LegalRuleML document, and provides facilities to identify the interpretations and to select them. The mechanism is illustrated with an example form Italian Jurisprudence. 1"
+ },
+ {
+  "title": "Text Analysis of Aberdeen Burgh Records 1530-1531",
+  "year": 2014,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.3115/v1/w14-0614",
+  "cited_by_count": 1,
+  "oa_url": "https://aclanthology.org/W14-0614.pdf",
+  "coauthors": [
+   "Jackson W. Armstrong",
+   "Andrew Mackillop",
+   "Philip D. Astley"
+  ],
+  "concepts": [
+   "Computer science"
+  ],
+  "abstract": "The paper outlines a text analytic project in progress on a corpus of entries in the historical burgh and council registers from Aberdeen, Scotland. Some preliminary output of the analysis is described. The registers run in a near-unbroken sequence form 1398 to the present day; the early volumes are a UNESCO UK listed cultural artefact. The study focusses on a set of transcribed pages from 1530-1531 originally hand written in a mixture of Latin and Middle Scots. We apply a text analytic tool to the corpus, providing deep semantic annotation and making the text amenable to linking to web-resources."
+ },
+ {
+  "title": "Mining fine-grained argument elements",
+  "year": 2014,
+  "type": "other",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Workbench",
+   "Computer science",
+   "Argument map",
+   "Architecture",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Epistemology"
+  ],
+  "abstract": "The paper discusses the architecture and development of an Argument Workbench, which supports an analyst in reconstructing arguments from across textual sources. The workbench takes a semi-automated, interactive approach searching in a corpus for fine-grained argument elements, which are concepts and conceptual patterns in expressions that are associated with argumentation schemes. The expressions can then be extracted from a corpus and reconstituted into instantiated argumentation schemes for and against a given conclusion. Such arguments can then be input to an argument evaluation tool."
+ },
+ {
+  "title": "Challenge+DC@RuleML 2014 Rule Challenge and Doctoral Consortium @ RuleML 2014",
+  "year": 2014,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Theodore Patkos",
+   "Adrian Giurca"
+  ],
+  "concepts": [
+   "RuleML",
+   "Computer science",
+   "World Wide Web"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Sentiment–topic modeling in text mining",
+  "year": 2015,
+  "type": "article",
+  "venue": "Wiley Interdisciplinary Reviews Data Mining and Knowledge Discovery",
+  "doi": "10.1002/widm.1161",
+  "cited_by_count": 12,
+  "oa_url": null,
+  "coauthors": [
+   "Chenghua Lin",
+   "Ebuka Ibeke",
+   "Frank Guérin"
+  ],
+  "concepts": [
+   "Sentiment analysis",
+   "Computer science",
+   "Cluster analysis",
+   "Topic model",
+   "Text mining",
+   "Domain (mathematical analysis)",
+   "Artificial intelligence",
+   "Probabilistic logic",
+   "Natural language processing",
+   "Biomedical text mining",
+   "Joint (building)",
+   "Information retrieval"
+  ],
+  "abstract": "In recent years, there has been a rapid growth of research interest in natural language processing that seeks to better understand sentiment or opinion expressed in text. There are several notable issues in most previous work in sentiment analysis, among them: the trained classifiers are domain‐dependent; the labeled corpora required for training can be difficult to acquire from real‐world text; and dependencies between sentiments and topics are not taken into consideration. In response to these limitations, a new family of probabilistic topic models, namely joint sentiment–topic models, have been developed, which are capable of detecting sentiment in connection with topic from text without using any labeled data for training. In addition, the sentiment‐bearing topics extracted by the joint sentiment–topic models provide means for automatically discovering and summarizing opinions from a vast amount of user‐generated data. WIREs Data Mining Knowl Discov 2015, 5:246–254. doi: 10.1002/widm.1161 This article is categorized under: Algorithmic Development &gt; Text Mining Technologies &gt; Machine Learning Technologies &gt; Structure Discovery and Clustering"
+ },
+ {
+  "title": "Senses of ‘argument’ in instantiated argumentation frameworks",
+  "year": 2015,
+  "type": "article",
+  "venue": "Argument & Computation",
+  "doi": "10.1080/19462166.2014.1002535",
+  "cited_by_count": 10,
+  "oa_url": "https://content.iospress.com:443/download/argument-and-computation/1002535?id=argument-and-computation%2F1002535",
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Paul E. Dunne",
+   "Federico Cerutti"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Computer science",
+   "Epistemology",
+   "Cognitive science"
+  ],
+  "abstract": "Argumentation Frameworks (AFs) provide a fruitful basis for exploring issues of defeasible reasoning. Their power largely derives from the abstract nature of the arguments within the framework, where arguments are atomic nodes in an undifferentiated relation of attack. This abstraction conceals different senses of argument, namely a single-step reason to a claim, a series of reasoning steps to a single claim, and reasoning steps for and against a claim. Concrete instantiations encounter difficulties and complexities as a result of conflating these senses. To distinguish them, we provide an approach to instantiating AFs in which the nodes are restricted to literals and rules, encoding the underlying theory directly. Arguments in these senses emerge from this framework as distinctive structures of nodes and paths. As a consequence of the approach, we reduce the effort of computing argumentation extensions, which is in contrast to other approaches. Our framework retains the theoretical and computational benefits of an abstract AF, distinguishes senses of argument, and efficiently computes extensions. Given the mixed intended audience of the paper, the style of presentation is semi-formal."
+ },
+ {
+  "title": "From the Language of Legislation to Executable Logic Programs",
+  "year": 2015,
+  "type": "book-chapter",
+  "venue": "Legisprudence library",
+  "doi": "10.1007/978-3-319-19575-9_15",
+  "cited_by_count": 7,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Executable",
+   "Programming language",
+   "Legislation",
+   "Computer science",
+   "Business"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Extracting Hohfeldian Relations from Text",
+  "year": 2015,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-609-5-189",
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "Wim Peters"
+  ],
+  "concepts": [
+   "Computer science",
+   "Natural language processing",
+   "Information retrieval",
+   "Artificial intelligence"
+  ],
+  "abstract": "This paper presents a semi-automatic methodology and application for identifying the Hohfeldian relation Duty in legal text, using the General Architecture for Text Engineering tool for the automated extraction of Duty instances and its associated roles. The method incrementally supports scholars in their interpretation."
+ },
+ {
+  "title": "LegalRuleML: Design Principles and Foundations",
+  "year": 2015,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-319-21768-0_6",
+  "cited_by_count": 78,
+  "oa_url": null,
+  "coauthors": [
+   "Tara Athan",
+   "Guido Governatori",
+   "Monica Palmirani",
+   "Adrian Paschke"
+  ],
+  "concepts": [
+   "Computer science",
+   "Domain (mathematical analysis)",
+   "Software engineering",
+   "Programming language",
+   "Management science",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Using Argumentation to Structure E-Participation in Policy Making",
+  "year": 2015,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-662-46485-4_1",
+  "cited_by_count": 17,
+  "oa_url": null,
+  "coauthors": [
+   "Trevor Bench‐Capon",
+   "Katie Atkinson"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Field (mathematics)",
+   "Domain (mathematical analysis)",
+   "Criticism",
+   "Scheme (mathematics)",
+   "Management science",
+   "Epistemology",
+   "Data science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Argument Discovery and Extraction with the Argument Workbench",
+  "year": 2015,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.3115/v1/w15-0510",
+  "cited_by_count": 6,
+  "oa_url": "https://www.aclweb.org/anthology/W15-0510.pdf",
+  "coauthors": [
+   "Wim Peters",
+   "David J. Price"
+  ],
+  "concepts": [
+   "Argument (complex analysis)",
+   "Computer science",
+   "Workbench",
+   "Terminology",
+   "Natural language processing",
+   "Artificial intelligence"
+  ],
+  "abstract": "The paper discusses the architecture and development of an Argument Workbench, which is a interactive, integrated, modular tool set to extract, reconstruct, and visualise arguments. We consider a corpora with dispersed information across texts, making it essential to conceptually search for argument elements, topics, and terminology. The Argument Workbench is a processing cascade, developed in collaboration with DebateGraph. The tool supports an argument engineer to reconstruct arguments from textual sources, using information processed at one stage as input to a subsequent stage of analysis, and then building an argument graph. We harvest and preprocess comments; highlight argument indicators, speech act and epistemic terminology; model topics; and identify domain terminology. We use conceptual semantic search over the corpus to extract sentences relative to argument and domain terminology. The argument engineer uses the extracts for the construction of arguments in DebateGraph."
+ },
+ {
+  "title": "<i>The Legal Language of Scottish Burghs: Standardization and Lexical Bundles 1380–1560.</i> By Joanna Kopaczyk. Pp. xvi, 368. ISBN: 9780199945153. Oxford: Oxford University Press, 2013. £50.00",
+  "year": 2015,
+  "type": "book-review",
+  "venue": "Scottish historical review/The Scottish historical review",
+  "doi": "10.3366/shr.2015.0266",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "History",
+   "Linguistics"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Passing a USA National Bar Exam &amp;ndash; a First Experiment",
+  "year": 2015,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-609-5-179",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Biralatei Fawei",
+   "Jeff Z. Pan"
+  ],
+  "concepts": [
+   "Bar (unit)",
+   "Psychology"
+  ],
+  "abstract": "Bar exams provide are a key watershed by which legal professionals demonstrate their knowledge of the law and its application. Passing the bar entitles one to practice the law in a given jurisdiction. The bar provides a excellent benchmark for the performance of legal information systems since passing the bar would arguably signal that the system has acquired key aspects of legal reason on a par with a human lawyer. The paper presents a first experiment with actual bar exam material, treating it as a form of textual entailment from the question to an answer. The Gold Standard is provided by the company which provides the bar exam. The paper reports a textual entailment student on a US bar exam, running &amp;lsquo;out of the box&amp;rsquo; the Excitement Open Platform for textual entailment. The results and evaluation show that the tool can identify wrong answers (non-entailment) with a high F1 score, it performs poorly in identifying the correct answer (entailment). The results provide a baseline performance measure against which to evaluate future improvements. The reasons for the poor performance are examined, and proposals are made to augment the tool in the future."
+ },
+ {
+  "title": "Front matter",
+  "year": 2015,
+  "type": "paratext",
+  "venue": "Proceedings from Semantics and Linguistic Theory",
+  "doi": "10.3765/salt.v10i0.2741",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.3765/salt.v10i0.2741",
+  "coauthors": [
+   "Steven K. Moore"
+  ],
+  "concepts": [
+   "Front (military)",
+   "Computer science"
+  ],
+  "abstract": "Proceedings of the 1st Semantics and Linguistic Theory Conference, held April 19-21, 1991 at Cornell University, edited by Steven K. Moore and Adam Zachary Wyner."
+ },
+ {
+  "title": "Front matter",
+  "year": 2015,
+  "type": "paratext",
+  "venue": "Proceedings from Semantics and Linguistic Theory",
+  "doi": "10.3765/salt.v1i0.2977",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.3765/salt.v1i0.2977",
+  "coauthors": [
+   "Steven K. Moore"
+  ],
+  "concepts": [
+   "Front (military)",
+   "Computer science"
+  ],
+  "abstract": "Proceedings of the 1st Semantics and Linguistic Theory Conference, held April 19-21, 1991 at Cornell University, edited by Steven K. Moore and Adam Zachary Wyner."
+ },
+ {
+  "title": "Front matter",
+  "year": 2015,
+  "type": "paratext",
+  "venue": "Proceedings from Semantics and Linguistic Theory",
+  "doi": "10.3765/salt.v3i0.2750",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.3765/salt.v3i0.2750",
+  "coauthors": [
+   "Utpal Lahiri"
+  ],
+  "concepts": [
+   "Front (military)",
+   "Computer science",
+   "Artificial intelligence"
+  ],
+  "abstract": "Proceedings from of the 3rd Semantics and Linguistic Theory Conference, held March 5-7, 1993 at the University of California at Irvine, edited by Utpal Lahiri and Adam Zachary Wyner."
+ },
+ {
+  "title": "Towards a High-level Controlled Language for Legal Sources on the Semantic Web",
+  "year": 2015,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Lévy, François",
+   "Alex N. Nazarenko"
+  ],
+  "concepts": [
+   "Computer science",
+   "Social Semantic Web",
+   "Semantic Web",
+   "Semantic Web Rule Language",
+   "Semantic Web Stack",
+   "Semantic analytics",
+   "Natural language processing",
+   "World Wide Web",
+   "Information retrieval"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Text Analytic Approach to Rural and Urban Legal Histories",
+  "year": 2015,
+  "type": "dataset",
+  "venue": "Open MIND",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Wim G. Peters",
+   "Jackson Armstrong",
+   "Edda Frankot"
+  ],
+  "concepts": [
+   "RDF",
+   "XML",
+   "Computer science",
+   "Terminology",
+   "Linked data",
+   "Information retrieval",
+   "Plain text",
+   "RDF Schema",
+   "Selection (genetic algorithm)",
+   "Annotation",
+   "World Wide Web",
+   "Simple Knowledge Organization System"
+  ],
+  "abstract": "Several data were created for the project \"A Text Analytic Approach to Rural and Urban Legal Histories\". The data are the output of the project described in the paper \"Text Analysis of Aberdeen Burgh Records 1530-1531\". The data represent annotations on the transcribed text of a selection of Aberdeen Burgh Records from 1530-1531. The annotations are various, covering non-legal (e.g. named entities) and legal (e.g. crimes and legal actions) terminology and relations as found in the text. The data was created using the General Architecture for Text Engineering (GATE) tool (along with some custom scripts), using manual and automated means. The data can be explored as well using the GATE tool or other compatible text analytic tools. The purposes of making the data available is to: present the output of the project; demonstrate the effectiveness of the toolchain; serve as a proof of concept for text analytic approaches to legal, historical materials; make the data available for exploration and analysis; and facilitate augmenting the data with further information. The data are: - GATE Standoff XML (.xml) - a standoff XML version of the project output. The data contain the full range of annotations on the text. Importing this file into GATE will enable viewing of the texts and all their annotations. - GATE RDF Triples (.rdf) - RDF triples that are the output of the GATE XML Standoff file, i.e. RDF triples for the annotated text. The RDF can be queried using SPARQL, allowing the user to do complex conceptual search over the corpus. - OWL Ontology (.owl) - an ontology for a subdomain (i.e. shipping and church buildings) of the GATE analysis. An ontology allows us to enrich the annotations on the text beyond the explicit textual information. - GATE Inline XML (.xml) - the inline GATE XML file for the project analysis. The same data is presented as in the GATE Standoff XML file, but in a different format. The inline XML can also be imported and viewed in GATE. Inline XML is useful for viewing and presenting fragments of the annotated text without the GATE tool. - GATE Inline XML Scheme (.xml) - a schema for the Inline XML file that can be useful for formatting."
+ },
+ {
+  "title": "Working on the argument pipeline: Through flow issues between natural language argument, instantiated arguments, and argumentation frameworks",
+  "year": 2016,
+  "type": "article",
+  "venue": "Argument & Computation",
+  "doi": "10.3233/aac-160002",
+  "cited_by_count": 16,
+  "oa_url": "https://content.iospress.com:443/download/argument-and-computation/aac002?id=argument-and-computation%2Faac002",
+  "coauthors": [
+   "Tom van Engers",
+   "Anthony Hunter"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Computer science",
+   "Pipeline (software)",
+   "Epistemology",
+   "Natural language",
+   "Linguistics"
+  ],
+  "abstract": "In many domains of public discourse such as arguments about public policy, there is an abundance of knowledge to store, query, and reason with. To use this knowledge, we must address two key general problems: first, the problem of the knowledge acquisition bottleneck between forms in which the knowledge is usually expressed, e.g., natural language, and forms which can be automatically processed; second, reasoning with the uncertainties and inconsistencies of the knowledge. Given such complexities, it is labour and knowledge intensive to conduct policy consultations, where participants contribute statements to the policy discourse. Yet, from such a consultation, we want to derive policy positions, where each position is a set of consistent statements, but where positions may be mutually inconsistent. To address these problems and support policy-making consultations, we consider recent automated techniques in natural language processing, instantiating arguments, and reasoning with the arguments in argumentation frameworks. We discuss application and “bridge” issues between these techniques, outlining a pipeline of technologies whereby: expressions in a controlled natural language are parsed and translated into a logic (a literals and rules knowledge base), from which we generate instantiated arguments and their relationships using a logic-based formalism (an argument knowledge base), which is then input to an implemented argumentation framework that calculates extensions of arguments (an argument extensions knowledge base), and finally, we extract consistent sets of expressions (policy positions). The paper reports progress towards reasoning with web-based, distributed, collaborative, incomplete, and inconsistent knowledge bases expressed in natural language."
+ },
+ {
+  "title": "Towards a Methodology for Formalizing Legal Texts in LegalRuleML",
+  "year": 2016,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-726-9-149",
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [
+   "Adeline Nazarenko",
+   "Levy Francois"
+  ],
+  "concepts": [
+   "Markup language",
+   "Computer science",
+   "Sample (material)",
+   "Information retrieval",
+   "Data science",
+   "Natural language processing",
+   "World Wide Web"
+  ],
+  "abstract": "It is well recognised that it is difficult to make the semantic content of legal texts machine readable. We propose a systematic methodology to begin to render a sample legal text into LegalRuleML, which is a proposed markup for legal rules. We propose three levels &amp;ndash; coarse, medium, and fine-grained analyses &amp;ndash; each of which is compatible with LegalRuleML and which facilitate development from text to formal LegalRuleML. This paper provides guidelines for a coarse-grained analysis, highlighting some of the challenges to address even at this level."
+ },
+ {
+  "title": "A functional perspective on argumentation schemes",
+  "year": 2016,
+  "type": "article",
+  "venue": "Argument & Computation",
+  "doi": "10.3233/aac-160010",
+  "cited_by_count": 9,
+  "oa_url": "https://content.iospress.com:443/download/argument-and-computation/aac010?id=argument-and-computation%2Faac010",
+  "coauthors": [],
+  "concepts": [
+   "Argumentation theory",
+   "Ninth",
+   "Capon",
+   "Principal (computer security)",
+   "Perspective (graphical)",
+   "Computer science",
+   "Work (physics)",
+   "Sociology",
+   "Mathematics education",
+   "Library science",
+   "Operations research",
+   "Political science",
+   "Epistemology"
+  ],
+  "abstract": "In multi-agent systems (MAS), abstract argumentation and argumentation schemes are increasingly important. To be useful for MAS, argumentation schemes require a computational approach so that agents can use the components of a scheme to construct and present arguments and counterarguments. This paper proposes a syntactic analysis that integrates argumentation schemes with abstract argumentation. Schemes can be analysed into the roles that propositions play in each scheme and the structure of the associated propositions, yielding a greater understanding of the schemes, a uniform method of analysis, and a systematic means to relate one scheme to another. This analysis of the schemes helps to clarify what is needed to provide denotations of the terms and predicates in a semantic model."
+ },
+ {
+  "title": "A Curated Corpus for Sentiment-Topic Analysis",
+  "year": 2016,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 2,
+  "oa_url": null,
+  "coauthors": [
+   "Emmanuel Ebuka Ibeke",
+   "Chenghua Lin",
+   "Christopher David Coe",
+   "Dong Liu",
+   "Mohamad Hardyman Barawi",
+   "Noor Fazilla Abd Yusof"
+  ],
+  "concepts": [
+   "Natural language processing",
+   "Computer science",
+   "Artificial intelligence",
+   "Linguistics",
+   "Data science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Summarising the points made in online political debates",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.18653/v1/w16-2816",
+  "cited_by_count": 24,
+  "oa_url": "https://www.aclweb.org/anthology/W16-2816.pdf",
+  "coauthors": [
+   "Charlie Egan",
+   "Advaith Siddharthan"
+  ],
+  "concepts": [
+   "Argumentative",
+   "Computer science",
+   "Verb",
+   "Parsing",
+   "Point (geometry)",
+   "Dependency (UML)",
+   "Key (lock)",
+   "Politics",
+   "Dependency grammar",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Linguistics",
+   "Information retrieval"
+  ],
+  "abstract": "Online communities host growing numbers of discussions amongst large groups of participants on all manner of topics. This user-generated content contains millions of statements of opinions and ideas. We propose an abstractive approach to summarize such argumentative discussions, making key content accessible through 'point' extraction, where a point is a verb and its syntactic arguments. Our approach uses both dependency parse information and verb case frames to identify and extract valid points, and generates an abstractive summary that discusses the key points being made in the debate. We performed a human evaluation of our approach using a corpus of online political debates and report significant improvements over a highperforming extractive summarizer."
+ },
+ {
+  "title": "Passing a USA national bar exam: A first corpus for experimentation",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": "Aberdeen University Research Archive (Aberdeen University)",
+  "doi": null,
+  "cited_by_count": 9,
+  "oa_url": "http://hdl.handle.net/2164/8204",
+  "coauthors": [
+   "Biralatei Fawei",
+   "Jeff Z. Pan"
+  ],
+  "concepts": [
+   "Computer science",
+   "Benchmark (surveying)",
+   "Textual entailment",
+   "Key (lock)",
+   "Bar (unit)",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Logical consequence",
+   "Baseline (sea)",
+   "Set (abstract data type)",
+   "Information retrieval",
+   "Data science"
+  ],
+  "abstract": "Bar exams provide a key watershed by which legal professionals demonstrate their knowledge of the law and its application.Passing the bar entitles one to practice the law in a given jurisdiction.The bar provides an excellent benchmark for the performance of legal information systems since passing the bar would arguably signal that the system has acquired key aspects of legal reason on a par with a human lawyer.The paper provides a corpus and experimental results with material derived from a real bar exam, treating the problem as a form of textual entailment from the question to an answer.The providers of the bar exam material set the Gold Standard, which is the answer key.The experiments carried out using the 'out of the box' the Excitement Open Platform for textual entailment.The results and evaluation show that the tool can identify wrong answers (non-entailment) with a high F1 score, but it performs poorly in identifying the correct answer (entailment).The results provide a baseline performance measure against which to evaluate future improvements.The reasons for the poor performance are examined, and proposals are made to augment the tool in the future.The corpus facilitates experimentation by other researchers."
+ },
+ {
+  "title": "Legal Text Interpretation: Identifying Hohfeldian Relations from Text",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.63317/3adqwbuqvemn",
+  "cited_by_count": 8,
+  "oa_url": "https://doi.org/10.63317/3adqwbuqvemn",
+  "coauthors": [
+   "Wim Peters"
+  ],
+  "concepts": [
+   "Computer science",
+   "Workflow",
+   "Task (project management)",
+   "Process (computing)",
+   "Quality (philosophy)",
+   "Natural language processing",
+   "Duty",
+   "Interpretation (philosophy)",
+   "Information retrieval",
+   "Reading (process)",
+   "Annotation",
+   "Relationship extraction",
+   "Artificial intelligence",
+   "Information extraction",
+   "Data science",
+   "Software engineering"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards a High-Level Controlled Language for Legal Sources on the Semantic Web",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-319-41498-0_9",
+  "cited_by_count": 4,
+  "oa_url": null,
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy"
+  ],
+  "concepts": [
+   "Computer science",
+   "XML",
+   "Parsing",
+   "Natural language processing",
+   "The Internet",
+   "Representation (politics)",
+   "Key (lock)",
+   "World Wide Web",
+   "Semantic Web",
+   "Semantics (computer science)",
+   "Information retrieval",
+   "Artificial intelligence",
+   "Programming language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Scrutable Feature Sets for Stance Classification",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.18653/v1/w16-2807",
+  "cited_by_count": 3,
+  "oa_url": "https://doi.org/10.18653/v1/w16-2807",
+  "coauthors": [
+   "Angrosh Mandya",
+   "Advaith Siddharthan"
+  ],
+  "concepts": [
+   "Argumentative",
+   "Computer science",
+   "Sentiment analysis",
+   "Feature (linguistics)",
+   "Artificial intelligence",
+   "Dependency (UML)",
+   "Set (abstract data type)",
+   "Term (time)",
+   "Natural language processing",
+   "Natural language",
+   "Natural (archaeology)",
+   "Range (aeronautics)",
+   "Function (biology)",
+   "Information retrieval",
+   "Machine learning"
+  ],
+  "abstract": "This paper describes and evaluates a novel feature set for stance classification of argumentative texts; i.e. deciding whether a post by a user is for or against the issue being debated. We model the debate both as attitude bearing features, including a set of automatically acquired ‘topic terms’ associated with a Distributional Lexical Model (DLM) that captures the writer’s attitude towards the topic term, and as dependency features that represent the points being made in the debate. The stance of the text towards the issue being debated is then learnt in a supervised framework as a function of these features. The main advantage of our feature set is that it is scrutable: The reasons for a classification can be explained to a human user in natural language. We also report that our method outperforms previous approaches to stance classification as well as a range of baselines based on sentiment analysis and topic-sentiment analysis."
+ },
+ {
+  "title": "Natural Language Argumentation: Mining, Processing, and Reasoning over Textual Arguments (Dagstuhl Seminar 16161)",
+  "year": 2016,
+  "type": "article",
+  "venue": "DROPS (Schloss Dagstuhl – Leibniz Center for Informatics)",
+  "doi": "10.4230/dagrep.6.4.80",
+  "cited_by_count": 2,
+  "oa_url": "https://drops.dagstuhl.de/entities/document/10.4230/DagRep.6.4.80",
+  "coauthors": [
+   "Elena Cabrio",
+   "Graeme Hirst",
+   "Serena Villata"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Argument (complex analysis)",
+   "Natural (archaeology)",
+   "Computer science",
+   "Cognition",
+   "Task (project management)",
+   "Epistemology",
+   "Computational linguistics",
+   "Natural language",
+   "Linguistics",
+   "Natural language processing",
+   "Cognitive science"
+  ],
+  "abstract": "This report documents the program and the outcomes of Dagstuhl Seminar 16161 \"Natural Language Argumentation: Mining, Processing, and Reasoning over Textual Arguments\", 17--22 April 2016. The seminar brought together leading researchers from computational linguistics, argumentation theory and cognitive psychology communities to discuss the obtained results and the future challenges of the recently born Argument Mining research area. 40 participants from 14 different countries took part in 7 sessions that included 30 talks, two tutorials, and a hands-on “unshared” task."
+ },
+ {
+  "title": "Erratum to: Controlled Natural Language",
+  "year": 2016,
+  "type": "erratum",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-319-41498-0_12",
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "Brian Davis",
+   "Gordon J. Pace"
+  ],
+  "concepts": [
+   "Computer science",
+   "Natural (archaeology)",
+   "Programming language",
+   "Natural language processing",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "An Underspecified Approach to a Controlled Language for Legal Texts\\\\- a Position Paper",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "François Lévy",
+   "Adeline Nazarenko"
+  ],
+  "concepts": [
+   "Computer science",
+   "Position (finance)",
+   "Position paper",
+   "Natural language processing",
+   "Linguistics"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Controlled Natural Language : 5th International Workshop, CNL 2016, Aberdeen, UK, July 25-27, 2016, Proceedings",
+  "year": 2016,
+  "type": "book",
+  "venue": "Springer eBooks",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Gordon J. Pace",
+   "Brian Davis"
+  ],
+  "concepts": [
+   "Natural (archaeology)",
+   "Natural language",
+   "Computer science",
+   "Library science",
+   "Natural language processing",
+   "Linguistics"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards a Methodology for Formalizing Legal Texts in LegalRuleML",
+  "year": 2016,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Alex N. Nazarenko",
+   "Lévy, François"
+  ],
+  "concepts": [
+   "Computer science",
+   "Programming language",
+   "Natural language processing"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Recognizing cited facts and principles in legal judgements",
+  "year": 2017,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-017-9197-6",
+  "cited_by_count": 71,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007%2Fs10506-017-9197-6.pdf",
+  "coauthors": [
+   "Olga Shulayeva",
+   "Advaith Siddharthan"
+  ],
+  "concepts": [
+   "Agreement",
+   "Legal doctrine",
+   "Legal citation",
+   "Kappa",
+   "Legal research",
+   "Computer science",
+   "Recall",
+   "Philosophy of law",
+   "Task (project management)",
+   "Classifier (UML)",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Law",
+   "Psychology"
+  ],
+  "abstract": "In common law jurisdictions, legal professionals cite facts and legal principles from precedent cases to support their arguments before the court for their intended outcome in a current case. This practice stems from the doctrine of stare decisis, where cases that have similar facts should receive similar decisions with respect to the principles. It is essential for legal professionals to identify such facts and principles in precedent cases, though this is a highly time intensive task. In this paper, we present studies that demonstrate that human annotators can achieve reasonable agreement on which sentences in legal judgements contain cited facts and principles (respectively, $$\\kappa =0.65$$ and $$\\kappa =0.95$$ for inter- and intra-annotator agreement). We further demonstrate that it is feasible to automatically annotate sentences containing such legal facts and principles in a supervised machine learning framework based on linguistic features, reporting per category precision and recall figures of between 0.79 and 0.89 for classifying sentences in legal judgements as cited facts, principles or neither using a Bayesian classifier, with an overall $$\\kappa$$ of 0.72 with the human-annotated gold standard."
+ },
+ {
+  "title": "On Annotation of the Textual Contents of Scottish Legal Instruments",
+  "year": 2017,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-838-9-101",
+  "cited_by_count": 8,
+  "oa_url": "https://doi.org/10.3233/978-1-61499-838-9-101",
+  "coauthors": [
+   "Fraser Gough",
+   "Levy Francois",
+   "Matt Lynch",
+   "Adeline Nazarenko"
+  ],
+  "concepts": [
+   "Annotation",
+   "Information retrieval",
+   "Computer science",
+   "History",
+   "Natural language processing"
+  ],
+  "abstract": "LegalRuleML is a developing standard for representing the fine-grained semantic contents of legal texts. Such a representation would be highly useful for Semantic Web applications, but deriving formal rules from the textual source is problematic; there is currently little in the way of methodology to systematically transform language to LegalRuleML. To address this, we outline the purposes, processes, and outputs of a pilot study on the annotation of the contents of Scottish legal instruments, using key LegalRuleML elements as annotations. The resulting annotated corpus is assessed in terms of how well it answers the users' queries."
+ },
+ {
+  "title": "Defeasible AceRules: A Prototype",
+  "year": 2017,
+  "type": "article",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 3,
+  "oa_url": null,
+  "coauthors": [
+   "Martin Diller",
+   "Hannes Straß"
+  ],
+  "concepts": [
+   "Computer science",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Legal Knowledge and Information Systems JURIX 2017: The Thirtieth Annual Conference",
+  "year": 2017,
+  "type": "book",
+  "venue": null,
+  "doi": null,
+  "cited_by_count": 5,
+  "oa_url": null,
+  "coauthors": [
+   "Giovanni Casini"
+  ],
+  "concepts": [
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Extracting and Understanding Contrastive Opinion through Topic Relevant Sentences",
+  "year": 2017,
+  "type": "conference-paper",
+  "venue": "International Joint Conference on Natural Language Processing",
+  "doi": null,
+  "cited_by_count": 11,
+  "oa_url": null,
+  "coauthors": [
+   "Emmanuel Ebuka Ibeke",
+   "Chenghua Lin",
+   "Mohamad Hardyman Barawi"
+  ],
+  "concepts": [
+   "Computer science",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Contrastive analysis",
+   "Sentiment analysis",
+   "Latent variable",
+   "Information retrieval",
+   "Linguistics"
+  ],
+  "abstract": "Contrastive opinion mining is essential in identifying, extracting and organising opinions from user generated texts. Most existing studies separate input data into respective collections. In addition, the relationships between the topics extracted and the sentences in the corpus which express the topics are opaque, hindering our understanding of the opinions expressed in the corpus. We propose a novel unified latent variable model (contraLDA) which addresses the above matters. Experimental results show the effectiveness of our model in mining contrasted opinions, outperforming our baselines."
+ },
+ {
+  "title": "On Automated Defeasible Reasoning with Controlled Natural Language and Argumentation",
+  "year": 2017,
+  "type": "conference-paper",
+  "venue": "National Conference on Artificial Intelligence",
+  "doi": null,
+  "cited_by_count": 6,
+  "oa_url": null,
+  "coauthors": [
+   "Hannes Straß"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Defeasible reasoning",
+   "Computer science",
+   "Defeasible estate",
+   "Natural language",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Natural (archaeology)",
+   "Programming language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "dARe – Using Argumentation to Explain Conclusions from a Controlled Natural Language Knowledge Base",
+  "year": 2017,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-319-60045-1_35",
+  "cited_by_count": 5,
+  "oa_url": null,
+  "coauthors": [
+   "Hannes Straß"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Knowledge base",
+   "Defeasible estate",
+   "Defeasible reasoning",
+   "Natural language",
+   "Natural (archaeology)",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Programming language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "The Aberdeen Burgh Records of 1398–1531 and the Semantic Web",
+  "year": 2017,
+  "type": "article",
+  "venue": "Journal of catalan intellectual history",
+  "doi": "10.1515/jocih-2016-0014",
+  "cited_by_count": 0,
+  "oa_url": "https://content.sciendo.com/downloadpdf/journals/jocih/1/11/article-p151.pdf",
+  "coauthors": [
+   "Anna Havinga"
+  ],
+  "concepts": [
+   "Computer science",
+   "Semantic Web",
+   "Library science",
+   "Information retrieval"
+  ],
+  "abstract": "Abstract This paper provides an overview of two text analytic projects on the Aberdeen burgh records, which are legal records of the city of Aberdeen, Scotland. These records contain detailed information about a range of activities in the city and their legal treatment. The projects cover the periods 1398–1511 (Law in the Aberdeen Council Registers project – LACR) and 1530–1531 (A Text Analytic Approach to Rural and Urban Legal Histories project – TAHL). The completed TAHL project annotated a selected corpus with rich semantic information for the purpose of facilitating historical research by querying and extracting data from across the corpus. The LACR project, which is ongoing, focuses on transcribing the first eight volumes of the Aberdeen burgh records (1398–1511) into the Text Encoding Initiative’s standard, thus making the text machinereadable. This project lays the foundation for further analysis and enrichment of the corpus."
+ },
+ {
+  "title": "A Chatbot Framework for the Children's Legal Centre",
+  "year": 2018,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/978-1-61499-935-5-205",
+  "cited_by_count": 6,
+  "oa_url": "https://cronfa.swan.ac.uk/Record/cronfa48384/Download/0048384-22012019170852.pdf",
+  "coauthors": [
+   "Jay Morgan",
+   "Adeline Paiement",
+   "Monika Seisenberger",
+   "Williams Jane"
+  ],
+  "concepts": [
+   "Chatbot",
+   "Computer science",
+   "World Wide Web"
+  ],
+  "abstract": "This paper presents a novel method to address legal rights for children through a chatbot framework by integrating machine learning, a dialogue graph, and information extraction. The method addresses a significant problem: we cannot presume that children have common knowledge about their rights or express themselves as an adult might. In our framework, a chatbot user begins a conversation, where based on the circumstance described, a neural network predicts both speech acts, relating to a dialogue graph, and legal types. Information is extracted in order to create a case for a legal advisor. In collaboration with the Children's Legal Centre Wales, who advocate for the improvement of legal rights in Wales, a corpus has been constructed and a prototype chatbot developed. The framework has been evaluated with classification measures and a user study."
+ },
+ {
+  "title": "A Methodology for a Criminal Law and Procedure Ontology for Legal Question Answering",
+  "year": 2018,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-030-04284-4_14",
+  "cited_by_count": 31,
+  "oa_url": null,
+  "coauthors": [
+   "Biralatei Fawei",
+   "Jeff Z. Pan",
+   "Martin J. Kollingbaum"
+  ],
+  "concepts": [
+   "Computer science",
+   "Ontology",
+   "Question answering",
+   "Semantic Web",
+   "Natural language",
+   "Philosophy of law",
+   "Legal aspects of computing",
+   "Criminal law",
+   "The Internet",
+   "Information retrieval",
+   "Natural language processing",
+   "World Wide Web"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Using Legal Ontologies with Rules for Legal Textual Entailment",
+  "year": 2018,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-030-00178-0_21",
+  "cited_by_count": 9,
+  "oa_url": null,
+  "coauthors": [
+   "Biralatei Fawei",
+   "Jeff Z. Pan",
+   "Martin J. Kollingbaum"
+  ],
+  "concepts": [
+   "Computer science",
+   "Natural language processing",
+   "Textual entailment",
+   "Logical consequence",
+   "Information retrieval",
+   "Artificial intelligence",
+   "Programming language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "An Annotation Language for Semantic Search of Legal Sources",
+  "year": 2018,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.63317/3a4vxy7nn7z7",
+  "cited_by_count": 3,
+  "oa_url": "https://doi.org/10.63317/3a4vxy7nn7z7",
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy"
+  ],
+  "concepts": [
+   "Computer science",
+   "Annotation",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Information retrieval",
+   "Semantic annotation",
+   "Temporal annotation"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Causal Models of Legal Cases",
+  "year": 2018,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-030-00178-0_11",
+  "cited_by_count": 3,
+  "oa_url": null,
+  "coauthors": [
+   "Rūta Liepiņa",
+   "Giovanni Sartor"
+  ],
+  "concepts": [
+   "Causation",
+   "Computer science",
+   "Defeasible reasoning",
+   "Focus (optics)",
+   "Causal reasoning",
+   "Defeasible estate",
+   "Attribution",
+   "Epistemology",
+   "Causal model",
+   "Management science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Knowledge Driven Intelligent Survey Systems for Linguists",
+  "year": 2018,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-030-04284-4_1",
+  "cited_by_count": 2,
+  "oa_url": null,
+  "coauthors": [
+   "Ricardo Ferreira Soares",
+   "Elspeth Edelstein",
+   "Jeff Z. Pan"
+  ],
+  "concepts": [
+   "Grammaticality",
+   "Computer science",
+   "Natural language processing",
+   "Knowledge graph",
+   "Artificial intelligence",
+   "Graph",
+   "Grammar"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Identification of Rhetorical Roles of Sentences in Indian Legal Judgments",
+  "year": 2019,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia190301",
+  "cited_by_count": 32,
+  "oa_url": "https://doi.org/10.3233/faia190301",
+  "coauthors": [
+   "Paheli Bhattacharya",
+   "Paul Shounak",
+   "Kripabandhu Ghosh",
+   "Ghosh Saptarshi"
+  ],
+  "concepts": [
+   "Rhetorical question",
+   "Automatic summarization",
+   "Computer science",
+   "Task (project management)",
+   "Judgement",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Conditional random field",
+   "Identification (biology)",
+   "Supreme court",
+   "Baseline (sea)",
+   "Rhetorical device"
+  ],
+  "abstract": "Automatically understanding the rhetorical roles of sentences in a legal case judgement is an important problem to solve, since it can help in several downstream tasks like summarization of legal judgments, legal search, and so on. The task is challenging since legal case documents are usually not well-structured, and these rhetorical roles may be subjective (as evident from variation of opinions between legal experts). In this paper, we address this task for judgments from the Supreme Court of India. We label sentences in 50 documents using multiple human annotators, and perform an extensive analysis of the human-assigned labels. We also attempt automatic identification of the rhetorical roles of sentences. While prior approaches towards this task used Conditional Random Fields over manually handcrafted features, we explore the use of deep neural models which do not require hand-crafting of features. Experiments show that neural models perform much better in this task than baseline methods which use handcrafted features."
+ },
+ {
+  "title": "Introduction for artificial intelligence and law: special issue “natural language processing for legal texts”",
+  "year": 2019,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-019-09251-2",
+  "cited_by_count": 50,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-019-09251-2.pdf",
+  "coauthors": [
+   "Livio Robaldo",
+   "Serena Villata",
+   "Matthias Grabmair"
+  ],
+  "concepts": [
+   "Legal aspects of computing",
+   "Philosophy of law",
+   "Law",
+   "Computer science",
+   "Artificial intelligence",
+   "Natural (archaeology)",
+   "Natural language processing",
+   "Political science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A Semi-automated Ontology Construction for Legal Question Answering",
+  "year": 2019,
+  "type": "article",
+  "venue": "New Generation Computing",
+  "doi": "10.1007/s00354-019-00070-2",
+  "cited_by_count": 43,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s00354-019-00070-2.pdf",
+  "coauthors": [
+   "Biralatei Fawei",
+   "Jeff Z. Pan",
+   "Martin J. Kollingbaum"
+  ],
+  "concepts": [
+   "Computer science",
+   "Ontology",
+   "Question answering",
+   "Upper ontology",
+   "Natural language",
+   "Legal case",
+   "Semantic Web",
+   "Information retrieval",
+   "Natural language processing",
+   "World Wide Web"
+  ],
+  "abstract": "The internet and the development of the semantic web have created the opportunity to provide structured legal data on the web. However, most legal information is in text. It is difficult to automatically determine the right natural language answer about the law to a given natural language question. One approach is to develop systems of legal ontologies and rules. Our example ontology represents semantic information about USA criminal law and procedure as well as the applicable legal rules. The purpose of the ontology is to provide reasoning support to a legal question answering tool that determines entailment between a pair of texts, one known as the background information (Bg) and the other question statement (Q), so whether Bg entails Q based on the application of the legal rules. The key contribution of this paper is the methodology and the semi-automated legal ontology generation tool, a clear and well-structured methodology that serves to develop such criminal law ontologies and rules (CLOR)."
+ },
+ {
+  "title": "Arguing about causes in law: a semi-formal framework for causal arguments",
+  "year": 2019,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-019-09246-z",
+  "cited_by_count": 10,
+  "oa_url": null,
+  "coauthors": [
+   "Rūta Liepiņa",
+   "Giovanni Sartor"
+  ],
+  "concepts": [
+   "Causation",
+   "Argumentation theory",
+   "Overdetermination",
+   "Epistemology",
+   "Defeasible estate",
+   "Counterfactual conditional",
+   "Attribution",
+   "Computer science",
+   "Law and economics",
+   "Psychology"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "EMIL: Extracting Meaning from Inconsistent Language",
+  "year": 2019,
+  "type": "article",
+  "venue": "International Journal of Approximate Reasoning",
+  "doi": "10.1016/j.ijar.2019.04.010",
+  "cited_by_count": 4,
+  "oa_url": "https://cronfa.swan.ac.uk/Record/cronfa50680",
+  "coauthors": [
+   "Hannes Straß",
+   "Martin Diller"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Computer science",
+   "Computational semantics",
+   "Defeasible reasoning",
+   "Natural language processing",
+   "Natural language",
+   "Artificial intelligence",
+   "Computational model",
+   "Programming language",
+   "Knowledge representation and reasoning",
+   "Semantics (computer science)",
+   "Object language"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A unified latent variable model for contrastive opinion mining",
+  "year": 2019,
+  "type": "article",
+  "venue": "Frontiers of Computer Science",
+  "doi": "10.1007/s11704-018-7073-5",
+  "cited_by_count": 11,
+  "oa_url": null,
+  "coauthors": [
+   "Ebuka Ibeke",
+   "Chenghua Lin",
+   "Mohamad Hardyman Barawi"
+  ],
+  "concepts": [
+   "Computer science",
+   "Contrastive analysis",
+   "Natural language processing",
+   "Sentiment analysis",
+   "Focus (optics)",
+   "Artificial intelligence",
+   "Variable (mathematics)",
+   "Latent variable",
+   "Information retrieval",
+   "Contrast (vision)",
+   "Linguistics",
+   "Data science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Identification of Rhetorical Roles of Sentences in Indian Legal\\n Judgments",
+  "year": 2019,
+  "type": "preprint",
+  "venue": "arXiv (Cornell University)",
+  "doi": "10.48550/arxiv.1911.05405",
+  "cited_by_count": 37,
+  "oa_url": "https://arxiv.org/pdf/1911.05405",
+  "coauthors": [
+   "Paheli Bhattacharya",
+   "Shounak Paul",
+   "Kripabandhu Ghosh",
+   "Saptarshi Ghosh"
+  ],
+  "concepts": [
+   "Rhetorical question",
+   "Automatic summarization",
+   "Task (project management)",
+   "Computer science",
+   "Judgement",
+   "Natural language processing",
+   "Artificial intelligence",
+   "Conditional random field",
+   "Identification (biology)",
+   "Supreme court",
+   "Baseline (sea)",
+   "Rhetorical device"
+  ],
+  "abstract": "Automatically understanding the rhetorical roles of sentences in a legal case\\njudgement is an important problem to solve, since it can help in several\\ndownstream tasks like summarization of legal judgments, legal search, and so\\non. The task is challenging since legal case documents are usually not\\nwell-structured, and these rhetorical roles may be subjective (as evident from\\nvariation of opinions between legal experts). In this paper, we address this\\ntask for judgments from the Supreme Court of India. We label sentences in 50\\ndocuments using multiple human annotators, and perform an extensive analysis of\\nthe human-assigned labels. We also attempt automatic identification of the\\nrhetorical roles of sentences. While prior approaches towards this task used\\nConditional Random Fields over manually handcrafted features, we explore the\\nuse of deep neural models which do not require hand-crafting of features.\\nExperiments show that neural models perform much better in this task than\\nbaseline methods which use handcrafted features.\\n"
+ },
+ {
+  "title": "Identification of Rhetorical Roles of Sentences in Indian Legal Judgments",
+  "year": 2019,
+  "type": "preprint",
+  "venue": "arXiv (Cornell University)",
+  "doi": "10.48550/arxiv.1911.05405",
+  "cited_by_count": 11,
+  "oa_url": "https://arxiv.org/pdf/1911.05405",
+  "coauthors": [
+   "Paheli Bhattacharya",
+   "Shounak Paul",
+   "Kripabandhu Ghosh",
+   "Saptarshi Ghosh"
+  ],
+  "concepts": [
+   "Rhetorical question",
+   "Computer science",
+   "Automatic summarization",
+   "Task (project management)",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Judgement",
+   "Conditional random field",
+   "Identification (biology)",
+   "Supreme court",
+   "Legal case",
+   "Baseline (sea)",
+   "Rhetorical device"
+  ],
+  "abstract": "Automatically understanding the rhetorical roles of sentences in a legal case judgement is an important problem to solve, since it can help in several downstream tasks like summarization of legal judgments, legal search, and so on. The task is challenging since legal case documents are usually not well-structured, and these rhetorical roles may be subjective (as evident from variation of opinions between legal experts). In this paper, we address this task for judgments from the Supreme Court of India. We label sentences in 50 documents using multiple human annotators, and perform an extensive analysis of the human-assigned labels. We also attempt automatic identification of the rhetorical roles of sentences. While prior approaches towards this task used Conditional Random Fields over manually handcrafted features, we explore the use of deep neural models which do not require hand-crafting of features. Experiments show that neural models perform much better in this task than baseline methods which use handcrafted features."
+ },
+ {
+  "title": "Making Sense of Conflicting (Defeasible) Rules in the Controlled Natural Language ACE: Design of a System with Support for Existential Quantification Using Skolemization",
+  "year": 2019,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.18653/v1/w19-0505",
+  "cited_by_count": 1,
+  "oa_url": "https://www.aclweb.org/anthology/W19-0505.pdf",
+  "coauthors": [
+   "Martin Diller",
+   "Hannes Straß"
+  ],
+  "concepts": [
+   "Computer science",
+   "Defeasible estate",
+   "Existentialism",
+   "Context (archaeology)",
+   "Natural language",
+   "Fragment (logic)",
+   "Defeasible reasoning",
+   "Set (abstract data type)",
+   "Artificial intelligence",
+   "Natural language processing",
+   "Programming language",
+   "Answer set programming"
+  ],
+  "abstract": "We present the design of a system for making sense of conflicting rules expressed in a fragment of the prominent controlled natural language ACE, yet extended with means of expressing defeasible rules in the form of normality assumptions. The approach we describe is ultimately based on answer-set-programming (ASP); simulating existential quantification by using skolemization in a manner resembling a translation for ASP recently formalized in the context of -ASP. We discuss the advantages of this approach to building on the existing ACE interface to rule-systems, ACERules."
+ },
+ {
+  "title": "Aberdeen Registers Online 1398-1511",
+  "year": 2019,
+  "type": "dataset",
+  "venue": "University of Aberdeen",
+  "doi": "10.20392/ff90263d-b66b-4a9b-8f78-e1daf25d81b7",
+  "cited_by_count": 1,
+  "oa_url": "https://doi.org/10.20392/ff90263d-b66b-4a9b-8f78-e1daf25d81b7",
+  "coauthors": [
+   "William Hepburn",
+   "Edda Frankot",
+   "Anna Havinga",
+   "Claire Hawes",
+   "Wilhelmus Theodorus Maria Peters",
+   "Jackson W. Armstrong",
+   "Philip William Astley",
+   "Andrew Mackillop",
+   "Andrew R. C. Simpson"
+  ],
+  "concepts": [
+   "Internet privacy",
+   "Business",
+   "Computer science"
+  ],
+  "abstract": "Aberdeen Registers Online: 1398-1511 (ARO) is a digital transcription of the first eight volumes of the Aberdeen Council Registers. These comprise the earliest and most complete run of books of civic government in Scotland, beginning in 1398 (volume one) and covering the period up to 1511 (volume eight) The Aberdeen Registers Online resource provides the digital transcription created by the LACR project LACR forms part of the Aberdeen Burgh Records Project, a partnership between the Aberdeen City and Aberdeenshire Archives and the Research Institute of Irish and Scottish Studies at the University of Aberdeen. LACR, the University of Aberdeen and Aberdeen City Council are committed to maintaining the Aberdeen Registers Online (ARO) as a resource that is publicly available and that is free at the point of access."
+ },
+ {
+  "title": "Evaluation of Causal Arguments in Law",
+  "year": 2019,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/3322640.3326698",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Rūta Liepiņa",
+   "Giovanni Sartor"
+  ],
+  "concepts": [
+   "Overdetermination",
+   "Argument (complex analysis)",
+   "Epistemology",
+   "Attribution",
+   "Outcome (game theory)",
+   "Set (abstract data type)",
+   "Causation",
+   "Computer science",
+   "Law and economics",
+   "Positive economics",
+   "Sociology",
+   "Mathematical economics"
+  ],
+  "abstract": "In many legal disputes, determining and evaluating cause-in-fact is a crucial step in the liability attribution. It is, however, difficult and opaque. In this paper, we analyse the cases of overdetermination, where there is more than one cause for the outcome. The proposed framework (FCA) employs logic-based argument modelling. It distinguishes individual contributors in overdetermination cases by using a new set of critical questions based on argument schemes from effect-to-cause. To illustrate the use of the FCA, the Heneghan v Manchester Dry Docks lung cancer case with multi-party contributions is analysed."
+ },
+ {
+  "title": "Aberdeen Registers Online 1398-1511",
+  "year": 2019,
+  "type": "other",
+  "venue": "Open MIND",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "William Hepburn",
+   "Edda Frankot",
+   "Anna Dorothea Havinga",
+   "Claire Hawes",
+   "Wilhelmus Theodorus Maria Peters",
+   "Jackson Armstrong",
+   "Philip William Astley",
+   "Andrew Mackillop",
+   "Andrew R. C. Simpson"
+  ],
+  "concepts": [
+   "General partnership",
+   "Library science",
+   "Irish",
+   "Government (linguistics)",
+   "Resource (disambiguation)",
+   "Transcription (linguistics)",
+   "Political science",
+   "Local authority",
+   "Public administration"
+  ],
+  "abstract": "Aberdeen Registers Online: 1398-1511 (ARO) is a digital transcription of the first eight volumes of the Aberdeen Council Registers. These comprise the earliest and most complete run of books of civic government in Scotland, beginning in 1398 (volume one) and covering the period up to 1511 (volume eight) The Aberdeen Registers Online resource provides the digital transcription created by the LACR project LACR forms part of the Aberdeen Burgh Records Project, a partnership between the Aberdeen City and Aberdeenshire Archives and the Research Institute of Irish and Scottish Studies at the University of Aberdeen. LACR, the University of Aberdeen and Aberdeen City Council are committed to maintaining the Aberdeen Registers Online (ARO) as a resource that is publicly available and that is free at the point of access."
+ },
+ {
+  "title": "Knowledge-Driven Intelligent Survey Systems Towards Open Science",
+  "year": 2020,
+  "type": "article",
+  "venue": "New Generation Computing",
+  "doi": "10.1007/s00354-020-00087-y",
+  "cited_by_count": 6,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s00354-020-00087-y.pdf",
+  "coauthors": [
+   "Elspeth Edelstein",
+   "Jeff Z. Pan",
+   "Ricardo Ferreira Soares"
+  ],
+  "concepts": [
+   "Grammaticality",
+   "Computer science",
+   "Natural language processing",
+   "Knowledge graph",
+   "Artificial intelligence",
+   "Graph",
+   "Implicit knowledge",
+   "Grammar",
+   "Information retrieval"
+  ],
+  "abstract": "Abstract In this paper, we propose Knowledge Graph (KG), an articulated underlying semantic structure, as a semantic bridge between humans, systems, and scientific knowledge. To illustrate our proposal, we focus on KG-based intelligent survey systems. In state-of-the-art systems, information is hard-coded or implicit, making it hard for researchers to reuse, customise, link, or transmit structured knowledge. Furthermore, such systems do not facilitate dynamic interaction based on semantic structure. We design and implement a knowledge-driven intelligent survey system which is based on knowledge graph, a widely used technology that facilitates sharing and querying hypotheses, survey content, results, and analyses. The approach is developed, implemented, and tested in the field of Linguistics. Syntacticians and morphologists develop theories of grammar of natural languages. To evaluate theories, they seek intuitive grammaticality (well-formedness) judgments from native speakers, which either support hypotheses or provide counter-evidence. Our preliminary experiments show that a knowledge graph-based linguistic survey can provide more nuanced results than the traditional document-based grammaticality judgment surveys by allowing for tagging and manipulation of specific linguistic variables."
+ },
+ {
+  "title": "A Dynamic and Informative Intelligent Survey System Based on Knowledge Graph",
+  "year": 2020,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-030-41407-8_15",
+  "cited_by_count": 2,
+  "oa_url": null,
+  "coauthors": [
+   "Patrik Bansky",
+   "Elspeth Edelstein",
+   "Jeff Z. Pan"
+  ],
+  "concepts": [
+   "Computer science",
+   "Component (thermodynamics)",
+   "Graph",
+   "Focus (optics)",
+   "Dynamic data",
+   "Data mining",
+   "Machine learning",
+   "Artificial intelligence",
+   "Data science",
+   "Theoretical computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "DeepRhole: deep learning for rhetorical role labeling of sentences in legal case documents",
+  "year": 2021,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-021-09304-5",
+  "cited_by_count": 48,
+  "oa_url": null,
+  "coauthors": [
+   "Paheli Bhattacharya",
+   "Shounak Paul",
+   "Kripabandhu Ghosh",
+   "Saptarshi Ghosh"
+  ],
+  "concepts": [
+   "Rhetorical question",
+   "Computer science",
+   "Artificial intelligence",
+   "Supreme court",
+   "Natural language processing",
+   "Conditional random field"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A Knowledge Graph Based Approach to Social Science Surveys",
+  "year": 2021,
+  "type": "article",
+  "venue": "Data Intelligence",
+  "doi": "10.1162/dint_a_00107",
+  "cited_by_count": 11,
+  "oa_url": "https://direct.mit.edu/dint/article-pdf/3/4/477/1968576/dint_a_00107.pdf",
+  "coauthors": [
+   "Jeff Z. Pan",
+   "Elspeth Edelstein",
+   "Patrik Bansky"
+  ],
+  "concepts": [
+   "Computer science",
+   "Knowledge graph",
+   "Context (archaeology)",
+   "Component (thermodynamics)",
+   "Graph",
+   "Data science",
+   "Survey data collection",
+   "Variable (mathematics)",
+   "Knowledge management",
+   "Artificial intelligence"
+  ],
+  "abstract": "Recent success of knowledge graphs has spurred interest in applying them in open science, such as on intelligent survey systems for scientists. However, efforts to understand the quality of candidate survey questions provided by these methods have been limited. Indeed, existing methods do not consider the type of on-the-fly content planning that is possible for face-to-face surveys and hence do not guarantee that selection of subsequent questions is based on response to previous questions in a survey. To address this limitation, we propose a dynamic and informative solution for an intelligent survey system that is based on knowledge graphs. To illustrate our proposal, we look into social science surveys, focusing on ordering the questions of a questionnaire component by their level of acceptance, along with conditional triggers that further customise participants' experience. Our main findings are: (i) evaluation of the proposed approach shows that the dynamic component can be beneficial in terms of lowering the number of questions asked per variable, thus allowing more informative data to be collected in a survey of equivalent length; and (ii) a primary advantage of the proposed approach is that it enables grouping of participants according to their responses, so that participants are not only served appropriate follow-up questions, but their responses to these questions may be analysed in the context of some initial categorisation. We believe that the proposed approach can easily be applied to other social science surveys based on grouping definitions in their contexts. The knowledge-graph-based intelligent survey approach proposed in our work allows online questionnaires to approach face-to-face interaction in their level of informativity and responsiveness, as well as duplicating certain advantages of interview-based data collection."
+ },
+ {
+  "title": "A Pragmatic Approach to Semantic Annotation for Search of Legal Texts – An Experiment on GDPR",
+  "year": 2021,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia210313",
+  "cited_by_count": 8,
+  "oa_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA210313",
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy"
+  ],
+  "concepts": [
+   "Computer science",
+   "Annotation",
+   "Semantic annotation",
+   "Information retrieval",
+   "XML",
+   "Interpretation (philosophy)",
+   "Natural language processing",
+   "Semantic interpretation",
+   "Artificial intelligence"
+  ],
+  "abstract": "Tools must be developed to help draft, consult, and explore textual legal sources. Between statistical information retrieval and the formalization of textual rules for automated legal reasoning, we defend a more pragmatic third way that enriches legal texts with a coarse-grained, interpretation-neutral, semantic annotation layer. The aim is that legal texts can be enriched on a large scale at a reasonable cost, paving the way for new search capabilities that will facilitate mining of legal sources. This new approach is illustrated on a proof-of-concept experiment that consisted in semantically annotating a significant part of the French version of the GDPR. The paper presents the design methodology of the annotation language, a first version of a Core Legal Annotation Language (CLAL), together with its formalization in XML, the gold standard resulting from the annotation of GDPR, and examples of user questions that can be better answered by semantic than by plain text search. This experimentation demonstrates the potential of the proposed approach and provides a basis for further development. All resources developed for that GDPR experiment are language independent and are publicly available."
+ },
+ {
+  "title": "",
+  "year": 2021,
+  "type": "other",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 5,
+  "oa_url": "https://dspace.library.uu.nl/handle/1874/415057",
+  "coauthors": [
+   "Justin Edwards",
+   "Philipp Wintersberger",
+   "Leigh Clark",
+   "Daniel Rough",
+   "Philip R. Doyle",
+   "Victoria A. Banks",
+   "Christian P. Janssen",
+   "Benjamin R. Cowan"
+  ],
+  "concepts": [
+   "Futures contract",
+   "Automotive industry",
+   "Computer science",
+   "Human–computer interaction",
+   "Work (physics)",
+   "User interface",
+   "Pessimism",
+   "World Wide Web",
+   "Multimedia"
+  ],
+  "abstract": "This work aims to connect the Automotive User Interfaces (Auto-UI) and Conversational User Interfaces (CUI) communities through discussion of their shared view of the future of automotive conversational user interfaces. The workshop aims to encourage creative consideration of optimistic and pessimistic futures, encouraging attendees to explore the opportunities and barriers that lie ahead through a game. Considerations of the future will be mapped out in greater detail through the drafting of research agendas, by which attendees will get to know each other's expertise and networks of resources. The two day workshop, consisting of two 90-minute sessions, will facilitate greater communication and collaboration between these communities, connecting researchers to work together to influence the futures they imagine in the workshop."
+ },
+ {
+  "title": "Thirty years of artificial intelligence and law: the third decade",
+  "year": 2022,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-022-09327-6",
+  "cited_by_count": 52,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-022-09327-6.pdf",
+  "coauthors": [
+   "Serena Villata",
+   "Michał Araszkiewicz",
+   "Kevin D. Ashley",
+   "Trevor Bench‐Capon",
+   "L. Karl Branting",
+   "Jack G. Conrad"
+  ],
+  "concepts": [
+   "Artificial intelligence",
+   "Variety (cybernetics)",
+   "Legal aspects of computing",
+   "Philosophy of law",
+   "Computer science",
+   "Feature (linguistics)",
+   "Symbolic artificial intelligence",
+   "Law",
+   "The Internet"
+  ],
+  "abstract": "Abstract The first issue of Artificial Intelligence and Law journal was published in 1992. This paper offers some commentaries on papers drawn from the Journal’s third decade. They indicate a major shift within Artificial Intelligence, both generally and in AI and Law: away from symbolic techniques to those based on Machine Learning approaches, especially those based on Natural Language texts rather than feature sets. Eight papers are discussed: two concern the management and use of documents available on the World Wide Web, and six apply machine learning techniques to a variety of legal applications."
+ },
+ {
+  "title": "Thirty years of Artificial Intelligence and Law: the second decade",
+  "year": 2022,
+  "type": "article",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-022-09326-7",
+  "cited_by_count": 24,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-022-09326-7.pdf",
+  "coauthors": [
+   "Giovanni Sartor",
+   "Michał Araszkiewicz",
+   "Katie Atkinson",
+   "Floris Bex",
+   "Tom van Engers",
+   "Enrico Francesconi",
+   "Henry Prakken",
+   "Giovanni Sileno",
+   "Frank Schilder",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Argumentation theory",
+   "Philosophy of law",
+   "Legal aspects of computing",
+   "Artificial intelligence",
+   "Representation (politics)",
+   "Computer science",
+   "Natural language",
+   "Knowledge representation and reasoning",
+   "Applied linguistics",
+   "Natural language processing",
+   "Law",
+   "Epistemology"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Correction: thirty years of Artificial Intelligence and Law: the second decade",
+  "year": 2022,
+  "type": "erratum",
+  "venue": "Artificial Intelligence and Law",
+  "doi": "10.1007/s10506-022-09333-8",
+  "cited_by_count": 0,
+  "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-022-09333-8.pdf",
+  "coauthors": [
+   "Giovanni Sartor",
+   "Michał Araszkiewicz",
+   "Katie Atkinson",
+   "Floris Bex",
+   "Tom van Engers",
+   "Enrico Francesconi",
+   "Henry Prakken",
+   "Giovanni Sileno",
+   "Frank Schilder",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Legal aspects of computing",
+   "Philosophy of law",
+   "Law",
+   "Political science",
+   "Computer science",
+   "Artificial intelligence"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards a Methodology for Formalising Legal Texts: A Comparison of Two Experiments",
+  "year": 2022,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy"
+  ],
+  "concepts": [
+   "Computer science",
+   "Programming language",
+   "Software engineering",
+   "Natural language processing"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "On Legal Teleological Reasoning",
+  "year": 2023,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia230948",
+  "cited_by_count": 4,
+  "oa_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA230948",
+  "coauthors": [
+   "Tomasz Żurek"
+  ],
+  "concepts": [
+   "Teleology",
+   "Epistemology",
+   "Value (mathematics)",
+   "Management science",
+   "Psychology",
+   "Computer science"
+  ],
+  "abstract": "Given a common pool of facts and legal rules, Judges on a panel may form different justifications for decisions, which are then voted upon. It is clear that a Judge’s personal values and purposes play in developing their opinion, which is a form of teleological reasoning. The paper introduces the Value-based Formal Reasoning (VFR) framework, which describes how a Judge’s personal values can be used in the construction of a justification for a decision."
+ },
+ {
+  "title": "Argumentation Schemes for Legal Presumption of Causality",
+  "year": 2023,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/3594536.3595130",
+  "cited_by_count": 5,
+  "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3594536.3595130?download=true",
+  "coauthors": [
+   "Rūta Liepiņa",
+   "Giovanni Sartor",
+   "Francesca Lagioia"
+  ],
+  "concepts": [
+   "Presumption",
+   "Causality (physics)",
+   "Argumentation theory",
+   "Computer science",
+   "Law and economics",
+   "Computer security",
+   "Law",
+   "Epistemology"
+  ],
+  "abstract": "Causal reasoning is a challenging topic not only in philosophy, science and in theories of human mind, but also in legal reasoning. Causality is indeed a key precondition for civil and criminal liability, in all cases dealing with the connection between human actions or omissions and harmful events. Only a partial overlap exists between natural causality (cause-in-fact) and legal causality: there are instances in which what appears to be a natural cause is not recognised as a legal one, as well as instances in which causality may be presumptively ascribed by the law in the absence of decisive evidence for natural causality. Legal policy considerations may explain these puzzling divergences, as we will discuss in the following. In this paper, we use argumentation schemes to provide simple and intuitive patterns for assessing causality in the legal domain. The analysis of these argument schemes will enable us to clarify some connections between natural and legal causation. Our schemes will include the necessary condition (but-for), overdetermination (NESS), preemption, presumptions based on the increase of risks or presumption based on statutory obligations, and interruption of causality due to unexpected events (Actus Novus). These approaches are tested on the basis of real legal cases in different domains."
+ },
+ {
+  "title": "Towards Requirements for Digital Norms",
+  "year": 2023,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy"
+  ],
+  "concepts": [
+   "Computer science"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Semantic Search in Legislation",
+  "year": 2023,
+  "type": "conference-paper",
+  "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Adeline Nazarenko",
+   "François Lévy",
+   "Haïfa Zargayouna"
+  ],
+  "concepts": [
+   "Legislation",
+   "Computer science",
+   "Information retrieval"
+  ],
+  "abstract": "International audience"
+ },
+ {
+  "title": "Argumentation Schemes for Legal Presumption of Causality",
+  "year": 2023,
+  "type": "conference-paper",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [
+   "Presumption",
+   "Causality (physics)",
+   "Law and economics",
+   "Argumentation theory",
+   "Economics",
+   "Epistemology",
+   "Political science",
+   "Action (physics)",
+   "Law",
+   "Positive economics",
+   "Causation"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "A SHACL-Based Approach for Enhancing Automated Compliance Checking with RDF Data",
+  "year": 2024,
+  "type": "article",
+  "venue": "Information",
+  "doi": "10.3390/info15120759",
+  "cited_by_count": 11,
+  "oa_url": "https://www.mdpi.com/2078-2489/15/12/759/pdf?version=1732885299",
+  "coauthors": [
+   "Joseph Anim",
+   "Livio Robaldo"
+  ],
+  "concepts": [
+   "SPARQL",
+   "RDF",
+   "Interoperability",
+   "Computer science",
+   "Semantic Web",
+   "Aggregate (composite)",
+   "Software engineering",
+   "Data science",
+   "World Wide Web",
+   "Knowledge management"
+  ],
+  "abstract": "Automated Compliance Checking (ACC) has emerged as a critical tool for enforcing legal regulations across various domains. This paper contributes to ongoing research in Semantic Web technologies, particularly focusing on the execution of SHACL-SPARQL rules on RDF data. The RDF, being one of the most widely used knowledge representation (KR) formats, serves as the foundation of our approach, ensuring compatibility with existing standards and enhancing interoperability. Our research enhances the aggregate and temporal aspects of ACC by addressing the limitations of traditional ACC methodologies, which often fall short in managing the nuanced temporal and aggregate requirements essential for legal reasoning. Through a case study analysis of selected regulations with aggregate and temporal facets in LI 2204, which regulates local content and participation in Ghana’s upstream petroleum industry, this paper demonstrates the effectiveness of the proposed solution in achieving these dimensions of ACC. The findings underscore the potential of Semantic Web technologies to transform ACC practices by moving towards standardized, interoperable solutions. All source codes are freely available online together with instructions to locally reproduce the simulations."
+ },
+ {
+  "title": "Compliance Checking in the Energy Domain via W3C Standards",
+  "year": 2024,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-031-60511-6_1",
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "Joseph Anim",
+   "Livio Robaldo"
+  ],
+  "concepts": [
+   "Computer science",
+   "Compliance (psychology)",
+   "Domain (mathematical analysis)",
+   "Software engineering"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards a Formalisation of Motivated Reasoning and the Roots of Conflict",
+  "year": 2024,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-031-58202-8_3",
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "Tomasz Żurek"
+  ],
+  "concepts": [
+   "Computer science",
+   "Artificial intelligence",
+   "Cognitive science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Towards a Formalisation of Value-based Actions and Consequentialist Ethics",
+  "year": 2024,
+  "type": "preprint",
+  "venue": "arXiv (Cornell University)",
+  "doi": "10.48550/arxiv.2403.16719",
+  "cited_by_count": 0,
+  "oa_url": "https://arxiv.org/pdf/2403.16719",
+  "coauthors": [
+   "Tomasz Żurek",
+   "Dorota Stachura-Zurek"
+  ],
+  "concepts": [
+   "Consequentialism",
+   "Value (mathematics)",
+   "Business ethics",
+   "Epistemology",
+   "Political science"
+  ],
+  "abstract": "Agents act to bring about a state of the world that is more compatible with their personal or institutional values. To formalise this intuition, the paper proposes an action framework based on the STRIPS formalisation. Technically, the contribution expresses actions in terms of Value-based Formal Reasoning (VFR), which provides a set of propositions derived from an Agent's value profile and the Agent's assessment of propositions with respect to the profile. Conceptually, the contribution provides a computational framework for a form of consequentialist ethics which is satisficing, luralistic, act-based, and preferential."
+ },
+ {
+  "title": "Value-Based Reasoning in ASPIC+",
+  "year": 2024,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia240332",
+  "cited_by_count": 0,
+  "oa_url": "http://dx.doi.org/10.3233/faia240332",
+  "coauthors": [
+   "Johannes Wallner",
+   "Tomasz Żurek"
+  ],
+  "concepts": [
+   "Value (mathematics)",
+   "Mathematics"
+  ],
+  "abstract": "In Value-based Argumentation Frameworks (VAFs), values are ascribed to abstract arguments and ordered one to another to reflect an audience’s preferences. An attack of one argument on another is successful only if the audience does not prefer the value of the attacked argument to the value of the attacking argument. Audiences can disagree about admissible arguments relative to their value preferences. Complementary to VAFs, this paper presents a novel integration of Value-Based Reasoning Frameworks (VBFs) with instantiated argumentation, specifically we focus on the structured argumentation approach of ASPIC+. Agents associate literals with social values and weight of values; together, these are used to filter the literals compatible with their values. Such a set of literals is used to construct agent-relative ASPIC+ knowledge bases, agent-relative instantiated arguments, and argumentation frameworks (AFs). Agents can attack one another’s arguments. VAF and VBF present complementary perspectives on values on arguments. VBF contributes a new, formal, articulated view of agreement and disagreement amongst agents, which is grounded in their values. In addition, VBF helps us understand how different agents choose what to argue from out of a pool of common resources."
+ },
+ {
+  "title": "Values and Factor Ascription Arguments",
+  "year": 2024,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia241249",
+  "cited_by_count": 0,
+  "oa_url": "https://ebooks.iospress.nl/pdf/doi/10.3233/FAIA241249",
+  "coauthors": [
+   "Tomasz Żurek",
+   "Trevor Bench‐Capon"
+  ],
+  "concepts": [
+   "Ascription",
+   "Dissenting opinion",
+   "Argumentation theory",
+   "Outcome (game theory)",
+   "Epistemology",
+   "Phenomenon",
+   "Psychology",
+   "Social psychology",
+   "Political science"
+  ],
+  "abstract": "Argumentation is often an attempt to resolve disagreement, but it is not always possible to reach a resolution. This is illustrated in law where multi-judge trials often end with a split decision. Not only do the judges disagree as to outcome (dissenting opinions), but also as to the reasons for a given outcome (concurring opinions). These disagreements can be explained in terms of different values held by the judges concerned. But while the role of values in determining which arguments are accepted has been widely explored, values can also determine which arguments can be constructed. The paper provides an analysis of this phenomenon."
+ },
+ {
+  "title": "Values and Factor Ascription Arguments",
+  "year": 2024,
+  "type": "book-chapter",
+  "venue": "Cronfa (Swansea University)",
+  "doi": null,
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [],
+  "concepts": [],
+  "abstract": null
+ },
+ {
+  "title": "Mind the Gaps: Logical English, Prolog, and Multi-agent Systems for Autonomous Vehicles",
+  "year": 2025,
+  "type": "article",
+  "venue": "Electronic Proceedings in Theoretical Computer Science",
+  "doi": "10.4204/eptcs.416.9",
+  "cited_by_count": 1,
+  "oa_url": "https://doi.org/10.4204/eptcs.416.9",
+  "coauthors": [
+   "Galileo Sartor",
+   "Giuseppe Contissa"
+  ],
+  "concepts": [
+   "Prolog",
+   "Computer science",
+   "Programming language",
+   "Artificial intelligence",
+   "Cognitive science"
+  ],
+  "abstract": "In this paper, we present a modular system for representing and reasoning with legal aspects of traffic rules for autonomous vehicles. We focus on a subset of the United Kingdom's Highway Code (HC) related to junctions. As human drivers and automated vehicles (AVs) will interact on the roads, especially in urban environments, we claim that an accessible, unitary, high-level computational model should exist and be applicable to both users. Autonomous vehicles introduce a shift in liability that should not bring disadvantages or increased burden on human drivers. We develop a system \"in silico\" of the model. The proposed system is built of three main components: a natural language interface, using Logical English, which encodes the rules; an internal representation of the rules in Prolog; and an multi-agent-based simulation environment, built in NetLogo. The three components interact: Logical English is translated into and out of Prolog (along with some support code); Prolog and NetLogo interface via predicates. Such a modular approach enables the different components to carry different \"burdens\" in the overall system; it also allows swapping of modules. Given NetLogo, we can visualize the effect of the modeled rules as well as validate the system with a simple dynamic running scenario. Designated agents monitor the behaviour of the vehicles for compliance and record potential violations where they occur. The information on potential violations is then utilized by Validators, to determine whether the violation is punishable, differentiating between exceptions and cases."
+ },
+ {
+  "title": "Towards a Formalisation of Value-Based Actions and Consequentialist Ethics",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-031-82039-7_2",
+  "cited_by_count": 1,
+  "oa_url": null,
+  "coauthors": [
+   "Tomasz Żurek",
+   "Dorota Stachura-Zurek"
+  ],
+  "concepts": [
+   "Computer science",
+   "Consequentialism",
+   "Value (mathematics)"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "The Model of Benevolence for Trust in Multi-agent System",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": "Smart innovation, systems and technologies",
+  "doi": "10.1007/978-981-97-6469-3_2",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Tomasz Żurek",
+   "Tom van Engers"
+  ],
+  "concepts": [
+   "Business",
+   "Psychology",
+   "Computer science"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Satisfaction in Negotiation by Structured Values and Propositions",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": "Lecture notes in computer science",
+  "doi": "10.1007/978-3-031-85463-7_11",
+  "cited_by_count": 0,
+  "oa_url": "https://handle.uba.uva.nl/personal/pure/en/publications/satisfaction-innegotiation-bystructured-values-andpropositions(660c95b2-63dc-488c-9bf9-82e6233a0f7c).html",
+  "coauthors": [
+   "Tomasz Żurek"
+  ],
+  "concepts": [
+   "Negotiation",
+   "Computer science",
+   "Human–computer interaction"
+  ],
+  "abstract": null
+ },
+ {
+  "title": "Penalties as Feedback on AV Behaviour",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1109/iavvc61942.2025.11219470",
+  "cited_by_count": 0,
+  "oa_url": null,
+  "coauthors": [
+   "Galileo Sartor"
+  ],
+  "concepts": [
+   "Computer science",
+   "Semantic reasoner",
+   "Focus (optics)",
+   "Accident (philosophy)",
+   "Risk analysis (engineering)",
+   "Computer security",
+   "Representation (politics)",
+   "Natural (archaeology)",
+   "Code (set theory)",
+   "Intersection (aeronautics)",
+   "Compliance (psychology)",
+   "Natural language"
+  ],
+  "abstract": "In this paper, we present a logic based system for representing and reasoning with legal aspects of traffic rules for autonomous vehicles (AVs) as they impact on behaviour. In particular, we focus on the possibility for AVs to reason with rule breaking and violations, prioritizing different goals depending on the specific situation. In mixed environments, where AVs interact with other road users, it might be beneficial for AVs to behave in a way that is predictable and understandable by humans. For this we need to consider that most traffic rules, such as the ones described in the United Kingdom's Highway Code (HC), are not strict rules, but rather behavioural indications for good drivers. However, a violation of the rules can nonetheless have legal consequences. In certain scenarios a driver might not be penalised for deliberately breaking a rule, where there are mitigating circumstances for its behaviour, like avoiding an accident or moving out of the way of an emergency vehicle. We propose a rule system for AVs to accommodate such scenarios. In this paper we consider a subset of the HC related to junctions. We develop a proof of concept of rule breaking reasoner “in silico”, which has: a natural language representation, using Logical English, which provides the internal representation of in Prolog; and an multi-agent-based simulation environment (SUMO). Designated agents monitor the behaviour of the vehicles for compliance and record potential violations where they occur. The information on potential violations is then utilized by validators, to determine whether the violation is penalised or not, given circumstances. Finally, the violations and penalties are used to dynamically adjust the AVs behaviour, thus providing inline feedback."
+ },
+ {
+  "title": "Plans and Diversions EA",
+  "year": 2025,
+  "type": "book-chapter",
+  "venue": "Frontiers in artificial intelligence and applications",
+  "doi": "10.3233/faia251629",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.3233/faia251629",
+  "coauthors": [
+   "Galileo Sartor",
+   "Guido Governatori",
+   "Giuseppe Pisano",
+   "Antonino Rotolo"
+  ],
+  "concepts": [
+   "Deontic logic",
+   "Plan (archaeology)",
+   "Set (abstract data type)",
+   "Defeasible estate",
+   "Computer science",
+   "Engineering",
+   "Risk analysis (engineering)",
+   "Operations research"
+  ],
+  "abstract": "Autonomous vehicles (AVs) must abide by the Highway Code. An AV agent would make plans which incorporate legal reasoning. Such plans must account for contingencies wherein the agent chooses between following a current plan that would lead to a violation of the law or providing an alternative plan which would not lead to a violation - a diversion. The paper utilises Defeasible Deontic Logic representing norms and encoded in Answer Set Programming (ASP) which is integrated with planning in ASP. The paper introduces diversions to address contingencies ith respect to legal reasoning."
+ },
+ {
+  "title": "You Take the High Road, and I’ll Take the Low Road",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/3769126.3769254",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.1145/3769126.3769254",
+  "coauthors": [
+   "Thiago Raulino Dal Pont",
+   "Galileo Sartor",
+   "Giovanni Sartor"
+  ],
+  "concepts": [
+   "Interpretability",
+   "Executable",
+   "Computer science",
+   "Robustness (evolution)",
+   "Transparency (behavior)",
+   "Accountability",
+   "Natural language",
+   "Artificial intelligence",
+   "Process (computing)",
+   "Parsing",
+   "Pipeline (software)",
+   "Computer security",
+   "Software engineering",
+   "Semantics of Business Vocabulary and Business Rules",
+   "Machine learning"
+  ],
+  "abstract": "Autonomous vehicles (AVs) must comply with regulatory frameworks to ensure road safety and predictability. Current proposed AV systems predominantly rely on machine learning models that lack explicit, computable representations of traffic laws, raising concerns about accountability and robustness in complex scenarios. This study proposes a novel pipeline that embeds formal logic rules in the autonomous agent to ensure legal compliance. To address the knowledge acquisition bottleneck, we propose using Large Language Models (LLMs), robust prompt engineering, and Logical English (LE) to translate traffic rules from natural language into a human-readable, executable rule-based framework. The pipeline includes an error correction phase to refine the process of extracting legal rules, which are then integrated into a simulation environment. Our approach successfully performed the translation of legal text into a structured, computable format, improving the transparency and interpretability of the high level decision making. The error correction phase improves rule accuracy, while simulations further validate rule compliance and performance in dynamic traffic scenarios."
+ },
+ {
+  "title": "Tipping the Scales: Balancing Principles",
+  "year": 2025,
+  "type": "conference-paper",
+  "venue": null,
+  "doi": "10.1145/3769126.3769208",
+  "cited_by_count": 0,
+  "oa_url": "https://doi.org/10.1145/3769126.3769208",
+  "coauthors": [
+   "M. Araszkiewicz",
+   "Tomasz Zurek",
+   "Tom van Engers"
+  ],
+  "concepts": [
+   "Key (lock)",
+   "Computer science",
+   "Management science",
+   "Risk analysis (engineering)",
+   "Law and economics",
+   "Term (time)",
+   "Operations research"
+  ],
+  "abstract": "The paper addresses the problem of making legal decisions about regulations such that they are compliant with legal principles. While decision-making using legal rules is well-developed in the literature, few researchers address reasoning with principles. A key difference between applying rules versus principles is that rules have a binary character, they are applied or not, while principles can be applied to a certain extent and in the case of conflicting principles, they require balancing instead of defeat. This paper provides a novel approach to balancing principles and deciding amongst regulations by proportional optimisation of values associated with regulations and principles. The approach can be generalised to other areas of decision-making."
+ }
+]

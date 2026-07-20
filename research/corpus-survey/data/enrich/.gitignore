@@ -1,0 +1,5 @@
+# Raw OpenAlex/S2 batch responses — redundant with ../enriched.json and re-fetchable
+# by scripts/enrich.py. Kept on disk for resume/skip; excluded from git to stay lean.
+openalex-*.json
+s2-*.json
+_run.log

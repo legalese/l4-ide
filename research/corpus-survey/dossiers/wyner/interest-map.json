@@ -1,0 +1,692 @@
+{
+ "author": "Adam Wyner",
+ "openalex": "A5063413613",
+ "dblp_pid": "73/3639",
+ "n_works": 154,
+ "year_span": [
+  1991,
+  2025
+ ],
+ "total_citations": 2152,
+ "top_venues": [
+  [
+   "Lecture notes in computer science",
+   31
+  ],
+  [
+   "Frontiers in artificial intelligence and applications",
+   20
+  ],
+  [
+   "Artificial Intelligence and Law",
+   11
+  ],
+  [
+   "Cronfa (Swansea University)",
+   7
+  ],
+  [
+   "HAL (Le Centre pour la Communication Scientifique Directe)",
+   6
+  ],
+  [
+   "Proceedings from Semantics and Linguistic Theory",
+   4
+  ],
+  [
+   "Argument & Computation",
+   3
+  ],
+  [
+   "arXiv (Cornell University)",
+   3
+  ],
+  [
+   "International Conference on Legal Knowledge and Information Systems",
+   2
+  ],
+  [
+   "Journal of Logic and Computation",
+   2
+  ],
+  [
+   "Open MIND",
+   2
+  ],
+  [
+   "New Generation Computing",
+   2
+  ],
+  [
+   "Medical Entomology and Zoology",
+   1
+  ],
+  [
+   "Studies in linguistics and philosophy",
+   1
+  ],
+  [
+   "UvA-DARE (University of Amsterdam)",
+   1
+  ]
+ ],
+ "top_concepts": [
+  [
+   "Computer science",
+   143
+  ],
+  [
+   "Artificial intelligence",
+   64
+  ],
+  [
+   "Natural language processing",
+   53
+  ],
+  [
+   "Argumentation theory",
+   41
+  ],
+  [
+   "Epistemology",
+   38
+  ],
+  [
+   "Information retrieval",
+   28
+  ],
+  [
+   "Argument (complex analysis)",
+   23
+  ],
+  [
+   "Programming language",
+   21
+  ],
+  [
+   "Natural language",
+   19
+  ],
+  [
+   "Linguistics",
+   18
+  ],
+  [
+   "World Wide Web",
+   17
+  ],
+  [
+   "Political science",
+   16
+  ],
+  [
+   "Data science",
+   16
+  ],
+  [
+   "Management science",
+   15
+  ],
+  [
+   "Law",
+   12
+  ],
+  [
+   "Defeasible estate",
+   11
+  ],
+  [
+   "Natural (archaeology)",
+   11
+  ],
+  [
+   "Representation (politics)",
+   10
+  ],
+  [
+   "Defeasible reasoning",
+   10
+  ],
+  [
+   "Software engineering",
+   10
+  ],
+  [
+   "Cognitive science",
+   9
+  ],
+  [
+   "Law and economics",
+   9
+  ],
+  [
+   "Context (archaeology)",
+   8
+  ],
+  [
+   "Argumentation framework",
+   8
+  ],
+  [
+   "Set (abstract data type)",
+   8
+  ]
+ ],
+ "top_coauthors": [
+  [
+   "Trevor Bench‐Capon",
+   31
+  ],
+  [
+   "Katie Atkinson",
+   21
+  ],
+  [
+   "Giovanni Sartor",
+   9
+  ],
+  [
+   "François Lévy",
+   9
+  ],
+  [
+   "Jeff Z. Pan",
+   9
+  ],
+  [
+   "Adeline Nazarenko",
+   9
+  ],
+  [
+   "Guido Governatori",
+   8
+  ],
+  [
+   "Tomasz Żurek",
+   8
+  ],
+  [
+   "Monica Palmirani",
+   7
+  ],
+  [
+   "Tom van Engers",
+   7
+  ],
+  [
+   "Wim Peters",
+   7
+  ],
+  [
+   "Henry Prakken",
+   7
+  ],
+  [
+   "Adrian Paschke",
+   7
+  ],
+  [
+   "Tara Athan",
+   5
+  ],
+  [
+   "Biralatei Fawei",
+   5
+  ],
+  [
+   "Hannes Straß",
+   5
+  ],
+  [
+   "Brian Davis",
+   4
+  ],
+  [
+   "Michał Araszkiewicz",
+   4
+  ],
+  [
+   "Jodi Schneider",
+   4
+  ],
+  [
+   "Chenghua Lin",
+   4
+  ]
+ ],
+ "works_per_year": {
+  "1991": 1,
+  "1993": 1,
+  "1998": 1,
+  "2004": 1,
+  "2006": 3,
+  "2007": 5,
+  "2008": 4,
+  "2009": 2,
+  "2010": 12,
+  "2011": 7,
+  "2012": 14,
+  "2013": 15,
+  "2014": 4,
+  "2015": 14,
+  "2016": 14,
+  "2017": 8,
+  "2018": 6,
+  "2019": 12,
+  "2020": 2,
+  "2021": 4,
+  "2022": 4,
+  "2023": 5,
+  "2024": 7,
+  "2025": 8
+ },
+ "most_cited": [
+  {
+   "title": "A history of AI and Law in 50 papers: 25 years of the international conference on AI and Law",
+   "year": 2012,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-012-9131-x",
+   "cited_by_count": 164,
+   "oa_url": "http://ruj.uj.edu.pl/xmlui/handle/item/25043",
+   "coauthors": [
+    "Trevor Bench‐Capon",
+    "Michał Araszkiewicz",
+    "Kevin D. Ashley",
+    "Katie Atkinson",
+    "Floris Bex",
+    "Filipe Borges",
+    "Danièle Bourcier",
+    "Paul Bourgine",
+    "Jack G. Conrad",
+    "Enrico Francesconi",
+    "Thomas F. Gordon",
+    "Guido Governatori",
+    "Jochen L. Leidner",
+    "David Lewis",
+    "Ronald P. Loui",
+    "L. Thorne McCarty",
+    "Henry Prakken",
+    "Frank Schilder",
+    "Erich Schweighofer",
+    "Paul Thompson",
+    "Alex Tyrrell",
+    "Bart Verheij",
+    "Douglas Walton"
+   ],
+   "concepts": [
+    "Context (archaeology)",
+    "Law",
+    "Philosophy of law",
+    "Legal history",
+    "Legal aspects of computing",
+    "Field (mathematics)",
+    "Political science",
+    "Comparative law",
+    "Sociology",
+    "History"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "Approaches to Text Mining Arguments from Legal Cases",
+   "year": 2010,
+   "type": "conference-paper",
+   "venue": "Lecture notes in computer science",
+   "doi": "10.1007/978-3-642-12837-0_4",
+   "cited_by_count": 138,
+   "oa_url": null,
+   "coauthors": [
+    "Raquel Mochales-Palau",
+    "Marie‐Francine Moens",
+    "David Milward"
+   ],
+   "concepts": [
+    "Computer science",
+    "Context (archaeology)",
+    "Identification (biology)",
+    "Natural language processing",
+    "Natural language",
+    "Grammar",
+    "Artificial intelligence",
+    "Natural (archaeology)",
+    "Information retrieval",
+    "Data science"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "On Rule Extraction from Regulations",
+   "year": 2011,
+   "type": "book-chapter",
+   "venue": "Frontiers in artificial intelligence and applications",
+   "doi": "10.3233/978-1-60750-981-3-113",
+   "cited_by_count": 84,
+   "oa_url": null,
+   "coauthors": [
+    "Wim Peters"
+   ],
+   "concepts": [
+    "Extraction (chemistry)",
+    "Computer science"
+   ],
+   "abstract": "Rules in regulations such as found in the US Federal Code of Regulations can be expressed using conditional and deontic rules. Identifying and extracting such rules from the language of the source material would be useful for automating rulebook management and translating into an executable logic. The paper presents a linguistically-oriented, rule-based approach, which is in contrast to a machine learning approach. It outlines use cases, discusses the source materials, reviews the methodology, then provides initial results and future steps."
+  },
+  {
+   "title": "A formalization of argumentation schemes for legal case-based reasoning in ASPIC+",
+   "year": 2013,
+   "type": "article",
+   "venue": "Journal of Logic and Computation",
+   "doi": "10.1093/logcom/ext010",
+   "cited_by_count": 80,
+   "oa_url": "https://academic.oup.com/logcom/article-pdf/25/5/1141/5274836/ext010.pdf",
+   "coauthors": [
+    "Henry Prakken",
+    "Trevor Bench‐Capon",
+    "Katie Atkinson"
+   ],
+   "concepts": [
+    "Argumentation theory",
+    "Defeasible estate",
+    "Scope (computer science)",
+    "Defeasible reasoning",
+    "Computer science",
+    "Inference",
+    "Artificial intelligence",
+    "Style (visual arts)",
+    "Case-based reasoning",
+    "Epistemology"
+   ],
+   "abstract": "In this article we offer a formal account of reasoning with legal cases in terms of argumentation schemes. These schemes, and undercutting attacks associated with them, are formalized as defeasible rules of inference within the ASPIC+ framework. We begin by modelling the style of reasoning with cases developed by Aleven and Ashley in the CATO project, which describes cases using factors, and then extend the account to accommodate the dimensions used in Rissland and Ashley's earlier HYPO project. Some additional scope for argumentation is then identified and formalized."
+  },
+  {
+   "title": "OASIS LegalRuleML",
+   "year": 2013,
+   "type": "conference-paper",
+   "venue": null,
+   "doi": "10.1145/2514601.2514603",
+   "cited_by_count": 78,
+   "oa_url": null,
+   "coauthors": [
+    "Tara Athan",
+    "Harold Boley",
+    "Guido Governatori",
+    "Monica Palmirani",
+    "Adrian Paschke"
+   ],
+   "concepts": [
+    "Deontic logic",
+    "Defeasible reasoning",
+    "Computer science",
+    "Core (optical fiber)",
+    "Syntax",
+    "Programming language",
+    "Software engineering",
+    "Linguistics"
+   ],
+   "abstract": "In this paper we present the motivation, use cases, design principles, abstract syntax, and initial core of LegalRuleML. The LegalRuleML-core is sufficiently rich for expressing legal sources, time, defeasibility, and deontic operators. An example is provided. LegalRuleMLis compared to related work."
+  },
+  {
+   "title": "LegalRuleML: Design Principles and Foundations",
+   "year": 2015,
+   "type": "conference-paper",
+   "venue": "Lecture notes in computer science",
+   "doi": "10.1007/978-3-319-21768-0_6",
+   "cited_by_count": 78,
+   "oa_url": null,
+   "coauthors": [
+    "Tara Athan",
+    "Guido Governatori",
+    "Monica Palmirani",
+    "Adrian Paschke"
+   ],
+   "concepts": [
+    "Computer science",
+    "Domain (mathematical analysis)",
+    "Software engineering",
+    "Programming language",
+    "Management science",
+    "Artificial intelligence"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "Semi-Automated Argumentative Analysis of Online Product Reviews",
+   "year": 2012,
+   "type": "book-chapter",
+   "venue": "Frontiers in artificial intelligence and applications",
+   "doi": "10.3233/978-1-61499-111-3-43",
+   "cited_by_count": 71,
+   "oa_url": null,
+   "coauthors": [
+    "Jodi Schneider",
+    "Katie Atkinson",
+    "Trevor Bench‐Capon"
+   ],
+   "concepts": [
+    "Argumentative",
+    "Product (mathematics)",
+    "Computer science"
+   ],
+   "abstract": "Argumentation is key to understanding and evaluating many texts. The arguments in the texts must be identified; using current tools, this requires substantial work from human analysts. With a rule-based tool for semi-automatic text analysis support, we facilitate argument identification. The tool highlights potential argumentative sections of a text according to terms indicative of arguments (e.g. &amp;lsquo;suppose&amp;rsquo; or &amp;lsquo;therefore&amp;rsquo;) and domain terminology (e.g. camera names and properties). The information can be used by an analyst to instantiate argumentation schemes and build arguments for and against a proposal. The resulting argumentation framework can then be passed to argument evaluation tools."
+  },
+  {
+   "title": "Recognizing cited facts and principles in legal judgements",
+   "year": 2017,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-017-9197-6",
+   "cited_by_count": 71,
+   "oa_url": "https://link.springer.com/content/pdf/10.1007%2Fs10506-017-9197-6.pdf",
+   "coauthors": [
+    "Olga Shulayeva",
+    "Advaith Siddharthan"
+   ],
+   "concepts": [
+    "Agreement",
+    "Legal doctrine",
+    "Legal citation",
+    "Kappa",
+    "Legal research",
+    "Computer science",
+    "Recall",
+    "Philosophy of law",
+    "Task (project management)",
+    "Classifier (UML)",
+    "Natural language processing",
+    "Artificial intelligence",
+    "Law",
+    "Psychology"
+   ],
+   "abstract": "In common law jurisdictions, legal professionals cite facts and legal principles from precedent cases to support their arguments before the court for their intended outcome in a current case. This practice stems from the doctrine of stare decisis, where cases that have similar facts should receive similar decisions with respect to the principles. It is essential for legal professionals to identify such facts and principles in precedent cases, though this is a highly time intensive task. In this paper, we present studies that demonstrate that human annotators can achieve reasonable agreement on which sentences in legal judgements contain cited facts and principles (respectively, $$\\kappa =0.65$$ and $$\\kappa =0.95$$ for inter- and intra-annotator agreement). We further demonstrate that it is feasible to automatically annotate sentences containing such legal facts and principles in a supervised machine learning framework based on linguistic features, reporting per category precision and recall figures of between 0.79 and 0.89 for classifying sentences in legal judgements as cited facts, principles or neither using a Bayesian classifier, with an overall $$\\kappa$$ of 0.72 with the human-annotated gold standard."
+  },
+  {
+   "title": "On Controlled Natural Languages: Properties and Prospects",
+   "year": 2010,
+   "type": "conference-paper",
+   "venue": "Lecture notes in computer science",
+   "doi": "10.1007/978-3-642-14418-9_17",
+   "cited_by_count": 63,
+   "oa_url": null,
+   "coauthors": [
+    "Krasimir Angelov",
+    "Guntis Bārzdiņš",
+    "Danica Damljanović",
+    "Brian Davis",
+    "Norbert E. Fuchs",
+    "Stefan Hoefler",
+    "Ken Jones",
+    "Kaarel Kaljurand",
+    "Tobias Kuhn",
+    "Martin Luts",
+    "Jonathan Pool",
+    "Mike Rosner",
+    "Rolf Schwitter",
+    "John F. Sowa"
+   ],
+   "concepts": [
+    "Natural (archaeology)",
+    "Field (mathematics)",
+    "Computer science",
+    "Management science"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "An ontology in OWL for legal case-based reasoning",
+   "year": 2008,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-008-9070-8",
+   "cited_by_count": 54,
+   "oa_url": null,
+   "coauthors": [],
+   "concepts": [
+    "Computer science",
+    "Ontology",
+    "Web Ontology Language",
+    "Ontology language",
+    "OWL-S",
+    "Semantic Web",
+    "Description logic",
+    "Knowledge representation and reasoning",
+    "Formal ontology",
+    "Representation (politics)",
+    "Novelty",
+    "Semantic Web Rule Language",
+    "Knowledge base",
+    "Natural language processing",
+    "Upper ontology",
+    "Information retrieval",
+    "Artificial intelligence"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "Argument Schemes for Legal Case-based Reasoning",
+   "year": 2007,
+   "type": "conference-paper",
+   "venue": "International Conference on Legal Knowledge and Information Systems",
+   "doi": null,
+   "cited_by_count": 53,
+   "oa_url": null,
+   "coauthors": [
+    "Trevor Bench‐Capon"
+   ],
+   "concepts": [
+    "Argument (complex analysis)",
+    "Computer science",
+    "Argument map",
+    "Set (abstract data type)",
+    "Artificial intelligence",
+    "Epistemology"
+   ],
+   "abstract": "In this paper we use the notion of argument schemes to analyse some leading approaches to case-based reasoning in Law. We identify a set of argument schemes that can express the argument provided by such systems and draw attention to some important differences between the various approaches."
+  },
+  {
+   "title": "Thirty years of artificial intelligence and law: the third decade",
+   "year": 2022,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-022-09327-6",
+   "cited_by_count": 52,
+   "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-022-09327-6.pdf",
+   "coauthors": [
+    "Serena Villata",
+    "Michał Araszkiewicz",
+    "Kevin D. Ashley",
+    "Trevor Bench‐Capon",
+    "L. Karl Branting",
+    "Jack G. Conrad"
+   ],
+   "concepts": [
+    "Artificial intelligence",
+    "Variety (cybernetics)",
+    "Legal aspects of computing",
+    "Philosophy of law",
+    "Computer science",
+    "Feature (linguistics)",
+    "Symbolic artificial intelligence",
+    "Law",
+    "The Internet"
+   ],
+   "abstract": "Abstract The first issue of Artificial Intelligence and Law journal was published in 1992. This paper offers some commentaries on papers drawn from the Journal’s third decade. They indicate a major shift within Artificial Intelligence, both generally and in AI and Law: away from symbolic techniques to those based on Machine Learning approaches, especially those based on Natural Language texts rather than feature sets. Eight papers are discussed: two concern the management and use of documents available on the World Wide Web, and six apply machine learning techniques to a variety of legal applications."
+  },
+  {
+   "title": "Introduction for artificial intelligence and law: special issue “natural language processing for legal texts”",
+   "year": 2019,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-019-09251-2",
+   "cited_by_count": 50,
+   "oa_url": "https://link.springer.com/content/pdf/10.1007/s10506-019-09251-2.pdf",
+   "coauthors": [
+    "Livio Robaldo",
+    "Serena Villata",
+    "Matthias Grabmair"
+   ],
+   "concepts": [
+    "Legal aspects of computing",
+    "Philosophy of law",
+    "Law",
+    "Computer science",
+    "Artificial intelligence",
+    "Natural (archaeology)",
+    "Natural language processing",
+    "Political science"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "DeepRhole: deep learning for rhetorical role labeling of sentences in legal case documents",
+   "year": 2021,
+   "type": "article",
+   "venue": "Artificial Intelligence and Law",
+   "doi": "10.1007/s10506-021-09304-5",
+   "cited_by_count": 48,
+   "oa_url": null,
+   "coauthors": [
+    "Paheli Bhattacharya",
+    "Shounak Paul",
+    "Kripabandhu Ghosh",
+    "Saptarshi Ghosh"
+   ],
+   "concepts": [
+    "Rhetorical question",
+    "Computer science",
+    "Artificial intelligence",
+    "Supreme court",
+    "Natural language processing",
+    "Conditional random field"
+   ],
+   "abstract": null
+  },
+  {
+   "title": "A Semi-automated Ontology Construction for Legal Question Answering",
+   "year": 2019,
+   "type": "article",
+   "venue": "New Generation Computing",
+   "doi": "10.1007/s00354-019-00070-2",
+   "cited_by_count": 43,
+   "oa_url": "https://link.springer.com/content/pdf/10.1007/s00354-019-00070-2.pdf",
+   "coauthors": [
+    "Biralatei Fawei",
+    "Jeff Z. Pan",
+    "Martin J. Kollingbaum"
+   ],
+   "concepts": [
+    "Computer science",
+    "Ontology",
+    "Question answering",
+    "Upper ontology",
+    "Natural language",
+    "Legal case",
+    "Semantic Web",
+    "Information retrieval",
+    "Natural language processing",
+    "World Wide Web"
+   ],
+   "abstract": "The internet and the development of the semantic web have created the opportunity to provide structured legal data on the web. However, most legal information is in text. It is difficult to automatically determine the right natural language answer about the law to a given natural language question. One approach is to develop systems of legal ontologies and rules. Our example ontology represents semantic information about USA criminal law and procedure as well as the applicable legal rules. The purpose of the ontology is to provide reasoning support to a legal question answering tool that determines entailment between a pair of texts, one known as the background information (Bg) and the other question statement (Q), so whether Bg entails Q based on the application of the legal rules. The key contribution of this paper is the methodology and the semi-automated legal ontology generation tool, a clear and well-structured methodology that serves to develop such criminal law ontologies and rules (CLOR)."
+  }
+ ]
+}

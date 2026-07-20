@@ -143,14 +143,21 @@ real him**, whose input validates anything the model produces. Loop him in early
   JURIX 680, DEON 238). Outputs in `data/` (`index.json`, `index.csv`, `summary.json`,
   `PHASE0-FINDINGS.md`); scripts in `scripts/`. **Gaps logged** (JURIX <2005, DEON early
   editions, MULL/JSTOR) — see below. *MULL/Jurimetrics deferred to a browser sub-run.*
-- [ ] **Phase 1 — Enrich** (abstracts / OA links / citations via S2 + OpenAlex) — *next*
-- [ ] **Phase 2 — Cheap pre-rank** (citation-graph proximity to known cluster)
+- [x] **Phase 1 — Enrich** — `data/enriched.json` (all 1,758 papers). OpenAlex 1,505/1,515 +
+  S2 1,476/1,515. Abstracts 76% / TLDRs 68% / OA-url 43%. **True OA ≫ DBLP flag** (ICAIL
+  1.7%→39%, JURIX 20%→60%). **DEON abstract hole logged** (3/238 — Phase-3 risk). Details in
+  `data/PHASE1-FINDINGS.md`; script `scripts/enrich.py`.
+- [ ] **Phase 2 — Cheap pre-rank** (citation-graph proximity to known cluster) — *next*
 - [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50")
 - [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights)
 - [ ] **Phase 5 — Deep-read + synthesize** (annotated bibliography keyed to facets)
-- [ ] **W0 — Wyner harvest**
-- [ ] **W1 — Wyner interest map**
+- [x] **W0 — Wyner harvest** — `dossiers/wyner/{works.json,interest-map.json,dblp-73-3639.xml}`;
+  154 works 1991–2025, 2,152 cites. Script `scripts/wyner_harvest.py`.
+- [~] **W1 — Wyner interest map** — seed built (`interest-map.json`: venues/concepts/coauthors/
+  most-cited). Narrative synthesis still to write.
 - [ ] **W2 — Wyner persona rehearsal** (guardrails §7)
+- [~] **MULL sub-corpus** — issue-level skeleton captured; **article-level harvest blocked** by
+  JSTOR SPA + MCP read-redaction (`data/MULL-STATUS.md`). Deferred to on-demand acquisition.
 
 ## Open questions / decisions pending
 
@@ -166,6 +173,16 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-20** — **Phase 1 COMPLETE + Wyner W0 COMPLETE.** Enriched all 1,758 papers via
+  OpenAlex + Semantic Scholar → `data/enriched.json` (abstracts 76%, TLDRs 68%, OA-url 43%).
+  Big finding: true OA far exceeds the DBLP flag (ICAIL 1.7%→39%, JURIX 20%→60%) — Phase-4
+  acquisition is cheap. Risk logged: DEON abstracts 3/238 → Phase-3 filter near-blind on DEON
+  (mitigations in `PHASE1-FINDINGS.md`). Wyner W0: 154 works (1991–2025, 2,152 cites); home
+  venues LNCS/JURIX/AI&Law; threads argumentation-mining + LegalRuleML + CNL; cluster
+  Bench-Capon(31)/Atkinson(21)/Sartor/Governatori. **MULL:** captured journal identity + issue
+  skeleton (slug `moduseloglaw`, Vols 1–7 1959–66, → Jurimetrics) but article-level TOC blocked
+  by JSTOR SPA + MCP read-redaction (read-side, not fixable by a user click); deferred to
+  on-demand pulls (`data/MULL-STATUS.md`). Next: **Phase 2** citation-graph pre-rank.
 - **2026-07-20** — **Phase 0 COMPLETE (modern core).** Harvested DBLP per-stream TOCs
   (`stream:streams/conf/<venue>:`, 100-hit/page → paginated). Result **1,817 records / 1,758
   papers**: ICAIL 840 (1987–2025), JURIX 680 (2005–2025), DEON 238 (1996–2025). Outputs:
