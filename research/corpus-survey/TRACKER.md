@@ -38,9 +38,19 @@ filter on abstracts, acquire only survivors.** Do NOT download-then-read.
 | ICAIL | biennial 1987–2025 | ~20 | ~900 | ACM DL — paywalled, **anti-bot** |
 | JURIX | annual 1988–2025 | ~37 | ~1,000–1,200 | **Mostly open** (IOS Press FAIA / jurix.nl) |
 | DEON  | biennial 1991– | ~16 | ~400 | Mixed (Springer LNCS + College Publications) |
+| **MULL** → *Jurimetrics* | quarterly 1959–1966 (→ *Jurimetrics* after) | ~7 vols | ~100–200 (many short notes) | **On JSTOR** via proxy |
 
-Rough total **~2,300–2,500 papers**. Phase 0 replaces these estimates with exact counts +
+Rough total **~2,300–2,500 papers** for the three modern venues; **MULL** adds a small,
+bounded **historical sub-corpus** on top. Phase 0 replaces all estimates with exact counts +
 open-access percentages.
+
+**MULL — historical roots (added 2026-07-20).** *Modern Uses of Logic in Law* is the first
+journal dedicated to computational law (inaugural issue Vol. 1 No. 1, Sept 1959; JSTOR
+`stable/29760800` is its front matter / TOC). Layman Allen and the late-'50s cohort worked out
+"law as logic" in its pages, and it **became *Jurimetrics*** (the ABA journal) in 1966 — a
+continuous, JSTOR-hosted lineage. Maximally relevant to the **genealogy / deep-roots** thread
+(ICAIL intro; complements the Mehl 1958 + Allen 1957 material already collected). Phase 0
+harvests the full MULL run (→ early *Jurimetrics*) as a bounded historical target.
 
 ## 4. Pipeline (metadata-first)
 
@@ -122,7 +132,7 @@ real him**, whose input validates anything the model produces. Loop him in early
 
 ## Phase Status
 
-- [ ] **Phase 0 — Index** (DBLP + OpenAlex TOC harvest → exact counts + OA %) — *next*
+- [ ] **Phase 0 — Index** (DBLP + OpenAlex TOC harvest → exact counts + OA %; + MULL/early-*Jurimetrics* run via JSTOR) — *next*
 - [ ] **Phase 1 — Enrich** (abstracts / OA links / citations via S2 + OpenAlex)
 - [ ] **Phase 2 — Cheap pre-rank** (citation-graph proximity to known cluster)
 - [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50")
@@ -146,3 +156,8 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-20** — Added **MULL → *Jurimetrics*** as a bounded historical sub-corpus (§3),
+  after spotting JSTOR `stable/29760800` = MULL Vol. 1 No. 1 front matter (Sept 1959, the
+  field's founding issue). Phase 0 to harvest its full run via the JSTOR proxy; feeds the
+  genealogy / deep-roots thread. (The front-matter item itself is a TOC, not a reading —
+  it was the signpost to the venue.)
