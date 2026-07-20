@@ -1,0 +1,632 @@
+{
+"result":{
+"query":":facetid:stream:\"streams/conf/deon\"",
+"status":{
+"@code":"200",
+"text":"OK"
+},
+"time":{
+"@unit":"msecs",
+"text":"3.58"
+},
+"completions":{
+"@total":"1",
+"@computed":"1",
+"@sent":"1",
+"c":{
+"@sc":"250",
+"@dc":"250",
+"@oc":"250",
+"@id":"56922979",
+"text":":facetid:stream:streams/conf/deon"
+}
+},
+"hits":{
+"@total":"250",
+"@computed":"200",
+"@sent":"100",
+"@first":"100",
+"hit":[{
+"@score":"1",
+"@id":"4699096",
+"info":{"authors":{"author":[{"@pid":"38/1512","text":"Albert J. J. Anglberger"},{"@pid":"147/5999","text":"Federico L. G. Faroldi"},{"@pid":"218/8258","text":"Johannes Korbmacher"}]},"title":"An Exact Truthmaker Semantics for Permission and Obligation.","venue":"DEON","pages":"16-31","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/AnglbergerFK16","url":"https://dblp.org/rec/conf/deon/AnglbergerFK16"},
+"url":"URL#4699096"
+},
+{
+"@score":"1",
+"@id":"4699097",
+"info":{"authors":{"author":[{"@pid":"64/8283","text":"Mathieu Beirlaen"},{"@pid":"32/9414","text":"Christian Straßer"}]},"title":"A Structured Argumentation Framework for Detaching Conditional Obligations.","venue":"DEON","pages":"32-48","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/BeirlaenS16","url":"https://dblp.org/rec/conf/deon/BeirlaenS16"},
+"url":"URL#4699097"
+},
+{
+"@score":"1",
+"@id":"4699098",
+"info":{"authors":{"author":{"@pid":"228/7693","text":"Zarnic Berislav"}},"title":"Deontic Logic as a Study of Conditions of Rationality in Norm-related Activities.","venue":"DEON","pages":"272-287","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Berislav16","url":"https://dblp.org/rec/conf/deon/Berislav16"},
+"url":"URL#4699098"
+},
+{
+"@score":"1",
+"@id":"4699099",
+"info":{"authors":{"author":[{"@pid":"67/11251","text":"Sjur Kristoffer Dyrkolbotn"},{"@pid":"61/11268","text":"Truls Pedersen"}]},"title":"Argumentation Frameworks with Justified Attacks.","venue":"DEON","pages":"49-64","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/DyrkolbotnP16","url":"https://dblp.org/rec/conf/deon/DyrkolbotnP16"},
+"url":"URL#4699099"
+},
+{
+"@score":"1",
+"@id":"4699100",
+"info":{"authors":{"author":[{"@pid":"67/11251","text":"Sjur Kristoffer Dyrkolbotn"},{"@pid":"61/11268","text":"Truls Pedersen"},{"@pid":"15/6917","text":"Jan M. Broersen"}]},"title":"Arguments, Responsibilities and Moral Dilemmas in Abductive Default Logic.","venue":"DEON","pages":"65-79","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/DyrkolbotnPB16","url":"https://dblp.org/rec/conf/deon/DyrkolbotnPB16"},
+"url":"URL#4699100"
+},
+{
+"@score":"1",
+"@id":"4699101",
+"info":{"authors":{"author":[{"@pid":"36/8784","text":"Alessandro Giordani"},{"@pid":"228/7698","text":"Ilaria Canavotto"}]},"title":"Basic Action Deontic Logic.","venue":"DEON","pages":"80-92","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/GiordaniC16","url":"https://dblp.org/rec/conf/deon/GiordaniC16"},
+"url":"URL#4699101"
+},
+{
+"@score":"1",
+"@id":"4699102",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"10/7503","text":"Francesco Olivieri"},{"@pid":"89/4099","text":"Erica Calardo"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"Sequence Semantics for Norms and Obligations.","venue":"DEON","pages":"93-108","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/GovernatoriOCR16","url":"https://dblp.org/rec/conf/deon/GovernatoriOCR16"},
+"url":"URL#4699102"
+},
+{
+"@score":"1",
+"@id":"4699103",
+"info":{"authors":{"author":[{"@pid":"23/10271","text":"Fengkui Ju"},{"@pid":"89/2195","text":"Jan van Eijck"}]},"title":"To Do Something Else.","venue":"DEON","pages":"109-122","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/JuE16","url":"https://dblp.org/rec/conf/deon/JuE16"},
+"url":"URL#4699103"
+},
+{
+"@score":"1",
+"@id":"4699104",
+"info":{"authors":{"author":[{"@pid":"87/7337","text":"Piotr Kulicki"},{"@pid":"01/58","text":"Robert Trypuz"}]},"title":"Multivalued Logics for Conflicting Norms.","venue":"DEON","pages":"123-138","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/KulickiT16","url":"https://dblp.org/rec/conf/deon/KulickiT16"},
+"url":"URL#4699104"
+},
+{
+"@score":"1",
+"@id":"4699105",
+"info":{"authors":{"author":[{"@pid":"05/1856","text":"Beishui Liao"},{"@pid":"93/2933","text":"Nir Oren"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"},{"@pid":"84/5009","text":"Serena Villata"}]},"title":"Prioritized Norms and Defaults in Formal Argumentation.","venue":"DEON","pages":"139-154","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/LiaoOTV16","url":"https://dblp.org/rec/conf/deon/LiaoOTV16"},
+"url":"URL#4699105"
+},
+{
+"@score":"1",
+"@id":"4699106",
+"info":{"authors":{"author":[{"@pid":"19/5949","text":"Fenrong Liu"},{"@pid":"43/6250","text":"Emiliano Lorini"}]},"title":"Reasons to Believe in a Social Environment.","venue":"DEON","pages":"155-170","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/LiuL16","url":"https://dblp.org/rec/conf/deon/LiuL16"},
+"url":"URL#4699106"
+},
+{
+"@score":"1",
+"@id":"4699107",
+"info":{"authors":{"author":{"@pid":"147/5955","text":"Alessandra Marra"}},"title":"Objective Oughts and a Puzzle about Futurity.","venue":"DEON","pages":"171-186","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Marra16","url":"https://dblp.org/rec/conf/deon/Marra16"},
+"url":"URL#4699107"
+},
+{
+"@score":"1",
+"@id":"4699108",
+"info":{"authors":{"author":{"@pid":"20/2116-3","text":"Robert Mullins 0003"}},"title":"Rights in Default Logic.","venue":"DEON","pages":"187-202","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Mullins16","url":"https://dblp.org/rec/conf/deon/Mullins16"},
+"url":"URL#4699108"
+},
+{
+"@score":"1",
+"@id":"4699109",
+"info":{"authors":{"author":{"@pid":"228/7699","text":"Carlotta Pavese"}},"title":"Logical Inference and Its Dynamics.","venue":"DEON","pages":"203-219","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Pavese16","url":"https://dblp.org/rec/conf/deon/Pavese16"},
+"url":"URL#4699109"
+},
+{
+"@score":"1",
+"@id":"4699110",
+"info":{"authors":{"author":[{"@pid":"154/5667","text":"Clayton Peterson"},{"@pid":"87/7337","text":"Piotr Kulicki"}]},"title":"Conditional Normative Reasoning with Substructural Logics.","venue":"DEON","pages":"220-236","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/PetersonK16","url":"https://dblp.org/rec/conf/deon/PetersonK16"},
+"url":"URL#4699110"
+},
+{
+"@score":"1",
+"@id":"4699111",
+"info":{"authors":{"author":{"@pid":"63/8283","text":"Frederik Van De Putte"}},"title":"Coarse Deontic Logic (short version).","venue":"DEON","pages":"256-271","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Putte16","url":"https://dblp.org/rec/conf/deon/Putte16"},
+"url":"URL#4699111"
+},
+{
+"@score":"1",
+"@id":"4699112",
+"info":{"authors":{"author":{"@pid":"149/0671","text":"Alex Silk"}},"title":"Update Semantics for Weak Necessity Modals.","venue":"DEON","pages":"237-255","year":"2016","type":"Conference and Workshop Papers","access":"unavailable","key":"conf/deon/Silk16","url":"https://dblp.org/rec/conf/deon/Silk16"},
+"url":"URL#4699112"
+},
+{
+"@score":"1",
+"@id":"4826436",
+"info":{"authors":{"author":[{"@pid":"68/3574","text":"Olivier Roy"},{"@pid":"73/176","text":"Allard M. Tamminga"},{"@pid":"09/8784","text":"Malte Willer"}]},"title":"Deontic Logic and Normative Systems - 13th International Conference, DEON 2016, Bayreuth, Germany, July 18-21, 2018.","venue":"DEON","publisher":"College Publications","year":"2016","type":"Editorship","key":"conf/deon/2016","ee":"http://www.collegepublications.co.uk/DEON/?00001","url":"https://dblp.org/rec/conf/deon/2016"},
+"url":"URL#4826436"
+},
+{
+"@score":"1",
+"@id":"5308547",
+"info":{"authors":{"author":[{"@pid":"38/1512","text":"Albert J. J. Anglberger"},{"@pid":"94/195","text":"Huimin Dong"},{"@pid":"68/3574","text":"Olivier Roy"}]},"title":"Open Reading without Free Choice.","venue":"DEON","pages":"19-32","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/AnglbergerDR14","doi":"10.1007/978-3-319-08615-6_3","ee":"https://doi.org/10.1007/978-3-319-08615-6_3","url":"https://dblp.org/rec/conf/deon/AnglbergerDR14"},
+"url":"URL#5308547"
+},
+{
+"@score":"1",
+"@id":"5308548",
+"info":{"authors":{"author":[{"@pid":"147/6116","text":"Gunnar Björnsson"},{"@pid":"147/6010","text":"Robert Shanklin"}]},"title":"&apos;Must&apos;, &apos;Ought&apos; and the Structure of Standards.","venue":"DEON","pages":"33-48","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BjornssonS14","doi":"10.1007/978-3-319-08615-6_4","ee":"https://doi.org/10.1007/978-3-319-08615-6_4","url":"https://dblp.org/rec/conf/deon/BjornssonS14"},
+"url":"URL#5308548"
+},
+{
+"@score":"1",
+"@id":"5308549",
+"info":{"authors":{"author":[{"@pid":"89/4099","text":"Erica Calardo"},{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"A Preference-Based Semantics for CTD Reasoning.","venue":"DEON","pages":"49-64","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/CalardoGR14","doi":"10.1007/978-3-319-08615-6_5","ee":"https://doi.org/10.1007/978-3-319-08615-6_5","url":"https://dblp.org/rec/conf/deon/CalardoGR14"},
+"url":"URL#5308549"
+},
+{
+"@score":"1",
+"@id":"5308550",
+"info":{"authors":{"author":[{"@pid":"147/5980","text":"Catharine Saint Croix"},{"@pid":"50/2268","text":"Richmond H. Thomason"}]},"title":"Chisholm&apos;s Paradox and Conditional Oughts.","venue":"DEON","pages":"192-207","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/CroixT14","doi":"10.1007/978-3-319-08615-6_15","ee":"https://doi.org/10.1007/978-3-319-08615-6_15","url":"https://dblp.org/rec/conf/deon/CroixT14"},
+"url":"URL#5308550"
+},
+{
+"@score":"1",
+"@id":"5308551",
+"info":{"authors":{"author":{"@pid":"147/5999","text":"Federico L. G. Faroldi"}},"title":"Denial of Responsibility and Normative Negation.","venue":"DEON","pages":"81-94","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Faroldi14","doi":"10.1007/978-3-319-08615-6_7","ee":"https://doi.org/10.1007/978-3-319-08615-6_7","url":"https://dblp.org/rec/conf/deon/Faroldi14"},
+"url":"URL#5308551"
+},
+{
+"@score":"1",
+"@id":"5308552",
+"info":{"authors":{"author":{"@pid":"147/6102","text":"Melissa Fusco"}},"title":"Factoring Disjunction Out of Deontic Modal Puzzles.","venue":"DEON","pages":"95-107","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Fusco14","doi":"10.1007/978-3-319-08615-6_8","ee":"https://doi.org/10.1007/978-3-319-08615-6_8","url":"https://dblp.org/rec/conf/deon/Fusco14"},
+"url":"URL#5308552"
+},
+{
+"@score":"1",
+"@id":"5308553",
+"info":{"authors":{"author":[{"@pid":"g/DovMGabbay","text":"Dov M. Gabbay"},{"@pid":"41/5768","text":"Livio Robaldo"},{"@pid":"20/3535-1","text":"Xin Sun 0001"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"},{"@pid":"147/6031","text":"Zohreh Baniasadi"}]},"title":"Toward a Linguistic Interpretation of Deontic Paradoxes - Beth-Reichenbach Semantics Approach for a New Analysis of the Miners Scenario.","venue":"DEON","pages":"108-123","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/GabbayRSTB14","doi":"10.1007/978-3-319-08615-6_9","ee":"https://doi.org/10.1007/978-3-319-08615-6_9","url":"https://dblp.org/rec/conf/deon/GabbayRSTB14"},
+"url":"URL#5308553"
+},
+{
+"@score":"1",
+"@id":"5308554",
+"info":{"authors":{"author":{"@pid":"h/SvenOveHansson","text":"Sven Ove Hansson"}},"title":"Deontic Diversity.","venue":"DEON","pages":"5-18","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Hansson14","doi":"10.1007/978-3-319-08615-6_2","ee":"https://doi.org/10.1007/978-3-319-08615-6_2","url":"https://dblp.org/rec/conf/deon/Hansson14"},
+"url":"URL#5308554"
+},
+{
+"@score":"1",
+"@id":"5308555",
+"info":{"authors":{"author":{"@pid":"52/1957","text":"Andrew J. I. Jones"}},"title":"Ingmar Pörn - In Memoriam.","venue":"DEON","pages":"1-4","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Jones14","doi":"10.1007/978-3-319-08615-6_1","ee":"https://doi.org/10.1007/978-3-319-08615-6_1","url":"https://dblp.org/rec/conf/deon/Jones14"},
+"url":"URL#5308555"
+},
+{
+"@score":"1",
+"@id":"5308556",
+"info":{"authors":{"author":{"@pid":"147/5955","text":"Alessandra Marra"}},"title":"For a Dynamic Semantics of Necessity Deontic Modals.","venue":"DEON","pages":"124-138","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Marra14","doi":"10.1007/978-3-319-08615-6_10","ee":"https://doi.org/10.1007/978-3-319-08615-6_10","url":"https://dblp.org/rec/conf/deon/Marra14"},
+"url":"URL#5308556"
+},
+{
+"@score":"1",
+"@id":"5308557",
+"info":{"authors":{"author":{"@pid":"138/3766","text":"Eugenio Orlandelli"}},"title":"Proof Analysis in Deontic Logics.","venue":"DEON","pages":"139-148","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Orlandelli14","doi":"10.1007/978-3-319-08615-6_11","ee":"https://doi.org/10.1007/978-3-319-08615-6_11","url":"https://dblp.org/rec/conf/deon/Orlandelli14"},
+"url":"URL#5308557"
+},
+{
+"@score":"1",
+"@id":"5308558",
+"info":{"authors":{"author":[{"@pid":"33/4590","text":"Xavier Parent 0001"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"&quot;Sing and Dance!&quot; - Input/Output Logics without Weakening.","venue":"DEON","pages":"149-165","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/ParentT14","doi":"10.1007/978-3-319-08615-6_12","ee":"https://doi.org/10.1007/978-3-319-08615-6_12","url":"https://dblp.org/rec/conf/deon/ParentT14"},
+"url":"URL#5308558"
+},
+{
+"@score":"1",
+"@id":"5308559",
+"info":{"authors":{"author":[{"@pid":"70/4532","text":"Martin Rechenauer"},{"@pid":"68/3574","text":"Olivier Roy"}]},"title":"The Logical Structure of Scanlon&apos;s Contractualism.","venue":"DEON","pages":"166-176","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/RechenauerR14","doi":"10.1007/978-3-319-08615-6_13","ee":"https://doi.org/10.1007/978-3-319-08615-6_13","url":"https://dblp.org/rec/conf/deon/RechenauerR14"},
+"url":"URL#5308559"
+},
+{
+"@score":"1",
+"@id":"5308560",
+"info":{"authors":{"author":[{"@pid":"77/2512","text":"Régis Riveret"},{"@pid":"a/AArtikis","text":"Alexander Artikis"},{"@pid":"97/2575","text":"Dídac Busquets"},{"@pid":"p/JeremyVPitt","text":"Jeremy Pitt"}]},"title":"Self-governance by Transfiguration: From Learning to Prescriptions.","venue":"DEON","pages":"177-191","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/RiveretABP14","doi":"10.1007/978-3-319-08615-6_14","ee":"https://doi.org/10.1007/978-3-319-08615-6_14","url":"https://dblp.org/rec/conf/deon/RiveretABP14"},
+"url":"URL#5308560"
+},
+{
+"@score":"1",
+"@id":"5308561",
+"info":{"authors":{"author":{"@pid":"147/6013","text":"Justin Snedegar"}},"title":"Deontic Reasoning Across Contexts.","venue":"DEON","pages":"208-223","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Snedegar14","doi":"10.1007/978-3-319-08615-6_16","ee":"https://doi.org/10.1007/978-3-319-08615-6_16","url":"https://dblp.org/rec/conf/deon/Snedegar14"},
+"url":"URL#5308561"
+},
+{
+"@score":"1",
+"@id":"5308562",
+"info":{"authors":{"author":[{"@pid":"32/9414","text":"Christian Straßer"},{"@pid":"66/4260","text":"Ofer Arieli"}]},"title":"Sequent-Based Argumentation for Normative Reasoning.","venue":"DEON","pages":"224-240","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/StrasserA14","doi":"10.1007/978-3-319-08615-6_17","ee":"https://doi.org/10.1007/978-3-319-08615-6_17","url":"https://dblp.org/rec/conf/deon/StrasserA14"},
+"url":"URL#5308562"
+},
+{
+"@score":"1",
+"@id":"5308563",
+"info":{"authors":{"author":[{"@pid":"20/3535-1","text":"Xin Sun 0001"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Combining Constitutive and Regulative Norms in Input/Output Logic.","venue":"DEON","pages":"241-257","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/SunT14","doi":"10.1007/978-3-319-08615-6_18","ee":"https://doi.org/10.1007/978-3-319-08615-6_18","url":"https://dblp.org/rec/conf/deon/SunT14"},
+"url":"URL#5308563"
+},
+{
+"@score":"1",
+"@id":"5308564",
+"info":{"authors":{"author":[{"@pid":"11/10481","text":"Silvano Colombo Tosatto"},{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"88/3203","text":"Pierre Kelsen"}]},"title":"Detecting Deontic Conflicts in Dynamic Settings.","venue":"DEON","pages":"65-80","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/TosattoGK14","doi":"10.1007/978-3-319-08615-6_6","ee":"https://doi.org/10.1007/978-3-319-08615-6_6","url":"https://dblp.org/rec/conf/deon/TosattoGK14"},
+"url":"URL#5308564"
+},
+{
+"@score":"1",
+"@id":"5308565",
+"info":{"authors":{"author":[{"@pid":"01/58","text":"Robert Trypuz"},{"@pid":"87/7337","text":"Piotr Kulicki"}]},"title":"A Deontic Logic of Actions and States.","venue":"DEON","pages":"258-272","year":"2014","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/TrypuzK14","doi":"10.1007/978-3-319-08615-6_19","ee":"https://doi.org/10.1007/978-3-319-08615-6_19","url":"https://dblp.org/rec/conf/deon/TrypuzK14"},
+"url":"URL#5308565"
+},
+{
+"@score":"1",
+"@id":"5432685",
+"info":{"authors":{"author":[{"@pid":"80/1361","text":"Fabrizio Cariani"},{"@pid":"21/782","text":"Davide Grossi"},{"@pid":"47/3187","text":"Joke Meheus"},{"@pid":"33/4590","text":"Xavier Parent 0001"}]},"title":"Deontic Logic and Normative Systems - 12th International Conference, DEON 2014, Ghent, Belgium, July 12-15, 2014. Proceedings","venue":["DEON","Lecture Notes in Computer Science"],"volume":"8554","publisher":"Springer","year":"2014","type":"Editorship","key":"conf/deon/2014","doi":"10.1007/978-3-319-08615-6","ee":"https://doi.org/10.1007/978-3-319-08615-6","url":"https://dblp.org/rec/conf/deon/2014"},
+"url":"URL#5432685"
+},
+{
+"@score":"1",
+"@id":"5873334",
+"info":{"authors":{"author":[{"@pid":"15/6917","text":"Jan M. Broersen"},{"@pid":"g/DovMGabbay","text":"Dov M. Gabbay"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Discussion Paper: Changing Norms Is Changing Obligation Change.","venue":"DEON","pages":"199-214","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BroersenGT12","doi":"10.1007/978-3-642-31570-1_14","ee":"https://doi.org/10.1007/978-3-642-31570-1_14","url":"https://dblp.org/rec/conf/deon/BroersenGT12"},
+"url":"URL#5873334"
+},
+{
+"@score":"1",
+"@id":"5873335",
+"info":{"authors":{"author":{"@pid":"31/4123","text":"Robert Demolombe"}},"title":"Causality in the Context of Multiple Agents.","venue":"DEON","pages":"1-15","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Demolombe12","doi":"10.1007/978-3-642-31570-1_1","ee":"https://doi.org/10.1007/978-3-642-31570-1_1","url":"https://dblp.org/rec/conf/deon/Demolombe12"},
+"url":"URL#5873335"
+},
+{
+"@score":"1",
+"@id":"5873336",
+"info":{"authors":{"author":{"@pid":"g/DovMGabbay","text":"Dov M. Gabbay"}},"title":"Temporal Deontic Logic for the Generalised Chisholm Set of Contrary to Duty Obligations.","venue":"DEON","pages":"91-107","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Gabbay12","doi":"10.1007/978-3-642-31570-1_7","ee":"https://doi.org/10.1007/978-3-642-31570-1_7","url":"https://dblp.org/rec/conf/deon/Gabbay12"},
+"url":"URL#5873336"
+},
+{
+"@score":"1",
+"@id":"5873337",
+"info":{"authors":{"author":[{"@pid":"68/2296-1","text":"Ricardo Gonçalves 0001"},{"@pid":"33/4396","text":"José Júlio Alferes"}]},"title":"An Embedding of Input-Output Logic in Deontic Logic Programs.","venue":"DEON","pages":"61-75","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/GoncalvesA12","doi":"10.1007/978-3-642-31570-1_5","ee":"https://doi.org/10.1007/978-3-642-31570-1_5","url":"https://dblp.org/rec/conf/deon/GoncalvesA12"},
+"url":"URL#5873337"
+},
+{
+"@score":"1",
+"@id":"5873338",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"89/4099","text":"Erica Calardo"}]},"title":"Possible World Semantics for Defeasible Deontic Logic.","venue":"DEON","pages":"46-60","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/GovernatoriRC12","doi":"10.1007/978-3-642-31570-1_4","ee":"https://doi.org/10.1007/978-3-642-31570-1_4","url":"https://dblp.org/rec/conf/deon/GovernatoriRC12"},
+"url":"URL#5873338"
+},
+{
+"@score":"1",
+"@id":"5873339",
+"info":{"authors":{"author":[{"@pid":"h/AndreasHerzig","text":"Andreas Herzig"},{"@pid":"55/5242","text":"Tiago de Lima"},{"@pid":"43/6250","text":"Emiliano Lorini"},{"@pid":"66/2057","text":"Nicolas Troquard"}]},"title":"A Computationally Grounded Dynamic Logic of Agency, with an Application to Legal Actions.","venue":"DEON","pages":"170-183","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/HerzigLLT12","doi":"10.1007/978-3-642-31570-1_12","ee":"https://doi.org/10.1007/978-3-642-31570-1_12","url":"https://dblp.org/rec/conf/deon/HerzigLLT12"},
+"url":"URL#5873339"
+},
+{
+"@score":"1",
+"@id":"5873340",
+"info":{"authors":{"author":{"@pid":"117/1757","text":"Louwe B. Kuijer"}},"title":"Sanction Semantics and Contrary-to-Duty Obligations.","venue":"DEON","pages":"76-90","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Kuijer12","doi":"10.1007/978-3-642-31570-1_6","ee":"https://doi.org/10.1007/978-3-642-31570-1_6","url":"https://dblp.org/rec/conf/deon/Kuijer12"},
+"url":"URL#5873340"
+},
+{
+"@score":"1",
+"@id":"5873341",
+"info":{"authors":{"author":[{"@pid":"87/7337","text":"Piotr Kulicki"},{"@pid":"01/58","text":"Robert Trypuz"}]},"title":"A Deontic Action Logic with Sequential Composition of Actions.","venue":"DEON","pages":"184-198","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/KulickiT12","doi":"10.1007/978-3-642-31570-1_13","ee":"https://doi.org/10.1007/978-3-642-31570-1_13","url":"https://dblp.org/rec/conf/deon/KulickiT12"},
+"url":"URL#5873341"
+},
+{
+"@score":"1",
+"@id":"5873342",
+"info":{"authors":{"author":{"@pid":"43/6250","text":"Emiliano Lorini"}},"title":"On the Logical Foundations of Moral Agency.","venue":"DEON","pages":"108-122","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Lorini12","doi":"10.1007/978-3-642-31570-1_8","ee":"https://doi.org/10.1007/978-3-642-31570-1_8","url":"https://dblp.org/rec/conf/deon/Lorini12"},
+"url":"URL#5873342"
+},
+{
+"@score":"1",
+"@id":"5873343",
+"info":{"authors":{"author":[{"@pid":"77/2512","text":"Régis Riveret"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"Norms and Learning in Probabilistic Logic-Based Agents.","venue":"DEON","pages":"123-138","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/RiveretRS12","doi":"10.1007/978-3-642-31570-1_9","ee":"https://doi.org/10.1007/978-3-642-31570-1_9","url":"https://dblp.org/rec/conf/deon/RiveretRS12"},
+"url":"URL#5873343"
+},
+{
+"@score":"1",
+"@id":"5873344",
+"info":{"authors":{"author":[{"@pid":"68/3574","text":"Olivier Roy"},{"@pid":"38/1512","text":"Albert J. J. Anglberger"},{"@pid":"57/8850","text":"Norbert Gratzl"}]},"title":"The Logic of Obligation as Weakest Permission - (Short Version).","venue":"DEON","pages":"139-150","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/RoyAG12","doi":"10.1007/978-3-642-31570-1_10","ee":"https://doi.org/10.1007/978-3-642-31570-1_10","url":"https://dblp.org/rec/conf/deon/RoyAG12"},
+"url":"URL#5873344"
+},
+{
+"@score":"1",
+"@id":"5873345",
+"info":{"authors":{"author":[{"@pid":"32/9414","text":"Christian Straßer"},{"@pid":"64/8283","text":"Mathieu Beirlaen"}]},"title":"An Andersonian Deontic Logic with Contextualized Sanctions.","venue":"DEON","pages":"151-169","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/StrasserB12","doi":"10.1007/978-3-642-31570-1_11","ee":"https://doi.org/10.1007/978-3-642-31570-1_11","url":"https://dblp.org/rec/conf/deon/StrasserB12"},
+"url":"URL#5873345"
+},
+{
+"@score":"1",
+"@id":"5873346",
+"info":{"authors":{"author":[{"@pid":"11/10481","text":"Silvano Colombo Tosatto"},{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"},{"@pid":"84/5009","text":"Serena Villata"}]},"title":"Visualizing Normative Systems: An Abstract Approach.","venue":"DEON","pages":"16-30","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/TosattoBTV12","doi":"10.1007/978-3-642-31570-1_2","ee":"https://doi.org/10.1007/978-3-642-31570-1_2","url":"https://dblp.org/rec/conf/deon/TosattoBTV12"},
+"url":"URL#5873346"
+},
+{
+"@score":"1",
+"@id":"5873347",
+"info":{"authors":{"author":{"@pid":"88/2484","text":"Paolo Turrini"}},"title":"Agreements as Norms.","venue":"DEON","pages":"31-45","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Turrini12","doi":"10.1007/978-3-642-31570-1_3","ee":"https://doi.org/10.1007/978-3-642-31570-1_3","url":"https://dblp.org/rec/conf/deon/Turrini12"},
+"url":"URL#5873347"
+},
+{
+"@score":"1",
+"@id":"5987932",
+"info":{"authors":{"author":[{"@pid":"47/424","text":"Thomas Ågotnes"},{"@pid":"15/6917","text":"Jan M. Broersen"},{"@pid":"94/5330","text":"Dag Elgesem"}]},"title":"Deontic Logic in Computer Science - 11th International Conference, DEON 2012, Bergen, Norway, July 16-18, 2012. Proceedings","venue":["DEON","Lecture Notes in Computer Science"],"volume":"7393","publisher":"Springer","year":"2012","type":"Editorship","key":"conf/deon/2012","doi":"10.1007/978-3-642-31570-1","ee":"https://doi.org/10.1007/978-3-642-31570-1","url":"https://dblp.org/rec/conf/deon/2012"},
+"url":"URL#5987932"
+},
+{
+"@score":"1",
+"@id":"6374024",
+"info":{"authors":{"author":[{"@pid":"30/8281","text":"Michael Abraham"},{"@pid":"g/DovMGabbay","text":"Dov M. Gabbay"},{"@pid":"94/4980","text":"Uri J. Schild"}]},"title":"Obligations and Prohibitions in Talmudic Deontic Logic.","venue":"DEON","pages":"166-178","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/AbrahamGS10","doi":"10.1007/978-3-642-14183-6_13","ee":"https://doi.org/10.1007/978-3-642-14183-6_13","url":"https://dblp.org/rec/conf/deon/AbrahamGS10"},
+"url":"URL#6374024"
+},
+{
+"@score":"1",
+"@id":"6374025",
+"info":{"authors":{"author":[{"@pid":"59/6726","text":"Guillaume Aucher"},{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Privacy Policies with Modal Logic: The Dynamic Turn.","venue":"DEON","pages":"196-213","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/AucherBT10","doi":"10.1007/978-3-642-14183-6_15","ee":"https://doi.org/10.1007/978-3-642-14183-6_15","url":"https://dblp.org/rec/conf/deon/AucherBT10"},
+"url":"URL#6374025"
+},
+{
+"@score":"1",
+"@id":"6374026",
+"info":{"authors":{"author":[{"@pid":"b/JvBenthem","text":"Johan van Benthem"},{"@pid":"21/782","text":"Davide Grossi"},{"@pid":"19/5949","text":"Fenrong Liu"}]},"title":"Deontics = Betterness + Priority.","venue":"DEON","pages":"50-65","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BenthemGL10","doi":"10.1007/978-3-642-14183-6_6","ee":"https://doi.org/10.1007/978-3-642-14183-6_6","url":"https://dblp.org/rec/conf/deon/BenthemGL10"},
+"url":"URL#6374026"
+},
+{
+"@score":"1",
+"@id":"6374027",
+"info":{"authors":{"author":[{"@pid":"03/7558","text":"Brigitte Burgemeestre"},{"@pid":"01/2440","text":"Joris Hulstijn"},{"@pid":"37/4594","text":"Yao-Hua Tan"}]},"title":"Value-Based Argumentation for Justifying Compliance.","venue":"DEON","pages":"214-228","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BurgemeestreHT10","doi":"10.1007/978-3-642-14183-6_16","ee":"https://doi.org/10.1007/978-3-642-14183-6_16","url":"https://dblp.org/rec/conf/deon/BurgemeestreHT10"},
+"url":"URL#6374027"
+},
+{
+"@score":"1",
+"@id":"6374028",
+"info":{"authors":{"author":[{"@pid":"53/3352","text":"Rosaria Conte"},{"@pid":"87/4126","text":"Giulia Andrighetto"},{"@pid":"87/674","text":"Daniel Villatoro"}]},"title":"From Norm Adoption to Norm Internalization.","venue":"DEON","pages":"1","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/ConteAV10","doi":"10.1007/978-3-642-14183-6_1","ee":"https://doi.org/10.1007/978-3-642-14183-6_1","url":"https://dblp.org/rec/conf/deon/ConteAV10"},
+"url":"URL#6374028"
+},
+{
+"@score":"1",
+"@id":"6374029",
+"info":{"authors":{"author":{"@pid":"31/4123","text":"Robert Demolombe"}},"title":"Relationships between Actions Performed by Institutional Agents, Human Agents or Software Agents.","venue":"DEON","pages":"259-273","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Demolombe10","doi":"10.1007/978-3-642-14183-6_19","ee":"https://doi.org/10.1007/978-3-642-14183-6_19","url":"https://dblp.org/rec/conf/deon/Demolombe10"},
+"url":"URL#6374029"
+},
+{
+"@score":"1",
+"@id":"6374030",
+"info":{"authors":{"author":[{"@pid":"07/3249","text":"Phan Minh Dung"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"A Logical Model of Private International Law.","venue":"DEON","pages":"229-246","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/DungS10","doi":"10.1007/978-3-642-14183-6_17","ee":"https://doi.org/10.1007/978-3-642-14183-6_17","url":"https://dblp.org/rec/conf/deon/DungS10"},
+"url":"URL#6374030"
+},
+{
+"@score":"1",
+"@id":"6374031",
+"info":{"authors":{"author":{"@pid":"18/6332","text":"Richard Evans"}},"title":"Introducing Exclusion Logic as a Deontic Logic.","venue":"DEON","pages":"179-195","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Evans10","doi":"10.1007/978-3-642-14183-6_14","ee":"https://doi.org/10.1007/978-3-642-14183-6_14","url":"https://dblp.org/rec/conf/deon/Evans10"},
+"url":"URL#6374031"
+},
+{
+"@score":"1",
+"@id":"6374032",
+"info":{"authors":{"author":[{"@pid":"29/1679","text":"Tim French 0002"},{"@pid":"08/3926","text":"John Christopher McCabe-Dansted"},{"@pid":"26/2746","text":"Mark Reynolds 0001"}]},"title":"Axioms for Obligation and Robustness with Temporal Logic.","venue":"DEON","pages":"66-83","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/FrenchMR10","doi":"10.1007/978-3-642-14183-6_7","ee":"https://doi.org/10.1007/978-3-642-14183-6_7","url":"https://dblp.org/rec/conf/deon/FrenchMR10"},
+"url":"URL#6374032"
+},
+{
+"@score":"1",
+"@id":"6374033",
+"info":{"authors":{"author":{"@pid":"21/1809","text":"Gert-Jan C. Lokhorst"}},"title":"Where Did Mally Go Wrong?","venue":"DEON","pages":"247-258","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Lokhorst10","doi":"10.1007/978-3-642-14183-6_18","ee":"https://doi.org/10.1007/978-3-642-14183-6_18","url":"https://dblp.org/rec/conf/deon/Lokhorst10"},
+"url":"URL#6374033"
+},
+{
+"@score":"1",
+"@id":"6374034",
+"info":{"authors":{"author":{"@pid":"43/6250","text":"Emiliano Lorini"}},"title":"A Logical Analysis of Commitment Dynamics.","venue":"DEON","pages":"288-305","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Lorini10","doi":"10.1007/978-3-642-14183-6_21","ee":"https://doi.org/10.1007/978-3-642-14183-6_21","url":"https://dblp.org/rec/conf/deon/Lorini10"},
+"url":"URL#6374034"
+},
+{
+"@score":"1",
+"@id":"6374035",
+"info":{"authors":{"author":{"@pid":"91/4529","text":"Rosja Mastop"}},"title":"Characterising Responsibility in Organisational Structures: The Problem of Many Hands.","venue":"DEON","pages":"274-287","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Mastop10","doi":"10.1007/978-3-642-14183-6_20","ee":"https://doi.org/10.1007/978-3-642-14183-6_20","url":"https://dblp.org/rec/conf/deon/Mastop10"},
+"url":"URL#6374035"
+},
+{
+"@score":"1",
+"@id":"6374036",
+"info":{"authors":{"author":[{"@pid":"47/3187","text":"Joke Meheus"},{"@pid":"64/8283","text":"Mathieu Beirlaen"},{"@pid":"63/8283","text":"Frederik Van De Putte"}]},"title":"Avoiding Deontic Explosion by Contextually Restricting Aggregation.","venue":"DEON","pages":"148-165","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/MeheusBP10","doi":"10.1007/978-3-642-14183-6_12","ee":"https://doi.org/10.1007/978-3-642-14183-6_12","url":"https://dblp.org/rec/conf/deon/MeheusBP10"},
+"url":"URL#6374036"
+},
+{
+"@score":"1",
+"@id":"6374037",
+"info":{"authors":{"author":{"@pid":"33/4590","text":"Xavier Parent 0001"}},"title":"Moral Particularism and Deontic Logic.","venue":"DEON","pages":"84-97","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Parent10","doi":"10.1007/978-3-642-14183-6_8","ee":"https://doi.org/10.1007/978-3-642-14183-6_8","url":"https://dblp.org/rec/conf/deon/Parent10"},
+"url":"URL#6374037"
+},
+{
+"@score":"1",
+"@id":"6374038",
+"info":{"authors":{"author":{"@pid":"94/2845","text":"Guillaume Piolle"}},"title":"A Dyadic Operator for the Gradation of Desirability.","venue":"DEON","pages":"33-49","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Piolle10","doi":"10.1007/978-3-642-14183-6_5","ee":"https://doi.org/10.1007/978-3-642-14183-6_5","url":"https://dblp.org/rec/conf/deon/Piolle10"},
+"url":"URL#6374038"
+},
+{
+"@score":"1",
+"@id":"6374039",
+"info":{"authors":{"author":{"@pid":"89/4715","text":"Antonino Rotolo"}},"title":"Retroactive Legal Changes and Revision Theory in Defeasible Logic.","venue":"DEON","pages":"116-131","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Rotolo10","doi":"10.1007/978-3-642-14183-6_10","ee":"https://doi.org/10.1007/978-3-642-14183-6_10","url":"https://dblp.org/rec/conf/deon/Rotolo10"},
+"url":"URL#6374039"
+},
+{
+"@score":"1",
+"@id":"6374040",
+"info":{"authors":{"author":{"@pid":"s/MarekJSergot","text":"Marek J. Sergot"}},"title":"Norms, Action and Agency in Multi-agent Systems.","venue":"DEON","pages":"2","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Sergot10","doi":"10.1007/978-3-642-14183-6_2","ee":"https://doi.org/10.1007/978-3-642-14183-6_2","url":"https://dblp.org/rec/conf/deon/Sergot10"},
+"url":"URL#6374040"
+},
+{
+"@score":"1",
+"@id":"6374041",
+"info":{"authors":{"author":{"@pid":"52/3008","text":"Audun Stolpe"}},"title":"Relevance, Derogation and Permission.","venue":"DEON","pages":"98-115","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Stolpe10","doi":"10.1007/978-3-642-14183-6_9","ee":"https://doi.org/10.1007/978-3-642-14183-6_9","url":"https://dblp.org/rec/conf/deon/Stolpe10"},
+"url":"URL#6374041"
+},
+{
+"@score":"1",
+"@id":"6374042",
+"info":{"authors":{"author":{"@pid":"61/5021","text":"Michele Taruffo"}},"title":"Towards a Logical Analysis of the Judgment on Facts.","venue":"DEON","pages":"3-10","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Taruffo10","doi":"10.1007/978-3-642-14183-6_3","ee":"https://doi.org/10.1007/978-3-642-14183-6_3","url":"https://dblp.org/rec/conf/deon/Taruffo10"},
+"url":"URL#6374042"
+},
+{
+"@score":"1",
+"@id":"6374043",
+"info":{"authors":{"author":{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}},"title":"Deontic Redundancy: A Fundamental Challenge for Deontic Logic.","venue":"DEON","pages":"11-32","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Torre10","doi":"10.1007/978-3-642-14183-6_4","ee":"https://doi.org/10.1007/978-3-642-14183-6_4","url":"https://dblp.org/rec/conf/deon/Torre10"},
+"url":"URL#6374043"
+},
+{
+"@score":"1",
+"@id":"6374044",
+"info":{"authors":{"author":[{"@pid":"01/58","text":"Robert Trypuz"},{"@pid":"87/7337","text":"Piotr Kulicki"}]},"title":"Towards Metalogical Systematisation of Deontic Action Logics Based on Boolean Algebra.","venue":"DEON","pages":"132-147","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/TrypuzK10","doi":"10.1007/978-3-642-14183-6_11","ee":"https://doi.org/10.1007/978-3-642-14183-6_11","url":"https://dblp.org/rec/conf/deon/TrypuzK10"},
+"url":"URL#6374044"
+},
+{
+"@score":"1",
+"@id":"6374045",
+"info":{"authors":{"author":[{"@pid":"88/2484","text":"Paolo Turrini"},{"@pid":"21/782","text":"Davide Grossi"},{"@pid":"15/6917","text":"Jan M. Broersen"},{"@pid":"m/JJCMeyer","text":"John-Jules Ch. Meyer"}]},"title":"Forbidding Undesirable Agreements: A Dependence-Based Approach to the Regulation of Multi-agent Systems.","venue":"DEON","pages":"306-322","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/TurriniGBM10","doi":"10.1007/978-3-642-14183-6_22","ee":"https://doi.org/10.1007/978-3-642-14183-6_22","url":"https://dblp.org/rec/conf/deon/TurriniGBM10"},
+"url":"URL#6374045"
+},
+{
+"@score":"1",
+"@id":"6475450",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"Deontic Logic in Computer Science, 10th International Conference, DEON 2010, Fiesole, Italy, July 7-9, 2010. Proceedings","venue":["DEON","Lecture Notes in Computer Science"],"volume":"6181","publisher":"Springer","year":"2010","type":"Editorship","key":"conf/deon/2010","doi":"10.1007/978-3-642-14183-6","ee":"https://doi.org/10.1007/978-3-642-14183-6","url":"https://dblp.org/rec/conf/deon/2010"},
+"url":"URL#6475450"
+},
+{
+"@score":"1",
+"@id":"6817375",
+"info":{"authors":{"author":{"@pid":"a/MartinAbadi","text":"Martín Abadi"}},"title":"Variations in Access Control Logic.","venue":"DEON","pages":"96-109","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Abadi08","doi":"10.1007/978-3-540-70525-3_9","ee":"https://doi.org/10.1007/978-3-540-70525-3_9","url":"https://dblp.org/rec/conf/deon/Abadi08"},
+"url":"URL#6817375"
+},
+{
+"@score":"1",
+"@id":"6817376",
+"info":{"authors":{"author":{"@pid":"a/RJAnderson","text":"Ross J. Anderson"}},"title":"Information Security Economics - and Beyond.","venue":"DEON","pages":"49","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Anderson08","doi":"10.1007/978-3-540-70525-3_5","ee":"https://doi.org/10.1007/978-3-540-70525-3_5","url":"https://dblp.org/rec/conf/deon/Anderson08"},
+"url":"URL#6817376"
+},
+{
+"@score":"1",
+"@id":"6817377",
+"info":{"authors":{"author":{"@pid":"72/3724","text":"Nuel Belnap"}},"title":"Norms in Branching Space-Times.","venue":"DEON","pages":"1-2","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Belnap08","doi":"10.1007/978-3-540-70525-3_1","ee":"https://doi.org/10.1007/978-3-540-70525-3_1","url":"https://dblp.org/rec/conf/deon/Belnap08"},
+"url":"URL#6817377"
+},
+{
+"@score":"1",
+"@id":"6817378",
+"info":{"authors":{"author":{"@pid":"15/6917","text":"Jan M. Broersen"}},"title":"A Logical Analysis of the Interaction between &apos;Obligation-to-do&apos; and &apos;Knowingly Doing&apos;.","venue":"DEON","pages":"140-154","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Broersen08","doi":"10.1007/978-3-540-70525-3_12","ee":"https://doi.org/10.1007/978-3-540-70525-3_12","url":"https://dblp.org/rec/conf/deon/Broersen08"},
+"url":"URL#6817378"
+},
+{
+"@score":"1",
+"@id":"6817379",
+"info":{"authors":{"author":[{"@pid":"15/6917","text":"Jan M. Broersen"},{"@pid":"91/4529","text":"Rosja Mastop"},{"@pid":"m/JJCMeyer","text":"John-Jules Ch. Meyer"},{"@pid":"88/2484","text":"Paolo Turrini"}]},"title":"A Deontic Logic for Socially Optimal Norms.","venue":"DEON","pages":"218-232","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BroersenMMT08","doi":"10.1007/978-3-540-70525-3_17","ee":"https://doi.org/10.1007/978-3-540-70525-3_17","url":"https://dblp.org/rec/conf/deon/BroersenMMT08"},
+"url":"URL#6817379"
+},
+{
+"@score":"1",
+"@id":"6817380",
+"info":{"authors":{"author":{"@pid":"41/217","text":"Mark A. Brown"}},"title":"Acting, Events and Actions.","venue":"DEON","pages":"19-33","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Brown08","doi":"10.1007/978-3-540-70525-3_3","ee":"https://doi.org/10.1007/978-3-540-70525-3_3","url":"https://dblp.org/rec/conf/deon/Brown08"},
+"url":"URL#6817380"
+},
+{
+"@score":"1",
+"@id":"6817381",
+"info":{"authors":{"author":[{"@pid":"57/1847","text":"Pablo F. Castro"},{"@pid":"m/TSEMaibaum","text":"T. S. E. Maibaum"}]},"title":"A Tableaux System for Deontic Action Logic.","venue":"DEON","pages":"34-48","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/CastroM08","doi":"10.1007/978-3-540-70525-3_4","ee":"https://doi.org/10.1007/978-3-540-70525-3_4","url":"https://dblp.org/rec/conf/deon/CastroM08"},
+"url":"URL#6817381"
+},
+{
+"@score":"1",
+"@id":"6817382",
+"info":{"authors":{"author":[{"@pid":"c/NoraCuppens","text":"Nora Cuppens-Boulahia"},{"@pid":"c/FredericCuppens","text":"Frédéric Cuppens"}]},"title":"Specifying Intrusion Detection and Reaction Policies: An Application of Deontic Logic.","venue":"DEON","pages":"65-80","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Cuppens-BoulahiaC08","doi":"10.1007/978-3-540-70525-3_7","ee":"https://doi.org/10.1007/978-3-540-70525-3_7","url":"https://dblp.org/rec/conf/deon/Cuppens-BoulahiaC08"},
+"url":"URL#6817382"
+},
+{
+"@score":"1",
+"@id":"6817383",
+"info":{"authors":{"author":[{"@pid":"59/3043","text":"Pilar Dellunde"},{"@pid":"15/801","text":"Lluís Godo"}]},"title":"Introducing Grades in Deontic Logics.","venue":"DEON","pages":"248-262","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/DellundeG08","doi":"10.1007/978-3-540-70525-3_19","ee":"https://doi.org/10.1007/978-3-540-70525-3_19","url":"https://dblp.org/rec/conf/deon/DellundeG08"},
+"url":"URL#6817383"
+},
+{
+"@score":"1",
+"@id":"6817384",
+"info":{"authors":{"author":[{"@pid":"40/467","text":"Nikhil Dinesh"},{"@pid":"j/AravindKJoshi","text":"Aravind K. Joshi"},{"@pid":"l/InsupLee","text":"Insup Lee 0001"},{"@pid":"31/4030","text":"Oleg Sokolsky"}]},"title":"Reasoning about Conditions and Exceptions to Laws in Regulatory Conformance Checking.","venue":"DEON","pages":"110-124","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/DineshJLS08","doi":"10.1007/978-3-540-70525-3_10","ee":"https://doi.org/10.1007/978-3-540-70525-3_10","url":"https://dblp.org/rec/conf/deon/DineshJLS08"},
+"url":"URL#6817384"
+},
+{
+"@score":"1",
+"@id":"6817385",
+"info":{"authors":{"author":{"@pid":"g/DovMGabbay","text":"Dov M. Gabbay"}},"title":"Reactive Kripke Models and Contrary to Duty Obligations.","venue":"DEON","pages":"155-173","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Gabbay08","doi":"10.1007/978-3-540-70525-3_13","ee":"https://doi.org/10.1007/978-3-540-70525-3_13","url":"https://dblp.org/rec/conf/deon/Gabbay08"},
+"url":"URL#6817385"
+},
+{
+"@score":"1",
+"@id":"6817386",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"Changing Legal Systems: Abrogation and Annulment Part I: Revision of Defeasible Theories.","venue":"DEON","pages":"3-18","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/GovernatoriR08","doi":"10.1007/978-3-540-70525-3_2","ee":"https://doi.org/10.1007/978-3-540-70525-3_2","url":"https://dblp.org/rec/conf/deon/GovernatoriR08"},
+"url":"URL#6817386"
+},
+{
+"@score":"1",
+"@id":"6817387",
+"info":{"authors":{"author":{"@pid":"21/782","text":"Davide Grossi"}},"title":"Pushing Anderson&apos;s Envelope: The Modal Logic of Ascription.","venue":"DEON","pages":"263-277","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Grossi08","doi":"10.1007/978-3-540-70525-3_20","ee":"https://doi.org/10.1007/978-3-540-70525-3_20","url":"https://dblp.org/rec/conf/deon/Grossi08"},
+"url":"URL#6817387"
+},
+{
+"@score":"1",
+"@id":"6817388",
+"info":{"authors":{"author":{"@pid":"01/2440","text":"Joris Hulstijn"}},"title":"Need to Know: Questions and the Paradox of Epistemic Obligation.","venue":"DEON","pages":"125-139","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Hulstijn08","doi":"10.1007/978-3-540-70525-3_11","ee":"https://doi.org/10.1007/978-3-540-70525-3_11","url":"https://dblp.org/rec/conf/deon/Hulstijn08"},
+"url":"URL#6817388"
+},
+{
+"@score":"1",
+"@id":"6817389",
+"info":{"authors":{"author":[{"@pid":"01/2440","text":"Joris Hulstijn"},{"@pid":"43/3771-7","text":"Jianwei Liu 0007"},{"@pid":"37/4594","text":"Yao-Hua Tan"}]},"title":"Delegation of Control in Administrative Procedures.","venue":"DEON","pages":"81-95","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/HulstijnLT08","doi":"10.1007/978-3-540-70525-3_8","ee":"https://doi.org/10.1007/978-3-540-70525-3_8","url":"https://dblp.org/rec/conf/deon/HulstijnLT08"},
+"url":"URL#6817389"
+},
+{
+"@score":"1",
+"@id":"6817390",
+"info":{"authors":{"author":[{"@pid":"80/4480","text":"Lars Lindahl"},{"@pid":"88/3694","text":"Jan Odelstad"}]},"title":"Strata of Intervenient Concepts in Normative Systems.","venue":"DEON","pages":"203-217","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/LindahlO08","doi":"10.1007/978-3-540-70525-3_16","ee":"https://doi.org/10.1007/978-3-540-70525-3_16","url":"https://dblp.org/rec/conf/deon/LindahlO08"},
+"url":"URL#6817390"
+},
+{
+"@score":"1",
+"@id":"6817391",
+"info":{"authors":{"author":[{"@pid":"43/6250","text":"Emiliano Lorini"},{"@pid":"31/4123","text":"Robert Demolombe"}]},"title":"Trust and Norms in the Context of Computer Security: A Logical Formalization.","venue":"DEON","pages":"50-64","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/LoriniD08","doi":"10.1007/978-3-540-70525-3_6","ee":"https://doi.org/10.1007/978-3-540-70525-3_6","url":"https://dblp.org/rec/conf/deon/LoriniD08"},
+"url":"URL#6817391"
+},
+{
+"@score":"1",
+"@id":"6817392",
+"info":{"authors":{"author":{"@pid":"40/4366","text":"Paul McNamara"}},"title":"Praise, Blame, Obligation, and Beyond: Toward a Framework for Classical Supererogation and Kin.","venue":"DEON","pages":"233-247","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/McNamara08","doi":"10.1007/978-3-540-70525-3_18","ee":"https://doi.org/10.1007/978-3-540-70525-3_18","url":"https://dblp.org/rec/conf/deon/McNamara08"},
+"url":"URL#6817392"
+},
+{
+"@score":"1",
+"@id":"6817393",
+"info":{"authors":{"author":{"@pid":"33/4590","text":"Xavier Parent 0001"}},"title":"On the Strong Completeness of Åqvist&apos;s Dyadic Deontic Logic G.","venue":"DEON","pages":"189-202","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Parent08","doi":"10.1007/978-3-540-70525-3_15","ee":"https://doi.org/10.1007/978-3-540-70525-3_15","url":"https://dblp.org/rec/conf/deon/Parent08"},
+"url":"URL#6817393"
+},
+{
+"@score":"1",
+"@id":"6817394",
+"info":{"authors":{"author":{"@pid":"52/3008","text":"Audun Stolpe"}},"title":"Normative Consequence: The Problem of Keeping It Whilst Giving It up.","venue":"DEON","pages":"174-188","year":"2008","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/Stolpe08","doi":"10.1007/978-3-540-70525-3_14","ee":"https://doi.org/10.1007/978-3-540-70525-3_14","url":"https://dblp.org/rec/conf/deon/Stolpe08"},
+"url":"URL#6817394"
+},
+{
+"@score":"1",
+"@id":"6907642",
+"info":{"authors":{"author":[{"@pid":"m/RvdMeyden","text":"Ron van der Meyden"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Deontic Logic in Computer Science, 9th International Conference, DEON 2008, Luxembourg, Luxembourg, July 15-18, 2008. Proceedings","venue":["DEON","Lecture Notes in Computer Science"],"volume":"5076","publisher":"Springer","year":"2008","type":"Editorship","key":"conf/deon/2008","doi":"10.1007/978-3-540-70525-3","ee":"https://doi.org/10.1007/978-3-540-70525-3","url":"https://dblp.org/rec/conf/deon/2008"},
+"url":"URL#6907642"
+},
+{
+"@score":"1",
+"@id":"7198455",
+"info":{"authors":{"author":[{"@pid":"17/6670","text":"Katie Atkinson"},{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}]},"title":"Addressing Moral Problems Through Practical Reasoning.","venue":"DEON","pages":"8-23","year":"2006","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/AtkinsonB06","doi":"10.1007/11786849_4","ee":"https://doi.org/10.1007/11786849_4","url":"https://dblp.org/rec/conf/deon/AtkinsonB06"},
+"url":"URL#7198455"
+},
+{
+"@score":"1",
+"@id":"7198456",
+"info":{"authors":{"author":[{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"A Logical Architecture of a Normative System.","venue":"DEON","pages":"24-35","year":"2006","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BoellaT06","doi":"10.1007/11786849_5","ee":"https://doi.org/10.1007/11786849_5","url":"https://dblp.org/rec/conf/deon/BoellaT06"},
+"url":"URL#7198456"
+},
+{
+"@score":"1",
+"@id":"7198457",
+"info":{"authors":{"author":[{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Delegation of Power in Normative Multiagent Systems.","venue":"DEON","pages":"36-52","year":"2006","type":"Conference and Workshop Papers","access":"closed","key":"conf/deon/BoellaT06a","doi":"10.1007/11786849_6","ee":"https://doi.org/10.1007/11786849_6","url":"https://dblp.org/rec/conf/deon/BoellaT06a"},
+"url":"URL#7198457"
+}
+]
+}
+}
+}

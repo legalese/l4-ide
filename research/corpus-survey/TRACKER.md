@@ -31,18 +31,25 @@ another ~4–5M tokens. Neither stresses a Max20/Sonnet week. What breaks is bru
 download — ACM/Springer anti-bot + proxy-ToS. So: **harvest metadata first (free APIs),
 filter on abstracts, acquire only survivors.** Do NOT download-then-read.
 
-## 3. Corpus scope & estimates (to be replaced with hard numbers in Phase 0)
+## 3. Corpus scope — Phase 0 actuals (DBLP core, harvested 2026-07-20)
 
-| Venue | Cadence | Editions | ~Papers | Access reality |
-|-------|---------|----------|---------|----------------|
-| ICAIL | biennial 1987–2025 | ~20 | ~900 | ACM DL — paywalled, **anti-bot** |
-| JURIX | annual 1988–2025 | ~37 | ~1,000–1,200 | **Mostly open** (IOS Press FAIA / jurix.nl) |
-| DEON  | biennial 1991– | ~16 | ~400 | Mixed (Springer LNCS + College Publications) |
-| **MULL** → *Jurimetrics* | quarterly 1959–1966 (→ *Jurimetrics* after) | ~7 vols | ~100–200 (many short notes) | **On JSTOR** via proxy |
+| Venue | Cadence | Editions indexed | Papers (excl. eds.) | DBLP-open % | Access reality |
+|-------|---------|-----------------:|--------------------:|------------:|----------------|
+| ICAIL | biennial 1987–2025 | 20 | **840** | 1.7% | ACM DL — paywalled, **anti-bot**; every paper has a DOI → OA-copy lookup in P1 |
+| JURIX | annual 2005–2025 | 21 | **680** | 20.3% | **Most open in practice** — jurix.nl loose PDFs (early yrs) + IOS Press FAIA (largely OA) |
+| DEON  | biennial 1996–2025 | 12 (of ~17) | **238** | 0.0% | Sparse DBLP meta (113 no-ee); Springer LNCS (late) + College Publications (early) |
+| **Total (modern core)** | | **53** | **1,758** | | |
+| **MULL** → *Jurimetrics* | quarterly 1959–1966 | *deferred* | ~100–200 (est.) | — | **On JSTOR** via proxy — needs authenticated browser sub-run |
 
-Rough total **~2,300–2,500 papers** for the three modern venues; **MULL** adds a small,
-bounded **historical sub-corpus** on top. Phase 0 replaces all estimates with exact counts +
-open-access percentages.
+Full flat table in `data/index.csv`; per-edition counts + machine summary in `data/summary.json`;
+narrative in `data/PHASE0-FINDINGS.md`.
+
+**Coverage gaps logged (Phase 0):**
+- **JURIX 1988–2004 (~16 editions)** — absent from DBLP *and* jurix.nl's PDF archive; largely
+  undigitized. *Priority LOW* (Bench-Capon "50" seed covers the canonical early AI&Law).
+- **DEON 1991/1994/1998/2000/2002 (~5 editions, ~90 papers)** — not in DBLP `conf/deon`;
+  College Publications era. *Priority MED-LOW* — fill if the Bounded-Deontics thread needs them.
+- **MULL/early-Jurimetrics** — JSTOR-gated; deferred to a browser sub-run (signpost `stable/29760800`).
 
 **MULL — historical roots (added 2026-07-20).** *Modern Uses of Logic in Law* is the first
 journal dedicated to computational law (inaugural issue Vol. 1 No. 1, Sept 1959; JSTOR
@@ -132,8 +139,11 @@ real him**, whose input validates anything the model produces. Loop him in early
 
 ## Phase Status
 
-- [ ] **Phase 0 — Index** (DBLP + OpenAlex TOC harvest → exact counts + OA %; + MULL/early-*Jurimetrics* run via JSTOR) — *next*
-- [ ] **Phase 1 — Enrich** (abstracts / OA links / citations via S2 + OpenAlex)
+- [x] **Phase 0 — Index** — DBLP core harvested: **1,817 records / 1,758 papers** (ICAIL 840,
+  JURIX 680, DEON 238). Outputs in `data/` (`index.json`, `index.csv`, `summary.json`,
+  `PHASE0-FINDINGS.md`); scripts in `scripts/`. **Gaps logged** (JURIX <2005, DEON early
+  editions, MULL/JSTOR) — see below. *MULL/Jurimetrics deferred to a browser sub-run.*
+- [ ] **Phase 1 — Enrich** (abstracts / OA links / citations via S2 + OpenAlex) — *next*
 - [ ] **Phase 2 — Cheap pre-rank** (citation-graph proximity to known cluster)
 - [ ] **Phase 3 — Abstract filter** (Sonnet, facet-mapped + recall check vs the "50")
 - [ ] **Phase 4 — Acquire survivors** (open-first; paywalled sparingly, with rights)
@@ -156,6 +166,16 @@ real him**, whose input validates anything the model produces. Loop him in early
   `research/corpus-survey`), off `unstable` @ dea9bc6c. Architecture locked as metadata-first
   (§2, §4). ToS guardrails locked (§5). Next action after user's context compaction:
   **start Phase 0** (harvest DBLP + OpenAlex TOCs for ICAIL/JURIX/DEON → `data/index.*`).
+- **2026-07-20** — **Phase 0 COMPLETE (modern core).** Harvested DBLP per-stream TOCs
+  (`stream:streams/conf/<venue>:`, 100-hit/page → paginated). Result **1,817 records / 1,758
+  papers**: ICAIL 840 (1987–2025), JURIX 680 (2005–2025), DEON 238 (1996–2025). Outputs:
+  `data/index.{json,csv}`, `data/summary.json`, `data/PHASE0-FINDINGS.md`; scripts in `scripts/`.
+  Key findings: (a) OpenAlex does **not** group these confs under one source (ICAIL source = 14
+  works) → **DBLP is the authoritative index**, OpenAlex is enrichment-only. (b) DBLP-open flag
+  = ICAIL 1.7% / JURIX 20.3% / DEON 0% — a *floor*; true OA higher (P1 refines). (c) Acquisition
+  recon: ICAIL = hard ACM wall but all DOI'd; JURIX = open via jurix.nl/pdf (early) + IOS FAIA;
+  DEON = sparse (113/238 no ee). Gaps LOGGED: JURIX <2005 (~16 eds, undigitized, LOW), DEON
+  1991/94/98/00/02 (~5 eds, MED-LOW), MULL/JSTOR (deferred to browser sub-run).
 - **2026-07-20** — Added **MULL → *Jurimetrics*** as a bounded historical sub-corpus (§3),
   after spotting JSTOR `stable/29760800` = MULL Vol. 1 No. 1 front matter (Sept 1959, the
   field's founding issue). Phase 0 to harvest its full run via the JSTOR proxy; feeds the

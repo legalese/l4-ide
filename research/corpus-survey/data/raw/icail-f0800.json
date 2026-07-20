@@ -1,0 +1,416 @@
+{
+"result":{
+"query":":facetid:stream:\"streams/conf/icail\"",
+"status":{
+"@code":"200",
+"text":"OK"
+},
+"time":{
+"@unit":"msecs",
+"text":"126.90"
+},
+"completions":{
+"@total":"1",
+"@computed":"1",
+"@sent":"1",
+"c":{
+"@sc":"864",
+"@dc":"864",
+"@oc":"864",
+"@id":"56924258",
+"text":":facetid:stream:streams/conf/icail"
+}
+},
+"hits":{
+"@total":"864",
+"@computed":"864",
+"@sent":"64",
+"@first":"800",
+"hit":[{
+"@score":"1",
+"@id":"8407848",
+"info":{"authors":{"author":[{"@pid":"56/3984","text":"George Vossos"},{"@pid":"96/5960","text":"John Zeleznikow"},{"@pid":"25/4706","text":"Tharam S. Dillon"},{"@pid":"60/3275","text":"Vivian Vossos"}]},"title":"An Example of Integrating Legal Case Based Reasoning with Object-Oriented Rule-Based Systems: IKBALS II.","venue":"ICAIL","pages":"31-41","year":"1991","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/VossosZDV91","doi":"10.1145/112646.112650","ee":"https://doi.org/10.1145/112646.112650","url":"https://dblp.org/rec/conf/icail/VossosZDV91"},
+"url":"URL#8407848"
+},
+{
+"@score":"1",
+"@id":"8418060",
+"info":{"authors":{"author":{"@pid":"76/549","text":"Richard E. Susskind"}},"title":"Proceedings of the Third International Conference on Artificial Intelligence and Law, ICAIL &apos;91, Oxford, England, June 25-28, 1991","venue":"ICAIL","publisher":"ACM","year":"1991","type":"Editorship","key":"conf/icail/1991","doi":"10.1145/112646","ee":"https://doi.org/10.1145/112646","url":"https://dblp.org/rec/conf/icail/1991"},
+"url":"URL#8418060"
+},
+{
+"@score":"1",
+"@id":"8463473",
+"info":{"authors":{"author":[{"@pid":"67/475","text":"Carlos E. Alchourrón"},{"@pid":"89/3933","text":"Antonio A. Martino"}]},"title":"A Sketch of Logic Without Truth.","venue":"ICAIL","pages":"165-179","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AlchourronM89","doi":"10.1145/74014.74036","ee":"https://doi.org/10.1145/74014.74036","url":"https://dblp.org/rec/conf/icail/AlchourronM89"},
+"url":"URL#8463473"
+},
+{
+"@score":"1",
+"@id":"8463474",
+"info":{"authors":{"author":{"@pid":"39/1439","text":"Kevin D. Ashley"}},"title":"Toward a Computational Theory of Arguing with Precedents.","venue":"ICAIL","pages":"93-102","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Ashley89","doi":"10.1145/74014.74028","ee":"https://doi.org/10.1145/74014.74028","url":"https://dblp.org/rec/conf/icail/Ashley89"},
+"url":"URL#8463474"
+},
+{
+"@score":"1",
+"@id":"8463475",
+"info":{"authors":{"author":{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}},"title":"Deep Models, Normative Reasoning and Legal Expert Systems.","venue":"ICAIL","pages":"37-45","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bench-Capon89","doi":"10.1145/74014.74020","ee":"https://doi.org/10.1145/74014.74020","url":"https://dblp.org/rec/conf/icail/Bench-Capon89"},
+"url":"URL#8463475"
+},
+{
+"@score":"1",
+"@id":"8463476",
+"info":{"authors":{"author":{"@pid":"28/2466","text":"Donald H. Berman"}},"title":"Cutting Legal Loops.","venue":"ICAIL","pages":"251-258","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Berman89","doi":"10.1145/74014.74046","ee":"https://doi.org/10.1145/74014.74046","url":"https://dblp.org/rec/conf/icail/Berman89"},
+"url":"URL#8463476"
+},
+{
+"@score":"1",
+"@id":"8463477",
+"info":{"authors":{"author":{"@pid":"b/KarlBranting","text":"Karl Branting"}},"title":"Representing and Reusing Explanations of Legal Precedents.","venue":"ICAIL","pages":"103-110","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Branting89","doi":"10.1145/74014.74029","ee":"https://doi.org/10.1145/74014.74029","url":"https://dblp.org/rec/conf/icail/Branting89"},
+"url":"URL#8463477"
+},
+{
+"@score":"1",
+"@id":"8463478",
+"info":{"authors":{"author":{"@pid":"72/106","text":"D. Burnstein"}},"title":"&quot;Boyd V. Deaver - Litigation Strategies&quot; Videodisc: An Opportunity to Improve Curriculum and Prototype Expert Systems.","venue":"ICAIL","pages":"207-214","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Burnstein89","doi":"10.1145/74014.74041","ee":"https://doi.org/10.1145/74014.74041","url":"https://dblp.org/rec/conf/icail/Burnstein89"},
+"url":"URL#8463478"
+},
+{
+"@score":"1",
+"@id":"8463479",
+"info":{"authors":{"author":[{"@pid":"19/884","text":"A. Galtung"},{"@pid":"97/6135","text":"D. S. Maesel"}]},"title":"Xcite (An Expert System for Naturalization Cases).","venue":"ICAIL","pages":"81-86","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GaltungM89","doi":"10.1145/74014.74026","ee":"https://doi.org/10.1145/74014.74026","url":"https://dblp.org/rec/conf/icail/GaltungM89"},
+"url":"URL#8463479"
+},
+{
+"@score":"1",
+"@id":"8463480",
+"info":{"authors":{"author":{"@pid":"38/5821","text":"Anne v. d. L. Gardner"}},"title":"Representing Developing Legal Doctrine.","venue":"ICAIL","pages":"16-22","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Gardner89","doi":"10.1145/74014.74017","ee":"https://doi.org/10.1145/74014.74017","url":"https://dblp.org/rec/conf/icail/Gardner89"},
+"url":"URL#8463480"
+},
+{
+"@score":"1",
+"@id":"8463481",
+"info":{"authors":{"author":{"@pid":"45/3471","text":"Thomas F. Gordon"}},"title":"Issue Spotting in a System for Searching Interpretation Spaces.","venue":"ICAIL","pages":"157-164","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Gordon89","doi":"10.1145/74014.74035","ee":"https://doi.org/10.1145/74014.74035","url":"https://dblp.org/rec/conf/icail/Gordon89"},
+"url":"URL#8463481"
+},
+{
+"@score":"1",
+"@id":"8463482",
+"info":{"authors":{"author":{"@pid":"k/RobertAKowalski","text":"Robert A. Kowalski"}},"title":"The Treatment of Negation in Logic Programs for Representing Legislation.","venue":"ICAIL","pages":"11-15","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Kowalski89","doi":"10.1145/74014.74016","ee":"https://doi.org/10.1145/74014.74016","url":"https://dblp.org/rec/conf/icail/Kowalski89"},
+"url":"URL#8463482"
+},
+{
+"@score":"1",
+"@id":"8463483",
+"info":{"authors":{"author":[{"@pid":"41/4418","text":"Kenneth A. Lambert"},{"@pid":"70/5623","text":"Mark H. Grunewald"}]},"title":"LESTER: Using Paradigm Cases in a Quasi-Precedential Legal Domain.","venue":"ICAIL","pages":"87-92","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LambertG89","doi":"10.1145/74014.74027","ee":"https://doi.org/10.1145/74014.74027","url":"https://dblp.org/rec/conf/icail/LambertG89"},
+"url":"URL#8463483"
+},
+{
+"@score":"1",
+"@id":"8463484",
+"info":{"authors":{"author":{"@pid":"78/2967","text":"L. S. Lutomski"}},"title":"The Design of an Attorney&apos;s Statistical Consultant.","venue":"ICAIL","pages":"224-233","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Lutomski89","doi":"10.1145/74014.74043","ee":"https://doi.org/10.1145/74014.74043","url":"https://dblp.org/rec/conf/icail/Lutomski89"},
+"url":"URL#8463484"
+},
+{
+"@score":"1",
+"@id":"8463485",
+"info":{"authors":{"author":{"@pid":"35/6016","text":"M. T. MacCrimmon"}},"title":"Expert Systems in Case-Based Law: The Hearsay Rule Advisor.","venue":"ICAIL","pages":"68-73","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MacCrimmon89","doi":"10.1145/74014.74024","ee":"https://doi.org/10.1145/74014.74024","url":"https://dblp.org/rec/conf/icail/MacCrimmon89"},
+"url":"URL#8463485"
+},
+{
+"@score":"1",
+"@id":"8463486",
+"info":{"authors":{"author":{"@pid":"57/3248","text":"C. C. Marshall"}},"title":"Representing the Structure of a Legal Argument.","venue":"ICAIL","pages":"121-127","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Marshall89","doi":"10.1145/74014.74031","ee":"https://doi.org/10.1145/74014.74031","url":"https://dblp.org/rec/conf/icail/Marshall89"},
+"url":"URL#8463486"
+},
+{
+"@score":"1",
+"@id":"8463487",
+"info":{"authors":{"author":{"@pid":"70/5086","text":"L. Thorne McCarty"}},"title":"A Language for Legal Discourse I: Basic Features.","venue":"ICAIL","pages":"180-189","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/McCarty89","doi":"10.1145/74014.74037","ee":"https://doi.org/10.1145/74014.74037","url":"https://dblp.org/rec/conf/icail/McCarty89"},
+"url":"URL#8463487"
+},
+{
+"@score":"1",
+"@id":"8463488",
+"info":{"authors":{"author":{"@pid":"29/3809","text":"Simon Mendelson"}},"title":"An Attempted Dimensional Analysis of the Law Governing Government Appeals in Criminal Cases.","venue":"ICAIL","pages":"128-137","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Mendelson89","doi":"10.1145/74014.74032","ee":"https://doi.org/10.1145/74014.74032","url":"https://dblp.org/rec/conf/icail/Mendelson89"},
+"url":"URL#8463488"
+},
+{
+"@score":"1",
+"@id":"8463489",
+"info":{"authors":{"author":{"@pid":"34/6036","text":"R. W. Morrison"}},"title":"Market Realities of Rule-Based Software for Lawyers: Where the Rubber Meets the Road.","venue":"ICAIL","pages":"33-36","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Morrison89","doi":"10.1145/74014.74019","ee":"https://doi.org/10.1145/74014.74019","url":"https://dblp.org/rec/conf/icail/Morrison89"},
+"url":"URL#8463489"
+},
+{
+"@score":"1",
+"@id":"8463490",
+"info":{"authors":{"author":[{"@pid":"94/5591","text":"Anja Oskamp"},{"@pid":"37/5792","text":"R. F. Walker"},{"@pid":"82/6613","text":"J. A. Schrickx"},{"@pid":"55/4889","text":"P. H. van den Berg"}]},"title":"PROLEXS Divide and Rule: A Legal Application.","venue":"ICAIL","pages":"54-62","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/OskampWSB89","doi":"10.1145/74014.74022","ee":"https://doi.org/10.1145/74014.74022","url":"https://dblp.org/rec/conf/icail/OskampWSB89"},
+"url":"URL#8463490"
+},
+{
+"@score":"1",
+"@id":"8463491",
+"info":{"authors":{"author":[{"@pid":"14/6574","text":"V. P. Pethe"},{"@pid":"21/6480","text":"C. P. Rippey"},{"@pid":"k/LaxmikantVKale","text":"Laxmikant V. Kalé"}]},"title":"A Specialized Expert System for Judicial Decision Support.","venue":"ICAIL","pages":"190-194","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PetheRK89","doi":"10.1145/74014.74038","ee":"https://doi.org/10.1145/74014.74038","url":"https://dblp.org/rec/conf/icail/PetheRK89"},
+"url":"URL#8463491"
+},
+{
+"@score":"1",
+"@id":"8463492",
+"info":{"authors":{"author":{"@pid":"66/2990","text":"R. D. Purdy"}},"title":"Knowledge and Tools in Building GRANDJUR 1.1.","venue":"ICAIL","pages":"201-206","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Purdy89","doi":"10.1145/74014.74040","ee":"https://doi.org/10.1145/74014.74040","url":"https://dblp.org/rec/conf/icail/Purdy89"},
+"url":"URL#8463492"
+},
+{
+"@score":"1",
+"@id":"8463493",
+"info":{"authors":{"author":{"@pid":"r/EdwinaLRissland","text":"Edwina L. Rissland"}},"title":"Dimension-Based Analysis of Hypotheticals from Supreme Court Oral Argument.","venue":"ICAIL","pages":"111-120","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Rissland89","doi":"10.1145/74014.74030","ee":"https://doi.org/10.1145/74014.74030","url":"https://dblp.org/rec/conf/icail/Rissland89"},
+"url":"URL#8463493"
+},
+{
+"@score":"1",
+"@id":"8463494",
+"info":{"authors":{"author":[{"@pid":"r/EdwinaLRissland","text":"Edwina L. Rissland"},{"@pid":"62/1493","text":"David B. Skalak"}]},"title":"Interpreting Statutory Predicates.","venue":"ICAIL","pages":"46-53","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RisslandS89","doi":"10.1145/74014.74021","ee":"https://doi.org/10.1145/74014.74021","url":"https://dblp.org/rec/conf/icail/RisslandS89"},
+"url":"URL#8463494"
+},
+{
+"@score":"1",
+"@id":"8463495",
+"info":{"authors":{"author":[{"@pid":"19/4071","text":"Daniel E. Rose"},{"@pid":"b/RKBelew","text":"Richard K. Belew"}]},"title":"Legal Information Retrieval a Hybrid Approach.","venue":"ICAIL","pages":"138-146","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RoseB89","doi":"10.1145/74014.74033","ee":"https://doi.org/10.1145/74014.74033","url":"https://dblp.org/rec/conf/icail/RoseB89"},
+"url":"URL#8463495"
+},
+{
+"@score":"1",
+"@id":"8463496",
+"info":{"authors":{"author":{"@pid":"45/6288","text":"Tom Routen"}},"title":"Hierarchically Organised Formalisations.","venue":"ICAIL","pages":"242-250","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Routen89","doi":"10.1145/74014.74045","ee":"https://doi.org/10.1145/74014.74045","url":"https://dblp.org/rec/conf/icail/Routen89"},
+"url":"URL#8463496"
+},
+{
+"@score":"1",
+"@id":"8463497",
+"info":{"authors":{"author":[{"@pid":"61/4398","text":"D. A. Schlobohm"},{"@pid":"70/5086","text":"L. Thorne McCarty"}]},"title":"EPS II: Estate Planning with Prototypes.","venue":"ICAIL","pages":"1-10","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SchlobohmM89","doi":"10.1145/74014.74015","ee":"https://doi.org/10.1145/74014.74015","url":"https://dblp.org/rec/conf/icail/SchlobohmM89"},
+"url":"URL#8463497"
+},
+{
+"@score":"1",
+"@id":"8463498",
+"info":{"authors":{"author":{"@pid":"00/5779","text":"D. M. Sherman"}},"title":"Expert Systems and ICAI in Tax Law: Killing Two Birds with One AI Stone.","venue":"ICAIL","pages":"74-80","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Sherman89","doi":"10.1145/74014.74025","ee":"https://doi.org/10.1145/74014.74025","url":"https://dblp.org/rec/conf/icail/Sherman89"},
+"url":"URL#8463498"
+},
+{
+"@score":"1",
+"@id":"8463499",
+"info":{"authors":{"author":[{"@pid":"s/EricSimon","text":"Eric Simon"},{"@pid":"266/5451","text":"Gerry Gaes"}]},"title":"ASSYST - Computer Support for Guideline Sentencing.","venue":"ICAIL","pages":"195-200","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SimonG89","doi":"10.1145/74014.74039","ee":"https://doi.org/10.1145/74014.74039","url":"https://dblp.org/rec/conf/icail/SimonG89"},
+"url":"URL#8463499"
+},
+{
+"@score":"1",
+"@id":"8463500",
+"info":{"authors":{"author":{"@pid":"62/1493","text":"David B. Skalak"}},"title":"Taking Advantage of Models for Legal Classification.","venue":"ICAIL","pages":"234-241","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Skalak89","doi":"10.1145/74014.74044","ee":"https://doi.org/10.1145/74014.74044","url":"https://dblp.org/rec/conf/icail/Skalak89"},
+"url":"URL#8463500"
+},
+{
+"@score":"1",
+"@id":"8463501",
+"info":{"authors":{"author":{"@pid":"76/549","text":"Richard E. Susskind"}},"title":"The Latent Damage System: A Jurisprudential Analysis.","venue":"ICAIL","pages":"23-32","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Susskind89","doi":"10.1145/74014.74018","ee":"https://doi.org/10.1145/74014.74018","url":"https://dblp.org/rec/conf/icail/Susskind89"},
+"url":"URL#8463501"
+},
+{
+"@score":"1",
+"@id":"8463502",
+"info":{"authors":{"author":{"@pid":"22/1337","text":"P. Wahlgren"}},"title":"Legal Reasoning - a Jurisprudential Description.","venue":"ICAIL","pages":"147-156","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Wahlgren89","doi":"10.1145/74014.74034","ee":"https://doi.org/10.1145/74014.74034","url":"https://dblp.org/rec/conf/icail/Wahlgren89"},
+"url":"URL#8463502"
+},
+{
+"@score":"1",
+"@id":"8463503",
+"info":{"authors":{"author":{"@pid":"79/942","text":"S. S. Weiner"}},"title":"CACE: Computer-Assisted Case Evaluation in the Brooklyn District Attorney&apos;s Office.","venue":"ICAIL","pages":"215-223","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Weiner89","doi":"10.1145/74014.74042","ee":"https://doi.org/10.1145/74014.74042","url":"https://dblp.org/rec/conf/icail/Weiner89"},
+"url":"URL#8463503"
+},
+{
+"@score":"1",
+"@id":"8463504",
+"info":{"authors":{"author":{"@pid":"91/372","text":"David E. Wolstenholme"}},"title":"Amalgamating Regulation- and Case-Based Advice Systems Through Suggested Answers.","venue":"ICAIL","pages":"63-67","year":"1989","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Wolstenholme89","doi":"10.1145/74014.74023","ee":"https://doi.org/10.1145/74014.74023","url":"https://dblp.org/rec/conf/icail/Wolstenholme89"},
+"url":"URL#8463504"
+},
+{
+"@score":"1",
+"@id":"8471524",
+"info":{"authors":{"author":[{"@pid":"33/1191","text":"J. C. Smith"},{"@pid":"161/9423","text":"R. T. Franson"}]},"title":"Proceedings of the Second International Conference on Artificial Intelligence and Law, ICAIL &apos;89, Vancouver, BC, Canada, June 13-16, 1989","venue":"ICAIL","publisher":"ACM","year":"1989","type":"Editorship","key":"conf/icail/1989","doi":"10.1145/74014","ee":"https://doi.org/10.1145/74014","url":"https://dblp.org/rec/conf/icail/1989"},
+"url":"URL#8471524"
+},
+{
+"@score":"1",
+"@id":"8506675",
+"info":{"authors":{"author":[{"@pid":"41/380","text":"Layman E. Allen"},{"@pid":"80/3631","text":"Charles S. Saxon"}]},"title":"Some Problems in Designing Expert Systems to Aid Legal Reasoning.","venue":"ICAIL","pages":"94-103","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AllenS87","doi":"10.1145/41735.41747","ee":"https://doi.org/10.1145/41735.41747","url":"https://dblp.org/rec/conf/icail/AllenS87"},
+"url":"URL#8506675"
+},
+{
+"@score":"1",
+"@id":"8506676",
+"info":{"authors":{"author":[{"@pid":"39/1439","text":"Kevin D. Ashley"},{"@pid":"r/EdwinaLRissland","text":"Edwina L. Rissland"}]},"title":"But, See, Accord: Generating Blue Book Citations in HYPO.","venue":"ICAIL","pages":"67-74","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AshleyR87","doi":"10.1145/41735.41744","ee":"https://doi.org/10.1145/41735.41744","url":"https://dblp.org/rec/conf/icail/AshleyR87"},
+"url":"URL#8506676"
+},
+{
+"@score":"1",
+"@id":"8506677",
+"info":{"authors":{"author":{"@pid":"b/RKBelew","text":"Richard K. Belew"}},"title":"A Connectionist Approach to Conceptual Information Retrieval.","venue":"ICAIL","pages":"116-126","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Belew87","doi":"10.1145/41735.41749","ee":"https://doi.org/10.1145/41735.41749","url":"https://dblp.org/rec/conf/icail/Belew87"},
+"url":"URL#8506677"
+},
+{
+"@score":"1",
+"@id":"8506678",
+"info":{"authors":{"author":{"@pid":"11/1432","text":"Keith Bellairs"}},"title":"Legal Data Modeling: The Prohibited Transaction Exemption Analyst.","venue":"ICAIL","pages":"252-257","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bellairs87","doi":"10.1145/41735.41763","ee":"https://doi.org/10.1145/41735.41763","url":"https://dblp.org/rec/conf/icail/Bellairs87"},
+"url":"URL#8506678"
+},
+{
+"@score":"1",
+"@id":"8506679",
+"info":{"authors":{"author":{"@pid":"53/5681","text":"Marvin Belzer"}},"title":"Legal Reasoning in 3-D.","venue":"ICAIL","pages":"155-163","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Belzer87","doi":"10.1145/41735.41753","ee":"https://doi.org/10.1145/41735.41753","url":"https://dblp.org/rec/conf/icail/Belzer87"},
+"url":"URL#8506679"
+},
+{
+"@score":"1",
+"@id":"8506680",
+"info":{"authors":{"author":{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}},"title":"Support for Policy Makers: Formulating Legislation with the Aid of Logical Models.","venue":"ICAIL","pages":"181-189","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bench-Capon87","doi":"10.1145/41735.41756","ee":"https://doi.org/10.1145/41735.41756","url":"https://dblp.org/rec/conf/icail/Bench-Capon87"},
+"url":"URL#8506680"
+},
+{
+"@score":"1",
+"@id":"8506681",
+"info":{"authors":{"author":[{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"},{"@pid":"75/5501","text":"G. O. Robinson"},{"@pid":"45/6288","text":"Tom Routen"},{"@pid":"s/MarekJSergot","text":"Marek J. Sergot"}]},"title":"Logic Programming for Large Scale Applications in Law: A Formalisation of Supplementary Benefit Legislation.","venue":"ICAIL","pages":"190-198","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bench-CaponRRS87","doi":"10.1145/41735.41757","ee":"https://doi.org/10.1145/41735.41757","url":"https://dblp.org/rec/conf/icail/Bench-CaponRRS87"},
+"url":"URL#8506681"
+},
+{
+"@score":"1",
+"@id":"8506682",
+"info":{"authors":{"author":[{"@pid":"14/517","text":"Carlo Biagioli"},{"@pid":"04/3296","text":"Paola Mariani"},{"@pid":"87/6854","text":"Daniela Tiscornia"}]},"title":"Esplex: A Rule and Conceptual Model for Representing Statutes.","venue":"ICAIL","pages":"240-251","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BiagioliMT87","doi":"10.1145/41735.41762","ee":"https://doi.org/10.1145/41735.41762","url":"https://dblp.org/rec/conf/icail/BiagioliMT87"},
+"url":"URL#8506682"
+},
+{
+"@score":"1",
+"@id":"8506683",
+"info":{"authors":{"author":{"@pid":"39/4998","text":"J. Bing"}},"title":"Designing Text Retrieval Systems for Conceptual Searching.","venue":"ICAIL","pages":"43-51","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bing87","doi":"10.1145/41735.41741","ee":"https://doi.org/10.1145/41735.41741","url":"https://dblp.org/rec/conf/icail/Bing87"},
+"url":"URL#8506683"
+},
+{
+"@score":"1",
+"@id":"8506684",
+"info":{"authors":{"author":{"@pid":"26/4481","text":"Judith P. Dick"}},"title":"Conceptual Retrieval and Case Law.","venue":"ICAIL","pages":"106-115","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Dick87","doi":"10.1145/41735.41748","ee":"https://doi.org/10.1145/41735.41748","url":"https://dblp.org/rec/conf/icail/Dick87"},
+"url":"URL#8506684"
+},
+{
+"@score":"1",
+"@id":"8506685",
+"info":{"authors":{"author":[{"@pid":"44/6528","text":"Seth R. Goldman"},{"@pid":"d/MGDyer","text":"Michael G. Dyer"},{"@pid":"63/4755","text":"Margot Flowers"}]},"title":"Precedent-Based Legal Reasoning and Knowledge Acquisition in Contract Law: A Process Model.","venue":"ICAIL","pages":"210-221","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GoldmanDF87","doi":"10.1145/41735.41759","ee":"https://doi.org/10.1145/41735.41759","url":"https://dblp.org/rec/conf/icail/GoldmanDF87"},
+"url":"URL#8506685"
+},
+{
+"@score":"1",
+"@id":"8506686",
+"info":{"authors":{"author":{"@pid":"45/3471","text":"Thomas F. Gordon"}},"title":"Oblog-2: A Hybrid Knowledge Representation System for Defeasible Reasoning.","venue":"ICAIL","pages":"231-239","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Gordon87","doi":"10.1145/41735.41761","ee":"https://doi.org/10.1145/41735.41761","url":"https://dblp.org/rec/conf/icail/Gordon87"},
+"url":"URL#8506686"
+},
+{
+"@score":"1",
+"@id":"8506687",
+"info":{"authors":{"author":[{"@pid":"48/2749","text":"G. Grdy"},{"@pid":"56/2410","text":"Ramesh S. Patil"}]},"title":"An Expert System for Screening Employee Pension Plans for the Internal Revenue Service.","venue":"ICAIL","pages":"137-144","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GrdyP87","doi":"10.1145/41735.41751","ee":"https://doi.org/10.1145/41735.41751","url":"https://dblp.org/rec/conf/icail/GrdyP87"},
+"url":"URL#8506687"
+},
+{
+"@score":"1",
+"@id":"8506688",
+"info":{"authors":{"author":[{"@pid":"04/3896","text":"Graham Greenleaf"},{"@pid":"20/2253","text":"Andrew Mowbray"},{"@pid":"51/4814","text":"Alan Tyree"}]},"title":"Expert Systems in Law: The Datalex Project.","venue":"ICAIL","pages":"9-17","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GreenleafMT87","doi":"10.1145/41735.41737","ee":"https://doi.org/10.1145/41735.41737","url":"https://dblp.org/rec/conf/icail/GreenleafMT87"},
+"url":"URL#8506688"
+},
+{
+"@score":"1",
+"@id":"8506689",
+"info":{"authors":{"author":{"@pid":"h/CaroleDHafner","text":"Carole D. Hafner"}},"title":"Conceptual Organization of Case Law Knowledge Bases.","venue":"ICAIL","pages":"35-42","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Hafner87","doi":"10.1145/41735.41740","ee":"https://doi.org/10.1145/41735.41740","url":"https://dblp.org/rec/conf/icail/Hafner87"},
+"url":"URL#8506689"
+},
+{
+"@score":"1",
+"@id":"8506690",
+"info":{"authors":{"author":[{"@pid":"82/5168","text":"Fritjof Haft"},{"@pid":"35/1155","text":"R. P. Jones"},{"@pid":"81/1622","text":"Thomas Wetter"}]},"title":"A Natural Language Based Legal Expert System for Consultation and Tutoring - the LEX Project.","venue":"ICAIL","pages":"75-83","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HaftJW87","doi":"10.1145/41735.41745","ee":"https://doi.org/10.1145/41735.41745","url":"https://dblp.org/rec/conf/icail/HaftJW87"},
+"url":"URL#8506690"
+},
+{
+"@score":"1",
+"@id":"8506691",
+"info":{"authors":{"author":{"@pid":"74/3999","text":"A. J. I. Jones"}},"title":"On the Relationship Between Permission and Obligation.","venue":"ICAIL","pages":"164-169","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Jones87","doi":"10.1145/41735.41754","ee":"https://doi.org/10.1145/41735.41754","url":"https://dblp.org/rec/conf/icail/Jones87"},
+"url":"URL#8506691"
+},
+{
+"@score":"1",
+"@id":"8506692",
+"info":{"authors":{"author":[{"@pid":"m/NaftalyHMinsky","text":"Naftaly H. Minsky"},{"@pid":"72/5303","text":"David Rozenshtein"}]},"title":"System = Program + Users + Law.","venue":"ICAIL","pages":"170-180","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MinskyR87","doi":"10.1145/41735.41755","ee":"https://doi.org/10.1145/41735.41755","url":"https://dblp.org/rec/conf/icail/MinskyR87"},
+"url":"URL#8506692"
+},
+{
+"@score":"1",
+"@id":"8506693",
+"info":{"authors":{"author":[{"@pid":"123/2132","text":"Gary Morris"},{"@pid":"98/4863","text":"Keith Taylor"},{"@pid":"250/3075","text":"Maury Harwood"}]},"title":"Handing of Significant Deviations from Boilerplate Text.","venue":"ICAIL","pages":"145-154","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MorrisTH87","doi":"10.1145/41735.41752","ee":"https://doi.org/10.1145/41735.41752","url":"https://dblp.org/rec/conf/icail/MorrisTH87"},
+"url":"URL#8506693"
+},
+{
+"@score":"1",
+"@id":"8506694",
+"info":{"authors":{"author":{"@pid":"27/742","text":"D. P. O&apos;Neil"}},"title":"A Process Specification of Expert Lawyer Reasoning.","venue":"ICAIL","pages":"52-59","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ONeil87","doi":"10.1145/41735.41742","ee":"https://doi.org/10.1145/41735.41742","url":"https://dblp.org/rec/conf/icail/ONeil87"},
+"url":"URL#8506694"
+},
+{
+"@score":"1",
+"@id":"8506695",
+"info":{"authors":{"author":{"@pid":"66/2990","text":"R. D. Purdy"}},"title":"Knowledge Representation in &quot;Default&quot;: An Attempt to Classify General Types of Knowledge used by Legal Experts.","venue":"ICAIL","pages":"199-208","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Purdy87","doi":"10.1145/41735.41758","ee":"https://doi.org/10.1145/41735.41758","url":"https://dblp.org/rec/conf/icail/Purdy87"},
+"url":"URL#8506695"
+},
+{
+"@score":"1",
+"@id":"8506696",
+"info":{"authors":{"author":[{"@pid":"r/EdwinaLRissland","text":"Edwina L. Rissland"},{"@pid":"39/1439","text":"Kevin D. Ashley"}]},"title":"A Case-Based System for Trade Secrets Law.","venue":"ICAIL","pages":"60-66","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RisslandA87","doi":"10.1145/41735.41743","ee":"https://doi.org/10.1145/41735.41743","url":"https://dblp.org/rec/conf/icail/RisslandA87"},
+"url":"URL#8506696"
+},
+{
+"@score":"1",
+"@id":"8506697",
+"info":{"authors":{"author":[{"@pid":"61/4398","text":"D. A. Schlobohm"},{"@pid":"29/6488","text":"Donald A. Waterman"}]},"title":"Explanation for an Expert system That Performs Estate Planning.","venue":"ICAIL","pages":"18-27","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SchlobohmW87","doi":"10.1145/41735.41738","ee":"https://doi.org/10.1145/41735.41738","url":"https://dblp.org/rec/conf/icail/SchlobohmW87"},
+"url":"URL#8506697"
+},
+{
+"@score":"1",
+"@id":"8506698",
+"info":{"authors":{"author":{"@pid":"00/5779","text":"D. M. Sherman"}},"title":"A Prolog Model of the Income Tax Act of Canada.","venue":"ICAIL","pages":"127-136","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Sherman87","doi":"10.1145/41735.41750","ee":"https://doi.org/10.1145/41735.41750","url":"https://dblp.org/rec/conf/icail/Sherman87"},
+"url":"URL#8506698"
+},
+{
+"@score":"1",
+"@id":"8506699",
+"info":{"authors":{"author":[{"@pid":"33/1191","text":"J. C. Smith"},{"@pid":"66/6302","text":"Cal Deedman"}]},"title":"The Application of Expert Systems Technology to Case-Based Law.","venue":"ICAIL","pages":"84-93","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SmithD87","ee":"http://www.acm.org/pubs/citations/proceedings/ai/41735/p84-smith/","url":"https://dblp.org/rec/conf/icail/SmithD87"},
+"url":"URL#8506699"
+},
+{
+"@score":"1",
+"@id":"8506700",
+"info":{"authors":{"author":{"@pid":"76/549","text":"Richard E. Susskind"}},"title":"Expert Systems in Law: Out of the Research Laboratory and into the Marketplace.","venue":"ICAIL","pages":"1-8","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Susskind87","doi":"10.1145/41735.41736","ee":"https://doi.org/10.1145/41735.41736","url":"https://dblp.org/rec/conf/icail/Susskind87"},
+"url":"URL#8506700"
+},
+{
+"@score":"1",
+"@id":"8506701",
+"info":{"authors":{"author":[{"@pid":"16/1460","text":"Richard M. Tong"},{"@pid":"35/6753","text":"C. A. Reid"},{"@pid":"72/3109","text":"G. J. Crowe"},{"@pid":"80/498","text":"P. R. Douglas"}]},"title":"Conceptual Legal Document Retrieval Using the RUBRIC System.","venue":"ICAIL","pages":"28-34","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/TongRCD87","doi":"10.1145/41735.41739","ee":"https://doi.org/10.1145/41735.41739","url":"https://dblp.org/rec/conf/icail/TongRCD87"},
+"url":"URL#8506701"
+},
+{
+"@score":"1",
+"@id":"8506702",
+"info":{"authors":{"author":{"@pid":"79/942","text":"S. S. Weiner"}},"title":"Reasoning about &apos;hard&apos; Cases in Talmudic Law.","venue":"ICAIL","pages":"222-230","year":"1987","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Weiner87","doi":"10.1145/41735.41760","ee":"https://doi.org/10.1145/41735.41760","url":"https://dblp.org/rec/conf/icail/Weiner87"},
+"url":"URL#8506702"
+},
+{
+"@score":"1",
+"@id":"8511526",
+"info":{"title":"Proceedings of the First International Conference on Artificial Intelligence and Law, ICAIL &apos;87, Boston, MA, USA, May 27-29, 1987","venue":"ICAIL","publisher":"ACM","year":"1987","type":"Editorship","key":"conf/icail/1987","doi":"10.1145/41735","ee":"https://doi.org/10.1145/41735","url":"https://dblp.org/rec/conf/icail/1987"},
+"url":"URL#8511526"
+}
+]
+}
+}
+}

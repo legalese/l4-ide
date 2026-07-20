@@ -1,0 +1,632 @@
+{
+"result":{
+"query":":facetid:stream:\"streams/conf/icail\"",
+"status":{
+"@code":"200",
+"text":"OK"
+},
+"time":{
+"@unit":"msecs",
+"text":"196.15"
+},
+"completions":{
+"@total":"1",
+"@computed":"1",
+"@sent":"1",
+"c":{
+"@sc":"864",
+"@dc":"864",
+"@oc":"864",
+"@id":"56924258",
+"text":":facetid:stream:streams/conf/icail"
+}
+},
+"hits":{
+"@total":"864",
+"@computed":"100",
+"@sent":"100",
+"@first":"0",
+"hit":[{
+"@score":"1",
+"@id":"599417",
+"info":{"authors":{"author":[{"@pid":"117/4885-1","text":"Phuong Minh Nguyen 0001"},{"@pid":"96/1687","text":"Thanh Ha Nguyen"},{"@pid":"286/6557","text":"May Myo Zin"},{"@pid":"s/KenSatoh","text":"Ken Satoh"}]},"title":"Data Augmented Pipeline for Legal Information Extraction and Reasoning.","venue":"ICAIL","pages":"481-482","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/0001NZS25","doi":"10.1145/3769126.3769200","ee":"https://doi.org/10.1145/3769126.3769200","url":"https://dblp.org/rec/conf/icail/0001NZS25"},
+"url":"URL#599417"
+},
+{
+"@score":"1",
+"@id":"599420",
+"info":{"authors":{"author":[{"@pid":"358/3250","text":"Vitor Almeida"},{"@pid":"335/9339","text":"Rilder S. Pires"},{"@pid":"316/7337","text":"João A. Monteiro Neto"},{"@pid":"17/2960","text":"Vasco Furtado"}]},"title":"Using Interpretability to Uncover Legal Petition Structures and Optimize Text Classification.","venue":"ICAIL","pages":"150-158","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AlmeidaPNF25","doi":"10.1145/3769126.3769239","ee":"https://doi.org/10.1145/3769126.3769239","url":"https://dblp.org/rec/conf/icail/AlmeidaPNF25"},
+"url":"URL#599420"
+},
+{
+"@score":"1",
+"@id":"599421",
+"info":{"authors":{"author":[{"@pid":"06/9512","text":"Michal Araszkiewicz"},{"@pid":"68/7168","text":"Tomasz Zurek"},{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"46/1348","text":"Tom M. van Engers"}]},"title":"Tipping the Scales: Balancing Principles.","venue":"ICAIL","pages":"258-267","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AraszkiewiczZWE25","doi":"10.1145/3769126.3769208","ee":"https://doi.org/10.1145/3769126.3769208","url":"https://dblp.org/rec/conf/icail/AraszkiewiczZWE25"},
+"url":"URL#599421"
+},
+{
+"@score":"1",
+"@id":"599422",
+"info":{"authors":{"author":{"@pid":"175/5988","text":"Chuck Arvin"}},"title":"Identifying Legal Holdings with LLMs: A Systematic Study of Performance, Scale, and Memorization.","venue":"ICAIL","pages":"404-408","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Arvin25","doi":"10.1145/3769126.3769128","ee":"https://doi.org/10.1145/3769126.3769128","url":"https://dblp.org/rec/conf/icail/Arvin25"},
+"url":"URL#599422"
+},
+{
+"@score":"1",
+"@id":"599423",
+"info":{"authors":{"author":[{"@pid":"423/9571","text":"David Bareham"},{"@pid":"17/6670","text":"Katie Atkinson"},{"@pid":"308/4178","text":"Jack Mumford"},{"@pid":"374/7735","text":"Jeremy Marshall"}]},"title":"Curb Your Enthusiasm: Towards a RAG Framework to Forecast Case Importance in the ECHR.","venue":"ICAIL","pages":"31-40","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BarehamAMM25","doi":"10.1145/3769126.3769238","ee":"https://doi.org/10.1145/3769126.3769238","url":"https://dblp.org/rec/conf/icail/BarehamAMM25"},
+"url":"URL#599423"
+},
+{
+"@score":"1",
+"@id":"599424",
+"info":{"authors":{"author":[{"@pid":"319/6851","text":"Ryan Calvin Barron"},{"@pid":"274/1070","text":"Maksim Ekin Eren"},{"@pid":"400/7299","text":"Olga M. Serafimova"},{"@pid":"21/3113","text":"Cynthia Matuszek"},{"@pid":"41/11017","text":"Boian S. Alexandrov"}]},"title":"Bridging Legal Knowledge and AI: Retrieval-Augmented Generation with Vector Stores, Knowledge Graphs, and Hierarchical Non-negative Matrix Factorization.","venue":"ICAIL","pages":"51-60","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BarronESMA25","doi":"10.1145/3769126.3769215","ee":"https://doi.org/10.1145/3769126.3769215","url":"https://dblp.org/rec/conf/icail/BarronESMA25"},
+"url":"URL#599424"
+},
+{
+"@score":"1",
+"@id":"599426",
+"info":{"authors":{"author":[{"@pid":"351/6898","text":"Anas Belfathi"},{"@pid":"255/1075","text":"Ygor Gallina"},{"@pid":"73/4641","text":"Nicolas Hernandez"},{"@pid":"68/3785","text":"Laura Monceaux"},{"@pid":"83/7858","text":"Richard Dufour"}]},"title":"Is Selective Masking A Key to Improving Domain Adaptation for Masked Language Model?","venue":"ICAIL","pages":"409-413","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BelfathiGHMD25","doi":"10.1145/3769126.3769216","ee":"https://doi.org/10.1145/3769126.3769216","url":"https://dblp.org/rec/conf/icail/BelfathiGHMD25"},
+"url":"URL#599426"
+},
+{
+"@score":"1",
+"@id":"599428",
+"info":{"authors":{"author":[{"@pid":"58/3301","text":"Marco Billi"},{"@pid":"119/9728","text":"Alessandro Parenti"},{"@pid":"277/2619","text":"Giuseppe Pisano"},{"@pid":"361/2546","text":"Marco Sanchi"}]},"title":"ALEXChat: a Generative - Symbolic Approach to Legal eXplainability.","venue":"ICAIL","pages":"491-492","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BilliPPS25","doi":"10.1145/3769126.3769234","ee":"https://doi.org/10.1145/3769126.3769234","url":"https://dblp.org/rec/conf/icail/BilliPPS25"},
+"url":"URL#599428"
+},
+{
+"@score":"1",
+"@id":"599429",
+"info":{"authors":{"author":[{"@pid":"264/9784","text":"Andrew Blair-Stanek"},{"@pid":"06/4775","text":"Benjamin Van Durme"}]},"title":"LLMs Provide Unstable Answers to Legal Questions.","venue":"ICAIL","pages":"425-429","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Blair-StanekD25","doi":"10.1145/3769126.3769245","ee":"https://doi.org/10.1145/3769126.3769245","url":"https://dblp.org/rec/conf/icail/Blair-StanekD25"},
+"url":"URL#599429"
+},
+{
+"@score":"1",
+"@id":"599430",
+"info":{"authors":{"author":[{"@pid":"348/6586","text":"Francisco das Chagas Jucá Bomfim"},{"@pid":"316/7337","text":"João A. Monteiro Neto"},{"@pid":"423/9519","text":"Alicia S. Neves"},{"@pid":"17/2960","text":"Vasco Furtado"},{"@pid":"429/6614","text":"Sara Pessoa Silva"},{"@pid":"16/6623","text":"Vládia Pinheiro"}]},"title":"Automating Legal Reasoning with Generative AI: A Framework for Judicial Decision Support.","venue":"ICAIL","pages":"229-238","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BomfimNNFSP25","doi":"10.1145/3769126.3769244","ee":"https://doi.org/10.1145/3769126.3769244","url":"https://dblp.org/rec/conf/icail/BomfimNNFSP25"},
+"url":"URL#599430"
+},
+{
+"@score":"1",
+"@id":"599431",
+"info":{"authors":{"author":[{"@pid":"230/7677","text":"Fabricio Ataides Braz"},{"@pid":"213/5497","text":"Nilton Correia da Silva"},{"@pid":"423/8988","text":"Luciana Nishi"},{"@pid":"423/9280","text":"Eduardo Siqueira"},{"@pid":"423/8731","text":"Débora Bonat"},{"@pid":"423/8604","text":"Cristina Bertoncini"},{"@pid":"192/8893","text":"Izabela Melo"}]},"title":"OSIRIS: A Domain-Guided Framework for Tax Foreclosure Automation Using Large Language Models.","venue":"ICAIL","pages":"444-448","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BrazSNSBBM25","doi":"10.1145/3769126.3769225","ee":"https://doi.org/10.1145/3769126.3769225","url":"https://dblp.org/rec/conf/icail/BrazSNSBBM25"},
+"url":"URL#599431"
+},
+{
+"@score":"1",
+"@id":"599432",
+"info":{"authors":{"author":[{"@pid":"400/8189","text":"Qingjing Chen"},{"@pid":"423/8973","text":"Rongxin Cheng 0002"},{"@pid":"150/4295","text":"Yan Liu"},{"@pid":"423/8930","text":"Ziheng Xie"},{"@pid":"423/9687","text":"Kangxin Zhao"},{"@pid":"227/2099","text":"Peiming Li"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"50/2482-33","text":"Yun Liu 0033"},{"@pid":"138/5777","text":"Weixing Shen"}]},"title":"EVENS: Equality versus Equity Notion Spectrum of LLMs.","venue":"ICAIL","pages":"374-378","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ChenCLXZLA0S25","doi":"10.1145/3769126.3769262","ee":"https://doi.org/10.1145/3769126.3769262","url":"https://dblp.org/rec/conf/icail/ChenCLXZLA0S25"},
+"url":"URL#599432"
+},
+{
+"@score":"1",
+"@id":"599433",
+"info":{"authors":{"author":[{"@pid":"332/3423","text":"Xiao Chi"},{"@pid":"418/1057","text":"Wenlin Zhong"},{"@pid":"43/2784-1","text":"Yiquan Wu 0001"},{"@pid":"35/7092-59","text":"Wei Wang 0059"},{"@pid":"194/4245-1","text":"Kun Kuang 0001"},{"@pid":"84/3254-1","text":"Fei Wu 0001"},{"@pid":"61/2053","text":"Minghui Xiong"}]},"title":"Universal Legal Article Prediction via Tight Collaboration between Supervised Classification Model and LLM.","venue":"ICAIL","pages":"21-30","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ChiZ0WK0X25","doi":"10.1145/3769126.3769221","ee":"https://doi.org/10.1145/3769126.3769221","url":"https://dblp.org/rec/conf/icail/ChiZ0WK0X25"},
+"url":"URL#599433"
+},
+{
+"@score":"1",
+"@id":"599434",
+"info":{"authors":{"author":{"@pid":"376/1101","text":"Hiroaki Chiba-Okabe"}},"title":"Probabilistic Analysis of Copyright Disputes and Generative AI Safety.","venue":"ICAIL","pages":"470-474","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Chiba-Okabe25","doi":"10.1145/3769126.3769139","ee":"https://doi.org/10.1145/3769126.3769139","url":"https://dblp.org/rec/conf/icail/Chiba-Okabe25"},
+"url":"URL#599434"
+},
+{
+"@score":"1",
+"@id":"599435",
+"info":{"authors":{"author":{"@pid":"423/9727","text":"Paolo Comoglio"}},"title":"Have your DAI in Court. The Role of Suggestive Algorithms in Judicial Decision-Making.","venue":"ICAIL","pages":"359-363","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Comoglio25","doi":"10.1145/3769126.3769135","ee":"https://doi.org/10.1145/3769126.3769135","url":"https://dblp.org/rec/conf/icail/Comoglio25"},
+"url":"URL#599435"
+},
+{
+"@score":"1",
+"@id":"599436",
+"info":{"authors":{"author":[{"@pid":"231/8106","text":"Michele Corazza"},{"@pid":"26/6137","text":"Monica Palmirani"},{"@pid":"224/9240","text":"Salvatore Sapienza"},{"@pid":"386/9089","text":"Generoso Longo"}]},"title":"Reporting Requests Modelling in European Legislation with a Hybrid AI Approach.","venue":"ICAIL","pages":"93-102","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/CorazzaPSL25","doi":"10.1145/3769126.3769255","ee":"https://doi.org/10.1145/3769126.3769255","url":"https://dblp.org/rec/conf/icail/CorazzaPSL25"},
+"url":"URL#599436"
+},
+{
+"@score":"1",
+"@id":"599437",
+"info":{"authors":{"author":{"@pid":"423/9854","text":"Courtney M. Cox"}},"title":"Non-Herculean Data: A Philosophical Intervention in a Technical Debate about Judicial Opinions as Data Sources.","venue":"ICAIL","pages":"1-10","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Cox25","doi":"10.1145/3769126.3769194","ee":"https://doi.org/10.1145/3769126.3769194","url":"https://dblp.org/rec/conf/icail/Cox25"},
+"url":"URL#599437"
+},
+{
+"@score":"1",
+"@id":"599438",
+"info":{"authors":{"author":[{"@pid":"417/7469","text":"Abhiyan Dhakal"},{"@pid":"423/9907","text":"Sugat Sujakhu"},{"@pid":"423/9763","text":"Pranish Kafle"},{"@pid":"417/7807","text":"Kausik Paudel"},{"@pid":"122/5518","text":"Prakash Poudyal"}]},"title":"Feasibility of Artificial Intelligence Driven Analysis in the Context of Nepalese Legal System.","venue":"ICAIL","pages":"498-499","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/DhakalSKPP25","doi":"10.1145/3769126.3769249","ee":"https://doi.org/10.1145/3769126.3769249","url":"https://dblp.org/rec/conf/icail/DhakalSKPP25"},
+"url":"URL#599438"
+},
+{
+"@score":"1",
+"@id":"599439",
+"info":{"authors":{"author":[{"@pid":"355/1185","text":"Josephine Dik"},{"@pid":"164/3994","text":"Réka Markovich"}]},"title":"Judicial Discretion as Normative Reasoning: Deontic Characterization of Judicial Decision Making with Answer Set Programming.","venue":"ICAIL","pages":"268-277","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/DikM25","doi":"10.1145/3769126.3769220","ee":"https://doi.org/10.1145/3769126.3769220","url":"https://dblp.org/rec/conf/icail/DikM25"},
+"url":"URL#599439"
+},
+{
+"@score":"1",
+"@id":"599440",
+"info":{"authors":{"author":[{"@pid":"323/5654","text":"Cecilia Di Florio"},{"@pid":"94/195","text":"Huimin Dong"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"Rule-based Classifier Models.","venue":"ICAIL","pages":"465-469","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/FlorioDR25","doi":"10.1145/3769126.3769243","ee":"https://doi.org/10.1145/3769126.3769243","url":"https://dblp.org/rec/conf/icail/FlorioDR25"},
+"url":"URL#599440"
+},
+{
+"@score":"1",
+"@id":"599441",
+"info":{"authors":{"author":[{"@pid":"251/2648","text":"Wachara Fungwacharakorn"},{"@pid":"226/3866","text":"Guilherme Paulino-Passos"},{"@pid":"99/3259","text":"Bart Verheij"},{"@pid":"s/KenSatoh","text":"Ken Satoh"}]},"title":"On Compatibility between Situation Outcome Cases and Logical Cases.","venue":"ICAIL","pages":"61-71","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Fungwacharakorn25","doi":"10.1145/3769126.3769211","ee":"https://doi.org/10.1145/3769126.3769211","url":"https://dblp.org/rec/conf/icail/Fungwacharakorn25"},
+"url":"URL#599441"
+},
+{
+"@score":"1",
+"@id":"599442",
+"info":{"authors":{"author":{"@pid":"423/8853","text":"Nicholas Godfrey"}},"title":"Applying a Fidelity Approach to Choices in Encoding Legislation.","venue":"ICAIL","pages":"317-326","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Godfrey25","doi":"10.1145/3769126.3769131","ee":"https://doi.org/10.1145/3769126.3769131","url":"https://dblp.org/rec/conf/icail/Godfrey25"},
+"url":"URL#599442"
+},
+{
+"@score":"1",
+"@id":"599443",
+"info":{"authors":{"author":[{"@pid":"g/RandyGoebel","text":"Randy Goebel"},{"@pid":"43/5345","text":"Yoshinobu Kano"},{"@pid":"95/2636","text":"Mi-Young Kim"},{"@pid":"423/9289","text":"Calum Kwan"},{"@pid":"s/KenSatoh","text":"Ken Satoh"},{"@pid":"122/1102-2","text":"Hiroaki Yamada 0002"},{"@pid":"88/5951","text":"Masaharu Yoshioka"}]},"title":"An Overview of the COLIEE 2025 Competition: Legal Case Law and Statute Law Information Retrieval and Entailment.","venue":"ICAIL","pages":"506-515","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GoebelKKKS0Y25","doi":"10.1145/3769126.3785016","ee":"https://doi.org/10.1145/3769126.3785016","url":"https://dblp.org/rec/conf/icail/GoebelKKKS0Y25"},
+"url":"URL#599443"
+},
+{
+"@score":"1",
+"@id":"599444",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"26/6137","text":"Monica Palmirani"}]},"title":"Legal Explanation in Defeasible Deontic Logic via LegalRuleML.","venue":"ICAIL","pages":"500-501","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GovernatoriP25","doi":"10.1145/3769126.3769257","ee":"https://doi.org/10.1145/3769126.3769257","url":"https://dblp.org/rec/conf/icail/GovernatoriP25"},
+"url":"URL#599444"
+},
+{
+"@score":"1",
+"@id":"599445",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"Judicial Permission.","venue":"ICAIL","pages":"460-464","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GovernatoriR25","doi":"10.1145/3769126.3769250","ee":"https://doi.org/10.1145/3769126.3769250","url":"https://dblp.org/rec/conf/icail/GovernatoriR25"},
+"url":"URL#599445"
+},
+{
+"@score":"1",
+"@id":"599446",
+"info":{"authors":{"author":[{"@pid":"245/3483","text":"Morgan A. Gray"},{"@pid":"05/11075","text":"Jaromír Savelka"},{"@pid":"231/7721","text":"Wesley M. Oliver"},{"@pid":"39/1439","text":"Kevin D. Ashley"}]},"title":"Generating Legal Arguments with Automatically Identified Factor Magnitudes.","venue":"ICAIL","pages":"199-208","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GraySOA25","doi":"10.1145/3769126.3769212","ee":"https://doi.org/10.1145/3769126.3769212","url":"https://dblp.org/rec/conf/icail/GraySOA25"},
+"url":"URL#599446"
+},
+{
+"@score":"1",
+"@id":"599448",
+"info":{"authors":{"author":[{"@pid":"h/JosephYHalpern","text":"Joseph Y. Halpern"},{"@pid":"185/5620","text":"Meir Friedenberg"}]},"title":"Intents in Actions.","venue":"ICAIL","pages":"308-316","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HalpernF25","doi":"10.1145/3769126.3769203","ee":"https://doi.org/10.1145/3769126.3769203","url":"https://dblp.org/rec/conf/icail/HalpernF25"},
+"url":"URL#599448"
+},
+{
+"@score":"1",
+"@id":"599449",
+"info":{"authors":{"author":[{"@pid":"415/4895","text":"Emaan Hariri"},{"@pid":"240/9334","text":"Daniel E. Ho"}]},"title":"AI for Statutory Simplification: A Comprehensive State Legal Corpus and Labor Benchmark.","venue":"ICAIL","pages":"177-187","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HaririH25","doi":"10.1145/3769126.3769256","ee":"https://doi.org/10.1145/3769126.3769256","url":"https://dblp.org/rec/conf/icail/HaririH25"},
+"url":"URL#599449"
+},
+{
+"@score":"1",
+"@id":"599452",
+"info":{"authors":{"author":[{"@pid":"278/1072","text":"Simon Horvát"},{"@pid":"90/8280","text":"Dávid Varga"},{"@pid":"303/1627","text":"Zoltán Szoplák"},{"@pid":"47/6103","text":"Peter Gurský"},{"@pid":"53/6005","text":"Stanislav Krajci"}]},"title":"Graph-Based Categorization of Court Decisions by Legal Domain.","venue":"ICAIL","pages":"399-403","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HorvatVSGK25","doi":"10.1145/3769126.3769251","ee":"https://doi.org/10.1145/3769126.3769251","url":"https://dblp.org/rec/conf/icail/HorvatVSGK25"},
+"url":"URL#599452"
+},
+{
+"@score":"1",
+"@id":"599453",
+"info":{"authors":{"author":[{"@pid":"65/2951","text":"Tokuyasu Kakuta"},{"@pid":"423/9416","text":"Kyoko Yoshimura"},{"@pid":"423/8711","text":"Tamaki Owa"},{"@pid":"423/8712","text":"Ukyo Sasaki"},{"@pid":"258/9957","text":"Daichi Saito"}]},"title":"Ordinance Template Composition System: Supporting legislative drafting in the eLen database system.","venue":"ICAIL","pages":"483-484","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/KakutaYOSS25","doi":"10.1145/3769126.3769201","ee":"https://doi.org/10.1145/3769126.3769201","url":"https://dblp.org/rec/conf/icail/KakutaYOSS25"},
+"url":"URL#599453"
+},
+{
+"@score":"1",
+"@id":"599454",
+"info":{"authors":{"author":[{"@pid":"232/2211","text":"Aniket Kesari"},{"@pid":"39/2657","text":"Stefan Bechtold"},{"@pid":"271/7737","text":"Elliott Ash"},{"@pid":"271/7744","text":"Mauro Luzzatto"}]},"title":"explainy: A Toolkit for Legal-XAI.","venue":"ICAIL","pages":"493-494","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/KesariBAL25","doi":"10.1145/3769126.3769240","ee":"https://doi.org/10.1145/3769126.3769240","url":"https://dblp.org/rec/conf/icail/KesariBAL25"},
+"url":"URL#599454"
+},
+{
+"@score":"1",
+"@id":"599455",
+"info":{"authors":{"author":[{"@pid":"232/2211","text":"Aniket Kesari"},{"@pid":"62/962","text":"Travis D. Breaux"},{"@pid":"375/7157","text":"Sarah Santos"},{"@pid":"423/9497","text":"Tom Norton"},{"@pid":"297/5503","text":"Anmol Singhal"}]},"title":"From Legal Text to Tech Specs: Generative AI&apos;s Interpretation of Consent in Privacy Law.","venue":"ICAIL","pages":"159-168","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/KesariBSNS25","doi":"10.1145/3769126.3769241","ee":"https://doi.org/10.1145/3769126.3769241","url":"https://dblp.org/rec/conf/icail/KesariBSNS25"},
+"url":"URL#599455"
+},
+{
+"@score":"1",
+"@id":"599456",
+"info":{"authors":{"author":[{"@pid":"398/3957","text":"Lara Lawniczak"},{"@pid":"b/CBenzmueller","text":"Christoph Benzmüller"}]},"title":"Logical Modalities within the European AI Act: An Analysis.","venue":"ICAIL","pages":"348-353","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LawniczakB25","doi":"10.1145/3769126.3769202","ee":"https://doi.org/10.1145/3769126.3769202","url":"https://dblp.org/rec/conf/icail/LawniczakB25"},
+"url":"URL#599456"
+},
+{
+"@score":"1",
+"@id":"599457",
+"info":{"authors":{"author":[{"@pid":"256/2300","text":"Ludi Simone van Leeuwen"},{"@pid":"99/3259","text":"Bart Verheij"},{"@pid":"v/RVerbrugge","text":"Rineke Verbrugge"},{"@pid":"08/4459","text":"Silja Renooij"}]},"title":"Evaluating Methods for Scenario Reasoning using Bayesian Networks in Exhaustive and Non-Exhaustive Settings.","venue":"ICAIL","pages":"83-92","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LeeuwenVVR25","doi":"10.1145/3769126.3769231","ee":"https://doi.org/10.1145/3769126.3769231","url":"https://dblp.org/rec/conf/icail/LeeuwenVVR25"},
+"url":"URL#599457"
+},
+{
+"@score":"1",
+"@id":"599458",
+"info":{"authors":{"author":[{"@pid":"61/8336","text":"Tomer Libal"},{"@pid":"157/7699","text":"Aleksander Smywinski-Pohl"},{"@pid":"396/1755","text":"Adam Kaczmarczyk"},{"@pid":"410/2500","text":"Magdalena Król"}]},"title":"Are manual annotations necessary for statutory interpretations retrieval?","venue":"ICAIL","pages":"414-419","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LibalSKK25","doi":"10.1145/3769126.3769224","ee":"https://doi.org/10.1145/3769126.3769224","url":"https://dblp.org/rec/conf/icail/LibalSKK25"},
+"url":"URL#599458"
+},
+{
+"@score":"1",
+"@id":"599460",
+"info":{"authors":{"author":[{"@pid":"215/8283","text":"Ruta Liepina"},{"@pid":"55/5242","text":"Tiago de Lima"},{"@pid":"43/6250","text":"Emiliano Lorini"},{"@pid":"277/2619","text":"Giuseppe Pisano"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"A Causal Model Checker for Legal Cases.","venue":"ICAIL","pages":"248-257","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LiepinaLLPS25","doi":"10.1145/3769126.3769207","ee":"https://doi.org/10.1145/3769126.3769207","url":"https://dblp.org/rec/conf/icail/LiepinaLLPS25"},
+"url":"URL#599460"
+},
+{
+"@score":"1",
+"@id":"599461",
+"info":{"authors":{"author":[{"@pid":"241/1764","text":"Junliang Luo"},{"@pid":"278/9106","text":"Xihan Xiong"},{"@pid":"37/1901","text":"William Knottenbelt"},{"@pid":"l/XueLiu","text":"Xue Liu 0001"}]},"title":"Decoding SEC Actions: Enforcement Trends through Analyzing Blockchain Litigation using LLM-based Thematic Factor Mapping.","venue":"ICAIL","pages":"209-218","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LuoXK025","doi":"10.1145/3769126.3769235","ee":"https://doi.org/10.1145/3769126.3769235","url":"https://dblp.org/rec/conf/icail/LuoXK025"},
+"url":"URL#599461"
+},
+{
+"@score":"1",
+"@id":"599462",
+"info":{"authors":{"author":[{"@pid":"274/2123","text":"Megan Ma"},{"@pid":"304/7681","text":"Riya Ranjan"}]},"title":"Human-Machine Legal Preference Benchmarking: An Experimental Pilot Evaluating the Comparative Performance of LLM Models, Enterprise Tools, and Humans on Legal Tasks.","venue":"ICAIL","pages":"430-433","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MaR25","doi":"10.1145/3769126.3769247","ee":"https://doi.org/10.1145/3769126.3769247","url":"https://dblp.org/rec/conf/icail/MaR25"},
+"url":"URL#599462"
+},
+{
+"@score":"1",
+"@id":"599463",
+"info":{"authors":{"author":[{"@pid":"329/8233","text":"Jiayu Ma"},{"@pid":"307/3719","text":"Shengran Wang"},{"@pid":"50/2482-33","text":"Yun Liu 0033"}]},"title":"Multi - agent Cooperative Mechanisms for Legal Adjudication: The Crucial Role of Automatic Prompt Optimization.","venue":"ICAIL","pages":"449-454","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MaWL25","doi":"10.1145/3769126.3769213","ee":"https://doi.org/10.1145/3769126.3769213","url":"https://dblp.org/rec/conf/icail/MaWL25"},
+"url":"URL#599463"
+},
+{
+"@score":"1",
+"@id":"599464",
+"info":{"authors":{"author":[{"@pid":"357/1222","text":"Ngoc-Duy Mai"},{"@pid":"289/6184","text":"Xuan-Bach Le"},{"@pid":"176/9655","text":"Thi-Hai-Yen Vuong"},{"@pid":"158/7894","text":"Ha-Thanh Nguyen"},{"@pid":"92/6043","text":"Kostas Stathis"},{"@pid":"s/KenSatoh","text":"Ken Satoh"}]},"title":"DeCoRA: Definition and Context Reasoning in Argumentation.","venue":"ICAIL","pages":"72-82","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MaiLVNSS25","doi":"10.1145/3769126.3769226","ee":"https://doi.org/10.1145/3769126.3769226","url":"https://dblp.org/rec/conf/icail/MaiLVNSS25"},
+"url":"URL#599464"
+},
+{
+"@score":"1",
+"@id":"599465",
+"info":{"authors":{"author":[{"@pid":"324/1575","text":"Larissa Mori"},{"@pid":"410/2808","text":"Carlos Sousa de Oliveira"},{"@pid":"75/4127","text":"Yuehwern Yih"},{"@pid":"26/3819","text":"Mario Ventresca"}]},"title":"Assessing the performance gap between lexical and semantic models for information retrieval with formulaic legal language.","venue":"ICAIL","pages":"114-128","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MoriOYV25","doi":"10.1145/3769126.3769205","ee":"https://doi.org/10.1145/3769126.3769205","url":"https://dblp.org/rec/conf/icail/MoriOYV25"},
+"url":"URL#599465"
+},
+{
+"@score":"1",
+"@id":"599466",
+"info":{"authors":{"author":[{"@pid":"308/4178","text":"Jack Mumford"},{"@pid":"423/9571","text":"David Bareham"},{"@pid":"17/6670","text":"Katie Atkinson"},{"@pid":"374/7735","text":"Jeremy Marshall"}]},"title":"Finding the Goldilocks Zone: Retrieving Citation Context.","venue":"ICAIL","pages":"434-438","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/MumfordBAM25","doi":"10.1145/3769126.3769261","ee":"https://doi.org/10.1145/3769126.3769261","url":"https://dblp.org/rec/conf/icail/MumfordBAM25"},
+"url":"URL#599466"
+},
+{
+"@score":"1",
+"@id":"599467",
+"info":{"authors":{"author":[{"@pid":"262/3427","text":"Philip Ndikum"},{"@pid":"372/2076","text":"Serge Ndikum"}]},"title":"Scaling International Legal Workflows with Ordinis: A Neuro-Symbolic Framework for GenAI in High-Stakes Domains.","venue":"ICAIL","pages":"487-488","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/NdikumN25","doi":"10.1145/3769126.3769223","ee":"https://doi.org/10.1145/3769126.3769223","url":"https://dblp.org/rec/conf/icail/NdikumN25"},
+"url":"URL#599467"
+},
+{
+"@score":"1",
+"@id":"599468",
+"info":{"authors":{"author":[{"@pid":"177/6470","text":"Tin Trung Nguyen"},{"@pid":"183/7333","text":"Jiannan Xu"},{"@pid":"401/9183","text":"Phuong-Anh Nguyen-Le"},{"@pid":"29/1257","text":"Jonathan Lazar"},{"@pid":"407/7491","text":"Donald Braman"},{"@pid":"77/2856","text":"Hal Daumé III"},{"@pid":"74/11345","text":"Zubin Jelveh"}]},"title":"Which Demographic Features Are Relevant for Individual Fairness Evaluation of U.S. Recidivism Risk Assessment Tools?","venue":"ICAIL","pages":"354-358","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/NguyenXNLBDJ25","doi":"10.1145/3769126.3769199","ee":"https://doi.org/10.1145/3769126.3769199","url":"https://dblp.org/rec/conf/icail/NguyenXNLBDJ25"},
+"url":"URL#599468"
+},
+{
+"@score":"1",
+"@id":"599469",
+"info":{"authors":{"author":[{"@pid":"423/8895","text":"Eduardo Caruso Barbosa Pacheco"},{"@pid":"423/9514","text":"Glauber Machado Pinto"}]},"title":"MAIA: AI System for Repetitive Demand Resolution in Brazil.","venue":"ICAIL","pages":"502-503","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PachecoP25","doi":"10.1145/3769126.3769259","ee":"https://doi.org/10.1145/3769126.3769259","url":"https://dblp.org/rec/conf/icail/PachecoP25"},
+"url":"URL#599469"
+},
+{
+"@score":"1",
+"@id":"599471",
+"info":{"authors":{"author":[{"@pid":"423/8642","text":"Marco Panarelli"},{"@pid":"208/4245","text":"Andrea Galassi"},{"@pid":"206/7577","text":"Francesca Lagioia"},{"@pid":"215/8283","text":"Ruta Liepina"},{"@pid":"81/1376","text":"Marco Lippi 0001"},{"@pid":"210/4979","text":"Przemyslaw Palka"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"Is It Worth Using LLMs for Unfair Clause Detection in Terms of Service?","venue":"ICAIL","pages":"139-149","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PanarelliGLL0PS25","doi":"10.1145/3769126.3769218","ee":"https://doi.org/10.1145/3769126.3769218","url":"https://dblp.org/rec/conf/icail/PanarelliGLL0PS25"},
+"url":"URL#599471"
+},
+{
+"@score":"1",
+"@id":"599472",
+"info":{"authors":{"author":[{"@pid":"130/6417","text":"Sachin Sharad Pawar"},{"@pid":"40/6919","text":"Manoj Apte"},{"@pid":"02/3157","text":"Girish Keshav Palshikar"},{"@pid":"120/4545","text":"Basit Ali"},{"@pid":"139/5430","text":"Nitin Ramrakhiyani"}]},"title":"DRAssist: Dispute Resolution Assistance using Large Language Models.","venue":"ICAIL","pages":"188-198","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PawarAPAR25","doi":"10.1145/3769126.3769210","ee":"https://doi.org/10.1145/3769126.3769210","url":"https://dblp.org/rec/conf/icail/PawarAPAR25"},
+"url":"URL#599472"
+},
+{
+"@score":"1",
+"@id":"599473",
+"info":{"authors":{"author":[{"@pid":"183/4477","text":"Joeri Peters"},{"@pid":"47/4875","text":"Floris Bex"},{"@pid":"64/5549","text":"Henry Prakken"}]},"title":"Justifying Black-Box Predictions with Domain Knowledge.","venue":"ICAIL","pages":"103-113","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PetersBP25","doi":"10.1145/3769126.3769253","ee":"https://doi.org/10.1145/3769126.3769253","url":"https://dblp.org/rec/conf/icail/PetersBP25"},
+"url":"URL#599473"
+},
+{
+"@score":"1",
+"@id":"599474",
+"info":{"authors":{"author":[{"@pid":"123/7573","text":"Ramon Pires"},{"@pid":"358/3258","text":"Roseval Malaquias Junior"},{"@pid":"175/1545","text":"Rodrigo Nogueira 0001"}]},"title":"Automatic Legal Writing Evaluation of LLMs.","venue":"ICAIL","pages":"420-424","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PiresJ025","doi":"10.1145/3769126.3769227","ee":"https://doi.org/10.1145/3769126.3769227","url":"https://dblp.org/rec/conf/icail/PiresJ025"},
+"url":"URL#599474"
+},
+{
+"@score":"1",
+"@id":"599475",
+"info":{"authors":{"author":[{"@pid":"277/2619","text":"Giuseppe Pisano"},{"@pid":"64/5549","text":"Henry Prakken"},{"@pid":"06/414","text":"Giovanni Sartor"},{"@pid":"215/8283","text":"Ruta Liepina"}]},"title":"Modelling Cause-in-Fact in Legal Cases through Defeasible Argumentation.","venue":"ICAIL","pages":"278-287","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PisanoPSL25","doi":"10.1145/3769126.3769228","ee":"https://doi.org/10.1145/3769126.3769228","url":"https://dblp.org/rec/conf/icail/PisanoPSL25"},
+"url":"URL#599475"
+},
+{
+"@score":"1",
+"@id":"599476",
+"info":{"authors":{"author":[{"@pid":"276/4944","text":"Thiago Raulino Dal Pont"},{"@pid":"188/8186","text":"Federico Galli"},{"@pid":"281/2743","text":"Galileo Sartor"},{"@pid":"00/5919","text":"Giuseppe Contissa"}]},"title":"&quot;Lost in EU Regulation? Don&apos;t Worry, AI Found the Obligation&quot;: Extracting and Representing Legal Obligations in the GDPR the DSA and the AI Act.","venue":"ICAIL","pages":"129-138","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PontGSC25","doi":"10.1145/3769126.3769260","ee":"https://doi.org/10.1145/3769126.3769260","url":"https://dblp.org/rec/conf/icail/PontGSC25"},
+"url":"URL#599476"
+},
+{
+"@score":"1",
+"@id":"599477",
+"info":{"authors":{"author":[{"@pid":"276/4944","text":"Thiago Raulino Dal Pont"},{"@pid":"281/2743","text":"Galileo Sartor"},{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"You Take the High Road, and I&apos;ll Take the Low Road: Large Language Models Logical English and the Highway Code.","venue":"ICAIL","pages":"337-347","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/PontSWS25","doi":"10.1145/3769126.3769254","ee":"https://doi.org/10.1145/3769126.3769254","url":"https://dblp.org/rec/conf/icail/PontSWS25"},
+"url":"URL#599477"
+},
+{
+"@score":"1",
+"@id":"599479",
+"info":{"authors":{"author":[{"@pid":"391/9482","text":"Diogo J. Morgado Rebelo"},{"@pid":"84/1520","text":"Francisco Pacheco de Andrade"},{"@pid":"77/2321","text":"Paulo Novais"}]},"title":"AI-based Consumers&apos; Creditworthiness Fate Needs EU &apos;Lawgorithmics&apos; to Innovate.","venue":"ICAIL","pages":"11-20","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RebeloAN25","doi":"10.1145/3769126.3769233","ee":"https://doi.org/10.1145/3769126.3769233","url":"https://dblp.org/rec/conf/icail/RebeloAN25"},
+"url":"URL#599479"
+},
+{
+"@score":"1",
+"@id":"599481",
+"info":{"authors":{"author":[{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"323/5654","text":"Cecilia Di Florio"},{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"}]},"title":"Rule-based Deontic Case-based Reasoning.","venue":"ICAIL","pages":"288-297","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RotoloFG25","doi":"10.1145/3769126.3769242","ee":"https://doi.org/10.1145/3769126.3769242","url":"https://dblp.org/rec/conf/icail/RotoloFG25"},
+"url":"URL#599481"
+},
+{
+"@score":"1",
+"@id":"599482",
+"info":{"authors":{"author":[{"@pid":"423/8751","text":"Stijn Van Ruymbeke"},{"@pid":"423/9461","text":"Aruna Audenaert"},{"@pid":"327/7629","text":"Henri Arno"},{"@pid":"423/9536","text":"Tibe Habils"},{"@pid":"301/8910","text":"Joke Baeck"},{"@pid":"327/6854","text":"Klaas Mulier"},{"@pid":"39/10077","text":"Thomas Demeester"}]},"title":"Leveraging Artificial Intelligence as a Decision Support System in Belgian Commercial Courts.","venue":"ICAIL","pages":"489-490","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/RuymbekeAAHBMD25","doi":"10.1145/3769126.3769232","ee":"https://doi.org/10.1145/3769126.3769232","url":"https://dblp.org/rec/conf/icail/RuymbekeAAHBMD25"},
+"url":"URL#599482"
+},
+{
+"@score":"1",
+"@id":"599483",
+"info":{"authors":{"author":[{"@pid":"423/8745","text":"Isabel Sebire"},{"@pid":"348/5863","text":"Claire Barale"},{"@pid":"59/6701","text":"Mirella Lapata"}]},"title":"Faithfulness and Content Selection in Long-Input Multi-Document Summarisation of U.S. Civil Rights Litigation.","venue":"ICAIL","pages":"384-388","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SebireBL25","doi":"10.1145/3769126.3769237","ee":"https://doi.org/10.1145/3769126.3769237","url":"https://dblp.org/rec/conf/icail/SebireBL25"},
+"url":"URL#599483"
+},
+{
+"@score":"1",
+"@id":"599485",
+"info":{"authors":{"author":[{"@pid":"148/3481","text":"Andrew Shin"},{"@pid":"31/3019","text":"Kunitake Kaneko"}]},"title":"Improved Understanding of Legal Text with Graph Attention Networks.","venue":"ICAIL","pages":"364-368","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ShinK25","doi":"10.1145/3769126.3769214","ee":"https://doi.org/10.1145/3769126.3769214","url":"https://dblp.org/rec/conf/icail/ShinK25"},
+"url":"URL#599485"
+},
+{
+"@score":"1",
+"@id":"599486",
+"info":{"authors":{"author":[{"@pid":"151/0768","text":"Raquel Silveira"},{"@pid":"423/9774","text":"João Víctor López Matias"},{"@pid":"188/5824","text":"Caio Ponte"},{"@pid":"423/9834","text":"Isadora Donza Corrêa"},{"@pid":"358/3078","text":"André Câmara"},{"@pid":"17/2960","text":"Vasco Furtado"}]},"title":"Optimizing Prompts for Legal Document Classification.","venue":"ICAIL","pages":"369-373","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SilveiraMPCCF25","doi":"10.1145/3769126.3769217","ee":"https://doi.org/10.1145/3769126.3769217","url":"https://dblp.org/rec/conf/icail/SilveiraMPCCF25"},
+"url":"URL#599486"
+},
+{
+"@score":"1",
+"@id":"599487",
+"info":{"authors":{"author":[{"@pid":"300/9352","text":"Bianca Steffes"},{"@pid":"359/7350","text":"Diogo Sasdelli"}]},"title":"ViNo - A Tool for the Visualisation of Norms.","venue":"ICAIL","pages":"485-486","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SteffesS25","doi":"10.1145/3769126.3769204","ee":"https://doi.org/10.1145/3769126.3769204","url":"https://dblp.org/rec/conf/icail/SteffesS25"},
+"url":"URL#599487"
+},
+{
+"@score":"1",
+"@id":"599488",
+"info":{"authors":{"author":[{"@pid":"300/9352","text":"Bianca Steffes"},{"@pid":"407/0225","text":"Nils Torben Wiedemann"},{"@pid":"407/9634","text":"Alexander Gratz"},{"@pid":"407/8137","text":"Pamela Hochreither"},{"@pid":"407/9040","text":"Jana Elina Meyer"},{"@pid":"407/8157","text":"Katharina Luise Schilke"}]},"title":"Summarisation of German Judgments in conjunction with a Class-based Evaluation.","venue":"ICAIL","pages":"379-383","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SteffesWGHMS25","doi":"10.1145/3769126.3769229","ee":"https://doi.org/10.1145/3769126.3769229","url":"https://dblp.org/rec/conf/icail/SteffesWGHMS25"},
+"url":"URL#599488"
+},
+{
+"@score":"1",
+"@id":"599489",
+"info":{"authors":{"author":[{"@pid":"252/8803","text":"Cor Steging"},{"@pid":"08/4459","text":"Silja Renooij"},{"@pid":"99/3259","text":"Bart Verheij"}]},"title":"Parameterized Argumentation-based Reasoning Tasks for Benchmarking Generative Language Models.","venue":"ICAIL","pages":"455-459","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/StegingRV25","doi":"10.1145/3769126.3769230","ee":"https://doi.org/10.1145/3769126.3769230","url":"https://dblp.org/rec/conf/icail/StegingRV25"},
+"url":"URL#599489"
+},
+{
+"@score":"1",
+"@id":"599490",
+"info":{"authors":{"author":[{"@pid":"342/7579","text":"Faiz Surani"},{"@pid":"410/5415","text":"Lindsey A. Gailmard"},{"@pid":"423/9798","text":"Allison Casasola"},{"@pid":"365/3769","text":"Varun Magesh"},{"@pid":"395/1319","text":"Emily J. Robitschek"},{"@pid":"240/9334","text":"Daniel E. Ho"}]},"title":"What Is the Law? A System for Statutory Research (STARA) with Large Language Models.","venue":"ICAIL","pages":"394-398","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/SuraniGCMRH25","doi":"10.1145/3769126.3769219","ee":"https://doi.org/10.1145/3769126.3769219","url":"https://dblp.org/rec/conf/icail/SuraniGCMRH25"},
+"url":"URL#599490"
+},
+{
+"@score":"1",
+"@id":"599491",
+"info":{"authors":{"author":[{"@pid":"356/8180","text":"Niklas Wais"},{"@pid":"09/1651","text":"Matthias Grabmair"}]},"title":"Learning from Computer Vision: The Effects of Loss Functions on Legal Text Classification with Class Imbalance.","venue":"ICAIL","pages":"41-50","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/WaisG25","doi":"10.1145/3769126.3769263","ee":"https://doi.org/10.1145/3769126.3769263","url":"https://dblp.org/rec/conf/icail/WaisG25"},
+"url":"URL#599491"
+},
+{
+"@score":"1",
+"@id":"599492",
+"info":{"authors":{"author":[{"@pid":"398/3121","text":"Oliver Wardas"},{"@pid":"m/FlorianMatthes","text":"Florian Matthes"}]},"title":"LLMs for Legal Subsumption in German Employment Contracts.","venue":"ICAIL","pages":"169-176","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/WardasM25","doi":"10.1145/3769126.3769209","ee":"https://doi.org/10.1145/3769126.3769209","url":"https://dblp.org/rec/conf/icail/WardasM25"},
+"url":"URL#599492"
+},
+{
+"@score":"1",
+"@id":"599493",
+"info":{"authors":{"author":{"@pid":"245/3643","text":"Hannes Westermann"}},"title":"A Demonstration of a Semi-Structured Legal Reasoning Framework.","venue":"ICAIL","pages":"504-505","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Westermann25","doi":"10.1145/3769126.3769196","ee":"https://doi.org/10.1145/3769126.3769196","url":"https://dblp.org/rec/conf/icail/Westermann25"},
+"url":"URL#599493"
+},
+{
+"@score":"1",
+"@id":"599494",
+"info":{"authors":{"author":[{"@pid":"245/3643","text":"Hannes Westermann"},{"@pid":"90/5632","text":"Vern R. Walker"},{"@pid":"05/11075","text":"Jaromír Savelka"}]},"title":"Automated Mapping of Legal Criteria to the Texts of Adjudicatory Decisions Using LLMs.","venue":"ICAIL","pages":"219-228","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/WestermannWS25","doi":"10.1145/3769126.3769236","ee":"https://doi.org/10.1145/3769126.3769236","url":"https://dblp.org/rec/conf/icail/WestermannWS25"},
+"url":"URL#599494"
+},
+{
+"@score":"1",
+"@id":"599495",
+"info":{"authors":{"author":{"@pid":"183/6247","text":"Wijnand van Woerkom"}},"title":"Formal Results on Case-Base Consistency: A COMPAS Case Study.","venue":"ICAIL","pages":"298-307","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Woerkom25","doi":"10.1145/3769126.3769190","ee":"https://doi.org/10.1145/3769126.3769190","url":"https://dblp.org/rec/conf/icail/Woerkom25"},
+"url":"URL#599495"
+},
+{
+"@score":"1",
+"@id":"599496",
+"info":{"authors":{"author":[{"@pid":"344/8607","text":"Yilin Xia"},{"@pid":"194/0360-1","text":"Heng Zheng 0001"},{"@pid":"58/576","text":"Shawn Bowers"},{"@pid":"l/BertramLudascher","text":"Bertram Ludäscher"}]},"title":"AF-XRAY: Visual Explanation and Resolution of Ambiguity in Legal Argumentation Frameworks.","venue":"ICAIL","pages":"495-497","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Xia0BL25","doi":"10.1145/3769126.3769246","ee":"https://doi.org/10.1145/3769126.3769246","url":"https://dblp.org/rec/conf/icail/Xia0BL25"},
+"url":"URL#599496"
+},
+{
+"@score":"1",
+"@id":"599497",
+"info":{"authors":{"author":[{"@pid":"32/9128","text":"Zhe Yu"},{"@pid":"180/2605","text":"Yiwei Lu"},{"@pid":"22/6495","text":"Burkhard Schafer 0001"},{"@pid":"167/9068","text":"Zhe Lin"}]},"title":"Cross-Border Legal Adaptation of Autonomous Vehicle Design based on Logic and Non-monotonic Reasoning.","venue":"ICAIL","pages":"475-480","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/YuL0L25","doi":"10.1145/3769126.3769258","ee":"https://doi.org/10.1145/3769126.3769258","url":"https://dblp.org/rec/conf/icail/YuL0L25"},
+"url":"URL#599497"
+},
+{
+"@score":"1",
+"@id":"599498",
+"info":{"authors":{"author":[{"@pid":"264/7514","text":"Liuwen Yu"},{"@pid":"246/0272","text":"Davide Liga"},{"@pid":"164/3994","text":"Réka Markovich"}]},"title":"Addressing the Right to Explanation and the Right to Challenge through Hybrid-AI: Symbolic Constraints over Large Language Models via Prompt Engineering.","venue":"ICAIL","pages":"239-247","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/YuLM25","doi":"10.1145/3769126.3769252","ee":"https://doi.org/10.1145/3769126.3769252","url":"https://dblp.org/rec/conf/icail/YuLM25"},
+"url":"URL#599498"
+},
+{
+"@score":"1",
+"@id":"599500",
+"info":{"authors":{"author":[{"@pid":"391/9074","text":"Martim Zanatti"},{"@pid":"23/20-1","text":"Ricardo Ribeiro 0001"},{"@pid":"p/HelenaSofiaPinto","text":"H. Sofia Pinto"}]},"title":"Exploring Metric Correlations for Legal Text Summarization Evaluation.","venue":"ICAIL","pages":"389-393","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Zanatti0P25","doi":"10.1145/3769126.3769206","ee":"https://doi.org/10.1145/3769126.3769206","url":"https://dblp.org/rec/conf/icail/Zanatti0P25"},
+"url":"URL#599500"
+},
+{
+"@score":"1",
+"@id":"599501",
+"info":{"authors":{"author":[{"@pid":"07/4227-5","text":"Tong Zhang 0005"},{"@pid":"43/2784-1","text":"Yiquan Wu 0001"},{"@pid":"189/6903","text":"Rujing Yao"},{"@pid":"139/5941","text":"Qianyu Zhang"},{"@pid":"212/2092","text":"Changlong Sun"},{"@pid":"370/5548","text":"Chenghao Wang"},{"@pid":"11/6389-1","text":"Xiaozhong Liu 0001"}]},"title":"Deep Interaction Timing: FOL-based Complexity Differentiation for Legal Queries.","venue":"ICAIL","pages":"439-443","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Zhang0YZSWL25","doi":"10.1145/3769126.3769248","ee":"https://doi.org/10.1145/3769126.3769248","url":"https://dblp.org/rec/conf/icail/Zhang0YZSWL25"},
+"url":"URL#599501"
+},
+{
+"@score":"1",
+"@id":"599503",
+"info":{"authors":{"author":[{"@pid":"286/6557","text":"May Myo Zin"},{"@pid":"27/11332","text":"Georg Borges"},{"@pid":"s/KenSatoh","text":"Ken Satoh"},{"@pid":"251/2648","text":"Wachara Fungwacharakorn"}]},"title":"Towards Machine-Readable Traffic Laws: Formalizing Traffic Rules into PROLOG Using LLMs.","venue":"ICAIL","pages":"327-336","year":"2025","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ZinBSF25","doi":"10.1145/3769126.3769222","ee":"https://doi.org/10.1145/3769126.3769222","url":"https://dblp.org/rec/conf/icail/ZinBSF25"},
+"url":"URL#599503"
+},
+{
+"@score":"1",
+"@id":"713596",
+"info":{"authors":{"author":{"@pid":"19/5709","text":"Juliano Maranhão"}},"title":"Proceedings of the Twentieth International Conference on Artificial Intelligence and Law, ICAIL 2025, Chicago, IL, USA, June 16-20, 2025","venue":"ICAIL","publisher":"ACM","year":"2025","type":"Editorship","key":"conf/icail/2025","doi":"10.1145/3769126","ee":"https://doi.org/10.1145/3769126","url":"https://dblp.org/rec/conf/icail/2025"},
+"url":"URL#713596"
+},
+{
+"@score":"1",
+"@id":"1763335",
+"info":{"authors":{"author":[{"@pid":"06/9512","text":"Michal Araszkiewicz"},{"@pid":"87/612","text":"Enrico Francesconi"},{"@pid":"68/7168","text":"Tomasz Zurek"}]},"title":"Identification of Legislative Errors.","venue":"ICAIL","pages":"2-11","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AraszkiewiczFZ23","doi":"10.1145/3594536.3595172","ee":"https://doi.org/10.1145/3594536.3595172","url":"https://dblp.org/rec/conf/icail/AraszkiewiczFZ23"},
+"url":"URL#1763335"
+},
+{
+"@score":"1",
+"@id":"1763336",
+"info":{"authors":{"author":[{"@pid":"17/6670","text":"Katie Atkinson"},{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}]},"title":"ANGELIC II: An Improved Methodology for Representing Legal Domain Knowledge.","venue":"ICAIL","pages":"12-21","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/AtkinsonB23","doi":"10.1145/3594536.3595137","ee":"https://doi.org/10.1145/3594536.3595137","url":"https://dblp.org/rec/conf/icail/AtkinsonB23"},
+"url":"URL#1763336"
+},
+{
+"@score":"1",
+"@id":"1763338",
+"info":{"authors":{"author":[{"@pid":"150/5866","text":"Gregor Behnke"},{"@pid":"356/8180","text":"Niklas Wais"}]},"title":"On the Semantic Difference of Judicial and Standard Language.","venue":"ICAIL","pages":"382-386","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BehnkeW23","doi":"10.1145/3594536.3595123","ee":"https://doi.org/10.1145/3594536.3595123","url":"https://dblp.org/rec/conf/icail/BehnkeW23"},
+"url":"URL#1763338"
+},
+{
+"@score":"1",
+"@id":"1763340",
+"info":{"authors":{"author":{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}},"title":"Whatever Happened to Hypotheticals?","venue":"ICAIL","pages":"387-391","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Bench-Capon23","doi":"10.1145/3594536.3595138","ee":"https://doi.org/10.1145/3594536.3595138","url":"https://dblp.org/rec/conf/icail/Bench-Capon23"},
+"url":"URL#1763340"
+},
+{
+"@score":"1",
+"@id":"1763341",
+"info":{"authors":{"author":[{"@pid":"264/9784","text":"Andrew Blair-Stanek"},{"@pid":"226/1982","text":"Nils Holzenberger"},{"@pid":"06/4775","text":"Benjamin Van Durme"}]},"title":"Can GPT-3 Perform Statutory Reasoning?","venue":"ICAIL","pages":"22-31","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Blair-StanekHD23","doi":"10.1145/3594536.3595163","ee":"https://doi.org/10.1145/3594536.3595163","url":"https://dblp.org/rec/conf/icail/Blair-StanekHD23"},
+"url":"URL#1763341"
+},
+{
+"@score":"1",
+"@id":"1763342",
+"info":{"authors":{"author":[{"@pid":"160/9914","text":"Joseph A. Blass"},{"@pid":"f/KDForbus","text":"Kenneth D. Forbus"}]},"title":"Analogical Reasoning, Generalization, and Rule Learning for Common Law Reasoning.","venue":"ICAIL","pages":"32-41","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BlassF23","doi":"10.1145/3594536.3595121","ee":"https://doi.org/10.1145/3594536.3595121","url":"https://dblp.org/rec/conf/icail/BlassF23"},
+"url":"URL#1763342"
+},
+{
+"@score":"1",
+"@id":"1763346",
+"info":{"authors":{"author":[{"@pid":"346/0252","text":"Tobias Brugger"},{"@pid":"33/4494","text":"Matthias Stürmer"},{"@pid":"232/4545","text":"Joel Niklaus"}]},"title":"MultiLegalSBD: A Multilingual Legal Sentence Boundary Detection Dataset.","venue":"ICAIL","pages":"42-51","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/BruggerSN23","doi":"10.1145/3594536.3595132","ee":"https://doi.org/10.1145/3594536.3595132","url":"https://dblp.org/rec/conf/icail/BruggerSN23"},
+"url":"URL#1763346"
+},
+{
+"@score":"1",
+"@id":"1763347",
+"info":{"authors":{"author":[{"@pid":"228/7698","text":"Ilaria Canavotto"},{"@pid":"h/JohnFHorty","text":"John F. Horty"}]},"title":"Reasoning with hierarchies of open-textured predicates.","venue":"ICAIL","pages":"52-61","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/CanavottoH23","doi":"10.1145/3594536.3595148","ee":"https://doi.org/10.1145/3594536.3595148","url":"https://dblp.org/rec/conf/icail/CanavottoH23"},
+"url":"URL#1763347"
+},
+{
+"@score":"1",
+"@id":"1763349",
+"info":{"authors":{"author":[{"@pid":"21/143","text":"Seth J. Chandler"},{"@pid":"356/8431","text":"Emily A. Muenster"},{"@pid":"29/2663","text":"Daniel Lichtblau"}]},"title":"Who really wrote Martin v. Hunter&apos;s Lessee?: Applying a machine learning ensemble to uncover a Chief Justice&apos;s unethical behavior.","venue":"ICAIL","pages":"62-70","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ChandlerML23","doi":"10.1145/3594536.3595118","ee":"https://doi.org/10.1145/3594536.3595118","url":"https://dblp.org/rec/conf/icail/ChandlerML23"},
+"url":"URL#1763349"
+},
+{
+"@score":"1",
+"@id":"1763350",
+"info":{"authors":{"author":[{"@pid":"191/0289-1","text":"Andong Chen 0001"},{"@pid":"68/3792","text":"Feng Yao"},{"@pid":"08/7955","text":"Xinyan Zhao"},{"@pid":"29/5889","text":"Yating Zhang"},{"@pid":"212/2092","text":"Changlong Sun"},{"@pid":"50/2482-33","text":"Yun Liu 0033"},{"@pid":"138/5777","text":"Weixing Shen"}]},"title":"EQUALS: A Real-world Dataset for Legal Question Answering via Reading Chinese Laws.","venue":"ICAIL","pages":"71-80","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/ChenYZZSLS23","doi":"10.1145/3594536.3595159","ee":"https://doi.org/10.1145/3594536.3595159","url":"https://dblp.org/rec/conf/icail/ChenYZZSLS23"},
+"url":"URL#1763350"
+},
+{
+"@score":"1",
+"@id":"1763354",
+"info":{"authors":{"author":[{"@pid":"298/1763","text":"Harshil Darji"},{"@pid":"133/1347","text":"Jelena Mitrovic"},{"@pid":"32/1270","text":"Michael Granitzer"}]},"title":"A Dataset of German Legal Reference Annotations.","venue":"ICAIL","pages":"392-396","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/DarjiMG23","doi":"10.1145/3594536.3595173","ee":"https://doi.org/10.1145/3594536.3595173","url":"https://dblp.org/rec/conf/icail/DarjiMG23"},
+"url":"URL#1763354"
+},
+{
+"@score":"1",
+"@id":"1763358",
+"info":{"authors":{"author":[{"@pid":"330/6057","text":"Romy A. N. van Drie"},{"@pid":"139/6924","text":"Maaike H. T. de Boer"},{"@pid":"318/7406","text":"Roos M. Bakker"},{"@pid":"274/1115","text":"Ioannis Tolios"},{"@pid":"332/7294","text":"Daan Vos"}]},"title":"The Dutch Law as a Semantic Role Labeling Dataset.","venue":"ICAIL","pages":"316-322","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/DrieBBTV23","doi":"10.1145/3594536.3595124","ee":"https://doi.org/10.1145/3594536.3595124","url":"https://dblp.org/rec/conf/icail/DrieBBTV23"},
+"url":"URL#1763358"
+},
+{
+"@score":"1",
+"@id":"1763360",
+"info":{"authors":{"author":[{"@pid":"267/8072","text":"Peter Fratric"},{"@pid":"251/6011","text":"Mostafa Mohajeri Parizi"},{"@pid":"122/5519","text":"Giovanni Sileno"},{"@pid":"46/1348","text":"Tom M. van Engers"},{"@pid":"62/2484","text":"Sander Klous"}]},"title":"Do agents dream of abiding by the rules?: Learning norms via behavioral exploration and sparse human supervision.","venue":"ICAIL","pages":"81-90","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/FratricPSEK23","doi":"10.1145/3594536.3595153","ee":"https://doi.org/10.1145/3594536.3595153","url":"https://dblp.org/rec/conf/icail/FratricPSEK23"},
+"url":"URL#1763360"
+},
+{
+"@score":"1",
+"@id":"1763361",
+"info":{"authors":{"author":[{"@pid":"02/5092","text":"Max Fuchs"},{"@pid":"75/6415","text":"Amit Jadhav"},{"@pid":"356/8205","text":"Advaith Jaishankar"},{"@pid":"356/8014","text":"Caroline Cauffman"},{"@pid":"43/7739","text":"Gerasimos Spanakis"}]},"title":"&quot;What&apos;s wrong with this product?&quot;: Detection of product safety issues based on information consumers share online.","venue":"ICAIL","pages":"397-401","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/FuchsJJCS23","doi":"10.1145/3594536.3595145","ee":"https://doi.org/10.1145/3594536.3595145","url":"https://dblp.org/rec/conf/icail/FuchsJJCS23"},
+"url":"URL#1763361"
+},
+{
+"@score":"1",
+"@id":"1763362",
+"info":{"authors":{"author":[{"@pid":"356/8013","text":"Frank Giaoui"},{"@pid":"356/8158","text":"Luv Aggarwal"},{"@pid":"356/8270","text":"Diego Lobo"},{"@pid":"356/8324","text":"Joan Gondolo"},{"@pid":"356/8316","text":"Philippe Lachkeur"},{"@pid":"227/5953","text":"Satvik Jain"}]},"title":"Applying NLLP and ML to Predict Damages as a Remedy for Contract Breach.","venue":"ICAIL","pages":"468-469","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GiaouiALGLJ23","doi":"10.1145/3594536.3595119","ee":"https://doi.org/10.1145/3594536.3595119","url":"https://dblp.org/rec/conf/icail/GiaouiALGLJ23"},
+"url":"URL#1763362"
+},
+{
+"@score":"1",
+"@id":"1763363",
+"info":{"authors":{"author":[{"@pid":"g/RandyGoebel","text":"Randy Goebel"},{"@pid":"43/5345","text":"Yoshinobu Kano"},{"@pid":"95/2636","text":"Mi-Young Kim"},{"@pid":"245/3417","text":"Juliano Rabelo 0001"},{"@pid":"s/KenSatoh","text":"Ken Satoh"},{"@pid":"88/5951","text":"Masaharu Yoshioka"}]},"title":"Summary of the Competition on Legal Information, Extraction/Entailment (COLIEE) 2023.","venue":"ICAIL","pages":"472-480","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GoebelKK0SY23","doi":"10.1145/3594536.3595176","ee":"https://doi.org/10.1145/3594536.3595176","url":"https://dblp.org/rec/conf/icail/GoebelKK0SY23"},
+"url":"URL#1763363"
+},
+{
+"@score":"1",
+"@id":"1763364",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"}]},"title":"Deontic Ambiguities in Legal Reasoning.","venue":"ICAIL","pages":"91-100","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GovernatoriR23","doi":"10.1145/3594536.3595175","ee":"https://doi.org/10.1145/3594536.3595175","url":"https://dblp.org/rec/conf/icail/GovernatoriR23"},
+"url":"URL#1763364"
+},
+{
+"@score":"1",
+"@id":"1763365",
+"info":{"authors":{"author":[{"@pid":"245/3483","text":"Morgan A. Gray"},{"@pid":"05/11075","text":"Jaromír Savelka"},{"@pid":"231/7721","text":"Wesley M. Oliver"},{"@pid":"39/1439","text":"Kevin D. Ashley"}]},"title":"Automatic Identification and Empirical Analysis of Legally Relevant Factors.","venue":"ICAIL","pages":"101-110","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/GraySOA23","doi":"10.1145/3594536.3595157","ee":"https://doi.org/10.1145/3594536.3595157","url":"https://dblp.org/rec/conf/icail/GraySOA23"},
+"url":"URL#1763365"
+},
+{
+"@score":"1",
+"@id":"1763366",
+"info":{"authors":{"author":[{"@pid":"346/7825","text":"Eliya Habba"},{"@pid":"304/8196","text":"Renana Keydar"},{"@pid":"264/5234","text":"Dan Bareket"},{"@pid":"166/1740","text":"Gabriel Stanovsky"}]},"title":"The Perfect Victim: Computational Analysis of Judicial Attitudes towards Victims of Sexual Violence.","venue":"ICAIL","pages":"111-120","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HabbaKBS23","doi":"10.1145/3594536.3595168","ee":"https://doi.org/10.1145/3594536.3595168","url":"https://dblp.org/rec/conf/icail/HabbaKBS23"},
+"url":"URL#1763366"
+},
+{
+"@score":"1",
+"@id":"1763367",
+"info":{"authors":{"author":{"@pid":"356/7813","text":"Amit Haim"}},"title":"Binding Language in Administrative Guidance Documents.","venue":"ICAIL","pages":"407-411","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Haim23","doi":"10.1145/3594536.3595127","ee":"https://doi.org/10.1145/3594536.3595127","url":"https://dblp.org/rec/conf/icail/Haim23"},
+"url":"URL#1763367"
+},
+{
+"@score":"1",
+"@id":"1763368",
+"info":{"authors":{"author":[{"@pid":"356/7813","text":"Amit Haim"},{"@pid":"232/2211","text":"Aniket Kesari"}]},"title":"Image Analysis Approach to Trademark Congestion and Depletion.","venue":"ICAIL","pages":"402-406","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HaimK23","doi":"10.1145/3594536.3595126","ee":"https://doi.org/10.1145/3594536.3595126","url":"https://dblp.org/rec/conf/icail/HaimK23"},
+"url":"URL#1763368"
+},
+{
+"@score":"1",
+"@id":"1763373",
+"info":{"authors":{"author":[{"@pid":"254/0988","text":"Lars Hillebrand"},{"@pid":"247/6968","text":"Maren Pielka"},{"@pid":"347/3096","text":"David Leonhard"},{"@pid":"326/0468","text":"Tobias Deußer"},{"@pid":"249/1884","text":"Tim Dilmaghani Khameneh"},{"@pid":"249/1781","text":"Bernd Kliem"},{"@pid":"249/1904","text":"Rüdiger Loitz"},{"@pid":"347/2340","text":"Milad Morad"},{"@pid":"347/3403","text":"Christian Temath"},{"@pid":"249/1911","text":"Thiago Bell"},{"@pid":"248/6129","text":"Robin Stenzel"},{"@pid":"122/7972","text":"Rafet Sifa"}]},"title":"sustain.AI: a Recommender System to analyze Sustainability Reports.","venue":"ICAIL","pages":"412-416","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/HillebrandPLDKK23","doi":"10.1145/3594536.3595131","ee":"https://doi.org/10.1145/3594536.3595131","url":"https://dblp.org/rec/conf/icail/HillebrandPLDKK23"},
+"url":"URL#1763373"
+},
+{
+"@score":"1",
+"@id":"1763374",
+"info":{"authors":{"author":{"@pid":"01/2440","text":"Joris Hulstijn"}},"title":"Computational Accountability.","venue":"ICAIL","pages":"121-130","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/Hulstijn23","doi":"10.1145/3594536.3595122","ee":"https://doi.org/10.1145/3594536.3595122","url":"https://dblp.org/rec/conf/icail/Hulstijn23"},
+"url":"URL#1763374"
+},
+{
+"@score":"1",
+"@id":"1763377",
+"info":{"authors":{"author":[{"@pid":"261/9557","text":"Cong Jiang"},{"@pid":"35/9756","text":"Xiaolei Yang"}]},"title":"Legal Syllogism Prompting: Teaching Large Language Models for Legal Judgment Prediction.","venue":"ICAIL","pages":"417-421","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/JiangY23","doi":"10.1145/3594536.3595170","ee":"https://doi.org/10.1145/3594536.3595170","url":"https://dblp.org/rec/conf/icail/JiangY23"},
+"url":"URL#1763377"
+},
+{
+"@score":"1",
+"@id":"1763380",
+"info":{"authors":{"author":[{"@pid":"193/3577","text":"Shao-Man Lee"},{"@pid":"356/8288","text":"Yu-Hsiang Tan"},{"@pid":"356/7913","text":"Han-Ting Yu"}]},"title":"LeArNER: Few-shot Legal Argument Named Entity Recognition.","venue":"ICAIL","pages":"422-426","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LeeTY23","doi":"10.1145/3594536.3595144","ee":"https://doi.org/10.1145/3594536.3595144","url":"https://dblp.org/rec/conf/icail/LeeTY23"},
+"url":"URL#1763380"
+},
+{
+"@score":"1",
+"@id":"1763381",
+"info":{"authors":{"author":[{"@pid":"256/2300","text":"Ludi van Leeuwen"},{"@pid":"99/3259","text":"Bart Verheij"},{"@pid":"v/RVerbrugge","text":"Rineke Verbrugge"},{"@pid":"08/4459","text":"Silja Renooij"}]},"title":"Using Agent-Based Simulations to Evaluate Bayesian Networks for Criminal Scenarios.","venue":"ICAIL","pages":"323-332","year":"2023","type":"Conference and Workshop Papers","access":"closed","key":"conf/icail/LeeuwenVVR23","doi":"10.1145/3594536.3595125","ee":"https://doi.org/10.1145/3594536.3595125","url":"https://dblp.org/rec/conf/icail/LeeuwenVVR23"},
+"url":"URL#1763381"
+}
+]
+}
+}
+}

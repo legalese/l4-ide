@@ -1,0 +1,632 @@
+{
+"result":{
+"query":":facetid:stream:\"streams/conf/jurix\"",
+"status":{
+"@code":"200",
+"text":"OK"
+},
+"time":{
+"@unit":"msecs",
+"text":"149.64"
+},
+"completions":{
+"@total":"1",
+"@computed":"1",
+"@sent":"1",
+"c":{
+"@sc":"703",
+"@dc":"703",
+"@oc":"703",
+"@id":"56925610",
+"text":":facetid:stream:streams/conf/jurix"
+}
+},
+"hits":{
+"@total":"703",
+"@computed":"600",
+"@sent":"100",
+"@first":"500",
+"hit":[{
+"@score":"1",
+"@id":"5670080",
+"info":{"authors":{"author":[{"@pid":"132/9702","text":"Charlotte S. Vlek"},{"@pid":"64/5549","text":"Henry Prakken"},{"@pid":"08/4459","text":"Silja Renooij"},{"@pid":"99/3259","text":"Bart Verheij"}]},"title":"Unfolding Crime Scenarios with Variations: A Method for Building a Bayesian Network for Legal Narratives.","venue":"JURIX","pages":"145-154","year":"2013","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/VlekPRV13","doi":"10.3233/978-1-61499-359-9-145","ee":"https://doi.org/10.3233/978-1-61499-359-9-145","url":"https://dblp.org/rec/conf/jurix/VlekPRV13"},
+"url":"URL#5670080"
+},
+{
+"@score":"1",
+"@id":"5670081",
+"info":{"authors":{"author":[{"@pid":"18/3818","text":"Radboud Winkels"},{"@pid":"80/6226","text":"Alexander Boer"},{"@pid":"141/6411","text":"Ivan Plantevin"}]},"title":"Creating Context Networks in Dutch Legislation.","venue":"JURIX","pages":"155-164","year":"2013","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WinkelsBP13","doi":"10.3233/978-1-61499-359-9-155","ee":"https://doi.org/10.3233/978-1-61499-359-9-155","url":"https://dblp.org/rec/conf/jurix/WinkelsBP13"},
+"url":"URL#5670081"
+},
+{
+"@score":"1",
+"@id":"5670082",
+"info":{"authors":{"author":[{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"84/163","text":"Wim Peters"},{"@pid":"135/8520","text":"Daniel Katz"}]},"title":"A Case Study on Legal Case Annotation.","venue":"JURIX","pages":"165-174","year":"2013","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WynerPK13","doi":"10.3233/978-1-61499-359-9-165","ee":"https://doi.org/10.3233/978-1-61499-359-9-165","url":"https://dblp.org/rec/conf/jurix/WynerPK13"},
+"url":"URL#5670082"
+},
+{
+"@score":"1",
+"@id":"5670083",
+"info":{"authors":{"author":[{"@pid":"15/2166","text":"Yutaka Yoshida"},{"@pid":"89/11497","text":"Kozo Honda"},{"@pid":"95/6448","text":"Yuichi Sei"},{"@pid":"75/6845","text":"Hiroyuki Nakagawa"},{"@pid":"96/914","text":"Yasuyuki Tahara"},{"@pid":"35/2289","text":"Akihiko Ohsuga"}]},"title":"Towards Semi-Automatic Identification of Functional Requirements in Legal Texts for Public Administration.","venue":"JURIX","pages":"175-184","year":"2013","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/YoshidaHSNTO13","doi":"10.3233/978-1-61499-359-9-175","ee":"https://doi.org/10.3233/978-1-61499-359-9-175","url":"https://dblp.org/rec/conf/jurix/YoshidaHSNTO13"},
+"url":"URL#5670083"
+},
+{
+"@score":"1",
+"@id":"5720402",
+"info":{"authors":{"author":{"@pid":"39/1439","text":"Kevin D. Ashley"}},"title":"Legal Knowledge and Information Systems - JURIX 2013: The Twenty-Sixth Annual Conference, December 11-13, 2013, University of Bologna, Italy","venue":["JURIX","Frontiers in Artificial Intelligence and Applications"],"volume":"259","publisher":"IOS Press","year":"2013","type":"Editorship","access":"unavailable","key":"conf/jurix/2013","url":"https://dblp.org/rec/conf/jurix/2013"},
+"url":"URL#5720402"
+},
+{
+"@score":"1",
+"@id":"5939648",
+"info":{"authors":{"author":[{"@pid":"06/9512","text":"Michal Araszkiewicz"},{"@pid":"05/11075","text":"Jaromír Savelka"}]},"title":"Refined Coherence as Constraint Satisfaction Framework for Representing Judicial Reasoning.","venue":"JURIX","pages":"1-10","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AraszkiewiczS12","doi":"10.3233/978-1-61499-167-0-1","ee":"https://doi.org/10.3233/978-1-61499-167-0-1","url":"https://dblp.org/rec/conf/jurix/AraszkiewiczS12"},
+"url":"URL#5939648"
+},
+{
+"@score":"1",
+"@id":"5939649",
+"info":{"authors":{"author":{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}},"title":"What Makes a System a Legal Expert?","venue":"JURIX","pages":"11-20","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Bench-Capon12","doi":"10.3233/978-1-61499-167-0-11","ee":"https://doi.org/10.3233/978-1-61499-167-0-11","url":"https://dblp.org/rec/conf/jurix/Bench-Capon12"},
+"url":"URL#5939649"
+},
+{
+"@score":"1",
+"@id":"5939650",
+"info":{"authors":{"author":[{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"12/5266","text":"Luigi Di Caro"},{"@pid":"03/3387","text":"Leonardo Lesmo"},{"@pid":"98/9512","text":"Daniele Rispoli"},{"@pid":"41/5768","text":"Livio Robaldo"}]},"title":"Multi-label Classification of Legislative Text into EuroVoc.","venue":"JURIX","pages":"21-30","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoellaCLRR12","doi":"10.3233/978-1-61499-167-0-21","ee":"https://doi.org/10.3233/978-1-61499-167-0-21","url":"https://dblp.org/rec/conf/jurix/BoellaCLRR12"},
+"url":"URL#5939650"
+},
+{
+"@score":"1",
+"@id":"5939651",
+"info":{"authors":{"author":[{"@pid":"04/5266","text":"William J. Buchanan"},{"@pid":"47/137","text":"Lu Fan"},{"@pid":"24/2172","text":"Alistair Lawson"},{"@pid":"22/6495","text":"Burkhard Schafer 0001"},{"@pid":"36/9512","text":"Russel Scott"},{"@pid":"10/9512","text":"Christoph Thuemmler"},{"@pid":"22/9512","text":"Omair Uthmani"}]},"title":"Computational data protection law: trusting each other offline and online.","venue":"JURIX","pages":"31-40","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BuchananFLSSTU12","doi":"10.3233/978-1-61499-167-0-31","ee":"https://doi.org/10.3233/978-1-61499-167-0-31","url":"https://dblp.org/rec/conf/jurix/BuchananFLSSTU12"},
+"url":"URL#5939651"
+},
+{
+"@score":"1",
+"@id":"5939652",
+"info":{"authors":{"author":{"@pid":"87/612","text":"Enrico Francesconi"}},"title":"Supporting Transnational Judicial Procedures between European Member States: the e-Codex Project.","venue":"JURIX","pages":"41-50","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Francesconi12","doi":"10.3233/978-1-61499-167-0-41","ee":"https://doi.org/10.3233/978-1-61499-167-0-41","url":"https://dblp.org/rec/conf/jurix/Francesconi12"},
+"url":"URL#5939652"
+},
+{
+"@score":"1",
+"@id":"5939653",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"10/7503","text":"Francesco Olivieri"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"35/8628","text":"Simone Scannapieco"}]},"title":"Narrowing Legal Concepts.","venue":"JURIX","pages":"51-60","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GovernatoriORS12","doi":"10.3233/978-1-61499-167-0-51","ee":"https://doi.org/10.3233/978-1-61499-167-0-51","url":"https://dblp.org/rec/conf/jurix/GovernatoriORS12"},
+"url":"URL#5939653"
+},
+{
+"@score":"1",
+"@id":"5939654",
+"info":{"authors":{"author":[{"@pid":"122/5522","text":"Shumpei Kubosawa"},{"@pid":"122/5520","text":"Youwei Lu"},{"@pid":"05/956","text":"Shogo Okada"},{"@pid":"80/2807","text":"Katsumi Nitta"}]},"title":"Argument Analysis with Factor Annotation Tool.","venue":"JURIX","pages":"61-70","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/KubosawaLON12","doi":"10.3233/978-1-61499-167-0-61","ee":"https://doi.org/10.3233/978-1-61499-167-0-61","url":"https://dblp.org/rec/conf/jurix/KubosawaLON12"},
+"url":"URL#5939654"
+},
+{
+"@score":"1",
+"@id":"5939655",
+"info":{"authors":{"author":[{"@pid":"122/5521","text":"QingYin Liang"},{"@pid":"40/267","text":"Bin Wei"}]},"title":"An argumentation model of evidential reasoning with variable degrees of justification.","venue":"JURIX","pages":"71-80","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/LiangW12","doi":"10.3233/978-1-61499-167-0-71","ee":"https://doi.org/10.3233/978-1-61499-167-0-71","url":"https://dblp.org/rec/conf/jurix/LiangW12"},
+"url":"URL#5939655"
+},
+{
+"@score":"1",
+"@id":"5939656",
+"info":{"authors":{"author":[{"@pid":"58/3939","text":"Collin F. Lynch"},{"@pid":"39/1439","text":"Kevin D. Ashley"},{"@pid":"22/8487","text":"Mohammad Hassan Falakmasir"}]},"title":"Comparing Argument Diagrams.","venue":"JURIX","pages":"81-90","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/LynchAF12","doi":"10.3233/978-1-61499-167-0-81","ee":"https://doi.org/10.3233/978-1-61499-167-0-81","url":"https://dblp.org/rec/conf/jurix/LynchAF12"},
+"url":"URL#5939656"
+},
+{
+"@score":"1",
+"@id":"5939657",
+"info":{"authors":{"author":[{"@pid":"30/5542","text":"Jean-Henry Morin"},{"@pid":"33/4672","text":"Olivier Glassey"}]},"title":"ThinkData: a Data Protection and Transparency Awareness Service based on Storytelling.","venue":"JURIX","pages":"91-94","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/MorinG12","doi":"10.3233/978-1-61499-167-0-91","ee":"https://doi.org/10.3233/978-1-61499-167-0-91","url":"https://dblp.org/rec/conf/jurix/MorinG12"},
+"url":"URL#5939657"
+},
+{
+"@score":"1",
+"@id":"5939658",
+"info":{"authors":{"author":{"@pid":"27/1629","text":"Marc van Opijnen"}},"title":"Citation Analysis and Beyond: in Search of Indicators Measuring Case Law Importance.","venue":"JURIX","pages":"95-104","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Opijnen12","doi":"10.3233/978-1-61499-167-0-95","ee":"https://doi.org/10.3233/978-1-61499-167-0-95","url":"https://dblp.org/rec/conf/jurix/Opijnen12"},
+"url":"URL#5939658"
+},
+{
+"@score":"1",
+"@id":"5939659",
+"info":{"authors":{"author":[{"@pid":"52/776","text":"Gordon J. Pace"},{"@pid":"28/1899","text":"Fernando Schapachnik"}]},"title":"Types of Rights in Two-Party Systems: A Formal Analysis.","venue":"JURIX","pages":"105-114","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PaceS12","doi":"10.3233/978-1-61499-167-0-105","ee":"https://doi.org/10.3233/978-1-61499-167-0-105","url":"https://dblp.org/rec/conf/jurix/PaceS12"},
+"url":"URL#5939659"
+},
+{
+"@score":"1",
+"@id":"5939660",
+"info":{"authors":{"author":[{"@pid":"122/5518","text":"Prakash Poudyal"},{"@pid":"73/4272","text":"Paulo Quaresma"}]},"title":"An hybrid approach for legal information extraction.","venue":"JURIX","pages":"115-118","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PoudyalQ12","doi":"10.3233/978-1-61499-167-0-115","ee":"https://doi.org/10.3233/978-1-61499-167-0-115","url":"https://dblp.org/rec/conf/jurix/PoudyalQ12"},
+"url":"URL#5939660"
+},
+{
+"@score":"1",
+"@id":"5939661",
+"info":{"authors":{"author":{"@pid":"64/5549","text":"Henry Prakken"}},"title":"Formalising a legal opinion on a legislative proposal in the ASPIC+ framework.","venue":"JURIX","pages":"119-128","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Prakken12","doi":"10.3233/978-1-61499-167-0-119","ee":"https://doi.org/10.3233/978-1-61499-167-0-119","url":"https://dblp.org/rec/conf/jurix/Prakken12"},
+"url":"URL#5939661"
+},
+{
+"@score":"1",
+"@id":"5939662",
+"info":{"authors":{"author":[{"@pid":"122/5517","text":"Shashishekar Ramakrishna"},{"@pid":"k/NaouelKaram","text":"Naouel Karam"},{"@pid":"24/2942","text":"Adrian Paschke"}]},"title":"The FSTP Test: a novel approach for an invention&apos;s non-obviousness analysis.","venue":"JURIX","pages":"129-132","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/RamakrishnaKP12","doi":"10.3233/978-1-61499-167-0-129","ee":"https://doi.org/10.3233/978-1-61499-167-0-129","url":"https://dblp.org/rec/conf/jurix/RamakrishnaKP12"},
+"url":"URL#5939662"
+},
+{
+"@score":"1",
+"@id":"5939663",
+"info":{"authors":{"author":[{"@pid":"41/5768","text":"Livio Robaldo"},{"@pid":"03/3387","text":"Leonardo Lesmo"},{"@pid":"50/750","text":"Daniele Paolo Radicioni"}]},"title":"Compiling Regular Expressions to Extract Legal Modifications.","venue":"JURIX","pages":"133-141","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/RobaldoLR12","doi":"10.3233/978-1-61499-167-0-133","ee":"https://doi.org/10.3233/978-1-61499-167-0-133","url":"https://dblp.org/rec/conf/jurix/RobaldoLR12"},
+"url":"URL#5939663"
+},
+{
+"@score":"1",
+"@id":"5939664",
+"info":{"authors":{"author":[{"@pid":"122/5519","text":"Giovanni Sileno"},{"@pid":"80/6226","text":"Alexander Boer"},{"@pid":"46/1348","text":"Tom M. van Engers"}]},"title":"Analysis of legal narratives: a conceptual framework.","venue":"JURIX","pages":"143-146","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/SilenoBE12","doi":"10.3233/978-1-61499-167-0-143","ee":"https://doi.org/10.3233/978-1-61499-167-0-143","url":"https://dblp.org/rec/conf/jurix/SilenoBE12"},
+"url":"URL#5939664"
+},
+{
+"@score":"1",
+"@id":"5939665",
+"info":{"authors":{"author":[{"@pid":"36/6817","text":"Akos Szoke"},{"@pid":"29/8362","text":"András Förhécz"},{"@pid":"77/2244","text":"György Strausz"}]},"title":"A Unified Change Management of Regulations and their Formal Representations based on the FRBR Framework and the Direct Method.","venue":"JURIX","pages":"147-156","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/SzokeFS12","doi":"10.3233/978-1-61499-167-0-147","ee":"https://doi.org/10.3233/978-1-61499-167-0-147","url":"https://dblp.org/rec/conf/jurix/SzokeFS12"},
+"url":"URL#5939665"
+},
+{
+"@score":"1",
+"@id":"5939666",
+"info":{"authors":{"author":[{"@pid":"18/3818","text":"Radboud Winkels"},{"@pid":"14/2726","text":"Rinke Hoekstra"}]},"title":"Automatic Extraction of Legal Concepts and Definitions.","venue":"JURIX","pages":"157-166","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WinkelsH12","doi":"10.3233/978-1-61499-167-0-157","ee":"https://doi.org/10.3233/978-1-61499-167-0-157","url":"https://dblp.org/rec/conf/jurix/WinkelsH12"},
+"url":"URL#5939666"
+},
+{
+"@score":"1",
+"@id":"5939667",
+"info":{"authors":{"author":[{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"56/746","text":"Johan Bos"},{"@pid":"86/11425","text":"Valerio Basile"},{"@pid":"73/4272","text":"Paulo Quaresma"}]},"title":"An Empirical Approach to the Semantic Representation of Laws.","venue":"JURIX","pages":"177-180","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WynerBBQ12","doi":"10.3233/978-1-61499-167-0-177","ee":"https://doi.org/10.3233/978-1-61499-167-0-177","url":"https://dblp.org/rec/conf/jurix/WynerBBQ12"},
+"url":"URL#5939667"
+},
+{
+"@score":"1",
+"@id":"5939668",
+"info":{"authors":{"author":[{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"41/4327","text":"Maya Wardeh"},{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"},{"@pid":"17/6670","text":"Katie Atkinson"}]},"title":"A Model-Based Critique Tool for Policy Deliberation.","venue":"JURIX","pages":"167-176","year":"2012","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WynerWBA12","doi":"10.3233/978-1-61499-167-0-167","ee":"https://doi.org/10.3233/978-1-61499-167-0-167","url":"https://dblp.org/rec/conf/jurix/WynerWBA12"},
+"url":"URL#5939668"
+},
+{
+"@score":"1",
+"@id":"5988814",
+"info":{"authors":{"author":{"@pid":"22/6495","text":"Burkhard Schäfer 0001"}},"title":"Legal Knowledge and Information Systems - JURIX 2012: The Twenty-Fifth Annual Conference, University of Amsterdam, The Netherlands, 17-19 December 2012","venue":["JURIX","Frontiers in Artificial Intelligence and Applications"],"volume":"250","publisher":"IOS Press","year":"2012","type":"Editorship","key":"conf/jurix/2012","ee":"http://www.booksonline.iospress.nl/Content/View.aspx?piid=32753","url":"https://dblp.org/rec/conf/jurix/2012"},
+"url":"URL#5988814"
+},
+{
+"@score":"1",
+"@id":"6197919",
+"info":{"authors":{"author":[{"@pid":"69/2328","text":"Witold Abramowicz"},{"@pid":"40/1441","text":"Piotr Stolarski"},{"@pid":"06/4354","text":"Agata Filipowska"},{"@pid":"19/11074","text":"Bartosz Perkowski"},{"@pid":"w/KrzysztofWecel","text":"Krzysztof Wecel"}]},"title":"System for Detection of Illegal Drugs E-Trading.","venue":"JURIX","pages":"163-164","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AbramowiczSFPW11","doi":"10.3233/978-1-60750-981-3-163","ee":"https://doi.org/10.3233/978-1-60750-981-3-163","url":"https://dblp.org/rec/conf/jurix/AbramowiczSFPW11"},
+"url":"URL#6197919"
+},
+{
+"@score":"1",
+"@id":"6197920",
+"info":{"authors":{"author":[{"@pid":"06/9512","text":"Michal Araszkiewicz"},{"@pid":"05/11075","text":"Jaromír Savelka"}]},"title":"Two Methods for Representing Judicial Reasoning in the Framework of Coherence as Constraint Satisfaction.","venue":"JURIX","pages":"165-166","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AraszkiewiczS11","doi":"10.3233/978-1-60750-981-3-165","ee":"https://doi.org/10.3233/978-1-60750-981-3-165","url":"https://dblp.org/rec/conf/jurix/AraszkiewiczS11"},
+"url":"URL#6197920"
+},
+{
+"@score":"1",
+"@id":"6197921",
+"info":{"authors":{"author":[{"@pid":"39/1439","text":"Kevin D. Ashley"},{"@pid":"69/2135","text":"Ilya M. Goldin"}]},"title":"Toward AI-enhanced Computer-supported Peer Review in Legal Education.","venue":"JURIX","pages":"3-12","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AshleyG11","doi":"10.3233/978-1-60750-981-3-3","ee":"https://doi.org/10.3233/978-1-60750-981-3-3","url":"https://dblp.org/rec/conf/jurix/AshleyG11"},
+"url":"URL#6197921"
+},
+{
+"@score":"1",
+"@id":"6197922",
+"info":{"authors":{"author":{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}},"title":"Relating Values in a Series of Supreme Court Decisions.","venue":"JURIX","pages":"13-22","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Bench-Capon11","doi":"10.3233/978-1-60750-981-3-13","ee":"https://doi.org/10.3233/978-1-60750-981-3-13","url":"https://dblp.org/rec/conf/jurix/Bench-Capon11"},
+"url":"URL#6197922"
+},
+{
+"@score":"1",
+"@id":"6197923",
+"info":{"authors":{"author":[{"@pid":"47/4875","text":"Floris Bex"},{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"},{"@pid":"99/3259","text":"Bart Verheij"}]},"title":"What Makes a Story Plausible? The Need for Precedents.","venue":"JURIX","pages":"23-32","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BexBV11","doi":"10.3233/978-1-60750-981-3-23","ee":"https://doi.org/10.3233/978-1-60750-981-3-23","url":"https://dblp.org/rec/conf/jurix/BexBV11"},
+"url":"URL#6197923"
+},
+{
+"@score":"1",
+"@id":"6197924",
+"info":{"authors":{"author":[{"@pid":"80/6226","text":"Alexander Boer"},{"@pid":"46/1348","text":"Tom M. van Engers"}]},"title":"Implementing Compliance Controls in Public Administration.","venue":"JURIX","pages":"33-42","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoerE11","doi":"10.3233/978-1-60750-981-3-33","ee":"https://doi.org/10.3233/978-1-60750-981-3-33","url":"https://dblp.org/rec/conf/jurix/BoerE11"},
+"url":"URL#6197924"
+},
+{
+"@score":"1",
+"@id":"6197925",
+"info":{"authors":{"author":[{"@pid":"05/6663","text":"Davide Carneiro"},{"@pid":"83/2246-2","text":"Marco Gomes 0002"},{"@pid":"77/2321","text":"Paulo Novais"},{"@pid":"84/1520","text":"Francisco Andrade 0001"},{"@pid":"84/5278","text":"José Neves 0001"}]},"title":"Automatic Classification of Personal Conflict Styles in Conflict Resolution.","venue":"JURIX","pages":"43-52","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/CarneiroGNAN11","doi":"10.3233/978-1-60750-981-3-43","ee":"https://doi.org/10.3233/978-1-60750-981-3-43","url":"https://dblp.org/rec/conf/jurix/CarneiroGNAN11"},
+"url":"URL#6197925"
+},
+{
+"@score":"1",
+"@id":"6197926",
+"info":{"authors":{"author":[{"@pid":"24/838","text":"Aaron Ciaghi"},{"@pid":"81/11076","text":"Andrea Dalla Valle"},{"@pid":"19/1157","text":"Adolfo Villafiorita"}]},"title":"Adapting Software Metrics to Analyze the Evolution of Laws - An Italian Case Study.","venue":"JURIX","pages":"53-62","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/CiaghiVV11","doi":"10.3233/978-1-60750-981-3-53","ee":"https://doi.org/10.3233/978-1-60750-981-3-53","url":"https://dblp.org/rec/conf/jurix/CiaghiVV11"},
+"url":"URL#6197926"
+},
+{
+"@score":"1",
+"@id":"6197927",
+"info":{"authors":{"author":[{"@pid":"87/612","text":"Enrico Francesconi"},{"@pid":"63/11076","text":"Tommaso Pratelli"}]},"title":"A Twofold Parsing Strategy for Italian Court Decisions.","venue":"JURIX","pages":"125-129","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/FrancesconiP11","doi":"10.3233/978-1-60750-981-3-125","ee":"https://doi.org/10.3233/978-1-60750-981-3-125","url":"https://dblp.org/rec/conf/jurix/FrancesconiP11"},
+"url":"URL#6197927"
+},
+{
+"@score":"1",
+"@id":"6197928",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"10/7503","text":"Francesco Olivieri"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"35/8628","text":"Simone Scannapieco"}]},"title":"Three Concepts of Defeasible Permission.","venue":"JURIX","pages":"63-72","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GovernatoriORS11","doi":"10.3233/978-1-60750-981-3-63","ee":"https://doi.org/10.3233/978-1-60750-981-3-63","url":"https://dblp.org/rec/conf/jurix/GovernatoriORS11"},
+"url":"URL#6197928"
+},
+{
+"@score":"1",
+"@id":"6197929",
+"info":{"authors":{"author":[{"@pid":"09/1651","text":"Matthias Grabmair"},{"@pid":"39/1439","text":"Kevin D. Ashley"},{"@pid":"29/3207","text":"Rebecca Hwa"},{"@pid":"77/11076","text":"Patricia M. Sweeney"}]},"title":"Toward Extracting Information from Public Health Statutes using Text Classification Machine Learning.","venue":"JURIX","pages":"73-82","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GrabmairAHS11","doi":"10.3233/978-1-60750-981-3-73","ee":"https://doi.org/10.3233/978-1-60750-981-3-73","url":"https://dblp.org/rec/conf/jurix/GrabmairAHS11"},
+"url":"URL#6197929"
+},
+{
+"@score":"1",
+"@id":"6197930",
+"info":{"authors":{"author":[{"@pid":"00/2689","text":"Czeslaw Jedrzejek"},{"@pid":"05/7507","text":"Jaroslaw Bak"},{"@pid":"64/849","text":"Maciej Falkowski"},{"@pid":"71/1168","text":"Jolanta Cybulka"},{"@pid":"95/6997","text":"Maciej Nowak"}]},"title":"On the Detection and Analysis of VAT Carousel Crime.","venue":"JURIX","pages":"130-134","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/JedrzejekBFCN11","doi":"10.3233/978-1-60750-981-3-130","ee":"https://doi.org/10.3233/978-1-60750-981-3-130","url":"https://dblp.org/rec/conf/jurix/JedrzejekBFCN11"},
+"url":"URL#6197930"
+},
+{
+"@score":"1",
+"@id":"6197931",
+"info":{"authors":{"author":[{"@pid":"99/7168","text":"Daniel Martin Katz"},{"@pid":"17/7168","text":"Michael J. Bommarito II"},{"@pid":"10/11074","text":"Julie Seaman"},{"@pid":"26/1185","text":"Eugene Agichtein"}]},"title":"Legal N-Grams? A Simple Approach to Track the Evolution of Legal Language.","venue":"JURIX","pages":"167-168","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/KatzBSA11","doi":"10.3233/978-1-60750-981-3-167","ee":"https://doi.org/10.3233/978-1-60750-981-3-167","url":"https://dblp.org/rec/conf/jurix/KatzBSA11"},
+"url":"URL#6197931"
+},
+{
+"@score":"1",
+"@id":"6197932",
+"info":{"authors":{"author":[{"@pid":"04/5140","text":"Thomas Kurz"},{"@pid":"52/11076","text":"C. Ruecker"},{"@pid":"127/6677","text":"Thomas J. Lampoltshammer"},{"@pid":"84/2718","text":"Thomas Heistracher"}]},"title":"Privacy Rule Definition Language - A Multi-stakeholder Approach to ENDORSE Privacy.","venue":"JURIX","pages":"135-139","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/KurzRLH11","doi":"10.3233/978-1-60750-981-3-135","ee":"https://doi.org/10.3233/978-1-60750-981-3-135","url":"https://dblp.org/rec/conf/jurix/KurzRLH11"},
+"url":"URL#6197932"
+},
+{
+"@score":"1",
+"@id":"6197933",
+"info":{"authors":{"author":[{"@pid":"52/776","text":"Gordon J. Pace"},{"@pid":"28/1899","text":"Fernando Schapachnik"}]},"title":"Permissions in Contracts, a Logical Insight.","venue":"JURIX","pages":"140-144","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PaceS11","doi":"10.3233/978-1-60750-981-3-140","ee":"https://doi.org/10.3233/978-1-60750-981-3-140","url":"https://dblp.org/rec/conf/jurix/PaceS11"},
+"url":"URL#6197933"
+},
+{
+"@score":"1",
+"@id":"6197934",
+"info":{"authors":{"author":{"@pid":"65/8090","text":"Craig Pfeifer"}},"title":"Author Attribution in US Supreme Court Decisions.","venue":"JURIX","pages":"145-149","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Pfeifer11","doi":"10.3233/978-1-60750-981-3-145","ee":"https://doi.org/10.3233/978-1-60750-981-3-145","url":"https://dblp.org/rec/conf/jurix/Pfeifer11"},
+"url":"URL#6197934"
+},
+{
+"@score":"1",
+"@id":"6197935",
+"info":{"authors":{"author":[{"@pid":"64/5549","text":"Henry Prakken"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"On modelling burdens and standards of proof in structured argumentation.","venue":"JURIX","pages":"83-92","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PrakkenS11","doi":"10.3233/978-1-60750-981-3-83","ee":"https://doi.org/10.3233/978-1-60750-981-3-83","url":"https://dblp.org/rec/conf/jurix/PrakkenS11"},
+"url":"URL#6197935"
+},
+{
+"@score":"1",
+"@id":"6197936",
+"info":{"authors":{"author":[{"@pid":"66/11075","text":"Sarah Pulfrey-Taylor"},{"@pid":"00/11076","text":"Emily Henthorn"},{"@pid":"17/6670","text":"Katie Atkinson"},{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"}]},"title":"Populating an Online Consultation Tool.","venue":"JURIX","pages":"150-154","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Pulfrey-TaylorHAWB11","doi":"10.3233/978-1-60750-981-3-150","ee":"https://doi.org/10.3233/978-1-60750-981-3-150","url":"https://dblp.org/rec/conf/jurix/Pulfrey-TaylorHAWB11"},
+"url":"URL#6197936"
+},
+{
+"@score":"1",
+"@id":"6197937",
+"info":{"authors":{"author":[{"@pid":"18/4633","text":"Ermo Täks"},{"@pid":"29/3541","text":"Leo Vohandu"},{"@pid":"14/9512","text":"Ahti Lohk"},{"@pid":"62/51","text":"Innar Liiv"}]},"title":"An experiment to find the deep structure of Estonian legislation.","venue":"JURIX","pages":"93-102","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/TaksVLL11","doi":"10.3233/978-1-60750-981-3-93","ee":"https://doi.org/10.3233/978-1-60750-981-3-93","url":"https://dblp.org/rec/conf/jurix/TaksVLL11"},
+"url":"URL#6197937"
+},
+{
+"@score":"1",
+"@id":"6197938",
+"info":{"authors":{"author":[{"@pid":"18/3818","text":"Radboud Winkels"},{"@pid":"40/11075","text":"Jelle de Ruyter"},{"@pid":"09/11075","text":"Henryk Kroese"}]},"title":"Determining Authority of Dutch Case Law.","venue":"JURIX","pages":"103-112","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WinkelsRK11","doi":"10.3233/978-1-60750-981-3-103","ee":"https://doi.org/10.3233/978-1-60750-981-3-103","url":"https://dblp.org/rec/conf/jurix/WinkelsRK11"},
+"url":"URL#6197938"
+},
+{
+"@score":"1",
+"@id":"6197939",
+"info":{"authors":{"author":[{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"84/163","text":"Wim Peters"}]},"title":"On Rule Extraction from Regulations.","venue":"JURIX","pages":"113-122","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WynerP11","doi":"10.3233/978-1-60750-981-3-113","ee":"https://doi.org/10.3233/978-1-60750-981-3-113","url":"https://dblp.org/rec/conf/jurix/WynerP11"},
+"url":"URL#6197939"
+},
+{
+"@score":"1",
+"@id":"6197940",
+"info":{"authors":{"author":{"@pid":"68/7168","text":"Tomasz Zurek"}},"title":"Instrumental Inference in Legal Expert System.","venue":"JURIX","pages":"155-159","year":"2011","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Zurek11","doi":"10.3233/978-1-60750-981-3-155","ee":"https://doi.org/10.3233/978-1-60750-981-3-155","url":"https://dblp.org/rec/conf/jurix/Zurek11"},
+"url":"URL#6197940"
+},
+{
+"@score":"1",
+"@id":"6241720",
+"info":{"authors":{"author":{"@pid":"17/6670","text":"Katie Atkinson"}},"title":"Legal Knowledge and Information Systems - JURIX 2011: The Twenty-Fourth Annual Conference, University of Vienna, Austria, 14th-16th December 2011","venue":["JURIX","Frontiers in Artificial Intelligence and Applications"],"volume":"235","publisher":"IOS Press","year":"2011","type":"Editorship","key":"conf/jurix/2011","ee":"http://www.booksonline.iospress.nl/Content/View.aspx?piid=26386","url":"https://dblp.org/rec/conf/jurix/2011"},
+"url":"URL#6241720"
+},
+{
+"@score":"1",
+"@id":"6433727",
+"info":{"authors":{"author":{"@pid":"06/9512","text":"Michal Araszkiewicz"}},"title":"Balancing of Legal Principles and Constraint Satisfaction.","venue":"JURIX","pages":"7-16","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Araszkiewicz10","doi":"10.3233/978-1-60750-682-9-7","ee":"https://doi.org/10.3233/978-1-60750-682-9-7","url":"https://dblp.org/rec/conf/jurix/Araszkiewicz10"},
+"url":"URL#6433727"
+},
+{
+"@score":"1",
+"@id":"6433728",
+"info":{"authors":{"author":[{"@pid":"05/9512","text":"Giacomo Bartoloni"},{"@pid":"87/612","text":"Enrico Francesconi"}]},"title":"Sharing Knowledge by Conceptual Mapping: the case of EU Thesaural Interoperability.","venue":"JURIX","pages":"17-26","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BartoloniF10","doi":"10.3233/978-1-60750-682-9-17","ee":"https://doi.org/10.3233/978-1-60750-682-9-17","url":"https://dblp.org/rec/conf/jurix/BartoloniF10"},
+"url":"URL#6433728"
+},
+{
+"@score":"1",
+"@id":"6433729",
+"info":{"authors":{"author":{"@pid":"40/9512","text":"Shawn J. Bayern"}},"title":"A Formal System for Analyzing Conveyances of Property Under the Common Law.","venue":"JURIX","pages":"139-142","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Bayern10","doi":"10.3233/978-1-60750-682-9-139","ee":"https://doi.org/10.3233/978-1-60750-682-9-139","url":"https://dblp.org/rec/conf/jurix/Bayern10"},
+"url":"URL#6433729"
+},
+{
+"@score":"1",
+"@id":"6433730",
+"info":{"authors":{"author":[{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"},{"@pid":"64/5549","text":"Henry Prakken"}]},"title":"A lightweight formal model of two-phase democratic deliberation.","venue":"JURIX","pages":"27-36","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Bench-CaponP10","doi":"10.3233/978-1-60750-682-9-27","ee":"https://doi.org/10.3233/978-1-60750-682-9-27","url":"https://dblp.org/rec/conf/jurix/Bench-CaponP10"},
+"url":"URL#6433730"
+},
+{
+"@score":"1",
+"@id":"6433731",
+"info":{"authors":{"author":[{"@pid":"47/4875","text":"Floris Bex"},{"@pid":"26/4182","text":"Douglas Walton"}]},"title":"Burdens and Standards of Proof for Inference to the Best Explanation.","venue":"JURIX","pages":"37-46","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BexW10","doi":"10.3233/978-1-60750-682-9-37","ee":"https://doi.org/10.3233/978-1-60750-682-9-37","url":"https://dblp.org/rec/conf/jurix/BexW10"},
+"url":"URL#6433731"
+},
+{
+"@score":"1",
+"@id":"6433732",
+"info":{"authors":{"author":[{"@pid":"80/6226","text":"Alexander Boer"},{"@pid":"46/1348","text":"Tom M. van Engers"}]},"title":"Generic Problem Solving Tasks and Agent Roles in Public Administration.","venue":"JURIX","pages":"47-56","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoerE10","doi":"10.3233/978-1-60750-682-9-47","ee":"https://doi.org/10.3233/978-1-60750-682-9-47","url":"https://dblp.org/rec/conf/jurix/BoerE10"},
+"url":"URL#6433732"
+},
+{
+"@score":"1",
+"@id":"6433733",
+"info":{"authors":{"author":[{"@pid":"04/5266","text":"William J. Buchanan"},{"@pid":"47/137","text":"Lu Fan"},{"@pid":"24/2172","text":"Alistair Lawson"},{"@pid":"22/6495","text":"Burkhard Schafer 0001"},{"@pid":"36/9512","text":"Russel Scott"},{"@pid":"10/9512","text":"Christoph Thuemmler"},{"@pid":"22/9512","text":"Omair Uthmani"}]},"title":"Interagency data exchange protocols as computational data protection law.","venue":"JURIX","pages":"143-146","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BuchananFLSSTU10","doi":"10.3233/978-1-60750-682-9-143","ee":"https://doi.org/10.3233/978-1-60750-682-9-143","url":"https://dblp.org/rec/conf/jurix/BuchananFLSSTU10"},
+"url":"URL#6433733"
+},
+{
+"@score":"1",
+"@id":"6433734",
+"info":{"authors":{"author":[{"@pid":"11/9512","text":"Peter Condliffe"},{"@pid":"15/2403","text":"Brooke Abrahams"},{"@pid":"96/5960","text":"John Zeleznikow"}]},"title":"A Legal Decision Support Guide for Owners Corporation Cases.","venue":"JURIX","pages":"147-150","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/CondliffeAZ10","doi":"10.3233/978-1-60750-682-9-147","ee":"https://doi.org/10.3233/978-1-60750-682-9-147","url":"https://dblp.org/rec/conf/jurix/CondliffeAZ10"},
+"url":"URL#6433734"
+},
+{
+"@score":"1",
+"@id":"6433735",
+"info":{"authors":{"author":[{"@pid":"10/4640","text":"Daniel Gorín"},{"@pid":"62/6127","text":"Sergio Mera"},{"@pid":"28/1899","text":"Fernando Schapachnik"}]},"title":"Model Checking Legal Documents.","venue":"JURIX","pages":"151-154","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GorinMS10","doi":"10.3233/978-1-60750-682-9-151","ee":"https://doi.org/10.3233/978-1-60750-682-9-151","url":"https://dblp.org/rec/conf/jurix/GorinMS10"},
+"url":"URL#6433735"
+},
+{
+"@score":"1",
+"@id":"6433736",
+"info":{"authors":{"author":[{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"Burdens of Proof in Monological Argumentation.","venue":"JURIX","pages":"57-66","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GovernatoriS10","doi":"10.3233/978-1-60750-682-9-57","ee":"https://doi.org/10.3233/978-1-60750-682-9-57","url":"https://dblp.org/rec/conf/jurix/GovernatoriS10"},
+"url":"URL#6433736"
+},
+{
+"@score":"1",
+"@id":"6433737",
+"info":{"authors":{"author":[{"@pid":"09/1651","text":"Matthias Grabmair"},{"@pid":"39/1439","text":"Kevin D. Ashley"}]},"title":"Argumentation with Value Judgments - An Example of Hypothetical Reasoning.","venue":"JURIX","pages":"67-76","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/GrabmairA10","doi":"10.3233/978-1-60750-682-9-67","ee":"https://doi.org/10.3233/978-1-60750-682-9-67","url":"https://dblp.org/rec/conf/jurix/GrabmairA10"},
+"url":"URL#6433737"
+},
+{
+"@score":"1",
+"@id":"6433738",
+"info":{"authors":{"author":[{"@pid":"93/6371","text":"Edward Hermann Haeusler"},{"@pid":"p/ValeriadePaiva","text":"Valeria de Paiva"},{"@pid":"59/2479","text":"Alexandre Rademaker"}]},"title":"Intuitionistic Logic and Legal Ontologies.","venue":"JURIX","pages":"155-158","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/HaeuslerPR10","doi":"10.3233/978-1-60750-682-9-155","ee":"https://doi.org/10.3233/978-1-60750-682-9-155","url":"https://dblp.org/rec/conf/jurix/HaeuslerPR10"},
+"url":"URL#6433738"
+},
+{
+"@score":"1",
+"@id":"6433739",
+"info":{"authors":{"author":{"@pid":"h/WiebevanderHoek","text":"Wiebe van der Hoek"}},"title":"Reasoning about Normative Systems.","venue":"JURIX","pages":"3","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Hoek10","doi":"10.3233/978-1-60750-682-9-3","ee":"https://doi.org/10.3233/978-1-60750-682-9-3","url":"https://dblp.org/rec/conf/jurix/Hoek10"},
+"url":"URL#6433739"
+},
+{
+"@score":"1",
+"@id":"6433740",
+"info":{"authors":{"author":[{"@pid":"14/2726","text":"Rinke Hoekstra"},{"@pid":"12/2645","text":"Arno R. Lodder"},{"@pid":"h/FrankvanHarmelen","text":"Frank van Harmelen"}]},"title":"Case Frames as Contextual Mappings to Case Law in BestPortal.","venue":"JURIX","pages":"77-86","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/HoekstraLH10","doi":"10.3233/978-1-60750-682-9-77","ee":"https://doi.org/10.3233/978-1-60750-682-9-77","url":"https://dblp.org/rec/conf/jurix/HoekstraLH10"},
+"url":"URL#6433740"
+},
+{
+"@score":"1",
+"@id":"6433741",
+"info":{"authors":{"author":[{"@pid":"82/2783","text":"Emile de Maat"},{"@pid":"30/9512","text":"Kai Krabben"},{"@pid":"18/3818","text":"Radboud Winkels"}]},"title":"Machine Learning versus Knowledge Based Classification of Legal Texts.","venue":"JURIX","pages":"87-96","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/MaatKW10","doi":"10.3233/978-1-60750-682-9-87","ee":"https://doi.org/10.3233/978-1-60750-682-9-87","url":"https://dblp.org/rec/conf/jurix/MaatKW10"},
+"url":"URL#6433741"
+},
+{
+"@score":"1",
+"@id":"6433742",
+"info":{"authors":{"author":{"@pid":"27/1629","text":"Marc van Opijnen"}},"title":"Canonicalizing Complex Case Law Citations.","venue":"JURIX","pages":"97-106","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Opijnen10","doi":"10.3233/978-1-60750-682-9-97","ee":"https://doi.org/10.3233/978-1-60750-682-9-97","url":"https://dblp.org/rec/conf/jurix/Opijnen10"},
+"url":"URL#6433742"
+},
+{
+"@score":"1",
+"@id":"6433743",
+"info":{"authors":{"author":[{"@pid":"26/6137","text":"Monica Palmirani"},{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"00/5919","text":"Giuseppe Contissa"}]},"title":"Temporal Dimensions in Rules Modelling.","venue":"JURIX","pages":"159-162","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PalmiraniGC10","doi":"10.3233/978-1-60750-682-9-159","ee":"https://doi.org/10.3233/978-1-60750-682-9-159","url":"https://dblp.org/rec/conf/jurix/PalmiraniGC10"},
+"url":"URL#6433743"
+},
+{
+"@score":"1",
+"@id":"6433744",
+"info":{"authors":{"author":[{"@pid":"01/9512","text":"Minh Quang Nhat Pham"},{"@pid":"n/MinhLeNguyen","text":"Minh Le Nguyen 0001"},{"@pid":"73/1076","text":"Akira Shimazu"}]},"title":"Update Legal Documents Using Hierarchical Ranking Models and Word Clustering.","venue":"JURIX","pages":"163-166","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/PhamNS10","doi":"10.3233/978-1-60750-682-9-163","ee":"https://doi.org/10.3233/978-1-60750-682-9-163","url":"https://dblp.org/rec/conf/jurix/PhamNS10"},
+"url":"URL#6433744"
+},
+{
+"@score":"1",
+"@id":"6433745",
+"info":{"authors":{"author":[{"@pid":"76/9156","text":"Henok Sahilu"},{"@pid":"224/5973","text":"Solomon Atnafu"}]},"title":"Towards Measuring User Query Tendency for Legal Document Retrieval.","venue":"JURIX","pages":"167-170","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/SahiluA10","doi":"10.3233/978-1-60750-682-9-167","ee":"https://doi.org/10.3233/978-1-60750-682-9-167","url":"https://dblp.org/rec/conf/jurix/SahiluA10"},
+"url":"URL#6433745"
+},
+{
+"@score":"1",
+"@id":"6433746",
+"info":{"authors":{"author":{"@pid":"83/5349","text":"John Sheridan"}},"title":"Written Laws are Like Spiders Webs.","venue":"JURIX","pages":"4","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Sheridan10","doi":"10.3233/978-1-60750-682-9-4","ee":"https://doi.org/10.3233/978-1-60750-682-9-4","url":"https://dblp.org/rec/conf/jurix/Sheridan10"},
+"url":"URL#6433746"
+},
+{
+"@score":"1",
+"@id":"6433747",
+"info":{"authors":{"author":[{"@pid":"65/6238","text":"Clara Smith"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"06/414","text":"Giovanni Sartor"}]},"title":"Representations of Time within Normative MAS.","venue":"JURIX","pages":"107-116","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/SmithRS10","doi":"10.3233/978-1-60750-682-9-107","ee":"https://doi.org/10.3233/978-1-60750-682-9-107","url":"https://dblp.org/rec/conf/jurix/SmithRS10"},
+"url":"URL#6433747"
+},
+{
+"@score":"1",
+"@id":"6433748",
+"info":{"authors":{"author":[{"@pid":"13/9512","text":"Kenji Takano"},{"@pid":"04/438","text":"Makoto Nakamura"},{"@pid":"20/9512","text":"Yoshiko Oyama"},{"@pid":"73/1076","text":"Akira Shimazu"}]},"title":"Semantic Analysis of Paragraphs Consisting of Multiple Sentences - Towards Development of a Logical Formulation System.","venue":"JURIX","pages":"117-126","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/TakanoNOS10","doi":"10.3233/978-1-60750-682-9-117","ee":"https://doi.org/10.3233/978-1-60750-682-9-117","url":"https://dblp.org/rec/conf/jurix/TakanoNOS10"},
+"url":"URL#6433748"
+},
+{
+"@score":"1",
+"@id":"6433749",
+"info":{"authors":{"author":[{"@pid":"18/4633","text":"Ermo Täks"},{"@pid":"14/9512","text":"Ahti Lohk"}]},"title":"An alternative method for computerized legal text restructuring.","venue":"JURIX","pages":"171-174","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/TaksL10","doi":"10.3233/978-1-60750-682-9-171","ee":"https://doi.org/10.3233/978-1-60750-682-9-171","url":"https://dblp.org/rec/conf/jurix/TaksL10"},
+"url":"URL#6433749"
+},
+{
+"@score":"1",
+"@id":"6433750",
+"info":{"authors":{"author":[{"@pid":"73/3639","text":"Adam Z. Wyner"},{"@pid":"84/163","text":"Wim Peters"}]},"title":"Lexical Semantics and Expert Legal Knowledge towards the Identification of Legal Case Factors.","venue":"JURIX","pages":"127-136","year":"2010","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/WynerP10","doi":"10.3233/978-1-60750-682-9-127","ee":"https://doi.org/10.3233/978-1-60750-682-9-127","url":"https://dblp.org/rec/conf/jurix/WynerP10"},
+"url":"URL#6433750"
+},
+{
+"@score":"1",
+"@id":"6476253",
+"info":{"authors":{"author":[{"@pid":"33/1594","text":"Pompeu Casanovas"},{"@pid":"25/5964","text":"Ugo Pagallo"},{"@pid":"06/414","text":"Giovanni Sartor"},{"@pid":"92/5835","text":"Gianmaria Ajani"}]},"title":"AI Approaches to the Complexity of Legal Systems. Complex Systems, the Semantic Web, Ontologies, Argumentation, and Dialogue - International Workshops AICOL-I/IVR-XXIV Beijing, China, September 19, 2009 and AICOL-II/JURIX 2009, Rotterdam,The Netherlands, December 16, 2009 Revised Selected Papers","venue":["AICOL Workshops","Lecture Notes in Computer Science"],"volume":"6237","publisher":"Springer","year":"2010","type":"Editorship","key":"conf/jurix/2009aicol","doi":"10.1007/978-3-642-16524-5","ee":"https://doi.org/10.1007/978-3-642-16524-5","url":"https://dblp.org/rec/conf/jurix/2009aicol"},
+"url":"URL#6476253"
+},
+{
+"@score":"1",
+"@id":"6476254",
+"info":{"authors":{"author":{"@pid":"18/3818","text":"Radboud Winkels"}},"title":"Legal Knowledge and Information Systems - JURIX 2010: The Twenty-Third Annual Conference on Legal Knowledge and Information Systems, Liverpool, UK, 16-17 December 2010","venue":["JURIX","Frontiers in Artificial Intelligence and Applications"],"volume":"223","publisher":"IOS Press","year":"2010","type":"Editorship","access":"unavailable","key":"conf/jurix/2010","url":"https://dblp.org/rec/conf/jurix/2010"},
+"url":"URL#6476254"
+},
+{
+"@score":"1",
+"@id":"6658368",
+"info":{"authors":{"author":{"@pid":"62/9051","text":"Antoni Abad-Ninet"}},"title":"Legal &quot;Neutral Dialogue&quot;, Implementing the Work of Bruce Ackerman in the Field of Law.","venue":"AICOL Workshops","pages":"217-228","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Abad-Ninet09","doi":"10.1007/978-3-642-16524-5_14","ee":"https://doi.org/10.1007/978-3-642-16524-5_14","url":"https://dblp.org/rec/conf/jurix/Abad-Ninet09"},
+"url":"URL#6658368"
+},
+{
+"@score":"1",
+"@id":"6658369",
+"info":{"authors":{"author":[{"@pid":"71/3515","text":"Tommaso Agnoloni"},{"@pid":"61/9051","text":"Meritxell Fernández Barrera"},{"@pid":"82/6967","text":"Maria-Teresa Sagri"},{"@pid":"87/6854","text":"Daniela Tiscornia"},{"@pid":"45/1484","text":"Giulia Venturi"}]},"title":"When a FrameNet-Style Knowledge Description Meets an Ontological Characterization of Fundamental Legal Concepts.","venue":"AICOL Workshops","pages":"93-112","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AgnoloniBSTV09","doi":"10.1007/978-3-642-16524-5_7","ee":"https://doi.org/10.1007/978-3-642-16524-5_7","url":"https://dblp.org/rec/conf/jurix/AgnoloniBSTV09"},
+"url":"URL#6658369"
+},
+{
+"@score":"1",
+"@id":"6658370",
+"info":{"authors":{"author":[{"@pid":"92/5835","text":"Gianmaria Ajani"},{"@pid":"34/3058","text":"Piercarlo Rossi"}]},"title":"Sailing the Semantic Seas by Structural Vessels: Problems and Perspectives for the Identification of Implicit Knowledge in the Legal Domain.","venue":"AICOL Workshops","pages":"27-38","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AjaniR09","doi":"10.1007/978-3-642-16524-5_3","ee":"https://doi.org/10.1007/978-3-642-16524-5_3","url":"https://dblp.org/rec/conf/jurix/AjaniR09"},
+"url":"URL#6658370"
+},
+{
+"@score":"1",
+"@id":"6658371",
+"info":{"authors":{"author":[{"@pid":"59/6726","text":"Guillaume Aucher"},{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Prescriptive and Descriptive Obligations in Dynamic Epistemic Deontic Logic.","venue":"AICOL Workshops","pages":"150-161","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/AucherBT09","doi":"10.1007/978-3-642-16524-5_10","ee":"https://doi.org/10.1007/978-3-642-16524-5_10","url":"https://dblp.org/rec/conf/jurix/AucherBT09"},
+"url":"URL#6658371"
+},
+{
+"@score":"1",
+"@id":"6658372",
+"info":{"authors":{"author":[{"@pid":"05/7507","text":"Jaroslaw Bak"},{"@pid":"00/2689","text":"Czeslaw Jedrzejek"}]},"title":"Application of an Ontology-Based Model to a Selected Fraudulent Disbursement Economic Crime.","venue":"AICOL Workshops","pages":"113-132","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BakJ09","doi":"10.1007/978-3-642-16524-5_8","ee":"https://doi.org/10.1007/978-3-642-16524-5_8","url":"https://dblp.org/rec/conf/jurix/BakJ09"},
+"url":"URL#6658372"
+},
+{
+"@score":"1",
+"@id":"6658373",
+"info":{"authors":{"author":[{"@pid":"02/8362","text":"Gioele Barabucci"},{"@pid":"65/7167","text":"Luca Cervone"},{"@pid":"26/6137","text":"Monica Palmirani"},{"@pid":"48/1099","text":"Silvio Peroni"},{"@pid":"80/2302","text":"Fabio Vitali"}]},"title":"Multi-layer Markup and Ontological Structures in Akoma Ntoso.","venue":"AICOL Workshops","pages":"133-149","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BarabucciCPPV09","doi":"10.1007/978-3-642-16524-5_9","ee":"https://doi.org/10.1007/978-3-642-16524-5_9","url":"https://dblp.org/rec/conf/jurix/BarabucciCPPV09"},
+"url":"URL#6658373"
+},
+{
+"@score":"1",
+"@id":"6658374",
+"info":{"authors":{"author":[{"@pid":"02/8362","text":"Gioele Barabucci"},{"@pid":"80/2302","text":"Fabio Vitali"}]},"title":"XDTD as a Simple Validation Language for XML-based Legal Documents.","venue":"JURIX","pages":"1-10","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BarabucciV09","doi":"10.3233/978-1-60750-082-7-1","ee":"https://doi.org/10.3233/978-1-60750-082-7-1","url":"https://dblp.org/rec/conf/jurix/BarabucciV09"},
+"url":"URL#6658374"
+},
+{
+"@score":"1",
+"@id":"6658375",
+"info":{"authors":{"author":[{"@pid":"b/TJMBenchCapon","text":"Trevor J. M. Bench-Capon"},{"@pid":"64/5549","text":"Henry Prakken"}]},"title":"A case study of hypothetical and value-based reasoning in US Supreme-Court cases.","venue":"JURIX","pages":"11-20","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Bench-CaponP09","doi":"10.3233/978-1-60750-082-7-11","ee":"https://doi.org/10.3233/978-1-60750-082-7-11","url":"https://dblp.org/rec/conf/jurix/Bench-CaponP09"},
+"url":"URL#6658375"
+},
+{
+"@score":"1",
+"@id":"6658376",
+"info":{"authors":{"author":[{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"g/GuidoGovernatori","text":"Guido Governatori"},{"@pid":"89/4715","text":"Antonino Rotolo"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Lex Minus Dixit Quam Voluit, Lex Magis Dixit Quam Voluit: A Formal Study on Legal Compliance and Interpretation.","venue":"AICOL Workshops","pages":"162-183","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoellaGRT09","doi":"10.1007/978-3-642-16524-5_11","ee":"https://doi.org/10.1007/978-3-642-16524-5_11","url":"https://dblp.org/rec/conf/jurix/BoellaGRT09"},
+"url":"URL#6658376"
+},
+{
+"@score":"1",
+"@id":"6658377",
+"info":{"authors":{"author":[{"@pid":"53/6604","text":"Guido Boella"},{"@pid":"p/GabriellaPigozzi","text":"Gabriella Pigozzi"},{"@pid":"t/LeendertWNvanderTorre","text":"Leendert W. N. van der Torre"}]},"title":"Five Guidelines for Normative Multiagent Systems.","venue":"JURIX","pages":"21-30","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoellaPT09","doi":"10.3233/978-1-60750-082-7-21","ee":"https://doi.org/10.3233/978-1-60750-082-7-21","url":"https://dblp.org/rec/conf/jurix/BoellaPT09"},
+"url":"URL#6658377"
+},
+{
+"@score":"1",
+"@id":"6658378",
+"info":{"authors":{"author":{"@pid":"80/6226","text":"Alexander Boer"}},"title":"MetaLex Naming Conventions and the Semantic Web.","venue":"JURIX","pages":"31-36","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Boer09","doi":"10.3233/978-1-60750-082-7-31","ee":"https://doi.org/10.3233/978-1-60750-082-7-31","url":"https://dblp.org/rec/conf/jurix/Boer09"},
+"url":"URL#6658378"
+},
+{
+"@score":"1",
+"@id":"6658379",
+"info":{"authors":{"author":[{"@pid":"80/6226","text":"Alexander Boer"},{"@pid":"46/1348","text":"Tom M. van Engers"},{"@pid":"18/3818","text":"Radboud Winkels"}]},"title":"Traceability and Change in Legal Requirements Engineering.","venue":"AICOL Workshops","pages":"74-92","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BoerEW09","doi":"10.1007/978-3-642-16524-5_6","ee":"https://doi.org/10.1007/978-3-642-16524-5_6","url":"https://dblp.org/rec/conf/jurix/BoerEW09"},
+"url":"URL#6658379"
+},
+{
+"@score":"1",
+"@id":"6658380",
+"info":{"authors":{"author":[{"@pid":"81/1282","text":"Romain Boulet"},{"@pid":"82/4556","text":"Pierre Mazzega"},{"@pid":"81/2138","text":"Danièle Bourcier"}]},"title":"Network Analysis of the French Environmental Code.","venue":"AICOL Workshops","pages":"39-53","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BouletMB09","doi":"10.1007/978-3-642-16524-5_4","ee":"https://doi.org/10.1007/978-3-642-16524-5_4","url":"https://dblp.org/rec/conf/jurix/BouletMB09"},
+"url":"URL#6658380"
+},
+{
+"@score":"1",
+"@id":"6658381",
+"info":{"authors":{"author":[{"@pid":"03/7558","text":"Brigitte Burgemeestre"},{"@pid":"01/2440","text":"Joris Hulstijn"},{"@pid":"37/4594","text":"Yao-Hua Tan"}]},"title":"Rule-based versus Principle-based Regulatory Compliance.","venue":"JURIX","pages":"37-46","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/BurgemeestreHT09","doi":"10.3233/978-1-60750-082-7-37","ee":"https://doi.org/10.3233/978-1-60750-082-7-37","url":"https://dblp.org/rec/conf/jurix/BurgemeestreHT09"},
+"url":"URL#6658381"
+},
+{
+"@score":"1",
+"@id":"6658382",
+"info":{"authors":{"author":[{"@pid":"05/6663","text":"Davide Carneiro"},{"@pid":"77/2321","text":"Paulo Novais"},{"@pid":"84/1520","text":"Francisco Andrade 0001"},{"@pid":"96/5960","text":"John Zeleznikow"},{"@pid":"84/5278","text":"José Neves 0001"}]},"title":"The Legal Precedent in Online Dispute Resolution.","venue":"JURIX","pages":"47-52","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/CarneiroNAZN09","doi":"10.3233/978-1-60750-082-7-47","ee":"https://doi.org/10.3233/978-1-60750-082-7-47","url":"https://dblp.org/rec/conf/jurix/CarneiroNAZN09"},
+"url":"URL#6658382"
+},
+{
+"@score":"1",
+"@id":"6658383",
+"info":{"authors":{"author":{"@pid":"33/1594","text":"Pompeu Casanovas"}},"title":"Legal Electronic Institutions and ONTOMEDIA: Dialogue, Inventio, and Relational Justice Scenarios.","venue":"AICOL Workshops","pages":"184-204","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Casanovas09","doi":"10.1007/978-3-642-16524-5_12","ee":"https://doi.org/10.1007/978-3-642-16524-5_12","url":"https://dblp.org/rec/conf/jurix/Casanovas09"},
+"url":"URL#6658383"
+},
+{
+"@score":"1",
+"@id":"6658384",
+"info":{"authors":{"author":[{"@pid":"33/1594","text":"Pompeu Casanovas"},{"@pid":"25/5964","text":"Ugo Pagallo"},{"@pid":"06/414","text":"Giovanni Sartor"},{"@pid":"92/5835","text":"Gianmaria Ajani"}]},"title":"Introduction: Complex Systems and Six Challenges for the Development of Law and the Semantic Web.","venue":"AICOL Workshops","pages":"1-11","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/CasanovasPSA09","doi":"10.1007/978-3-642-16524-5_1","ee":"https://doi.org/10.1007/978-3-642-16524-5_1","url":"https://dblp.org/rec/conf/jurix/CasanovasPSA09"},
+"url":"URL#6658384"
+},
+{
+"@score":"1",
+"@id":"6658385",
+"info":{"authors":{"author":[{"@pid":"29/8362","text":"András Förhécz"},{"@pid":"07/8362","text":"Gábor Korösi"},{"@pid":"88/5217","text":"András Millinghoffer"},{"@pid":"77/2244","text":"György Strausz"}]},"title":"Emerald: Legal Knowledge Engineering Using OWL and Rules.","venue":"JURIX","pages":"53-58","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/ForheczKMS09","doi":"10.3233/978-1-60750-082-7-53","ee":"https://doi.org/10.3233/978-1-60750-082-7-53","url":"https://dblp.org/rec/conf/jurix/ForheczKMS09"},
+"url":"URL#6658385"
+},
+{
+"@score":"1",
+"@id":"6658386",
+"info":{"authors":{"author":{"@pid":"87/612","text":"Enrico Francesconi"}},"title":"An Approach to Legal Rules Modelling and Automatic Learning.","venue":"JURIX","pages":"59-68","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Francesconi09","doi":"10.3233/978-1-60750-082-7-59","ee":"https://doi.org/10.3233/978-1-60750-082-7-59","url":"https://dblp.org/rec/conf/jurix/Francesconi09"},
+"url":"URL#6658386"
+},
+{
+"@score":"1",
+"@id":"6658387",
+"info":{"authors":{"author":{"@pid":"27/1214","text":"Jorge González-Conejero"}},"title":"Legal Multimedia Management through JPEG2000 Framework.","venue":"AICOL Workshops","pages":"229-241","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Gonzalez-Conejero09","doi":"10.1007/978-3-642-16524-5_15","ee":"https://doi.org/10.1007/978-3-642-16524-5_15","url":"https://dblp.org/rec/conf/jurix/Gonzalez-Conejero09"},
+"url":"URL#6658387"
+},
+{
+"@score":"1",
+"@id":"6658388",
+"info":{"authors":{"author":{"@pid":"14/2726","text":"Rinke Hoekstra"}},"title":"BestPortal: Lessons Learned in Lightweight Semantic Access to Court Proceedings.","venue":"JURIX","pages":"69-78","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Hoekstra09","doi":"10.3233/978-1-60750-082-7-69","ee":"https://doi.org/10.3233/978-1-60750-082-7-69","url":"https://dblp.org/rec/conf/jurix/Hoekstra09"},
+"url":"URL#6658388"
+},
+{
+"@score":"1",
+"@id":"6658389",
+"info":{"authors":{"author":[{"@pid":"00/2689","text":"Czeslaw Jedrzejek"},{"@pid":"64/849","text":"Maciej Falkowski"},{"@pid":"18/8362","text":"Maciej Smolenski"}]},"title":"Link Analysis of Fuel Laundering Scams and Implications of Results for Scheme Understanding and Prosecutor Strategy.","venue":"JURIX","pages":"79-88","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/JedrzejekFS09","doi":"10.3233/978-1-60750-082-7-79","ee":"https://doi.org/10.3233/978-1-60750-082-7-79","url":"https://dblp.org/rec/conf/jurix/JedrzejekFS09"},
+"url":"URL#6658389"
+},
+{
+"@score":"1",
+"@id":"6658390",
+"info":{"authors":{"author":{"@pid":"37/1469","text":"Jeroen Keppens"}},"title":"Conceptions of Vagueness in Subjective Probability for Evidential Reasoning.","venue":"JURIX","pages":"89-99","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Keppens09","doi":"10.3233/978-1-60750-082-7-89","ee":"https://doi.org/10.3233/978-1-60750-082-7-89","url":"https://dblp.org/rec/conf/jurix/Keppens09"},
+"url":"URL#6658390"
+},
+{
+"@score":"1",
+"@id":"6658391",
+"info":{"authors":{"author":{"@pid":"26/3029","text":"Doris Liebwald"}},"title":"An Ontology for the Implementation of the EU Services Directive.","venue":"JURIX","pages":"100-105","year":"2009","type":"Conference and Workshop Papers","access":"closed","key":"conf/jurix/Liebwald09","doi":"10.3233/978-1-60750-082-7-100","ee":"https://doi.org/10.3233/978-1-60750-082-7-100","url":"https://dblp.org/rec/conf/jurix/Liebwald09"},
+"url":"URL#6658391"
+}
+]
+}
+}
+}

@@ -1,0 +1,65 @@
+{
+  "generated": "phase0",
+  "total_records": 1817,
+  "by_venue": {
+    "ICAIL": {
+      "records": 864,
+      "papers_excl_editorship": 840,
+      "editorship_volumes": 24,
+      "year_span": [
+        1987,
+        2025
+      ],
+      "distinct_years": 22,
+      "types": {
+        "Editorship": 24,
+        "Conference and Workshop Papers": 840
+      },
+      "access": {
+        "closed": 819,
+        "unavailable": 7,
+        "open": 14
+      },
+      "open_pct": 1.7
+    },
+    "JURIX": {
+      "records": 703,
+      "papers_excl_editorship": 680,
+      "editorship_volumes": 23,
+      "year_span": [
+        2005,
+        2025
+      ],
+      "distinct_years": 21,
+      "types": {
+        "Editorship": 23,
+        "Conference and Workshop Papers": 680
+      },
+      "access": {
+        "closed": 540,
+        "unavailable": 2,
+        "open": 138
+      },
+      "open_pct": 20.3
+    },
+    "DEON": {
+      "records": 250,
+      "papers_excl_editorship": 238,
+      "editorship_volumes": 12,
+      "year_span": [
+        1996,
+        2025
+      ],
+      "distinct_years": 12,
+      "types": {
+        "Editorship": 12,
+        "Conference and Workshop Papers": 238
+      },
+      "access": {
+        "closed": 125,
+        "unavailable": 113
+      },
+      "open_pct": 0.0
+    }
+  }
+}
