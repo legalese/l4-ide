@@ -114,6 +114,8 @@ natural language**, deontic logic, case-based reasoning, ontologies (LKIF), text
   threads that intersect L4.
 - **W2 — Persona rehearsal tool.** A *grounded* model of what Adam would likely care about /
   push back on, from his actual corpus — used to prep the co-authored paper.
+- **W3 — Agent spec (DRAFT).** Operationalizes W2 into an invokable `wyner-lens` reviewer
+  (draft `.claude/agents/` definition, not yet installed); same guardrails.
 
 **Guardrails (persona):** it stays **clearly synthetic**; generated text is **never**
 attributed to or passed off as the real Adam; it's preparation for a paper written **with the
@@ -176,6 +178,10 @@ real him**, whose input validates anything the model produces. Loop him in early
   corpus-grounded pre-mortem for the co-authored CNL paper — his likely value-priors + 7
   anticipated probes with prep, working-style notes, guardrails (never attributed to real Adam;
   loop him in early; his answers replace the model).
+- [~] **W3 — `wyner-lens` agent spec (DRAFT)** — `dossiers/wyner/W3-agent-spec.md`: operationalizes
+  W2 into an invokable read-only reviewer (critical-questions-first; documented-vs-extrapolation
+  tagging; subagent *or* skill). **NOT installed** — awaiting Wyner-dossier session review before
+  promotion to `.claude/agents/wyner-lens.md`. Same synthetic/never-attributed guardrails as W2.
 - [~] **MULL sub-corpus** — issue-level skeleton captured; **article-level harvest blocked** by
   JSTOR SPA + MCP read-redaction (`data/MULL-STATUS.md`). Deferred to on-demand acquisition.
 
@@ -200,6 +206,23 @@ real him**, whose input validates anything the model produces. Loop him in early
   probes + prep), with hard guardrails (never attributed to the real Adam; validate with him; his
   answers replace the model). **Original-ask items ALL complete.** Optional remainders only:
   DEON no-DOI tail, on-demand full-text, and turning `bib/*.md` into per-paper related-work drafts.
+- **2026-07-21** — **Wyner full-text acquisition** (`dossiers/wyner/FULLTEXT-ACQUISITION.md`).
+  Green-OA-only pull of his oeuvre, two channels: (1) **his own self-archive**, recovered from the
+  Internet Archive Wayback Machine after `wyner.info` lapsed — **74 author-copy PDFs** (61 papers +
+  13 grey-lit), the dominant channel and heavy on his 2008–2014 core; (2) **metadata OA**
+  (OpenAlex/Unpaywall/arXiv + Semantic-Scholar long-tail) — **24 PDFs**, thin because his DOI work
+  is mostly Springer/IOS/ACM. **~46/154 distinct works held.** No Sci-Hub. Scripts:
+  `wyner_selfarchive.py` (Wayback CDX + availability-API fallback), `wyner_fulltext.py`,
+  `wyner_longtail.py`, `wyner_reconcile.py` (fuzzy filename↔work matcher). PDFs + status files
+  gitignored; `wayback-cdx.json` + `acquire-list.json` are the reproducible inputs. Highest-cited
+  still-paywalled (for licensed access later): arg-schemes JLC 2013, LegalRuleML Design Principles
+  2015, CBR-OWL ontology 2008, Argument Schemes for Legal CBR 2007.
+- **2026-07-21** — **W3 agent spec drafted** (`dossiers/wyner/W3-agent-spec.md`). Turns the W2
+  persona into a draft `wyner-lens` reviewer agent (read-only; critical-questions-first; each claim
+  tagged documented-vs-extrapolation; deployable as subagent or drafting-time skill). Grounded in
+  W1/W2 + `bib/cnl.md` — honestly flagged as metadata/abstract-derived, not full-text close reads.
+  **Marked DRAFT, not installed**; promotion checklist in the file awaits the Wyner-dossier session's
+  review. Prompted by a design discussion on persona-vs-simulated-person and corpus grounding.
 - **2026-07-21** — **Phase 4 + Phase 5 COMPLETE.** Phase 4 acquisition audit: 327 tight-core →
   179 OA-url / 148 paywalled; fixed the landing-page problem (OpenAlex pdf_url + arXiv) → 110
   direct urls; green-OA sweep via Unpaywall over residue. **Sci-Hub declined** (user asked; it

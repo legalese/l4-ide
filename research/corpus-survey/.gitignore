@@ -2,3 +2,8 @@ data/acquire-direct-status.json
 data/acquire-open-status.json
 pdfs/
 data/green-oa-status.json
+dossiers/wyner/pdfs/
+dossiers/wyner/fulltext-status.json
+dossiers/wyner/selfarchive-status.json
+dossiers/wyner/pull.log
+**/__pycache__/
