@@ -110,25 +110,43 @@ Traditional wedding vows formalized as L4 regulative rules:
 - **`careinsicknessandhealth`** - "In sickness and in health"
 - **`deathreleasesvows`** - "Till death do us part" (MAY permission)
 - **`noabandonment`** / **`fidelity`** - Prohibitions (SHANT)
-- **`marriagecontract`** - Combined parallel obligations using RAND
+- **`marriagecontract`** - Combined parallel obligations using RAND. Draws as a single
+  `ALL OF` junction fanning out to the four vows, each with its own lifecycle:
+  ```
+  initial (ALL OF) --> "Spouse1 must love and cherish" --> ...
+                   --> "Spouse1 must have and hold"    --> ...
+                   --> "Spouse2 must love and cherish" --> ...
+                   --> "Spouse2 must have and hold"    --> ...
+  ```
+
+### Regulative AND / OR (from `contracts.l4`)
+
+- **`z`** - `x ROR y`: a `ONE OF` junction, exactly one branch is taken
+- **`a`** - `z RAND z`: an `ALL OF` junction, every branch is entered
 
 ## Visual Conventions
 
 - **Node shapes**:
   - Ellipse: Regular state
   - Double circle: Terminal state (Fulfilled or Breach)
+  - Diamond: Junction — a `RAND`/`ROR` fan-out point, labelled `ALL OF` or `ONE OF`
 
 - **Node colors**:
   - Light blue (#e8f4fd): Initial state
   - White (#ffffff): Intermediate state
   - Light green (#d4edda): Fulfilled (terminal success)
   - Light red (#f8d7da): Breach (terminal failure)
+  - Violet (#e6dcf5): `ALL OF` junction (`RAND`)
+  - Amber (#fde8cc): `ONE OF` junction (`ROR`)
 
 - **Edge styles**:
   - Solid green (#28a745): Success/HENCE path
   - Dashed red (#dc3545): Failure/LEST/timeout path
+  - Solid violet (#6f42c1): branch of an `ALL OF` junction — every branch is entered
+  - Dotted amber (#e8850c): branch of a `ONE OF` junction — exactly one branch is entered
 
-- **Edge labels**: `<party> <MODAL> <action> [<deadline>] [IF <guard>]`
+- **Edge labels**: `<party> <MODAL> <action> [<deadline>] [IF <guard>]`. Edges out of
+  a junction are unlabelled: a junction is a control point, not an action.
 
 ## Rendering
 
