@@ -16,6 +16,7 @@
 module VizGuardedRows (spec) where
 
 import Base
+import qualified Base.Text as Text
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..))
 import L4.Names (getName)
@@ -97,6 +98,54 @@ considerBinding =
   \DECIDE compliant IF\n\
   \  CONSIDER c\n\
   \  WHEN anything THEN TRUE\n"
+
+-- | A binding row whose body is @FALSE@ contributes nothing to the disjunction, so it
+-- can be dropped rather than forcing the whole chain back to a leaf. This is the shape
+-- of the two widest single-leaf diagrams in the corpus (both @the purpose is
+-- charitable@, 3494px and 3212px), whose only offending row is an @other …@ catch-all
+-- that draws nothing.
+considerInertBinder :: Text
+considerInertBinder =
+  "DECLARE Purpose\n\
+  \  IS ONE OF\n\
+  \    education\n\
+  \    health\n\
+  \    other HAS description IS A STRING\n\
+  \GIVEN p IS A Purpose\n\
+  \DECIDE compliant IF\n\
+  \  CONSIDER p\n\
+  \  WHEN education THEN TRUE\n\
+  \  WHEN health THEN TRUE\n\
+  \  WHEN other description THEN FALSE\n\
+  \  OTHERWISE FALSE\n"
+
+-- | The control. The same binding row with a body that DOES draw something cannot be
+-- dropped — its guard is unexpressible, so the whole chain must stay a leaf.
+considerLiveBinder :: Text
+considerLiveBinder =
+  "DECLARE Purpose\n\
+  \  IS ONE OF\n\
+  \    education\n\
+  \    other HAS description IS A STRING\n\
+  \GIVEN p IS A Purpose\n\
+  \DECIDE compliant IF\n\
+  \  CONSIDER p\n\
+  \  WHEN education THEN TRUE\n\
+  \  WHEN other description THEN TRUE\n\
+  \  OTHERWISE FALSE\n"
+
+-- | Two @EXACTLY@ patterns over two NUMBER parameters. @lo@ and @hi@ can hold the same
+-- value, so these guards are NOT mutually exclusive and the negated prefix must survive.
+exactlyVariables :: Text
+exactlyVariables =
+  "GIVEN x IS A NUMBER\n\
+  \      lo IS A NUMBER\n\
+  \      hi IS A NUMBER\n\
+  \DECIDE compliant IF\n\
+  \  CONSIDER x\n\
+  \  WHEN EXACTLY lo THEN FALSE\n\
+  \  WHEN EXACTLY hi THEN TRUE\n\
+  \  OTHERWISE FALSE\n"
 
 -- | Tier-2 disjointness: @\<@ and @AT LEAST@ on the same operands are complementary,
 -- so neither row needs a prefix. This is the shape of a real threshold rule.
@@ -208,6 +257,41 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
     let body = vizBody False unrelatedGuards
     countNots body `shouldBe` 1
 
+  -- A binding row that draws nothing is dropped; one that draws something is not.
+  it "a binding row with a FALSE body is dropped, and the rest expands" $ do
+    let body = vizBody False considerInertBinder
+    case body of
+      V.Or _ ds -> do
+        length ds `shouldBe` 2        -- education and health
+        countNots body `shouldBe` 0
+      other -> expectationFailure ("expected an Or, got: " <> show other)
+
+  it "but a binding row with a live body keeps the whole chain a leaf" $
+    countLeaves (vizBody False considerLiveBinder) `shouldBe` 1
+
+  -- Found by adversarial review. `Var` is a pattern synonym for `App ann n []`, so a
+  -- naive "nullary application means nullary constructor" test also matches every
+  -- GIVEN parameter. Two EXACTLY patterns over two NUMBER parameters are NOT mutually
+  -- exclusive -- lo and hi can be equal -- so the negated prefix must survive. Without
+  -- this, the diagram answers TRUE where the rule answers FALSE whenever lo == hi.
+  it "EXACTLY over two variables is NOT disjoint: the prefix survives" $ do
+    let body = vizBody False exactlyVariables
+    countNots body `shouldSatisfy` (>= 1)
+
+  -- Also found by adversarial review. leafFromExpr mints a FRESH Unique per call for a
+  -- compound expression, and submitNewBinding binds exactly one Unique with no
+  -- fan-out. If the positive occurrence of a guard and its negated twin were
+  -- translated separately they would be two unrelated atoms, and the user could set
+  -- one TRUE and the other FALSE -- a diagram asserting P and NOT P at once.
+  it "a duplicated compound guard is ONE atom, not two" $ do
+    let body = vizBody False unrelatedGuards
+        ids = identitiesOf body
+        threshold = [u | (u, l) <- ids, "107000" `Text.isInfixOf` l]
+    -- it appears twice (row 1, and row 2's negated prefix) ...
+    length threshold `shouldSatisfy` (>= 2)
+    -- ... under exactly one identity
+    length (nub threshold) `shouldBe` 1
+
   -- simplify is ON in the LSP's default path and runs BEFORE this expansion, on the
   -- raw L4 expression. Pin that it does not eat the chain on the way past.
   it "survives simplify=True" $
@@ -247,6 +331,16 @@ atomsOf = \case
   V.Implies _ p q _ -> atomsOf p <> atomsOf q
   V.App _ _ es _ -> concatMap atomsOf es
   _ -> []
+
+-- | Every atom occurrence, as (unique, label). Two occurrences of the SAME proposition
+-- must share a unique, or a binding on one will not move the other.
+identitiesOf :: V.IRExpr -> [(Int, Text)]
+identitiesOf e = here <> concatMap identitiesOf (children e)
+  where
+    here = case e of
+      V.UBoolVar _ nm _ _ _ _ -> [(nm.unique, nm.label)]
+      V.App _ nm _ _ -> [(nm.unique, nm.label)]
+      _ -> []
 
 countNots :: V.IRExpr -> Int
 countNots = countWhere $ \case

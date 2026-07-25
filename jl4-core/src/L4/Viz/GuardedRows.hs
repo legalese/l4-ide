@@ -68,54 +68,106 @@ normaliseGuarded = \case
   _ -> Nothing
 
 -- | @CONSIDER@ rows. Each @WHEN@ pattern becomes an equality guard against the
--- scrutinee. Bails on patterns that BIND (@PatVar@, @PatApp@ with arguments,
--- @PatCons@): the body may reference the bound name, so the branch is not a closed
--- boolean expression and cannot be booleanised. Also bails if @OTHERWISE@ is not last.
+-- scrutinee.
+--
+-- A pattern that BINDS (@PatVar@, @PatApp@ with arguments, @PatCons@) has no such
+-- guard: the body may reference the bound name, so the branch is not a closed boolean
+-- expression. Such a row is __unexpressible__, and there are two dispositions.
+--
+-- Normally it forces the whole chain back to a leaf. But an unexpressible row whose
+-- body is literally @FALSE@ contributes nothing to the disjunction, and can simply be
+-- __dropped__ — provided nothing else needed its guard. Two things could:
+--
+--   * a LATER row's negated prefix, which is absent exactly when the guards are
+--     disjoint; and
+--   * the @OTHERWISE@ branch's @⋀ ¬gⱼ@, which is absent exactly when there is no
+--     @OTHERWISE@ or its body is itself @FALSE@.
+--
+-- This is not a corner case. The two widest single-leaf diagrams in the corpus (3494px
+-- and 3212px, both @the purpose is charitable@) are enum matches whose only offending
+-- row is a @WHEN \`other purpose\` description THEN FALSE@ catch-all. Bailing on them
+-- would have left the two biggest ribbons in place for a row that draws nothing.
+--
+-- Note that a constructor pattern is exclusive by its CONSTRUCTOR, whatever its arity,
+-- so an unexpressible row still contributes its disjointness witness.
+--
+-- Also bails if @OTHERWISE@ is not last.
 considerRows :: Expr Resolved -> [Branch Resolved] -> Maybe GuardedRows
-considerRows scrutinee = fmap assemble . walk
+considerRows scrutinee branches = do
+  (infos, oth) <- walk branches
+  let disjoint      = allDistinctJust (map (.biKey) infos)
+      unexpressible = [i | i <- infos, isNothing i.biRow]
+      -- Could the fallback have needed the dropped guards?
+      fallbackHarmless = case oth of
+        Nothing -> True
+        Just b0 -> literalBool b0 == Just False
+  -- Every dropped row must be inert, and nothing may have needed its guard.
+  guard (all (\i -> literalBool i.biBody == Just False) unexpressible)
+  guard (null unexpressible || (disjoint && fallbackHarmless))
+  pure MkGuardedRows
+    { grRows      = mapMaybe (.biRow) infos
+    , grOtherwise = oth
+      -- Distinct constructors / literals against ONE scrutinee cannot both hold.
+      -- This is exact and free: the pattern match already says so.
+    , grDisjoint  = disjoint
+    }
   where
-    assemble (rows, oth, keys) = MkGuardedRows
-      { grRows      = rows
-      , grOtherwise = oth
-        -- Distinct constructors / literals against ONE scrutinee cannot both hold.
-        -- This is exact and free: the pattern match already says so.
-      , grDisjoint  = allDistinctJust keys
-      }
-
-    walk :: [Branch Resolved]
-         -> Maybe ([(Expr Resolved, Expr Resolved)], Maybe (Expr Resolved), [Maybe PatKey])
-    walk [] = Just ([], Nothing, [])
+    walk :: [Branch Resolved] -> Maybe ([BranchInfo], Maybe (Expr Resolved))
+    walk [] = Just ([], Nothing)
     walk (MkBranch _ (Otherwise _) body : rest)
-      | null rest = Just ([], Just body, [])
+      | null rest = Just ([], Just body)
       | otherwise = Nothing
     walk (MkBranch _ (When _ pat) body : rest) = do
-      (guard', mkey) <- patternGuard scrutinee pat
-      (rows, oth, keys) <- walk rest
-      pure ((guard', body) : rows, oth, mkey : keys)
+      let (mguard, mkey) = patternGuard scrutinee pat
+      (infos, oth) <- walk rest
+      pure (MkBranchInfo mkey ((,body) <$> mguard) body : infos, oth)
 
--- | What makes two @CONSIDER@ patterns mutually exclusive: a distinct nullary
--- constructor, or a distinct literal. Anything else contributes no witness.
+-- | One @WHEN@ row, as far as it can be understood.
+data BranchInfo = MkBranchInfo
+  { biKey  :: Maybe PatKey
+    -- ^ its exclusivity witness, if it has one
+  , biRow  :: Maybe (Expr Resolved, Expr Resolved)
+    -- ^ 'Nothing' when the pattern binds, so no guard can be written
+  , biBody :: Expr Resolved
+  }
+
+-- | What makes two @CONSIDER@ patterns mutually exclusive: a distinct constructor, or
+-- a distinct literal. Anything else contributes no witness.
 data PatKey = KeyCtor !Int | KeyNum !Rational | KeyStr !Text
   deriving stock (Eq)
 
--- | The equality guard a non-binding pattern denotes, plus its exclusivity witness.
-patternGuard :: Expr Resolved -> Pattern Resolved -> Maybe (Expr Resolved, Maybe PatKey)
+-- | The equality guard a pattern denotes (when it binds nothing), and its exclusivity
+-- witness (which survives binding, since exclusivity is a property of the constructor
+-- and not of its arguments).
+patternGuard :: Expr Resolved -> Pattern Resolved -> (Maybe (Expr Resolved), Maybe PatKey)
 patternGuard scrutinee = \case
-  PatApp _ ctor [] -> Just (eqTo (App emptyAnno ctor []), Just (KeyCtor (getUnique ctor).unique))
-  PatLit _ lit     -> Just (eqTo (Lit emptyAnno lit), litKey lit)
-  PatExpr _ ex     -> Just (eqTo ex, exprKey ex)
-  _                -> Nothing   -- PatVar / PatApp with args / PatCons all bind
+  PatApp _ ctor []   -> (Just (eqTo (App emptyAnno ctor [])), Just (ctorKey ctor))
+  PatApp _ ctor _    -> (Nothing, Just (ctorKey ctor))   -- binds, but still exclusive
+  PatLit _ lit       -> (Just (eqTo (Lit emptyAnno lit)), litKey lit)
+  PatExpr _ ex       -> (Just (eqTo ex), exprKey ex)
+  _                  -> (Nothing, Nothing)               -- PatVar / PatCons
   where
     eqTo = Equals emptyAnno scrutinee
+
+    ctorKey r = KeyCtor (getUnique r).unique
 
     litKey = \case
       NumericLit _ r -> Just (KeyNum r)
       StringLit _ t  -> Just (KeyStr t)
 
+    -- ONLY literals. It is tempting to add @App _ r [] -> Just (ctorKey r)@ here on
+    -- the grounds that a nullary application is a nullary constructor. It is not:
+    -- 'L4.Syntax.Var' is a pattern synonym for @App ann n []@, so that case also
+    -- matches every reference to a GIVEN parameter, a local binding, and every
+    -- zero-argument DECIDE. @WHEN EXACTLY lo@ / @WHEN EXACTLY hi@ over two NUMBER
+    -- parameters would then be declared mutually exclusive, the negated prefixes
+    -- would be dropped, and the diagram would answer TRUE where the rule answers
+    -- FALSE whenever @lo == hi@. Unlike 'PatApp', which the typechecker only produces
+    -- once 'resolveConstructor' has succeeded, a 'PatExpr' carries no such guarantee:
+    -- @inferPattern@ types it with a plain @inferExpr@.
     exprKey = \case
-      Lit _ lit  -> litKey lit
-      App _ r [] -> Just (KeyCtor (getUnique r).unique)
-      _          -> Nothing
+      Lit _ lit -> litKey lit
+      _         -> Nothing
 
 allDistinctJust :: Eq a => [Maybe a] -> Bool
 allDistinctJust ms = case sequence ms of
@@ -194,6 +246,66 @@ guardedToLadder
   -> GuardedRows
   -> m IRExpr
 guardedToLadder fresh go rows = do
+  -- Translate each guard EXACTLY ONCE and copy the result at every later occurrence.
+  --
+  -- This is not an optimisation, it is a correctness requirement. A guard appears once
+  -- positively and again under a negation in every later prefix and in the OTHERWISE
+  -- branch. Translating it afresh each time routes it through @leafFromExpr@, which
+  -- mints a fresh @Unique@ per call (@tempUniqueTODO <- getFresh@) for any COMPOUND
+  -- expression -- so @income LESS THAN 107000@ and its negated twin would become two
+  -- unrelated atoms. @submitNewBinding@ on the TypeScript side binds exactly one
+  -- 'Unique' and does NOT fan out, so a user could set one copy TRUE and the other
+  -- FALSE, and the diagram would assert a proposition and its negation at once.
+  --
+  -- (Bare variables are safe on their own: @varLeaf@ keys off the resolved name's
+  -- unique, which is stable across occurrences. It is only compound guards that need
+  -- this -- which is exactly the interesting case, e.g. every numeric threshold.)
+  --
+  -- 'copyOf' gives each occurrence fresh node IDs -- the ladder's ViewSpec is keyed by
+  -- node, so those must stay distinct -- while preserving every 'V.Name' (hence every
+  -- 'Unique') and every atomId.
+  canonical <- traverse go guards
+  let guardAt i = copyOf (canonical !! i)
+
+      prefixFor :: Int -> m [IRExpr]
+      prefixFor i
+        | rows.grDisjoint = pure []
+        | otherwise       = traverse negatedAt [0 .. i - 1]
+
+      negatedAt :: Int -> m IRExpr
+      negatedAt j = do
+        nid <- fresh
+        V.Not nid <$> guardAt j
+
+      allNegated :: m [IRExpr]
+      allNegated = traverse negatedAt [0 .. length guards - 1]
+
+      mkRow :: Int -> (Expr Resolved, Expr Resolved) -> m (Maybe IRExpr)
+      mkRow i (_, b) = case literalBool b of
+        Just False -> pure Nothing
+        Just True  -> do
+          pfx <- prefixFor i
+          g'  <- guardAt i
+          Just <$> conj (pfx <> [g'])
+        Nothing    -> do
+          pfx <- prefixFor i
+          g'  <- guardAt i
+          b'  <- go b
+          Just <$> conj (pfx <> [g', b'])
+
+      mkFallback :: m (Maybe IRExpr)
+      mkFallback = case rows.grOtherwise of
+        Nothing -> pure Nothing
+        Just b0 -> case literalBool b0 of
+          Just False -> pure Nothing
+          Just True  -> do
+            pfx <- allNegated
+            if null pfx then Just <$> mkLit True else Just <$> conj pfx
+          Nothing    -> do
+            pfx <- allNegated
+            b'  <- go b0
+            Just <$> conj (pfx <> [b'])
+
   disjuncts <- catMaybes <$> sequence (zipWith mkRow [0 ..] rows.grRows <> [mkFallback])
   case disjuncts of
     []  -> mkLit False   -- nothing can conduct
@@ -204,16 +316,18 @@ guardedToLadder fresh go rows = do
   where
     guards = map fst rows.grRows
 
-    negated :: [Expr Resolved] -> m [IRExpr]
-    negated = traverse $ \g -> do
-      nid <- fresh
-      V.Not nid <$> go g
-
-    -- The prefix that says "no earlier guard fired".
-    prefixFor :: Int -> m [IRExpr]
-    prefixFor i
-      | rows.grDisjoint = pure []
-      | otherwise       = negated (take i guards)
+    -- Fresh node IDs, identical atom identity.
+    copyOf :: IRExpr -> m IRExpr
+    copyOf = \case
+      V.And _ xs                -> V.And <$> fresh <*> traverse copyOf xs
+      V.Or _ xs                 -> V.Or <$> fresh <*> traverse copyOf xs
+      V.Not _ x                 -> V.Not <$> fresh <*> copyOf x
+      V.Implies _ p q seam      -> (\i p' q' -> V.Implies i p' q' seam) <$> fresh <*> copyOf p <*> copyOf q
+      V.UBoolVar _ nm v ci a ty -> (\i -> V.UBoolVar i nm v ci a ty) <$> fresh
+      V.App _ nm xs a           -> (\i xs' -> V.App i nm xs' a) <$> fresh <*> traverse copyOf xs
+      V.TrueE _ nm              -> (`V.TrueE` nm) <$> fresh
+      V.FalseE _ nm             -> (`V.FalseE` nm) <$> fresh
+      V.InertE _ t c            -> (\i -> V.InertE i t c) <$> fresh
 
     conj :: [IRExpr] -> m IRExpr
     conj []  = mkLit True
@@ -228,29 +342,3 @@ guardedToLadder fresh go rows = do
       nid <- fresh
       let name = V.MkName nid.id (if b then "TRUE" else "FALSE")
       pure (if b then V.TrueE vid name else V.FalseE vid name)
-
-    mkRow :: Int -> (Expr Resolved, Expr Resolved) -> m (Maybe IRExpr)
-    mkRow i (g, b) = case literalBool b of
-      Just False -> pure Nothing
-      Just True  -> do
-        pfx <- prefixFor i
-        g'  <- go g
-        Just <$> conj (pfx <> [g'])
-      Nothing    -> do
-        pfx <- prefixFor i
-        g'  <- go g
-        b'  <- go b
-        Just <$> conj (pfx <> [g', b'])
-
-    mkFallback :: m (Maybe IRExpr)
-    mkFallback = case rows.grOtherwise of
-      Nothing -> pure Nothing
-      Just b0 -> case literalBool b0 of
-        Just False -> pure Nothing
-        Just True  -> do
-          pfx <- negated guards
-          if null pfx then Just <$> mkLit True else Just <$> conj pfx
-        Nothing    -> do
-          pfx <- negated guards
-          b'  <- go b0
-          Just <$> conj (pfx <> [b'])
