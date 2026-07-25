@@ -308,6 +308,108 @@ below, where we correct ourselves.
 
 ---
 
+## The same instinct, industrialised: Lexipedia and Reg CF (2026)
+
+The window challenge was July 2021: two people, a torn sheet of paper and a tidy
+boxes-and-arrows chart. The natural rejoinder — _those were amateurs; a real
+practitioner with a real tool would not slip_ — deserves a real answer, and one
+turned up on its own.
+
+[**Lexipedia**](https://www.lexipedia.xyz) is an open-source project that models
+"legal processes" as shareable, forkable **BPMN and DMN**. It is careful,
+technically fluent, and exactly the sort of open civic-tech effort this field wants
+more of. Its page for
+[**Regulation Crowdfunding exemptions**](https://www.lexipedia.xyz/doku.php?id=reg_cf_exemptions)
+renders the SEC's Reg CF rules — who may raise, how much, from whom, and what they
+must then do — as a single BPMN process diagram. It is _drawn properly_, in the
+_industrial_ notation, by people who plainly know it. And every failure this page
+has been describing is sitting inside it.
+
+Here is its skeleton, redrawn:
+
+```mermaid
+flowchart LR
+  start((start)) --> elig{Check Issuer<br/>Eligibility}
+  elig -- Eligible --> off[Check Offering<br/>Limit]
+  off --> inv{Check Investor<br/>Contribution Limits}
+  inv -- "income/net worth &lt; $107,000" --> five[Apply 5% Limit]
+  inv -- "income/net worth ≥ $107,000" --> ten[Apply 10% Limit]
+  inv -- "accredited investor" --> olc
+  five --> olc{Offering<br/>Limit Check}
+  ten --> olc
+  olc -- Within Limit --> cil[Check Investor Limits]
+  cil --> disc[Prepare Disclosure<br/>Requirements] --> intm[Select Intermediary] --> adv[Comply with<br/>Advertising Restrictions] --> rep[Prepare Ongoing<br/>Reporting] --> res[Understand Resale<br/>Restrictions] --> done((end))
+```
+
+_(Our redrawing, for the purpose of criticism; the original BPMN is at
+[lexipedia.xyz](https://www.lexipedia.xyz/doku.php?id=reg_cf_exemptions) and remains
+the work of that project. The nodes and labels are theirs; only the tidying is ours.)_
+
+Read it against the four things this page has said a flowchart does to a rule.
+
+**It invents a sequence the law does not have.** Issuer eligibility, the offering
+cap and the investor-contribution limit are three _conditions_ that must all hold;
+Reg CF nowhere says to test them in an order. The diagram nonetheless marches
+`eligibility → offering limit → investor limit`, left to right, as though each gated
+the next. Permute the three and the statute is unchanged while the picture must be
+redrawn — the tell, every time, of an order that lives in the drawing and not in the
+law. _It says more than the law._
+
+**Its gateways have a true branch and no false one.** `Check Issuer Eligibility`
+emits a single arrow, `Eligible`; there is none for _not_ eligible.
+`Offering Limit Check` emits `Within Limit` and nothing for _over_ it. The
+non-qualifying issuer and the over-cap raise simply fall off the diagram into the
+unlabelled exit this page warned about — the exact place a rules-as-code project
+loses track of whether "no" meant _fail_, _stop_, or _undefined_. A material
+conditional makes "does Reg CF even bite this offering?" a first-class question with
+a first-class answer; here it is a missing edge.
+
+**It draws a computation as a fork.** The investor limit is not a classification, it
+is a _piecewise formula_ — broadly, a percentage of income or net worth, over a
+floor, with a threshold that switches the percentage and (since the 2021 amendments)
+no cap at all for accredited investors. The diagram reconstitutes that arithmetic as
+three control-flow branches into tasks named `Apply 5% Limit` and `Apply 10% Limit`.
+This is the "computation as branches" failure the [decision-table
+section](#decision-tables-the-strongest-rival-and-where-it-actually-runs-out) returns
+to: the honest home for `greater(floor, rate × base)` is a _cell_ or a _function_, not
+a gateway. (Note too the `$107,000` painted into the branch labels — a hard-coded
+dollar figure of the kind that silently drifts. Reg CF's thresholds have already moved
+since that number was current; the diagram has not.)
+
+**It fuses two kinds of law into one line, and serves neither.** Look where the flow
+goes _after_ the limits: `Prepare Disclosure Requirements → Select Intermediary →
+Comply with Advertising Restrictions → Prepare Ongoing Reporting → Understand Resale
+Restrictions`. That tail is not decision logic at all — it is _obligation and
+process_: some one-time, some continuing, some standing constraints on conduct with
+no natural position in a queue. "Understand resale restrictions" is not step twelve
+because "prepare ongoing reporting" was step eleven; they are sequenced only because
+a line has to run from somewhere to somewhere. So the front half is a **predicate
+mis-drawn as flow** and the back half is **genuine process flattened into a
+checklist**, and the one undifferentiated diagram is right about neither. This is
+precisely the split the section below on process insists on — decision logic and
+process are different semantic categories — and the reason a single picture cannot
+carry both.
+
+None of this is a knock on the people. It is, once again, the notation asking the
+same thing of everyone: pick an order, gate each step on the last, and terminate
+every path by hand. Lexipedia did it fluently, in the standard-issue tool, and the
+category error survived the competence — which is the whole argument of this page,
+now with a 2026 dateline instead of a 2021 one.
+
+And notice the one move Lexipedia gets exactly right, because it is the move worth
+keeping. Their processes are **open, shareable, forkable, versioned** — law you can
+send someone a pull request against. That instinct is correct, and this document
+should say so plainly. What is misplaced is only the _substrate_: fork a BPMN and you
+fork its ceiling with it — the invented order, the missing exits, the arithmetic you
+cannot write — because the diagram _is_ the source. The answer is not to draw a better
+diagram but to move the source: keep the rule in a language and let the BPMN, the DMN
+table and the ladder each be a _derived view_ that cannot drift from it or from one
+another. That is the [inversion](#why-this-matters-the-inversion) this page closes on
+— and Reg CF is a good place to watch it bite, because a faithful account of it needs
+a predicate, a function _and_ a process, and no one picture is all three.
+
+---
+
 ## The right pictures for logic
 
 Because the law here is set-theoretic and truth-functional, the fitting diagrams
