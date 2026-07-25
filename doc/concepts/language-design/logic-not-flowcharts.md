@@ -390,6 +390,77 @@ precisely the split the section below on process insists on — decision logic a
 process are different semantic categories — and the reason a single picture cannot
 carry both.
 
+### The same number, twice, and only one of them updated
+
+The four defects above are ones you can reason your way to from the picture. This
+fifth one we found only by formalising the underlying regulation and comparing —
+and it is the most useful of the five, because it is not an argument. It is a
+measurement.
+
+The page states the investor-limit threshold as **$107,000** in its investor-limits
+group. Fourteen lines later, in its disclosure group, it states the financial-statement
+tier-1 threshold as **$124,000**. These are not two thresholds. They are the same
+figure, in two places, and they were moved by the **same amendatory instruction on the
+same day**:
+
+> a. In paragraph (a)(2)(i), removing reference to "$2,200" and adding in its place
+> "$2,500"; and removing "$107,000" and adding in its place "$124,000" […] 3. Amend Sec. 227.201 by: a. In paragraph (t)(1), removing reference to "$107,000"
+> and adding in its place "$124,000"
+>
+> — 87 FR 57394, 57398 (effective 2022-09-20)
+
+Half the page took the amendment. Half did not. The page now asserts two different
+values for one fact, and nothing on it can tell you which is current. (It is worse than
+staleness: elsewhere the same page states the limit as a percentage of _the lesser_ of
+income or net worth, which the rule stopped saying in March 2021 — so a reader cannot
+even assume the older number belongs to a coherent older rule.)
+
+**This is a named bug, and software engineering has named it more than once.** That is
+the point of raising it. It is not an exotic failure or a lapse in care; it is one of
+the first failure modes anyone teaches, with a smell name, a remedy, and in some cases
+a tool that finds it for you:
+
+| The frame                        | What it says about this page                                                                                                                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DRY / single source of truth** | Hunt & Thomas's formulation is about _knowledge_, not text: "every piece of knowledge must have a single, unambiguous, authoritative representation within a system." The cut point is knowledge. It has two representations and no authority.                                                            |
+| **Magic number**                 | `$124,000` appears as a bare literal with no name. Nothing on the page says these two occurrences _are_ the same quantity; a reader has to know the law to know they should move together.                                                                                                                |
+| **Shotgun surgery**              | Fowler's smell: one conceptual change forces many scattered small edits. Note who is committing it — the amendatory instruction quoted above _is_ a shotgun-surgery changelist. The regulator ships a textual diff against N sites, and the CFR is itself the unnormalised store.                         |
+| **Inconsistent clone update**    | The closest empirical analogue. Juergens et al. (ICSE 2009) studied whether clones actually matter and found that _inconsistently changed_ clones are a substantial fault source — copies are cheap to make and expensive to keep in step. Exactly what happened here.                                    |
+| **Update anomaly**               | The most precise frame, because this is data rather than code. Codd's point about unnormalised relations: store one fact in several places and an update touching only some of them leaves the store self-contradictory. Normalisation does not discipline the anomaly — it makes it **unrepresentable**. |
+
+**And the format guarantees it.** This is where the diagnosis stops being about
+Lexipedia and starts being about the substrate again. A DokuWiki page is prose plus a
+pasted `<bpmnio>` block. There is **no binding form** — nowhere to write
+_let the cut point be $124,000_ and refer to it twice. DRY is therefore not merely
+unobserved on that page; it is **unavailable**. A perfect editor with unlimited care
+cannot normalise a document that has no place to put the name. What they have instead
+is the "Notes for editors" section on their Charlottesville page, telling humans to
+keep the diagram and the text in sync — in safety-engineering terms an _administrative
+control_ (ask people to be careful) standing in for an _engineering control_ (make the
+failure impossible). Administrative controls are the weakest tier for a reason.
+
+**And it failed silently.** No test broke, because there is nothing that could break.
+The two occurrences are not connected by anything capable of noticing they disagree.
+The defect has been sitting on the flagship page of a project whose stated audience
+includes "legal engineers building automated systems," and it took formalising the
+regulation to see it.
+
+The contrast is not that we are more careful. It is that the question does not arise.
+In the Reg CF mirror corpus (`jl4/examples/legal/regcf/regcf.l4`)
+the figure is **bound once**, as `income or net worth cut point`, and read by both the
+investor-limit rule and the financial-statement tier. Name resolution — not editorial
+diligence — is what guarantees the two agree; a divergence is not a thing you can write
+down. The boundary cases either side of it are pinned by executable assertions, so even
+a deliberate attempt to duplicate the value gets caught. And because the binding carries
+its effective date, "what was the limit on 2021-06-01?" is a query rather than an
+exercise in page archaeology.
+
+That is what the previous paragraph meant by a derived view that _cannot drift_. Here is
+the drift, in the wild, on the flagship page, in a number that decides how much money a
+person is allowed to invest.
+
+### Not a knock on the people
+
 None of this is a knock on the people. It is, once again, the notation asking the
 same thing of everyone: pick an order, gate each step on the last, and terminate
 every path by hand. Lexipedia did it fluently, in the standard-issue tool, and the

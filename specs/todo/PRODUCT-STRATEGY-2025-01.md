@@ -808,19 +808,19 @@ _Priority:_ **P2 - Post-Sprint Week 3-4**
 
 ## The Adoption Thesis (Why-Now / Why-Us)
 
-*Added 2026-07-25. Condensed, product-facing version; the full long-form treatment lives in the pitch knowledge base (`l4-pitch` repo → `PITCH.md` → "Deep Dive: The Adoption Thesis"). Captured here so the roadmap is disciplined by it.*
+_Added 2026-07-25. Condensed, product-facing version; the full long-form treatment lives in the pitch knowledge base (`l4-pitch` repo → `PITCH.md` → "Deep Dive: The Adoption Thesis"). Captured here so the roadmap is disciplined by it._
 
-Computational law has been attempted since Allen (1957) and the 1986 British Nationality Act formalization, and never achieved adoption. Before we claim "this time is different," we owe a *mechanism*, not a mood — and the mechanism should discipline what we build.
+Computational law has been attempted since Allen (1957) and the 1986 British Nationality Act formalization, and never achieved adoption. Before we claim "this time is different," we owe a _mechanism_, not a mood — and the mechanism should discipline what we build.
 
 **The failures were not logic failures.** The blockers were: (1) **incentive misalignment** — the party who did the encoding wasn't the party who captured the value; (2) **no consuming downstream** — the formal artifact was a demo, nothing ran on it; (3) **maintenance rot** — nobody funded keeping encodings current; (4) **deliberate ambiguity** — vagueness as a negotiated asset a powerful party won't give up; (5) **skill scarcity with no gradual on-ramp**. A better prover or type system fixes none of these, so **we don't lead with "better logic."**
 
 **What changed (W. Brian Arthur's enabling-technology test).** Two complements crossed a threshold. (a) **LLMs collapse the two historically fatal costs** — formalizing at scale, and explaining a formal result to a layperson. (b) **A consuming runtime now exists** — citizen wizard, decision-service API, anti-hallucination oracle — so the formal artifact produces value without a human in the loop (Claude Code is already a consumer). Production cost collapsed; a paying downstream appeared.
 
-**The honest limit.** LLMs do *not* fix the incentives for **incumbent personas** (practicing lawyers, legislatures). That's why the nonconsumer-first wedge is load-bearing, not optional — it's the only terrain where the 50-year blocker is genuinely absent (there was no prior solution, so "good enough" can't be true there).
+**The honest limit.** LLMs do _not_ fix the incentives for **incumbent personas** (practicing lawyers, legislatures). That's why the nonconsumer-first wedge is load-bearing, not optional — it's the only terrain where the 50-year blocker is genuinely absent (there was no prior solution, so "good enough" can't be true there).
 
 **Where demand is real.** Not one-off contracts — that pain is diffuse and probabilistic, as hard to sell against as insurance. Demand is real where a legal defect **repeats at scale**: per-claim insurance payout logic, regulator compliance throughput, high-frequency contract operations. Every hard pilot finding (the legislative race condition; the million-dollar payout ambiguity) landed there, by selection rather than luck.
 
-**The real risk is repeatability, not adoption in the abstract.** The pilots already prove the tech works and the value is monetizable; the open question is whether each win *productizes* or stays artisanal consulting. **The open-core corpus is the mechanism that converts bespoke engagements into a compounding, recurring-revenue library — and de-risking that conversion is the single most important thing this roadmap must do.**
+**The real risk is repeatability, not adoption in the abstract.** The pilots already prove the tech works and the value is monetizable; the open question is whether each win _productizes_ or stays artisanal consulting. **The open-core corpus is the mechanism that converts bespoke engagements into a compounding, recurring-revenue library — and de-risking that conversion is the single most important thing this roadmap must do.**
 
 **The four-question qualifier** — say "different" only when all four are yes; decline the opportunity if any is no:
 
@@ -829,7 +829,7 @@ Computational law has been attempted since Allen (1957) and the 1986 British Nat
 3. A nonconsumer buyer with no "good enough" incumbent to displace.
 4. A consuming runtime that turns the artifact into value without a human in the loop.
 
-Public claim we defend: **not** "a System of Record for all of law" — that's a decades-long social project we name as the *direction* — but the two or three niches where the complement has already crossed the threshold, proven by our pilots.
+Public claim we defend: **not** "a System of Record for all of law" — that's a decades-long social project we name as the _direction_ — but the two or three niches where the complement has already crossed the threshold, proven by our pilots.
 
 ---
 
