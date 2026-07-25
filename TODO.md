@@ -6,17 +6,24 @@ Last reoriented: 2026-07-15._
 
 ---
 
-## 0. Where we are (post-#96, post-#116, post-§25)
+## 0. Where we are (post-#96, post-#116-MERGED, post-§25, post-E1-Steps-1–3)
 
 - **PR #96 is MERGED into `unstable`.** The foundation: the pure BBE `ladder-core` (P0
   kernel), the standalone interactive page (target C), and the visual language §15–§22
   (ELIMINABLE, folding, unboxed inert, Bézier fan, valuation/override, leader+streamer
   current flow, NOT, TYPICALLY defaulted-vs-given).
-- **PR #116 is OPEN into `unstable`** (this branch). It carries: the **viz-expr adapter**
-  (A1), the **TYPICALLY→provenance consumption** (B1) + real-module test (B2), the **IDE-free
-  L4→ladder playground** (A2 transport, in a form we didn't originally plan), the **sentence
-  expander**, the **ASCII + Mermaid carriers** (§24), and — newest — the whole **IMPLIES seam**
-  (§25, task **J** below). Green: ladder-core 43/43, jl4 1125/0, jl4-service 293/0, turbo 25/25.
+- **PR #116 is MERGED into `unstable`** (2026-07-18, merge commit `5bde53da`, via the merge
+  queue). It carried everything on this branch: the **viz-expr adapter** (A1), the
+  **TYPICALLY→provenance consumption** (B1) + real-module test (B2), the **IDE-free L4→ladder
+  playground** (A2 transport), the **sentence expander**, the **ASCII + Mermaid carriers**
+  (§24), the whole **IMPLIES seam** (§25, task **J**), the **`ladder-svg` split** (E4/G6),
+  the **R1 corpus spike**, and **E1 Steps 1 / 2-metrics / 3** — the identity + `verdictFor`,
+  `canvasMetrics`, and the LIR-free `LadderModel`. Plus the §18 Bézier-thrust tuning.
+- **⚠ This worktree branch is now STALE.** After the #116 merge, `mengwong/ladder-diagrams-3`
+  is **0 ahead / 55 behind `origin/unstable`** — fully merged, nothing unpushed. Those 55
+  commits are unrelated parallel work (set-operators #133, fixity #128/#131, library-resolution
+  #134, l4-papers #132). **H2 is now forced:** cut a fresh branch off `origin/unstable` for
+  E1 Step 4+ rather than continuing on this dead branch (see §H2).
 - **PR #110 is MERGED** — the shared TYPICALLY wire field + both extractors (Haskell
   `VizExpr.hs` `UBoolVar` 6th field, TS `viz-expr.ts` `typically`, the shared
   `typicallyBridge`). The "build once, do not duplicate" bridge exists; we consume it.
@@ -304,8 +311,12 @@ NotApplicable`) on the query plan and on every impact preview; support computed 
 
 - [ ] **H1.** Decide storage for the `tmp/` PDFs (the box-model + and/or-tree spec PDFs;
       still deliberately untracked pending a binary-storage decision).
-- [ ] **H2.** Retire / rebase this worktree — since #96 merged, either merge `unstable`
-      back in to continue here, or cut fresh feature branches off `origin/unstable` per follow-up.
+- [x] **H2. DONE (2026-07-25).** `mengwong/ladder-diagrams-3` went 0-ahead / 55-behind after
+      #116 merged, so the tracker updates (this file's §0, DESIGN §14, the E1 doc header) were
+      carried onto a fresh branch off `origin/unstable` —
+      **`mengwong/lexipedia-superset`** — which also carries the new programme spec at
+      `specs/todo/lexipedia-superset/`. E1 Step 4+ resumes from there or from a sibling branch
+      off `origin/unstable`. The stale `ladder-diagrams-3` worktree can now be retired.
 - [x] **H3.** ~~Pre-existing prettier failures~~ — **DONE** (`07ff7742`, its own commit so the
       ~650 lines of formatting churn stayed out of the substantive diff). Every _tracked_ file now
       passes `prettier --check .`; the only remaining warnings are on untracked scratch (`tmp/`,
