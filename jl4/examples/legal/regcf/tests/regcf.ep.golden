@@ -274,6 +274,16 @@ DECLARE InvestorProfile HAS
 -- limit for every investor whose income and net worth differ. This is a change
 -- in the shape of the rule, not merely in a number, and it is the single most
 -- consequential edit in Reg CF's history for an individual investor.
+--
+-- Neither reading was ever compelled by the statute. Section 4(a)(6)(B) of the
+-- Securities Act says only "a given percentage of the annual income or net worth
+-- of such investor, as applicable"; the Commission notes that "[t]he statutory
+-- language does not expressly provide that the investor use the lesser of annual
+-- income or net worth" (86 FR 3496, n.460), and that in 2015 it "considered
+-- whether to use a 'greater of' or 'lesser of' standard ... and determined to use
+-- the 'lesser of' standard at that time due to concerns about investors incurring
+-- unaffordable losses". So the operative word here is a discretionary regulatory
+-- gloss on an ambiguous statute, held for five years and then reversed.
 @ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER

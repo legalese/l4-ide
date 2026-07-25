@@ -97,6 +97,14 @@ Primary text used: eCFR Title 17 Part 227 at the 2026-07-23 issue date, retrieve
 `https://www.ecfr.gov/api/versioner/v1/full/2026-07-23/title-17.xml?part=227`. The pre-2021
 comparison text is the same API at `2021-01-04`.
 
+**Currency check.** A Federal Register query for documents affecting 17 CFR 227 published
+on or after 2023-01-01 returns **zero results**, so Release 33-11098 (2022-09-20) is the most
+recent amendment and the figures above are current as at 2026-07-25. The deadlines in Rules
+202/203 were confirmed unchanged: the only 2021 amendment to Rule 203 revised paragraph
+(a)(1) (co-issuer language) and left (a)(3)(i), (b)(1) and (b)(3) alone; Rule 202 has never
+been touched by an inflation release (its 2017 amendment, 82 FR 45725, is hurricane relief,
+not 82 FR 17545).
+
 ## 3. Where the mirrored page is wrong or stale
 
 Nine findings. The first is a substantive misstatement of law, not a stale number.
@@ -119,6 +127,24 @@ consequential edit in Reg CF's history for an individual investor:
 
 Encoded at `greater of annual income or net worth`; the $10,000 figure is asserted at
 `#ASSERT \`investment limit\` (\`an investor with\` FALSE 60000 200000 0) EQUALS 10000`.
+
+What makes this more than a typo on their part is that **neither reading was ever compelled
+by the statute**. Section 4(a)(6)(B) of the Securities Act says only "a given percentage of
+the annual income or net worth of such investor, as applicable". The Commission says so
+itself, twice, in the release that flipped it:
+
+> "The statutory language does not expressly provide that the investor use the lesser of
+> annual income or net worth." — 86 FR 3496, n.460
+>
+> "When adopting Regulation Crowdfunding, the Commission considered whether to use a
+> 'greater of' or 'lesser of' standard for the exemption's investment limits and determined
+> to use the 'lesser of' standard at that time due to concerns about investors incurring
+> unaffordable losses." — 86 FR 3496
+
+So "lesser of" was a discretionary gloss on an ambiguous statute, held for five years and
+then reversed to align Reg CF with Tier 2 of Regulation A. A page that still says "lesser
+of" is not carrying a stale *number*; it is carrying a **policy position the regulator
+abandoned**, and nothing in the page's format can tell a reader which of the two it is.
 
 ### 3.2 `$107,000` and `$2,200` are the pre-2022 figures
 
@@ -170,8 +196,9 @@ disqualified from the *next* offering (17 CFR 227.100(b)(5)). Encoded as
 `(b)(5) — delinquent in ongoing annual reports`, with a dedicated `a delinquent issuer`
 fixture and a top-level scenario showing an otherwise-clean transaction failing on it.
 
-The page also omits Rule 100(b)(2)'s companion framing and folds the blank-check test into
-the "specific business plan" bullet; that is a presentational choice, not an error.
+To be fair to the page: it does cover (b)(1), (b)(2), (b)(3), (b)(4) and (b)(6), splitting
+(b)(6) across a "blank check company" mention and a "specific business plan" bullet. That
+split is a presentational choice, not an error. **(b)(5) is the one genuinely missing limb.**
 
 ### 3.7 The page omits two of the five ongoing-reporting termination conditions
 
@@ -231,7 +258,7 @@ Boundary coverage — at least one case on each side of every numeric threshold:
 | 3 annual reports | `3` ✓ | `2` ✗ |
 | 1-year resale window | `365` permitted | `364` restricted |
 
-The four `#TRACE` directives residuate the obligation tail. Verbatim results:
+The seven `#TRACE` directives residuate the obligation tail. Verbatim results:
 
 ```
 `advertising restriction` `a conforming notice`, Issuer advertises at 10
