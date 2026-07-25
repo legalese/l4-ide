@@ -54,6 +54,11 @@
 --    BPMN's interrupting boundary event is exactly the race @SHANT@ needs,
 --    provided the two arms are wired the way the L4 runtime resolves them and
 --    not the way they look. See 'raceArms'.
+-- 4. Three shapes the 'L4.StateGraph' types permit and today's extractor never
+--    produces — several @HENCE@ arms from one state (@P-MULTI-HENCE@), a
+--    junction that is also an obligation (@P-JUNCTION-OBLIGATION@), and a cycle
+--    (@P-CYCLE@) — are detected and reported without being drawn, because
+--    there is no honest shape to draw instead. See 'multiHenceFindings'.
 module L4.Bpmn.Lower
   ( stateGraphToBpmn
   ) where
@@ -688,8 +693,130 @@ stateGraphToBpmn opts sg =
   findings =
     concat [c.scFindings | (_, c) <- chains]
       <> joinFindings
+      <> multiHenceFindings
+      <> junctionObligationFindings
+      <> cycleFindings
       <> [bearerFinding | not (null parties)]
       <> [ruleVersionFinding]
+
+  ------------------------------------------------------------------
+  -- Shapes the types permit that today's extractor cannot reach
+  ------------------------------------------------------------------
+
+  -- 'L4.StateGraph' currently emits at most one @HENCE@ and one @LEST@ per
+  -- state, never a junction that is also an obligation, and never a back edge.
+  -- The /types/ permit all three, and this module is written against the types,
+  -- not against one afternoon's extractor. Each of the three lowers to
+  -- something that reads as a claim the source does not make, so each is
+  -- detected here and named.
+  --
+  -- __Detected, not rendered.__ There is no honest shape to draw instead — the
+  -- whole difficulty is that BPMN's notation already spends its unconditional
+  -- outgoing flows on \"and\" — so inventing one is exactly how this exporter
+  -- would start lying. The note is the deliverable. It is also cheap insurance:
+  -- the day someone teaches the extractor a new shape, the report says what
+  -- happened instead of the diagram quietly saying something else.
+
+  -- Two @HENCE@ arms leave the /same/ task, both unconditional. BPMN reads
+  -- several unconditional outgoing sequence flows as an implicit parallel split
+  -- — the AND-split you get for free by drawing nothing — so a choice between
+  -- continuations is drawn as \"both happen\". That is the AllOf\/OneOf
+  -- confusion this whole track exists to fix, reappearing one level down where
+  -- no gateway marks it.
+  multiHenceFindings =
+    [ MkFidelityNote
+      { code = "P-MULTI-HENCE"
+      , severity = Blocking
+      , element = fromMaybe ("state " <> Text.pack (show s.stateId)) (taskOf s.stateId)
+      , range = Nothing
+      , message =
+          "This state has "
+            <> Text.pack (show (length hs))
+            <> " HENCE transitions. All of them leave the same task with no \
+               \condition on any of them, and BPMN reads several unconditional \
+               \outgoing flows as an implicit parallel split — so the diagram \
+               \says every continuation happens, where the source offered a \
+               \choice. Only the first HENCE named the task, so the others also \
+               \lost their party, action and deadline."
+      , lost =
+          "the choice between the continuations, and every label but the \
+          \first's; an exclusive gateway would draw the choice, but nothing in \
+          \the source says which arm wins, so drawing one would invent the \
+          \answer"
+      }
+    | s <- sg.sgStates
+    , let hs = [t | t <- outOf s.stateId, t.transType == HenceTransition]
+    , length hs > 1
+    ]
+
+  -- A junction state contributes a diverging gateway; an obligation state
+  -- contributes a task; and 'chainFlows' wires a state's own nodes in order, so
+  -- a state that is both hangs the task off the gateway. The gateway then has
+  -- one more outgoing arm than the junction has branches, and that extra arm is
+  -- the obligation — drawn as a sibling of the branches rather than as their
+  -- precondition.
+  junctionObligationFindings =
+    [ MkFidelityNote
+      { code = "P-JUNCTION-OBLIGATION"
+      , severity = Blocking
+      , element = fromMaybe ("state " <> Text.pack (show s.stateId)) (gatewayOf s.stateId)
+      , range = Nothing
+      , message =
+          "This state is both a "
+            <> fanName s.stateFan
+            <> " junction and an obligation, so it draws a diverging gateway \
+               \and a task, and the task hangs off the gateway. The gateway \
+               \therefore has one arm more than the junction has branches: \
+               \under \8216all of\8217 the obligation is drawn as one more \
+               \concurrent branch, under \8216one of\8217 as one more \
+               \alternative. Neither is what the source says."
+      , lost =
+          "the obligation's place in the order — that it governs the junction \
+          \rather than racing it"
+      }
+    | s <- sg.sgStates
+    , s.stateFan /= Linear
+    , any
+        (\t -> t.transType == HenceTransition || t.transType == LestTransition)
+        (outOf s.stateId)
+    ]
+
+  -- Some state can get back to itself. BPMN draws loops perfectly well; this
+  -- LAYOUT does not, because it ranks a node by its longest path from the start
+  -- and a node on a cycle has no such thing.
+  cycleFindings =
+    [ MkFidelityNote
+      { code = "P-CYCLE"
+      , severity = Lossy
+      , element = processId
+      , range = Nothing
+      , message =
+          "The state graph has a cycle ("
+            <> Text.intercalate ", " (map stateNameOf onACycle)
+            <> "). BPMN can draw a loop, but this layout places a node by its \
+               \longest path from the start and a node on a cycle has none, so \
+               \inside the loop a node further right no longer means a moment \
+               \further on: the positions are wherever the relaxation ran out \
+               \of fuel."
+      , lost =
+          "the reading that left-to-right is time, which is the only thing the \
+          \horizontal axis was carrying"
+      }
+    | not (null onACycle)
+    ]
+
+  -- A state is on a cycle when one of its successors can get back to it.
+  onACycle :: [StateId]
+  onACycle =
+    [ s.stateId
+    | s <- sg.sgStates
+    , any (Set.member s.stateId . reachFrom) (Map.findWithDefault [] s.stateId succsOf)
+    ]
+
+  stateNameOf sid =
+    fromMaybe
+      (Text.pack (show sid))
+      (listToMaybe [s.stateName | s <- sg.sgStates, s.stateId == sid])
 
   bearerFinding =
     MkFidelityNote

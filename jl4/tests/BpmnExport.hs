@@ -214,6 +214,131 @@ opaqueDeadlineSrc =
   ]
 
 --------------------------------------------------------------------------------
+-- Hand-built state graphs
+--------------------------------------------------------------------------------
+
+-- Three shapes the 'StateGraph' types permit and no L4 source can currently
+-- produce, so they are built by hand. That is not a contrivance: 'L4.Bpmn.Lower'
+-- is written against the types, every one of these lowers to a diagram that
+-- says something the source did not, and \"the extractor happens not to emit it
+-- this month\" is a property of the extractor, not of the exporter.
+--
+-- Each is deliberately minimal — one anomaly, nothing else — so that a failure
+-- names the anomaly rather than a fixture.
+
+node :: StateId -> Text -> StateType -> FanKind -> ContractState
+node i nm ty fan =
+  ContractState {stateId = i, stateName = nm, stateType = ty, stateFan = fan}
+
+-- | An obligation edge. The label is as plain as the type allows: any
+-- difference between two of these is the thing under test.
+edge :: StateId -> StateId -> TransitionType -> Text -> Transition
+edge src dst ty act =
+  Transition
+    { transFrom = src
+    , transTo = dst
+    , transLabel =
+        TransitionLabel
+          { labelParty = Just "Alice"
+          , labelModal = Just DMust
+          , labelAction = act
+          , labelDeadline = Nothing
+          , labelGuard = Nothing
+          }
+    , transType = ty
+    }
+
+byHand :: Text -> [ContractState] -> [Transition] -> StateGraph
+byHand nm ss ts =
+  StateGraph {sgName = nm, sgStates = ss, sgTransitions = ts, sgInitialState = 0}
+
+-- | Two HENCE arms out of one state. Both leave the same task, neither carries
+-- a condition, and BPMN reads that as an implicit AND-split.
+multiHenceGraph :: StateGraph
+multiHenceGraph =
+  byHand
+    "two ways on"
+    [ node 0 "start" InitialState Linear
+    , node 1 "Fulfilled" TerminalFulfilled Linear
+    , node 2 "Breach" TerminalBreach Linear
+    ]
+    [edge 0 1 HenceTransition "pay", edge 0 2 HenceTransition "deliver"]
+
+-- | The control for it: the same graph with one HENCE.
+oneHenceGraph :: StateGraph
+oneHenceGraph =
+  byHand
+    "one way on"
+    [ node 0 "start" InitialState Linear
+    , node 1 "Fulfilled" TerminalFulfilled Linear
+    ]
+    [edge 0 1 HenceTransition "pay"]
+
+-- | A state that is both an @AllOf@ junction and an obligation.
+junctionObligationGraph :: StateGraph
+junctionObligationGraph =
+  byHand
+    "junction that is also a duty"
+    [ node 0 "start" InitialState AllOf
+    , node 1 "left" IntermediateState Linear
+    , node 2 "right" IntermediateState Linear
+    , node 3 "Fulfilled" TerminalFulfilled Linear
+    ]
+    [ edge 0 1 DefaultTransition "left branch"
+    , edge 0 2 DefaultTransition "right branch"
+    , edge 0 3 HenceTransition "pay"
+    , edge 1 3 HenceTransition "do the left thing"
+    , edge 2 3 HenceTransition "do the right thing"
+    ]
+
+-- | The control: the same junction with no obligation on it.
+plainJunctionGraph :: StateGraph
+plainJunctionGraph =
+  byHand
+    "junction that is only a junction"
+    [ node 0 "start" InitialState AllOf
+    , node 1 "left" IntermediateState Linear
+    , node 2 "right" IntermediateState Linear
+    , node 3 "Fulfilled" TerminalFulfilled Linear
+    ]
+    [ edge 0 1 DefaultTransition "left branch"
+    , edge 0 2 DefaultTransition "right branch"
+    , edge 1 3 HenceTransition "do the left thing"
+    , edge 2 3 HenceTransition "do the right thing"
+    ]
+
+-- | A back edge: state 2 returns to state 1.
+cyclicGraph :: StateGraph
+cyclicGraph =
+  byHand
+    "round and round"
+    [ node 0 "start" InitialState Linear
+    , node 1 "review" IntermediateState Linear
+    , node 2 "revise" IntermediateState Linear
+    , node 3 "Breach" TerminalBreach Linear
+    ]
+    [ edge 0 1 HenceTransition "submit"
+    , edge 1 2 HenceTransition "reject"
+    , edge 2 1 HenceTransition "resubmit"
+    , edge 1 3 LestTransition "timeout"
+    ]
+
+-- | The control: the same four states, wired forwards only.
+acyclicGraph :: StateGraph
+acyclicGraph =
+  byHand
+    "straight through"
+    [ node 0 "start" InitialState Linear
+    , node 1 "review" IntermediateState Linear
+    , node 2 "revise" IntermediateState Linear
+    , node 3 "Breach" TerminalBreach Linear
+    ]
+    [ edge 0 1 HenceTransition "submit"
+    , edge 1 2 HenceTransition "reject"
+    , edge 1 3 LestTransition "timeout"
+    ]
+
+--------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
 
@@ -433,6 +558,24 @@ verticalMerges bx =
   ]
  where
   overlapLen (a1, a2) (c1, c2) = min (max a1 a2) (max c1 c2) - max (min a1 a2) (min c1 c2)
+
+-- | Flows whose target is drawn no further right than their source.
+--
+-- This is what a cycle costs, stated as arithmetic over the emitted DI rather
+-- than as a claim about the layout's internals: the layout ranks a node by its
+-- longest path from the start, so on an acyclic graph every flow advances and
+-- \"further right\" reliably means \"later\". A back edge cannot advance, and
+-- once one node's position is arbitrary so is every position it feeds.
+nonAdvancingEdges :: BpmnExport -> [Text]
+nonAdvancingEdges bx =
+  [ f.flowId
+  | f <- bx.bxProcess.procFlows
+  , Just s <- [boundsFor f.flowFrom]
+  , Just t <- [boundsFor f.flowTo]
+  , t.bx <= s.bx
+  ]
+ where
+  boundsFor nid = listToMaybe [b | (n, b) <- flowNodeShapes bx, n == nid]
 
 -- | Ids of every timer boundary event from which a breach terminal is
 -- reachable — every place the diagram says \"let the clock run out and you are
@@ -860,6 +1003,89 @@ spec = do
       report `shouldSatisfy` Text.isInfixOf "[F1] blocking — Task_0"
       report `shouldSatisfy` Text.isInfixOf "[F5] advisory — Process_chain"
       report `shouldSatisfy` Text.isInfixOf "      lost: "
+
+  -- Three shapes the StateGraph types permit and today's extractor never
+  -- builds. Each is detected and named, and none is drawn, because there is no
+  -- honest shape to draw instead.
+  --
+  -- Every assertion below pairs the note with the DEFECT IN THE EMITTED
+  -- DIAGRAM that motivates it, and pairs that with a control graph differing in
+  -- one edge. Asserting only "the note is present" would pass for an exporter
+  -- that filed all three notes unconditionally, which is a different way of
+  -- being useless.
+  describe "shapes the types permit but nothing can draw" $ do
+    describe "several HENCE arms from one state" $ do
+      let bx = stateGraphToBpmn defaultBpmnOptions multiHenceGraph
+          control = stateGraphToBpmn defaultBpmnOptions oneHenceGraph
+          outOfTask e = [f | f <- e.bxProcess.procFlows, f.flowFrom == "Task_0"]
+
+      -- This is the AllOf/OneOf confusion the whole track exists to fix,
+      -- one level down: BPMN's implicit AND-split is what you get by drawing
+      -- nothing, so the choice reads as a conjunction with no gateway to blame.
+      it "leaves the task with two unconditional outgoing flows, which BPMN reads as AND" $ do
+        map (.flowCondition) (outOfTask bx) `shouldBe` [Nothing, Nothing]
+        map (.flowTo) (outOfTask bx) `shouldSatisfy` ((== 2) . length)
+
+      it "and says so, at blocking, naming the task" $ do
+        map (.severity) (findingsFor "P-MULTI-HENCE" bx) `shouldBe` [Blocking]
+        map (.element) (findingsFor "P-MULTI-HENCE" bx) `shouldBe` ["Task_0"]
+        findingsFor "P-MULTI-HENCE" bx `shouldSatisfy` all (mentions "parallel split")
+
+      it "the control: one HENCE, one flow, no note" $ do
+        map (.flowCondition) (outOfTask control) `shouldBe` [Nothing]
+        findingsFor "P-MULTI-HENCE" control `shouldBe` []
+
+    describe "a junction that is also an obligation" $ do
+      let bx = stateGraphToBpmn defaultBpmnOptions junctionObligationGraph
+          control = stateGraphToBpmn defaultBpmnOptions plainJunctionGraph
+          outOfSplit e = [f.flowTo | f <- e.bxProcess.procFlows, f.flowFrom == "Split_0"]
+
+      -- The gateway ends up with one arm more than the junction has branches,
+      -- and the extra one is the obligation: under "all of" the duty is drawn
+      -- as a third concurrent branch rather than as the thing that governs the
+      -- other two.
+      it "hangs the task off the gateway as one more branch" $ do
+        outOfSplit bx `shouldSatisfy` elem "Task_0"
+        length (outOfSplit bx) `shouldBe` 3
+
+      it "and says so, at blocking, naming the gateway" $ do
+        map (.severity) (findingsFor "P-JUNCTION-OBLIGATION" bx) `shouldBe` [Blocking]
+        map (.element) (findingsFor "P-JUNCTION-OBLIGATION" bx) `shouldBe` ["Split_0"]
+
+      it "the control: the same junction with no duty on it has two arms, no note" $ do
+        length (outOfSplit control) `shouldBe` 2
+        outOfSplit control `shouldSatisfy` all (Text.isPrefixOf "Task_")
+        findingsFor "P-JUNCTION-OBLIGATION" control `shouldBe` []
+
+    describe "a cycle" $ do
+      let bx = stateGraphToBpmn defaultBpmnOptions cyclicGraph
+          control = stateGraphToBpmn defaultBpmnOptions acyclicGraph
+
+      -- Not "a cycle exists" — what a cycle COSTS. The layout ranks by longest
+      -- path from the start, which a node on a cycle does not have, so the
+      -- horizontal axis stops ordering the diagram in time. Measured off the
+      -- emitted DI, not off the layout's internals.
+      it "breaks the left-to-right reading, which is what the note is about" $
+        nonAdvancingEdges bx `shouldNotBe` []
+
+      it "and says so, at lossy, naming the states in the loop" $ do
+        map (.severity) (findingsFor "P-CYCLE" bx) `shouldBe` [Lossy]
+        findingsFor "P-CYCLE" bx `shouldSatisfy` all (mentions "review")
+        findingsFor "P-CYCLE" bx `shouldSatisfy` all (mentions "revise")
+
+      it "the control: remove the back edge and every flow advances again" $ do
+        nonAdvancingEdges control `shouldBe` []
+        findingsFor "P-CYCLE" control `shouldBe` []
+
+    -- And the fixtures a real L4 source produces must trip none of the three,
+    -- or the notes would be noise that a reader learns to skip.
+    it "no real fixture trips any of them" $
+      [ (nm, n.code)
+      | (nm, body) <- fixtures
+      , n <- (exportOf defaultBpmnOptions nm body).bxFidelity.notes
+      , n.code `elem` ["P-MULTI-HENCE", "P-JUNCTION-OBLIGATION", "P-CYCLE"]
+      ]
+        `shouldBe` []
 
   describe "well-formedness (structural, over every fixture)" $
     forM_ fixtures \(nm, body) -> describe (Text.unpack nm) do
