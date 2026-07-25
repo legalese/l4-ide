@@ -1,0 +1,38 @@
+Fidelity report for the offering — 13 findings, 2 loud
+
+F1  deontic modality
+      Task_0 (MUST file the offering statement)
+        MUST, MAY and SHANT all draw as a task. Nothing here makes skipping this one a breach and skipping another one fine; the modality survives in the label and the <documentation>, not in the notation.
+      Task_2 (MUST check the investor limit)
+        MUST, MAY and SHANT all draw as a task. Nothing here makes skipping this one a breach and skipping another one fine; the modality survives in the label and the <documentation>, not in the notation.
+    ! Task_5 (SHANT advertise the terms)
+        A prohibition is not an activity at all, and BPMN has no negative shape for one. Read literally, this diagram instructs the reader to perform the very act the rule forbids; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force.
+      Task_6 (MUST file the annual report)
+        MUST, MAY and SHANT all draw as a task. Nothing here makes skipping this one a breach and skipping another one fine; the modality survives in the label and the <documentation>, not in the notation.
+    ! Task_7 (SHANT resell the securities)
+        A prohibition is not an activity at all, and BPMN has no negative shape for one. Read literally, this diagram instructs the reader to perform the very act the rule forbids; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force.
+
+F2  bearer vs performer
+      Process_the_offering (the offering)
+        A lane says who performs the work; L4's PARTY says who owes the obligation. These come apart whenever an agent acts for a principal, and this diagram can only show the first. Lanes here: Issuer, Intermediary, Investor.
+
+F5  rule version
+      Process_the_offering (the offering)
+        BPMN has no as-of date. Every threshold and deadline drawn here is a value someone must remember to edit when the rule changes; the L4 source can answer the same question under two different rule dates.
+
+X1  deadline unit assumed
+      Boundary_0 (21)
+        Deadline ‘21’ carries no unit; read as days (P21D), following the day-serial convention of libraries/datetime.l4. If this model's clock is not days, edit the duration.
+      Boundary_2 (7)
+        Deadline ‘7’ carries no unit; read as days (P7D), following the day-serial convention of libraries/datetime.l4. If this model's clock is not days, edit the duration.
+      Boundary_5 (30)
+        Deadline ‘30’ carries no unit; read as days (P30D), following the day-serial convention of libraries/datetime.l4. If this model's clock is not days, edit the duration.
+      Boundary_6 (120)
+        Deadline ‘120’ carries no unit; read as days (P120D), following the day-serial convention of libraries/datetime.l4. If this model's clock is not days, edit the duration.
+      Boundary_7 (365)
+        Deadline ‘365’ carries no unit; read as days (P365D), following the day-serial convention of libraries/datetime.l4. If this model's clock is not days, edit the duration.
+
+X3  parallel branches do not reconverge
+      Split_1 (RAND with 4 branches)
+        The branches of this RAND do not all end at one common state (a branch can reach BREACH, or two branches overlap), so no converging parallel gateway was invented: a join a branch can escape is a token trap. Completion still requires every branch to finish, because a BPMN instance ends only when all of its tokens are consumed — but the conjunction is implicit rather than drawn.
+

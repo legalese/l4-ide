@@ -1,0 +1,33 @@
+-- A second BPMN fixture, chosen to cover the constructs `offering.l4` does not:
+--
+--   * a deadline that is a NAME rather than a number, which no amount of
+--     parsing turns into an ISO 8601 duration (so: a conditional boundary
+--     event carrying the text verbatim, and a loud fidelity finding);
+--   * a RAND whose branches are both permissions, so neither can reach BREACH
+--     and both provably end at FULFILLED — the one shape for which a
+--     converging parallel gateway is safe to invent;
+--   * a ROR, which must come out as an exclusive gateway, not a parallel one.
+--
+-- Fixture for `jl4/tests/BpmnExport.hs`.
+
+DECLARE Party IS ONE OF Tenant, Landlord
+
+DECLARE Step IS ONE OF
+  `give vacant possession`
+  `inspect the premises`
+  `photograph the premises`
+  `retain the deposit`
+  `apply to the tribunal`
+
+`grace period` MEANS 14
+
+`the handover` MEANS
+  PARTY Tenant
+  MUST `give vacant possession`
+  WITHIN `grace period`
+  HENCE
+        ((PARTY Landlord MAY `inspect the premises` WITHIN 7)
+    RAND (PARTY Landlord MAY `photograph the premises` WITHIN 7))
+  LEST
+        ((PARTY Landlord MAY `retain the deposit` WITHIN 30)
+     ROR (PARTY Landlord MAY `apply to the tribunal` WITHIN 30))
