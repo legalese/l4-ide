@@ -39,6 +39,7 @@ preamble =
   , "  pay"
   , "  deliver"
   , "  notify"
+  , "  gamble HAS amount IS A NUMBER"
   , ""
   ]
 
@@ -105,6 +106,17 @@ nestedJoinSrc =
   , "      (PARTY Alice MAY pay WITHIN 3"
   , "         HENCE ((PARTY Bob MAY deliver WITHIN 5) RAND (PARTY Carol MAY notify WITHIN 7)))"
   , "  RAND (PARTY Alice MAY notify WITHIN 9)"
+  ]
+
+-- | A @PROVIDED@ guard. In L4 this is a precondition on the obligation; BPMN
+-- has no activity precondition, so it can only become a condition on the way
+-- out.
+guardSrc :: [Text]
+guardSrc =
+  [ "`guarded` MEANS"
+  , "  PARTY Alice"
+  , "  MUST gamble amt PROVIDED amt > 100"
+  , "  WITHIN 3"
   ]
 
 -- | A deadline that is a name, not a number. @prettyLayout@ hands us @grace@,
@@ -359,6 +371,31 @@ spec = do
           f.fidElement `shouldBe` "Boundary_0"
         other -> expectationFailure ("expected one X2 finding, got " <> show (length other))
 
+  describe "a PROVIDED guard" $ do
+    let bx = exportOf defaultBpmnOptions "guarded" guardSrc
+        xml = renderBpmn bx
+        conditions = [c | f <- bx.bxProcess.procFlows, Just c <- [f.flowCondition]]
+
+    it "rides on the task's normal outgoing flow, and only that one" $ do
+      [(f.flowFrom, f.flowCondition) | f <- bx.bxProcess.procFlows, isJust f.flowCondition]
+        `shouldBe` [("Task_0", listToMaybe conditions)]
+      length conditions `shouldBe` 1
+
+    it "is emitted as a formal expression" $ do
+      xml `shouldSatisfy` Text.isInfixOf "<bpmn:conditionExpression xsi:type=\"bpmn:tFormalExpression\">"
+      -- whatever prettyLayout gave us, both operands survive into the XML
+      xml `shouldSatisfy` Text.isInfixOf "amt"
+      xml `shouldSatisfy` Text.isInfixOf "100"
+
+    it "reports the guard body as opaque (F4) and the vacuity it creates (F3)" $ do
+      map (.fidElement) (findingsFor FGuardBody bx) `shouldBe` ["Task_0"]
+      map (.fidElement) (findingsFor FVacuity bx) `shouldBe` ["Task_0"]
+
+    it "reports neither for an unguarded obligation" $ do
+      let plain = exportOf defaultBpmnOptions "chain" linearSrc
+      findingsFor FGuardBody plain `shouldBe` []
+      findingsFor FVacuity plain `shouldBe` []
+
   describe "reading a deadline as an ISO 8601 duration" $ do
     let cases =
           [ ("30 days", TimerAfter "P30D")
@@ -509,5 +546,6 @@ spec = do
     , ("split", randSrc)
     , ("both", randJoinSrc)
     , ("nested", nestedJoinSrc)
+    , ("guarded", guardSrc)
     , ("deferred", opaqueDeadlineSrc)
     ]
