@@ -1219,13 +1219,27 @@ data LayoutInput = LayoutInput
   , liFlows :: [SequenceFlow]
   }
 
-layerWidth, taskSlotWidth, rowHeight, lanePadTop, lanePadBottom, minLaneHeight :: Int
-layerWidth = 180
+taskSlotWidth, rowHeight, lanePadTop, lanePadBottom, minLaneHeight :: Int
 taskSlotWidth = 100
 rowHeight = 120
 lanePadTop = 20
 lanePadBottom = 20
 minLaneHeight = 140
+
+-- | The gutter is the empty strip to the right of each rank's column, and every
+-- vertical run in the drawing happens in one. Its width is /derived/, not
+-- fixed: it has to hold one channel per flow that turns in it, and below
+-- thirteen channels the minimum already does, which is why @layerWidth@ comes
+-- out at its historical 180 for every graph anyone has drawn so far.
+--
+-- Fixing the width instead and clamping the channels into it is the same bug
+-- one level down: past the point where they fit, flows land on the same x and
+-- draw as a single line, which is exactly what per-flow channels exist to
+-- prevent. A wider drawing is the only honest alternative.
+minGutterWidth, minChannelGap, gutterInset :: Int
+minGutterWidth = 80
+minChannelGap = 4
+gutterInset = 14
 
 poolX, poolY, laneLabelWidth, laneLeftPad, poolRightPad :: Int
 poolX = 130
@@ -1450,9 +1464,13 @@ layoutDiagram li =
   -- every task at that rank occupies, and ran it the full height of the pool.
   --
   -- Each flow gets its own channel within the gutter so that parallel flows do
-  -- not land on the same x and draw as a single merged line.
-  gutterWidth = layerWidth - taskSlotWidth
-  gutterInset = 14
+  -- not land on the same x and draw as a single merged line. That is only a
+  -- claim about collisions if the channels fit, so the gutter is sized to hold
+  -- them — see 'minGutterWidth' — and 'layerWidth' follows from it rather than
+  -- the other way round.
+  gutterWidth =
+    max minGutterWidth (2 * gutterInset + widestChannel * minChannelGap + 4)
+  layerWidth = taskSlotWidth + gutterWidth
 
   -- The vertical run goes in the gutter immediately BEFORE the target's
   -- column, so the horizontal approach into a shared node is as short as
@@ -1482,20 +1500,26 @@ layoutDiagram li =
 
   rankOfFlowSource f = maybe 0 rankOfNode (Map.lookup f.flowFrom byId)
 
-  -- Spread whatever indices were needed across the gutter's usable width.
+  -- How many channels the busiest gutter turned out to need. 'gutterWidth' is
+  -- derived from this, so a wide fan widens the drawing instead of stacking
+  -- flows on one x.
+  widestChannel = maximum (0 : Map.elems channelIndexOf)
+
+  -- Spread whatever indices were needed across the gutter's usable width, but
+  -- never closer together than 'minChannelGap' — which is the case the gutter
+  -- was widened for, so the two together mean the last channel always lands
+  -- inside the gutter and no clamp is needed. Deliberately no clamp: if this
+  -- arithmetic is ever wrong the tests see a crossing, where a clamp would have
+  -- turned it into two flows silently sharing a line.
   channelStep =
-    let widest = maximum (0 : Map.elems channelIndexOf)
-     in max 4 ((gutterWidth - 2 * gutterInset) `div` max 1 widest)
+    max minChannelGap ((gutterWidth - 2 * gutterInset) `div` max 1 widestChannel)
 
   channelOf :: Map Text Int
   channelOf = Map.map (\i -> gutterInset + i * channelStep) channelIndexOf
 
   -- x of the free strip immediately right of a rank's column. Nodes never live
   -- here, so a vertical run in it cannot cross one.
-  gutterX rank channel =
-    min
-      (contentX0 + rank * layerWidth + taskSlotWidth + gutterWidth - 4)
-      (contentX0 + rank * layerWidth + taskSlotWidth + channel)
+  gutterX rank channel = contentX0 + rank * layerWidth + taskSlotWidth + channel
 
   -- The free HORIZONTAL band, for the same reason the gutter is the free
   -- vertical one. Every node is centred in an 80px slot inside a 120px row, so

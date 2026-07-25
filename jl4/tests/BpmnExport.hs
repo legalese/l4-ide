@@ -325,6 +325,27 @@ cyclicGraph =
     , edge 1 3 LestTransition "timeout"
     ]
 
+-- | An @n@-way fan out of one exclusive gateway and back into one terminal.
+--
+-- Every one of the @n@ flows leaving the gateway has to run vertically in the
+-- same gutter, and so does every one of the @n@ flows arriving at the terminal.
+-- That is the case the router's per-edge channel offsets exist for, and it is
+-- the case no fixture reaches: @offering.l4@'s four-way @RAND@ needs about six
+-- channels.
+wideFanGraph :: Int -> StateGraph
+wideFanGraph n =
+  StateGraph
+    { sgName = "wide fan"
+    , sgStates =
+        node 0 "start" InitialState OneOf
+          : [node i ("branch " <> Text.textShow i) IntermediateState Linear | i <- [1 .. n]]
+            <> [node (n + 1) "Fulfilled" TerminalFulfilled Linear]
+    , sgTransitions =
+        [edge 0 i DefaultTransition ("choose " <> Text.textShow i) | i <- [1 .. n]]
+          <> [edge i (n + 1) HenceTransition ("do " <> Text.textShow i) | i <- [1 .. n]]
+    , sgInitialState = 0
+    }
+
 -- | A long chain whose obligations rotate through @lanes@ different parties.
 --
 -- Deliberately many-ranked and __five-laned__. The layout used to be cubic and
@@ -1113,6 +1134,31 @@ spec = do
       , n.code `elem` ["P-MULTI-HENCE", "P-JUNCTION-OBLIGATION", "P-CYCLE"]
       ]
         `shouldBe` []
+
+  -- Boundary outflows used to drop straight down inside the column every task
+  -- at that rank occupies, so the router now confines every vertical run to the
+  -- gutter between two columns and gives each flow its own channel there.
+  --
+  -- A channel per flow is only a claim about collisions if the channels fit.
+  -- The fixtures need about six and the gutter holds twelve, so nothing here
+  -- exercises what happens past that — which is why this case is built by hand
+  -- and is deliberately far past it.
+  describe "a fan wider than the gutter" $ do
+    let bx = stateGraphToBpmn defaultBpmnOptions (wideFanGraph 20)
+
+    it "still gives every flow a channel of its own" $
+      verticalMerges bx `shouldBe` []
+
+    it "and still draws nothing through a node" $
+      crossings bx `shouldBe` []
+
+    -- The control: the numbers above are only interesting if the narrow case
+    -- was never in doubt, and if the fan really is wide enough to matter.
+    it "the same shape narrow enough to fit, which was never in doubt" $ do
+      let narrow = stateGraphToBpmn defaultBpmnOptions (wideFanGraph 3)
+      verticalMerges narrow `shouldBe` []
+      crossings narrow `shouldBe` []
+      length [f | f <- bx.bxProcess.procFlows, f.flowTo == "End_21"] `shouldBe` 20
 
   -- The layout was cubic, and invisibly so. 'laneTop' summed 'laneHeight' over
   -- every preceding lane, 'laneHeight' rescanned every placed node once per
