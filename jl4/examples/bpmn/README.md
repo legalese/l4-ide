@@ -9,10 +9,19 @@ genuinely _is_ a transition system, so drawing it as one says nothing the source
 did not. Predicates are a different matter, and belong to the ladder; see
 `doc/concepts/language-design/logic-not-flowcharts.md`.
 
-| Fixture         | Covers                                                                                                                                        |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `offering.l4`   | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
-| `handover.l4`   | A deadline that is a _name_ (no timer, no invented duration), a `RAND` whose branches provably reconverge (so a real join), and a `ROR`       |
+| Fixture       | Covers                                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `offering.l4` | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal                    |
+| `handover.l4` | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers               |
+
+Neither fixture currently gets a converging parallel gateway, and that is the
+point of both `P-NOJOIN` notes rather than a gap in coverage. `offering.l4`'s
+`RAND` has a branch that can reach `BREACH`; `handover.l4`'s permissions each
+carry a `WITHIN`, so each branch reaches the join by two mutually exclusive
+routes — the task completing, or the lapse timer firing — and a parallel join
+would wait for both. The one shape a join is sound for is exercised in
+`BpmnExport.hs` (`randJoinSrc`): permissions with no deadline, no `LEST`, and no
+guard, so each branch delivers exactly one token by exactly one route.
 
 Each produces two goldens under `expected/`:
 
@@ -22,8 +31,11 @@ Each produces two goldens under `expected/`:
   that lost it. The report type is `L4.Interchange.Fidelity`, shared with every
   other interchange backend so the CLI has one shape to render rather than one
   per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
-  writing more Haskell; codes `P-…` are approximations this exporter made and
-  could be. (DMN uses `D-…`, so a combined report never confuses the two.)
+  writing more Haskell; codes `P-…` are this exporter's own doing — an
+  approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
+  (`P-NOJOIN`), or a shape the `StateGraph` types permit that BPMN has no honest
+  drawing for at all (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
+  (DMN uses `D-…`, so a combined report never confuses the two.)
 
 ## Checking the XML is really importable
 
@@ -39,6 +51,14 @@ npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs \
 It reports parse errors, moddle warnings, unresolved references, boundary events
 without a trigger, and any flow node or sequence flow missing its diagram
 interchange. Both fixtures parse with zero warnings.
+
+**It is not evidence that the diagram is right, and must never be cited as
+such.** It checks well-formedness, and well-formedness is exactly what a wrong
+diagram has: it passed an inverted prohibition, a converging gateway that
+deadlocked, four dropped `WITHIN` windows, and twelve edges drawn straight
+through unrelated nodes, all at zero warnings, while the Haskell suite was green
+at 1581 examples. Run it to catch a regression in the XML; read
+`BpmnExport.hs` for whether the XML says what the rule says.
 
 ## Regenerating
 
