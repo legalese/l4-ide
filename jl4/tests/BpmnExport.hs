@@ -85,14 +85,43 @@ rorSrc =
   , "  ROR  (PARTY Bob MUST deliver WITHIN 5)"
   ]
 
--- | Both branches are permissions, so neither can reach BREACH and the only
--- state either can end at is FULFILLED. That is the one shape for which a
--- converging parallel gateway is safe.
+-- | Both branches are permissions with no deadline, so each contributes
+-- exactly one token by exactly one route: no LEST arm, no lapse timer, no
+-- guard. That is the only shape for which a converging parallel gateway is
+-- sound, and it is deliberately a narrow one.
 randJoinSrc :: [Text]
 randJoinSrc =
   [ "`both` MEANS"
+  , "      (PARTY Alice MAY pay)"
+  , "  RAND (PARTY Bob MAY deliver)"
+  ]
+
+-- | The same, but each branch carries a deadline. The lapse timer gives every
+-- branch a SECOND route to the join point, and the two are mutually exclusive,
+-- so a parallel join would wait for four tokens where two arrive.
+randDeadlockSrc :: [Text]
+randDeadlockSrc =
+  [ "`both` MEANS"
   , "      (PARTY Alice MAY pay WITHIN 3)"
   , "  RAND (PARTY Bob MAY deliver WITHIN 5)"
+  ]
+
+-- | A ROR inside a RAND branch: the exclusive gateway sends one token down one
+-- of two edges, and both edges arrive at the join.
+rorInRandSrc :: [Text]
+rorInRandSrc =
+  [ "`mixed` MEANS"
+  , "      (PARTY Alice MAY pay)"
+  , "  RAND ((PARTY Bob MAY deliver) ROR (PARTY Carol MAY notify))"
+  ]
+
+-- | A PROVIDED guard inside a RAND branch: that branch reaches the join by a
+-- CONDITIONAL flow, which may never fire at all.
+guardInRandSrc :: [Text]
+guardInRandSrc =
+  [ "`mixed` MEANS"
+  , "      (PARTY Alice MAY gamble amt PROVIDED amt > 100)"
+  , "  RAND (PARTY Bob MAY deliver)"
   ]
 
 -- | A RAND inside the HENCE of a branch of another RAND — nested for real,
@@ -107,6 +136,33 @@ nestedJoinSrc =
   , "      (PARTY Alice MAY pay WITHIN 3"
   , "         HENCE ((PARTY Bob MAY deliver WITHIN 5) RAND (PARTY Carol MAY notify WITHIN 7)))"
   , "  RAND (PARTY Alice MAY notify WITHIN 9)"
+  ]
+
+-- | A prohibition with a deadline, and the same shape as a MUST. Deliberately
+-- named identically so that the two sources differ in exactly one token: any
+-- difference in the output is attributable to the modal and nothing else.
+shantSrc, mustSrc :: [Text]
+shantSrc =
+  [ "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  SHANT notify"
+  , "  WITHIN 30"
+  ]
+mustSrc =
+  [ "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  MUST notify"
+  , "  WITHIN 30"
+  ]
+
+-- | A permission with a deadline and no LEST: nothing to hang a LEST boundary
+-- on, but the lapse still has a knowable destination.
+mayNoLestSrc :: [Text]
+mayNoLestSrc =
+  [ "`optional` MEANS"
+  , "  PARTY Alice"
+  , "  MAY notify"
+  , "  WITHIN 30"
   ]
 
 -- | A @PROVIDED@ guard. In L4 this is a precondition on the obligation; BPMN
@@ -161,6 +217,11 @@ nodesWhere p bx = filter p bx.bxProcess.procNodes
 isKind :: (NodeKind -> Bool) -> FlowNode -> Bool
 isKind p n = p n.nodeKind
 
+-- | Ids of converging parallel gateways: the joins.
+converging :: BpmnExport -> [Text]
+converging bx =
+  [n.nodeId | n <- bx.bxProcess.procNodes, Gateway ParallelGateway Converging <- [n.nodeKind]]
+
 gateways :: BpmnExport -> [FlowNode]
 gateways = nodesWhere (isKind \case Gateway _ _ -> True; _ -> False)
 
@@ -177,6 +238,189 @@ nodeNamed bx nid = find (\n -> n.nodeId == nid) bx.bxProcess.procNodes
 -- the notation; @P-…@ are approximations this exporter made.
 findingsFor :: Text -> BpmnExport -> [FidelityNote]
 findingsFor c bx = [n | n <- bx.bxFidelity.notes, n.code == c]
+
+------------------------------------------------------------------------
+-- Reachability, so tests can assert MEANING rather than shape
+------------------------------------------------------------------------
+
+-- | Every node reachable from a starting node by following sequence flows.
+--
+-- This is what lets a test ask \"where does waiting get you?\" instead of \"is
+-- there a boundary event?\". The distinction is not academic: the version of
+-- this exporter that raced every prohibition backwards had exactly the right
+-- /number/ of boundary events, every attribute well-formed, and passed
+-- bpmn-moddle with zero warnings.
+--
+-- A boundary event is /attached/ to its task rather than flowed to, so walking
+-- from the task never wanders onto the boundary's arm. That separation is what
+-- makes 'raceOutcome' able to see the two arms independently.
+reachableFrom :: BpmnExport -> Text -> Set Text
+reachableFrom bx = go Set.empty . pure
+ where
+  go seen [] = seen
+  go seen (n : rest)
+    | Set.member n seen = go seen rest
+    | otherwise =
+        go
+          (Set.insert n seen)
+          ([f.flowTo | f <- bx.bxProcess.procFlows, f.flowFrom == n] <> rest)
+
+-- | Which terminal a path ends at.
+data Terminal = ToFulfilled | ToBreach | ToBoth | ToNeither
+  deriving stock (Eq, Show)
+
+terminalFrom :: BpmnExport -> Text -> Terminal
+terminalFrom bx start =
+  case (reachesEnd False, reachesEnd True) of
+    (True, True) -> ToBoth
+    (True, False) -> ToFulfilled
+    (False, True) -> ToBreach
+    (False, False) -> ToNeither
+ where
+  reached = Set.toList (reachableFrom bx start)
+  reachesEnd wantError =
+    any
+      (\nid -> maybe False ((== EndEvent wantError) . (.nodeKind)) (nodeNamed bx nid))
+      reached
+
+-- | The two arms of an obligation's race, as terminals:
+-- @(where completing the activity gets you, where the deadline expiring gets
+-- you)@.
+--
+-- For @MUST@ that should be @(ToFulfilled, ToBreach)@ and for @SHANT@ exactly
+-- the reverse — which is the entire content of the bug this pins.
+raceOutcome :: BpmnExport -> (Terminal, Terminal)
+raceOutcome bx = (fromNode taskId, fromNode boundaryId)
+ where
+  fromNode = maybe ToNeither (terminalFrom bx)
+  taskId = listToMaybe [n.nodeId | n <- bx.bxProcess.procNodes, n.nodeKind == Task]
+  boundaryId =
+    listToMaybe [n.nodeId | n <- bx.bxProcess.procNodes, Boundary _ _ <- [n.nodeKind]]
+
+-- | Converging parallel gateways that cannot possibly receive a token on every
+-- incoming flow — i.e. every join this exporter should have declined to draw.
+--
+-- Two ways a join is unsound, both of which the exporter once emitted happily:
+-- an incoming flow that is conditional (it may never fire), and two incoming
+-- flows whose sources are mutually exclusive (a boundary event and its own
+-- host, since @cancelActivity@ makes them alternatives; or two arms of a common
+-- exclusive gateway). This is a token argument, not a shape argument, which is
+-- the entire point.
+unsoundJoins :: BpmnExport -> [(Text, Text)]
+unsoundJoins bx =
+  [ (g.nodeId, why)
+  | g <- bx.bxProcess.procNodes
+  , Gateway ParallelGateway Converging <- [g.nodeKind]
+  , let ins = [f | f <- bx.bxProcess.procFlows, f.flowTo == g.nodeId]
+  , why <- conditionalIn ins <> exclusivePairs (map (.flowFrom) ins)
+  ]
+ where
+  conditionalIn ins =
+    ["conditional incoming flow" | any (isJust . (.flowCondition)) ins]
+
+  exclusivePairs srcs =
+    [ "mutually exclusive sources: " <> a <> " and " <> b
+    | (a, b) <- distinctPairs srcs
+    , exclusive a b
+    ]
+
+  distinctPairs xs = [(a, b) | (i, a) <- zip [0 :: Int ..] xs, (j, b) <- zip [0 ..] xs, i < j]
+
+  hostOf nid = case nodeNamed bx nid of
+    Just n | Boundary h _ <- n.nodeKind -> Just h
+    _ -> Nothing
+
+  -- An interrupting boundary and its host are alternatives, never both.
+  attached a b = hostOf a == Just b || hostOf b == Just a
+
+  -- Two arms of one exclusive gateway are alternatives too.
+  splitApart a b =
+    or
+      [ any (Set.member a . reachableFrom bx) [f.flowTo | f <- outs, f.flowId == fi]
+          && any (Set.member b . reachableFrom bx) [f.flowTo | f <- outs, f.flowId == fj]
+      | x <- bx.bxProcess.procNodes
+      , Gateway ExclusiveGateway _ <- [x.nodeKind]
+      , let outs = [f | f <- bx.bxProcess.procFlows, f.flowFrom == x.nodeId]
+      , (fi, fj) <- distinctPairs (map (.flowId) outs)
+      ]
+
+  exclusive a b = attached a b || splitApart a b
+
+------------------------------------------------------------------------
+-- Geometry, checked by arithmetic rather than by eye
+------------------------------------------------------------------------
+
+-- | Node shapes only: the pool and lane bands are containers and every edge is
+-- expected to run through them.
+flowNodeShapes :: BpmnExport -> [(Text, Bounds)]
+flowNodeShapes bx =
+  [(sh.shapeOf, sh.shapeBounds) | sh <- bx.bxDiagram.diagShapes, sh.shapeKind == PlainShape]
+
+segments :: EdgeGeom -> [(Point, Point)]
+segments e = zip e.edgeWaypoints (drop 1 e.edgeWaypoints)
+
+-- | Edge segments that pass through a node shape that is not one of their own
+-- endpoints. Any hit is a line drawn straight over a box.
+--
+-- The old router dropped a boundary event's outflow vertically at
+-- @task.bx + 72@ — inside the column every task at that rank occupies — and ran
+-- it the height of the pool: twelve hits in one exhibit. Nothing in the
+-- structural tests could see it, and bpmn-moddle reported zero warnings.
+crossings :: BpmnExport -> [(Text, Text)]
+crossings bx =
+  [ (e.edgeOf, nid)
+  | e <- bx.bxDiagram.diagEdges
+  , (p, q) <- segments e
+  , (nid, b) <- flowNodeShapes bx
+  , hits p q b
+  , not (endpointInside b (p, q))
+  ]
+ where
+  hits p q b
+    | p.ptX == q.ptX =
+        p.ptX > b.bx && p.ptX < b.bx + b.bw && overlaps (p.ptY, q.ptY) (b.by, b.by + b.bh)
+    | p.ptY == q.ptY =
+        p.ptY > b.by && p.ptY < b.by + b.bh && overlaps (p.ptX, q.ptX) (b.bx, b.bx + b.bw)
+    | otherwise = False
+  overlaps (a1, a2) (c1, c2) = max (min a1 a2) c1 < min (max a1 a2) c2
+  endpointInside b (p, q) = any inside [p, q]
+   where
+    inside pt =
+      pt.ptX >= b.bx && pt.ptX <= b.bx + b.bw && pt.ptY >= b.by && pt.ptY <= b.by + b.bh
+
+-- | Pairs of edges whose VERTICAL runs lie on the same x and overlap: two flows
+-- drawn as one line, which is a lie about how many there are.
+--
+-- Horizontal overlap is not checked, because several flows converging on one
+-- end event genuinely do meet at its edge — that is what convergence looks
+-- like in every BPMN tool. A shared vertical run is different: it is the router
+-- putting two independent flows in the same channel.
+verticalMerges :: BpmnExport -> [(Text, Text)]
+verticalMerges bx =
+  [ (a.edgeOf, b.edgeOf)
+  | (i, a) <- zip [0 :: Int ..] bx.bxDiagram.diagEdges
+  , (j, b) <- zip [0 ..] bx.bxDiagram.diagEdges
+  , i < j
+  , (p, q) <- segments a
+  , (r, w) <- segments b
+  , p.ptX == q.ptX
+  , r.ptX == w.ptX
+  , p.ptX == r.ptX
+  , overlapLen (p.ptY, q.ptY) (r.ptY, w.ptY) > 5
+  ]
+ where
+  overlapLen (a1, a2) (c1, c2) = min (max a1 a2) (max c1 c2) - max (min a1 a2) (min c1 c2)
+
+-- | Ids of every timer boundary event from which a breach terminal is
+-- reachable — every place the diagram says \"let the clock run out and you are
+-- in breach\".
+timersLeadingToBreach :: BpmnExport -> [Text]
+timersLeadingToBreach bx =
+  [ n.nodeId
+  | n <- bx.bxProcess.procNodes
+  , Boundary _ (TimerAfter _) <- [n.nodeKind]
+  , terminalFrom bx n.nodeId `elem` [ToBreach, ToBoth]
+  ]
 
 mentions :: Text -> FidelityNote -> Bool
 mentions needle n = Text.isInfixOf needle (n.message <> " " <> n.lost)
@@ -304,9 +548,17 @@ spec = do
 
     it "does not invent a join when a branch can escape to BREACH" $ do
       map (.nodeKind) (gateways randBx) `shouldBe` [Gateway ParallelGateway Diverging]
-      length (findingsFor "P-NOJOIN" randBx) `shouldBe` 1
+      case findingsFor "P-NOJOIN" randBx of
+        [f] -> do
+          -- the stated reason must be the one that actually applied
+          f `shouldSatisfy` mentions "BREACH"
+          -- and it must not repeat the false consolation that the conjunction
+          -- survives because all tokens get consumed: an error end abandons
+          -- its siblings
+          f.lost `shouldSatisfy` Text.isInfixOf "abandons"
+        other -> expectationFailure ("expected one P-NOJOIN, got " <> show (length other))
 
-    it "does join when every branch provably ends at the same state" $ do
+    it "does join when every branch delivers exactly one token, one way" $ do
       let joined = exportOf defaultBpmnOptions "both" randJoinSrc
       map (.nodeKind) (gateways joined)
         `shouldBe` [ Gateway ParallelGateway Diverging
@@ -317,18 +569,29 @@ spec = do
       [f.flowTo | f <- joined.bxProcess.procFlows, f.flowFrom == "Join_0"]
         `shouldSatisfy` all (Text.isPrefixOf "End_")
 
-    it "joins nested RANDs once, at the outer gateway, not twice" $ do
+    -- Reproductions of the three ways a reachability proof draws a deadlock.
+    -- Each of these once emitted a converging parallel gateway waiting for more
+    -- tokens than can ever arrive, and emitted no fidelity note about it.
+    it "declines when a lapse timer gives a branch two exclusive routes" $ do
+      let bx = exportOf defaultBpmnOptions "both" randDeadlockSrc
+      converging bx `shouldBe` []
+      map (.code) (findingsFor "P-NOJOIN" bx) `shouldBe` ["P-NOJOIN"]
+      findingsFor "P-NOJOIN" bx `shouldSatisfy` all (mentions "routes")
+
+    it "declines when a ROR inside a branch fires only one of two edges" $ do
+      let bx = exportOf defaultBpmnOptions "mixed" rorInRandSrc
+      converging bx `shouldBe` []
+      findingsFor "P-NOJOIN" bx `shouldSatisfy` ((== 1) . length)
+
+    it "declines when a branch reaches the join by a conditional flow" $ do
+      let bx = exportOf defaultBpmnOptions "mixed" guardInRandSrc
+      converging bx `shouldBe` []
+      findingsFor "P-NOJOIN" bx `shouldSatisfy` all (mentions "conditional")
+
+    it "nested RANDs: the inner one reports a folded join, not a failed one" $ do
       let nested = exportOf defaultBpmnOptions "nested" nestedJoinSrc
-          converging = [n.nodeId | n <- nested.bxProcess.procNodes, isConverging n]
-          isConverging n = case n.nodeKind of
-            Gateway _ Converging -> True
-            _ -> False
-      converging `shouldBe` ["Join_0"]
-      -- all three permissions flow into that one join
-      length [f | f <- nested.bxProcess.procFlows, f.flowTo == "Join_0"] `shouldBe` 3
-      -- and the inner RAND says why it did not get one of its own
-      map (.element) (findingsFor "P-NOJOIN" nested)
-        `shouldSatisfy` \els -> length els == 1 && all (Text.isPrefixOf "Split_") els
+      -- whatever it decides, it must never leave an unsound join behind
+      unsoundJoins nested `shouldBe` []
 
   describe "terminals" $ do
     let bx = exportOf defaultBpmnOptions "chain" linearSrc
@@ -383,6 +646,78 @@ spec = do
           f.severity `shouldBe` Blocking
           f.element `shouldBe` "Boundary_0"
         other -> expectationFailure ("expected one P-DEADLINE note, got " <> show (length other))
+
+  -- An interrupting boundary event is a race between "the activity completed"
+  -- and "the trigger fired". For a prohibition the L4 runtime races them the
+  -- other way round from every other modal (Machine.hs: deadline expiry =>
+  -- "Prohibition was RESPECTED" => HENCE; act performed => "Prohibition
+  -- violated" => LEST), and this exporter originally wired it the obvious way,
+  -- drawing "wait 30 days and you are in breach" for a rule that says the
+  -- opposite.
+  --
+  -- Every assertion here is about where a path GOES, never about what shapes
+  -- exist. The broken version had the right shapes.
+  describe "a prohibition races its two arms the other way round" $ do
+    let shant = exportOf defaultBpmnOptions "rule" shantSrc
+        must = exportOf defaultBpmnOptions "rule" mustSrc
+
+    it "SHANT: performing the act breaches; the deadline passing fulfils" $
+      raceOutcome shant `shouldBe` (ToBreach, ToFulfilled)
+
+    -- The control. Without it, an exporter that emitted no timers at all, or
+    -- wired both arms to Fulfilled, would satisfy every SHANT assertion above.
+    -- Do not delete this as redundant: it is the reason the others mean
+    -- anything.
+    it "MUST: the mirror image, and it must be the mirror image" $
+      raceOutcome must `shouldBe` (ToFulfilled, ToBreach)
+
+    it "no timer leads to breach under a prohibition; under MUST one does" $ do
+      timersLeadingToBreach shant `shouldBe` []
+      timersLeadingToBreach must `shouldSatisfy` ((== 1) . length)
+
+    it "the sources differ in exactly one token" $
+      length (filter id (zipWith (/=) shantSrc mustSrc)) `shouldBe` 1
+
+    -- The WITHIN is drawn, not confessed: BPMN expresses this race natively,
+    -- so there is nothing to lose and nothing to report.
+    it "keeps the deadline as a real timer rather than dropping it" $ do
+      map (.nodeKind) (boundaries shant)
+        `shouldBe` [Boundary "Task_0" (TimerAfter "P30D")]
+      renderBpmn shant `shouldSatisfy` Text.isInfixOf "<bpmn:timeDuration"
+
+    it "files no fidelity note for a race the notation can express" $
+      findingsFor "P-PROHIBITION" shant `shouldBe` []
+
+    it "says on the elements which arm is which, since the shapes cannot" $ do
+      map (.nodeDoc) (boundaries shant)
+        `shouldSatisfy` all (maybe False (Text.isInfixOf "prohibition is respected"))
+      map (.nodeDoc) (tasks shant)
+        `shouldSatisfy` all (maybe False (Text.isInfixOf "LEST arm"))
+
+  describe "a permission that lapses" $ do
+    let bx = exportOf defaultBpmnOptions "optional" mayNoLestSrc
+
+    -- Machine.hs routes expiry of an unexercised MAY to FULFILLED, so the
+    -- timer has a knowable destination and the deadline can be DRAWN rather
+    -- than confessed. This used to emit nothing at all: four real deadlines
+    -- vanished from handover.bpmn without a word.
+    it "draws the deadline as a timer instead of dropping it" $ do
+      map (.nodeKind) (boundaries bx)
+        `shouldBe` [Boundary "Task_0" (TimerAfter "P30D")]
+      renderBpmn bx `shouldSatisfy` Text.isInfixOf "<bpmn:timeDuration"
+
+    it "sends the lapse where HENCE goes, not to breach" $
+      raceOutcome bx `shouldBe` (ToFulfilled, ToFulfilled)
+
+    it "files no undrawn-deadline note, because nothing was undrawn" $
+      findingsFor "P-DEADLINE-UNDRAWN" bx `shouldBe` []
+
+    -- F5 used to say "every threshold and deadline drawn here", which asserts
+    -- that they all were. When four of them were not, that made F5 itself a
+    -- false statement.
+    it "and F5 no longer implies every deadline made it into the diagram" $
+      map (.message) (findingsFor "F5" bx)
+        `shouldSatisfy` all (\m -> Text.isInfixOf "does appear" m && not (Text.isInfixOf "every threshold and deadline drawn" m))
 
   describe "a PROVIDED guard" $ do
     let bx = exportOf defaultBpmnOptions "guarded" guardSrc
@@ -513,6 +848,18 @@ spec = do
           ]
           `shouldBe` []
 
+      -- The property, not the shape: a converging parallel gateway must be
+      -- able to receive a token on every incoming flow, or the instance hangs.
+      -- Counting gateways would pass on every deadlock this ever emitted.
+      it "no converging parallel gateway can deadlock" $
+        unsoundJoins bx `shouldBe` []
+
+      it "no edge is drawn through a node" $
+        crossings bx `shouldBe` []
+
+      it "no two edges share a vertical channel" $
+        verticalMerges bx `shouldBe` []
+
       it "every id is unique" $ do
         let ids =
               map (.nodeId) bx.bxProcess.procNodes
@@ -569,5 +916,9 @@ spec = do
     , ("both", randJoinSrc)
     , ("nested", nestedJoinSrc)
     , ("guarded", guardSrc)
+    , ("rule", shantSrc)
+    , ("optional", mayNoLestSrc)
+    , ("both", randDeadlockSrc)
+    , ("mixed", rorInRandSrc)
     , ("deferred", opaqueDeadlineSrc)
     ]

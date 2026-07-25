@@ -8,18 +8,33 @@ fidelity report — BPMN 2.0
   [F1] blocking — Task_2
       A permission is drawn as a task, so the diagram reads as an instruction to perform it.
       lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [P-DEADLINE-UNIT] advisory — Lapse_2
+      Deadline ‘7’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P7D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
+      lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_4
       A permission is drawn as a task, so the diagram reads as an instruction to perform it.
       lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [P-DEADLINE-UNIT] advisory — Lapse_4
+      Deadline ‘7’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P7D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
+      lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_6
       A permission is drawn as a task, so the diagram reads as an instruction to perform it.
       lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [P-DEADLINE-UNIT] advisory — Lapse_6
+      Deadline ‘30’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P30D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
+      lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_7
       A permission is drawn as a task, so the diagram reads as an instruction to perform it.
       lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [P-DEADLINE-UNIT] advisory — Lapse_7
+      Deadline ‘30’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P30D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
+      lost: certainty about the unit — if this model's clock is not days, the duration needs editing
+  [P-NOJOIN] lossy — Split_1
+      No converging parallel gateway was drawn for this RAND because one of its branches reaches the join by 2 different routes — an interrupting boundary event, a ROR, or a lapse timer — of which at most one will fire, whereas a parallel join would wait for every one of them. A join that waits for a token nothing will send is a deadlock, which is worse than an undrawn conjunction.
+      lost: the conjunction as a drawn gateway. No branch here can breach, so every token is still consumed before the instance ends and the conjunction does hold — it is simply not drawn.
   [F2] lossy — Process_the_handover
       A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: Tenant, Landlord).
       lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
   [F5] advisory — Process_the_handover
-      BPMN has no as-of date, so every threshold and deadline drawn here is a value someone must remember to edit when the rule changes.
+      BPMN has no as-of date, so any threshold or deadline that does appear in this diagram is a value someone must remember to edit when the rule changes.
       lost: asking the same question as of a different rule date, which the L4 source can still answer

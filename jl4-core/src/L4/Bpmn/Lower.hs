@@ -130,7 +130,13 @@ stateGraphToBpmn opts sg =
     StateChain
       { scNodes = nodes
       , scBoundary = boundary
-      , scFindings = taskFindings <> boundaryFindings <> danglingFindings
+      , scLapse = lapse
+      , scFindings =
+          taskFindings
+            <> boundaryFindings
+            <> lapseFindings
+            <> undrawnDeadlineFindings
+            <> danglingFindings
       }
    where
     sid = s.stateId
@@ -166,7 +172,7 @@ stateGraphToBpmn opts sg =
             { nodeId = "Task_" <> tag
             , nodeName = taskName t.transLabel
             , nodeKind = Task
-            , nodeDoc = Just (restateRule t.transLabel)
+            , nodeDoc = Just (restateRule t.transLabel <> taskArmNote t.transLabel.labelModal)
             , nodeLane = t.transLabel.labelParty
             }
         ]
@@ -198,25 +204,82 @@ stateGraphToBpmn opts sg =
 
     nodes = startNodes <> gatewayNodes <> taskNodes <> endNodes <> danglingNodes
 
-    -- The LEST edge hangs off the task as an interrupting boundary event. Its
-    -- trigger comes from the OBLIGATION's deadline (WITHIN lives on the HENCE
-    -- label), not from the LEST edge's own label, which is a bare "timeout".
+    modal = obligation >>= (.transLabel.labelModal)
+    deadline = obligation >>= (.transLabel.labelDeadline)
+
+    -- The deadline hangs off the task as an interrupting boundary event. The
+    -- trigger is the same for every modal — the WITHIN running out — because
+    -- that is the event BPMN is being asked to draw. What differs by modal is
+    -- /which arm the timer leads to/, and that is settled in 'transitionFlows',
+    -- not here. See 'raceArms'.
+    --
+    -- Note the deadline comes from the obligation's own label (WITHIN lives on
+    -- the HENCE edge), not from the LEST edge, whose label is a bare "timeout"
+    -- or "violation".
     (boundary, boundaryFindings) = case (lestOf sid, taskNodes) of
       (Just lestT, host : _) ->
-        let deadline = obligation >>= (.transLabel.labelDeadline)
-            bid = "Boundary_" <> tag
+        let bid = "Boundary_" <> tag
             (trigger, finds) = boundaryTrigger opts bid lestT.transLabel.labelAction deadline
          in ( Just
                 FlowNode
                   { nodeId = bid
                   , nodeName = triggerName trigger lestT.transLabel.labelAction
                   , nodeKind = Boundary host.nodeId trigger
-                  , nodeDoc = fmap ("LEST: the obligation is not discharged within " <>) deadline
+                  , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
                   }
             , finds
             )
       _ -> (Nothing, [])
+
+    -- A permission with a deadline and no LEST still has somewhere for its
+    -- timer to go: expiry of an unexercised MAY routes to FULFILLED, the same
+    -- place HENCE goes. So synthesise the boundary event and draw the lapse
+    -- rather than dropping the WITHIN and filing a note about it. Confessing a
+    -- loss you could have avoided is not honesty.
+    (lapse, lapseFindings) = case (modal, lestOf sid, deadline, taskNodes) of
+      (Just DMay, Nothing, Just _, host : _) ->
+        let lid = "Lapse_" <> tag
+            (trigger, finds) = boundaryTrigger opts lid "lapses" deadline
+         in ( Just
+                FlowNode
+                  { nodeId = lid
+                  , nodeName = triggerName trigger "lapses"
+                  , nodeKind = Boundary host.nodeId trigger
+                  , nodeDoc =
+                      Just
+                        "the permission lapses: the deadline passes without it \
+                        \being exercised, which routes where HENCE routes"
+                  , nodeLane = host.nodeLane
+                  }
+            , finds
+            )
+      _ -> (Nothing, [])
+
+    -- What is left is DO, which requires an explicit HENCE/LEST and so offers
+    -- no target to infer. Its WITHIN is drawn nowhere, and a temporal
+    -- constraint disappearing in silence is what this report exists to prevent.
+    undrawnDeadlineFindings =
+      [ MkFidelityNote
+        { code = "P-DEADLINE-UNDRAWN"
+        , severity = Lossy
+        , element = tn.nodeId
+        , range = Nothing
+        , message =
+            "The deadline \8216"
+              <> d
+              <> "\8217 is not drawn anywhere: this obligation has no LEST and \
+                 \no inferable target for its expiry, so there is no boundary \
+                 \event to carry it."
+        , lost =
+            "the deadline as a drawn constraint; it survives only in the \
+            \element's <documentation>"
+        }
+      | isNothing boundary
+      , isNothing lapse
+      , Just d <- [deadline]
+      , tn <- take 1 taskNodes
+      ]
 
     taskFindings = case (obligation, taskNodes) of
       (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
@@ -244,7 +307,7 @@ stateGraphToBpmn opts sg =
 
   baseNodes :: [FlowNode]
   baseNodes =
-    concat [c.scNodes <> maybeToList c.scBoundary | (_, c) <- chains]
+    concat [c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse | (_, c) <- chains]
 
   -- Which state each node came from; needed to tell a flow that leaves a
   -- parallel branch from one that merely happens to end at the same place.
@@ -253,7 +316,7 @@ stateGraphToBpmn opts sg =
     Map.fromList
       [ (n.nodeId, sid)
       | (sid, c) <- chains
-      , n <- c.scNodes <> maybeToList c.scBoundary
+      , n <- c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse
       ]
 
   entryOf :: StateId -> Maybe Text
@@ -269,6 +332,9 @@ stateGraphToBpmn opts sg =
 
   boundaryOf :: StateId -> Maybe Text
   boundaryOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scBoundary
+
+  lapseOf :: StateId -> Maybe Text
+  lapseOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scLapse
 
   ------------------------------------------------------------------
   -- Pass 2: flows
@@ -293,18 +359,19 @@ stateGraphToBpmn opts sg =
     -- see.
     perState s =
       let sid = s.stateId
+          (henceSrc, lestSrc) = raceArms (modalAt sid) (taskOf sid) (boundaryOf sid)
           hence =
             [ (src, tgt, t.transLabel.labelGuard)
             | t <- outOf sid
             , t.transType == HenceTransition
-            , Just src <- [taskOf sid]
+            , Just src <- [henceSrc]
             , Just tgt <- [entryOf t.transTo]
             ]
           lest =
             [ (src, tgt, Nothing)
             | t <- outOf sid
             , t.transType == LestTransition
-            , Just src <- [boundaryOf sid]
+            , Just src <- [lestSrc]
             , Just tgt <- [entryOf t.transTo]
             ]
           branches =
@@ -313,9 +380,20 @@ stateGraphToBpmn opts sg =
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
             ]
-       in hence <> lest <> branches
+          -- The lapse timer lands wherever HENCE lands: that is the whole
+          -- claim being drawn.
+          lapses =
+            [ (src, tgt, Nothing)
+            | t <- outOf sid
+            , t.transType == HenceTransition
+            , Just src <- [lapseOf sid]
+            , Just tgt <- [entryOf t.transTo]
+            ]
+       in hence <> lest <> branches <> lapses
 
     lastChainNode sid = chainOf sid >>= \c -> (.nodeId) <$> listToMaybe (reverse c.scNodes)
+
+    modalAt sid = (henceOf sid <|> lestOf sid) >>= (.transLabel.labelModal)
 
   -- Ids are assigned only after the join pass, so that a flow the join
   -- rewrote is not left carrying the id of the node it used to point at.
@@ -358,45 +436,102 @@ stateGraphToBpmn opts sg =
       | Set.member s seen = go seen rest
       | otherwise = go (Set.insert s seen) (Map.findWithDefault [] s succsOf <> rest)
 
-  -- A converging parallel gateway is correct only if every branch ends at the
-  -- same single state and can reach nothing else that stops. Anything weaker
-  -- and the join is a token trap.
+  -- A converging parallel gateway waits for one token on __every__ incoming
+  -- flow. So the thing that has to be proved before drawing one is not that the
+  -- branches /reach/ a common point — reachability is far too weak — but that
+  -- each branch delivers __exactly one token, unconditionally__.
+  --
+  -- The distinction is the whole bug. An earlier version counted rewired edges
+  -- and required two or more, which passes happily for a branch containing an
+  -- interrupting boundary event (@cancelActivity="true"@ makes its two arms
+  -- mutually exclusive: two edges, one token), a @ROR@ (an exclusive gateway:
+  -- n edges, one token), or a lapse timer (same shape again). Each of those
+  -- emits a join that waits forever for a token nothing will ever send, and the
+  -- emitted BPMN deadlocks — a strictly worse failure than not drawing the
+  -- gateway at all, because a reader can see a missing gateway and cannot see a
+  -- token that never arrives.
+  --
+  -- So: one unconditional edge per branch, or decline. Declining costs little,
+  -- and 'P-NOJOIN' says so.
   addJoin ::
     ([FlowNode], [Edge], [FidelityNote]) ->
     StateId ->
     ([FlowNode], [Edge], [FidelityNote])
   addJoin (nodes, edges, finds) junction =
-    case joinTarget of
-      Just r
-        | Just tgt <- entryOf r
-        , disjointBranches ->
-            let jid = "Join_" <> Text.pack (show junction)
-                inside = Set.insert junction (Set.delete r (Set.unions (map reachFrom branches)))
-                fromFan from =
-                  maybe False (`Set.member` inside) (Map.lookup from nodeState)
-                redirect (edgeFrom, edgeTo, cond)
-                  | edgeTo == tgt && fromFan edgeFrom = (True, (edgeFrom, jid, cond))
-                  | otherwise = (False, (edgeFrom, edgeTo, cond))
-                marked = map redirect edges
-                rewired = map snd marked
-                joinNode =
-                  FlowNode
-                    { nodeId = jid
-                    , nodeName = ""
-                    , nodeKind = Gateway ParallelGateway Converging
-                    , nodeDoc = Just "every branch of the RAND must complete"
-                    , nodeLane = Nothing
-                    }
-             in -- A join needs at least two things to join. Fewer means an outer
-                -- junction already claimed these edges (nested RANDs sharing a
-                -- terminal), and inserting a gateway with one incoming flow — or
-                -- none — would be worse than not drawing one at all.
-                if length (filter fst marked) >= 2
-                  then (nodes <> [joinNode], rewired <> [(jid, tgt, Nothing)], finds)
-                  else (nodes, edges, finds <> [noJoinFinding])
-      _ -> (nodes, edges, finds <> [noJoinFinding])
+    case (joinTarget, joinTarget >>= entryOf) of
+      (Just r, Just tgt)
+        | not disjointBranches -> declineWith overlapReason
+        | otherwise -> case tokenProof r tgt of
+            Left reason -> declineWith reason
+            Right proven ->
+              let jid = "Join_" <> Text.pack (show junction)
+                  claimed = Set.fromList [(a, b) | (a, b, _) <- proven]
+                  redirect (edgeFrom, edgeTo, cond)
+                    | Set.member (edgeFrom, edgeTo) claimed = (edgeFrom, jid, cond)
+                    | otherwise = (edgeFrom, edgeTo, cond)
+                  joinNode =
+                    FlowNode
+                      { nodeId = jid
+                      , nodeName = ""
+                      , nodeKind = Gateway ParallelGateway Converging
+                      , nodeDoc =
+                          Just
+                            "every branch of the RAND must complete; each \
+                            \delivers exactly one token"
+                      , nodeLane = Nothing
+                      }
+               in ( nodes <> [joinNode]
+                  , map redirect edges <> [(jid, tgt, Nothing)]
+                  , finds
+                  )
+      _ -> declineWith cannotReason
    where
     branches = map (.transTo) (defaultsOf junction)
+
+    declineWith reason
+      | anyBranchFolded = (nodes, edges, finds <> [foldedFinding])
+      | otherwise = (nodes, edges, finds <> [noJoinFinding reason])
+
+    interiorOf r b = Set.delete r (reachFrom b)
+
+    nodesInside interior nid =
+      maybe False (`Set.member` interior) (Map.lookup nid nodeState)
+
+    -- Edges by which one branch arrives at the join point.
+    arrivalsOf r tgt b =
+      let interior = interiorOf r b
+       in [e | e@(eFrom, eTo, _) <- edges, eTo == tgt, nodesInside interior eFrom]
+
+    -- Exactly one unconditional arrival per branch, or the reason it failed.
+    tokenProof r tgt = traverse (check . arrivalsOf r tgt) branches
+     where
+      check = \case
+        [e@(_, _, Nothing)] -> Right e
+        [(_, _, Just _)] ->
+          Left
+            "one of its branches reaches the join through a conditional flow, \
+            \which may never fire, so a parallel join could wait for a token \
+            \that is never sent"
+        [] -> Left "one of its branches never reaches the join point at all"
+        several ->
+          Left
+            ( "one of its branches reaches the join by "
+                <> Text.pack (show (length several))
+                <> " different routes — an interrupting boundary event, a ROR, \
+                   \or a lapse timer — of which at most one will fire, whereas \
+                   \a parallel join would wait for every one of them"
+            )
+
+    -- An enclosing junction already rewrote this branch's arrivals to its own
+    -- gateway. That is not a failure to join; the join exists, one level out.
+    anyBranchFolded =
+      or
+        [ Text.isPrefixOf "Join_" eTo
+        | r <- maybeToList joinTarget
+        , b <- branches
+        , (eFrom, eTo, _) <- edges
+        , nodesInside (interiorOf r b) eFrom
+        ]
 
     exitsOf b = Set.filter (\s -> null (Map.findWithDefault [] s succsOf)) (reachFrom b)
 
@@ -411,7 +546,7 @@ stateGraphToBpmn opts sg =
     -- Branch subgraphs that overlap anywhere but the join point would make the
     -- rewrite ambiguous; refuse rather than draw something we cannot justify.
     disjointBranches =
-      let interiors = [Set.delete r (reachFrom b) | b <- branches, r <- maybeToList joinTarget]
+      let interiors = [interiorOf r b | b <- branches, r <- maybeToList joinTarget]
        in and
             [ Set.null (Set.intersection a b)
             | (i, a) <- zip [0 :: Int ..] interiors
@@ -419,23 +554,65 @@ stateGraphToBpmn opts sg =
             , i < j
             ]
 
-    noJoinFinding =
+    overlapReason =
+      "two of its branches share intermediate states, so which arrival belongs \
+      \to which branch is ambiguous"
+
+    cannotReason
+      | length branches < 2 = "it has fewer than two branches"
+      | otherwise =
+          "its branches do not all stop at one common state — at least one can \
+          \reach an outcome the others cannot, typically BREACH"
+
+    -- Whether declining actually costs the reader anything depends on whether a
+    -- branch can breach, so the note must not assert the same thing either way.
+    someBranchBreaches =
+      or
+        [ s.stateType == TerminalBreach
+        | b <- branches
+        , sid <- Set.toList (reachFrom b)
+        , s <- sg.sgStates
+        , s.stateId == sid
+        ]
+
+    noJoinFinding reason =
       MkFidelityNote
         { code = "P-NOJOIN"
         , severity = Lossy
         , element = fromMaybe ("state " <> Text.pack (show junction)) (gatewayOf junction)
         , range = Nothing
         , message =
-            "The "
-              <> Text.pack (show (length branches))
-              <> " branches of this RAND do not all end at one common state — a \
-                 \branch can reach BREACH, or two branches overlap — so no \
-                 \converging parallel gateway was invented, because a join a \
-                 \branch can escape is a token trap."
+            "No converging parallel gateway was drawn for this RAND because "
+              <> reason
+              <> ". A join that waits for a token nothing will send is a \
+                 \deadlock, which is worse than an undrawn conjunction."
         , lost =
-            "the conjunction as a drawn gateway; it still holds, because a BPMN \
-            \instance ends only once every token is consumed, but the reader \
-            \has to know that"
+            "the conjunction as a drawn gateway"
+              <> if someBranchBreaches
+                then
+                  " — and do not assume it survives implicitly. An instance does \
+                  \end only once every token is consumed, but a branch here can \
+                  \reach BREACH, whose error end abandons its siblings rather \
+                  \than waiting for them."
+                else
+                  ". No branch here can breach, so every token is still \
+                  \consumed before the instance ends and the conjunction does \
+                  \hold — it is simply not drawn."
+        }
+
+    -- The join exists, drawn by an enclosing gateway. Nothing is gone, so the
+    -- severity is Advisory and the note says so plainly.
+    foldedFinding =
+      MkFidelityNote
+        { code = "P-JOIN-FOLDED"
+        , severity = Advisory
+        , element = fromMaybe ("state " <> Text.pack (show junction)) (gatewayOf junction)
+        , range = Nothing
+        , message =
+            "This RAND's join was folded into the enclosing junction's \
+            \converging gateway, which already waits for every one of these \
+            \branches, so a second gateway would have had nothing left to join."
+        , lost = "nothing; the conjunction is drawn, one level out"
         }
 
   ------------------------------------------------------------------
@@ -529,8 +706,9 @@ stateGraphToBpmn opts sg =
       , element = processId
       , range = Nothing
       , message =
-          "BPMN has no as-of date, so every threshold and deadline drawn here \
-          \is a value someone must remember to edit when the rule changes."
+          "BPMN has no as-of date, so any threshold or deadline that does \
+          \appear in this diagram is a value someone must remember to edit when \
+          \the rule changes."
       , lost =
           "asking the same question as of a different rule date, which the L4 \
           \source can still answer"
@@ -550,6 +728,10 @@ type Edge = (Text, Text, Maybe Text)
 data StateChain = StateChain
   { scNodes :: [FlowNode]
   , scBoundary :: Maybe FlowNode
+  , -- | A synthesised timer for a permission that lapses; see 'chainFor'. It
+    -- is a boundary event like 'scBoundary', but its outflow goes to the HENCE
+    -- target rather than the LEST one.
+    scLapse :: Maybe FlowNode
   , scFindings :: [FidelityNote]
   }
 
@@ -592,6 +774,14 @@ taskName l = case l.labelModal of
  where
   nonEmpty' t = if Text.null (Text.strip t) then "(unnamed action)" else t
 
+-- | For a prohibition, completing the task /is/ the violation, which is the
+-- opposite of what an activity normally means. Say so on the element, since the
+-- notation cannot.
+taskArmNote :: Maybe DeonticModal -> Text
+taskArmNote (Just DMustNot) =
+  " \8212 completing this activity means the prohibited act was performed, which is the LEST arm"
+taskArmNote _ = ""
+
 -- | The source rule, restated for @\<documentation\>@.
 restateRule :: TransitionLabel -> Text
 restateRule l =
@@ -608,6 +798,48 @@ triggerName :: BoundaryTrigger -> Text -> Text
 triggerName trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
+
+-- | Which node each arm of the obligation leaves from: @(HENCE source, LEST
+-- source)@, given the task and the deadline's boundary event.
+--
+-- __For a prohibition the two arms are raced the other way round.__ An
+-- interrupting boundary event is a race between \"the activity completed\" and
+-- \"the trigger fired\", and for @SHANT@ the L4 runtime races them like this
+-- (@L4.EvaluateLazy.Machine@):
+--
+-- * the deadline expires with the act not performed ⇒ /\"Prohibition was
+--   RESPECTED\"/ ⇒ __HENCE__;
+-- * the act is performed ⇒ /\"Prohibition violated\"/ ⇒ __LEST__.
+--
+-- So the timer leads to the fulfilment arm and the task's own completion —
+-- which is what performing the forbidden act /is/ — leads to the breach arm.
+-- Wiring it the obvious way round, as this exporter originally did, draws a
+-- diagram that says \"wait long enough and you are in breach\" when the rule
+-- says the opposite. Nothing about this needs a fidelity note: BPMN expresses
+-- the race natively, and confessing a loss that did not occur would be its own
+-- kind of inaccuracy.
+--
+-- Every other modal reaches LEST by the deadline running out, so for them the
+-- obvious wiring is the correct one.
+raceArms ::
+  Maybe DeonticModal ->
+  -- | the task
+  Maybe Text ->
+  -- | the deadline's boundary event, if any
+  Maybe Text ->
+  (Maybe Text, Maybe Text)
+raceArms (Just DMustNot) task bnd = (bnd <|> task, task)
+raceArms _ task bnd = (task, bnd)
+
+-- | Documentation for the deadline's boundary event, which for a prohibition
+-- marks compliance rather than failure.
+boundaryDoc :: Maybe DeonticModal -> Maybe Text -> Text
+boundaryDoc (Just DMustNot) mDue =
+  "the deadline passes"
+    <> maybe "" (" (" <>) (fmap (<> ")") mDue)
+    <> " with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm"
+boundaryDoc _ (Just d) = "LEST: the obligation is not discharged within " <> d
+boundaryDoc _ Nothing = "LEST: the obligation is not discharged"
 
 --------------------------------------------------------------------------------
 -- Deadlines
@@ -643,11 +875,15 @@ boundaryTrigger opts elemId lestLabel = \case
             Advisory
             ( "Deadline "
                 <> quoted raw
-                <> " carries no unit, because L4's WITHIN does not fix one; it \
-                   \is read here as days ("
+                <> " carries no unit, because nothing in L4 fixes one — WITHIN \
+                   \is typed as a bare NUMBER (TypeCheck.hs) and the evaluator \
+                   \only ever adds it to an event timestamp. It is read here as \
+                   \days ("
                 <> iso
-                <> "), following the day-serial convention of \
-                   \libraries/datetime.l4."
+                <> "), following the commonest convention in the corpus, where \
+                   \event clocks are day counts (libraries/daydate.l4, `Day` \
+                   \AKA `Date to days`). A model stamping events in abstract \
+                   \ticks will need this edited."
             )
             "certainty about the unit — if this model's clock is not days, the \
             \duration needs editing"
@@ -919,19 +1155,44 @@ layoutDiagram li =
       , (r, n) <- zip [0 ..] [n | n <- placed, laneOf n == lane, rankOfNode n == rank]
       ]
 
-  laneRows lane =
-    max 1 $
-      maximum
-        ( 0
-            : [ length [n | n <- placed, laneOf n == lane, rankOfNode n == rank]
-              | rank <- [0 .. maxRank]
-              ]
-        )
+  -- Both of these are memoised into maps, and that is not premature.
+  --
+  -- Written as plain recursive functions they compose into a cubic: 'laneTop'
+  -- sums 'laneHeight' over every preceding lane, 'laneHeight' scans every
+  -- placed node once per rank, and the bounds pass calls 'laneTop' afresh for
+  -- every node. It is invisible in a three-lane fixture and it is invisible at
+  -- one lane — @laneTop 0@ sums an empty list and never calls 'laneHeight' at
+  -- all — so a golden suite of small many-ranked graphs cannot see it. At 400
+  -- nodes across 5 lanes it was ~11 seconds; memoised, ~0.15.
+  -- One pass over the nodes: how many share each (lane, rank) cell, then the
+  -- busiest cell in each lane. The old form rescanned every node once per
+  -- (lane, rank) pair.
+  laneRowsOf :: Map Int Int
+  laneRowsOf =
+    Map.fromListWith
+      max
+      ([(l, 1) | l <- [0 .. laneCount - 1]] <> [(lane, n) | ((lane, _), n) <- Map.toList perCell])
+   where
+    perCell :: Map (Int, Int) Int
+    perCell = Map.fromListWith (+) [((laneOf n, rankOfNode n), 1) | n <- placed]
 
-  laneHeight lane =
-    max minLaneHeight (lanePadTop + laneRows lane * rowHeight + lanePadBottom)
+  laneRows lane = Map.findWithDefault 1 lane laneRowsOf
 
-  laneTop lane = poolY + sum [laneHeight l | l <- [0 .. lane - 1]]
+  laneHeightOf :: Map Int Int
+  laneHeightOf =
+    Map.fromList
+      [ (l, max minLaneHeight (lanePadTop + laneRows l * rowHeight + lanePadBottom))
+      | l <- [0 .. laneCount - 1]
+      ]
+
+  laneHeight lane = Map.findWithDefault minLaneHeight lane laneHeightOf
+
+  -- Running totals, computed once, rather than a fresh prefix sum per node.
+  laneTopOf :: Map Int Int
+  laneTopOf =
+    Map.fromList (zip [0 ..] (scanl (+) poolY [laneHeight l | l <- [0 .. laneCount - 1]]))
+
+  laneTop lane = Map.findWithDefault poolY lane laneTopOf
 
   contentX0 = poolX + laneLabelWidth + laneLeftPad
   poolWidth =
@@ -1026,32 +1287,120 @@ layoutDiagram li =
     | f <- li.liFlows
     ]
 
+  -- Every vertical run happens in the gutter BETWEEN two rank columns, never
+  -- inside one.
+  --
+  -- Nodes occupy @[contentX0 + rank*layerWidth, +taskSlotWidth]@, so the
+  -- @layerWidth - taskSlotWidth@ strip to the right of each column is
+  -- guaranteed empty. Routing every turn into that strip makes a
+  -- segment-through-node crossing impossible by construction rather than by
+  -- luck — which matters, because the previous router dropped a boundary
+  -- event's outflow straight down at @task.bx + 72@, inside the very column
+  -- every task at that rank occupies, and ran it the full height of the pool.
+  --
+  -- Each flow gets its own channel within the gutter so that parallel flows do
+  -- not land on the same x and draw as a single merged line.
+  gutterWidth = layerWidth - taskSlotWidth
+  gutterInset = 14
+
+  -- The vertical run goes in the gutter immediately BEFORE the target's
+  -- column, so the horizontal approach into a shared node is as short as
+  -- possible. Several flows converging on one end event will still meet, but
+  -- they meet at its doorstep rather than sharing a long merged line.
+  gutterRankOf f =
+    let sr = maybe 0 rankOfNode (Map.lookup f.flowFrom byId)
+        tr = maybe 0 rankOfNode (Map.lookup f.flowTo byId)
+     in max sr (tr - 1)
+
+  -- A flow occupies up to two gutters — the one it leaves through and the one
+  -- it arrives through — so grouping by either alone lets two flows collide in
+  -- the gutter they happen to share. Assign greedily instead: each flow takes
+  -- the lowest channel index unused in /every/ gutter it touches. That is a
+  -- two-line graph colouring, deterministic in flow order, and collision-free
+  -- by construction rather than by choosing a big enough step.
+  channelIndexOf :: Map Text Int
+  channelIndexOf = snd (foldl' claim (Map.empty :: Map Int (Set Int), Map.empty) li.liFlows)
+   where
+    claim (used, acc) f =
+      let gs = nubOrd [rankOfFlowSource f, gutterRankOf f]
+          taken = Set.unions [Map.findWithDefault Set.empty g used | g <- gs]
+          -- the list is infinite and 'taken' is finite, so this always yields
+          i = fromMaybe 0 (listToMaybe [k | k <- [0 :: Int ..], not (Set.member k taken)])
+          used' = foldl' (\m g -> Map.insertWith Set.union g (Set.singleton i) m) used gs
+       in (used', Map.insert f.flowId i acc)
+
+  rankOfFlowSource f = maybe 0 rankOfNode (Map.lookup f.flowFrom byId)
+
+  -- Spread whatever indices were needed across the gutter's usable width.
+  channelStep =
+    let widest = maximum (0 : Map.elems channelIndexOf)
+     in max 4 ((gutterWidth - 2 * gutterInset) `div` max 1 widest)
+
+  channelOf :: Map Text Int
+  channelOf = Map.map (\i -> gutterInset + i * channelStep) channelIndexOf
+
+  -- x of the free strip immediately right of a rank's column. Nodes never live
+  -- here, so a vertical run in it cannot cross one.
+  gutterX rank channel =
+    min
+      (contentX0 + rank * layerWidth + taskSlotWidth + gutterWidth - 4)
+      (contentX0 + rank * layerWidth + taskSlotWidth + channel)
+
+  -- The free HORIZONTAL band, for the same reason the gutter is the free
+  -- vertical one. Every node is centred in an 80px slot inside a 120px row, so
+  -- the remainder of the row is empty across the whole width of the pool. A
+  -- long horizontal run at some node's centre line, by contrast, will sooner or
+  -- later meet a node that shares that centre line — which is how a flow ended
+  -- up drawn straight through the task two columns along.
+  corridorBelow n =
+    let lane = laneOf n
+        row = Map.findWithDefault 0 n.nodeId rowOf
+        slotTop = laneTop lane + lanePadTop + row * rowHeight
+     in slotTop + nodeHeight Task + (rowHeight - nodeHeight Task) `div` 2
+
   waypoints f =
     let sb = Map.lookup f.flowFrom boundsOf
         tb = Map.lookup f.flowTo boundsOf
-        fromBoundary = maybe False isBoundary (Map.lookup f.flowFrom byId)
+        src = Map.lookup f.flowFrom byId
+        tgt = Map.lookup f.flowTo byId
+        channel = Map.findWithDefault gutterInset f.flowId channelOf
+        sRank = maybe 0 rankOfNode src
+        gxOut = gutterX sRank channel
+        gxIn = gutterX (gutterRankOf f) channel
+        -- the corridor below whichever of the two sits higher up the page
+        corridor = case (src, tgt) of
+          (Just a, Just b) ->
+            Just (corridorBelow (if fromMaybe 0 (fmap (.by) sb) <= fromMaybe 0 (fmap (.by) tb) then a else b))
+          _ -> Nothing
      in case (sb, tb) of
-          (Just s, Just t)
-            | fromBoundary -> ensureTwo s t (dedupe (downThenAcross s t))
-            | otherwise -> ensureTwo s t (dedupe (acrossThen s t))
+          (Just s, Just t) ->
+            let depart =
+                  if maybe False isBoundary src
+                    then -- a boundary event sits on its host's bottom border,
+                    -- so it steps clear downwards before turning
+                      Point (s.bx + s.bw `div` 2) (s.by + s.bh)
+                    else Point (s.bx + s.bw) (centreY s)
+                arrive = Point t.bx (centreY t)
+             in ensureTwo s t . dedupe $
+                  [depart] <> viaCorridor corridor gxOut gxIn depart arrive <> [arrive]
           _ -> [Point 0 0, Point 0 0]
 
-  acrossThen s t =
-    let sy = s.by + s.bh `div` 2
-        ty = t.by + t.bh `div` 2
-        sx = s.bx + s.bw
-        tx = t.bx
-     in if sy == ty
-          then [Point sx sy, Point tx ty]
-          else
-            let mx = (sx + tx) `div` 2
-             in [Point sx sy, Point mx sy, Point mx ty, Point tx ty]
+  centreY b = b.by + b.bh `div` 2
 
-  downThenAcross s t =
-    let sx = s.bx + s.bw `div` 2
-        sy = s.by + s.bh
-        ty = t.by + t.bh `div` 2
-     in [Point sx sy, Point sx ty, Point t.bx ty]
+  -- Out into the gutter, along the free corridor when the two columns are not
+  -- adjacent, then into the gutter beside the target. Every turn happens where
+  -- nothing is drawn, so a crossing is impossible by construction rather than
+  -- unlikely in practice.
+  viaCorridor corridor gxOut gxIn depart arrive
+    | gxOut == gxIn = [Point gxOut depart.ptY, Point gxOut arrive.ptY]
+    | otherwise = case corridor of
+        Nothing -> [Point gxOut depart.ptY, Point gxOut arrive.ptY, Point gxIn arrive.ptY]
+        Just cy ->
+          [ Point gxOut depart.ptY
+          , Point gxOut cy
+          , Point gxIn cy
+          , Point gxIn arrive.ptY
+          ]
 
   dedupe (p : q : rest) | p == q = dedupe (q : rest)
   dedupe (p : rest) = p : dedupe rest

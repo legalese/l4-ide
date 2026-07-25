@@ -3,38 +3,38 @@ fidelity report — BPMN 2.0
       MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
       lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
   [P-DEADLINE-UNIT] advisory — Boundary_0
-      Deadline ‘21’ carries no unit, because L4's WITHIN does not fix one; it is read here as days (P21D), following the day-serial convention of libraries/datetime.l4.
+      Deadline ‘21’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P21D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_2
       MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
       lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
   [P-DEADLINE-UNIT] advisory — Boundary_2
-      Deadline ‘7’ carries no unit, because L4's WITHIN does not fix one; it is read here as days (P7D), following the day-serial convention of libraries/datetime.l4.
+      Deadline ‘7’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P7D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_5
       A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
       lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force
   [P-DEADLINE-UNIT] advisory — Boundary_5
-      Deadline ‘30’ carries no unit, because L4's WITHIN does not fix one; it is read here as days (P30D), following the day-serial convention of libraries/datetime.l4.
+      Deadline ‘30’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P30D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_6
       MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
       lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
   [P-DEADLINE-UNIT] advisory — Boundary_6
-      Deadline ‘120’ carries no unit, because L4's WITHIN does not fix one; it is read here as days (P120D), following the day-serial convention of libraries/datetime.l4.
+      Deadline ‘120’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P120D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_7
       A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
       lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force
   [P-DEADLINE-UNIT] advisory — Boundary_7
-      Deadline ‘365’ carries no unit, because L4's WITHIN does not fix one; it is read here as days (P365D), following the day-serial convention of libraries/datetime.l4.
+      Deadline ‘365’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P365D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [P-NOJOIN] lossy — Split_1
-      The 4 branches of this RAND do not all end at one common state — a branch can reach BREACH, or two branches overlap — so no converging parallel gateway was invented, because a join a branch can escape is a token trap.
-      lost: the conjunction as a drawn gateway; it still holds, because a BPMN instance ends only once every token is consumed, but the reader has to know that
+      No converging parallel gateway was drawn for this RAND because its branches do not all stop at one common state — at least one can reach an outcome the others cannot, typically BREACH. A join that waits for a token nothing will send is a deadlock, which is worse than an undrawn conjunction.
+      lost: the conjunction as a drawn gateway — and do not assume it survives implicitly. An instance does end only once every token is consumed, but a branch here can reach BREACH, whose error end abandons its siblings rather than waiting for them.
   [F2] lossy — Process_the_offering
       A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: Issuer, Intermediary, Investor).
       lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
   [F5] advisory — Process_the_offering
-      BPMN has no as-of date, so every threshold and deadline drawn here is a value someone must remember to edit when the rule changes.
+      BPMN has no as-of date, so any threshold or deadline that does appear in this diagram is a value someone must remember to edit when the rule changes.
       lost: asking the same question as of a different rule date, which the L4 source can still answer

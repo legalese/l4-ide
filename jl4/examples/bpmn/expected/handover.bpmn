@@ -19,16 +19,19 @@
       </bpmn:lane>
       <bpmn:lane id="Lane_2_Landlord" name="Landlord">
         <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Lapse_2</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Lapse_4</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Lapse_6</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Lapse_7</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_unassigned" name="(unassigned)">
         <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Split_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Split_5</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Join_1</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
@@ -47,48 +50,72 @@
     <bpmn:task id="Task_2" name="MAY inspect the premises">
       <bpmn:documentation>PARTY Landlord MAY inspect the premises WITHIN 7</bpmn:documentation>
     </bpmn:task>
+    <bpmn:boundaryEvent id="Lapse_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_2">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Fulfilled" />
     <bpmn:task id="Task_4" name="MAY photograph the premises">
       <bpmn:documentation>PARTY Landlord MAY photograph the premises WITHIN 7</bpmn:documentation>
     </bpmn:task>
+    <bpmn:boundaryEvent id="Lapse_4" name="after P7D" attachedToRef="Task_4" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_4">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
     <bpmn:exclusiveGateway id="Split_5" name="one of" gatewayDirection="Diverging">
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
     <bpmn:task id="Task_6" name="MAY retain the deposit">
       <bpmn:documentation>PARTY Landlord MAY retain the deposit WITHIN 30</bpmn:documentation>
     </bpmn:task>
+    <bpmn:boundaryEvent id="Lapse_6" name="after P30D" attachedToRef="Task_6" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_6">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
     <bpmn:task id="Task_7" name="MAY apply to the tribunal">
       <bpmn:documentation>PARTY Landlord MAY apply to the tribunal WITHIN 30</bpmn:documentation>
     </bpmn:task>
-    <bpmn:parallelGateway id="Join_1" gatewayDirection="Converging">
-      <bpmn:documentation>every branch of the RAND must complete</bpmn:documentation>
-    </bpmn:parallelGateway>
+    <bpmn:boundaryEvent id="Lapse_7" name="after P30D" attachedToRef="Task_7" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Lapse_7">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
     <bpmn:sequenceFlow id="Flow_Task_0__Split_1" sourceRef="Task_0" targetRef="Split_1" />
     <bpmn:sequenceFlow id="Flow_Boundary_0__Split_5" sourceRef="Boundary_0" targetRef="Split_5" />
     <bpmn:sequenceFlow id="Flow_Split_1__Task_2" sourceRef="Split_1" targetRef="Task_2" />
     <bpmn:sequenceFlow id="Flow_Split_1__Task_4" sourceRef="Split_1" targetRef="Task_4" />
-    <bpmn:sequenceFlow id="Flow_Task_2__Join_1" sourceRef="Task_2" targetRef="Join_1" />
-    <bpmn:sequenceFlow id="Flow_Task_4__Join_1" sourceRef="Task_4" targetRef="Join_1" />
+    <bpmn:sequenceFlow id="Flow_Task_2__End_3" sourceRef="Task_2" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Lapse_2__End_3" sourceRef="Lapse_2" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Task_4__End_3" sourceRef="Task_4" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Lapse_4__End_3" sourceRef="Lapse_4" targetRef="End_3" />
     <bpmn:sequenceFlow id="Flow_Split_5__Task_6" sourceRef="Split_5" targetRef="Task_6" />
     <bpmn:sequenceFlow id="Flow_Split_5__Task_7" sourceRef="Split_5" targetRef="Task_7" />
     <bpmn:sequenceFlow id="Flow_Task_6__End_3" sourceRef="Task_6" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Lapse_6__End_3" sourceRef="Lapse_6" targetRef="End_3" />
     <bpmn:sequenceFlow id="Flow_Task_7__End_3" sourceRef="Task_7" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Join_1__End_3" sourceRef="Join_1" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Lapse_7__End_3" sourceRef="Lapse_7" targetRef="End_3" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_handover">
       <bpmndi:BPMNShape id="Shape_Participant_the_handover" bpmnElement="Participant_the_handover" isHorizontal="true">
-        <dc:Bounds x="130" y="80" width="1130" height="960" />
+        <dc:Bounds x="130" y="80" width="950" height="960" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_1_Tenant" bpmnElement="Lane_1_Tenant" isHorizontal="true">
-        <dc:Bounds x="160" y="80" width="1100" height="160" />
+        <dc:Bounds x="160" y="80" width="920" height="160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_2_Landlord" bpmnElement="Lane_2_Landlord" isHorizontal="true">
-        <dc:Bounds x="160" y="240" width="1100" height="520" />
+        <dc:Bounds x="160" y="240" width="920" height="520" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
-        <dc:Bounds x="160" y="760" width="1100" height="280" />
+        <dc:Bounds x="160" y="760" width="920" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
         <dc:Bounds x="232" y="802" width="36" height="36" />
@@ -105,11 +132,17 @@
       <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
         <dc:Bounds x="740" y="260" width="100" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lapse_2" bpmnElement="Lapse_2">
+        <dc:Bounds x="794" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
-        <dc:Bounds x="1132" y="802" width="36" height="36" />
+        <dc:Bounds x="952" y="802" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
         <dc:Bounds x="740" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lapse_4" bpmnElement="Lapse_4">
+        <dc:Bounds x="794" y="442" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Split_5" bpmnElement="Split_5">
         <dc:Bounds x="585" y="915" width="50" height="50" />
@@ -117,80 +150,104 @@
       <bpmndi:BPMNShape id="Shape_Task_6" bpmnElement="Task_6">
         <dc:Bounds x="740" y="500" width="100" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lapse_6" bpmnElement="Lapse_6">
+        <dc:Bounds x="794" y="562" width="36" height="36" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_7" bpmnElement="Task_7">
         <dc:Bounds x="740" y="620" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Join_1" bpmnElement="Join_1">
-        <dc:Bounds x="945" y="795" width="50" height="50" />
+      <bpmndi:BPMNShape id="Shape_Lapse_7" bpmnElement="Lapse_7">
+        <dc:Bounds x="794" y="682" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
         <di:waypoint x="268" y="820" />
-        <di:waypoint x="324" y="820" />
-        <di:waypoint x="324" y="140" />
+        <di:waypoint x="314" y="820" />
+        <di:waypoint x="314" y="140" />
         <di:waypoint x="380" y="140" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_0__Split_1" bpmnElement="Flow_Task_0__Split_1">
         <di:waypoint x="480" y="140" />
-        <di:waypoint x="532" y="140" />
-        <di:waypoint x="532" y="820" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="494" y="820" />
         <di:waypoint x="585" y="820" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__Split_5" bpmnElement="Flow_Boundary_0__Split_5">
         <di:waypoint x="452" y="198" />
-        <di:waypoint x="452" y="940" />
+        <di:waypoint x="501" y="198" />
+        <di:waypoint x="501" y="940" />
         <di:waypoint x="585" y="940" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_1__Task_2" bpmnElement="Flow_Split_1__Task_2">
         <di:waypoint x="635" y="820" />
-        <di:waypoint x="687" y="820" />
-        <di:waypoint x="687" y="300" />
+        <di:waypoint x="674" y="820" />
+        <di:waypoint x="674" y="300" />
         <di:waypoint x="740" y="300" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_1__Task_4" bpmnElement="Flow_Split_1__Task_4">
         <di:waypoint x="635" y="820" />
-        <di:waypoint x="687" y="820" />
-        <di:waypoint x="687" y="420" />
+        <di:waypoint x="681" y="820" />
+        <di:waypoint x="681" y="420" />
         <di:waypoint x="740" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Task_2__Join_1" bpmnElement="Flow_Task_2__Join_1">
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_2__End_3" bpmnElement="Flow_Task_2__End_3">
         <di:waypoint x="840" y="300" />
-        <di:waypoint x="892" y="300" />
-        <di:waypoint x="892" y="820" />
-        <di:waypoint x="945" y="820" />
+        <di:waypoint x="854" y="300" />
+        <di:waypoint x="854" y="820" />
+        <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__Join_1" bpmnElement="Flow_Task_4__Join_1">
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_2__End_3" bpmnElement="Flow_Lapse_2__End_3">
+        <di:waypoint x="812" y="358" />
+        <di:waypoint x="861" y="358" />
+        <di:waypoint x="861" y="820" />
+        <di:waypoint x="952" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__End_3" bpmnElement="Flow_Task_4__End_3">
         <di:waypoint x="840" y="420" />
-        <di:waypoint x="892" y="420" />
-        <di:waypoint x="892" y="820" />
-        <di:waypoint x="945" y="820" />
+        <di:waypoint x="868" y="420" />
+        <di:waypoint x="868" y="820" />
+        <di:waypoint x="952" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_4__End_3" bpmnElement="Flow_Lapse_4__End_3">
+        <di:waypoint x="812" y="478" />
+        <di:waypoint x="875" y="478" />
+        <di:waypoint x="875" y="820" />
+        <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_5__Task_6" bpmnElement="Flow_Split_5__Task_6">
         <di:waypoint x="635" y="940" />
-        <di:waypoint x="687" y="940" />
-        <di:waypoint x="687" y="540" />
+        <di:waypoint x="688" y="940" />
+        <di:waypoint x="688" y="540" />
         <di:waypoint x="740" y="540" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_5__Task_7" bpmnElement="Flow_Split_5__Task_7">
         <di:waypoint x="635" y="940" />
-        <di:waypoint x="687" y="940" />
-        <di:waypoint x="687" y="660" />
+        <di:waypoint x="695" y="940" />
+        <di:waypoint x="695" y="660" />
         <di:waypoint x="740" y="660" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_6__End_3" bpmnElement="Flow_Task_6__End_3">
         <di:waypoint x="840" y="540" />
-        <di:waypoint x="986" y="540" />
-        <di:waypoint x="986" y="820" />
-        <di:waypoint x="1132" y="820" />
+        <di:waypoint x="882" y="540" />
+        <di:waypoint x="882" y="820" />
+        <di:waypoint x="952" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_6__End_3" bpmnElement="Flow_Lapse_6__End_3">
+        <di:waypoint x="812" y="598" />
+        <di:waypoint x="889" y="598" />
+        <di:waypoint x="889" y="820" />
+        <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_7__End_3" bpmnElement="Flow_Task_7__End_3">
         <di:waypoint x="840" y="660" />
-        <di:waypoint x="986" y="660" />
-        <di:waypoint x="986" y="820" />
-        <di:waypoint x="1132" y="820" />
+        <di:waypoint x="896" y="660" />
+        <di:waypoint x="896" y="820" />
+        <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Join_1__End_3" bpmnElement="Flow_Join_1__End_3">
-        <di:waypoint x="995" y="820" />
-        <di:waypoint x="1132" y="820" />
+      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_7__End_3" bpmnElement="Flow_Lapse_7__End_3">
+        <di:waypoint x="812" y="718" />
+        <di:waypoint x="903" y="718" />
+        <di:waypoint x="903" y="820" />
+        <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
