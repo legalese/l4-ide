@@ -1,0 +1,40 @@
+`maximum` with list of 3, 1, 4, 1, 5, 9, 2 and 6
+`maximum` with list of 3, 1, 4, 1, 5, 9, 2 and 6 is equal to 9
+`maximum` with list of 7 is equal to 7
+`maximum` with list of -3, -1 and -4 is equal to -1
+`minimum` with list of 3, 1, 4, 1, 5, 9, 2 and 6
+`minimum` with list of 3, 1, 4, 1, 5, 9, 2 and 6 is equal to 1
+`minimum` with list of 7 is equal to 7
+`minimum` with list of -3, -1 and -4 is equal to -4
+`maximum1` with 3 and list of 1, 4, 1, 5, 9, 2 and 6
+`maximum1` with 3 and list of 1, 4, 1, 5, 9, 2 and 6 is equal to 9
+`maximum1` with 99 and list of 1, 4, 1 and 5 is equal to 99
+`maximum1` with 42 and `EMPTY` is equal to 42
+`minimum1` with 3 and list of 1, 4, 1, 5, 9, 2 and 6
+`minimum1` with 3 and list of 1, 4, 1, 5, 9, 2 and 6 is equal to 1
+`minimum1` with -99 and list of 1, 4, 1 and 5 is equal to -99
+`minimum1` with 42 and `EMPTY` is equal to 42
+`maximum` with list of `JUST` with 3, `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6
+`maximum` with list of `JUST` with 3, `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6 is equal to `JUST` with 9
+`maximum` with list of `JUST` with 7 is equal to `JUST` with 7
+`minimum` with list of `JUST` with 3, `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6
+`minimum` with list of `JUST` with 3, `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6 is equal to `JUST` with 1
+`minimum` with list of `JUST` with 7 is equal to `JUST` with 7
+`maximum1` with `JUST` with 3 and list of `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6
+`maximum1` with `JUST` with 3 and list of `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6 is equal to `JUST` with 9
+`maximum1` with `JUST` with 99 and list of `JUST` with 1, `JUST` with 4, `JUST` with 1 and `JUST` with 5 is equal to `JUST` with 99
+`maximum1` with `JUST` with 42 and `EMPTY` is equal to `JUST` with 42
+`minimum1` with `JUST` with 3 and list of `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6
+`minimum1` with `JUST` with 3 and list of `JUST` with 1, `JUST` with 4, `JUST` with 1, `JUST` with 5, `JUST` with 9, `JUST` with 2 and `JUST` with 6 is equal to `JUST` with 1
+`minimum1` with `JUST` with 1 and list of `JUST` with 4 and `JUST` with 5 is equal to `JUST` with 1
+`minimum1` with `JUST` with 42 and `EMPTY` is equal to `JUST` with 42
+`max` with 3 and 5 is equal to 5
+`min` with 3 and 5 is equal to 3
+`max` with `JUST` with 3 and `JUST` with 5 is equal to `JUST` with 5
+`min` with `JUST` with 3 and `JUST` with 5 is equal to `JUST` with 3
+`max` with `JUST` with 3 and `NOTHING`
+`max` with `NOTHING` and `JUST` with 3
+`min` with `JUST` with 3 and `NOTHING`
+`min` with `NOTHING` and `JUST` with 3
+`maximum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5
+`minimum` with list of `JUST` with 3, `NOTHING` and `JUST` with 5
