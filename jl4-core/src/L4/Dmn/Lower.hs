@@ -33,6 +33,24 @@
 --   this one must not. A @NUMBER@-returning @BRANCH@ — a fee schedule, an
 --   investor limit — is precisely what a decision table is /for/.
 --
+-- __The boundary this exporter reports on.__ Everything DMN can statically
+-- check — completeness and consistency since Montalbano (1962), inter-tabular
+-- checking since 1998, cross-DRD SMT verification since 2022 — is defined over
+-- __S-FEEL input entries, constant output entries, and a single-hit policy__.
+-- The DMN specification's own §9.1 then says "few if any complete decision
+-- models can be defined using S-FEEL" and encourages "the full FEEL
+-- specification rather than the S-FEEL subset". So the fragment you can verify
+-- is not the fragment you are told to write
+-- (@specs\/research\/DMN-STEELMAN.md@ §2.5, which also records what must /not/
+-- be claimed: nobody has proved FEEL analysis undecidable). This exporter's job
+-- is to say, per file, exactly where the emitted model crossed that line.
+--
+-- Of the three conditions, the third is met for free: the only hit policies here
+-- are @U@ and @F@, both single-hit. @Collect@ is excluded from every published
+-- result (Semantic DMN: "S-FEEL does not provide list-handling constructs …
+-- hence only single-hit policies combine well with S-FEEL within a DRG"), and
+-- L4's guarded chains are single-hit by construction anyway.
+--
 -- __The conservatism, stated once.__ A guard conjunct becomes a column plus a
 -- unary test only when the test reduces to a /constant/ endpoint. Anything else
 -- becomes its own boolean column whose input expression is the conjunct's own
@@ -69,6 +87,9 @@ module L4.Dmn.Lower
   , renderFeel
   , renderFeelIn
   , sanitiseId
+  , selectIdiom
+  , peelLocals
+  , flattenGuarded
   ) where
 
 import Base
@@ -78,13 +99,14 @@ import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Optics
 
-import L4.Annotation (Anno_ (..), getAnno)
+import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
 import L4.Desugar (carameliseExpr)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
 import L4.Viz.GuardedRows (GuardedRows (..), hasEffectfulNode, normaliseGuarded)
+import L4.Interchange.Fidelity
 
 import L4.Dmn.IR
 
@@ -101,6 +123,10 @@ data TableCtx = MkTableCtx
     -- ^ nullary constructors visible in the module. A @CONSIDER@ arm becomes an
     -- equality against a constant only if we can tell a constructor from a
     -- variable; see 'isConstantRef' for why guessing here is unsound.
+  , tcConstants    :: !(Set Unique)
+    -- ^ nullary decisions whose body is a literal, i.e. named thresholds. Used
+    -- only to decide whether a lifted @max@\/@min@ deserves a
+    -- @D-LIFTEDTHRESHOLD@ note; it never changes the lowering.
   , tcEnums        :: !(Set Unique)
     -- ^ type constructors declared as @IS ONE OF@ over nullary constructors.
     -- FEEL has no sum types, so we serialise their values as strings; saying
@@ -119,6 +145,7 @@ defaultTableCtx = MkTableCtx
   , tcIdPrefix     = "decision"
   , tcOutputType   = DmnAny
   , tcConstructors = Set.empty
+  , tcConstants    = Set.empty
   , tcEnums        = Set.empty
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
@@ -151,7 +178,14 @@ rowsToDmn = rowsToDmnWith defaultTableCtx
 
 -- | 'rowsToDmn', told who it is working for.
 rowsToDmnWith :: TableCtx -> GuardedRows -> Either FidelityLoss DecisionTable
-rowsToDmnWith ctx rows = do
+rowsToDmnWith ctx = rowsToDmnWith' ctx [] []
+
+-- | 'rowsToDmnWith', plus the two things only the module-level caller knows:
+-- which @WHERE@\/@LET@ locals it inlined, and which nested bodies it declined to
+-- flatten. Both are reported, not silently absorbed.
+rowsToDmnWith'
+  :: TableCtx -> [Text] -> [Expr Resolved] -> GuardedRows -> Either FidelityLoss DecisionTable
+rowsToDmnWith' ctx inlined cappedBodies rows = do
   -- A DMN input expression is evaluated ONCE for the whole table and then tested
   -- by every rule, whereas BRANCH short-circuits. Tabulating an effectful guard
   -- would therefore change how often the effect runs. (GUARDED-ROWS.md §6.)
@@ -186,7 +220,7 @@ rowsToDmnWith ctx rows = do
     { drId          = ctx.tcIdPrefix <> "_r" <> tshow i
     , drInputs      = cells
     , drOutput      = renderFeel body
-    , drDescription = Just (oneLineText (prettyLayout guardE))
+    , drDescription = Just (oneLine (prettyLayout guardE))
     }
 
   -- Under First the catch-all is a final rule with all-`-` inputs, which is
@@ -229,7 +263,7 @@ rowsToDmnWith ctx rows = do
     , dtInputs    = typedColumns
     , dtOutput    = outColumn
     , dtRules     = allRules
-    , dtNotes     = tableNotes ctx decomposed columnCells typedColumns policy rows
+    , dtNotes     = tableNotes ctx decomposed columnCells typedColumns policy rows inlined cappedBodies
     }
 
 ------------------------------------------------------------------------
@@ -435,7 +469,7 @@ orderedColumns rows = go Set.empty [c | row <- rows, c <- row]
 mkColumn :: TableCtx -> Int -> Cell -> InputColumn
 mkColumn ctx i c = MkInputColumn
   { icId    = ctx.tcIdPrefix <> "_i" <> tshow i
-  , icLabel = oneLineText (prettyLayout c.cellSubject)
+  , icLabel = oneLine (prettyLayout c.cellSubject)
   , icExpr  = renderFeelIn ctx.tcConstructors c.cellSubject
   , icType  = annType ctx c.cellSubject
   }
@@ -606,7 +640,7 @@ renderFeel = renderFeelIn Set.empty
 -- disagree with the input side, where 'constantOf' has already quoted the same
 -- constructor into a @\"red\"@ cell.
 renderFeelIn :: Set Unique -> Expr Resolved -> FeelExpr
-renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLineText txt) frag
+renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt) frag
  where
   -- (precedence, text, fragment)
   go :: Expr Resolved -> (Int, Text, FeelFragment)
@@ -633,8 +667,14 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLineText 
     -- gives a constitutive IMPLIES, and it is what the ladder's seam draws.
     Implies _ a b -> pair e FullFeel (\ta tb -> "(not(" <> ta <> ") or " <> tb <> ")") a b
     List _ xs -> nary e FullFeel (\ts -> "[" <> Text.intercalate ", " ts <> "]") xs
-    IfThenElse _ c t f ->
-      triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
+    -- A conditional whose arms ARE its comparison's operands is not a decision;
+    -- it is `max` / `min`. Lower it to FEEL's own function rather than to an
+    -- `if`, the way a compiler backend recognises a select pattern instead of
+    -- emitting a branch.
+    IfThenElse _ c t f
+      | Just (fn, a, b) <- selectIdiom e -> call e fn [a, b]
+      | otherwise ->
+          triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
     App _ r args -> call e (feelIdent r) args
     _ -> verbatim e
    where
@@ -696,6 +736,222 @@ feelIdent :: Resolved -> Text
 feelIdent = feelIdentText . nameOf
 
 ------------------------------------------------------------------------
+-- The select idiom: max / min wearing a conditional's clothes
+------------------------------------------------------------------------
+
+-- | @IF a AT LEAST b THEN a ELSE b@ is not a decision over two cases. It is
+-- @max a b@, and the L4 prelude literally defines @max@ that way.
+--
+-- A corpus survey found 17 instances across 12 files, ten of which sit under a
+-- declaration or comment that /names/ the operation in English — "The lesser
+-- of", "the earlier of", "greater of annual income or net worth" — while
+-- spelling the conditional out longhand. So authors know it is @min@; they just
+-- do not write @min@.
+--
+-- Recognising it is the peephole a compiler backend runs (LLVM's
+-- @matchSelectPattern@ folding a branch into @SPF_SMAX@\/@SMIN@), and it matters
+-- here for a structural reason: without it, 'flattenGuarded' would expand a
+-- @max@ into extra table rows, manufacturing cases the regulation does not have.
+-- 17 CFR 227.100(a)(2)(i) says "__The greater of__ $2,500, or 5 percent of …" —
+-- the statute states an operator, so @max@ is the isomorphic rendering and the
+-- expansion would be a derivation the statute never makes.
+--
+-- __Strictness does not matter here__, which is why @>=@ and @>@ map to the same
+-- thing: the arms are the operands, so on a tie both branches return equal
+-- values.
+--
+-- The match is exact and syntactic — arms must be the comparison's own operands
+-- modulo annotations. That is what keeps it off the corpus\'s near misses:
+-- @IF pool > promised THEN pool + increase ELSE pool@ (an arm is an operand
+-- /plus a term/), @IF n < 0 THEN 0 - n ELSE n@ (@abs@, four times in the
+-- corpus), and @IF n > k THEN n - 1 ELSE n@ (an off-by-one).
+selectIdiom :: Expr Resolved -> Maybe (Text, Expr Resolved, Expr Resolved)
+selectIdiom = \case
+  IfThenElse _ c t f -> do
+    (thenIsA, a, b) <- comparisonOf c
+    let same x y = clearAnno x == clearAnno y
+    if      same t a && same f b then Just (if thenIsA then "max" else "min", a, b)
+    else if same t b && same f a then Just (if thenIsA then "min" else "max", a, b)
+    else Nothing
+  _ -> Nothing
+ where
+  -- 'thenIsA' is True when taking the THEN arm as `a` means "the bigger one".
+  comparisonOf = \case
+    Geq _ a b -> Just (True, a, b)
+    Gt  _ a b -> Just (True, a, b)
+    Leq _ a b -> Just (False, a, b)
+    Lt  _ a b -> Just (False, a, b)
+    _         -> Nothing
+
+isSelectIdiom :: Expr Resolved -> Bool
+isSelectIdiom = isJust . selectIdiom
+
+-- | Lifted @max@\/@min@ whose operands include a literal or a named constant.
+--
+-- Lifting is right (see 'selectIdiom'), but it has a real cost that the report
+-- must not swallow: the Reg CF $2,500 investment floor becomes part of
+-- @max(2500, …)@ instead of being a row a compliance reader can point at. Two
+-- symmetric computed quantities (@max(annual income, net worth)@) are
+-- arithmetic and get no note; a named or literal threshold as one operand is
+-- policy, and does.
+liftedThresholds :: TableCtx -> Expr Resolved -> [(Text, Expr Resolved)]
+liftedThresholds ctx top =
+  [ (fn, sub)
+  | sub <- toListOf (cosmosOf (gplate @(Expr Resolved))) top
+  , Just (fn, a, b) <- [selectIdiom sub]
+  , any isThreshold [a, b]
+  ]
+ where
+  isThreshold = \case
+    Lit _ _    -> True
+    App _ r [] -> Set.member (getUnique r) ctx.tcConstants
+    _          -> False
+
+------------------------------------------------------------------------
+-- WHERE / LET
+------------------------------------------------------------------------
+
+-- | Peel @WHERE@ and @LET@ wrappers off a decision body, substituting every
+-- local into the expression that used it.
+--
+-- 'normaliseGuarded' matches only @IfThenElse@ \/ @MultiWayIf@ \/ @Consider@, so
+-- a @WHERE@-wrapped chain is invisible to it — and the corpus\'s best decision
+-- tables are all @WHERE@-wrapped. Peeling is therefore not a nicety.
+--
+-- __Inlining, not hoisting.__ A @WHERE@-local could in principle become its own
+-- DRG decision, but DMN\'s decisions are globally named where L4\'s locals are
+-- lexically scoped, so hoisting invites collisions between two decisions that
+-- each happen to define @aggregate@. The DRG still gets a real dependency chain
+-- from the module\'s top-level @MEANS@ declarations.
+--
+-- Bails (rather than producing a table with dangling names) when a local takes
+-- parameters, is an @ASSUME@, performs I\/O, or is recursive.
+peelLocals :: Expr Resolved -> Either FidelityLoss (Expr Resolved, [Text])
+peelLocals = collect Map.empty []
+ where
+  collect env names = \case
+    Where _ body ds -> absorb env names body ds
+    LetIn _ ds body -> absorb env names body ds
+    e               -> Right (substLocals env e, reverse names)
+
+  absorb env names body ds = do
+    bindings <- traverse binding ds
+    env' <- resolveEnv (env <> Map.fromList [(u, b) | (u, _, b) <- bindings])
+    collect env' (reverse [nm | (_, nm, _) <- bindings] <> names) body
+
+  binding = \case
+    LocalDecide _ (MkDecide _ _ (MkAppForm _ n [] _) b)
+      | not (hasEffectfulNode b) -> Right (getUnique n, nameOf n, b)
+    _ -> Left UninlinableLocal
+
+  -- Later locals may reference earlier ones (and, in a WHERE, vice versa), so
+  -- substitute the environment into itself until it stops changing. Bounded by
+  -- the number of bindings; anything still self-referential after that is
+  -- recursive, which has no closed form.
+  resolveEnv raw =
+    let step m = Map.map (substLocals m) m
+        fixed  = iterate step raw !! Map.size raw
+    in if any (mentions (Map.keysSet raw)) (Map.elems fixed)
+         then Left UninlinableLocal
+         else Right fixed
+
+  mentions keys e =
+    or [Set.member (getUnique r) keys | App _ r [] <- toListOf (cosmosOf (gplate @(Expr Resolved))) e]
+
+-- | Replace every nullary reference to a bound local with its body.
+substLocals :: Map Unique (Expr Resolved) -> Expr Resolved -> Expr Resolved
+substLocals env
+  | Map.null env = id
+  | otherwise    = go
+ where
+  go e = case e of
+    App _ r [] | Just b <- Map.lookup (getUnique r) env -> b
+    _ -> over (gplate @(Expr Resolved)) go e
+
+------------------------------------------------------------------------
+-- Flattening nested chains
+------------------------------------------------------------------------
+
+-- | How deep to splice nested chains, and how many rules to tolerate.
+--
+-- @IF a THEN x ELSE IF b THEN y ELSE IF c THEN z ELSE w@ normalises to ONE row
+-- plus an @OTHERWISE@ that is itself a chain. Lowered naively that is a
+-- one-rule table whose default output is a nested conditional — the opaque
+-- ribbon this programme exists to remove, relocated into DMN. So splice:
+--
+-- > row (g, b) where b normalises to [(h1,c1) … (hm,cm)] + otherwise c0
+-- >   =>  (g and h1, c1) … (g and hm, cm), (g, c0)
+--
+-- The final @(g, c0)@ is correct under @First@, and the parent\'s negated prefix
+-- stays implicit for the same reason no other prefix is materialised.
+--
+-- The caps are not paranoia: nesting multiplies, and an unbounded splice on a
+-- deeply nested rule is a table-size explosion.
+maxFlattenDepth, maxFlattenRows :: Int
+maxFlattenDepth = 4
+maxFlattenRows  = 64
+
+-- | Splice nested chains into more rows. Returns the flattened chain and the
+-- bodies left unflattened by a cap.
+flattenGuarded :: GuardedRows -> (GuardedRows, [Expr Resolved])
+flattenGuarded rs0
+  | length flat.grRows > maxFlattenRows = (rs0, [b | (_, b) <- rs0.grRows, isJust (childOf b)])
+  | otherwise                           = (flat, capped)
+ where
+  (flat, capped) = go maxFlattenDepth rs0
+
+  go depth rs =
+    let expanded = map (expandRow depth) rs.grRows
+        (othRows, othFinal, othDisj, othCapped) = expandOtherwise depth rs.grOtherwise
+        rows = concatMap (\(r, _, _) -> r) expanded <> othRows
+        -- Disjointness composes: the flattened family is exclusive iff the
+        -- parent family was AND every child family is AND no child contributed
+        -- a bare catch-all row (which its siblings' guards all imply).
+        disjoint = rs.grDisjoint && and [d | (_, d, _) <- expanded] && othDisj
+    in ( MkGuardedRows
+           { grRows      = rows
+           , grOtherwise = othFinal
+           , grDisjoint  = disjoint
+           }
+       , concatMap (\(_, _, c) -> c) expanded <> othCapped
+       )
+
+  expandRow depth (g, b) = case childOf b of
+    Nothing  -> ([(g, b)], True, [])
+    Just sub
+      | depth <= 0 -> ([(g, b)], True, [b])
+      | otherwise ->
+          let (child, ccapped) = go (depth - 1) sub
+          in ( [(conj g h, c) | (h, c) <- child.grRows]
+                 <> [(g, c0) | Just c0 <- [child.grOtherwise]]
+             , child.grDisjoint && isNothing child.grOtherwise
+             , ccapped
+             )
+
+  expandOtherwise _ Nothing = ([], Nothing, True, [])
+  expandOtherwise depth (Just b0) = case childOf b0 of
+    Just sub | depth > 0 ->
+      let (child, ccapped) = go (depth - 1) sub
+      -- Splicing the OTHERWISE's rows AFTER the parent's is exactly First; but
+      -- the parent's guards and these need not exclude one another, so once any
+      -- parent row exists the family is no longer provably disjoint.
+      in (child.grRows, child.grOtherwise, False, ccapped)
+    _ -> ([], Just b0, True, [])
+
+  conj = And emptyAnno
+
+  -- Reuse the normaliser's own answer rather than re-deriving its bail
+  -- conditions, and refuse the two cases this module adds on top of them.
+  childOf b
+    | isSelectIdiom b    = Nothing
+    | hasEffectfulNode b = Nothing
+    | otherwise = case normaliseGuarded b of
+        Just sub
+          | not (rowsElided b sub)
+          , not (any (hasEffectfulNode . fst) sub.grRows) -> Just sub
+        _ -> Nothing
+
+------------------------------------------------------------------------
 -- Types
 ------------------------------------------------------------------------
 
@@ -731,6 +987,25 @@ builtinType u
 -- Notes
 ------------------------------------------------------------------------
 
+-- | The note codes this backend emits. All prefixed @D-@ so they cannot collide
+-- with the process-side backend's in a combined report.
+--
+-- Severity follows the shared vocabulary: 'Blocking' means DMN cannot express
+-- the thing at all and we emitted a fallback; 'Lossy' means something the L4
+-- said is gone; 'Advisory' means the emission is faithful but a /target-side/
+-- capability is forfeited. Most of these are Advisory, and that is the point —
+-- the losses are properties of DMN, not defects in the export.
+dmnNote :: Text -> FidelitySeverity -> Text -> Maybe SrcRange -> Text -> Text -> FidelityNote
+dmnNote c sev el rng msg lostWhat =
+  MkFidelityNote
+    { code     = c
+    , severity = sev
+    , element  = el
+    , range    = rng
+    , message  = msg
+    , lost     = lostWhat
+    }
+
 tableNotes
   :: TableCtx
   -> [[Cell]]
@@ -738,19 +1013,22 @@ tableNotes
   -> [InputColumn]
   -> HitPolicy
   -> GuardedRows
+  -> [Text]              -- ^ names of inlined WHERE/LET locals
+  -> [Expr Resolved]     -- ^ bodies left unflattened by the cap
   -> [FidelityNote]
-tableNotes ctx decomposed columnCells columns policy rows =
-  dedupeNotes (fallbackNotes <> sfeelNotes <> policyNotes <> outputNotes)
+tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
+  dedupeNotes $
+    fallbackNotes <> sfeelNotes <> policyNotes <> outputNotes
+      <> inlineNotes <> capNotes <> thresholdNotes
  where
-  note frag rng reason = MkFidelityNote
-    { fnDecision = ctx.tcName
-    , fnRange    = rng
-    , fnFragment = frag
-    , fnReason   = reason
-    }
+  here = ctx.tcIdPrefix
 
   fallbackNotes =
-    [ note (oneLineText (prettyLayout c.cellSubject)) (bestRange c.cellSubject) GuardNotDecomposable
+    [ dmnNote "D-UNDECOMPOSABLE" Advisory here (bestRange c.cellSubject)
+        ("the guard `" <> oneLine (prettyLayout c.cellSubject)
+           <> "` has no constant endpoint, so it became its own boolean column rather than \
+              \an input expression tested by a unary test")
+        "interval gap and overlap analysis over this condition"
     | row <- decomposed, c <- row, c.cellNote
     ]
 
@@ -758,7 +1036,10 @@ tableNotes ctx decomposed columnCells columns policy rows =
   fallbackKeys = Set.fromList [c.cellKey | row <- decomposed, c <- row, c.cellFallback]
 
   sfeelNotes =
-    [ note col.icLabel (bestRange c.cellSubject) InputExpressionNotSFeel
+    [ dmnNote "D-NONFEEL" Advisory here (bestRange c.cellSubject)
+        ("the input expression `" <> col.icExpr.feText
+           <> "` is outside S-FEEL (which admits only arithmetic, simple values and comparisons)")
+        "completeness, consistency and overlap checking, all of which DMN's analysis is defined over S-FEEL only"
     | (col, c) <- zip columns columnCells
     , col.icExpr.feFragment /= SFeel
     , not (Set.member c.cellKey fallbackKeys)
@@ -769,23 +1050,65 @@ tableNotes ctx decomposed columnCells columns policy rows =
   tableRange = listToMaybe (mapMaybe (bestRange . fst) rows.grRows)
 
   policyNotes =
-    [ note ctx.tcName tableRange HitPolicyDowngraded | rows.grDisjoint, policy == HitFirst ]
-      <> [ note ctx.tcName tableRange OrderDependentTable
+    [ dmnNote "D-HITPOLICY" Advisory here tableRange
+        "the L4 guards are provably exclusive, but the emitted columns cannot witness it, \
+        \so the hit policy is First rather than Unique"
+        "the reader's and the tool's ability to see that the rules cannot conflict"
+    | rows.grDisjoint, policy == HitFirst
+    ]
+      <> [ dmnNote "D-ORDERDEPENDENT" Advisory here tableRange
+             "hit policy First is order-dependent: DMN 8.2.10 says of such tables that \
+             \\"the table is hard to validate manually and therefore has to be used with care\""
+             "order-free reading; a rule cannot be checked without the rules above it"
          | policy == HitFirst
          , length rows.grRows + length (maybeToList rows.grOtherwise) > 1
          ]
 
-  -- DMN 8.2.9 makes an output entry an expression, so this is legal; but both
-  -- Calvanese formalisations map an output entry to an OBJECT, which is why a
-  -- computed-output table is outside the analysable fragment by construction.
-  -- The OTHERWISE body counts too, whether it landed on a rule or on the output
-  -- clause's default.
+  -- The whole point of the S-FEEL pincer, made concrete. DMN 8.2.9 says "a rule
+  -- output entry is an expression", so this is legal and we emit it faithfully.
+  -- But both Calvanese formalisations define an output entry as mapping to an
+  -- OBJECT, so a computed-output table is outside the analysable fragment BY
+  -- CONSTRUCTION -- and our flagship exhibit, a MIN/MAX of computed quantities,
+  -- is exactly such a table. Saying nothing here would let a reader assume the
+  -- DMN tooling can check a table it cannot.
   outputNotes =
-    [ note fe.feText (bestRange body) ComputedOutput
+    [ dmnNote "D-COMPUTEDOUTPUT" Advisory here (bestRange body)
+        ("the output entry `" <> fe.feText
+           <> "` is an expression, not a constant; DMN 8.2.9 permits that, but every published \
+              \decision-table analysis defines an output entry as a constant")
+        "gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it"
     | body <- map snd rows.grRows <> maybeToList rows.grOtherwise
     , let fe = renderFeelIn ctx.tcConstructors body
     , not (isConstantText fe)
     ]
+
+  inlineNotes =
+    [ dmnNote "D-INLINEDLOCAL" Advisory here tableRange
+        ("the WHERE/LET local(s) " <> Text.intercalate ", " (map tick inlined)
+           <> " were inlined into the cells that used them; DMN has no lexically scoped \
+              \intermediate value")
+        "the name the drafter gave the intermediate quantity"
+    | not (null inlined)
+    ]
+
+  capNotes =
+    [ dmnNote "D-FLATTENCAP" Advisory here (bestRange b)
+        ("a nested guarded chain was left as an output expression rather than spliced into \
+         \more rules, because flattening hit the depth or row cap")
+        "the rows the nested chain would have contributed"
+    | b <- cappedBodies
+    ]
+
+  thresholdNotes =
+    [ dmnNote "D-LIFTEDTHRESHOLD" Advisory here (bestRange sub)
+        ("`" <> oneLine (prettyLayout sub) <> "` was lifted to " <> fn
+           <> "(...): the threshold is now inside an output expression rather than a row of the table")
+        "a compliance reader's ability to point at the threshold as a rule"
+    | body <- map snd rows.grRows <> maybeToList rows.grOtherwise
+    , (fn, sub) <- liftedThresholds ctx body
+    ]
+
+  tick t = "`" <> t <> "`"
 
   isConstantText fe =
     fe.feFragment == SFeel
@@ -802,7 +1125,7 @@ dedupeNotes = go Set.empty
     | Set.member k seen = go seen ns
     | otherwise         = n : go (Set.insert k seen) ns
    where
-    k = (n.fnFragment, Text.pack (show n.fnReason))
+    k = (n.code, n.message)
 
 -- | The first source range anywhere under an expression. Guards synthesised by
 -- 'normaliseGuarded' (a @CONSIDER@ arm becomes @scrutinee EQUALS ctor@) carry an
@@ -863,6 +1186,14 @@ lowerModule opts modul@(MkModule _ uri _) =
     SynonymDecl _ _   -> []
 
   decideIds      = assignIds "decision_" (map decideName decides)
+
+  -- A nullary decision whose body is a literal is a NAMED THRESHOLD -- the thing
+  -- that makes a lifted max/min worth a D-LIFTEDTHRESHOLD note.
+  namedConstants = Set.fromList
+    [ getUnique n
+    | MkDecide _ _ (MkAppForm _ n [] _) b <- decides
+    , Lit _ _ <- [carameliseExpr b]
+    ]
   decideByUnique = Map.fromList (zip (map (getUnique . decideResolved) decides) decideIds)
 
   -- Free terms, collected across every decision first so that ids and types are
@@ -912,12 +1243,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- apart. Note that the same term used by two decisions is NOT this, and does
   -- not warn.
   sharedInputNotes =
-    [ MkFidelityNote
-        { fnDecision = Text.intercalate ", " users
-        , fnRange    = Nothing
-        , fnFragment = nm
-        , fnReason   = InputDataNameShared
-        }
+    [ dmnNote "D-SCOPE" Lossy ("input_" <> sanitiseId nm) Nothing
+        ("two different terms are both named `" <> nm <> "` (in "
+           <> Text.intercalate ", " users
+           <> "); DMN's inputData is global, so the emitted model has two elements a FEEL \
+              \expression cannot tell apart")
+        "L4's lexical scoping of GIVEN parameters"
     | (nm, us) <- Map.toAscList sharedNames
     , length us > 1
     , let users = nubOrd [decideName d | d <- decides, any ((`elem` us) . fst) (decideFreeTerms d)]
@@ -934,7 +1265,12 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- The typechecker desugars every binary operator into a function
     -- application; 'carameliseExpr' undoes that, which is what makes a
     -- comparison recognisable as a comparison. The ladder does the same.
-    body = carameliseExpr rawBody
+    caramelised = carameliseExpr rawBody
+
+    -- WHERE/LET first: 'normaliseGuarded' cannot see through a wrapper, and the
+    -- corpus's best tables are all WHERE-wrapped.
+    peeled = peelLocals caramelised
+    (body, inlined) = either (const (caramelised, [])) id peeled
 
     declaredType = case mGiveth of
       Just (MkGivethSig _ ty) -> dmnTypeOf enums ty
@@ -945,30 +1281,46 @@ lowerModule opts modul@(MkModule _ uri _) =
       , tcIdPrefix     = did
       , tcOutputType   = declaredType
       , tcConstructors = constructors
+      , tcConstants    = namedConstants
       , tcEnums        = enums
       , tcSubst        = opts.dloSubstitution
       , tcUri          = uri
       }
 
-    (logic, notes) = case normaliseGuarded body of
-      Nothing -> literalFallback NotAGuardedChain
-      Just rs
-        | rowsElided body rs -> literalFallback RowsElided
-        | otherwise -> case rowsToDmnWith tctx rs of
-            Right t   -> (LogicTable t, [])
-            Left loss -> literalFallback loss
+    (logic, notes) = case peeled of
+      Left loss -> literalFallback loss
+      -- A whole body that IS the select idiom is a formula, not a one-case
+      -- table. DMN's own answer for a formula is a boxed literal expression, so
+      -- this is not a loss and gets no D-LITERALEXPR note -- only the threshold
+      -- note, if a threshold went inside the expression.
+      Right _ | isSelectIdiom body ->
+        ( LogicLiteral (renderFeelIn constructors body)
+        , [ dmnNote "D-LIFTEDTHRESHOLD" Advisory did (bestRange sub)
+              ("`" <> oneLine (prettyLayout sub) <> "` was lifted to " <> fn
+                 <> "(...): the threshold is now inside an expression rather than a row of a table")
+              "a compliance reader's ability to point at the threshold as a rule"
+          | (fn, sub) <- liftedThresholds tctx body
+          ]
+        )
+      Right _ -> case normaliseGuarded body of
+        Nothing -> literalFallback NotAGuardedChain
+        Just rs0
+          | rowsElided body rs0 -> literalFallback RowsElided
+          | otherwise ->
+              let (rs, capped) = flattenGuarded rs0
+              in case rowsToDmnWith' tctx inlined capped rs of
+                   Right t   -> (LogicTable t, [])
+                   Left loss -> literalFallback loss
 
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
     -- would describe a different rule set than the module does.
     literalFallback loss =
       ( LogicLiteral rendered
-      , [ MkFidelityNote
-            { fnDecision = decideName d
-            , fnRange    = bestRange body
-            , fnFragment = rendered.feText
-            , fnReason   = NotADecisionTable loss
-            }
+      , [ dmnNote "D-LITERALEXPR" Blocking did (bestRange body)
+            ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
+               <> ", so it is emitted as a boxed literal expression rather than a decision table")
+            "every decision-table analysis: gap, overlap, consistency and manual review"
         ]
       )
      where
@@ -1111,8 +1463,3 @@ isRegulative = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
 
 tshow :: Show a => a -> Text
 tshow = Text.pack . show
-
--- | A DMN cell is a one-liner, and an SVG @\<text\>@ collapses newlines to
--- spaces regardless. Better to do it where it can be seen.
-oneLineText :: Text -> Text
-oneLineText = Text.unwords . Text.words

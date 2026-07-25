@@ -50,6 +50,7 @@ module L4.Dmn.IR
   , renderNumber
   , quoteFeelString
   , feelIdentText
+  , oneLine
     -- * The decision requirements graph
   , Drg (..)
   , DrgNode (..)
@@ -61,15 +62,11 @@ module L4.Dmn.IR
   , drgDecisions
   , drgInputData
     -- * Fidelity
+    -- $fidelity
   , FidelityLoss (..)
-  , FidelityNote (..)
-  , FidelityReason (..)
-  , DmnCapability (..)
-  , capabilitiesLost
   , renderFidelityLoss
-  , renderFidelityNote
-  , renderFidelityReport
   , drgNotesAll
+  , dmnReport
   ) where
 
 import Base
@@ -77,7 +74,7 @@ import qualified Base.Text as Text
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
 
-import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
+import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, emptyReport)
 
 ------------------------------------------------------------------------
 -- Cells
@@ -421,7 +418,22 @@ drgInputData drg = [i | NodeInputData i <- drg.drgNodes]
 -- Fidelity
 ------------------------------------------------------------------------
 
--- | Why a guarded chain could not become a decision table at all. The caller's
+-- $fidelity
+--
+-- Per-note accumulation uses the /shared/ 'L4.Interchange.Fidelity.FidelityNote',
+-- not a DMN-local record: the DMN and BPMN backends have one @--fidelity-report@
+-- output shape between them, so the CLI does not have to reconcile two
+-- near-identical types. (Duplicating that knowledge would be the exact bug this
+-- programme is a critique of.)
+--
+-- DMN\'s note codes are all prefixed @D-@ so they cannot collide with BPMN\'s
+-- @F1@–@F5@ in a combined report. They are documented at their construction
+-- sites in "L4.Dmn.Lower" and "L4.Dmn.Markdown".
+--
+-- 'FidelityLoss' is the separate, /fatal/ question: not "what did this table
+-- give up" but "is there a table at all".
+
+-- | Why a guarded chain could not become a decision table at all. The caller\'s
 -- recourse is a @\<literalExpression\>@, never silence.
 data FidelityLoss
   = NotAGuardedChain
@@ -433,13 +445,16 @@ data FidelityLoss
     -- whole table/, whereas @BRANCH@ short-circuits, so tabulating would change
     -- how often the effect runs.
   | RegulativeBody
-    -- ^ a row's body is a deontic rule. DMN "has no notion of time" (Callewaert &
+    -- ^ a row\'s body is a deontic rule. DMN "has no notion of time" (Callewaert &
     -- Vennekens, TPLP 2024) and cannot hold an obligation as a state.
   | RowsElided
     -- ^ the normaliser dropped a @CONSIDER@ arm as inert and there is no
     -- @OTHERWISE@ to cover the inputs it used to catch. That is sound for the
     -- ladder, where a missing disjunct is FALSE; it is /not/ sound for DMN,
     -- where an unmatched input yields __null__.
+  | UninlinableLocal
+    -- ^ a @WHERE@ \/ @LET@ local could not be inlined (it takes parameters, or its
+    -- body performs I\/O), so the chain cannot be flattened into a closed table.
   deriving stock (Eq, Show, Generic)
 
 renderFidelityLoss :: FidelityLoss -> Text
@@ -451,125 +466,10 @@ renderFidelityLoss = \case
   RowsElided       ->
     "an inert CONSIDER arm was elided with no OTHERWISE to cover it; \
     \a DMN table would answer null where the rule answers FALSE"
+  UninlinableLocal ->
+    "a WHERE/LET local could not be inlined (parameterised, or effectful)"
 
--- | A capability of DMN's own analysis lineage that a given loss forfeits.
---
--- These are not invented for this exporter: they are the tasks decision-table
--- verification has performed since Montalbano (1962) advertised "a method of
--- verifying both the completeness and consistency of a problem description", and
--- they are what KIE\/Trisotech\/Signavio actually ship. Naming the /specific/
--- capability lost is the point — "this is less analysable" is not a diagnostic.
-data DmnCapability
-  = CompletenessChecking  -- ^ is every input combination covered? (gap analysis)
-  | ConsistencyChecking   -- ^ can two rules disagree about the output?
-  | OverlapDetection      -- ^ do two rules' input cubes intersect?
-  | ManualValidation      -- ^ can a human read the table off the page and check it?
-  deriving stock (Eq, Ord, Show, Generic)
-
-renderCapability :: DmnCapability -> Text
-renderCapability = \case
-  CompletenessChecking -> "completeness checking (gap analysis)"
-  ConsistencyChecking  -> "consistency checking"
-  OverlapDetection     -> "overlap detection"
-  ManualValidation     -> "manual validation"
-
-data FidelityReason
-  = GuardNotDecomposable
-    -- ^ a conjunct could not be split into an input expression plus a constant
-    -- unary test, so it became its own boolean column with a @true@ cell. Sound,
-    -- but the column is now opaque to interval reasoning.
-  | InputExpressionNotSFeel
-    -- ^ the column's input expression is outside S-FEEL (a function invocation, a
-    -- boolean connective, an @if@). Every published DMN analysis result is
-    -- defined over S-FEEL; KIE throws on generalized unary tests and Trisotech
-    -- greys the analysis button out.
-  | ComputedOutput
-    -- ^ the output entry is an expression rather than a constant. Legal DMN
-    -- (§8.2.9) — but both Calvanese formalisations define an output entry as
-    -- mapping to an /object/, so computed-output tables are outside the analysable
-    -- fragment by construction.
-  | HitPolicyDowngraded
-    -- ^ L4 proved the guards mutually exclusive, but the emitted columns cannot
-    -- show it, so the table falls back to @F@. The exclusivity is real; the
-    -- /table/ just cannot witness it.
-  | OrderDependentTable
-    -- ^ hit policy @F@: "the meaning depends on the order of the rules… the table
-    -- is hard to validate manually and therefore has to be used with care"
-    -- (DMN §8.2.10, in DMN's own voice).
-  | NotADecisionTable !FidelityLoss
-    -- ^ the decision fell back to a @\<literalExpression\>@.
-  | InputDataNameShared
-    -- ^ two decisions have same-named free terms, which DMN's global @inputData@
-    -- necessarily unifies. DMN "variables correspond to constants (i.e., 0-ary
-    -- functions)" (Vandevelde et al., cDMN); L4's are lexically scoped.
-  deriving stock (Eq, Show, Generic)
-
-capabilitiesLost :: FidelityReason -> [DmnCapability]
-capabilitiesLost = \case
-  GuardNotDecomposable    -> [CompletenessChecking, OverlapDetection]
-  InputExpressionNotSFeel -> [CompletenessChecking, ConsistencyChecking, OverlapDetection]
-  ComputedOutput          -> [ConsistencyChecking]
-  HitPolicyDowngraded     -> [ManualValidation]
-  OrderDependentTable     -> [ManualValidation]
-  NotADecisionTable _     -> [CompletenessChecking, ConsistencyChecking, OverlapDetection, ManualValidation]
-  InputDataNameShared     -> [ConsistencyChecking]
-
-renderReason :: FidelityReason -> Text
-renderReason = \case
-  GuardNotDecomposable ->
-    "guard could not be split into an input expression and a constant unary test; \
-    \emitted as its own boolean column"
-  InputExpressionNotSFeel ->
-    "input expression is outside S-FEEL, the fragment DMN's analysis is defined over"
-  ComputedOutput ->
-    "output entry is an expression, not a constant (legal DMN 8.2.9, outside the analysable fragment)"
-  HitPolicyDowngraded ->
-    "guards are provably exclusive in L4 but the emitted columns cannot witness it; \
-    \hit policy downgraded from U to F"
-  OrderDependentTable ->
-    "hit policy F is order-dependent; DMN 8.2.10 warns such a table is hard to validate manually"
-  NotADecisionTable loss ->
-    "emitted as a literal expression rather than a decision table: " <> renderFidelityLoss loss
-  InputDataNameShared ->
-    "free term shared between decisions; DMN's inputData is global where L4's binding is lexically scoped"
-
--- | One located fidelity loss.
-data FidelityNote = MkFidelityNote
-  { fnDecision :: !Text            -- ^ the decision it happened in
-  , fnRange    :: !(Maybe SrcRange)
-  , fnFragment :: !Text            -- ^ the offending L4 text
-  , fnReason   :: !FidelityReason
-  }
-  deriving stock (Eq, Show, Generic)
-
--- | Three lines: where, what, and what it costs.
-renderFidelityNote :: FidelityNote -> Text
-renderFidelityNote n =
-  Text.unlines
-    [ prettySrcRangeM n.fnRange <> ": in `" <> n.fnDecision <> "`"
-    , "  " <> renderReason n.fnReason
-    , "  fragment: " <> oneLine n.fnFragment
-    , "  DMN capability lost: " <> capabilities
-    ]
- where
-  capabilities = case capabilitiesLost n.fnReason of
-    []   -> "none"
-    caps -> Text.intercalate ", " (map renderCapability caps)
-
--- | The whole report, in note order (which is source order).
-renderFidelityReport :: [FidelityNote] -> Text
-renderFidelityReport [] =
-  "DMN fidelity report: no losses. Every emitted table is inside S-FEEL with constant outputs,\n\
-  \which is the fragment DMN's completeness and consistency checking is defined over.\n"
-renderFidelityReport notes =
-  Text.unlines
-    [ "DMN fidelity report: " <> Text.pack (show (length notes)) <> " loss(es)."
-    , "Each is a place where the emitted model left the fragment DMN can analyse."
-    , ""
-    ]
-    <> Text.intercalate "\n" (map renderFidelityNote notes)
-
--- | Every note in a 'Drg': the module-level ones, then each table's own, in
+-- | Every note in a 'Drg': the module-level ones, then each table\'s own, in
 -- decision order.
 drgNotesAll :: Drg -> [FidelityNote]
 drgNotesAll drg =
@@ -579,6 +479,10 @@ drgNotesAll drg =
        , LogicTable t <- [d.dcnLogic]
        , note <- t.dtNotes
        ]
+
+-- | The XML backend\'s report.
+dmnReport :: Drg -> FidelityReport
+dmnReport drg = foldl' (flip addNote) (emptyReport "DMN 1.3 (XML)") (drgNotesAll drg)
 
 -- | Collapse newlines and runs of whitespace. A DMN cell is a one-liner, and an
 -- SVG @\<text\>@ collapses newlines to spaces anyway — better to do it where it

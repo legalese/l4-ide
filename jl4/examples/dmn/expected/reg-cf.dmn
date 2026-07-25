@@ -9,6 +9,12 @@
   <inputData id="input_net_worth" name="net worth">
     <variable id="input_net_worth_var" name="net worth" typeRef="number"/>
   </inputData>
+  <inputData id="input_offering_amount" name="offering amount">
+    <variable id="input_offering_amount_var" name="offering amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_first_time_issuer" name="first-time issuer">
+    <variable id="input_first_time_issuer_var" name="first_time issuer" typeRef="boolean"/>
+  </inputData>
   <decision id="decision_is_accredited_investor" name="is accredited investor">
     <variable id="decision_is_accredited_investor_var" name="is accredited investor" typeRef="boolean"/>
     <informationRequirement id="decision_is_accredited_investor_ir1">
@@ -65,24 +71,76 @@
     <informationRequirement id="decision_annual_limit_basis_ir2">
       <requiredInput href="#input_net_worth"/>
     </informationRequirement>
-    <decisionTable id="decision_annual_limit_basis_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="annual limit basis">
-      <input id="decision_annual_limit_basis_i1" label="`annual income` AT LEAST `net worth`">
-        <inputExpression id="decision_annual_limit_basis_i1_expr" typeRef="boolean">
-          <text>annual income &gt;= net worth</text>
+    <literalExpression id="decision_annual_limit_basis_literal">
+      <text>min(annual income, net worth)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_financial_statements_required" name="financial statements required">
+    <variable id="decision_financial_statements_required_var" name="financial statements required" typeRef="string"/>
+    <informationRequirement id="decision_financial_statements_required_ir1">
+      <requiredInput href="#input_first_time_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir2">
+      <requiredInput href="#input_offering_amount"/>
+    </informationRequirement>
+    <decisionTable id="decision_financial_statements_required_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="financial statements required">
+      <input id="decision_financial_statements_required_i1" label="`offering amount`">
+        <inputExpression id="decision_financial_statements_required_i1_expr" typeRef="number">
+          <text>offering amount</text>
         </inputExpression>
       </input>
-      <output id="decision_annual_limit_basis_o1" name="annual limit basis" typeRef="number">
-        <defaultOutputEntry id="decision_annual_limit_basis_o1_default">
-          <text>annual income</text>
-        </defaultOutputEntry>
-      </output>
-      <rule id="decision_annual_limit_basis_r1">
-        <description>`annual income` AT LEAST `net worth`</description>
-        <inputEntry id="decision_annual_limit_basis_r1_i1">
+      <input id="decision_financial_statements_required_i2" label="`first-time issuer`">
+        <inputExpression id="decision_financial_statements_required_i2_expr" typeRef="boolean">
+          <text>first_time issuer</text>
+        </inputExpression>
+      </input>
+      <output id="decision_financial_statements_required_o1" name="financial statements required" typeRef="string"/>
+      <rule id="decision_financial_statements_required_r1">
+        <description>`offering amount` AT MOST 107000</description>
+        <inputEntry id="decision_financial_statements_required_r1_i1">
+          <text>&lt;= 107000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r1_o1">
+          <text>"certified by the principal executive officer"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r2">
+        <description>`offering amount` AT MOST 535000</description>
+        <inputEntry id="decision_financial_statements_required_r2_i1">
+          <text>&lt;= 535000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r2_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r2_o1">
+          <text>"reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r3">
+        <description>`first-time issuer` AND `offering amount` AT MOST 1070000</description>
+        <inputEntry id="decision_financial_statements_required_r3_i1">
+          <text>&lt;= 1070000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r3_i2">
           <text>true</text>
         </inputEntry>
-        <outputEntry id="decision_annual_limit_basis_r1_o1">
-          <text>net worth</text>
+        <outputEntry id="decision_financial_statements_required_r3_o1">
+          <text>"reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r4">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_financial_statements_required_r4_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r4_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r4_o1">
+          <text>"audited by an independent public accountant"</text>
         </outputEntry>
       </rule>
     </decisionTable>
@@ -128,7 +186,7 @@
           <text>&lt; 124000</text>
         </inputEntry>
         <outputEntry id="decision_investor_limit_r2_o1">
-          <text>2500</text>
+          <text>max(2500, annual limit basis)</text>
         </outputEntry>
       </rule>
       <rule id="decision_investor_limit_r3">
@@ -156,6 +214,12 @@
       <dmndi:DMNShape id="input_net_worth_shape" dmnElementRef="input_net_worth">
         <dc:Bounds x="500" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_amount_shape" dmnElementRef="input_offering_amount">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_first_time_issuer_shape" dmnElementRef="input_first_time_issuer">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_is_accredited_investor_shape" dmnElementRef="decision_is_accredited_investor">
         <dc:Bounds x="60" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
@@ -164,6 +228,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_annual_limit_basis_shape" dmnElementRef="decision_annual_limit_basis">
         <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_financial_statements_required_shape" dmnElementRef="decision_financial_statements_required">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_investor_limit_shape" dmnElementRef="decision_investor_limit">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
@@ -187,6 +254,14 @@
       <dmndi:DMNEdge id="decision_annual_limit_basis_ir2_edge" dmnElementRef="decision_annual_limit_basis_ir2">
         <di:waypoint x="590" y="380"/>
         <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir1_edge" dmnElementRef="decision_financial_statements_required_ir1">
+        <di:waypoint x="1030" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir2_edge" dmnElementRef="decision_financial_statements_required_ir2">
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="810" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investor_limit_ir1_edge" dmnElementRef="decision_investor_limit_ir1">
         <di:waypoint x="590" y="220"/>

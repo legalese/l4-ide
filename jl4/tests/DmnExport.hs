@@ -28,6 +28,8 @@ import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVF
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule)
+import L4.Dmn.Markdown (emitMarkdown, markdownReport)
+import L4.Interchange.Fidelity
 
 import System.FilePath ((</>))
 import Test.Hspec
@@ -251,6 +253,117 @@ disjointButUnwitnessable =
   \   IF income AT LEAST limit THEN 2\n\
   \   OTHERWISE 0\n"
 
+-- | The shape the corpus's best decision tables actually have: a WHERE-wrapped
+-- chain of ELSE-IFs testing successively higher thresholds, returning a STRING.
+-- Two things must happen or it degrades to one opaque rule: the WHERE has to be
+-- peeled (normaliseGuarded cannot see through it) and the nest has to be
+-- flattened into siblings.
+whereWrappedTiers :: Text
+whereWrappedTiers =
+  "ASSUME `offering amount` IS A NUMBER\n\
+  \ASSUME `first time` IS A BOOLEAN\n\
+  \GIVETH A STRING\n\
+  \`financial statements required` MEANS\n\
+  \  IF   `aggregate` AT MOST 100000\n\
+  \  THEN \"certified\"\n\
+  \  ELSE IF   `aggregate` AT MOST 500000\n\
+  \       THEN \"reviewed\"\n\
+  \       ELSE IF   `relief applies`\n\
+  \            THEN \"reviewed\"\n\
+  \            ELSE \"audited\"\n\
+  \  WHERE\n\
+  \  `aggregate` MEANS `offering amount`\n\
+  \  `relief applies` MEANS `first time` AND `aggregate` AT MOST 300000\n"
+
+-- | A CONSIDER over three nullary constructors returning NUMBER. The corpus's
+-- cleanest table, and the one that must come out as U.
+assuranceLevel :: Text
+assuranceLevel =
+  "DECLARE Assurance\n\
+  \  IS ONE OF\n\
+  \    low\n\
+  \    moderate\n\
+  \    high\n\
+  \ASSUME level IS A Assurance\n\
+  \GIVETH A NUMBER\n\
+  \`assurance level` MEANS\n\
+  \  CONSIDER level\n\
+  \  WHEN low THEN 1\n\
+  \  WHEN moderate THEN 2\n\
+  \  WHEN high THEN 3\n\
+  \  OTHERWISE 0\n"
+
+-- | @IF a AT LEAST b THEN a ELSE b@ is `max`, not a decision over two cases.
+maxIdiom :: Text
+maxIdiom =
+  "ASSUME a IS A NUMBER\n\
+  \ASSUME b IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \`the greater` MEANS\n\
+  \  IF a AT LEAST b THEN a ELSE b\n"
+
+-- | The same idiom over DATE. FEEL's min/max are defined over comparable items,
+-- so the lowering must not assume numbers.
+minIdiomDate :: Text
+minIdiomDate =
+  "ASSUME `start` IS A DATE\n\
+  \ASSUME `end` IS A DATE\n\
+  \GIVETH A DATE\n\
+  \`the earlier of` MEANS\n\
+  \  IF `start` AT MOST `end` THEN `start` ELSE `end`\n"
+
+-- | Corpus near-miss 1 (safe-post-new.l4:188): the ELSE arm IS an operand, but
+-- the THEN arm is that operand PLUS a term. Must not fire.
+nearMissPlusTerm :: Text
+nearMissPlusTerm =
+  "ASSUME pool IS A NUMBER\n\
+  \ASSUME promised IS A NUMBER\n\
+  \ASSUME increase IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \`new pool` MEANS\n\
+  \  IF promised GREATER THAN pool THEN pool PLUS increase ELSE pool\n"
+
+-- | Corpus near-miss 2 (math.l4:43, if-example.l4:20): `abs`, four times over.
+-- Arms are `n` and `0 - n`; operands are `n` and `0`. Must not fire.
+nearMissAbs :: Text
+nearMissAbs =
+  "ASSUME n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \magnitude MEANS\n\
+  \  IF n LESS THAN 0 THEN 0 MINUS n ELSE n\n"
+
+-- | Corpus near-miss 3 (excel-date.l4:80): an off-by-one, not a max.
+nearMissOffByOne :: Text
+nearMissOffByOne =
+  "ASSUME n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \adjusted MEANS\n\
+  \  IF n GREATER THAN 60 THEN n MINUS 1 ELSE n\n"
+
+-- | A lifted max with a LITERAL operand: the Reg CF $2,500 investment floor in
+-- miniature. Lifting is right (the statute says "the greater of"), but the floor
+-- stops being a row anyone can point at, and the report must say so.
+liftedFloor :: Text
+liftedFloor =
+  "ASSUME income IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \`investment limit` MEANS\n\
+  \  BRANCH\n\
+  \   IF income AT LEAST 1000 THEN IF 2500 AT LEAST income THEN 2500 ELSE income\n\
+  \   OTHERWISE 0\n"
+
+-- | A DATE-typed column. DMN has a `date` type; dmnmd does not.
+dateColumn :: Text
+dateColumn =
+  "ASSUME `filed on` IS A DATE\n\
+  \ASSUME `deadline` IS A DATE\n\
+  \ASSUME late IS A BOOLEAN\n\
+  \GIVETH A DATE\n\
+  \`effective date` MEANS\n\
+  \  BRANCH\n\
+  \   IF late THEN `deadline`\n\
+  \   OTHERWISE `filed on`\n"
+
 -- | A range guard: two bounds on one column become one interval cell, which is
 -- the idiom DMN's own interval analysis is built around.
 rangeGuard :: Text
@@ -325,7 +438,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       let t = tableOf "pick" orOverTwoColumns
       map (.icExpr.feText) t.dtInputs `shouldBe` ["a = 1 or b = 2"]
       map (.drInputs) t.dtRules `shouldBe` [[TestEq (VBool True)]]
-      map (.fnReason) t.dtNotes `shouldContain` [GuardNotDecomposable]
+      map (.code) t.dtNotes `shouldContain` ["D-UNDECOMPOSABLE"]
 
     it "a constructor is quoted on the OUTPUT side as well as the input side" $ do
       let t = tableOf "complement" constructorOutput
@@ -333,7 +446,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "\"blue\""
       t.dtOutput.ocType `shouldBe` DmnString
       -- and a quoted constant is not a "computed output"
-      map (.fnReason) t.dtNotes `shouldNotContain` [ComputedOutput]
+      map (.code) t.dtNotes `shouldNotContain` ["D-COMPUTEDOUTPUT"]
 
     it "a negated comparison keeps its subject's column and wraps the cell" $ do
       let t = tableOf "band" negatedComparison
@@ -356,16 +469,88 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       map cellTexts t.dtRules `shouldBe` [["[18..65)"]]
       fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "0"
 
+  describe "the shapes the real corpus has" $ do
+    it "a WHERE-wrapped 4-tier chain flattens to four rules with the local inlined" $ do
+      let t = tableOf "financial statements required" whereWrappedTiers
+      t.dtHitPolicy `shouldBe` HitFirst
+      length t.dtRules `shouldBe` 4
+      -- `aggregate` is gone; what is left is what it stood for
+      -- and the inlined local's own conjuncts get decomposed too, so the third
+      -- tier shares the `offering amount` column rather than hiding inside an
+      -- opaque boolean one
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["offering amount", "first time"]
+      map cellTexts t.dtRules
+        `shouldBe` [ ["<= 100000", "-"]
+                   , ["<= 500000", "-"]
+                   , ["<= 300000", "true"]
+                   , ["-", "-"]
+                   ]
+      map (.drOutput.feText) t.dtRules
+        `shouldBe` ["\"certified\"", "\"reviewed\"", "\"reviewed\"", "\"audited\""]
+      t.dtOutput.ocType `shouldBe` DmnString
+      map (.code) t.dtNotes `shouldContain` ["D-INLINEDLOCAL"]
+      [n.message | n <- t.dtNotes, n.code == "D-INLINEDLOCAL"]
+        `shouldSatisfy` all (Text.isInfixOf "`aggregate`")
+
+    it "a CONSIDER over three constructors returning NUMBER is a clean U table" $ do
+      let t = tableOf "assurance level" assuranceLevel
+      t.dtHitPolicy `shouldBe` HitUnique
+      length t.dtRules `shouldBe` 3
+      t.dtOutput.ocType `shouldBe` DmnNumber
+      fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "0"
+      map cellTexts t.dtRules `shouldBe` [["\"low\""], ["\"moderate\""], ["\"high\""]]
+      -- constant outputs and a single-hit policy: this one is INSIDE the
+      -- fragment DMN can analyse, and has nothing to report.
+      t.dtNotes `shouldBe` []
+
+  describe "the select idiom: max/min wearing a conditional's clothes" $ do
+    it "IF a >= b THEN a ELSE b is max(a, b), not a one-case table" $ do
+      let d = decisionNamed "the greater" (drgOf maxIdiom)
+      case d.dcnLogic of
+        LogicLiteral e -> e.feText `shouldBe` "max(a, b)"
+        LogicTable _   -> expectationFailure "expected max(a, b), got a decision table"
+
+    it "and the same over DATE, since FEEL's max is over comparables" $ do
+      let d = decisionNamed "the earlier of" (drgOf minIdiomDate)
+      case d.dcnLogic of
+        LogicLiteral e -> e.feText `shouldBe` "min(start, end)"
+        LogicTable _   -> expectationFailure "expected min(start, end), got a decision table"
+      d.dcnType `shouldBe` DmnDate
+
+    it "does not fire when an arm is an operand PLUS a term" $
+      mustNotBeSelect "new pool" nearMissPlusTerm
+
+    it "does not fire on abs" $
+      mustNotBeSelect "magnitude" nearMissAbs
+
+    it "does not fire on an off-by-one" $
+      mustNotBeSelect "adjusted" nearMissOffByOne
+
+    it "a lifted max is NOT flattened into extra rows, and the threshold is reported" $ do
+      let t = tableOf "investment limit" liftedFloor
+      -- ONE rule, not three: the max is a value, so it stays in the output
+      -- expression instead of becoming a floor row and a cap row.
+      length t.dtRules `shouldBe` 1
+      map (.drOutput.feText) t.dtRules `shouldBe` ["max(2500, income)"]
+      fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "0"
+      let notes = [n | n <- t.dtNotes, n.code == "D-LIFTEDTHRESHOLD"]
+      map (.severity) notes `shouldBe` [Advisory]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "2500")
+      -- and the computed output is itself reported, per DMN-STEELMAN 2.5
+      map (.code) t.dtNotes `shouldContain` ["D-COMPUTEDOUTPUT"]
+
   describe "fidelity: never say more than the L4 does" $ do
     it "an undecomposable guard becomes a boolean column AND is named in the report" $ do
       let t = tableOf "bonus" undecomposableGuard
       map (.icExpr.feText) t.dtInputs `shouldBe` ["is even(n)"]
       map (.drInputs) t.dtRules `shouldBe` [[TestEq (VBool True)]]
-      let notes = [n | n <- t.dtNotes, n.fnReason == GuardNotDecomposable]
-      map (.fnFragment) notes `shouldBe` ["`is even` OF n"]
-      -- the note is located, and it names what was given up
-      map (.fnRange) notes `shouldSatisfy` all isJust
-      concatMap (capabilitiesLost . (.fnReason)) notes `shouldContain` [OverlapDetection]
+      let notes = [n | n <- t.dtNotes, n.code == "D-UNDECOMPOSABLE"]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`is even` OF n")
+      -- the note is located, names what was given up, and is honest about severity:
+      -- DMN CAN express this, so it is advisory, not blocking.
+      map (.range) notes `shouldSatisfy` all isJust
+      map (.severity) notes `shouldBe` [Advisory]
+      map (.lost) notes `shouldSatisfy` all (not . Text.null)
 
     it "a column whose input expression leaves S-FEEL is named and located" $ do
       let t = tableOf "tier" nonSFeelColumn
@@ -374,9 +559,10 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       map (.icExpr.feText) t.dtInputs `shouldBe` ["double(n)"]
       map (.icExpr.feFragment) t.dtInputs `shouldBe` [FullFeel]
       map (.drInputs) t.dtRules `shouldBe` [[TestCmp OpGeq (VNum 10)]]
-      let notes = [n | n <- t.dtNotes, n.fnReason == InputExpressionNotSFeel]
-      map (.fnFragment) notes `shouldBe` ["double OF n"]
-      map (.fnRange) notes `shouldSatisfy` all isJust
+      let notes = [n | n <- t.dtNotes, n.code == "D-NONFEEL"]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "double(n)")
+      map (.range) notes `shouldSatisfy` all isJust
+      map (.severity) notes `shouldBe` [Advisory]
 
     it "a decision that does not normalise becomes a literalExpression, with a note" $ do
       let drg = drgOf notATable
@@ -384,8 +570,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case d.dcnLogic of
         LogicLiteral e -> e.feText `shouldBe` "a and b"
         LogicTable _   -> expectationFailure "expected a literal expression, got a decision table"
-      [n.fnReason | n <- drg.drgNotes, n.fnDecision == "ok"]
-        `shouldBe` [NotADecisionTable NotAGuardedChain]
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Blocking)]
       emitDrg drg `shouldSatisfy` Text.isInfixOf "<literalExpression"
 
     it "an elided CONSIDER arm with no OTHERWISE refuses to become a table" $ do
@@ -394,7 +579,8 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case (decisionNamed "charitable" drg).dcnLogic of
         LogicLiteral _ -> pure ()
         LogicTable _   -> expectationFailure "emitted a table that answers null where the rule answers FALSE"
-      [n.fnReason | n <- drg.drgNotes] `shouldBe` [NotADecisionTable RowsElided]
+      [n.code | n <- drg.drgNotes] `shouldBe` ["D-LITERALEXPR"]
+      [n.message | n <- drg.drgNotes] `shouldSatisfy` all (Text.isInfixOf "answer null")
 
     it "...but with an OTHERWISE the default output plugs the hole" $ do
       let t = tableOf "charitable" elidedArmWithOtherwise
@@ -406,12 +592,13 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- L4 knows `< limit` and `>= limit` are complementary...
       t.dtHitPolicy `shouldBe` HitFirst
       -- ...and the report says why the table cannot show it
-      map (.fnReason) t.dtNotes `shouldContain` [HitPolicyDowngraded]
+      map (.code) t.dtNotes `shouldContain` ["D-HITPOLICY"]
 
     it "an order-dependent table says so, in DMN's own terms" $ do
       let t = tableOf "rate" overlappingThresholds
-      map (.fnReason) t.dtNotes `shouldContain` [OrderDependentTable]
-      capabilitiesLost OrderDependentTable `shouldBe` [ManualValidation]
+      map (.code) t.dtNotes `shouldContain` ["D-ORDERDEPENDENT"]
+      [n.message | n <- t.dtNotes, n.code == "D-ORDERDEPENDENT"]
+        `shouldSatisfy` all (Text.isInfixOf "hard to validate manually")
 
     it "a clean numeric table has no fidelity losses at all" $
       (tableOf "amount" ifThenElseNumber).dtNotes `shouldBe` []
@@ -441,7 +628,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- two elements a FEEL expression cannot tell apart.
       let drg = drgOf undecomposableGuard
       map (.idId) (drgInputData drg) `shouldBe` ["input_n", "input_n_2"]
-      [n.fnFragment | n <- drg.drgNotes, n.fnReason == InputDataNameShared] `shouldBe` ["n"]
+      let shared = [n | n <- drg.drgNotes, n.code == "D-SCOPE"]
+      map (.severity) shared `shouldBe` [Lossy]
+      map (.message) shared `shouldSatisfy` all (Text.isInfixOf "both named `n`")
 
     it "element ids derive from L4 names, so they survive a rebuild" $ do
       let drg = drgOf decisionChain
@@ -465,9 +654,75 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       xml `shouldSatisfy` Text.isInfixOf "xmlns=\"https://www.omg.org/spec/DMN/20191111/MODEL/\""
       xml `shouldSatisfy` Text.isInfixOf "hitPolicy=\"UNIQUE\""
 
+  describe "dmnmd markdown (the second emitter over the same IR)" $ do
+    it "renders a table as a pipe table, with the hit policy as the first header cell" $ do
+      let md = emitMarkdown (drgOf considerConstructors)
+      md `shouldSatisfy` Text.isInfixOf "| F | c : String | score (out) : Number |"
+      md `shouldSatisfy` Text.isInfixOf "| 1 | red | 1 |"
+      md `shouldSatisfy` Text.isInfixOf "| 2 | green | 2 |"
+      -- the OTHERWISE became the catch-all row the U-to-F downgrade bought
+      md `shouldSatisfy` Text.isInfixOf "| 3 | - | 0 |"
+
+    it "downgrades U to F because dmnmd has no defaultOutputEntry, and says so" $ do
+      let drg = drgOf considerConstructors
+      (decisionNamed "score" drg).dcnLogic `shouldSatisfy` isUniqueTable
+      emitMarkdown drg `shouldSatisfy` Text.isInfixOf "| F |"
+      let notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NODEFAULT"]
+      map (.severity) notes `shouldBe` [Lossy]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "U down to F")
+
+    it "renders a multi-value cell comma-separated, and a comparison literally" $ do
+      emitMarkdown (drgOf orOverOneColumn) `shouldSatisfy` Text.isInfixOf "| 1 | red, green | 1 |"
+      emitMarkdown (drgOf overlappingThresholds) `shouldSatisfy` Text.isInfixOf "| 1 | >= 200000 | 10 |"
+
+    it "ends with exactly one newline, because dmnmd misdiagnoses a missing one" $ do
+      -- An unterminated final row backtracks the whole table and reports the
+      -- error at its HEADER row, eight lines from the fault.
+      let md = emitMarkdown (drgOf considerConstructors)
+      Text.isSuffixOf "|\n" md `shouldBe` True
+      Text.isSuffixOf "|\n\n" md `shouldBe` False
+
+    it "writes (out) with no interior space, which the post-label parser requires" $
+      emitMarkdown (drgOf considerConstructors) `shouldSatisfy` Text.isInfixOf "(out) :"
+
+    it "omits a table whose column is an EXPRESSION, since a header is a variable name" $ do
+      let drg = drgOf nonSFeelColumn
+      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      [n.code | n <- (markdownReport drg).notes] `shouldContain` ["D-MD-NONIDENTCOLUMN"]
+
+    it "omits a decision with no table shape, and names it" $ do
+      let drg = drgOf notATable
+          notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NOLITERAL"]
+      map (.severity) notes `shouldBe` [Blocking]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "no boxed-expression form")
+
+    it "reports that the DRG itself has no markdown form" $ do
+      let notes = [n | n <- (markdownReport (drgOf decisionChain)).notes, n.code == "D-MD-NODRG"]
+      map (.severity) notes `shouldBe` [Blocking]
+
+    it "reports the type collapse for a DATE column, which dmnmd has no type for" $ do
+      -- an enum column does NOT collapse here: it was already a string on both
+      -- sides, because FEEL has no sum types either. A date is a real loss --
+      -- DMN has `date`, dmnmd has only String/Number/Boolean/List.
+      let notes = [n | n <- (markdownReport (drgOf dateColumn)).notes, n.code == "D-MD-TYPE"]
+      map (.severity) notes `shouldSatisfy` all (== Lossy)
+      notes `shouldSatisfy` (not . null)
+
+    it "is byte-identical across two independent lowerings" $
+      emitMarkdown (drgOf considerConstructors) `shouldBe` emitMarkdown (drgOf considerConstructors)
+
+    it "renders a number the same way the XML emitter does" $ do
+      -- the DRY point: one renderNumber, so `9` cannot be `9.0` in one and `9`
+      -- in the other
+      let drg = drgOf overlappingThresholds
+      emitMarkdown drg `shouldSatisfy` Text.isInfixOf "200000"
+      emitDrg drg `shouldSatisfy` Text.isInfixOf "&gt;= 200000"
+
   describe "golden" $ do
     it "the Reg CF exhibit, as DMN 1.3 XML" $ goldenDmn examplesRoot
     it "the Reg CF exhibit's fidelity report" $ goldenFidelity examplesRoot
+    it "the Reg CF exhibit, as dmnmd markdown" $ goldenMarkdown examplesRoot
+    it "the Reg CF exhibit's markdown fidelity report" $ goldenMarkdownFidelity examplesRoot
 
 ------------------------------------------------------------------------
 -- golden
@@ -497,7 +752,7 @@ goldenDmn examplesRoot = do
 goldenFidelity :: FilePath -> IO (Golden Text)
 goldenFidelity examplesRoot = do
   src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  let output = renderFidelityReport (drgNotesAll (drgNamed "Regulation Crowdfunding" src))
+  let output = renderReport (dmnReport (drgNamed "Regulation Crowdfunding" src))
   pure
     Golden
       { output
@@ -508,6 +763,39 @@ goldenFidelity examplesRoot = do
       , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> "reg-cf.fidelity.actual")
       , failFirstTime = True
       }
+
+-- | The markdown emitter's two goldens. Kept separate from the XML pair on
+-- purpose: the whole demonstration is that ONE IR produces TWO artifacts with
+-- TWO different loss lists.
+goldenMarkdown :: FilePath -> IO (Golden Text)
+goldenMarkdown examplesRoot = do
+  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
+  pure (mkGolden examplesRoot "reg-cf.dmn.md" (emitMarkdown (drgNamed "Regulation Crowdfunding" src)))
+
+goldenMarkdownFidelity :: FilePath -> IO (Golden Text)
+goldenMarkdownFidelity examplesRoot = do
+  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
+  pure
+    ( mkGolden examplesRoot "reg-cf.md.fidelity.txt"
+        (renderReport (markdownReport (drgNamed "Regulation Crowdfunding" src)))
+    )
+
+mkGolden :: FilePath -> FilePath -> Text -> Golden Text
+mkGolden examplesRoot name output =
+  Golden
+    { output
+    , encodePretty = Text.unpack
+    , writeToFile = Text.writeFile
+    , readFromFile = Text.readFile
+    , goldenFile = examplesRoot </> "dmn" </> "expected" </> name
+    , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> (name <> ".actual"))
+    , failFirstTime = True
+    }
+
+isUniqueTable :: DecisionLogic -> Bool
+isUniqueTable = \case
+  LogicTable t  -> t.dtHitPolicy == HitUnique
+  LogicLiteral _ -> False
 
 ------------------------------------------------------------------------
 -- helpers
@@ -533,6 +821,15 @@ tableOf :: Text -> Text -> DecisionTable
 tableOf nm src = case (decisionNamed nm (drgOf src)).dcnLogic of
   LogicTable t   -> t
   LogicLiteral e -> error ("expected a decision table for " <> show nm <> ", got: " <> show e.feText)
+
+-- | The decision must stay a table: the select-idiom peephole must not fire.
+mustNotBeSelect :: Text -> Text -> Expectation
+mustNotBeSelect nm src = do
+  let drg = drgOf src
+  case (decisionNamed nm drg).dcnLogic of
+    LogicTable _   -> pure ()
+    LogicLiteral e -> expectationFailure ("select idiom fired on " <> show nm <> ": " <> show e.feText)
+  emitDrg drg `shouldSatisfy` (\x -> not (Text.isInfixOf "max(" x) && not (Text.isInfixOf "min(" x))
 
 cellTexts :: DmnRule -> [Text]
 cellTexts r = map renderUnaryTest r.drInputs

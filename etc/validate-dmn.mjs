@@ -15,8 +15,48 @@
 //
 // With no arguments it validates every *.dmn under jl4/examples/dmn/expected/.
 // Exits non-zero if any file fails to parse or produces warnings.
+//
+// ---------------------------------------------------------------------------
+// THE dmnmd LEGS (local evidence, not CI)
+//
+// `dmnmd` is a separate repo and must NOT become a build dependency. This script
+// uses it when it is present on this machine and skips silently otherwise. The
+// Homebrew-shimmed ~/.local/bin/dmnmd is broken here (missing libpcre.1.dylib);
+// the working binary is the cabal-built one, and DMNMD= overrides the path:
+//
+//   DMNMD=/Users/mengwong/src/smucclaw/dmnmd/languages/haskell/dist-newstyle/build/\
+//   aarch64-osx/ghc-9.10.3/dmnmd-0.1.0.2/x/dmnmd/build/dmnmd/dmnmd \
+//     npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
+//
+// Then, to close the round trip (this part is not automated here because it
+// needs the L4 toolchain):
+//
+//   dmnmd -f md -t l4 jl4/examples/dmn/expected/reg-cf.dmn.md > /tmp/rt.l4
+//   cabal run l4 -- check /tmp/rt.l4
+//
+// THE DIFFERENTIAL. Both emitters feed one IR, and dmnmd reads both formats and
+// writes L4, so the two legs should produce the same L4 -- a consistency check
+// with a neutral referee. The XML leg is BLOCKED today; the harness is written
+// and guarded so it switches on when dmnmd is fixed. Four independent blockers,
+// in the order they surface (see BUILD-SPEC-dmnmd-extensions.md; only the last
+// is the specified E0a):
+//
+//   1. `<inputData>` carrying a `<variable>` child -> "xpCheckEmptyContents:
+//      unprocessed XML content detected". The unpickler does not model the
+//      element, and `<variable>` is how DMN names a decision's output.
+//   2. `<output>` without a `label` attribute -> "no attribute value found for
+//      label". `label` is OPTIONAL in DMN 1.3; dmnmd requires it.
+//   3. `<defaultOutputEntry>` -> unmodelled, same unpickling failure.
+//   4. E0a: XmlToDmnmd.convertType maps XSD names, so it knows "integer" and not
+//      "number" -- and `number` is THE FEEL numeric type that every real 1.3
+//      producer emits. Dies with `Unknown type: "number"`.
+//
+// Verified by stripping each blocker in turn from our own output until a minimal
+// numeric table reached blocker 4.
 
 import { readFile, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -136,6 +176,60 @@ for (const file of await targets()) {
   for (const w of warnings) console.log(`       moddle warning: ${w.message}`);
   for (const p of problems) console.log(`       structural: ${p}`);
   if (warnings.length || problems.length) failed++;
+}
+
+// ---------------------------------------------------------------------------
+// dmnmd legs
+// ---------------------------------------------------------------------------
+
+const dmnmd = process.env.DMNMD;
+if (!dmnmd || !existsSync(dmnmd)) {
+  console.log(
+    "SKIP  dmnmd legs (set DMNMD=<path to the cabal-built dmnmd binary> to run them)",
+  );
+} else {
+  const mdFiles = (await readdir(defaultDir))
+    .filter((f) => f.endsWith(".dmn.md"))
+    .map((f) => join(defaultDir, f));
+
+  for (const file of mdFiles) {
+    const md = spawnSync(dmnmd, ["-v", "-f", "md", "-t", "l4", file], {
+      encoding: "utf8",
+    });
+    const imported = /\* imported (\d+) tables\./.exec(md.stderr + md.stdout);
+    if (md.status !== 0 || !imported) {
+      console.error(`FAIL  ${file}\n  dmnmd could not read it:\n${md.stderr}`);
+      failed++;
+      continue;
+    }
+    console.log(
+      `OK    ${file}\n       dmnmd -f md -t l4: imported ${imported[1]} table(s)`,
+    );
+    console.log(
+      "       (now run `cabal run l4 -- check` on that output to close the round trip)",
+    );
+  }
+
+  // The XML leg of the differential. Guarded: see blockers 1-4 in the header.
+  const RUN_XML_LEG = false;
+  if (RUN_XML_LEG) {
+    for (const file of (await readdir(defaultDir)).filter((f) =>
+      f.endsWith(".dmn"),
+    )) {
+      const xml = spawnSync(
+        dmnmd,
+        ["-f", "xml", "-t", "l4", join(defaultDir, file)],
+        {
+          encoding: "utf8",
+        },
+      );
+      console.log(`       dmnmd -f xml -t l4 ${file}: exit ${xml.status}`);
+    }
+  } else {
+    console.log(
+      "SKIP  XML leg of the differential: blocked on dmnmd (4 blockers, see header)",
+    );
+  }
 }
 
 process.exit(failed === 0 ? 0 : 1);

@@ -1,26 +1,36 @@
--- The exhibit for the DMN 1.3 exporter (Track D1 of the Lexipedia-superset
+-- The exhibit for the DMN exporter (Track D1 of the Lexipedia-superset
 -- programme). Modelled on the decision logic of Regulation Crowdfunding that
 -- the Lexipedia page draws as BPMN *gateways* -- which is the category error
 -- the programme is about: eligibility and the investor limit are decisions, and
 -- a decision belongs in a decision table.
 --
--- Four decisions, deliberately of four different shapes, so the golden shows
--- every outcome the exporter has at once:
+-- Five decisions, deliberately of five different shapes, so the goldens show
+-- every outcome the exporter has -- and most of the fidelity notes it can emit
+-- -- at once:
 --
---   * `is accredited investor` -- U hit policy over a CONSIDER, OTHERWISE as
---                                 the <defaultOutputEntry>;
---   * `combined resources`     -- not a guarded chain at all, so a
---                                 <literalExpression> plus a fidelity note;
---   * `annual limit basis`     -- an IF/THEN/ELSE whose guard has no constant
---                                 endpoint, so a boolean column plus a note;
---   * `investor limit`         -- F hit policy over overlapping guards, with a
---                                 computed output entry on the last rule.
+--   * `is accredited investor`        U hit policy over a CONSIDER, OTHERWISE as
+--                                     the <defaultOutputEntry>; constant
+--                                     outputs, so NOTHING is lost;
+--   * `combined resources`            not a guarded chain, so a
+--                                     <literalExpression>   [D-LITERALEXPR];
+--   * `annual limit basis`            a conditional whose arms are its own
+--                                     comparison's operands: that is `min`, not
+--                                     a decision, and is lifted;
+--   * `financial statements required` a WHERE-wrapped chain of ELSE-IFs: peeled,
+--                                     inlined and flattened into four sibling
+--                                     rules              [D-INLINEDLOCAL];
+--   * `investor limit`                F hit policy over overlapping guards, with
+--                                     a lifted floor and a computed output
+--                                     [D-LIFTEDTHRESHOLD, D-COMPUTEDOUTPUT,
+--                                     D-ORDERDEPENDENT].
 --
 -- Figures are illustrative. The point of the exhibit is the SHAPE, not the
 -- currency of the numbers.
 
 ASSUME `annual income` IS A NUMBER
 ASSUME `net worth` IS A NUMBER
+ASSUME `offering amount` IS A NUMBER
+ASSUME `first-time issuer` IS A BOOLEAN
 
 DECLARE `Investor Class`
   IS ONE OF
@@ -32,7 +42,9 @@ ASSUME `class` IS A `Investor Class`
 
 -- A CONSIDER over distinct nullary constructors: the guards cannot both hold,
 -- so the table is honestly Unique and OTHERWISE becomes the default output.
--- FEEL has no sum types, so the constructors serialise as strings.
+-- FEEL has no sum types, so the constructors serialise as strings. Constant
+-- outputs plus a single-hit policy means this table is INSIDE the fragment
+-- DMN's own analysis is defined over, and the report says nothing about it.
 GIVETH A BOOLEAN
 DECIDE `is accredited investor` IF
   CONSIDER `class`
@@ -47,20 +59,43 @@ GIVETH A NUMBER
 `combined resources` MEANS
   `annual income` PLUS `net worth`
 
--- A guard comparing two VARIABLES. There is no constant endpoint to put in a
--- cell, so the conjunct becomes its own boolean column -- correct, and reported.
--- Guessing an endpoint here is what the exporter refuses to do.
+-- 17 CFR 227.100(a)(2) says "the LESSER of". The L4 spells that longhand, but
+-- both arms are exactly the two operands of the guard, so it is `min` -- and
+-- expanding it into a two-row table would manufacture cases the regulation does
+-- not have. Lifted to FEEL's own min(). No threshold note: two symmetric
+-- computed quantities are arithmetic, not policy.
 GIVETH A NUMBER
 `annual limit basis` MEANS
-  IF `annual income` AT LEAST `net worth` THEN `net worth` ELSE `annual income`
+  IF `annual income` AT MOST `net worth` THEN `annual income` ELSE `net worth`
 
--- Overlapping numeric thresholds in descending order: first match wins, so the
--- hit policy is F and no rule restates that an earlier one did not fire. The
--- last output entry is COMPUTED, which is legal DMN 8.2.9 and outside the
--- fragment DMN's analysis is defined over -- exactly the loss the report names.
+-- Successively higher thresholds, each ELSE-IF introducing a condition the one
+-- above did not. THIS one is a real decision and does flatten -- into four
+-- sibling rules, under First. Note also that the WHERE-local `aggregate` has to
+-- be peeled and inlined before the chain is visible to the normaliser at all.
+GIVETH A STRING
+`financial statements required` MEANS
+  IF   `aggregate` AT MOST 107000
+  THEN "certified by the principal executive officer"
+  ELSE IF   `aggregate` AT MOST 535000
+       THEN "reviewed by an independent public accountant"
+       ELSE IF   `first-time issuer relief applies`
+            THEN "reviewed by an independent public accountant"
+            ELSE "audited by an independent public accountant"
+  WHERE
+  `aggregate` MEANS `offering amount`
+  `first-time issuer relief applies` MEANS
+    `first-time issuer` AND `aggregate` AT MOST 1070000
+
+-- Overlapping numeric thresholds: first match wins, so the hit policy is F and
+-- no rule restates that an earlier one did not fire. The second output carries a
+-- lifted $2,500 floor -- correct, because 227.100(a)(2)(i) says "The greater of
+-- $2,500, or ..." -- and the report names it, because a compliance reader can no
+-- longer point at the floor as a row of the table. The last output is computed,
+-- which is legal DMN 8.2.9 and outside the fragment DMN's analysis covers.
 GIVETH A NUMBER
 `investor limit` MEANS
   BRANCH
-    IF `is accredited investor`              THEN 100000000
-    IF `annual limit basis` LESS THAN 124000 THEN 2500
+    IF `is accredited investor` THEN 100000000
+    IF `annual limit basis` LESS THAN 124000
+      THEN IF 2500 AT LEAST `annual limit basis` THEN 2500 ELSE `annual limit basis`
     OTHERWISE `annual limit basis` * 10 / 100
