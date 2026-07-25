@@ -164,6 +164,32 @@ good place to end up, and a bad place to start.
 
 ---
 
+## 5a. Two constraints found by adversarial review _(added 2026-07-25, after implementation)_
+
+Both were confirmed against the code, and both are now pinned by tests. Recorded here
+because either would be easy to reintroduce.
+
+**Exclusivity witnesses must come from real constructors.** `L4.Syntax.Var` is a _pattern
+synonym_ for `App ann n []`, so a "nullary application means nullary constructor" test also
+matches every `GIVEN` parameter, every local binding, and every zero-argument `DECIDE`.
+`PatApp` is safe — the typechecker only builds one once `resolveConstructor` has succeeded —
+but `PatExpr` (from `WHEN EXACTLY <e>`) is typed by a plain `inferExpr` and carries no such
+guarantee. Treating `WHEN EXACTLY lo` / `WHEN EXACTLY hi` as exclusive drops the negated
+prefix, and the diagram then answers TRUE where the rule answers FALSE whenever `lo == hi`.
+**Literal keys only.**
+
+**Each guard must be translated exactly once.** A guard appears once positively and again
+negated in every later prefix and in the `OTHERWISE`. `leafFromExpr` mints a fresh `Unique`
+per call for any _compound_ expression, and `submitNewBinding` binds exactly one `Unique`
+with **no fan-out** — so separately-translated copies of `income LESS THAN 107000` become
+unrelated atoms and the user can set one TRUE and the other FALSE. The expansion must
+translate each guard once and emit copies that carry fresh **node ids** but the same
+**`Name`/`Unique`/atomId**. Note this corrects the DAG-sharing assumption: it holds for bare
+variables (`varLeaf` keys off the resolved name) and had to be _made_ to hold for compound
+guards.
+
+---
+
 ## 6. Scope boundaries — what this does **not** do
 
 **Boolean-returning only.** The flagship investor-limit rule returns a _Number_ (a percentage,
@@ -237,3 +263,37 @@ T11 is the acceptance gate and the honest one: the spike script already exists a
 `ts-shared/ladder-svg/spike/corpus-sizes.ts` and drives every decision in the corpus through
 the real pipeline. Re-running it turns "this should help" into a measured claim, and if the
 numbers do not move, this design is wrong.
+
+### T11, run — and what it says _(2026-07-25)_
+
+450 decisions across `doc`, `jl4-core/libraries`, `jl4/examples/ok`, `jl4/ok`:
+
+| width  | p50 | p90  | p99      | max      |
+| ------ | --- | ---- | -------- | -------- |
+| before | 516 | 1088 | 2889     | 3494     |
+| after  | 515 | 1081 | **2600** | **3313** |
+
+**Six of 450 decisions changed.** The gate passes, but only just, and the aggregate movement
+must not be oversold. What did move, moved a long way:
+
+```
+ 3494 ->  676   the purpose is charitable   [module-2-examples.l4]
+ 3212 ->  676   the purpose is charitable   [module-6-examples.l4]
+  797 ->  373   isNothing                   [prelude.l4]
+  475 ->  433   is weekend                  [daydate.l4]
+  475 ->  457   is weekday                  [daydate.l4]
+  538 ->  769   is leap year                [daydate.l4]   <- WIDER
+```
+
+One decision got **wider**: three small boxes plus connectors occupy more horizontal space
+than one medium box did. That is a fair trade for a picture that shows its structure, but it
+is a real regression in the metric and is recorded rather than hidden.
+
+**The correction this forces.** §1 above implies the guarded-chain expansion is _the_ answer
+to the ribbon problem. It is not. Of the 16 widest single-leaf decisions in the corpus, 14
+are `CONSIDER` — and **12 of those destructure lists or `Maybe`** (`WHEN x FOLLOWED BY xs`,
+`WHEN JUST x`) with live bodies. Those bind, so they are correctly out of scope here, and
+they are the bulk of the remaining tail. The ribbon problem is therefore only _partly_ a
+guarded-chain problem; the rest belongs to §23/D1's structured table-leaf and to leaf-label
+wrapping. This work should be justified by faithfulness and by being the DMN front end —
+not by the width statistic.
