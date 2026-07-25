@@ -976,6 +976,19 @@ spec = do
         raceOutcome shantO `shouldBe` (ToBreach, ToFulfilled)
         raceOutcome mustO `shouldBe` (ToFulfilled, ToBreach)
 
+      -- A prohibition with no WITHIN at all still gets a boundary event, since
+      -- BPMN has no untriggered one. Naming that "deadline passes" would assert
+      -- a deadline the rule does not have — the same class of mistake as the
+      -- one above, in the opposite direction.
+      it "and claims no deadline where the rule set none" $ do
+        let bare =
+              exportOf
+                defaultBpmnOptions
+                "rule"
+                ["`rule` MEANS", "  PARTY Alice", "  SHANT notify"]
+        map (.nodeName) (boundaries bare) `shouldBe` ["the act is not performed"]
+        raceOutcome bare `shouldBe` (ToBreach, ToFulfilled)
+
   describe "a permission that lapses" $ do
     let bx = exportOf defaultBpmnOptions "optional" mayNoLestSrc
 
@@ -1191,6 +1204,15 @@ spec = do
 
     it "and leaves behind no join that can deadlock" $
       unsoundJoins bx `shouldBe` []
+
+    -- This is now the only graph in the suite that HAS a converging gateway:
+    -- fix 2's token proof left every L4 fixture without one. So without this
+    -- pair, nothing anywhere checks that a Join_ node's own edges get routed
+    -- like everyone else's — and the router's original second collision was at
+    -- a Join_.
+    it "and routes the join's own edges without crossing or merging" $ do
+      crossings bx `shouldBe` []
+      verticalMerges bx `shouldBe` []
 
   -- Boundary outflows used to drop straight down inside the column every task
   -- at that rank occupies, so the router now confines every vertical run to the

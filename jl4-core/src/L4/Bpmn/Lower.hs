@@ -237,7 +237,7 @@ stateGraphToBpmn opts sg =
          in ( Just
                 FlowNode
                   { nodeId = bid
-                  , nodeName = triggerName modal trigger lestT.transLabel.labelAction
+                  , nodeName = triggerName modal deadline trigger lestT.transLabel.labelAction
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
@@ -258,7 +258,7 @@ stateGraphToBpmn opts sg =
          in ( Just
                 FlowNode
                   { nodeId = lid
-                  , nodeName = triggerName modal trigger "lapses"
+                  , nodeName = triggerName modal deadline trigger "lapses"
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc =
                       Just
@@ -963,11 +963,17 @@ restateRule l =
 -- 'raceArms' right and then labelling the compliance arm \"violation\" would
 -- leave the diagram saying the same wrong thing in a smaller font, so a
 -- prohibition names its boundary itself and never borrows that word.
-triggerName :: Maybe DeonticModal -> BoundaryTrigger -> Text -> Text
-triggerName (Just DMustNot) trigger _ = case trigger of
+-- The deadline is passed separately from the trigger because a boundary event
+-- has one either way: with no @WITHIN@ at all, 'boundaryTrigger' still emits a
+-- conditional trigger, and naming that one \"deadline passes\" would assert a
+-- deadline the rule does not have.
+triggerName :: Maybe DeonticModal -> Maybe Text -> BoundaryTrigger -> Text -> Text
+triggerName (Just DMustNot) mDue trigger _ = case trigger of
   TimerAfter iso -> "after " <> iso <> ", not performed"
-  WhenCondition _ -> "deadline passes, not performed"
-triggerName _ trigger fallback = case trigger of
+  WhenCondition _
+    | isJust mDue -> "deadline passes, not performed"
+    | otherwise -> "the act is not performed"
+triggerName _ _ trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
 
