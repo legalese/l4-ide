@@ -14,7 +14,9 @@ module BpmnExport (spec) where
 
 import Base
 import qualified Base.Text as Text
+import Control.Exception (evaluate)
 import qualified Data.Set as Set
+import GHC.Clock (getMonotonicTime)
 import System.FilePath ((</>))
 import Test.Hspec
 import Test.Hspec.Golden
@@ -322,6 +324,31 @@ cyclicGraph =
     , edge 2 1 HenceTransition "resubmit"
     , edge 1 3 LestTransition "timeout"
     ]
+
+-- | A long chain whose obligations rotate through @lanes@ different parties.
+--
+-- Deliberately many-ranked and __five-laned__. The layout used to be cubic and
+-- the third factor was the lane loop, so the cost appears only once there are
+-- several lanes to sum over: at one lane @laneTop 0@ sums an empty list and
+-- never calls @laneHeight@ at all. Measured on the old code, the same 400-node
+-- graph took 10.95s at five lanes and 0.13s at one — which is exactly why the
+-- three- and four-lane goldens sat there looking fine.
+wideGraph :: Int -> Int -> StateGraph
+wideGraph lanes len =
+  StateGraph
+    { sgName = "wide"
+    , sgStates =
+        node 0 "start" InitialState Linear
+          : [node i ("step " <> Text.textShow i) IntermediateState Linear | i <- [1 .. len - 1]]
+            <> [node len "Fulfilled" TerminalFulfilled Linear]
+    , sgTransitions =
+        [ withParty ("Party " <> Text.textShow (i `mod` lanes)) (edge i (i + 1) HenceTransition "act")
+        | i <- [0 .. len - 1]
+        ]
+    , sgInitialState = 0
+    }
+ where
+  withParty p t = t {transLabel = t.transLabel {labelParty = Just p}}
 
 -- | The control: the same four states, wired forwards only.
 acyclicGraph :: StateGraph
@@ -1086,6 +1113,51 @@ spec = do
       , n.code `elem` ["P-MULTI-HENCE", "P-JUNCTION-OBLIGATION", "P-CYCLE"]
       ]
         `shouldBe` []
+
+  -- The layout was cubic, and invisibly so. 'laneTop' summed 'laneHeight' over
+  -- every preceding lane, 'laneHeight' rescanned every placed node once per
+  -- rank, and the bounds pass called 'laneTop' afresh for every node.
+  --
+  -- What made it invisible is that the lane loop is the third factor: 'laneTop
+  -- 0' sums an empty list and never calls 'laneHeight' at all, so at one lane
+  -- the cubic version was instant. Every golden here is a small three- or
+  -- four-lane fixture, so the suite could stay green while the exporter was
+  -- unusable on anything the size of a real contract.
+  --
+  -- Hence a test that is explicitly about size and explicitly about lanes.
+  -- Measured here, on this graph, by putting the old definitions back:
+  --
+  -- >              400 nodes    600 nodes
+  -- >  cubic          6.94s       18.31s
+  -- >  memoised       0.15s        0.19s
+  --
+  -- 600 rather than 400 because the ratio is what the budget has to separate,
+  -- and at 600 it is 96x rather than 45x.
+  describe "layout scales" $
+    -- The budget is loose on purpose. This is not a benchmark and must never
+    -- become one: it separates linear from cubic, and everything between 0.19s
+    -- and 5s is slack for a loaded machine. It is also not arbitrary — the
+    -- cubic version misses it by 3.7x and the memoised one by 26x, so neither
+    -- verdict is close.
+    it "lays out 600 nodes across 5 lanes well inside a linear budget" $ do
+      let budget = 5.0 :: Double
+          bx = stateGraphToBpmn defaultBpmnOptions (wideGraph 5 600)
+      t0 <- getMonotonicTime
+      n <- evaluate (Text.length (renderBpmn bx))
+      t1 <- getMonotonicTime
+      -- the XML really was produced, so the timing is not of a thunk
+      n `shouldSatisfy` (> 10000)
+      -- and the graph really did span five lanes, or the test measures nothing:
+      -- at one lane even the cubic version was instant
+      length bx.bxProcess.procLanes `shouldSatisfy` (>= 5)
+      when (t1 - t0 > budget) $
+        expectationFailure
+          ( "600 nodes across 5 lanes took "
+              <> show (t1 - t0)
+              <> "s, over the "
+              <> show budget
+              <> "s budget: the layout has gone superlinear again"
+          )
 
   describe "well-formedness (structural, over every fixture)" $
     forM_ fixtures \(nm, body) -> describe (Text.unpack nm) do
