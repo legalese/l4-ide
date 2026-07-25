@@ -1305,6 +1305,65 @@ spec = do
               <> "s budget: the layout has gone superlinear again"
           )
 
+  -- Which RANDs can be drawn with a join, and which cannot, established by
+  -- experiment rather than by reasoning about 'tokenProof'.
+  --
+  -- This exists because the answer turned out to be much narrower than anyone
+  -- writing PROCESS-TRACK.md §4.1 assumed, and the narrowness is a property of
+  -- BPMN's converging parallel gateway rather than a shortcoming of the proof.
+  -- Each case below says which of the two independent conditions it fails.
+  describe "the boundary of what can be joined" $ do
+    let joinsIn src = [n.nodeId | n <- (exportOf defaultBpmnOptions "r" src).bxProcess.procNodes, Gateway ParallelGateway Converging <- [n.nodeKind]]
+        rule body = ["`r` MEANS"] <> body
+
+    it "permissions with no deadline join" $
+      joinsIn (rule ["      (PARTY Alice MAY pay)", "  RAND (PARTY Bob MAY deliver)"])
+        `shouldBe` ["Join_0"]
+
+    it "three of them still join" $
+      joinsIn
+        ( rule
+            [ "      (PARTY Alice MAY pay)"
+            , "  RAND (PARTY Bob MAY deliver)"
+            , "  RAND (PARTY Carol MAY notify)"
+            ]
+        )
+        `shouldBe` ["Join_0"]
+
+    it "and a branch may be a chain, so long as the chain ends once" $
+      joinsIn
+        ( rule
+            [ "      (PARTY Alice MAY pay HENCE (PARTY Bob MAY deliver))"
+            , "  RAND (PARTY Carol MAY notify)"
+            ]
+        )
+        `shouldBe` ["Join_0"]
+
+    -- Fails the SINGLE COMMON EXIT condition, before the token proof is even
+    -- reached. Every MUST gets a LEST to BREACH whether the drafter wrote one
+    -- or not, so an obligation branch stops at two places and the other
+    -- branches do not share the second.
+    it "obligations do NOT join, even with no deadline anywhere" $
+      joinsIn (rule ["      (PARTY Alice MUST pay)", "  RAND (PARTY Bob MUST deliver)"])
+        `shouldBe` []
+
+    -- Fails the ONE UNCONDITIONAL ARRIVAL condition. The deadline gives the
+    -- branch a lapse timer, hence a second, mutually exclusive route in.
+    it "one deadline anywhere is enough to stop it joining" $
+      joinsIn (rule ["      (PARTY Alice MAY pay WITHIN 3)", "  RAND (PARTY Bob MAY deliver)"])
+        `shouldBe` []
+
+    -- Fails it too, by the other route: an explicit reparation that rejoins the
+    -- happy path is a second way for the branch to arrive.
+    it "nor does a reparation that leads back to the same terminal" $
+      joinsIn
+        ( rule
+            [ "      (PARTY Alice MUST pay WITHIN 3 HENCE FULFILLED LEST FULFILLED)"
+            , "  RAND (PARTY Bob MAY deliver)"
+            ]
+        )
+        `shouldBe` []
+
   describe "well-formedness (structural, over every fixture)" $
     forM_ fixtures \(nm, body) -> describe (Text.unpack nm) do
       let bx = exportOf defaultBpmnOptions nm body
@@ -1372,6 +1431,32 @@ spec = do
   -- The XML and the report are separate files on purpose: the .bpmn has to
   -- stay a file you can hand to Camunda Modeler (and to
   -- `etc/validate-bpmn.mjs`) without editing anything out of it first.
+  -- The goldens are byte-compared, which catches change but says nothing about
+  -- correctness. For the join exhibit that is not enough: it is the only FILE
+  -- in the repository that demonstrates a drawn conjunction, so what it
+  -- demonstrates is asserted here rather than left implicit in 400 lines of
+  -- XML nobody re-reads.
+  describe "the join exhibit (consultation.l4)" $ do
+    it "really does draw a converging gateway, and reports no loss for it" $ do
+      bx <- exportOfFile "consultation" "the consultation"
+      converging bx `shouldBe` ["Join_0"]
+      findingsFor "P-NOJOIN" bx `shouldBe` []
+
+    it "and the gateway it draws cannot deadlock" $ do
+      bx <- exportOfFile "consultation" "the consultation"
+      unsoundJoins bx `shouldBe` []
+      -- one token in from each branch, one out
+      length [f | f <- bx.bxProcess.procFlows, f.flowTo == "Join_0"] `shouldBe` 2
+      length [f | f <- bx.bxProcess.procFlows, f.flowFrom == "Join_0"] `shouldBe` 1
+
+    -- The goldens get no structural pass of their own, and this is the only one
+    -- with a Join_ node in it — which is where the router's second collision
+    -- was.
+    it "and is drawn without a crossing or a merged channel" $ do
+      bx <- exportOfFile "consultation" "the consultation"
+      crossings bx `shouldBe` []
+      verticalMerges bx `shouldBe` []
+
   describe "golden" $ forM_ goldenCases \(stem, ruleName) -> do
     it (stem <> " lowers to stable XML") $
       goldenCase stem ruleName ".bpmn" \_ bx -> renderBpmn bx
@@ -1383,6 +1468,7 @@ spec = do
   goldenCases =
     [ ("offering", "the offering")
     , ("handover", "the handover")
+    , ("consultation", "the consultation")
     ]
 
   goldenCase stem ruleName ext render = do
@@ -1407,6 +1493,15 @@ spec = do
   graphsOf src = case checkWithImports emptyVFS src of
     Left errs -> error ("fixture failed to typecheck: " <> show errs)
     Right r -> extractStateGraphs r.tcdModule
+
+  -- One of the .l4 files under examples/bpmn, lowered — so a golden fixture can
+  -- be asserted about rather than only compared byte for byte.
+  exportOfFile stem ruleName = do
+    dataDir <- Paths_jl4.getDataDir
+    src <- Text.readFile (dataDir </> "examples" </> "bpmn" </> (stem <> ".l4"))
+    case [g | g <- graphsOf src, g.sgName == ruleName] of
+      (g : _) -> pure (stateGraphToBpmn defaultBpmnOptions g)
+      [] -> error (stem <> ".l4: no state graph named " <> show ruleName)
 
   fixtures =
     [ ("chain" :: Text, linearSrc)

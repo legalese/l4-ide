@@ -9,19 +9,40 @@ genuinely _is_ a transition system, so drawing it as one says nothing the source
 did not. Predicates are a different matter, and belong to the ladder; see
 `doc/concepts/language-design/logic-not-flowcharts.md`.
 
-| Fixture       | Covers                                                                                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `offering.l4` | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal                    |
-| `handover.l4` | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers               |
+| Fixture           | Covers                                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
+| `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
+| `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 
-Neither fixture currently gets a converging parallel gateway, and that is the
-point of both `P-NOJOIN` notes rather than a gap in coverage. `offering.l4`'s
-`RAND` has a branch that can reach `BREACH`; `handover.l4`'s permissions each
-carry a `WITHIN`, so each branch reaches the join by two mutually exclusive
-routes — the task completing, or the lapse timer firing — and a parallel join
-would wait for both. The one shape a join is sound for is exercised in
-`BpmnExport.hs` (`randJoinSrc`): permissions with no deadline, no `LEST`, and no
-guard, so each branch delivers exactly one token by exactly one route.
+## What can be joined, and why so little of it
+
+`consultation.l4` exists because the other two decline, for two different and
+correct reasons — and without a positive case, a regression that stopped this
+exporter drawing joins **at all** would leave every golden byte-identical.
+
+Two independent conditions have to hold before a converging parallel gateway is
+drawn, and between them they rule out most of what anyone would actually write.
+The full enumeration is `"the boundary of what can be joined"` in
+`BpmnExport.hs`; the summary is:
+
+- **Every branch must stop at the same single state.** L4 gives every `MUST` a
+  `LEST` to `BREACH` whether the drafter writes one or not, so **an obligation
+  branch never joins** — it stops in two places and its siblings do not share
+  the second. This is why `offering.l4` gets a split and no join.
+- **Every branch must arrive exactly once, unconditionally.** A `WITHIN` on a
+  permission becomes a lapse timer, which is a second and mutually exclusive
+  arrival; an explicit `LEST` that rejoins the happy path is another; a
+  `PROVIDED` guard makes the arrival conditional, which on an incoming flow of a
+  parallel gateway is a spec violation outright. This is why `handover.l4` gets
+  a split and no join.
+
+So in practice **a joinable `RAND` is a `RAND` of deadline-free permissions**,
+and any regulative model with deadlines in it — which is to say any realistic
+one — is drawn as a fork without a join, with `P-NOJOIN` saying so. That is a
+real limitation of what this exporter draws today and it is stated here rather
+than left for a reader to infer from two goldens that both decline. Whether it
+can be relaxed is an open question recorded in the PR, not a settled one.
 
 Each produces two goldens under `expected/`:
 
@@ -45,12 +66,13 @@ BPMN with. Nothing is added to `package.json`:
 ```sh
 npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs \
   jl4/examples/bpmn/expected/offering.bpmn \
-  jl4/examples/bpmn/expected/handover.bpmn
+  jl4/examples/bpmn/expected/handover.bpmn \
+  jl4/examples/bpmn/expected/consultation.bpmn
 ```
 
 It reports parse errors, moddle warnings, unresolved references, boundary events
 without a trigger, and any flow node or sequence flow missing its diagram
-interchange. Both fixtures parse with zero warnings.
+interchange. All three fixtures parse with zero warnings.
 
 **It is not evidence that the diagram is right, and must never be cited as
 such.** It checks well-formedness, and well-formedness is exactly what a wrong

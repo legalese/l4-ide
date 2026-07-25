@@ -3,9 +3,14 @@
 --   * a deadline that is a NAME rather than a number, which no amount of
 --     parsing turns into an ISO 8601 duration (so: a conditional boundary
 --     event carrying the text verbatim, and a loud fidelity finding);
---   * a RAND whose branches are both permissions, so neither can reach BREACH
---     and both provably end at FULFILLED — the one shape for which a
---     converging parallel gateway is safe to invent;
+--   * a RAND whose branches carry deadlines, which is the ordinary case and
+--     draws a split with NO join. Each permission's WITHIN becomes a lapse
+--     timer, giving that branch a second and mutually exclusive way to reach
+--     the join point, and a converging parallel gateway would wait for both.
+--     This file used to advertise itself as the join exhibit and was wrong
+--     about it: see `consultation.l4`, which is what a joinable RAND has to
+--     look like, and `P-NOJOIN` in the fidelity report here for why this one
+--     is not;
 --   * a ROR, which must come out as an exclusive gateway, not a parallel one.
 --
 -- Fixture for `jl4/tests/BpmnExport.hs`.
