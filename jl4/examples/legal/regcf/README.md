@@ -238,7 +238,7 @@ Check succeeded.
 
 Boundary coverage — at least one case on each side of every numeric threshold:
 
-| Threshold | Inside | Outside |
+| Threshold | On the permissive side | On the restrictive side |
 |---|---|---|
 | $5,000,000 offering limit | `5000000` ✓ | `5000001` ✗ |
 | …with $4,000,000 already sold | `+1000000` ✓ | `+1000001` ✗ |
