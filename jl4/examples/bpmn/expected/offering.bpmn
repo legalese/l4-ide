@@ -66,7 +66,7 @@
     <bpmn:task id="Task_5" name="SHANT advertise the terms">
       <bpmn:documentation>PARTY Issuer SHANT advertise the terms WITHIN 30 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Boundary_5" name="after P30D" attachedToRef="Task_5" cancelActivity="true">
+    <bpmn:boundaryEvent id="Boundary_5" name="after P30D, not performed" attachedToRef="Task_5" cancelActivity="true">
       <bpmn:documentation>the deadline passes (30) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
       <bpmn:timerEventDefinition id="Timer_Boundary_5">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
@@ -84,7 +84,7 @@
     <bpmn:task id="Task_7" name="SHANT resell the securities">
       <bpmn:documentation>PARTY Investor SHANT resell the securities WITHIN 365 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Boundary_7" name="after P365D" attachedToRef="Task_7" cancelActivity="true">
+    <bpmn:boundaryEvent id="Boundary_7" name="after P365D, not performed" attachedToRef="Task_7" cancelActivity="true">
       <bpmn:documentation>the deadline passes (365) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
       <bpmn:timerEventDefinition id="Timer_Boundary_7">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P365D</bpmn:timeDuration>

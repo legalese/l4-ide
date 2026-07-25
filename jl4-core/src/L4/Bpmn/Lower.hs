@@ -35,16 +35,25 @@
 --    timer carrying a duration we made up (@P-DEADLINE@). A bare number is
 --    read as days only because 'AssumeDays' says so, and says so out loud
 --    (@P-DEADLINE-UNIT@).
--- 2. An @RAND@ gets a converging @\<parallelGateway\>@ only when its branches
---    /provably/ reconverge on one state and nowhere else. A join that one
---    branch can escape (to @BREACH@, say) is a deadlock in BPMN, so where the
---    condition fails we leave the branches unjoined and say so
---    (@P-NOJOIN@). Nothing is lost by this: a BPMN instance completes
---    only when every token is consumed, so \"all of\" still holds — it is
---    merely implicit rather than drawn.
+-- 2. An @RAND@ gets a converging @\<parallelGateway\>@ only when every branch
+--    is /proved/ to deliver exactly one token, unconditionally. Reachability is
+--    not that proof and asserting it is how this exporter used to emit
+--    deadlocks; see 'addJoin'. Where the proof fails we leave the branches
+--    unjoined and say so (@P-NOJOIN@).
+--
+--    Whether that costs the reader anything depends on the graph, so the note
+--    does not pretend otherwise. Where no branch can breach, a BPMN instance
+--    does end only once every token is consumed, so \"all of\" still holds
+--    implicitly. Where one can, it does not: @BREACH@ is an error end event,
+--    and an uncaught top-level error terminates the instance rather than
+--    consuming one token and waiting for the siblings. @P-NOJOIN@ says which
+--    case applies.
 -- 3. A prohibition is not an activity. It is still drawn as a task, because
 --    BPMN has no other shape for it, and the loss is reported as @F1@ at
---    'Blocking' severity.
+--    'Blocking' severity. Its /deadline/, by contrast, is drawn faithfully:
+--    BPMN's interrupting boundary event is exactly the race @SHANT@ needs,
+--    provided the two arms are wired the way the L4 runtime resolves them and
+--    not the way they look. See 'raceArms'.
 module L4.Bpmn.Lower
   ( stateGraphToBpmn
   ) where
@@ -223,7 +232,7 @@ stateGraphToBpmn opts sg =
          in ( Just
                 FlowNode
                   { nodeId = bid
-                  , nodeName = triggerName trigger lestT.transLabel.labelAction
+                  , nodeName = triggerName modal trigger lestT.transLabel.labelAction
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
@@ -244,7 +253,7 @@ stateGraphToBpmn opts sg =
          in ( Just
                 FlowNode
                   { nodeId = lid
-                  , nodeName = triggerName trigger "lapses"
+                  , nodeName = triggerName modal trigger "lapses"
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc =
                       Just
@@ -794,8 +803,23 @@ restateRule l =
       , fmap ("PROVIDED " <>) l.labelGuard
       ]
 
-triggerName :: BoundaryTrigger -> Text -> Text
-triggerName trigger fallback = case trigger of
+-- | The boundary event's name — the words a reader sees on the diagram, with no
+-- @\<documentation\>@ open.
+--
+-- The fallback is the @LEST@ edge's own label, and the extractor writes that as
+-- the bare word @\"timeout\"@ — or @\"violation\"@ where a @SHANT@ defaulted its
+-- own @LEST@ — for every modal alike (@L4.StateGraph@, @timeoutLabel@). For an
+-- obligation that is merely terse. On a prohibition it is __false__: this
+-- boundary is reached when the deadline passes /with the act not performed/,
+-- which is compliance, not a missed deadline and not a violation. Getting
+-- 'raceArms' right and then labelling the compliance arm \"violation\" would
+-- leave the diagram saying the same wrong thing in a smaller font, so a
+-- prohibition names its boundary itself and never borrows that word.
+triggerName :: Maybe DeonticModal -> BoundaryTrigger -> Text -> Text
+triggerName (Just DMustNot) trigger _ = case trigger of
+  TimerAfter iso -> "after " <> iso <> ", not performed"
+  WhenCondition _ -> "deadline passes, not performed"
+triggerName _ trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
 

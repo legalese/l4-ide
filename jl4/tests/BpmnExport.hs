@@ -155,6 +155,29 @@ mustSrc =
   , "  WITHIN 30"
   ]
 
+-- | The same pair again, but with a deadline that is a /name/, so no ISO
+-- duration can be built and the boundary event falls back to naming itself
+-- after the LEST edge's own label. That label is the extractor's bare
+-- \"timeout\" (or \"violation\") for every modal alike, which is where the
+-- wrong word leaks onto a prohibition's compliance arm.
+shantOpaqueSrc, mustOpaqueSrc :: [Text]
+shantOpaqueSrc =
+  [ "`grace` MEANS 30"
+  , ""
+  , "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  SHANT notify"
+  , "  WITHIN grace"
+  ]
+mustOpaqueSrc =
+  [ "`grace` MEANS 30"
+  , ""
+  , "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  MUST notify"
+  , "  WITHIN grace"
+  ]
+
 -- | A permission with a deadline and no LEST: nothing to hang a LEST boundary
 -- on, but the lapse still has a knowable destination.
 mayNoLestSrc :: [Text]
@@ -694,6 +717,38 @@ spec = do
       map (.nodeDoc) (tasks shant)
         `shouldSatisfy` all (maybe False (Text.isInfixOf "LEST arm"))
 
+    -- <documentation> is not what a reader sees. The boundary's NAME is drawn
+    -- on the diagram, and it used to be whatever the extractor put on the LEST
+    -- edge — the bare word "timeout", or "violation" where a SHANT defaulted
+    -- its own LEST. On the arm that means the prohibition was RESPECTED, both
+    -- of those are false, and no amount of correct wiring underneath fixes a
+    -- label that says the opposite of what the arm means.
+    --
+    -- The opaque-deadline pair is what pins this: with a parseable WITHIN the
+    -- name is "after P30D" and the leak never shows.
+    describe "and the label a reader actually sees says so too" $ do
+      let shantO = exportOf defaultBpmnOptions "rule" shantOpaqueSrc
+          mustO = exportOf defaultBpmnOptions "rule" mustOpaqueSrc
+
+      it "never calls the compliance arm a timeout or a violation" $ do
+        map (.nodeName) (boundaries shantO)
+          `shouldSatisfy` all
+            (\n -> not (Text.isInfixOf "timeout" n) && not (Text.isInfixOf "violation" n))
+        map (.nodeName) (boundaries shantO)
+          `shouldSatisfy` all (Text.isInfixOf "not performed")
+        map (.nodeName) (boundaries shant)
+          `shouldSatisfy` all (Text.isInfixOf "not performed")
+
+      -- The control, and it is the whole of the evidence: MUST must KEEP the
+      -- word. Suppressing "timeout" everywhere would pass the assertion above
+      -- while destroying the one place the label is true.
+      it "but an obligation keeps it, because for an obligation it is true" $
+        map (.nodeName) (boundaries mustO) `shouldBe` ["timeout"]
+
+      it "and the arms are still raced the right way round without a timer" $ do
+        raceOutcome shantO `shouldBe` (ToBreach, ToFulfilled)
+        raceOutcome mustO `shouldBe` (ToFulfilled, ToBreach)
+
   describe "a permission that lapses" $ do
     let bx = exportOf defaultBpmnOptions "optional" mayNoLestSrc
 
@@ -921,4 +976,5 @@ spec = do
     , ("both", randDeadlockSrc)
     , ("mixed", rorInRandSrc)
     , ("deferred", opaqueDeadlineSrc)
+    , ("rule", shantOpaqueSrc)
     ]
