@@ -45,6 +45,7 @@ import qualified SemanticTokens
 import qualified VizAutoRefresh
 import qualified VizImplies
 import qualified VizGuardedRows
+import qualified DmnExport
 
 main :: IO ()
 main = do
@@ -113,6 +114,7 @@ main = do
     describe "viz" VizAutoRefresh.spec
     describe "viz implies" VizImplies.spec
     describe "viz guarded rows" VizGuardedRows.spec
+    DmnExport.spec examplesRoot
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

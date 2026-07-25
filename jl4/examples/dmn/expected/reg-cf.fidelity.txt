@@ -1,0 +1,32 @@
+DMN fidelity report: 6 loss(es).
+Each is a place where the emitted model left the fragment DMN can analyse.
+
+main.l4:48:3-35: in `combined resources`
+  emitted as a literal expression rather than a decision table: not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows
+  fragment: annual income + net worth
+  DMN capability lost: completeness checking (gap analysis), consistency checking, overlap detection, manual validation
+
+main.l4:55:6-42: in `annual limit basis`
+  guard could not be split into an input expression and a constant unary test; emitted as its own boolean column
+  fragment: `annual income` AT LEAST `net worth`
+  DMN capability lost: completeness checking (gap analysis), overlap detection
+
+main.l4:55:48-59: in `annual limit basis`
+  output entry is an expression, not a constant (legal DMN 8.2.9, outside the analysable fragment)
+  fragment: net worth
+  DMN capability lost: consistency checking
+
+main.l4:55:65-80: in `annual limit basis`
+  output entry is an expression, not a constant (legal DMN 8.2.9, outside the analysable fragment)
+  fragment: annual income
+  DMN capability lost: consistency checking
+
+main.l4:64:8-32: in `investor limit`
+  hit policy F is order-dependent; DMN 8.2.10 warns such a table is hard to validate manually
+  fragment: investor limit
+  DMN capability lost: manual validation
+
+main.l4:66:15-46: in `investor limit`
+  output entry is an expression, not a constant (legal DMN 8.2.9, outside the analysable fragment)
+  fragment: annual limit basis * 10 / 100
+  DMN capability lost: consistency checking

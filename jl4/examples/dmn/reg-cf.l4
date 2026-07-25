@@ -1,0 +1,66 @@
+-- The exhibit for the DMN 1.3 exporter (Track D1 of the Lexipedia-superset
+-- programme). Modelled on the decision logic of Regulation Crowdfunding that
+-- the Lexipedia page draws as BPMN *gateways* -- which is the category error
+-- the programme is about: eligibility and the investor limit are decisions, and
+-- a decision belongs in a decision table.
+--
+-- Four decisions, deliberately of four different shapes, so the golden shows
+-- every outcome the exporter has at once:
+--
+--   * `is accredited investor` -- U hit policy over a CONSIDER, OTHERWISE as
+--                                 the <defaultOutputEntry>;
+--   * `combined resources`     -- not a guarded chain at all, so a
+--                                 <literalExpression> plus a fidelity note;
+--   * `annual limit basis`     -- an IF/THEN/ELSE whose guard has no constant
+--                                 endpoint, so a boolean column plus a note;
+--   * `investor limit`         -- F hit policy over overlapping guards, with a
+--                                 computed output entry on the last rule.
+--
+-- Figures are illustrative. The point of the exhibit is the SHAPE, not the
+-- currency of the numbers.
+
+ASSUME `annual income` IS A NUMBER
+ASSUME `net worth` IS A NUMBER
+
+DECLARE `Investor Class`
+  IS ONE OF
+    `accredited`
+    `retail`
+    `institutional`
+
+ASSUME `class` IS A `Investor Class`
+
+-- A CONSIDER over distinct nullary constructors: the guards cannot both hold,
+-- so the table is honestly Unique and OTHERWISE becomes the default output.
+-- FEEL has no sum types, so the constructors serialise as strings.
+GIVETH A BOOLEAN
+DECIDE `is accredited investor` IF
+  CONSIDER `class`
+  WHEN `accredited`    THEN TRUE
+  WHEN `institutional` THEN TRUE
+  OTHERWISE FALSE
+
+-- Not a guarded chain: plain arithmetic. DMN's own answer for logic with no
+-- table shape is a boxed literal expression, and the fidelity report says so
+-- rather than the exporter quietly dropping the decision.
+GIVETH A NUMBER
+`combined resources` MEANS
+  `annual income` PLUS `net worth`
+
+-- A guard comparing two VARIABLES. There is no constant endpoint to put in a
+-- cell, so the conjunct becomes its own boolean column -- correct, and reported.
+-- Guessing an endpoint here is what the exporter refuses to do.
+GIVETH A NUMBER
+`annual limit basis` MEANS
+  IF `annual income` AT LEAST `net worth` THEN `net worth` ELSE `annual income`
+
+-- Overlapping numeric thresholds in descending order: first match wins, so the
+-- hit policy is F and no rule restates that an earlier one did not fire. The
+-- last output entry is COMPUTED, which is legal DMN 8.2.9 and outside the
+-- fragment DMN's analysis is defined over -- exactly the loss the report names.
+GIVETH A NUMBER
+`investor limit` MEANS
+  BRANCH
+    IF `is accredited investor`              THEN 100000000
+    IF `annual limit basis` LESS THAN 124000 THEN 2500
+    OTHERWISE `annual limit basis` * 10 / 100
