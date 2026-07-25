@@ -60,6 +60,39 @@ through unrelated nodes, all at zero warnings, while the Haskell suite was green
 at 1581 examples. Run it to catch a regression in the XML; read
 `BpmnExport.hs` for whether the XML says what the rule says.
 
+## How the defects in here were actually found
+
+Worth recording, because the two methods are different and neither would have
+found the other's.
+
+Six defects came from an **adversarial review**: running the exporter on inputs
+nobody had tried — an interrupting boundary inside a `RAND` branch, a `PROVIDED`
+guard on a joined branch — and doing arithmetic on the emitted coordinates
+rather than looking at the picture. That is how the inverted prohibition, the
+deadlocking join, the dropped `WITHIN` windows and the crossing geometry
+surfaced.
+
+Three more came from **reading the fixes' own diff and asking what each did not
+cover**: `raceArms` settled where a prohibition's arms go but not what the
+boundary is *called*; the lapse timers of one fix silently invalidated a
+fixture's stated purpose in another; and the channel offsets stopped separating
+flows past the point where they fit in the gutter. None of the three is
+reachable from the inputs the review tried.
+
+The common thread, and the reason both methods were needed: **every defect
+produced plausible, well-formed, green output.** None of them looked like a bug
+from anywhere except a test that asked what the diagram *means*.
+
+One note was also **removed** rather than fixed. `P-JOIN-FOLDED` said a join had
+been folded into an enclosing gateway and nothing was lost. It made sense under
+the edge-counting join it was written for, and cannot fire under the token proof
+that replaced it: folding needs an enclosing junction to have drawn its join
+while sharing this one's join target, and sharing the target is exactly what
+gives the enclosing branch two arrivals and makes its own proof fail first. See
+`addJoin` in `Lower.hs` for the argument in full. A failed proof now has one
+outcome, `P-NOJOIN` at `Lossy`, which is safe whether or not anything was really
+lost.
+
 ## Regenerating
 
 Delete the golden and re-run the suite twice (the first run writes it and fails

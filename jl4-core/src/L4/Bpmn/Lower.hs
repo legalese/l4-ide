@@ -442,8 +442,7 @@ stateGraphToBpmn opts sg =
   allOfJunctions :: [StateId]
   allOfJunctions = [s.stateId | s <- sg.sgStates, s.stateFan == AllOf]
 
-  -- The id a junction's converging gateway gets, if it gets one. Named rather
-  -- than spelled out twice, because 'anyBranchFolded' has to recognise one.
+  -- The id a junction's converging gateway gets, if it gets one.
   joinIdFor :: StateId -> Text
   joinIdFor j = "Join_" <> Text.pack (show j)
 
@@ -472,6 +471,24 @@ stateGraphToBpmn opts sg =
   --
   -- So: one unconditional edge per branch, or decline. Declining costs little,
   -- and 'P-NOJOIN' says so.
+  --
+  -- __A failed proof has exactly one honest outcome, and it is 'P-NOJOIN'.__
+  -- There was once a second: under the edge-counting join this replaced, an
+  -- enclosing junction could draw its gateway first and rewrite this one's
+  -- arrivals to it, leaving nothing here to join — a benign outcome, reported
+  -- as folded, at 'Advisory', saying nothing was lost.
+  --
+  -- That cannot happen under a token proof, and the reason is worth keeping
+  -- rather than rediscovering. Folding needs the enclosing junction to have
+  -- drawn its join /while sharing this one's join target/ — and sharing the
+  -- target is precisely what gives the enclosing junction's branch two arrivals
+  -- and makes its own proof fail first. The two conditions exclude each other.
+  -- So do not reintroduce a \"nothing was lost\" note here on the strength of an
+  -- arrival that points at some gateway: an arrival redirected to a join is
+  -- equally consistent with a junction this one /contains/ having claimed it,
+  -- and in that direction the conjunction here really is undrawn and really is
+  -- a loss. 'P-NOJOIN' at 'Lossy' is safe in every case; an Advisory that
+  -- misfires is the one note a reader stops reading after.
   addJoin ::
     ([FlowNode], [Edge], [FidelityNote]) ->
     StateId ->
@@ -507,9 +524,7 @@ stateGraphToBpmn opts sg =
    where
     branches = map (.transTo) (defaultsOf junction)
 
-    declineWith reason
-      | anyBranchFolded = (nodes, edges, finds <> [foldedFinding])
-      | otherwise = (nodes, edges, finds <> [noJoinFinding reason])
+    declineWith reason = (nodes, edges, finds <> [noJoinFinding reason])
 
     interiorOf r b = Set.delete r (reachFrom b)
 
@@ -540,33 +555,6 @@ stateGraphToBpmn opts sg =
                    \or a lapse timer — of which at most one will fire, whereas \
                    \a parallel join would wait for every one of them"
             )
-
-    -- An __enclosing__ junction already rewrote this branch's arrivals to its
-    -- own gateway. That is not a failure to join; the join exists, one level
-    -- out, and 'foldedFinding' says so at 'Advisory'.
-    --
-    -- \"Enclosing\" is the whole of it. An arrival redirected to /some/ join is
-    -- equally consistent with a junction this one CONTAINS having claimed it,
-    -- and in that direction nothing has been folded — the conjunction here is
-    -- simply undrawn, and an Advisory note saying otherwise would be a false
-    -- reassurance, which is the failure mode this whole report exists to avoid.
-    -- So the claiming gateway has to belong to a junction whose own branches
-    -- reach this one.
-    enclosingJoinIds =
-      [ joinIdFor j
-      | j <- allOfJunctions
-      , j /= junction
-      , any (Set.member junction . reachFrom) (map (.transTo) (defaultsOf j))
-      ]
-
-    anyBranchFolded =
-      or
-        [ eTo `elem` enclosingJoinIds
-        | r <- maybeToList joinTarget
-        , b <- branches
-        , (eFrom, eTo, _) <- edges
-        , nodesInside (interiorOf r b) eFrom
-        ]
 
     exitsOf b = Set.filter (\s -> null (Map.findWithDefault [] s succsOf)) (reachFrom b)
 
@@ -633,21 +621,6 @@ stateGraphToBpmn opts sg =
                   ". No branch here can breach, so every token is still \
                   \consumed before the instance ends and the conjunction does \
                   \hold — it is simply not drawn."
-        }
-
-    -- The join exists, drawn by an enclosing gateway. Nothing is gone, so the
-    -- severity is Advisory and the note says so plainly.
-    foldedFinding =
-      MkFidelityNote
-        { code = "P-JOIN-FOLDED"
-        , severity = Advisory
-        , element = fromMaybe ("state " <> Text.pack (show junction)) (gatewayOf junction)
-        , range = Nothing
-        , message =
-            "This RAND's join was folded into the enclosing junction's \
-            \converging gateway, which already waits for every one of these \
-            \branches, so a second gateway would have had nothing left to join."
-        , lost = "nothing; the conjunction is drawn, one level out"
         }
 
   ------------------------------------------------------------------

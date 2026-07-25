@@ -330,11 +330,11 @@ cyclicGraph =
 -- arrivals before the outer junction goes looking for them.
 --
 -- The outer then finds no arrival it can call its own and declines, which is
--- right. What must not happen is @P-JOIN-FOLDED@: the join that exists is one
--- level /in/, not one level out, and it waits for the inner branches only — it
--- has never heard of the outer's other branch. An Advisory note saying nothing
--- was lost would be a false reassurance, which is the one thing a fidelity
--- report must never produce.
+-- right — and the decline is a real loss, which is the point. The join that
+-- exists is one level /in/, not one level out; it waits for the inner branches
+-- only and has never heard of the outer's other branch. Anything reassuring
+-- said about that would be a false reassurance, which is the one thing a
+-- fidelity report must never produce.
 enclosedJoinGraph :: StateGraph
 enclosedJoinGraph =
   StateGraph
@@ -815,9 +815,26 @@ spec = do
                    , Gateway ParallelGateway Converging
                    ]
       findingsFor "P-NOJOIN" joined `shouldBe` []
-      -- and the join sits between the branches and the end event
+      -- and the join sits between the branches and the end event, waiting for
+      -- one token from each
       [f.flowTo | f <- joined.bxProcess.procFlows, f.flowFrom == "Join_0"]
         `shouldSatisfy` all (Text.isPrefixOf "End_")
+      length [f | f <- joined.bxProcess.procFlows, f.flowTo == "Join_0"] `shouldBe` 2
+
+      -- The preconditions, asserted rather than assumed. This is the ONLY case
+      -- in the suite where a join is drawn, so it is the only thing standing
+      -- between us and a regression that made 'tokenProof' always fail: three
+      -- decline reproductions would all still pass while the exporter quietly
+      -- stopped drawing conjunctions altogether.
+      --
+      -- It is also fragile in a specific way. Add a WITHIN to either branch and
+      -- it grows a lapse timer, every branch gains a second route, and this
+      -- becomes a fourth decline case — which is exactly how handover.l4
+      -- stopped being the join exhibit. So the absence of a boundary event and
+      -- of any condition is checked here, loudly, rather than left to whoever
+      -- next edits the fixture.
+      boundaries joined `shouldBe` []
+      map (.flowCondition) joined.bxProcess.procFlows `shouldSatisfy` all isNothing
 
     -- Reproductions of the three ways a reachability proof draws a deadlock.
     -- Each of these once emitted a converging parallel gateway waiting for more
@@ -1184,23 +1201,27 @@ spec = do
       ]
         `shouldBe` []
 
-  -- P-JOIN-FOLDED is the one Advisory note in this report — the one that says
-  -- nothing was lost. A note that says nothing was lost had better be right,
-  -- so the condition for it has to distinguish a join drawn one level OUT from
-  -- a join drawn one level IN, and an arrival redirected to "some Join_" does
-  -- not.
-  describe "a join drawn one level in, not one level out" $ do
+  -- A failed token proof has exactly one honest outcome, and this pins it.
+  --
+  -- There was briefly a second: a note saying the join had been folded into an
+  -- enclosing gateway and nothing was lost, at Advisory. This graph is the case
+  -- that killed it. The gateway that claimed the outer junction's arrivals is
+  -- one level IN, not one level out; it waits for the inner branches and has
+  -- never heard of the outer's other branch. So the outer conjunction really is
+  -- undrawn, really is a loss, and anything reassuring said about it is false.
+  describe "a junction whose arrivals were claimed by a gateway inside it" $ do
     let bx = stateGraphToBpmn defaultBpmnOptions enclosedJoinGraph
 
     it "draws the inner join and declines the outer, which is correct" $
       converging bx `shouldBe` ["Join_1"]
 
-    -- Join_1 waits for the inner branches. It knows nothing about the outer's
-    -- other branch, so the outer conjunction really is undrawn and really is a
-    -- loss, and must be reported as one.
-    it "and does not call that folded, because nothing was folded outwards" $ do
-      findingsFor "P-JOIN-FOLDED" bx `shouldBe` []
+    -- Lossy, not Advisory, and no note anywhere claiming nothing was lost.
+    -- Severity is the assertion: a reader who finds a reassurance stops
+    -- looking, so the one thing this must never be is comforting.
+    it "and reports the loss rather than reassuring anyone about it" $ do
       map (.severity) (findingsFor "P-NOJOIN" bx) `shouldBe` [Lossy]
+      [n.code | n <- bx.bxFidelity.notes, n.severity == Advisory, mentions "nothing" n]
+        `shouldBe` []
 
     it "and leaves behind no join that can deadlock" $
       unsoundJoins bx `shouldBe` []
