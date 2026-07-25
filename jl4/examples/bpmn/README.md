@@ -19,9 +19,11 @@ Each produces two goldens under `expected/`:
 - `<name>.bpmn` — the XML, exactly as `l4` would write it. Openable in Camunda
   Modeler as-is.
 - `<name>.fidelity.txt` — what BPMN could not carry, naming the specific element
-  that lost it. `F1`–`F5` are losses of the notation and cannot be fixed by
-  writing more Haskell; `X1`–`X4` are approximations this exporter made and
-  could be.
+  that lost it. The report type is `L4.Interchange.Fidelity`, shared with every
+  other interchange backend so the CLI has one shape to render rather than one
+  per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
+  writing more Haskell; codes `P-…` are approximations this exporter made and
+  could be. (DMN uses `D-…`, so a combined report never confuses the two.)
 
 ## Checking the XML is really importable
 

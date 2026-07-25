@@ -18,13 +18,16 @@
 -- is permitted; it has no as-of date; it cannot distinguish an obligation that
 -- never became applicable from one that was discharged. Naming those losses is
 -- therefore a feature of the exporter rather than an apology for it, which is
--- why they are first-class values ('Fidelity') carried alongside the XML rather
--- than warnings printed and forgotten.
+-- why they are carried alongside the XML as first-class values rather than as
+-- warnings printed and forgotten.
 --
--- Codes @F1@–@F5@ are the notation losses enumerated in
--- @specs\/todo\/lexipedia-superset\/PROCESS-TRACK.md@ §5. Codes @X1@–@X4@ are a
--- different animal: they are places where /this exporter/ had to approximate,
--- and are kept in a separate numbering so the two are never confused.
+-- The type is 'L4.Interchange.Fidelity.FidelityReport', shared with every other
+-- interchange backend so that the CLI has one report shape to render rather
+-- than one per target. Codes @F1@–@F5@ are the notation losses enumerated in
+-- @specs\/todo\/lexipedia-superset\/PROCESS-TRACK.md@ §5. Codes @P-…@ are a
+-- different animal: places where /this exporter/ had to approximate. They are
+-- prefixed so that in a combined report a BPMN approximation can never be
+-- mistaken for a DMN one (@D-…@), nor either for a loss of the notation.
 module L4.Bpmn.IR
   ( -- * The export
     BpmnExport (..)
@@ -50,14 +53,6 @@ module L4.Bpmn.IR
   , Bounds (..)
   , Point (..)
 
-    -- * The fidelity report
-  , Fidelity (..)
-  , FidelityCode (..)
-  , FidelitySeverity (..)
-  , fidelityTag
-  , fidelityTitle
-  , renderFidelityReport
-
     -- * Options
   , BpmnOptions (..)
   , defaultBpmnOptions
@@ -65,7 +60,8 @@ module L4.Bpmn.IR
   ) where
 
 import Base
-import qualified Base.Text as Text
+
+import L4.Interchange.Fidelity (FidelityReport)
 
 --------------------------------------------------------------------------------
 -- Options
@@ -201,7 +197,7 @@ data BpmnExport = BpmnExport
   , -- | 'True' when at least one end event is an error end, so the emitter
     -- knows to declare the shared @\<error\>@ root element.
     bxHasError :: !Bool
-  , bxFidelity :: ![Fidelity]
+  , bxFidelity :: !FidelityReport
   }
   deriving stock (Eq, Show)
 
@@ -277,109 +273,3 @@ nodeHeight = \case
   Boundary _ _ -> 36
   Gateway _ _ -> 50
   Task -> 80
-
---------------------------------------------------------------------------------
--- Fidelity
---------------------------------------------------------------------------------
-
--- | What the export could not carry, and where.
---
--- @F1@–@F5@ are losses of the /notation/ (PROCESS-TRACK.md §5); @X1@–@X4@ are
--- approximations made by /this exporter/. The distinction matters: the first
--- set cannot be fixed by writing more Haskell, and the second can.
-data FidelityCode
-  = -- | F1 — deontic modality. @MUST@, @MAY@ and @SHANT@ all draw as a task.
-    FModality
-  | -- | F2 — bearer vs performer. A lane says who acts; a deontic says who owes.
-    FBearer
-  | -- | F3 — vacuity. \"Never became applicable\" and \"was discharged\" look alike.
-    FVacuity
-  | -- | F4 — guard bodies. A @PROVIDED@ ladder becomes an opaque string.
-    FGuardBody
-  | -- | F5 — rule version. BPMN has no as-of date.
-    FRuleVersion
-  | -- | X1 — a unit-less deadline was read as days.
-    XDeadlineUnit
-  | -- | X2 — a deadline we could not turn into an ISO 8601 duration.
-    XDeadlineUnparsed
-  | -- | X3 — an @RAND@ whose branches do not reconverge, so no join was invented.
-    XNoParallelJoin
-  | -- | X4 — a state the extractor left with nowhere to go.
-    XDanglingState
-  deriving stock (Eq, Ord, Show, Enum, Bounded)
-
-data FidelitySeverity
-  = -- | Something a reader of the diagram will get wrong if not told.
-    Loud
-  | -- | Worth recording; not misleading on its own.
-    Note
-  deriving stock (Eq, Ord, Show)
-
-data Fidelity = Fidelity
-  { fidCode :: !FidelityCode
-  , fidSeverity :: !FidelitySeverity
-  , -- | The id of the BPMN element that lost the information.
-    fidElement :: !Text
-  , -- | A human name for that element.
-    fidSubject :: !Text
-  , fidMessage :: !Text
-  }
-  deriving stock (Eq, Show)
-
-fidelityTag :: FidelityCode -> Text
-fidelityTag = \case
-  FModality -> "F1"
-  FBearer -> "F2"
-  FVacuity -> "F3"
-  FGuardBody -> "F4"
-  FRuleVersion -> "F5"
-  XDeadlineUnit -> "X1"
-  XDeadlineUnparsed -> "X2"
-  XNoParallelJoin -> "X3"
-  XDanglingState -> "X4"
-
-fidelityTitle :: FidelityCode -> Text
-fidelityTitle = \case
-  FModality -> "deontic modality"
-  FBearer -> "bearer vs performer"
-  FVacuity -> "vacuity"
-  FGuardBody -> "guard bodies"
-  FRuleVersion -> "rule version"
-  XDeadlineUnit -> "deadline unit assumed"
-  XDeadlineUnparsed -> "deadline not expressible as a duration"
-  XNoParallelJoin -> "parallel branches do not reconverge"
-  XDanglingState -> "dangling state"
-
--- | The human-readable rendering, grouped by code and stable in order.
-renderFidelityReport :: Text -> [Fidelity] -> Text
-renderFidelityReport subject findings =
-  Text.unlines (headline : "" : concatMap section [minBound .. maxBound])
- where
-  loud = length [() | f <- findings, f.fidSeverity == Loud]
-  headline =
-    "Fidelity report for "
-      <> subject
-      <> " — "
-      <> plural (length findings) "finding"
-      <> ", "
-      <> Text.pack (show loud)
-      <> " loud"
-
-  section code = case [f | f <- findings, f.fidCode == code] of
-    [] -> []
-    fs ->
-      (fidelityTag code <> "  " <> fidelityTitle code)
-        : map entry fs
-        <> [""]
-
-  entry f =
-    "    "
-      <> (if f.fidSeverity == Loud then "! " else "  ")
-      <> f.fidElement
-      <> " ("
-      <> f.fidSubject
-      <> ")\n        "
-      <> f.fidMessage
-
-  plural n what =
-    Text.pack (show n) <> " " <> what <> (if n == 1 then "" else "s")

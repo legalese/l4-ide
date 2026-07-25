@@ -23,6 +23,7 @@ import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR
 import L4.Bpmn.Lower (stateGraphToBpmn)
+import L4.Interchange.Fidelity
 import L4.StateGraph
 import L4.Syntax (DeonticModal (..))
 
@@ -172,8 +173,13 @@ tasks = nodesWhere (isKind (== Task))
 nodeNamed :: BpmnExport -> Text -> Maybe FlowNode
 nodeNamed bx nid = find (\n -> n.nodeId == nid) bx.bxProcess.procNodes
 
-findingsFor :: FidelityCode -> BpmnExport -> [Fidelity]
-findingsFor code bx = [f | f <- bx.bxFidelity, f.fidCode == code]
+-- | Notes carrying a given code, in emission order. @F1@-@F5@ are losses of
+-- the notation; @P-…@ are approximations this exporter made.
+findingsFor :: Text -> BpmnExport -> [FidelityNote]
+findingsFor c bx = [n | n <- bx.bxFidelity.notes, n.code == c]
+
+mentions :: Text -> FidelityNote -> Bool
+mentions needle n = Text.isInfixOf needle (n.message <> " " <> n.lost)
 
 -- | A one-obligation graph carrying a given deadline text, built directly
 -- rather than parsed. L4 cannot currently spell @WITHIN 30 days@ — the
@@ -253,8 +259,14 @@ spec = do
       map (fmap (.nodeName) . nodeNamed bx) outOfBoundary
         `shouldBe` [Just "MUST notify"]
 
-    it "records the assumed unit for a deadline L4 leaves unit-less" $
-      map (.fidSubject) (findingsFor XDeadlineUnit bx) `shouldBe` ["3", "1"]
+    it "records the assumed unit for a deadline L4 leaves unit-less" $ do
+      let assumed = findingsFor "P-DEADLINE-UNIT" bx
+      map (.element) assumed `shouldBe` ["Boundary_0", "Boundary_2"]
+      map (.severity) assumed `shouldBe` [Advisory, Advisory]
+      -- the raw text and what it was read as both reach the reader
+      zipWith mentions ["\8216" <> "3" <> "\8217", "\8216" <> "1" <> "\8217"] assumed
+        `shouldBe` [True, True]
+      map (mentions "P3D") assumed `shouldBe` [True, False]
 
     it "refuses the assumption under RefuseToGuess, and says so" $ do
       let strict = exportOf (BpmnOptions {optDeadlineUnit = RefuseToGuess}) "late" lestSrc
@@ -263,7 +275,8 @@ spec = do
                    , Boundary "Task_2" (WhenCondition "1")
                    ]
       renderBpmn strict `shouldSatisfy` not . Text.isInfixOf "timeDuration"
-      map (.fidSubject) (findingsFor XDeadlineUnparsed strict) `shouldBe` ["3", "1"]
+      map (.element) (findingsFor "P-DEADLINE" strict)
+        `shouldBe` ["Boundary_0", "Boundary_2"]
 
   describe "RAND and ROR are different gateways (the P0 bug, at the surface)" $ do
     let randBx = exportOf defaultBpmnOptions "split" randSrc
@@ -291,7 +304,7 @@ spec = do
 
     it "does not invent a join when a branch can escape to BREACH" $ do
       map (.nodeKind) (gateways randBx) `shouldBe` [Gateway ParallelGateway Diverging]
-      length (findingsFor XNoParallelJoin randBx) `shouldBe` 1
+      length (findingsFor "P-NOJOIN" randBx) `shouldBe` 1
 
     it "does join when every branch provably ends at the same state" $ do
       let joined = exportOf defaultBpmnOptions "both" randJoinSrc
@@ -299,7 +312,7 @@ spec = do
         `shouldBe` [ Gateway ParallelGateway Diverging
                    , Gateway ParallelGateway Converging
                    ]
-      findingsFor XNoParallelJoin joined `shouldBe` []
+      findingsFor "P-NOJOIN" joined `shouldBe` []
       -- and the join sits between the branches and the end event
       [f.flowTo | f <- joined.bxProcess.procFlows, f.flowFrom == "Join_0"]
         `shouldSatisfy` all (Text.isPrefixOf "End_")
@@ -314,7 +327,7 @@ spec = do
       -- all three permissions flow into that one join
       length [f | f <- nested.bxProcess.procFlows, f.flowTo == "Join_0"] `shouldBe` 3
       -- and the inner RAND says why it did not get one of its own
-      map (.fidElement) (findingsFor XNoParallelJoin nested)
+      map (.element) (findingsFor "P-NOJOIN" nested)
         `shouldSatisfy` \els -> length els == 1 && all (Text.isPrefixOf "Split_") els
 
   describe "terminals" $ do
@@ -364,12 +377,12 @@ spec = do
         `shouldBe` [Boundary "Task_0" (WhenCondition "grace")]
 
     it "names the offending deadline in the fidelity report, loudly" $
-      case findingsFor XDeadlineUnparsed bx of
+      case findingsFor "P-DEADLINE" bx of
         [f] -> do
-          f.fidSubject `shouldBe` "grace"
-          f.fidSeverity `shouldBe` Loud
-          f.fidElement `shouldBe` "Boundary_0"
-        other -> expectationFailure ("expected one X2 finding, got " <> show (length other))
+          f `shouldSatisfy` mentions "\8216grace\8217"
+          f.severity `shouldBe` Blocking
+          f.element `shouldBe` "Boundary_0"
+        other -> expectationFailure ("expected one P-DEADLINE note, got " <> show (length other))
 
   describe "a PROVIDED guard" $ do
     let bx = exportOf defaultBpmnOptions "guarded" guardSrc
@@ -388,13 +401,15 @@ spec = do
       xml `shouldSatisfy` Text.isInfixOf "100"
 
     it "reports the guard body as opaque (F4) and the vacuity it creates (F3)" $ do
-      map (.fidElement) (findingsFor FGuardBody bx) `shouldBe` ["Task_0"]
-      map (.fidElement) (findingsFor FVacuity bx) `shouldBe` ["Task_0"]
+      map (.element) (findingsFor "F4" bx) `shouldBe` ["Task_0"]
+      map (.element) (findingsFor "F3" bx) `shouldBe` ["Task_0"]
+      map (.severity) (findingsFor "F4" bx) `shouldBe` [Lossy]
+      map (.severity) (findingsFor "F3" bx) `shouldBe` [Blocking]
 
     it "reports neither for an unguarded obligation" $ do
       let plain = exportOf defaultBpmnOptions "chain" linearSrc
-      findingsFor FGuardBody plain `shouldBe` []
-      findingsFor FVacuity plain `shouldBe` []
+      findingsFor "F4" plain `shouldBe` []
+      findingsFor "F3" plain `shouldBe` []
 
   describe "reading a deadline as an ISO 8601 duration" $ do
     let cases =
@@ -424,8 +439,9 @@ spec = do
   describe "the fidelity report" $ do
     let bx = exportOf defaultBpmnOptions "chain" linearSrc
 
-    it "reports the modality loss once per task" $
-      map (.fidElement) (findingsFor FModality bx) `shouldBe` ["Task_0", "Task_1"]
+    it "reports the modality loss once per task, as blocking" $ do
+      map (.element) (findingsFor "F1" bx) `shouldBe` ["Task_0", "Task_1"]
+      map (.severity) (findingsFor "F1" bx) `shouldBe` [Blocking, Blocking]
 
     it "is loud about a prohibition, which is not a task at all" $ do
       let shant =
@@ -437,17 +453,23 @@ spec = do
               , "  SHANT notify"
               , "  WITHIN 3"
               ]
-      map (.fidSeverity) (findingsFor FModality shant) `shouldBe` [Loud]
+      -- every F1 is Blocking, so severity cannot be what marks a prohibition
+      -- out; the note has to say it in words
+      findingsFor "F1" shant `shouldSatisfy` all (mentions "forbids")
       map (.nodeName) (tasks shant) `shouldBe` ["SHANT notify"]
 
     it "reports the notation-level losses that no amount of Haskell can fix" $ do
-      map (.fidElement) (findingsFor FBearer bx) `shouldBe` ["Process_chain"]
-      map (.fidElement) (findingsFor FRuleVersion bx) `shouldBe` ["Process_chain"]
+      map (.element) (findingsFor "F2" bx) `shouldBe` ["Process_chain"]
+      map (.element) (findingsFor "F5" bx) `shouldBe` ["Process_chain"]
+      map (.severity) (findingsFor "F2" bx) `shouldBe` [Lossy]
+      map (.severity) (findingsFor "F5" bx) `shouldBe` [Advisory]
 
     it "renders to something a human can read" $ do
-      let report = renderFidelityReport "chain" bx.bxFidelity
-      report `shouldSatisfy` Text.isInfixOf "F1  deontic modality"
-      report `shouldSatisfy` Text.isInfixOf "F5  rule version"
+      let report = renderReport bx.bxFidelity
+      report `shouldSatisfy` Text.isInfixOf "fidelity report — BPMN 2.0"
+      report `shouldSatisfy` Text.isInfixOf "[F1] blocking — Task_0"
+      report `shouldSatisfy` Text.isInfixOf "[F5] advisory — Process_chain"
+      report `shouldSatisfy` Text.isInfixOf "      lost: "
 
   describe "well-formedness (structural, over every fixture)" $
     forM_ fixtures \(nm, body) -> describe (Text.unpack nm) do
@@ -509,8 +531,8 @@ spec = do
       goldenCase stem ruleName ".bpmn" \_ bx -> renderBpmn bx
 
     it (stem <> " lowers to a stable fidelity report") $
-      goldenCase stem ruleName ".fidelity.txt" \sg bx ->
-        renderFidelityReport sg.sgName bx.bxFidelity
+      goldenCase stem ruleName ".fidelity.txt" \_ bx ->
+        renderReport bx.bxFidelity
  where
   goldenCases =
     [ ("offering", "the offering")

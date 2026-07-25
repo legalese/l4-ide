@@ -1,26 +1,25 @@
-Fidelity report for the handover — 8 findings, 1 loud
-
-F1  deontic modality
-      Task_0 (MUST give vacant possession)
-        MUST, MAY and SHANT all draw as a task. Nothing here makes skipping this one a breach and skipping another one fine; the modality survives in the label and the <documentation>, not in the notation.
-      Task_2 (MAY inspect the premises)
-        A permission is drawn as a task, so the diagram reads as an instruction. BPMN has no way to mark an activity optional.
-      Task_4 (MAY photograph the premises)
-        A permission is drawn as a task, so the diagram reads as an instruction. BPMN has no way to mark an activity optional.
-      Task_6 (MAY retain the deposit)
-        A permission is drawn as a task, so the diagram reads as an instruction. BPMN has no way to mark an activity optional.
-      Task_7 (MAY apply to the tribunal)
-        A permission is drawn as a task, so the diagram reads as an instruction. BPMN has no way to mark an activity optional.
-
-F2  bearer vs performer
-      Process_the_handover (the handover)
-        A lane says who performs the work; L4's PARTY says who owes the obligation. These come apart whenever an agent acts for a principal, and this diagram can only show the first. Lanes here: Tenant, Landlord.
-
-F5  rule version
-      Process_the_handover (the handover)
-        BPMN has no as-of date. Every threshold and deadline drawn here is a value someone must remember to edit when the rule changes; the L4 source can answer the same question under two different rule dates.
-
-X2  deadline not expressible as a duration
-    ! Boundary_0 (`grace period`)
-        Deadline ‘`grace period`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
-
+fidelity report — BPMN 2.0
+  [F1] blocking — Task_0
+      MUST, MAY and SHANT all draw as a task, so nothing here makes skipping this one a breach and skipping another one fine.
+      lost: the deontic modality, which survives in the label and the <documentation> but has no notational force
+  [P-DEADLINE] blocking — Boundary_0
+      Deadline ‘`grace period`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
+      lost: the deadline as a machine-checkable timer
+  [F1] blocking — Task_2
+      A permission is drawn as a task, so the diagram reads as an instruction to perform it.
+      lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [F1] blocking — Task_4
+      A permission is drawn as a task, so the diagram reads as an instruction to perform it.
+      lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [F1] blocking — Task_6
+      A permission is drawn as a task, so the diagram reads as an instruction to perform it.
+      lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [F1] blocking — Task_7
+      A permission is drawn as a task, so the diagram reads as an instruction to perform it.
+      lost: the difference between what a party may do and what it must do; BPMN cannot mark an activity optional
+  [F2] lossy — Process_the_handover
+      A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: Tenant, Landlord).
+      lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
+  [F5] advisory — Process_the_handover
+      BPMN has no as-of date, so every threshold and deadline drawn here is a value someone must remember to edit when the rule changes.
+      lost: asking the same question as of a different rule date, which the L4 source can still answer

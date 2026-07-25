@@ -159,6 +159,7 @@ library
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution
+    L4.Interchange.Fidelity
     L4.Instances.Serialise
     L4.API
     L4.API.VirtualFS

@@ -32,19 +32,19 @@
 --
 -- 1. A deadline that is not an ISO 8601 duration and has no unit we can read
 --    becomes a /conditional/ boundary event carrying the raw text, never a
---    timer carrying a duration we made up ('XDeadlineUnparsed'). A bare number
---    is read as days only because 'AssumeDays' says so, and says so out loud
---    ('XDeadlineUnit').
+--    timer carrying a duration we made up (@P-DEADLINE@). A bare number is
+--    read as days only because 'AssumeDays' says so, and says so out loud
+--    (@P-DEADLINE-UNIT@).
 -- 2. An @RAND@ gets a converging @\<parallelGateway\>@ only when its branches
 --    /provably/ reconverge on one state and nowhere else. A join that one
 --    branch can escape (to @BREACH@, say) is a deadlock in BPMN, so where the
 --    condition fails we leave the branches unjoined and say so
---    ('XNoParallelJoin'). Nothing is lost by this: a BPMN instance completes
+--    (@P-NOJOIN@). Nothing is lost by this: a BPMN instance completes
 --    only when every token is consumed, so \"all of\" still holds — it is
 --    merely implicit rather than drawn.
 -- 3. A prohibition is not an activity. It is still drawn as a task, because
---    BPMN has no other shape for it, and the loss is reported at 'Loud'
---    severity ('FModality').
+--    BPMN has no other shape for it, and the loss is reported as @F1@ at
+--    'Blocking' severity.
 module L4.Bpmn.Lower
   ( stateGraphToBpmn
   ) where
@@ -57,6 +57,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import L4.Bpmn.IR
+import L4.Interchange.Fidelity
 import L4.StateGraph
 import L4.Syntax (DeonticModal (..))
 
@@ -82,7 +83,7 @@ stateGraphToBpmn opts sg =
           }
     , bxDiagram = diagram
     , bxHasError = any isErrorEnd allNodes
-    , bxFidelity = findings
+    , bxFidelity = foldl' (flip addNote) (emptyReport "BPMN 2.0") findings
     }
  where
   slug = ncName sg.sgName
@@ -222,14 +223,17 @@ stateGraphToBpmn opts sg =
       _ -> []
 
     danglingFindings =
-      [ Fidelity
-        { fidCode = XDanglingState
-        , fidSeverity = Note
-        , fidElement = n.nodeId
-        , fidSubject = s.stateName
-        , fidMessage =
-            "This state has no outgoing transition in the source graph, so the \
-            \path is drawn as ending here rather than dangling."
+      [ MkFidelityNote
+        { code = "P-DANGLING"
+        , severity = Advisory
+        , element = n.nodeId
+        , range = Nothing
+        , message =
+            "The state \8216"
+              <> s.stateName
+              <> "\8217 has no outgoing transition in the source graph, so the \
+                 \path is drawn as ending here rather than left dangling."
+        , lost = "nothing the source said; this is an artefact of extraction"
         }
       | n <- danglingNodes
       ]
@@ -358,9 +362,9 @@ stateGraphToBpmn opts sg =
   -- same single state and can reach nothing else that stops. Anything weaker
   -- and the join is a token trap.
   addJoin ::
-    ([FlowNode], [Edge], [Fidelity]) ->
+    ([FlowNode], [Edge], [FidelityNote]) ->
     StateId ->
-    ([FlowNode], [Edge], [Fidelity])
+    ([FlowNode], [Edge], [FidelityNote])
   addJoin (nodes, edges, finds) junction =
     case joinTarget of
       Just r
@@ -416,18 +420,22 @@ stateGraphToBpmn opts sg =
             ]
 
     noJoinFinding =
-      Fidelity
-        { fidCode = XNoParallelJoin
-        , fidSeverity = Note
-        , fidElement = fromMaybe ("state " <> Text.pack (show junction)) (gatewayOf junction)
-        , fidSubject = "RAND with " <> Text.pack (show (length branches)) <> " branches"
-        , fidMessage =
-            "The branches of this RAND do not all end at one common state \
-            \(a branch can reach BREACH, or two branches overlap), so no \
-            \converging parallel gateway was invented: a join a branch can \
-            \escape is a token trap. Completion still requires every branch to \
-            \finish, because a BPMN instance ends only when all of its tokens \
-            \are consumed — but the conjunction is implicit rather than drawn."
+      MkFidelityNote
+        { code = "P-NOJOIN"
+        , severity = Lossy
+        , element = fromMaybe ("state " <> Text.pack (show junction)) (gatewayOf junction)
+        , range = Nothing
+        , message =
+            "The "
+              <> Text.pack (show (length branches))
+              <> " branches of this RAND do not all end at one common state — a \
+                 \branch can reach BREACH, or two branches overlap — so no \
+                 \converging parallel gateway was invented, because a join a \
+                 \branch can escape is a token trap."
+        , lost =
+            "the conjunction as a drawn gateway; it still holds, because a BPMN \
+            \instance ends only once every token is consumed, but the reader \
+            \has to know that"
         }
 
   ------------------------------------------------------------------
@@ -498,29 +506,34 @@ stateGraphToBpmn opts sg =
       <> [ruleVersionFinding]
 
   bearerFinding =
-    Fidelity
-      { fidCode = FBearer
-      , fidSeverity = Note
-      , fidElement = processId
-      , fidSubject = sg.sgName
-      , fidMessage =
-          "A lane says who performs the work; L4's PARTY says who owes the \
-          \obligation. These come apart whenever an agent acts for a principal, \
-          \and this diagram can only show the first. Lanes here: "
+    MkFidelityNote
+      { code = "F2"
+      , severity = Lossy
+      , element = processId
+      , range = Nothing
+      , message =
+          "A lane says who performs the work, where L4's PARTY says who owes \
+          \the obligation, and this diagram can only show the first (lanes \
+          \here: "
             <> Text.intercalate ", " parties
-            <> "."
+            <> ")."
+      , lost =
+          "the bearer, as distinct from the performer — the two come apart \
+          \whenever an agent acts for a principal"
       }
 
   ruleVersionFinding =
-    Fidelity
-      { fidCode = FRuleVersion
-      , fidSeverity = Note
-      , fidElement = processId
-      , fidSubject = sg.sgName
-      , fidMessage =
-          "BPMN has no as-of date. Every threshold and deadline drawn here is a \
-          \value someone must remember to edit when the rule changes; the L4 \
-          \source can answer the same question under two different rule dates."
+    MkFidelityNote
+      { code = "F5"
+      , severity = Advisory
+      , element = processId
+      , range = Nothing
+      , message =
+          "BPMN has no as-of date, so every threshold and deadline drawn here \
+          \is a value someone must remember to edit when the rule changes."
+      , lost =
+          "asking the same question as of a different rule date, which the L4 \
+          \source can still answer"
       }
 
 isErrorEnd :: FlowNode -> Bool
@@ -537,7 +550,7 @@ type Edge = (Text, Text, Maybe Text)
 data StateChain = StateChain
   { scNodes :: [FlowNode]
   , scBoundary :: Maybe FlowNode
-  , scFindings :: [Fidelity]
+  , scFindings :: [FidelityNote]
   }
 
 --------------------------------------------------------------------------------
@@ -571,7 +584,7 @@ modalWord = \case
 -- | The task's label. The modal keyword is kept in the /name/ deliberately:
 -- BPMN cannot draw the difference between an obligation and a permission, so
 -- the only place the distinction can survive at all is the text. See
--- 'FModality' — this mitigates the loss, it does not repair it.
+-- @F1@ — this mitigates the loss, it does not repair it.
 taskName :: TransitionLabel -> Text
 taskName l = case l.labelModal of
   Nothing -> nonEmpty' l.labelAction
@@ -608,17 +621,17 @@ boundaryTrigger ::
   Text ->
   -- | the obligation's @WITHIN@ text, if any
   Maybe Text ->
-  (BoundaryTrigger, [Fidelity])
+  (BoundaryTrigger, [FidelityNote])
 boundaryTrigger opts elemId lestLabel = \case
   Nothing ->
     ( WhenCondition (fallbackCondition lestLabel)
     , [ note
-          XDeadlineUnparsed
-          Note
-          "no WITHIN"
+          "P-DEADLINE"
+          Blocking
           "This LEST has no deadline, and BPMN has no untriggered boundary \
           \event, so it is drawn as a conditional boundary event rather than a \
           \timer."
+          "the trigger as something an engine could evaluate"
       ]
     )
   Just raw -> case parseDuration opts.optDeadlineUnit raw of
@@ -626,25 +639,25 @@ boundaryTrigger opts elemId lestLabel = \case
     ParsedAsDays iso ->
       ( TimerAfter iso
       , [ note
-            XDeadlineUnit
-            Note
-            raw
+            "P-DEADLINE-UNIT"
+            Advisory
             ( "Deadline "
                 <> quoted raw
-                <> " carries no unit; read as days ("
+                <> " carries no unit, because L4's WITHIN does not fix one; it \
+                   \is read here as days ("
                 <> iso
                 <> "), following the day-serial convention of \
-                   \libraries/datetime.l4. If this model's clock is not days, \
-                   \edit the duration."
+                   \libraries/datetime.l4."
             )
+            "certainty about the unit — if this model's clock is not days, the \
+            \duration needs editing"
         ]
       )
     Unparsed ->
       ( WhenCondition raw
       , [ note
-            XDeadlineUnparsed
-            Loud
-            raw
+            "P-DEADLINE"
+            Blocking
             ( "Deadline "
                 <> quoted raw
                 <> " is not an ISO 8601 duration and no unit could be read from \
@@ -652,16 +665,18 @@ boundaryTrigger opts elemId lestLabel = \case
                    \condition rather than a timer carrying a duration we \
                    \invented."
             )
+            "the deadline as a machine-checkable timer"
         ]
       )
  where
-  note code sev subject msg =
-    Fidelity
-      { fidCode = code
-      , fidSeverity = sev
-      , fidElement = elemId
-      , fidSubject = subject
-      , fidMessage = msg
+  note c sev msg what =
+    MkFidelityNote
+      { code = c
+      , severity = sev
+      , element = elemId
+      , range = Nothing
+      , message = msg
+      , lost = what
       }
   quoted t = "\8216" <> t <> "\8217"
 
@@ -737,65 +752,70 @@ numberWithUnit t = do
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
 
-modalityFinding :: FlowNode -> TransitionLabel -> [Fidelity]
+modalityFinding :: FlowNode -> TransitionLabel -> [FidelityNote]
 modalityFinding n l =
-  [ Fidelity
-      { fidCode = FModality
-      , fidSeverity = severity
-      , fidElement = n.nodeId
-      , fidSubject = n.nodeName
-      , fidMessage = message
+  [ MkFidelityNote
+      { code = "F1"
+      , severity = Blocking
+      , element = n.nodeId
+      , range = Nothing
+      , message = message
+      , lost = what
       }
   ]
  where
-  (severity, message) = case l.labelModal of
+  (message, what) = case l.labelModal of
     Just DMustNot ->
-      ( Loud
-      , "A prohibition is not an activity at all, and BPMN has no negative \
-        \shape for one. Read literally, this diagram instructs the reader to \
-        \perform the very act the rule forbids; only the SHANT in the label \
-        \and the <documentation> say otherwise, and neither has any \
-        \notational force."
+      ( "A prohibition is not an activity at all and BPMN has no negative \
+        \shape for one, so read literally this diagram instructs the reader \
+        \to perform the very act the rule forbids."
+      , "the difference between a required act and a forbidden one; only the \
+        \SHANT in the label and the <documentation> say otherwise, and neither \
+        \has any notational force"
       )
     Just DMay ->
-      ( Note
-      , "A permission is drawn as a task, so the diagram reads as an \
-        \instruction. BPMN has no way to mark an activity optional."
+      ( "A permission is drawn as a task, so the diagram reads as an \
+        \instruction to perform it."
+      , "the difference between what a party may do and what it must do; BPMN \
+        \cannot mark an activity optional"
       )
     _ ->
-      ( Note
-      , "MUST, MAY and SHANT all draw as a task. Nothing here makes skipping \
-        \this one a breach and skipping another one fine; the modality \
-        \survives in the label and the <documentation>, not in the notation."
+      ( "MUST, MAY and SHANT all draw as a task, so nothing here makes \
+        \skipping this one a breach and skipping another one fine."
+      , "the deontic modality, which survives in the label and the \
+        \<documentation> but has no notational force"
       )
 
-guardFindings :: FlowNode -> TransitionLabel -> [Fidelity]
+guardFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
 guardFindings n l = case l.labelGuard of
   Nothing -> []
   Just g ->
-    [ Fidelity
-        { fidCode = FGuardBody
-        , fidSeverity = Note
-        , fidElement = n.nodeId
-        , fidSubject = n.nodeName
-        , fidMessage =
+    [ MkFidelityNote
+        { code = "F4"
+        , severity = Lossy
+        , element = n.nodeId
+        , range = Nothing
+        , message =
             "The PROVIDED condition \8216"
               <> g
-              <> "\8217 becomes an opaque conditionExpression, losing whatever \
-                 \decision structure backed it — DMN would be its right home, \
-                 \and the DMN/BPMN link is an association, not a semantics. It \
-                 \also moves: BPMN has no activity precondition, so a guard on \
-                 \the obligation is drawn as a condition on its exit."
+              <> "\8217 becomes an opaque conditionExpression on the task's \
+                 \outgoing flow, because BPMN has no activity precondition."
+        , lost =
+            "whatever decision structure backed the guard — DMN would be its \
+            \right home, and the DMN/BPMN link is an association, not a \
+            \semantics"
         }
-    , Fidelity
-        { fidCode = FVacuity
-        , fidSeverity = Note
-        , fidElement = n.nodeId
-        , fidSubject = n.nodeName
-        , fidMessage =
-            "This obligation can fail to become applicable at all. BPMN has one \
-            \kind of \8216did not happen\8217, so a path that was never \
-            \reached and a path that was discharged are drawn identically."
+    , MkFidelityNote
+        { code = "F3"
+        , severity = Blocking
+        , element = n.nodeId
+        , range = Nothing
+        , message =
+            "This obligation can fail to become applicable at all, and BPMN \
+            \has only one kind of \8216did not happen\8217."
+        , lost =
+            "the difference between an obligation that was never reached and \
+            \one that was discharged"
         }
     ]
 
