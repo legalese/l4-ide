@@ -442,6 +442,11 @@ stateGraphToBpmn opts sg =
   allOfJunctions :: [StateId]
   allOfJunctions = [s.stateId | s <- sg.sgStates, s.stateFan == AllOf]
 
+  -- The id a junction's converging gateway gets, if it gets one. Named rather
+  -- than spelled out twice, because 'anyBranchFolded' has to recognise one.
+  joinIdFor :: StateId -> Text
+  joinIdFor j = "Join_" <> Text.pack (show j)
+
   reachFrom :: StateId -> Set StateId
   reachFrom = go Set.empty . pure
    where
@@ -478,7 +483,7 @@ stateGraphToBpmn opts sg =
         | otherwise -> case tokenProof r tgt of
             Left reason -> declineWith reason
             Right proven ->
-              let jid = "Join_" <> Text.pack (show junction)
+              let jid = joinIdFor junction
                   claimed = Set.fromList [(a, b) | (a, b, _) <- proven]
                   redirect (edgeFrom, edgeTo, cond)
                     | Set.member (edgeFrom, edgeTo) claimed = (edgeFrom, jid, cond)
@@ -536,11 +541,27 @@ stateGraphToBpmn opts sg =
                    \a parallel join would wait for every one of them"
             )
 
-    -- An enclosing junction already rewrote this branch's arrivals to its own
-    -- gateway. That is not a failure to join; the join exists, one level out.
+    -- An __enclosing__ junction already rewrote this branch's arrivals to its
+    -- own gateway. That is not a failure to join; the join exists, one level
+    -- out, and 'foldedFinding' says so at 'Advisory'.
+    --
+    -- \"Enclosing\" is the whole of it. An arrival redirected to /some/ join is
+    -- equally consistent with a junction this one CONTAINS having claimed it,
+    -- and in that direction nothing has been folded — the conjunction here is
+    -- simply undrawn, and an Advisory note saying otherwise would be a false
+    -- reassurance, which is the failure mode this whole report exists to avoid.
+    -- So the claiming gateway has to belong to a junction whose own branches
+    -- reach this one.
+    enclosingJoinIds =
+      [ joinIdFor j
+      | j <- allOfJunctions
+      , j /= junction
+      , any (Set.member junction . reachFrom) (map (.transTo) (defaultsOf j))
+      ]
+
     anyBranchFolded =
       or
-        [ Text.isPrefixOf "Join_" eTo
+        [ eTo `elem` enclosingJoinIds
         | r <- maybeToList joinTarget
         , b <- branches
         , (eFrom, eTo, _) <- edges

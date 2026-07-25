@@ -325,6 +325,42 @@ cyclicGraph =
     , edge 1 3 LestTransition "timeout"
     ]
 
+-- | Two nested @AllOf@ junctions sharing a terminal, with the __inner__ one
+-- listed first so that 'addJoin' reaches it first and its gateway claims the
+-- arrivals before the outer junction goes looking for them.
+--
+-- The outer then finds no arrival it can call its own and declines, which is
+-- right. What must not happen is @P-JOIN-FOLDED@: the join that exists is one
+-- level /in/, not one level out, and it waits for the inner branches only — it
+-- has never heard of the outer's other branch. An Advisory note saying nothing
+-- was lost would be a false reassurance, which is the one thing a fidelity
+-- report must never produce.
+enclosedJoinGraph :: StateGraph
+enclosedJoinGraph =
+  StateGraph
+    { sgName = "inner join first"
+    , sgStates =
+        [ node 1 "inner split" IntermediateState AllOf
+        , node 0 "start" InitialState Linear
+        , node 4 "outer split" IntermediateState AllOf
+        , node 2 "left" IntermediateState Linear
+        , node 3 "right" IntermediateState Linear
+        , node 5 "third" IntermediateState Linear
+        , node 6 "Fulfilled" TerminalFulfilled Linear
+        ]
+    , sgTransitions =
+        [ edge 0 4 HenceTransition "begin"
+        , edge 4 1 DefaultTransition "first branch"
+        , edge 4 5 DefaultTransition "second branch"
+        , edge 1 2 DefaultTransition "left"
+        , edge 1 3 DefaultTransition "right"
+        , edge 2 6 HenceTransition "do left"
+        , edge 3 6 HenceTransition "do right"
+        , edge 5 6 HenceTransition "do third"
+        ]
+    , sgInitialState = 0
+    }
+
 -- | An @n@-way fan out of one exclusive gateway and back into one terminal.
 --
 -- Every one of the @n@ flows leaving the gateway has to run vertically in the
@@ -1134,6 +1170,27 @@ spec = do
       , n.code `elem` ["P-MULTI-HENCE", "P-JUNCTION-OBLIGATION", "P-CYCLE"]
       ]
         `shouldBe` []
+
+  -- P-JOIN-FOLDED is the one Advisory note in this report — the one that says
+  -- nothing was lost. A note that says nothing was lost had better be right,
+  -- so the condition for it has to distinguish a join drawn one level OUT from
+  -- a join drawn one level IN, and an arrival redirected to "some Join_" does
+  -- not.
+  describe "a join drawn one level in, not one level out" $ do
+    let bx = stateGraphToBpmn defaultBpmnOptions enclosedJoinGraph
+
+    it "draws the inner join and declines the outer, which is correct" $
+      converging bx `shouldBe` ["Join_1"]
+
+    -- Join_1 waits for the inner branches. It knows nothing about the outer's
+    -- other branch, so the outer conjunction really is undrawn and really is a
+    -- loss, and must be reported as one.
+    it "and does not call that folded, because nothing was folded outwards" $ do
+      findingsFor "P-JOIN-FOLDED" bx `shouldBe` []
+      map (.severity) (findingsFor "P-NOJOIN" bx) `shouldBe` [Lossy]
+
+    it "and leaves behind no join that can deadlock" $
+      unsoundJoins bx `shouldBe` []
 
   -- Boundary outflows used to drop straight down inside the column every task
   -- at that rank occupies, so the router now confines every vertical run to the
