@@ -195,6 +195,7 @@ test-suite jl4-core-test
     BitemporalSubstrateSpec
     BitemporalRecallSpec
     TraceOrderingSpec
+    StateGraphSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
