@@ -152,6 +152,7 @@ library
     L4.Utils.Ratio
     L4.Crypto.SHA1
     L4.Crypto.UUID5
+    L4.Viz.GuardedRows
     L4.Viz.Ladder
     L4.Viz.VizExpr
     L4.Import.Resolution

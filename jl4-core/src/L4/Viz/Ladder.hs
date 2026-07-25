@@ -54,6 +54,7 @@ import L4.Desugar
 import qualified L4.Export as Export
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
+import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, GuardedRows (..))
 
 ------------------------------------------------------
 -- Errors
@@ -439,7 +440,17 @@ translateExpr shouldSimplify = top
           else
             leafFromExpr e
 
-      _ -> leafFromExpr e
+      -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@, @BRANCH@,
+      -- @CONSIDER@ -- is ladder structure, not a leaf. See "L4.Viz.GuardedRows".
+      -- Every bail-out lands on 'leafFromExpr', i.e. the pre-existing behaviour.
+      _ -> do
+        isBool <- hasBooleanType (getAnno e)
+        case normaliseGuarded e of
+          Just rows
+            | isBool
+            , not (any (hasEffectfulNode . fst) rows.grRows) ->
+                guardedToLadder getFresh go rows
+          _ -> leafFromExpr e
 
 -- | How the seam is labelled in the picture (DESIGN §25e).
 --

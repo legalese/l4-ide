@@ -44,6 +44,8 @@ import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
 import qualified L4.Transform as Transform (simplify)
+import qualified L4.Viz.GuardedRows as GR
+import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -432,8 +434,20 @@ translateExpr shouldSimplify = top
             else
               leafFromExpr e
 
+        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
+        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
+        -- core visualiser via "L4.Viz.GuardedRows"; this module and
+        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
+        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
+        -- the pre-existing behaviour.
         _ -> do
-          leafFromExpr e
+          isBool <- hasBooleanType (getAnno e)
+          case GR.normaliseGuarded e of
+            Just rows
+              | isBool
+              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
+                  GR.guardedToLadder getFresh (go CtxNone) rows
+            _ -> leafFromExpr e
 
 scanAnd :: Expr Resolved -> [Expr Resolved]
 scanAnd (And _ e1 e2) =
