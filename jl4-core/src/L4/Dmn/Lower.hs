@@ -87,7 +87,11 @@ module L4.Dmn.Lower
   , renderFeel
   , renderFeelIn
   , sanitiseId
+  , selectShape
   , selectIdiom
+  , selectIdiomIn
+  , TypeOracle (..)
+  , noTypeOracle
   , peelLocals
   , flattenGuarded
   ) where
@@ -149,6 +153,54 @@ defaultTableCtx = MkTableCtx
   , tcEnums        = Set.empty
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
+  }
+
+-- | The typechecker's answer to "what type is this expression?", bundled — the
+-- three arguments 'annTypeOf' already takes.
+--
+-- 'TableCtx' carries all three already, but 'renderFeelIn' has to ask the same
+-- question without being inside a table: FEEL orders only the datatypes DMN 1.3
+-- Table 54 lists, so both the select-idiom gate ('selectIdiomIn') and the
+-- rendering of @\<@ \/ @\<=@ \/ @\>@ \/ @\>=@ itself need the operand's type.
+-- Bundling is what lets a caller that holds only an expression ('renderFeel')
+-- and a caller that holds a whole table ('mkColumn') ask through the same
+-- predicate.
+--
+-- Deliberately NOT threaded into 'flattenGuarded': its @childOf@ guard is
+-- structural, not type-directed. See 'selectShape'.
+data TypeOracle = MkTypeOracle
+  { toEnums :: !(Set Unique)
+  , toSubst :: !TC.Substitution
+  , toUri   :: !NormalizedUri
+  }
+
+-- | An oracle that knows only what each node's own annotation already says.
+--
+-- Weaker, and the two directions differ. An operand still annotated with an
+-- inference variable resolves to 'DmnAny' rather than to whatever the final
+-- substitution would have given, so 'selectIdiomIn' declines to fold — a lost
+-- peephole, nothing more. But 'DmnAny' also fails 'isBooleanOperand', so a
+-- comparison whose operand type is unknown still renders as @a \>= b@; that is
+-- right for every type FEEL orders and wrong only for a BOOLEAN comparison the
+-- oracle could not see was one.
+--
+-- In practice it sees: a resolved comparison's operands carry the winning
+-- overload's ground type in their own annotation (see 'feelOrderable'), which is
+-- exactly what this oracle reads. Every lowering path inside a module goes
+-- through 'oracleOf' and its substitution anyway; this one exists for
+-- 'renderFeel', which has an expression and nothing else.
+noTypeOracle :: TypeOracle
+noTypeOracle = MkTypeOracle
+  { toEnums = Set.empty
+  , toSubst = Map.empty
+  , toUri   = toNormalizedUri (Uri "")
+  }
+
+oracleOf :: TableCtx -> TypeOracle
+oracleOf ctx = MkTypeOracle
+  { toEnums = ctx.tcEnums
+  , toSubst = ctx.tcSubst
+  , toUri   = ctx.tcUri
   }
 
 data DmnLowerOptions = MkDmnLowerOptions
@@ -219,7 +271,10 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
   mkRule i cells (guardE, body) = MkDmnRule
     { drId          = ctx.tcIdPrefix <> "_r" <> tshow i
     , drInputs      = cells
-    , drOutput      = renderFeel body
+    -- NB the empty constructor set is this call site's existing behaviour (a
+    -- rule output has never quoted constructors, unlike `defaultOut` below);
+    -- only the oracle is new here.
+    , drOutput      = renderFeelIn Set.empty (oracleOf ctx) body
     , drDescription = Just (oneLine (prettyLayout guardE))
     }
 
@@ -231,14 +286,14 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
       [ MkDmnRule
           { drId          = ctx.tcIdPrefix <> "_r" <> tshow (length rowRules + 1)
           , drInputs      = map (const TestAny) columnKeys
-          , drOutput      = renderFeelIn ctx.tcConstructors b0
+          , drOutput      = renderFeelIn ctx.tcConstructors (oracleOf ctx) b0
           , drDescription = Just "OTHERWISE"
           }
       ]
     _ -> []
 
   allRules   = rowRules <> catchAll
-  defaultOut = renderFeelIn ctx.tcConstructors <$> rows.grOtherwise
+  defaultOut = renderFeelIn ctx.tcConstructors (oracleOf ctx) <$> rows.grOtherwise
 
   -- A column's declared type is whatever L4 inferred for its subject; when that
   -- is opaque to FEEL (an enum, a record, an inference variable) but every cell
@@ -381,10 +436,20 @@ tryDecompose ctx = \case
     TestOneOf ts -> ts
     t            -> [t]
 
+  -- A boolean endpoint is refused for the same reason 'renderFeelIn' sends a
+  -- boolean @\>=@ out verbatim: DMN 1.3 §10.3.2.13 defines the ordering
+  -- operators "only for the datatypes listed in Table 54", which has no boolean
+  -- row, so a cell reading @\>= true@ is outside FEEL. Refusing here sends the
+  -- conjunct to 'fallbackCell', where the whole comparison becomes the column
+  -- subject and is reported Blocking rather than silently emitted as S-FEEL.
   comparison op mirrored a b = case (constantOf ctx a, constantOf ctx b) of
-    (Nothing, Just v) -> Just (a, TestCmp op v)
-    (Just v, Nothing) -> Just (b, TestCmp mirrored v)
-    _                 -> Nothing
+    (Nothing, Just v) | not (isBoolValue v) -> Just (a, TestCmp op v)
+    (Just v, Nothing) | not (isBoolValue v) -> Just (b, TestCmp mirrored v)
+    _                                       -> Nothing
+
+  isBoolValue = \case
+    VBool _ -> True
+    _       -> False
 
   equalityOn a b = case (constantOf ctx a, constantOf ctx b) of
     (Nothing, Just v) -> Just (a, TestEq v)
@@ -470,7 +535,7 @@ mkColumn :: TableCtx -> Int -> Cell -> InputColumn
 mkColumn ctx i c = MkInputColumn
   { icId    = ctx.tcIdPrefix <> "_i" <> tshow i
   , icLabel = oneLine (prettyLayout c.cellSubject)
-  , icExpr  = renderFeelIn ctx.tcConstructors c.cellSubject
+  , icExpr  = renderFeelIn ctx.tcConstructors (oracleOf ctx) c.cellSubject
   , icType  = annType ctx c.cellSubject
   }
 
@@ -630,17 +695,24 @@ rulesPairwiseDisjoint rules =
 -- If any sub-expression is 'L4Verbatim' the whole node is re-rendered with
 -- 'prettyLayout' rather than spliced, so the text never mixes the two languages.
 renderFeel :: Expr Resolved -> FeelExpr
-renderFeel = renderFeelIn Set.empty
+renderFeel = renderFeelIn Set.empty noTypeOracle
 
--- | 'renderFeel', told which nullary references are data constructors.
+-- | 'renderFeel', told which nullary references are data constructors, and given
+-- a 'TypeOracle'.
 --
--- This matters on the OUTPUT side and is easy to get wrong: a constructor is a
--- /value/, and FEEL has no sum types, so it must be quoted. Rendered as a bare
--- name it would read as a reference to a variable of that name — and it would
--- disagree with the input side, where 'constantOf' has already quoted the same
--- constructor into a @\"red\"@ cell.
-renderFeelIn :: Set Unique -> Expr Resolved -> FeelExpr
-renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt) frag
+-- The constructor set matters on the OUTPUT side and is easy to get wrong: a
+-- constructor is a /value/, and FEEL has no sum types, so it must be quoted.
+-- Rendered as a bare name it would read as a reference to a variable of that
+-- name — and it would disagree with the input side, where 'constantOf' has
+-- already quoted the same constructor into a @\"red\"@ cell.
+--
+-- The oracle answers the one question FEEL's grammar cannot: which of L4's
+-- comparisons DMN actually orders. It decides whether the select idiom may fold
+-- ('selectIdiomIn'), and whether a bare @\<@ \/ @\<=@ \/ @\>@ \/ @\>=@ is FEEL
+-- at all (see 'ordering' below). Both fall out of DMN 1.3 Table 54, so both ask
+-- the same predicate family and cannot drift apart.
+renderFeelIn :: Set Unique -> TypeOracle -> Expr Resolved -> FeelExpr
+renderFeelIn ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt) frag
  where
   -- (precedence, text, fragment)
   go :: Expr Resolved -> (Int, Text, FeelFragment)
@@ -653,10 +725,13 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
     Minus     _ a b -> binary e 6 SFeel "-"  a b
     Times     _ a b -> binary e 7 SFeel "*"  a b
     DividedBy _ a b -> binary e 7 SFeel "/"  a b
-    Lt        _ a b -> binary e 5 SFeel "<"  a b
-    Leq       _ a b -> binary e 5 SFeel "<=" a b
-    Gt        _ a b -> binary e 5 SFeel ">"  a b
-    Geq       _ a b -> binary e 5 SFeel ">=" a b
+    Lt        _ a b -> ordering e "<"  a b
+    Leq       _ a b -> ordering e "<=" a b
+    Gt        _ a b -> ordering e ">"  a b
+    Geq       _ a b -> ordering e ">=" a b
+    -- Equality, unlike ordering, is total in FEEL: Table 52 requires only that
+    -- both sides be "of the same kind/datatype", and Table 53 gives boolean its
+    -- own row ("e1 and e2 must both be true or both be false").
     Equals    _ a b -> binary e 5 SFeel "="  a b
     -- Inert text is grammatical scaffolding -- a quoted fragment of the statute
     -- carried along for isomorphism -- whose VALUE is its context's identity
@@ -724,7 +799,7 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
     -- `if`, the way a compiler backend recognises a select pattern instead of
     -- emitting a branch.
     IfThenElse _ c t f
-      | Just (fn, a, b) <- selectIdiom e -> call e fn [a, b]
+      | Just (fn, a, b) <- selectIdiomIn oracle e -> call e fn [a, b]
       | otherwise ->
           triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
     -- A call to an L4 function is NOT a FEEL function invocation, and this used
@@ -754,6 +829,24 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
       in if f == L4Verbatim
            then verbatim whole
            else (atomPrec, build (parenIf (p < atomPrec) t), max frag f)
+
+    -- FEEL's ORDERING operators are partial in a way its equality is not.
+    -- DMN 1.3 §10.3.2.13: "The other comparison operators are defined only for
+    -- the datatypes listed in Table 54", and Table 54 has rows for number,
+    -- string, date, date-and-time, time and the two durations — and __none for
+    -- boolean__. L4 does order booleans (@__LEQ__@ has a
+    -- @BOOLEAN AND BOOLEAN TO BOOLEAN@ variant, "L4.TypeCheck.Environment"), so
+    -- @IF p AT LEAST q@ is a well-typed L4 program whose obvious transliteration
+    -- @p >= q@ is outside FEEL's language, not merely outside S-FEEL.
+    --
+    -- Emitting it tagged 'SFeel' would be the strongest executability claim this
+    -- module can make about a fragment DMN does not define. So it goes out
+    -- verbatim, which is what this module already does for every other
+    -- "renders fine, evaluates to nothing" case (see the @App@ note above), and
+    -- verbatim is what raises @D-NONFEELINPUT@ \/ @D-NONFEELOUTPUT@ Blocking.
+    ordering whole op a b
+      | any (isBooleanOperand oracle) [a, b] = verbatim whole
+      | otherwise                            = binary whole 5 SFeel op a b
 
     binary whole prec frag op a b =
       let (pa, ta, fa) = go a
@@ -818,11 +911,12 @@ feelIdent = feelIdentText . nameOf
 -- do not write @min@.
 --
 -- Recognising it is the peephole a compiler backend runs (LLVM's
--- @matchSelectPattern@ folding a branch into @SPF_SMAX@\/@SMIN@), and it matters
--- here for a structural reason: without it, 'flattenGuarded' would expand a
--- @max@ into extra table rows, manufacturing cases the regulation does not have.
--- 17 CFR 227.100(a)(2)(i) says "__The greater of__ $2,500, or 5 percent of …" —
--- the statute states an operator, so @max@ is the isomorphic rendering and the
+-- @matchSelectPattern@ folding a branch into @SPF_SMAX@\/@SMIN@), and recognising
+-- the SHAPE also matters structurally, whether or not the fold fires: without
+-- 'selectShape', 'flattenGuarded' would expand the conditional into extra table
+-- rows, manufacturing cases the regulation does not have. 17 CFR
+-- 227.100(a)(2)(i) says "__The greater of__ $2,500, or 5 percent of …" — the
+-- statute states an operator, so @max@ is the isomorphic rendering and the
 -- expansion would be a derivation the statute never makes.
 --
 -- __Strictness does not matter here__, which is why @>=@ and @>@ map to the same
@@ -834,8 +928,68 @@ feelIdent = feelIdentText . nameOf
 -- @IF pool > promised THEN pool + increase ELSE pool@ (an arm is an operand
 -- /plus a term/), @IF n < 0 THEN 0 - n ELSE n@ (@abs@, four times in the
 -- corpus), and @IF n > k THEN n - 1 ELSE n@ (an off-by-one).
+--
+-- __The shape is not the whole test.__ L4\'s @\<@ \/ @\<=@ \/ @\>@ \/ @\>=@ are
+-- overloaded — "L4.TypeCheck.Environment" gives each a @NUMBER@, a @STRING@ and
+-- a @BOOLEAN@ variant, and @daydate.l4@ adds a @DATE@ one — so
+-- @IF s AT LEAST t THEN s ELSE t@ is a well-typed L4 program over any of the
+-- four, and the syntax says nothing about which. FEEL\'s @min@\/@max@ take a
+-- "non-empty list of __comparable__ items" (DMN 1.3 §10.3.4.4 Table 75), and
+-- what FEEL can compare is fixed by §10.3.2.13: "The other comparison operators
+-- are defined only for the datatypes listed in Table 54", whose rows are number,
+-- string, date, date-and-time, time and the two durations. __Boolean is absent__,
+-- so @max(true, false)@ is outside the builtin\'s domain and §10.3.4 makes an
+-- out-of-domain parameter yield @null@. (Drools\/KIE 8.44 answers @true@ anyway,
+-- because it delegates to Java\'s @Comparable@ — engine-specific luck an exporter
+-- must not bank on.)
+--
+-- So the gate is __FEEL-orderable operands__ ('feelOrderable'), which of the
+-- types this backend models means @NUMBER@, @STRING@ and @DATE@. That line is
+-- forced rather than chosen: the un-folded fallthrough is
+-- @(if s >= t then s else t)@, whose @\>=@ is legal in exactly the same rows of
+-- exactly the same table. Refusing to emit @min@ over dates while emitting @\<=@
+-- over dates would not be conservative, just inconsistent. Boolean fails the
+-- gate for a reason that applies to both spellings at once, and 'renderFeelIn'
+-- accordingly sends a boolean @\>=@ out verbatim rather than pretending it is
+-- S-FEEL.
+--
+-- An operand the oracle cannot type at all ('DmnAny' — no annotation, an
+-- unresolved inference variable, a synthesised node) also fails the gate: not
+-- because @if@ is safer, but because we cannot say it is orderable. Missing type
+-- information costs a peephole, never correctness.
+--
+-- 'selectIdiom' asks the weakest oracle there is ('noTypeOracle'): it reads each
+-- operand\'s own annotation and nothing else. Callers holding a 'TableCtx' should
+-- use 'selectIdiomIn' with 'oracleOf', which can additionally resolve an operand
+-- whose annotation is still an inference variable.
 selectIdiom :: Expr Resolved -> Maybe (Text, Expr Resolved, Expr Resolved)
-selectIdiom = \case
+selectIdiom = selectIdiomIn noTypeOracle
+
+-- | 'selectIdiom', told how to type an operand.
+selectIdiomIn :: TypeOracle -> Expr Resolved -> Maybe (Text, Expr Resolved, Expr Resolved)
+selectIdiomIn oracle e = do
+  found@(_, a, b) <- selectShape e
+  guard (feelOrderable oracle a && feelOrderable oracle b)
+  pure found
+
+-- | The select /shape/, with no view on the operands\' type: @IF@ whose arms are
+-- its own comparison\'s operands.
+--
+-- Separate from 'selectIdiomIn' because the two questions have different
+-- consumers and must not be conflated:
+--
+--   * __may we fold?__ is 'selectIdiomIn', and it is about what FEEL can
+--     evaluate.
+--   * __may we expand?__ is this one, and it is about ISOMORPHISM. @childOf@ in
+--     'flattenGuarded' asks it to keep a select out of the row splicer, because
+--     splicing @IF a >= b THEN a ELSE b@ into two rules manufactures a case
+--     distinction the source does not make and drags the whole table from @U@ to
+--     @F@ (DMN 8.2.10 order dependence) for a body that is one operator. That
+--     harm does not go away when the operands are strings, and it is not caused
+--     by the fold — so gating expansion on the fold's type test would have made
+--     the artifact worse for exactly the operands the fold declines.
+selectShape :: Expr Resolved -> Maybe (Text, Expr Resolved, Expr Resolved)
+selectShape = \case
   IfThenElse _ c t f -> do
     (thenIsA, a, b) <- comparisonOf c
     let same x y = clearAnno x == clearAnno y
@@ -852,8 +1006,49 @@ selectIdiom = \case
     Lt  _ a b -> Just (False, a, b)
     _         -> Nothing
 
-isSelectIdiom :: Expr Resolved -> Bool
-isSelectIdiom = isJust . selectIdiom
+-- | Is this operand of a comparison of a type FEEL can ORDER (DMN 1.3 Table 54)?
+--
+-- The overload the typechecker committed to is /not/ readable here: it desugars
+-- @a AT LEAST b@ into an application of one of @__GEQ__@\'s variants, but
+-- 'carameliseExpr' — which "L4.Dmn.Lower" runs to make a comparison look like a
+-- comparison again — matches on the head\'s NAME TEXT and drops the 'Resolved',
+-- which is the only carrier of the chosen 'Unique'. Every variant, including
+-- @daydate.l4@\'s user-level @DATE@ ones, caramelises to the identical 'Geq'
+-- node.
+--
+-- What survives is better placed anyway. @matchFunTy@ checks each argument
+-- against the chosen candidate\'s own declared parameter type, and @checkExpr@
+-- stamps that expected type onto the node
+-- ("L4.TypeCheck": @setAnnResolvedType t Nothing re@). Since the comparison
+-- builtins are @fun_ [ty, ty] boolean@ for a ground @ty@, a resolved
+-- comparison\'s operand carries the winning overload\'s concrete
+-- @NUMBER@\/@STRING@\/@BOOLEAN@\/@DATE@ — in an annotation caramelisation
+-- rebuilds in place and 'substLocals' splices intact. That is exactly the fact
+-- the discarded 'Unique' would have given.
+feelOrderable :: TypeOracle -> Expr Resolved -> Bool
+feelOrderable oracle e = builtinOperandType oracle e `elem` [DmnNumber, DmnString, DmnDate]
+
+-- | Is this operand a @BOOLEAN@ — the one type L4 orders and FEEL does not?
+isBooleanOperand :: TypeOracle -> Expr Resolved -> Bool
+isBooleanOperand oracle e = builtinOperandType oracle e == DmnBoolean
+
+-- | The operand\'s type as a FEEL /builtin/, with the enum collapse deliberately
+-- switched off.
+--
+-- 'annType' maps an @IS ONE OF@ to 'DmnString', which is right for a typeRef —
+-- an enum\'s values serialise as strings — but wrong as a licence to ORDER them.
+-- @max("red", "green")@ compares constructor SPELLINGS, and the L4 declaration
+-- order those constructors were written in is the only ordering the source ever
+-- suggested. Passing the empty constructor set makes 'dmnTypeOf' fall through to
+-- 'builtinType', so an enum answers 'DmnAny' here and fails both gates.
+builtinOperandType :: TypeOracle -> Expr Resolved -> DmnType
+builtinOperandType o = annTypeOf Set.empty o.toSubst o.toUri
+
+isSelectIdiomIn :: TypeOracle -> Expr Resolved -> Bool
+isSelectIdiomIn oracle = isJust . selectIdiomIn oracle
+
+isSelectShape :: Expr Resolved -> Bool
+isSelectShape = isJust . selectShape
 
 -- | Lifted @max@\/@min@ whose operands include a literal or a named constant.
 --
@@ -867,7 +1062,7 @@ liftedThresholds :: TableCtx -> Expr Resolved -> [(Text, Expr Resolved)]
 liftedThresholds ctx top =
   [ (fn, sub)
   | sub <- toListOf (cosmosOf (gplate @(Expr Resolved))) top
-  , Just (fn, a, b) <- [selectIdiom sub]
+  , Just (fn, a, b) <- [selectIdiomIn (oracleOf ctx) sub]
   , any isThreshold [a, b]
   ]
  where
@@ -962,6 +1157,11 @@ maxFlattenRows  = 64
 
 -- | Splice nested chains into more rows. Returns the flattened chain and the
 -- bodies left unflattened by a cap.
+--
+-- Deliberately type-blind: @childOf@ below asks 'selectShape', not
+-- 'selectIdiomIn'. Whether the select may be FOLDED is a question about FEEL\'s
+-- domain; whether it may be EXPANDED is a question about isomorphism, and the
+-- answer to the second is no for every operand type.
 flattenGuarded :: GuardedRows -> (GuardedRows, [Expr Resolved])
 flattenGuarded rs0
   | length flat.grRows > maxFlattenRows = (rs0, [b | (_, b) <- rs0.grRows, isJust (childOf b)])
@@ -1012,7 +1212,7 @@ flattenGuarded rs0
   -- Reuse the normaliser's own answer rather than re-deriving its bail
   -- conditions, and refuse the two cases this module adds on top of them.
   childOf b
-    | isSelectIdiom b    = Nothing
+    | isSelectShape b    = Nothing
     | hasEffectfulNode b = Nothing
     | otherwise = case normaliseGuarded b of
         Just sub
@@ -1025,7 +1225,10 @@ flattenGuarded rs0
 ------------------------------------------------------------------------
 
 annType :: TableCtx -> Expr Resolved -> DmnType
-annType ctx = annTypeOf ctx.tcEnums ctx.tcSubst ctx.tcUri
+annType = oracleType . oracleOf
+
+oracleType :: TypeOracle -> Expr Resolved -> DmnType
+oracleType o = annTypeOf o.toEnums o.toSubst o.toUri
 
 -- | Kept separate from 'annType' on purpose: 'TableCtx' has strict fields, so a
 -- caller computing @tcOutputType@ from an expression's annotation cannot go
@@ -1211,7 +1414,7 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
               \decision-table analysis defines an output entry as a constant")
         "gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it"
     | body <- outputBodies
-    , let fe = renderFeelIn ctx.tcConstructors body
+    , let fe = renderFeelIn ctx.tcConstructors (oracleOf ctx) body
       -- MUTUALLY EXCLUSIVE with D-NONFEELOUTPUT. An L4Verbatim entry satisfies
       -- `not . isConstantText` too, and used to be reported by this Advisory
       -- note alone -- a note about ANALYSABILITY standing in for a failure of
@@ -1226,7 +1429,7 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   nonFeelOutputNotes =
     [ nonFeelOutput here (bestRange body) fe
     | body <- outputBodies
-    , let fe = renderFeelIn ctx.tcConstructors body
+    , let fe = renderFeelIn ctx.tcConstructors (oracleOf ctx) body
     , fe.feFragment == L4Verbatim
     ]
 
@@ -1443,8 +1646,8 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- table. DMN's own answer for a formula is a boxed literal expression, so
       -- this is not a loss and gets no D-LITERALEXPR note -- only the threshold
       -- note, if a threshold went inside the expression.
-      Right _ | isSelectIdiom body ->
-        let rendered = renderFeelIn constructors body
+      Right _ | isSelectIdiomIn (oracleOf tctx) body ->
+        let rendered = renderFeelIn constructors (oracleOf tctx) body
         in
         ( LogicLiteral rendered
         , [ dmnNote "D-LIFTEDTHRESHOLD" Advisory did (bestRange sub)
@@ -1484,7 +1687,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         ]
       )
      where
-      rendered = renderFeelIn constructors body
+      rendered = renderFeelIn constructors (oracleOf tctx) body
 
     decision = MkDecision
       { dcnId           = did
