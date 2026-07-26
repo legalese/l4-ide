@@ -190,6 +190,13 @@ trailing. First action is **H2**: this branch is that fresh branch off `origin/u
 | **C2** | The citizen wizard (housing-wizard façade pattern)                                                                                                                       | C0         |
 | **C3** | Scenario tests — the negotiation-stage idea applied to a regulation                                                                                                      | C0         |
 
+Build spec: [CORPUS-TRACK.md](./CORPUS-TRACK.md) — C0's residual gap, C1's four moves sized
+against what is already built, C2/C3, and the M5 script. It also carries **the corrected Reg
+CF regime table** (four regimes, three boundaries — the earlier three-regime reading omitted
+the 2017-04-12 inflation adjustment) and the **temporal closure rule**: a function may be
+dated only when every constant in its transitive read set is dated over the same window.
+Both are load-bearing for M5 and were established by adversarial review; see its §9.
+
 ### Track S — surfaces
 
 | ID     | Work                                                                    | Depends on |
@@ -208,15 +215,15 @@ trailing. First action is **H2**: this branch is that fresh branch off `origin/u
 
 ## 5. Milestones
 
-| #      | Deliverable                                           | Tracks         |
-| ------ | ----------------------------------------------------- | -------------- |
-| **M0** | Ribbons stop being the typical outcome                | D0             |
-| **M1** | The new ladder is the IDE default in both apps        | L, E0          |
-| **M2** | A ladder embeds in an arbitrary web page              | E1, E2, S1     |
-| **M3** | **The mirror page** — parity exhibit, page for page   | C0, C2, M2     |
-| **M4** | DMN + BPMN out, each with its fidelity report         | D1, P1, S0     |
-| **M5** | **The superset page** — temporal, verified, queryable | C1, C3, S2, S3 |
-| **M6** | Process/LTS visualiser                                | P2 (own spec)  |
+| #      | Deliverable                                           | Tracks                 |
+| ------ | ----------------------------------------------------- | ---------------------- |
+| **M0** | Ribbons stop being the typical outcome                | D0                     |
+| **M1** | The new ladder is the IDE default in both apps        | L, E0                  |
+| **M2** | A ladder embeds in an arbitrary web page              | E1, E2, S1             |
+| **M3** | **The mirror page** — parity exhibit, page for page   | C0, C2, M2             |
+| **M4** | DMN + BPMN out, each with its fidelity report         | D1, P1, S0             |
+| **M5** | **The superset page** — temporal, verified, queryable | C1, **C2**, C3, S2, S3 |
+| **M6** | Process/LTS visualiser                                | P2 (own spec)          |
 
 **M0 first, and deliberately so.** It is the smallest change with the widest blast radius:
 one Haskell function, no TypeScript, and it simultaneously improves every existing ladder,
@@ -246,7 +253,11 @@ exporter. Nothing else on this list has that ratio.
   `BUILD-SPEC-dmnmd-to-l4.md`; its mapping table inverts usefully for D1, but round-tripping
   is out of scope here.)
 - **Not** a full formalisation of 17 CFR 227. C0 is bounded by their page; C1 extends only
-  where it demonstrates something their format structurally cannot hold.
+  where it demonstrates something their format cannot **evaluate** — not something it cannot
+  represent. (Anything can be typeset; the earlier "structurally cannot hold" framing did not
+  survive review. See CORPUS-TRACK.md §2.0.) The 2020 COVID temporary rules
+  (17 CFR 227.201(z)/(bb)) are in-scope material deliberately left unmodelled, named in
+  CORPUS-TRACK.md §2.4.1 rather than silently omitted.
 - **Not** a claim that BPMN is always wrong. It is wrong for predicates. `PARTY … MUST …
 HENCE/LEST` genuinely _is_ process, and that is exactly what Track P exports.
 
@@ -267,7 +278,21 @@ Concretely, for the mirror milestone (M3):
 4. The ladder for the eligibility decision renders in a plain HTML page with a script tag, and
    clicking a term changes the verdict.
 
-And for the superset (M5), the demonstration that lands the argument: **ask the same question
-under two different rule dates and get two different answers**, each correct for its date —
-against a diagram whose threshold is a number someone typed once and has to remember to
-change in two places.
+And for the superset (M5), the demonstration that lands the argument: **someone asks the same
+question, with their own figures, under two different rule dates, and gets two different
+answers**, each correct for its date — against a diagram whose threshold is a number someone
+typed once and has to remember to change in two places.
+
+Three qualifications on that sentence, established by review and detailed in
+[CORPUS-TRACK.md §9](./CORPUS-TRACK.md):
+
+- **"Someone asks" is load-bearing.** Two expected values in a golden file satisfy the
+  sentence literally and demonstrate nothing a static table could not. The interactive
+  surface is **C2**, which is why M5 now depends on it.
+- **"Each correct for its date" is an accuracy claim about us**, and it fails unless every
+  constant the demonstrated function reads is dated over the same window — not just the one
+  the headline turns on. See CORPUS-TRACK.md §2.4 trap 5.
+- **"What their format cannot hold" is the wrong standard** and is not used in the corpus
+  track; anything can be typeset. The standard is what their format cannot **evaluate**,
+  cannot be caught being **wrong** about, and cannot answer for **arbitrary inputs**. See
+  CORPUS-TRACK.md §2.0.
