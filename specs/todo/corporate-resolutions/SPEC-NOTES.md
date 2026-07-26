@@ -102,14 +102,44 @@ Verified against `CoA1967`, the chain is **not quite** that — and each correct
 | General meeting     | s175 / s177                                                                                                                                                                                              | Quorum s177(1)                                  |
 | Notice              | s177(2) ordinary; **s184(1)** special                                                                                                                                                                    | **14 days private, 21 days public** — see below |
 
-**Correction 1 — pre-emption is constitutional here, not statutory.** "Pre-emption" appears
-**zero** times in `CoA1967`. Unlike UK CA2006 s561, Singapore has no general statutory pre-emption
-right on new issues for private companies; the offer-to-existing-members step comes from the
-company's own constitution (and the model constitution). This _strengthens_ §2.2: the dependency
-graph is assembled from **both** layers, and the pre-emption edge is precisely one of the
-configurable ones. A company can delete it; it cannot delete s161. The graph should therefore
-colour edges by provenance — mandatory (Act) vs configured (constitution) — which is §3(2) falling
-out of §2.1 automatically.
+**Correction 1 — there is no offer-to-existing-members step at all, in either layer.** Now checked
+against the actual First Schedule text (`sso.agc.gov.sg/SL/CoA1967-S833-2015?ProvIds=Sc1-`), not
+just the Act:
+
+- **"Pre-emption" appears zero times in `CoA1967`.** Unlike UK CA2006 s561, Singapore has no general
+  statutory pre-emption right on new issues for private companies.
+- **The model constitution has no pre-emption on issue.** Para 7(1) reads in full: _"Without
+  prejudice to any special rights previously conferred on the holders of any existing shares or
+  class of shares but subject to the Act, shares in the company may be issued by the directors."_
+  The only fetter is "subject to the Act" — which picks up s161's general-meeting approval and
+  nothing else.
+- **The model constitution has no ROFR on transfer either.** Paras 24–27 impose no offer round. What
+  they impose is categorically different: **para 26 — the directors _may decline_ to lodge a notice
+  of transfer if the shares are not fully paid, the company has a lien, or _"the directors do not
+  approve of the transferee"_.**
+
+**That last point is a modelling trap worth stating explicitly.** A directors' veto and a
+pre-emption right are both loosely called "transfer restrictions" and are **different deontic
+objects**: para 26(b) is a _discretionary permission held by the board_, with no stated criteria and
+no procedure; a ROFR is an _obligation on the seller_ plus _correlative rights in the other
+members_, with a mandatory sequence and a clock. An encoding that files both under "restriction"
+has already lost the distinction that matters. (Hohfeld earns his keep here.)
+
+**So the motivating chain of §2.4 does not exist for a default-configured Singapore private
+company.** The only prerequisite the default stack imposes on a share issue is s161 approval. Every
+protective step founders and investors _assume_ is there — pre-emption, ROFR, tag-along — exists
+only if someone put it in **user space** (§2.5). Meng's point is therefore stronger than first
+stated: this is not a case where user space _also_ defines these rights; it is the case where user
+space is the _only_ place they are defined.
+
+Two consequences worth carrying forward:
+
+1. **The default configuration is minority-hostile.** No pre-emption, no ROFR, no tag — and the
+   _directors_ get a discretionary veto over who may become a member. That is a quotable fact and it
+   explains why an SHA is universal in Singapore startup practice: it is not belt-and-braces, it is
+   the only place the protections live.
+2. **The graph must colour edges by provenance and by layer**, since almost every interesting edge
+   turns out to originate outside both the Act and the constitution.
 
 **Correction 2 — 21 days is the public-company figure.** s184(1) after Act 36/2014 splits it:
 **(a) private company — not less than 14 days'** written notice; **(b) public company — not less
@@ -141,9 +171,17 @@ and a plan that sequences other steps too slowly silently invalidates its own pr
 
 ### 2.5 Pre-emption and ROFR also live in "user space" — the layer stack
 
-§2.4 treats pre-emption as constitutional rather than statutory. That is still too simple. Both
-pre-emption and ROFR are routinely defined **in shareholders' agreements, investment agreements and
-side letters** — and that is what makes this case study interesting rather than merely detailed.
+§2.4 establishes that neither the Act nor the model constitution supplies pre-emption or ROFR at
+all. Both are defined **in shareholders' agreements, investment agreements and side letters** — and
+that is what makes this case study interesting rather than merely detailed.
+
+**The model constitution itself points at that layer.** Para 49(1) sets 14 days' notice for general
+meetings _"Subject to the provisions of the Act relating to special resolutions **and any agreement
+amongst persons who are entitled to receive notices of general meetings from a company**"_. So the
+constitution expressly subordinates one of its own defaults to a private agreement it never names
+and cannot see. That is a cross-layer reference written into the public document — and a
+ready-made hook for the encoding, since it means layer composition is not something we are imposing
+on the material. The material already does it.
 
 | Layer         | Instrument                          | Public?               | Amendment threshold                | Binds                                       |
 | ------------- | ----------------------------------- | --------------------- | ---------------------------------- | ------------------------------------------- |
@@ -323,11 +361,40 @@ constitution outright. Static, decidable given §2.1's marking, and the direct a
 static analysis. _This is the flagship: a founder uploads their constitution and gets told which
 clauses are void._
 
-**A2 — Recusal breaks quorum.** An interested director must disclose and (typically, per the
-constitution) abstain. If enough directors are interested, abstention drops the meeting below
-quorum and the board deadlocks — it can neither act nor validly decline to. Same shape as the
-deontic race condition found in the government pilot: a double bind arising from the interaction
-of two independently-reasonable rules. Strong candidate for the flagship _finding_.
+**A2 — Interested-director deadlock. Now verified in the model constitution's own text, and it is
+sharper than "recusal breaks quorum".** The operative paragraphs:
+
+- **85(1)** — _"A director **must not vote** in respect of any transaction or proposed transaction
+  with the company in which the director is interested…"_ — a prohibition, not a convention.
+  **85(2)** — if the director votes anyway, _"the director's vote must not be counted."_
+- **86** — _"The quorum … may be fixed by the directors, and unless so fixed is **2**."_
+- **87(2)** — where the number of directors falls below quorum, the continuing directors _"may not
+  act except for the purpose of increasing the number of directors … or … summoning a general
+  meeting."_
+
+Take the very common two-founder, two-director company, and any transaction both are interested in
+— a founder loan, a related-party services agreement, an issue of shares to themselves. Then:
+
+**The meeting is quorate but structurally incapable of deciding.** Para 85 prohibits _voting_, not
+_attending_, so the quorum of 2 under para 86 is satisfied; there are simply no votes that may be
+counted. That is a cleaner double bind than a quorum failure — the board is validly convened and
+can transact nothing.
+
+**And para 87(2)'s escape hatch does not reach it.** 87(2) is triggered by the _number_ of directors
+falling below quorum — vacancies — not by universal disqualification from voting. So the model
+constitution provides a relief valve for one kind of board paralysis and not for the structurally
+similar one. A human reading 87 assumes they are covered; a reachability check finds in seconds that
+they are not.
+
+Same shape as the deontic race condition found in the government pilot: a double bind emerging from
+two independently reasonable rules. **This is the flagship finding candidate**, and unlike most of
+this file it needs no new machinery to demonstrate — the rules are short, verified, and the
+counterexample is a two-person company.
+
+Caveats to state when writing it up: s156 disclosure sits alongside this; para 85 is a default a
+bespoke constitution or an SHA routinely disapplies; and members can ratify. The point is precisely
+that **the default configuration deadlocks**, which is a statement about the model constitution, not
+about every company.
 
 **A3 — AGM dispensation interactions.** s175A lets a company dispense with AGMs; s184F(2) already
 carves out resolutions mentioned in s175A(1). What else silently requires a meeting that a
@@ -422,7 +489,10 @@ should reproduce:
 
 ## 8. Next actions
 
-- [ ] Pull the model constitution Schedules from SSO; note the lawplain gap (§7.5).
+- [x] ~~Pull the model constitution Schedules from SSO~~ — done; text at `sso.agc.gov.sg/SL/CoA1967-S833-2015?ProvIds=Sc1-`.
+      **lawplain gap confirmed and still open**: its `S 833/2015` record is 935 chars (enacting
+      regulations only), so the Schedules are absent from the corpus. SSO 403s WebFetch but serves
+      a normal browser UA. Worth checking whether scheduled instruments are systematically thin.
 - [ ] Read `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` — does it already handle §2.1's markers?
 - [ ] Extract the mandatory/default partition from `CoA1967` Part on meetings, using the §2.1 stock
       phrases. Small, mechanical, high-value, and independently checkable.
