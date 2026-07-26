@@ -19,6 +19,40 @@ index.
 | **Seeing Like a Citizen**                       | [`political-economy/`](political-economy/)               | The political economy of legal legibility as civic infrastructure. _Design note._                                                                                    |
 | **Hohfeld, higher-order**                       | [`hohfeld-higher-order/`](hohfeld-higher-order/)         | Hohfeldian powers as higher-order deontics. **Now a section of _Deontics as Domination_** (see its `DESIGN.md`), not a standalone paper.                             |
 
+## Planned — placeholder, not yet started
+
+| Facet                                          | Source notes                                                                                                                                                                                        | What it would be                                                                                       |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Who May Change the Rules** _(working title)_ | [`yc-safe/`](../specs/todo/yc-safe/SPEC-NOTES.md) · [`corporate-resolutions/`](../specs/todo/corporate-resolutions/SPEC-NOTES.md) · [`godel-loophole/`](../specs/todo/godel-loophole/SPEC-NOTES.md) | Self-reference in normative systems, across three worked instruments. **No directory yet, by design.** |
+
+_The first two spec-note links resolve once `docs/yc-safe-spec` and
+`docs/corporate-resolutions-spec` merge; only `docs/godel-loophole-spec` is on this branch._
+
+Three arcs that look unrelated are one problem. The YC SAFE's value depends on the valuation that
+depends on the SAFE — an **arithmetic fixpoint**. Corporate governance asks who may change the rule
+that says who may change the rules — **layered amendment authority**. Article V applies the amendment
+rule to itself — an **open regress**, and the leading reconstruction of what Gödel is said to have
+found in 1947.
+
+The candidate spine, if it survives contact with the work: **a self-amendment regress is closed
+exactly when the meta-rule lives in a layer the actor cannot reach.** Singapore company law closes
+it — s26 and s26A of the Companies Act sit in the statute, outside the constitution they govern, and
+entrenchment is removable only by unanimity. The US Constitution cannot, because Article V is inside
+the document it governs. The testbed ladder runs **Love Letter** (rules do not change) → **Fluxx**
+(finite, fixed deck) → **Nomic** (open, player-authored), and is chosen so the encoding fails cheaply
+before it is pointed at real law.
+
+Prior art to distinguish from, not to rediscover: **van der Meyden & Maher** on the SAFE (2025
+Springer book), **Ellul & Pace** on Nomic (_SoliNomic_, 2022 — and Pace is already a named direct
+ancestor in [`formal-methods-in-law/`](formal-methods-in-law/)), and the **Ross–Hart–Suber**
+self-amendment literature that long predates the Gödel framing.
+
+> **Discipline: write this after the work ships, not before.** The value of all three arcs is that
+> they produce checkable findings; a paper drafted ahead of them would be an argument about what we
+> expect to find. Two of the three arcs currently have no code at all, and one of them — the Gödel
+> case — has **no ground truth by construction**, since Gödel never wrote his contradiction down.
+> This row exists so the facet is not forgotten, not so it can be started.
+
 ## Case studies
 
 Worked L4 analyses of real instruments — not full papers, but valuable writing and a
