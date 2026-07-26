@@ -151,7 +151,75 @@ first is what earns the right to attempt the general one.
 
 ---
 
-## 5a. The testbed: Fluxx and Nomic
+## 5a. The testbed ladder: Love Letter → Fluxx → Nomic
+
+### 5a.0 Rung zero — Love Letter, and it is the onboarding asset for the whole programme
+
+**Love Letter** (Seiji Kanai, 2012 — the classic 16-card version; the 2019 edition differs, see
+below). Its qualification for rung zero is precisely that it has **no rule mutation at all**: fixed
+rules, changing state. It teaches the notation _without_ the self-reference, which is what makes it
+gentle. The full ladder:
+
+| Rung  | System                      | How rules change              | Rule-change space       |
+| ----- | --------------------------- | ----------------------------- | ----------------------- |
+| **0** | **Love Letter**             | **they don't**                | — teaches notation only |
+| 1     | Fluxx                       | cards from a fixed deck       | finite, enumerable      |
+| 2     | Nomic                       | player-authored text          | unbounded               |
+| 3     | Company constitution        | bounded by statute (s26/s26A) | Fluxx-like              |
+| 4     | US Constitution / Article V | self-applying                 | Nomic-like              |
+
+**The pedagogic argument is the real one, and it is stronger than "it's small".** Every
+legal-formalisation demo for a lay audience has the same defect: **the reader cannot check whether
+the encoding is faithful**, because they do not know the law. They are asked to take the
+formalisation on trust — which is exactly the trust this project is trying to earn rather than
+assume. With Love Letter the reader knows the rules _completely_; the rulebook is one card and they
+learned it in three minutes. So they can **audit the encoding themselves, and verify it by playing
+against it.** No statute, insurance policy or SAFE demo can offer that. The trust earned here is
+what transfers to the cases where checking is impossible.
+
+**It is legal-shaped despite being tiny.** The classic deck: Guard 1 ×5, Priest 2 ×2, Baron 3 ×2,
+Handmaid 4 ×2, Prince 5 ×2, King 6 ×1, Countess 7 ×1, Princess 8 ×1 — 16 cards. Four teaching
+moments fall straight out:
+
+- **Countess (7) is a genuine deontic obligation with a state trigger.** If you hold the Countess
+  _and_ either the King or the Prince, you **must** discard the Countess. It is the only forced move
+  in the game. A lay reader gets _"the rules can compel you, conditionally"_ from a single card, with
+  no jargon. That is the deontic primitive, delivered for free.
+- **Handmaid (4) is a Hohfeldian immunity** — you cannot be targeted until your next turn. It
+  interacts with every targeting card in the deck, which teaches actor-indexed effects and why "who
+  is bound" is a real question. Ties directly to [[deontic-actor-indexed-actions]].
+- **Prince (5) + Princess (8) is a composed forced loss.** Another player may compel you to discard
+  your hand; if that hand is the Princess, you are out. **Neither card says this.** The consequence
+  exists only in the composition — which is the corporate arc's §2.5 argument in miniature: every
+  component is individually fine, and the composite is reviewed by nobody.
+- **The all-protected case is a totality gap.** If every other player is protected by the Handmaid
+  and you must play a card that requires a target, the base rules as written do not cleanly define
+  the outcome. (There is a settled ruling — the card is played with no effect, or self-targeted where
+  the card permits — but it is a _ruling_, which is the point.) **This is the same defect class as
+  the SAFE's non-convertible valuation range**: a rule undefined on reachable inputs. Demonstrable in
+  thirty seconds, to anyone.
+
+That last one is why this is better than a warm-up. **Love Letter contains, in miniature, the
+flagship defect class of [[yc-safe-executable]]** — so the onboarding example also previews the
+punchline.
+
+**Epistemic bonus, and a pleasing coincidence.** Guard guessing and Priest peeking make this a real
+hidden-information game: what each player knows, and knows that others know. Worth noting that **Ron
+van der Meyden's principal research area is epistemic logic and reasoning about knowledge in
+multi-agent systems** — the SAFE work is the moonlight. So the same person anchors the ground truth
+for the SAFE arc _and_ the natural formalism for this one. If the collaboration approach in
+[[yc-safe-executable]] ever happens, having both makes a better letter.
+
+**Versioning bonus.** The 2012 classic is 16 cards, 2–4 players; the 2019 edition adds **Spy (0)**
+and **Chancellor (6)**, reaching 21 cards and 2–6 players. Same game, amended rules — a free,
+zero-risk instance of the temporal rule-version axis to exercise `EVAL UNDER RULES EFFECTIVE AT` on.
+**Target the 2012 version and say so explicitly**, because "which Love Letter?" is exactly the sort
+of unstated assumption this project exists to eliminate.
+
+**Home:** `jl4/examples/experiments/`. There is no games example there today — `miles-card` is
+credit-card miles, not cards.
+
+### 5a.1 Rungs one and two — Fluxx and Nomic
 
 **Nomic closes the loop with §4.** Peter Suber invented Nomic in 1982 and published it as
 **Appendix 3 of _The Paradox of Self-Amendment_** — "Nomic: A Game of Self-Amendment"
@@ -193,7 +261,40 @@ a **fixed ruleset over changing state**. Fluxx and Nomic invert that: **the rule
 That is the same defect that makes self-amendment resist ordinary reachability (§5), in a domain
 where we can iterate cheaply. If the encoding cannot do Fluxx, it will not do Article V.
 
-**Prior modelling work** — found by search, **authors and venues not yet verified**, treat as leads:
+**Rung 2 has already been built, by the project's own acknowledged ancestor.**
+
+> **SoliNomic: a self-modifying smart contract game exploring reflexivity in law.**
+> Joshua Ellul & **Gordon J. Pace**, in _Disruptive Technologies in Media, Arts and Design_
+> (Springer, 2022), pp. 3–14. <https://www.um.edu.mt/library/oar/handle/123456789/136411>
+
+They encode Nomic as executable smart-contract code, so that "rules, decision making processes and
+ability to alter both the rules and processes are encoded within smart contracts" — reflexive rule
+change with integrity guarantees.
+
+**This is not a stray citation.** `paper/formal-methods-in-law/FORMAL-PAPER.md:163` already names
+Pace as a **"direct ancestor"** — Pace, Prisacariu & Schneider, _Model Checking Contracts — A Case
+Study_ (ATVA 2007), the **CL** contract language: deontic O/P/F over a dynamic logic of actions with
+contrary-to-duty reparations, compiled and model-checked for conflicts and superfluous clauses. The
+differentiator over CL is already articulated there — a human-writable DSL with isomorphic surface
+syntax, and obligation _derived_ rather than declared. **That same differentiator is what we would
+have to claim over SoliNomic**, so it should be stated before any work starts, not after.
+
+Two consequences:
+
+1. **Do not reinvent rung 2.** Read SoliNomic first. It may well be that the useful contribution at
+   that rung is _analysis over_ their encoding rather than another encoding.
+2. **Pace is the obvious reader.** Between him on Nomic and van der Meyden on the SAFE, both arcs
+   have a living, reachable prior-art author working in exactly this tradition.
+
+**A pattern worth naming before it bites us.** Both anchors — van der Meyden's _Can SAFE contracts be
+smart?_ / _Architecture for Smart SAFE Contracts_, and Ellul & Pace's SoliNomic — reached for
+**blockchain**. Both did so for the same reason: they wanted a substrate where rules genuinely
+execute and cannot be quietly reinterpreted. That is an **enforcement/integrity** problem. Ours is
+an **analysis** problem, and it is orthogonal to the substrate. Say so explicitly, or the work will
+read as a blockchain competitor it is not — and note that the analysis is the part that is useful
+_before_ anyone signs, which is where all three arcs claim their value.
+
+**Other modelling work** — found by search, **authors and venues not yet verified**, treat as leads:
 
 - **"Minimum Nomic: A tool for studying rule dynamics"** — a reduced Nomic that keeps the essence
   while promoting evolvability of the self-amendment game.
@@ -244,7 +345,14 @@ than failing at the US Constitution.
 - [ ] **Gate: do not start the _constitutional_ work until the SAFE and corporate arcs have shipped
       something real.** §5a's Fluxx work is **not** gated — it is cheap, finite, and the right way to
       find out early whether the encoding can do self-modification at all.
-- [ ] **Encode Fluxx and check for deadlock** (§5a). Finite rule space, decidable, no jurisdiction,
+- [ ] **Encode Love Letter (2012, 16-card)** — rung 0, §5a.0. No rule mutation; it teaches the
+      notation and doubles as the lay-reader onboarding piece. Target the Countess obligation, the
+      Handmaid immunity, the Prince+Princess composed loss, and the all-protected totality gap.
+      Home: `jl4/examples/experiments/`.
+- [ ] **Read SoliNomic (Ellul & Pace 2022) before touching Nomic** — rung 2 is already built, by the
+      author `FORMAL-PAPER.md:163` already calls a direct ancestor. Decide whether our contribution
+      there is a fresh encoding or analysis over theirs.
+- [ ] **Encode Fluxx and check for deadlock** (§5a.1). Finite rule space, decidable, no jurisdiction,
       no client, no ground-truth problem. Probably the first thing to do in this whole file.
 - [ ] Encode Suber's Nomic initial ruleset — small, complete, and entrenchment is explicit in it.
 - [ ] Read Suber, _The Paradox of Self-Amendment_. Cheapest high-value step, and it may moot §5(4).
