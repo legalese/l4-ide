@@ -151,6 +151,74 @@ first is what earns the right to attempt the general one.
 
 ---
 
+## 5a. The testbed: Fluxx and Nomic
+
+**Nomic closes the loop with §4.** Peter Suber invented Nomic in 1982 and published it as
+**Appendix 3 of _The Paradox of Self-Amendment_** — "Nomic: A Game of Self-Amendment"
+(<https://legacy.earlham.edu/~peters/writing/nomic.htm>). So the book §4 recommends reading first
+_contains the game_. Suber did not merely write about self-amendment; he shipped an **executable
+model** of it. Nomic is the operational semantics for the paradox, and it is small enough to encode
+in full — which the US Constitution is not.
+
+**Nomic's structure is entrenchment made explicit.** Its initial ruleset is divided into **mutable
+and immutable** rules, and an **immutable rule must first be _transmuted_ into a mutable one before
+it can be amended or repealed.** Line that up with §3:
+
+| System          | Entrenchment                          | The regress                       |
+| --------------- | ------------------------------------- | --------------------------------- |
+| US Constitution | Article V's own clauses, amendable    | **open**                          |
+| Company (s26A)  | statutory, unanimity to remove        | **closed by a higher layer**      |
+| **Nomic**       | immutable rules, transmutable by rule | **open, but explicitly modelled** |
+
+Nomic sits **between** the two cases and is the more useful of the three to build on, because it
+makes the transmutation step legal, visible and finite — which is exactly what neither the
+Constitution nor company law does openly. It is the controlled experiment.
+
+**Fluxx and Nomic are a ladder, and it is the same ladder as the whole programme.** The distinction
+that matters is the _size of the rule-change space_:
+
+| Game      | How rules change                           | Rule-change space                                                                       | Analogue                                 |
+| --------- | ------------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Fluxx** | playing cards from a **fixed deck**        | **finite and known in advance** — essentially the powerset of the New Rule / Goal cards | the bounded-configuration corporate case |
+| **Nomic** | proposal and vote, **players author text** | **open and unbounded**                                                                  | the Article V / Gödel case               |
+
+So **Fluxx is bounded self-modification and Nomic is unbounded** — precisely the distinction between
+[[corporate-resolutions-lts]] (bounded by statute the actor cannot reach) and this arc (open). That
+makes them a scale model of the entire programme that fits on a table, with **no jurisdiction, no
+client and no ground-truth problem**.
+
+**Both break Game Description Language, for our reason.** GDL and GDL-II, and the Card Game
+Description Language (Springer 2013, demonstrated on poker variants, Blackjack and UNO), all assume
+a **fixed ruleset over changing state**. Fluxx and Nomic invert that: **the rules _are_ the state.**
+That is the same defect that makes self-amendment resist ordinary reachability (§5), in a domain
+where we can iterate cheaply. If the encoding cannot do Fluxx, it will not do Article V.
+
+**Prior modelling work** — found by search, **authors and venues not yet verified**, treat as leads:
+
+- **"Minimum Nomic: A tool for studying rule dynamics"** — a reduced Nomic that keeps the essence
+  while promoting evolvability of the self-amendment game.
+- **"Reasoning and Reflection in the Game of Nomic: Self-Organising Self-Aware Agents with Mutable
+  Rule-Sets"** — normative multi-agent systems. The title alone names our open question 1: _self-aware
+  agents with mutable rule-sets_ is the reflective-evaluator fork.
+- **Fluxx appears to be essentially unmodelled formally.** Searching turns up only its use as a
+  _pedagogical_ device for teaching use-case modelling. If that holds up, the gap is an opportunity
+  rather than a problem — but check properly before claiming it.
+
+**The concrete first target, and it should probably come before anything in this file.** Fluxx's rule
+space is finite, so real properties are decidable by enumeration:
+
+- **Can Fluxx deadlock?** Reach a state where no legal move exists, or where the Goal is unreachable
+  — e.g. rule cards that make the draw/play counts jointly unsatisfiable, or a state with no Goal in
+  play. This is a **liveness** question with a yes/no answer over a finite space.
+- **Is a given state winnable, and by whom?** Reachability, again finite.
+
+That is a genuine model-checking result, on a system whose entire ruleset fits on a few cards, and
+it exercises exactly the machinery this arc needs. **Do Fluxx first.** It is cheap, it is finite, it
+is publishable-adjacent, and failing at it is a much better way to discover the encoding is wrong
+than failing at the US Constitution.
+
+---
+
 ## 6. Open questions
 
 1. **Does the evaluator have to go reflective, or can self-amendment be staged?** If each amendment
@@ -173,8 +241,17 @@ first is what earns the right to attempt the general one.
 
 ## 7. Next actions — all gated
 
-- [ ] **Gate: do not start until the SAFE and corporate arcs have shipped something real.**
+- [ ] **Gate: do not start the _constitutional_ work until the SAFE and corporate arcs have shipped
+      something real.** §5a's Fluxx work is **not** gated — it is cheap, finite, and the right way to
+      find out early whether the encoding can do self-modification at all.
+- [ ] **Encode Fluxx and check for deadlock** (§5a). Finite rule space, decidable, no jurisdiction,
+      no client, no ground-truth problem. Probably the first thing to do in this whole file.
+- [ ] Encode Suber's Nomic initial ruleset — small, complete, and entrenchment is explicit in it.
 - [ ] Read Suber, _The Paradox of Self-Amendment_. Cheapest high-value step, and it may moot §5(4).
+      Note that the game is **Appendix 3 of that same book**, so this action and the previous one are
+      one purchase.
+- [ ] Verify authors/venues for the two Nomic modelling leads in §5a, and confirm whether Fluxx
+      really is formally unmodelled before saying so anywhere public.
 - [ ] Read Guerra-Pujol properly, not via abstract.
 - [ ] Pull the Morgenstern PDF from the IAS `SMC.THOMAS` collection and read the actual four pages
       rather than the legend.
