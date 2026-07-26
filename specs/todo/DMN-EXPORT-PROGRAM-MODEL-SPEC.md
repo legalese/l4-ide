@@ -88,7 +88,10 @@ charities-jersey-2014/`, `jl4/experiments/housing-act-*.l4`):
 - **tier 2 is 2.7% / 4.0% / 4.3%** of parameterised decisions. It is a handful, not pervasive.
 - **tier 2 correlates ≈100% with cross-module reuse** — 7/7 in Housing, 4/5 in Charities. The
   six `Ground N made out` roll-ups are tier 1 _inside their own file_ and become functions only
-  when an aggregator imports them.
+  when an aggregator imports them. **Downgraded 2026-07-27 from census to sample:** §2.4.3's
+  independent re-derivation found a parameterised-decision population 2.0–2.6× this one, which
+  makes 7 and 5 samples of ~19 and ~13 rather than complete tier-2 sets. The rate below is
+  unaffected; the correlation is unverified at full population and owes a re-run.
 - **Arity is essentially always 1.** Every arity ≥3 decision in all three corpora turned out to
   be a test-fixture builder.
 - **No decision is ever applied to a constructed record or a conditional.** The complete
@@ -214,6 +217,556 @@ One operational note: because a service's parameters must be top-level `<inputDa
 emitting `Required dependency not found` errors and `[SKIPPED]` results alongside the correct
 answers. `evaluateByName` and `evaluateDecisionService` both report zero messages. Cosmetic, but it
 will confuse anyone driving the export from a test harness.
+
+---
+
+### 2.4 Strictness: the totality side-condition on un-lifting — ruled 2026-07-27
+
+**R2 was stated backwards, and the correction changes the severity.** DMN evaluates every decision
+in the required closure; L4 forces lazily. Un-lifting moves a decision out of a lazily-evaluated
+argument position and into the DRG's unconditionally-required set, so it widens the inputs that
+decision is evaluated under — R2 had the mechanism right. What it got wrong is the consequence.
+**FEEL has no undefined.** It has `null`, and `null` reads as `false` in every consuming position.
+
+Verified in `feelin` 7.0.1: every operation L4 raises on returns `null`, and the `null` is then
+_coerced_, not propagated.
+
+| FEEL                                                                                   | result                                          |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `1 / 0`, `modulo(5, 0)`, `sqrt(-1)`, `log(0)`, `number("abc")`, `[1,2][3]`, `{a: 1}.b` | `null`                                          |
+| `if null then 1 else 2`                                                                | `2` — a null guard silently takes the `else`    |
+| unary test `> 3` against `? = null`                                                    | `false` — the table row silently does not match |
+| `every p in [2, null] satisfies p > 1`                                                 | `false` — silently "no"                         |
+| `null or true` / `null and false`                                                      | `true` / `false` — full Kleene, symmetric       |
+
+L4's answer on the same widened input is a **loud user exception**. Verified: with `d MEANS 0` and
+`q MEANS 100 / d`, `#EVAL q` reports `Division by zero in the operation: DIVIDED BY`, while
+`#EVAL (IF d EQUALS 0 THEN 0 ELSE q)` returns `0`.
+
+So the exporter would not be converting a refusal-to-answer into a differently-spelled
+refusal-to-answer. It would be converting it into a **wrong answer that nothing downstream
+catches** — the mode §2.3.2 already called the worst available for a legal reasoner. It is also the
+mode the exporter has already met once and already refuses on, in one special case. `rowsElided`
+(`Lower.hs:1599`), on an elided `CONSIDER` arm with no `OTHERWISE` to plug the hole: _"For the
+ladder that is exact: a missing disjunct contributes FALSE. For DMN it is not, because an unmatched
+input yields **null**, not `false`. … the table would answer differently from the rule, so we refuse
+to emit one."_
+
+**R2 is the general case of a special case the exporter already handles.** The precedent for the
+ruling is in-tree, and the ruling is: the side-condition stays.
+
+One symmetry to record and then set aside. The widening runs both ways: FEEL's `and`/`or` are
+symmetric Kleene, L4's are left-strict short-circuit, so `boom OR TRUE` raises in L4 and returns
+`true` in FEEL. DMN can therefore also _succeed where L4 fails_. Both directions are fidelity
+breaks; only null-as-false is a soundness break, and only soundness is ruled on here.
+
+#### 2.4.1 The criterion
+
+Let a _decision_ be a top-level `DECIDE`/`MEANS` (`Lower.hs:1310`) together with the `WHERE`-locals
+`Lower` already peels and inlines.
+
+```
+DMN-SAFE(d)  ≡  TOTAL(d) ∧ PURE(d) ∧ DETERMINISTIC(d)
+
+TOTAL(d)     ⇔  LOCALLY-TOTAL(body d)
+              ∧  ∀ c ∈ calls(d). TOTAL(c)
+              ∧  TERMINATES(d)
+```
+
+`TOTAL` is the **greatest** fixed point, computed SCC-ordered over the call graph, seeded `True`
+within each SCC and pinned `False` on every SCC `TERMINATES` cannot certify. The three bits are
+ANDed for the routing decision but kept separately reportable, because they have different
+remedies.
+
+> **Corrected 2026-07-27; this said "least fixed point" and that rejected the entire design.** The
+> equation is conjunctive, so on any SCC containing a self-call both `True` and `False` are fixed
+> points and the _least_ one is `False`. Instantiated at `sum` — self-recursive, structurally
+> terminating, locally total — it reads `T(sum) = True ∧ T(sum) ∧ True`, whose least solution is
+> `False`. Taken literally the lfp formulation therefore rejected `sum`, `count`, `and`, `or`,
+> `map`, `filter` and every list-touching decision in all three corpora, i.e. it produced exactly
+> the "design collapses" outcome the `TERMINATES` paragraph below exists to prevent, and made that
+> paragraph dead text. The seeding language was the tell: seeding _some_ SCCs `False` only means
+> anything if the rest are seeded `True`, which is a co-inductive computation. Totality here is
+> co-inductive **modulo** termination — assume the SCC total, discharge the well-foundedness
+> obligation separately with `TERMINATES`, and pin `False` when that obligation cannot be
+> discharged. Recorded rather than silently patched because the same slip is easy to reintroduce.
+
+**`LOCALLY-TOTAL(e)`** is a syntactic walk over the `Expr Resolved` with the substituted type at
+each node. It is `False` if `e` contains, **in a strict position** (below), any of the following.
+The clause list is derived from `UserEvalException` (`EvaluateLazy/Exceptions.hs:42-53`) — eight
+constructors, which is the ground truth to re-derive against when the evaluator grows.
+`InternalEvalException` is the compiler-bug channel and is deliberately not modelled.
+
+| #   | reject                                                                                                                                                                                                                                                                                                                           | forecloses                                                                                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| L1  | a `Consider` the checker reported `PatternMatchesMissing` on, **or** whose analysis was suppressed (`branchHasOpaquePattern`; `isPrimitiveType`, `TypeCheck.hs:1954`) and which has no `OTHERWISE` arm. Multi-clause functions desugar to `CONSIDER`, so they are covered — but see L11: L1 does **not** exhaust this exception. | `NonExhaustivePatterns`                                                                                  |
+| L2  | a `DECIDE`/`MEANS` carrying `@nonexhaustive` — the author's own machine-readable declaration that the match is incomplete                                                                                                                                                                                                        | same                                                                                                     |
+| L3  | `DIVIDED BY` whose divisor is not a nonzero numeric literal after constant folding                                                                                                                                                                                                                                               | `DivisionByZero`                                                                                         |
+| L4  | `MODULO`; `TO THE POWER OF`; `SPLIT` with a non-literal or empty delimiter                                                                                                                                                                                                                                                       | `NotAnInteger`; NaN/∞ via `Double`; an **uncaught** `Data.Text.splitOn: empty input` (`Machine.hs:2850`) |
+| L5  | `SQRT`, `LN`, `LOG10`, `ASIN`, `ACOS`                                                                                                                                                                                                                                                                                            | NaN                                                                                                      |
+| L6  | `DATE_FROM_DMY` / `TIME_FROM_HMS` / `DATETIME_FROM_DTZ` with any non-literal argument; the `DATE`/`TIME` projections off a `DATETIME` (timezone load)                                                                                                                                                                            | `UserError`                                                                                              |
+| L7  | `EQUALS` at a type whose **transitive component structure** contains a function or `CONTRACT` type — not merely a function-headed or `CONTRACT`-headed one                                                                                                                                                                       | `EqualityOnUnsupportedType`                                                                              |
+| L8  | `AS STRING` whose argument type does not resolve to `NUMBER`/`STRING`/`BOOLEAN`/`DATE`/`TIME`/`DATETIME`                                                                                                                                                                                                                         | `UserError`                                                                                              |
+| L9  | `EVER BETWEEN`, `ALWAYS BETWEEN`, `WHEN LAST`, `WHEN NEXT`, `VALUE AT`                                                                                                                                                                                                                                                           | `UserError`; none has a DMN lowering anyway                                                              |
+| L10 | `TODAY` / `TIMEZONE` / `CURRENTTIME` / `RULES EFFECTIVE DATE` with no `TIMEZONE IS` in module scope                                                                                                                                                                                                                              | `UserError`                                                                                              |
+| L11 | a **projection `x's f` whose scrutinee type is an `IS ONE OF` with more than one constructor**, unless every constructor of that type declares a field `f`                                                                                                                                                                       | `NonExhaustivePatterns` — the source L1 cannot see                                                       |
+| L12 | a `WHERE`/`LET` local whose right-hand sides form a **dependency cycle** among themselves                                                                                                                                                                                                                                        | `BlackholeForced`                                                                                        |
+
+**Derive it mechanically, not by eye.** The first pass of this list was written by reading the
+eight constructors and it still missed two of them and under-stated a third — each found by
+_probing the evaluator_, not by re-reading the list. The coverage map is therefore part of the
+ruling, and the implementation owes a test that fails when a ninth constructor appears:
+
+| constructor                 | foreclosed by                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `NonExhaustivePatterns`     | L1, L2, **L11** — L1+L2 alone do _not_ cover it, see L11                             |
+| `EqualityOnUnsupportedType` | **L7**, which had to be restated transitively                                        |
+| `DivisionByZero`            | L3                                                                                   |
+| `NotAnInteger`              | L4                                                                                   |
+| `UserError`                 | L4, L6, L8, L9, L10; the JSON sites via `PURE`                                       |
+| `BlackholeForced`           | **L12** — was unmapped                                                               |
+| `StackOverflow`             | `TERMINATES` — see below; not an independent clause                                  |
+| `Stuck`                     | deliberately _not_ foreclosed: it is the `ASSUME` channel, i.e. an input (see below) |
+
+`StackOverflow` is not a construct and has no syntactic image: `pushFrame`
+(`EvaluateLazy/Machine.hs:457`) raises it when the frame stack passes `maximumFrameDepth`. It is a
+resource bound, reachable as a _symptom_ of the divergence `TERMINATES` already refuses and,
+independently, of data deeper than the cap. The second case is not statically decidable and is not
+modelled; `DMN-SAFE` therefore claims definedness for well-founded evaluation, not evaluation under
+a fixed frame budget. Say so rather than pretend the clause list covers it.
+
+**L11, and why L1 alone was unsound.** L1 keys on a `CONSIDER` node. Record projection off a sum
+type has no `CONSIDER` node in the source at all: `Proj` desugars to a _selector application_ at
+eval time — `EvaluateLazy/Machine.hs:804`, `Proj _ann e l -> continueExpr env (App emptyAnno l [e])`
+— so the selector is a partial function nothing in the source spells out. Verified on the installed
+`l4`:
+
+```l4
+DECLARE Shape IS ONE OF
+    Circle HAS radius IS A NUMBER
+    Square HAS side   IS A NUMBER
+
+GIVEN s IS A Shape
+GIVETH A NUMBER
+`the radius` s MEANS s's radius     -- l4 check: "Check succeeded." No diagnostic at all.
+```
+
+``#EVAL `the radius` (Circle WITH radius IS 3)`` → `3`;
+``#EVAL `the radius` (Square WITH side IS 4)`` → _"Value &144@sum1.l4 has no corresponding
+pattern"_, i.e. `NonExhaustivePatterns`. PR #45 (the §2.4.5 prerequisite) does **not** help: it
+repairs `checkConsider`'s constructor oracle, and there is no `CONSIDER` here. The FEEL image is the
+silent one — re-verified in `feelin` 7.0.1: `{a:1}.b` → `null`, `{a:1}.b > 3` → `null`,
+`if {a:1}.b then 1 else 2` → `2`. Without L11 the criterion certified that decision `DMN-SAFE`.
+
+The corpus has the shape live — `housing-act-ground-1A.l4:58`,
+``DECLARE Disposal IS ONE OF `sell a freehold or leasehold interest` | `grant a long lease` HAS `term certain in years` IS A NUMBER`` — but scrutinises it with `CONSIDER` rather than projecting it,
+so this is not yet a corpus break. **It is also not fully covered by §4.2's tagged-union
+`Blocking`**, which is R4 and _still an open ruling_ ("leaning refusal for v1"). L11 must therefore
+stand on its own inside `LOCALLY-TOTAL`, and not be justified by a sub-ruling that has not been
+made.
+
+**L7, and why the head type is the wrong granularity.** `EQUALS` in L4 is structurally recursive:
+`runBinOpEquals` (`EvaluateLazy/Machine.hs:2874-2886`) pushes an `EqConstructor1` frame and recurses
+componentwise over `ValConstructor` and `ValCons`, and the catch-all
+(`:2893`, `userException (EqualityOnUnsupportedType v1 v2)`) is reached from _inside_ that recursion.
+So the exception propagates out of a plain **record** with a function component, no sum type in
+sight. Verified: a `DECLARE Policy HAS name IS A STRING, payout IS A FUNCTION FROM NUMBER TO NUMBER`
+compared with `a EQUALS b` passes `l4 check` and raises _"Trying to check equality on types that do
+not support it"_ at `#EVAL`. `LIST OF (FUNCTION …)` and `MAYBE (FUNCTION …)` are the same story.
+
+**L12, and the hole `TERMINATES` did not close.** §2.4.1 defines a decision to _include_ its
+`WHERE`-locals, which puts a cycle among those locals outside `calls(d)` — and `TERMINATES`'
+structural rule is stated only for "a self-recursive `f`", so it never fires on a decision that is
+not self-recursive. Verified:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`f` n MEANS y
+  WHERE
+    y MEANS z PLUS n
+    z MEANS y                       -- l4 check: "Check succeeded."
+```
+
+``#EVAL `f` 1`` → _"Infinite loop detected while trying to evaluate: z PLUS n"_
+(`EvaluateLazy/Machine.hs:3093`, `userException (BlackholeForced e)`). Before L12 the criterion
+returned `DMN-SAFE(f) = True` for a divergent decision. Because `Lower` **inlines** `WHERE`-locals,
+this is a plausible exporter hang and not merely a wrong answer, so L12 is also a robustness fix for
+the exporter itself. The check is a cycle test on the locals' dependency graph, which `Lower`
+already needs in order to order the inlining.
+
+**`PURE(d)`**: no `FETCH`, `POST`, `GETENV`, `JSON DECODE`, and no `RECALL`/`RECORD`/`ATTEST`. The
+JSON decoder's dozen `UserError` sites are reachable only through these, so they are subsumed.
+**`DETERMINISTIC(d)`**: no clock reader at all. `TODAY` is total once `TIMEZONE IS` is declared, but
+DMN has no clock — kept separate from L10 because the remedy differs: partiality routes to a
+fallback, a clock reader routes to "synthesise `today` as an `inputData`".
+
+**Explicitly _not_ a partiality: a reference to an `ASSUME`d term.** Forcing one is `Stuck` in L4
+precisely _because_ it is an input, and in DMN it is an `<inputData>` supplied at invocation.
+`TYPICALLY` does not change this — `evalAssume` writes `ValAssumed` regardless. Reading `Stuck` as
+partial would reject the whole `ASSUME`-style corpus, flagship exhibit included. Also accepted,
+because they are genuinely total: `TO NUMBER`/`TO DATE`/`TO TIME` (they return `MAYBE`),
+`DATE VALUE`/`TIME VALUE` (`EITHER`), `CHARAT` (clamps out of range to `""`), `INDEXOF` (returns
+`-1`), `SUBSTRING`. `SPLIT` is the only string builtin that breaks the pattern, which is why it is
+in L4 rather than here.
+
+**`TERMINATES` is a structural check, not an allowlist.** L4 has no loops, so `calls(d)` acyclic ⇒
+terminating — but that alone rejects `sum`, `count`, `and`, `or`, `map`, `filter`, i.e. essentially
+every list-touching decision, and the design collapses. The cheap check that saves them, ~40 lines:
+
+> A self-recursive `f` **structurally terminates** if there is a parameter position `k` such that
+> every recursive call to `f` passes, in position `k`, a variable bound by a `FOLLOWED BY` pattern
+> of a `CONSIDER` whose scrutinee is transitively parameter `k`.
+
+That certifies `foldr`/`foldl`/`map`/`filter`/`sum`/`count`/`and`/`or`/`reverse`/`maximum1`/
+`minimum1`/`at` in `prelude.l4` automatically. Mutual recursion and `NUMBER`-measure recursion
+(`countdown (n - 1)`) reject in v1; the corpora contain neither — but see §2.4.3 on the fact that
+this rule is the one part of the criterion the measurement did **not** score.
+
+`calls(d)` acyclicity is not the whole well-foundedness obligation, because a decision's
+`WHERE`-locals live inside its body rather than in `calls(d)`. `TERMINATES(d)` therefore also
+requires **L12**'s cycle test over those locals.
+
+The prelude is the proof that the two hard checks are orthogonal and compose exactly right: `at`
+(`prelude.l4:132`) is structurally decreasing _and_ non-exhaustive, hence partial; `sum`/`map`/
+`filter` are structurally decreasing _and_ exhaustive, hence total. A criterion combining them
+classifies the whole prelude with no hand-maintained table — which matters, because the alternative
+(a trusted totality basis, hand-audited) has to be re-audited on every prelude edit, and this
+branch's prelude proves edits go wrong: **`maximum` over `LIST OF MAYBE NUMBER` (`prelude.l4:375`)
+computes the _minimum_**, its body being `minimum1 x xs`, with `maximum1` (`:384`) recursing on
+`min x y`. Fixed on `main` by PR #45; still wrong here. That and the `SPLIT` escape in L4 are live
+evaluator bugs rather than R2 concerns, and each deserves its own issue.
+
+**The refinement that saves the corpus: _strict position_.** Partiality is dangerous only where the
+position is evaluated unconditionally.
+
+- **Safe** — reached only on the path that guards it: a `THEN`/`ELSE` arm of an `IF` that lowers to
+  a FEEL `if` (branch-lazy, verified above); and the **output entry** of a single-hit table, of
+  which exactly one is used. `IR.hs:288`'s no-`Collect` invariant is what makes the second one
+  true, and R2 promotes that invariant from tidy to **load-bearing** — a `Collect` table evaluates
+  every matching rule's output entry.
+- **Strict** — always evaluated: a table's **input entries**, evaluated for every rule in order to
+  match; the body of any `<decision>` in the required closure; anything reached through an
+  un-lifted DRG edge.
+
+The discrimination this buys is the right one, and it removes what would otherwise be the
+criterion's largest false-rejection class. `IF d EQUALS 0 THEN 0 ELSE n / d` is **accepted** when
+the guard and the division sit in the same decision, and rejected only when the guard lives in a
+_different_ decision from the division — which is precisely the configuration un-lifting creates
+and R2 exists to catch.
+
+#### 2.4.2 On refusal: route by the _call site_, not by the node kind
+
+**Corrected 2026-07-27. The first version of this ruling said "route to tier 2, do not reject" and
+justified it with "tier 2 is sound for R2 _by construction_". That is false, and it left the
+failure mode §2.4 exists to close fully open.** The correction is recorded rather than overwritten,
+because the mistake is the natural one to make twice.
+
+What the original said, and why it looked right: a BKM's parameters bind at the call site to the
+caller's actuals — the same discipline L4 has, so the free-parameter widening does not happen; and a
+BKM invocation sits inside a FEEL expression, where `if` evaluates only the taken branch, so the
+required-closure widening does not happen either. Both sentences are **true**. Both are also
+**irrelevant**, because neither mechanism is what turns a partial expression into `false`. The
+coercion is done by FEEL's `null`, and `null` arrives identically whether the partiality sits in a
+`<decision>` body, in a BKM's `encapsulatedLogic`, or inlined at the call site. Routing removes the
+_widening_; it does nothing about the _coercion_.
+
+The counterexample, run end to end. `share` below is tier 2 by §2.1 (two distinct argument tuples),
+is `¬DMN-SAFE` by L3 (divisor not a nonzero literal), and its whole body is a strict position:
+
+```l4
+DECLARE Claim
+  HAS `pot`       IS A NUMBER
+      `claimants` IS A NUMBER
+
+GIVEN pot IS A NUMBER
+      n   IS A NUMBER
+GIVETH A NUMBER
+`share` pot n MEANS pot DIVIDED BY n
+
+GIVEN c IS A Claim
+GIVETH A BOOLEAN
+`above threshold` c MEANS `share` (c's pot) (c's claimants) GREATER THAN 10
+
+GIVEN c IS A Claim
+GIVETH A NUMBER
+`per head` c MEANS `share` 100 (c's claimants)
+```
+
+L4, with `claimants = 0`: `Division by zero in the operation: DIVIDED BY` — a loud refusal. FEEL
+(`feelin` 7.0.1, the install §2.4 cites):
+
+```
+100/0                                 => null
+100/0 > 10                            => null
+(100/0 > 10) and true                 => null
+if 100/0 > 10 then "yes" else "no"    => "no"      <-- silent wrong answer
+every x in [1,2] satisfies 100/0 > x  => false
+some  x in [1,2] satisfies 100/0 > x  => false
+recip(0)  where recip(d) = 100/d      => null      <-- BKM invocation, identical
+```
+
+The last line is the point. Under the original ruling `share` was emitted as a
+`businessKnowledgeModel` carrying a **`Lossy`** `D-PARTIAL` note, and the caller's guard-free
+consumption of it produced precisely the silent wrong answer §2.4's opening calls "the worst
+available for a legal reasoner" — under a `Lossy` note, i.e. an advisory one. The `inline into each
+caller` row was worse: it puts the identical expression into the identical strict position with the
+DRG node additionally gone.
+
+**The ruled rule.** Severity keys off whether the **call site consumes the invocation strictly**, in
+exactly the sense §2.4.1 already defines, and node kind is only the mechanical consequence:
+
+```
+DMN-SAFE(d) ∧ tier-1 side-condition          →  <decision>              nothing lost
+¬DMN-SAFE(d), EVERY call site consumes d
+  from a lazy position (a FEEL `if` arm, a
+  single-hit output entry)                   →  BKM or inline           Lossy: D-PARTIAL
+¬DMN-SAFE(d), ANY call site consumes d
+  from a strict position                     →  D-PARTIAL, Blocking
+¬DMN-SAFE(d), d is a DRG root / uncalled     →  D-PARTIAL, Blocking — never a node
+```
+
+Rows are first-match in the order written, which is what stops a root decision falling into the
+"inline into each caller" arm with no caller to inline into.
+
+**Partiality is contagious, and that is load-bearing rather than incidental.** `TOTAL(d)` already
+requires `∀ c ∈ calls(d). TOTAL(c)`, so in the example `above threshold` is itself `¬DMN-SAFE` and
+is routed by this table too, not emitted as a node. Under the corrected severity rule the chain
+terminates in a `Blocking` at the first strict consumer — here immediately, since
+`` `share` … GREATER THAN 10 `` is the whole body of `above threshold`. That is the behaviour §2.4
+was arguing for all along; the original table simply never reached it, because every arm before the
+last was `Lossy`.
+
+**Consequence for the cost claim, stated plainly: R2's `Blocking` arm is no longer empty by
+construction.** §2.4.3 measured a refusal set of five, all recursion, all already refused by §6.3-1
+— and under the original table those five produced no _new_ `Blocking`s. Under the corrected table
+a `¬DMN-SAFE` decision consumed strictly is a `Blocking`, so the arm is empty on the three corpora
+only because the refusal set happens to be empty of non-recursive members there. That is a
+contingent fact about these corpora, not a property of the rule, and §2.4.3's "R2 adds a routing
+rule and no new refusals" must be read that way.
+
+**The same predicate gates a second site R2 has not so far been connected to: multi-output
+`decisionService` co-membership (§2.3).** A service computes _all_ of its output decisions, so
+putting a not-certified-total decision in the same `§` as a total one forces it identically. §2.3.2
+already splits services to break cycles; the split rule must fire on partiality too. §2.3.1's
+"prefer one output decision per service" makes that nearly free.
+
+Honour `¬DMN-SAFE` at both sites and `evaluateAll` over the whole model becomes safe as well, since
+such a decision is never a node. That is not a small bonus: `evaluateAll` is the default entry point
+in most tooling, and it forces every decision rather than a requested closure.
+
+**`Blocking` remains the correct floor for the residual case**, given §2.4's opening — the
+alternative is a silently wrong answer, which is what `rowsElided` already refuses on. The
+measurement says the residual case is empty _on these three corpora_; under the corrected severity
+rule above that is a fact about the corpora, not a guarantee.
+
+#### 2.4.3 The measurement: what it actually scored, and what it did not
+
+Measured over the same three corpora as §2.2 (62 files) by running `l4 ast` on each file and walking
+the parsed abstract syntax — not grep. Tier 1 as §2.1 defines it, `#EVAL`/`#ASSERT`/`#TRACE` sites
+excluded (see the flag below). Six detectors, applied to each tier-1 decision's body and
+transitively to its corpus-local callees: non-exhaustive `CONSIDER`, division/`MODULO`, `MAYBE`
+projection, `ASSUME` reference, recursion, partial prelude builtin.
+
+> **Read the table below as a measurement of a _proxy_, not of the ruled criterion.** The detector
+> list contains a flat "recursion" test. The criterion in §2.4.1 contains a structural-termination
+> check that deliberately **accepts** structural recursion — the ~40 lines the same section says are
+> all that stands between the design and collapse. The proxy therefore differs from the ruling on
+> exactly the construct that produced 100% of the refusals.
+>
+> The corpus's one instance of the _accepting_ case was refused by the proxy.
+> `jl4/experiments/housing-act-possession-decision.l4:251-257`:
+>
+> ```l4
+> GIVEN branches IS A LIST OF DEONTIC Actor Action
+> GIVETH A DEONTIC Actor Action
+> `ror together` branches MEANS
+>   CONSIDER branches
+>   WHEN EMPTY                 THEN FULFILLED
+>   WHEN d FOLLOWED BY EMPTY   THEN d
+>   WHEN d FOLLOWED BY rest    THEN d ROR `ror together` rest
+> ```
+>
+> Parameter position 1 is `branches`; the recursive call passes `rest`, bound by a `FOLLOWED BY`
+> pattern of a `CONSIDER` whose scrutinee is parameter 1; the match is exhaustive. That is verbatim
+> the §2.4.1 structural rule, so the **ruled** criterion certifies `ror together` terminating and
+> total. `rent spine` (`housing-act-ground-1.l4:42`, ``HENCE `rent spine` (monthsLeft MINUS 1)``)
+> is `NUMBER`-measure recursion, which §2.4.4 case 2 rejects in v1 — the _rejecting_ branch. The
+> check that distinguishes them is untested against the corpora **on both sides**, and no measured
+> decision exercises its accepting branch at all.
+>
+> The error direction is conservative, so **0.8% stands as an upper bound on the cost**. What does
+> not stand is "the criterion is cheap" as a claim this measurement earned, or the headline below
+> as a statement about the ruling rather than about the proxy. Re-running the census against the
+> real structural check is an implementation-phase obligation, listed in §10 Phase 4.
+
+| corpus    | tier 1  | refused | rate | tier 1 excl. regulative bodies | refused | rate     |
+| --------- | ------- | ------- | ---- | ------------------------------ | ------- | -------- |
+| Reg CF    | 40      | 1       | 2.5% | 37                             | 0       | **0.0%** |
+| Charities | 309     | 0       | 0.0% | 249                            | 0       | **0.0%** |
+| Housing   | 305     | 4       | 1.3% | 255                            | 1       | **0.4%** |
+| **total** | **654** | **5**   | 0.8% | **541**                        | **1**   | **0.2%** |
+
+Not a long tail — **one construct accounts for 100% of the refusals of the proxy, and it is
+recursion.** Every instance is a deontic combinator: `ongoing reporting obligation` and `rent spine`
+(`HENCE` self-call), `ror together` (an `ROr` fold over a list of contracts), and the decisions that
+reach them. The one refusal whose own root node is not a `Regulative` — `election among available
+grounds` — is `ror together (available ground duties cf)`, a contract fold. **For the population
+that reaches the DRG at all, the proxy's refusal count is zero** — and at least two of the five
+(`ror together` and the `election` that calls it) are refusals the ruled criterion would _not_ make,
+per the box above.
+
+Cross-checked under the opposite framing: counting tier-1 decisions that use _any_ construct outside
+a known-total core refuses 3 / 61 / 50, and the outside-core constructs are exactly `MkDeonton`,
+`Regulative`, `RAnd`, `ROr`, `Record`, `Breach` — the same population. The result does not depend on
+blacklist-versus-whitelist framing.
+
+**This is what justifies routing over rejection, and it justifies it twice over.** The entire
+measured refusal set is recursion, and §6.3-1 already routes recursion to a `Blocking` `D-RECURSIVE`
+— so R2's own `Blocking` arm is **empty on all three corpora**, in the contingent sense §2.4.2 now
+spells out. R2 adds a routing rule and, on these corpora, no new
+refusals. Choosing rejection instead would therefore cost nothing measurable _today_, which is
+exactly why it should not be chosen: the one decision the corpora say would eventually be caught by
+a rejection rule is a `meets the charity test`-shaped tier-2 function, and §6.2 has already ruled
+that refusing those exports a model missing the statute's constitutive test.
+
+**The measurement is syntactic, and its zeroes deserve their caveats.** It walks the parsed but
+_unresolved_ AST, so name resolution is textual and corpus-wide rather than per-module. That
+produced two false positives, both instructive: `DECLARE Disposal` has 2 constructors in
+`housing-act-ground-1A.l4` and 3 in `-1B.l4`, and a corpus-wide type table conflates them — both
+`CONSIDER`s are exhaustive in their own module, and a real per-module checker gets this right; and
+`BRANCH` carries a _mandatory_ otherwise arm in the AST, so it is always total. Exhaustiveness was
+checked against declared constructor sets rather than by the real checker, and prelude bodies were
+not scanned beyond the six enumerated partials.
+
+**And the zeroes are partly zeroes because the corpora barely contain the constructs being tested.**
+There are **19 `CONSIDER`s in all 62 files** (1 / 1 / 17) and all 19 are exhaustive; **zero**
+occurrences of `DIVIDED BY` or `MODULO` anywhere; **zero `ASSUME` declarations** in any of the three
+(all use the GIVEN+record house style); `at`/`maximum`/`minimum` are never applied as prelude
+functions. A positive control was therefore run — 7 probes and 4 negative controls, including a
+parameter shadowing the name `maximum` — and **all seven detectors fire while all four negatives
+stay clean**. The honest reading of the table above is _the criterion is cheap_, not _the criterion
+is well exercised_. The single real division in all 62 files is `reg-cf.l4:101`'s
+`OTHERWISE annual limit basis * 10 / 100`, whose divisor is the literal `100`, which L3 accepts.
+
+**Bad news, flagged rather than buried — and it is not R2's.** The measurement re-derived §2.2's
+census and got **4.8% / 4.0% / 5.9%** tier 2 against §2.2's **2.7% / 4.0% / 4.3%**. The first
+version of this paragraph read those as corroboration — "Charities lands exactly, the other two are
+1–2 points high, most likely a scope-unit difference". **That reading is wrong: the rates agree and
+the populations do not.**
+
+Back out the denominators. §2.4.3's Charities tier-1 count of 309 at a 4.0% tier-2 rate implies
+~322 parameterised decisions and ~13 tier-2; Housing's 305 at 5.9% implies ~324 and ~19; Reg CF's 40
+at 4.8% implies ~42 and ~2. §2.2 names its tier-2 sets outright — "7/7 in Housing, 4/5 in Charities"
+— so **5** and **7**, which at 4.0% and 4.3% imply ~125 and ~163 parameterised decisions. An
+independent count of top-level `GIVEN` blocks, the natural proxy for a parameterised decision,
+settles which measurement the corpora support:
+
+| corpus                            | top-level `^GIVEN` | §2.4.3 implies | §2.2 implies |
+| --------------------------------- | ------------------ | -------------- | ------------ |
+| `regcf.l4` (981 lines)            | 42                 | ~42            | ~74          |
+| `charities-jersey-2014/*.l4` (12) | 332                | ~322           | ~125         |
+| `housing-act-*.l4` (49)           | 349                | ~324           | ~163         |
+
+So the re-derivation did **not** reproduce §2.2. It measured a population 2.0–2.6× larger and
+landed on a similar ratio, and the larger population is the one the files support.
+
+**The consequence lands on §2.2, not on R2, and it is the consequence §2.2 can least afford.** If
+Housing really has ~19 tier-2 decisions, then "7/7 in Housing" is 7 of ~19 and "tier 2 correlates
+≈100% with cross-module reuse" is a claim about a sample of roughly a third — and that bullet is the
+one §2.2 calls "the frame paying rent", the one that makes R1 and "where do we draw the lambda"
+literally the same question. **§2.2's second bullet is hereby downgraded from census to sample**
+until the correlation is re-run over the full tier-2 set. Nothing in §2.4 depends on it; §2.3's
+service-granularity ruling does.
+
+The same pass also found that **the tiering is fragile with respect to test fixtures, which is where
+the redesign's census claim is separately at risk.** Counting `#EVAL`/`#ASSERT`/`#TRACE` sites as
+call sites flips tier 2 to
+**69.0% / 83.5% / 71.3%**. §2.1 says "every reference to `d` within the scope unit" and does not
+exclude directives; that sentence must say so explicitly, or the analysis inverts. Two smaller
+findings from the same pass: **185 of 688 parameterised decisions (27%) have zero non-directive call
+sites**, so they un-lift vacuously rather than by observed unification — R6's population, and larger
+than R6 states; and the un-lifting analysis is **currently untested**, since `DmnExport.hs:986`
+goldens exactly one file whose five decisions are all nullary, so no golden exists in which anything
+un-lifts at all.
+
+#### 2.4.4 Where the criterion cannot decide: a note, not a refusal
+
+**Yes — a fidelity note is the fallback, and it is `D-PARTIAL` (§7).** The criterion has three
+"don't know" cases. Each must read as `¬TOTAL` for routing purposes, while the note says _not
+certified total_ rather than _is partial_:
+
+1. **Analysis-suppressed `CONSIDER`s.** `branchHasOpaquePattern` bails on literal and expression
+   patterns because the guard model cannot reason about them, and `isPrimitiveType`
+   (`TypeCheck.hs:1954`) deliberately skips `NUMBER`/`STRING`/`DATE` scrutinees. An `OTHERWISE` arm
+   makes both accepted, so the residual is narrow.
+2. **Non-structural recursion** — accumulator patterns whose decreasing argument is not recognised,
+   mutual recursion, `NUMBER`-measure recursion.
+3. **Statically-safe uses of L3–L6** — `SQRT 4`, `x MODULO 12` on a whole-number field. Constant
+   folding recovers the all-literal cases; the rest stay conservative, at zero measured cost.
+
+`D-PARTIAL` therefore carries two severities and always names the failing clause and its source
+range. At `Lossy`: _"`d` could not be certified total (⟨clause⟩ at ⟨range⟩), so it was emitted as a
+`businessKnowledgeModel` / inlined at N call sites rather than as a `<decision>`. A DMN decision node
+is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is
+`null`, which reads as `false`."_ At `Blocking`, the same text with "and no fallback was available".
+
+Two things the note must **not** say. It must not claim the decision _is_ partial — cases 1–3 are
+ignorance, not evidence. And it must not offer `@nonexhaustive` as a remedy: `@nonexhaustive` is a
+_reject_ signal, being the author's own declaration that the match is incomplete. The remedy for a
+genuinely non-exhaustive `CONSIDER` is in the source, and that pressure is correct.
+
+One cross-reference, to keep the claim honest: **DMN-SAFE is about definedness, not equality.** L4's
+`NUMBER` is an exact `Rational`; FEEL's `number` is a 34-digit decimal (§10.3.2.3.1). A DMN-SAFE
+decision can still produce a _different_ answer. That is a fidelity question and not R2's, but
+nobody should read DMN-SAFE as value-equal.
+
+#### 2.4.5 The prerequisite: as it stands, this cannot ship on this branch
+
+**Say it plainly: L1 is nearly vacuous here.** `checkConsider` sources its constructor oracle from
+`buildConstructorLookup` (`TypeCheck.hs:1457`), which is fed only from **top-level** `DECLARE`s and
+is **reset to `Map.empty` at the import boundary** (`Import/Resolution.hs:401`). Measured against
+the installed `l4`:
+
+| probe                                                                                                    | warns?  |
+| -------------------------------------------------------------------------------------------------------- | ------- |
+| enum declared and `CONSIDER`ed in the same file, top level                                               | **yes** |
+| the same enum declared in an `IMPORT`ed module                                                           | no      |
+| the same `CONSIDER` placed inside a `WHERE`                                                              | no      |
+| `CONSIDER` over `MAYBE` missing `NOTHING`; over `BOOLEAN` missing `FALSE`; over a `LIST` missing `EMPTY` | no      |
+
+A criterion that trusts `PatternMatchesMissing` on this branch will certify imported-enum,
+`WHERE`-local, `MAYBE`, `BOOLEAN` and `LIST` partial matches as **total** — unsound in the silent
+direction, which is the direction this whole ruling exists to close.
+
+`main` already fixed exactly this, and **it is not an ancestor of this branch**
+(`git merge-base --is-ancestor 8a8b46bc HEAD` → false). PR #45 replaces the lookup with
+`constructorsInScopeFromEntityInfo`, sourced from the cumulative, cross-module-unioned,
+builtin-inclusive `entityInfo`; it injects `LIST`'s `[EMPTY, cons]` pair, and excludes only
+`CONTRACT` — permanently, the deontic values being an open sum. It also introduces `@nonexhaustive`,
+which L2 depends on outright.
+
+**So R2 lands in §10's Phase 4, where the routing decision is made, but with a hard prerequisite
+that was not in that table: PR #45's exhaustiveness oracle must be on the `mengwong/dmn-export` line
+first.** Until it is, any totality claim outside same-file top-level enums is vacuous. Added as
+Phase 0.5.
+
+Implementation surface, briefly. `lowerModule` (`Lower.hs:1296`) sees only the `Module Resolved` and
+needs the checker's output; `CheckResult` (`TypeCheck/Types.hs:481-493`) already carries both
+`entityInfo` and `errors`, so the signature grows one parameter. The cheap route scans
+`CheckResult.errors` for `PatternMatchesMissing`, and attribution to the enclosing decision is
+already free — every `CONSIDER` inside a `DECIDE` is checked under
+`errorContext (WhileCheckingDecide …)` (`TypeCheck.hs:564`), so walk the context chain, taking the
+outermost for a `WHERE`-local, or key by `SrcRange` containment. The cleaner route re-runs the
+analysis from `entityInfo` inside the exporter, and is the only one that can distinguish "missing
+arms" from "analysis suppressed" — a distinction route one structurally cannot see, because a
+suppressed analysis emits no warning and is indistinguishable from a clean one. That distinction is
+what §2.4.4 case 1 rests on, so the cleaner route is the one to build.
+
+Cross-module callees are a genuine gap in both routes. `freeRefs` (`Lower.hs:1565-1570`) drops names
+from other modules by design — _"which is what keeps every prelude function and builtin out of the
+DRG"_ — so `TOTAL`'s fixpoint over `calls(d)` needs traversal the exporter does not have today.
+Prelude callees are covered by the structural check above; user imports are not.
 
 ---
 
@@ -511,15 +1064,16 @@ nothing.
 
 ## 7. Fidelity notes
 
-| Code               | Change                                                                                                                                                                                                                                        | Rationale                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `D-SCOPE`          | **Repurpose.** Today it fires on "two Uniques, one FEEL name" (`Lower.hs:1245-1258`) — universal under GIVEN style, so pure noise. Replace the predicate with a **type conflict** test: two same-named terms with _different_ declared types. | `freeTermTypes` is a plain `Map.fromList` (`Lower.hs:1228`), i.e. **last-wins** — that is the genuine defect currently hidden behind the false positives. Also fix: the message hardcodes "two different terms" for 3+, anchors only to the first element's id, and its `lost:` text ("L4's lexical scoping of GIVEN parameters") is false when two global `ASSUME`s collide. |
-| `D-PARAM-AS-INPUT` | **New**, `Advisory`. A tier-1 decision's parameters became model inputs; the decision can no longer be applied twice to different subjects within this model.                                                                                 | Names what un-lifting costs, without pretending it is free.                                                                                                                                                                                                                                                                                                                   |
-| `D-BKM`            | **New**, `Advisory`. A tier-2 decision became a BKM, with the differing call sites listed.                                                                                                                                                    | The reader should know which decisions are functions.                                                                                                                                                                                                                                                                                                                         |
-| `D-RECURSIVE`      | **New**, `Blocking`. §6.3 case 1.                                                                                                                                                                                                             |                                                                                                                                                                                                                                                                                                                                                                               |
-| `D-SUMTYPE`        | **New**, `Blocking`. §4.2, tagged union.                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                                                                               |
-| `D-RENAME`         | **New**, two severities. Benign mangle = `Advisory` (recoverable from `@label`); collision suffix = `Lossy`.                                                                                                                                  | §5.2.                                                                                                                                                                                                                                                                                                                                                                         |
-| `D-MD-FLATRECORD`  | **New**, `Lossy`, markdown carrier only. §8.                                                                                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                               |
+| Code               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                  | Rationale                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `D-SCOPE`          | **Repurpose.** Today it fires on "two Uniques, one FEEL name" (`Lower.hs:1245-1258`) — universal under GIVEN style, so pure noise. Replace the predicate with a **type conflict** test: two same-named terms with _different_ declared types.                                                                                                                                                                                           | `freeTermTypes` is a plain `Map.fromList` (`Lower.hs:1228`), i.e. **last-wins** — that is the genuine defect currently hidden behind the false positives. Also fix: the message hardcodes "two different terms" for 3+, anchors only to the first element's id, and its `lost:` text ("L4's lexical scoping of GIVEN parameters") is false when two global `ASSUME`s collide. |
+| `D-PARAM-AS-INPUT` | **New**, `Advisory`. A tier-1 decision's parameters became model inputs; the decision can no longer be applied twice to different subjects within this model.                                                                                                                                                                                                                                                                           | Names what un-lifting costs, without pretending it is free.                                                                                                                                                                                                                                                                                                                   |
+| `D-BKM`            | **New**, `Advisory`. A tier-2 decision became a BKM, with the differing call sites listed.                                                                                                                                                                                                                                                                                                                                              | The reader should know which decisions are functions.                                                                                                                                                                                                                                                                                                                         |
+| `D-RECURSIVE`      | **New**, `Blocking`. §6.3 case 1.                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                                                                                                                                                                                                                                                                                                                               |
+| `D-PARTIAL`        | **New**, two severities, **keyed off the call site and not off the node kind** (§2.4.2). `Lossy` only when every call site consumes the decision from a _lazy_ position and it was inlined or emitted as a BKM; `Blocking` when any call site consumes it strictly, and when it is a DRG root. Names the failing clause and its range, says _not certified total_ rather than _partial_, and never offers `@nonexhaustive` as a remedy. | §2.4. Not decision-node-ness: an undefined FEEL result is `null` wherever it arises — `<decision>` body, BKM `encapsulatedLogic`, or inlined cell alike — and `null` reads as `false` at the first boolean consumer. Routing to a BKM removes the input _widening_; only a lazy consuming position removes the _coercion_.                                                    |
+| `D-SUMTYPE`        | **New**, `Blocking`. §4.2, tagged union.                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                                                                                                                                                                                                                                               |
+| `D-RENAME`         | **New**, two severities. Benign mangle = `Advisory` (recoverable from `@label`); collision suffix = `Lossy`.                                                                                                                                                                                                                                                                                                                            | §5.2.                                                                                                                                                                                                                                                                                                                                                                         |
+| `D-MD-FLATRECORD`  | **New**, `Lossy`, markdown carrier only. §8.                                                                                                                                                                                                                                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -607,15 +1161,16 @@ may be obsolete by the time either side ships.
 
 Each phase is independently shippable and independently useful.
 
-| Phase | Content                                                                                                            | Depends on |
-| ----- | ------------------------------------------------------------------------------------------------------------------ | ---------- |
-| **0** | Kill the dot passthrough in `feelIdentText` (§5.1-1). Fix `drgNamed`'s type-error hole (§9). Add the Xerces check. | —          |
-| **1** | Columns: `typeRef` + `<inputValues>` / `<outputValues>` from L4's known domains (§3).                              | 0          |
-| **2** | Naming policy: `feelBase` + `uniquifyIn`, `@label` everywhere, `feelTypeNameText` (§5.2).                          | 0          |
-| **3** | `itemDefinition` emission and placement; records and enums at the data level (§4).                                 | 2          |
-| **4** | The un-lifting analysis; `D-SCOPE` repurposed; `D-PARAM-AS-INPUT` (§2.1, §7).                                      | 3          |
-| **5** | BKM emission, `knowledgeRequirement`, the three refusals (§6).                                                     | 4          |
-| **6** | Markdown carrier: flattening + `D-MD-FLATRECORD`; dmnmd addendum (§8).                                             | 3          |
+| Phase   | Content                                                                                                                                                                                                                                                                                                                                                                                             | Depends on |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **0**   | Kill the dot passthrough in `feelIdentText` (§5.1-1). Fix `drgNamed`'s type-error hole (§9). Add the Xerces check.                                                                                                                                                                                                                                                                                  | —          |
+| **0.5** | Land PR #45's exhaustiveness oracle (`constructorsInScopeFromEntityInfo`, `@nonexhaustive`) on this line — `8a8b46bc` is not an ancestor. Hard prerequisite for §2.4's L1 and L2; without it the totality criterion is vacuous outside same-file top-level enums.                                                                                                                                   | —          |
+| **1**   | Columns: `typeRef` + `<inputValues>` / `<outputValues>` from L4's known domains (§3).                                                                                                                                                                                                                                                                                                               | 0          |
+| **2**   | Naming policy: `feelBase` + `uniquifyIn`, `@label` everywhere, `feelTypeNameText` (§5.2).                                                                                                                                                                                                                                                                                                           | 0          |
+| **3**   | `itemDefinition` emission and placement; records and enums at the data level (§4).                                                                                                                                                                                                                                                                                                                  | 2          |
+| **4**   | The un-lifting analysis and its totality side-condition; `D-SCOPE` repurposed; `D-PARAM-AS-INPUT`, `D-PARTIAL` (§2.1, §2.4, §7). **Two obligations §2.4 incurs on this phase:** a test that fails when `UserEvalException` grows a ninth constructor (§2.4.1's coverage map), and a re-run of §2.4.3's census against the _real_ structural-termination check rather than the flat recursion proxy. | 3, 0.5     |
+| **5**   | BKM emission, `knowledgeRequirement`, the three refusals (§6).                                                                                                                                                                                                                                                                                                                                      | 4          |
+| **6**   | Markdown carrier: flattening + `D-MD-FLATRECORD`; dmnmd addendum (§8).                                                                                                                                                                                                                                                                                                                              | 3          |
 
 Phase 1 alone makes the existing exhibit's analysability claim true, which is worth shipping on
 its own.
@@ -629,11 +1184,36 @@ its own.
   `tInvocable` is a `drgElement`, so many services live in one model. The residual sub-ruling is
   §2.3's **service granularity**, which is a constraint to satisfy rather than a preference to
   choose.
-- **R2 — Strictness.** DMN computes every _required_ decision; L4 forces lazily. Un-lifting
-  widens the input set a shared node is evaluated under, so it makes this worse, not better. A
-  decision undefined or divergent for some inputs will surface in DMN on paths L4 never forces.
-  Proposed: a strictness side-condition on un-lifting, refusing to merge a parameter whose
-  decision is not total. **Not settled — flagged deliberately rather than assumed benign.**
+- **R2 — Strictness. ANSWERED 2026-07-27, revised the same day under review, see §2.4.** DMN
+  computes every _required_ decision; L4 forces lazily, and un-lifting widens the input set a shared
+  node is evaluated under. The consequence is worse than "undefined": **FEEL has no undefined** — it
+  has `null`, and `null` reads as `false` in a guard, a table row and an `every … satisfies` alike,
+  so L4's loud exception becomes a silent wrong answer. The side-condition stays, as a **routing**
+  rule rather than a rejection: `TOTAL ∧ PURE ∧ DETERMINISTIC`, evaluated only in strict positions,
+  gates tier-1 `<decision>` emission and multi-output `decisionService` co-membership.
+  **Severity is keyed off the call site, not the node kind** — routing to a BKM removes the input
+  widening but not the `null` coercion, so a strictly-consumed `¬DMN-SAFE` decision is `Blocking`
+  even though a fallback node kind exists (§2.4.2). Measured cost: **5 of 654 tier-1 decisions
+  (0.8%), 1 of 541 (0.2%) once regulative bodies are excluded, all five recursion — a set §6.3-1
+  already refuses**, so R2's own `Blocking` arm is empty on these three corpora, contingently.
+
+  **What review changed, recorded so it is not un-changed by accident.** Five defects, all repaired
+  in place, none of which unseated the ruling: `TOTAL` was specified as the _least_ fixed point,
+  which rejects every list-touching decision (now the greatest, §2.4.1); L1 did not exhaust
+  `NonExhaustivePatterns` — sum-type field projection is a second, `CONSIDER`-free source, now L11;
+  L7 was stated at the head type when `EQUALS` recurses structurally, so a record with a function
+  field escaped it; `BlackholeForced` was unmapped and a `WHERE`-local cycle escaped both
+  `LOCALLY-TOTAL` and `TERMINATES`, now L12; and §2.4.2's "tier 2 is sound by construction" was
+  false. Two of the five were **silent-unsoundness** holes found by probing the evaluator rather
+  than by re-reading the constructor list, which is why §2.4.1 now carries an explicit coverage map
+  and an obligation to test it mechanically.
+
+  Residual risk, in order. (1) The **oracle**: L1 depends on PR #45's exhaustiveness fix, which is
+  not on this branch (§2.4.5, Phase 0.5 in §10). (2) The **measurement scored a proxy** whose
+  recursion detector is flatter than the ruled structural check, so the accepting branch of that
+  check has zero corpus exercise and 0.8% is an upper bound rather than an estimate (§2.4.3). (3)
+  L11 is not covered by §4.2's tagged-union `Blocking`, because **R4 is still open**.
+
 - **R3 — Unicode in `feelBase`.** Keep FEEL-legal non-ASCII name characters (spec-legal;
   `feelin` evaluates `revenu année` natively) or ASCII-fold? Today's `feelIdentText` destroys
   them (`année` → `ann_e`). Leaning keep, with a fold behind a flag.
