@@ -165,6 +165,8 @@ post-M4 work and belongs to neither track alone.
 
 ## 7. P2 — the process/LTS visualiser
 
+**Now specified: [LTS-VISUALISER.md](./LTS-VISUALISER.md).**
+
 Out of scope here, and it gets its own spec. Recorded so the boundary is explicit: the ambition
 is to draw the transition system _better than BPMN can_, with the Petri-net lineage from earlier
 work as the starting point — token game, trace animation, and the deontic distinctions F1 says
