@@ -227,15 +227,53 @@ exporter. Nothing else on this list has that ratio.
 
 ## 6. Decisions locked 2026-07-25
 
-| #      | Decision                                                                                                                                                                                                                                           |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **K1** | **Elicitation marks gate the default flip; chrome trails it.** Marks are correctness-adjacent — a picture that omits "you have not answered this yet" misleads in the same register §25f does. Menus are convenience.                              |
-| **K2** | **The paths-list is not ported.** `expandSentences` substitutes. It answers the same question in a form that reads aloud, survives print, and needs no DAG. `node-paths-selection.ts` and `algebraic-graphs` die together at Step 8.               |
-| **K3** | **Mirror their scope first, superset second — and the superset is not optional.** The page is the unit of comparison; a wider v1 blurs it. C1/C3 are committed work, not a stretch goal.                                                           |
-| **K4** | **BPMN export targets Camunda import.** Their authoring flow is already Camunda Modeler → paste XML, so a paste-ready file slots into their workflow at zero cost. The fidelity report rides along as a second output rather than being the point. |
-| **K5** | **The process track is scoped to build in parallel.** P0/P1 share only the CLI and service surface with Track D. P2 spins out entirely.                                                                                                            |
-| **K6** | **Exporters live in Haskell; the ladder stays TypeScript.** `jl4-core` already owns both IRs; Haskell exporters get CLI _and_ service for free. The service serves data, the browser draws.                                                        |
-| **K7** | **The normaliser is shared infrastructure, built first.** Not a ladder patch. See GUARDED-ROWS.md.                                                                                                                                                 |
+| #      | Decision                                                                                                                                                                                                                                                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **K1** | **Elicitation marks gate the default flip; chrome trails it.** Marks are correctness-adjacent — a picture that omits "you have not answered this yet" misleads in the same register §25f does. Menus are convenience.                                                                                                                      |
+| **K2** | **The paths-list is not ported.** `expandSentences` substitutes. It answers the same question in a form that reads aloud, survives print, and needs no DAG. `node-paths-selection.ts` and `algebraic-graphs` die together at Step 8.                                                                                                       |
+| **K3** | **Mirror their scope first, superset second — and the superset is not optional.** The page is the unit of comparison; a wider v1 blurs it. C1/C3 are committed work, not a stretch goal.                                                                                                                                                   |
+| **K4** | **BPMN export targets Camunda import.** Their authoring flow is already Camunda Modeler → paste XML, so a paste-ready file slots into their workflow at zero cost. The fidelity report rides along as a second output rather than being the point. **Amended 2026-07-27 — see K8: Camunda is the target, but it is not the only checker.** |
+| **K5** | **The process track is scoped to build in parallel.** P0/P1 share only the CLI and service surface with Track D. P2 spins out entirely.                                                                                                                                                                                                    |
+| **K6** | **Exporters live in Haskell; the ladder stays TypeScript.** `jl4-core` already owns both IRs; Haskell exporters get CLI _and_ service for free. The service serves data, the browser draws.                                                                                                                                                |
+| **K7** | **The normaliser is shared infrastructure, built first.** Not a ladder patch. See GUARDED-ROWS.md.                                                                                                                                                                                                                                         |
+
+## 6.1 Decision locked 2026-07-27
+
+| #      | Decision                                                                                                                                                                                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **K8** | **Two engines, both exporters.** Every export is checked against **both** the Camunda ecosystem and **KIE**, and the DMN exporter emits a **flavor per ecosystem**. One validator is one opinion, and each exporter is currently blind in the opposite eye. |
+
+**Why, concretely.** The two exporters have inverted blind spots today:
+
+|      | checked by                                                          | not checked by |
+| ---- | ------------------------------------------------------------------- | -------------- |
+| BPMN | `bpmn-moddle` — what `bpmn-js`, and so Camunda Modeler, parses with | KIE / jBPM     |
+| DMN  | Drools/KIE 8.44.0.Final, the DMN TCK reference implementation       | Camunda        |
+
+Neither gap is hypothetical. The BPMN exporter's first version passed `bpmn-moddle` at **zero
+warnings** across 1581 green examples while emitting a **deadlocking** diagram — the converging
+join counted edges rather than tokens, so an `ROR` or an interrupting boundary inside a `RAND`
+branch produced a process that can never complete. A parser cannot see that; an engine that tries
+to run it can. The DMN exporter was bitten the same way from the other side: schema-valid output
+that no engine could execute, reported as advisory.
+
+So the checks must be **independent implementations**, and ideally ones that _execute_ rather than
+merely parse — parse-level agreement is nearly free and would have caught none of the nine BPMN
+defects.
+
+**For DMN this is a flavor axis, not merely a second check.** It settles **R7** of
+`../DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §11 ("Is Camunda a target?") as **yes** — which by that
+ruling's own terms means the full §5 naming/mangling policy applies rather than collapsing to
+"just stop emitting dots", and that §6.3-3 BKM emission needs gating. `§`-as-`decisionService`
+(§2.3) is a third likely divergence point. **All three axes are ours and are verified; the
+per-engine behaviour on each is not, and must be measured against both engines before the flavors
+are designed** — the recurring lesson on this programme is that the validator's opinion and the
+engine's are different things.
+
+**Not a new target audience.** Camunda remains _the_ audience, because their authoring flow is
+Camunda Modeler → paste XML. KIE is a correctness instrument, and the DMN KIE flavor exists so the
+DMN↔BPMN pairing (the F4 seam) is consumable end-to-end in either ecosystem rather than half in
+each.
 
 ---
 
@@ -262,9 +300,13 @@ Concretely, for the mirror milestone (M3):
 1. Every one of their eight numbered requirements is traceable to `.l4` source, and every
    answer the wizard gives cites the rule it came from.
 2. The BPMN we emit **imports cleanly into Camunda Modeler** and describes the same obligation
-   tail their diagram does.
-3. The fidelity report names, in their vocabulary, what BPMN and DMN each dropped.
-4. The ladder for the eligibility decision renders in a plain HTML page with a script tag, and
+   tail their diagram does — and **KIE agrees** (K8). Camunda import is the deliverable; KIE is
+   the second opinion that catches what a parser cannot, such as a process that parses perfectly
+   and then deadlocks.
+3. The DMN we emit is accepted by **both** ecosystems, in each one's flavor (K8).
+4. The fidelity report names, in their vocabulary, what BPMN and DMN each dropped — including any
+   divergence between the two engines, which is a fidelity fact and not an implementation detail.
+5. The ladder for the eligibility decision renders in a plain HTML page with a script tag, and
    clicking a term changes the verdict.
 
 And for the superset (M5), the demonstration that lands the argument: **ask the same question
