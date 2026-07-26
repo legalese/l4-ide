@@ -311,9 +311,18 @@ data InputColumn = MkInputColumn
   }
   deriving stock (Eq, Show, Generic)
 
--- | The single output column. L4 decisions return one value, so there is exactly
--- one; DMN permits several (and 'BUILD-SPEC-dmnmd-to-l4.md' §1.4 handles the
--- inverse case by synthesising a record).
+-- | The single output column — a restriction of __this exporter__, not of L4.
+--
+-- An L4 decision may perfectly well return several values, by returning a
+-- record: @GIVETH A Assessment@ with branches building @Assessment WITH …@, or
+-- (as the Charities corpus actually does) @GIVETH A MAYBE Part6Penalty@ with
+-- branches returning @JUST \<named constant\>@. DMN likewise permits several
+-- @\<output\>@ clauses per table, and 'BUILD-SPEC-dmnmd-to-l4.md' §1.4 already
+-- handles the inverse direction by synthesising a record.
+--
+-- What is missing is the forward lowering: a record-valued decision currently
+-- collapses to one @Any@-typed column whose entry is L4 source text rather than
+-- FEEL. See @specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@.
 --
 -- @ocDefault@ is the @\<defaultOutputEntry\>@, which DMN supports precisely for
 -- the single-hit order-free policies. It is where @OTHERWISE@ goes under 'HitUnique';
