@@ -139,6 +139,94 @@ and a plan that sequences other steps too slowly silently invalidates its own pr
 
 ---
 
+### 2.5 Pre-emption and ROFR also live in "user space" — the layer stack
+
+§2.4 treats pre-emption as constitutional rather than statutory. That is still too simple. Both
+pre-emption and ROFR are routinely defined **in shareholders' agreements, investment agreements and
+side letters** — and that is what makes this case study interesting rather than merely detailed.
+
+| Layer         | Instrument                          | Public?               | Amendment threshold                | Binds                                       |
+| ------------- | ----------------------------------- | --------------------- | ---------------------------------- | ------------------------------------------- |
+| kernel        | Companies Act                       | yes                   | Parliament                         | everyone                                    |
+| system config | Constitution                        | **yes — filed**       | special resolution, 75% (s26(1))   | company + all members incl. future (s39(1)) |
+| user space    | Shareholders' agreement (SHA)       | **no**                | usually unanimity or class consent | **only its parties**                        |
+| per-deal      | Subscription / investment agreement | no                    | as drafted                         | its parties                                 |
+| per-process   | Side letters (incl. SAFE pro rata)  | no, often undisclosed | bilateral, but MFN-linked          | its parties                                 |
+
+**Why terms migrate down into user space.** Four pragmatics, and the second is the one people get
+backwards:
+
+1. **Publicity.** The constitution is filed and public. Nobody wants liquidation preferences, veto
+   schedules or ROFR mechanics legible to competitors and to the next round's investors. The real
+   deal therefore lives in the SHA.
+2. **Amendment threshold — the crucial inversion.** The constitution changes on 75% (s26(1)), so a
+   10% holder has no protection in it. An SHA typically changes only by unanimity or defined-class
+   consent. **The private layer is the _stronger_ lock.** This is the single biggest reason
+   investors insist on SHA terms rather than trusting the articles, and it inverts the naive
+   intuition that the "constitutional" layer is more fundamental. Any model that ranks layers by
+   formality rather than by amendment threshold will get precedence exactly wrong.
+3. **Who is bound.** The constitution binds all members automatically, including future ones
+   (s39(1) — it binds "as if it had been signed and sealed by each member"). An SHA binds only its
+   parties, hence **deeds of adherence**: a transfer is conditioned on the transferee acceding. Miss
+   one and the SHA **silently leaks** — the ROFR chain acquires a hole that no document review
+   surfaces, because every document is individually fine.
+4. **Remedy.** SHA breach is ordinary contract — damages, specific performance, injunction — and it
+   can bind shareholders _inter se_ as to how they vote, which the statutory contract does poorly.
+
+**The Russell limit, and it is good law here.** A company cannot validly fetter its statutory power
+to alter its own constitution; but the very same agreement is valid as a personal covenant _between
+the shareholders_. `Russell v Northern Bank Development Corp` [1992] 1 WLR 588 is endorsed by the
+Singapore Court of Appeal in **_The Wellness Group Pte Ltd v Paris Investment Pte Ltd_ [2018] SGCA
+47** ("a shareholders' agreement to exercise their votes in a particular way is valid and
+enforceable by the courts") and discussed in **_Golden Harvest Films Distribution v Golden Village
+Multiplex_ [2006] SGCA 44**.
+
+Formally this is the important bit: **the same clause is void as against the company and
+enforceable as against the shareholders.** Validity is a predicate over _who is bound_, not a
+position in a hierarchy. **An encoding that models layer precedence as a total order gets this
+wrong**, and so does every diagram that draws the stack as strata.
+
+**The conformity clause and its lag.** SHAs almost always provide that, in conflict, as between the
+shareholders the SHA prevails and the parties _shall vote to amend the constitution to conform_.
+That is an obligation to bring one layer into agreement with another — deontic, with a temporal lag,
+and **during the lag the layers genuinely disagree**. It is also, in practice, among the
+most-breached clauses in the stack: the amendment is simply never made, and years later the public
+document and the private deal say different things. That is a standing, checkable defect.
+
+**ROFR is a family, not a right.** These must be distinguished because they interact:
+
+- pre-emption on **issue** (pro rata / participation) — anti-dilution
+- pre-emption on **transfer** / **ROFR** — offer before selling
+- **ROFO** — offer first, at a named price
+- **tag-along** (co-sale) — minority joins the majority's sale
+- **drag-along** — majority compels the minority to sell
+
+The bugs live in the interaction: overlapping or inconsistent time windows; one "Transfer Notice"
+serving two regimes that define it differently; drag firing while a ROFR window is still open;
+permitted-transferee carve-outs that differ between the constitution and the SHA.
+
+**MFN is a fixpoint.** A side letter with a most-favoured-nation clause defines its own content by
+reference to the set of all _other_ side letters. Two holders each with MFN are mutually referential.
+Does a stable assignment exist, and is it unique? This is the **same shape** as van der Meyden's
+circularity, relocated — and note that **MFN is one of YC's own SAFE variants**.
+
+**Where the two arcs converge.** YC's post-2018 SAFE unbundled the pro rata right into a **separate
+side letter**. Pro rata is pre-emption on issue, defined in user space — and it must be honoured in
+the very equity round in which the SAFE converts, whose share count is determined by that same
+conversion. **How many shares the holder may take up pro rata depends on the post-round cap table,
+which depends on how many shares their SAFE just converted into.** That is a second circularity
+stacked on the one [[yc-safe-executable]] catalogues, and his single-SAFE analysis scopes to
+conversion and does not appear to reach it. Worth checking against the 2025 book before claiming it.
+
+**Why this makes the case study better, not merely bigger.** Counsel drafts the SHA; the company
+secretary maintains the constitution; the CFO maintains the cap table; the founder signs the side
+letters. Each document is reviewed by someone competent. **The composition is reviewed by nobody.**
+That is precisely the System-of-Record gap this project exists to close, and corporate governance
+may demonstrate it more cleanly than contracts generally, because the layers are crisply separated
+and each has a different owner.
+
+---
+
 ## 3. What "dependency" means here — four distinct relations
 
 "Draw a DAG of the dependencies" is underspecified; there are at least four relations, and they
@@ -254,6 +342,43 @@ Purely arithmetic, needs no picture, and answers a question founders actually as
 
 **A6 — Authority chains.** Can the board do this alone, or does it need the members? Renders as
 provenance annotation, not a graph.
+
+### Cross-layer targets (from §2.5)
+
+**A7 — Conformity drift.** The SHA obliges the parties to conform the constitution. Diff what the
+constitution says against what the SHA requires it to say. Purely mechanical once both are encoded,
+and it finds a defect that is near-universal in practice and invisible to single-document review.
+
+**A8 — Per-party validity, not precedence.** Resolve conflicts with a `Russell`-aware predicate:
+void as against the company, enforceable between shareholders. **Test that the encoding refuses to
+express this as a total order** — if layer precedence typechecks as a ranking, the model is wrong.
+
+**A9 — Transfer-regime interaction.** ROFR / ROFO / tag / drag: are the windows consistent, is the
+priority total, and can two regimes fire on the same Transfer Notice with different deadlines?
+
+**A10 — Adherence-chain integrity.** Is every current holder actually a party to the SHA? A missing
+deed of adherence is a hole in the ROFR chain that no document review finds.
+
+**A11 — MFN fixpoint.** With multiple MFN side letters, does a stable assignment of terms exist, and
+is it unique? Same shape as the SAFE's circularity.
+
+**A12 — Pro rata ⊗ conversion.** The convergence case of §2.5. Bridges to [[yc-safe-executable]].
+
+### Failure modes to use as the test corpus
+
+Drawn from how these documents actually go wrong in practice, and each is a scenario the encoding
+should reproduce:
+
+- **Deed of adherence never signed** — transferee unbound, ROFR chain holed.
+- **Constitution never conformed** to the SHA, per A7.
+- **Pre-emption waived informally** to close a round fast, with no written waiver — leaving a
+  voidable issue. This is the classic seed-round diligence finding, and it is a _procedural_
+  defect that the arithmetic of the cap table cannot show.
+- **Cap-table drift** — options granted outside the pool, SAFEs untracked, side letters forgotten.
+- **Notice mechanics** — deemed-receipt clauses, email vs post, and a ROFR clock whose start date
+  nobody recorded.
+- **Definitional divergence** — "Transfer", "Permitted Transferee", "Investor Majority" defined
+  differently across constitution, SHA and SSA. Cheap to check, embarrassing to find late.
 
 ---
 
