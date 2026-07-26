@@ -87,6 +87,56 @@ itself interesting: the members' side is heavily regulated, the board's side is 
 configuration. It also means the board side is where a constitution can most easily create a
 defect the Act will not catch.
 
+### 2.4 The anchoring worked example: issuing new shares
+
+The motivating chain: _to issue new shares the directors must first offer them to existing
+shareholders; to do that they need shareholder approval; that needs a meeting; that needs notice._
+Every resolution is an edge; the interesting structure is the dominators.
+
+Verified against `CoA1967`, the chain is **not quite** that — and each correction is load-bearing.
+
+| Step                | Source                                                                                                                                                                                                   | Note                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Directors may issue | **s161(1)** — _"Despite anything in a company's constitution, the directors must not, without the prior approval of the company in general meeting, exercise any power of the company to issue shares."_ | **Mandatory.** Not overridable.                 |
+| Offer to existing   | **The constitution — _not_ the Act**                                                                                                                                                                     | See below. Configurable, and droppable.         |
+| General meeting     | s175 / s177                                                                                                                                                                                              | Quorum s177(1)                                  |
+| Notice              | s177(2) ordinary; **s184(1)** special                                                                                                                                                                    | **14 days private, 21 days public** — see below |
+
+**Correction 1 — pre-emption is constitutional here, not statutory.** "Pre-emption" appears
+**zero** times in `CoA1967`. Unlike UK CA2006 s561, Singapore has no general statutory pre-emption
+right on new issues for private companies; the offer-to-existing-members step comes from the
+company's own constitution (and the model constitution). This _strengthens_ §2.2: the dependency
+graph is assembled from **both** layers, and the pre-emption edge is precisely one of the
+configurable ones. A company can delete it; it cannot delete s161. The graph should therefore
+colour edges by provenance — mandatory (Act) vs configured (constitution) — which is §3(2) falling
+out of §2.1 automatically.
+
+**Correction 2 — 21 days is the public-company figure.** s184(1) after Act 36/2014 splits it:
+**(a) private company — not less than 14 days'** written notice; **(b) public company — not less
+than 21 days'**. Ordinary meetings are ≥14 days under s177(2), "or such longer period as is
+provided in the constitution" — a **one-directional default**: a constitution may lengthen notice
+but not shorten it. That is a lattice, not a free choice, and it is a nice small test of whether
+the encoding can express bounded variability rather than mere overriding.
+
+**Correction 3, and the one that justifies the whole approach — notice is not a dominator.**
+s184(2) lets a special resolution be passed on **short notice** where a majority in number holding
+**≥95% of total voting rights** so agree. That is a bypass edge. So "21/14 days' notice" does
+**not** dominate "special resolution passed" — there exists a path to the resolution that never
+passes through the notice node.
+
+This is the payoff. A hand-drawn dependency DAG shows notice as a hard prerequisite, because that
+is what everyone believes. **Lengauer–Tarjan says otherwise, and it is right.** The algorithm
+corrects the intuition rather than merely illustrating it — which is exactly the argument P2 §7.3's
+gate demands of any picture, and it is an argument about the _analysis_, not the rendering. It also
+generalises: consent-based short-notice waivers, unanimous-assent (Duomatic-style) routes, and
+s182 court-ordered meetings are all bypass edges, and every one of them is a false dominator in the
+naive graph.
+
+**A fourth wrinkle — edges decay.** s161(3): approval to issue shares continues in force only until
+the conclusion of the next AGM (or when that AGM was due). So the approval edge has a **lifetime**,
+and a plan that sequences other steps too slowly silently invalidates its own prerequisite. That is
+§3(3) temporal feasibility, and it is not visible in any static graph at all.
+
 ---
 
 ## 3. What "dependency" means here — four distinct relations
@@ -251,9 +301,14 @@ provenance annotation, not a graph.
 - [ ] Read `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` — does it already handle §2.1's markers?
 - [ ] Extract the mandatory/default partition from `CoA1967` Part on meetings, using the §2.1 stock
       phrases. Small, mechanical, high-value, and independently checkable.
-- [ ] Encode the general-meeting machinery for a private company limited by shares. Members' side
-      only; leave the board side for a second pass.
+- [ ] **Encode §2.4's share-issue chain end to end** — s161 approval, constitutional pre-emption,
+      meeting, quorum, notice, plus the s184(2) short-notice bypass and the s161(3) expiry. Small,
+      self-contained, and it is the example everything else is explained against.
+- [ ] Encode the rest of the general-meeting machinery for a private company limited by shares.
+      Members' side only; leave the board side for a second pass.
 - [ ] Spike **P2f** (Lengauer–Tarjan dominators over `StateGraph`) against it — answered as a set
-      of acts, no picture. This is the real first deliverable.
+      of acts, no picture. This is the real first deliverable. **Acceptance test: it must report
+      that notice does _not_ dominate a passed special resolution** (§2.4, correction 3). If it
+      says otherwise, the bypass edge was not modelled and the encoding is wrong.
 - [ ] Try A2 (recusal-breaks-quorum) as the flagship finding.
 - [ ] Only then revisit whether a DAG rendering earns its keep, against P2's gate.
