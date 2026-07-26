@@ -308,6 +308,179 @@ below, where we correct ourselves.
 
 ---
 
+## The same instinct, industrialised: Lexipedia and Reg CF (2026)
+
+The window challenge was July 2021: two people, a torn sheet of paper and a tidy
+boxes-and-arrows chart. The natural rejoinder — _those were amateurs; a real
+practitioner with a real tool would not slip_ — deserves a real answer, and one
+turned up on its own.
+
+[**Lexipedia**](https://www.lexipedia.xyz) is an open-source project that models
+"legal processes" as shareable, forkable **BPMN and DMN**. It is careful,
+technically fluent, and exactly the sort of open civic-tech effort this field wants
+more of. Its page for
+[**Regulation Crowdfunding exemptions**](https://www.lexipedia.xyz/doku.php?id=reg_cf_exemptions)
+renders the SEC's Reg CF rules — who may raise, how much, from whom, and what they
+must then do — as a single BPMN process diagram. It is _drawn properly_, in the
+_industrial_ notation, by people who plainly know it. And every failure this page
+has been describing is sitting inside it.
+
+Here is its skeleton, redrawn:
+
+```mermaid
+flowchart LR
+  start((start)) --> elig{Check Issuer<br/>Eligibility}
+  elig -- Eligible --> off[Check Offering<br/>Limit]
+  off --> inv{Check Investor<br/>Contribution Limits}
+  inv -- "income/net worth &lt; $107,000" --> five[Apply 5% Limit]
+  inv -- "income/net worth ≥ $107,000" --> ten[Apply 10% Limit]
+  inv -- "accredited investor" --> olc
+  five --> olc{Offering<br/>Limit Check}
+  ten --> olc
+  olc -- Within Limit --> cil[Check Investor Limits]
+  cil --> disc[Prepare Disclosure<br/>Requirements] --> intm[Select Intermediary] --> adv[Comply with<br/>Advertising Restrictions] --> rep[Prepare Ongoing<br/>Reporting] --> res[Understand Resale<br/>Restrictions] --> done((end))
+```
+
+_(Our redrawing, for the purpose of criticism; the original BPMN is at
+[lexipedia.xyz](https://www.lexipedia.xyz/doku.php?id=reg_cf_exemptions) and remains
+the work of that project. The nodes and labels are theirs; only the tidying is ours.)_
+
+Read it against the four things this page has said a flowchart does to a rule.
+
+**It invents a sequence the law does not have.** Issuer eligibility, the offering
+cap and the investor-contribution limit are three _conditions_ that must all hold;
+Reg CF nowhere says to test them in an order. The diagram nonetheless marches
+`eligibility → offering limit → investor limit`, left to right, as though each gated
+the next. Permute the three and the statute is unchanged while the picture must be
+redrawn — the tell, every time, of an order that lives in the drawing and not in the
+law. _It says more than the law._
+
+**Its gateways have a true branch and no false one.** `Check Issuer Eligibility`
+emits a single arrow, `Eligible`; there is none for _not_ eligible.
+`Offering Limit Check` emits `Within Limit` and nothing for _over_ it. The
+non-qualifying issuer and the over-cap raise simply fall off the diagram into the
+unlabelled exit this page warned about — the exact place a rules-as-code project
+loses track of whether "no" meant _fail_, _stop_, or _undefined_. A material
+conditional makes "does Reg CF even bite this offering?" a first-class question with
+a first-class answer; here it is a missing edge.
+
+**It draws a computation as a fork.** The investor limit is not a classification, it
+is a _piecewise formula_ — broadly, a percentage of income or net worth, over a
+floor, with a threshold that switches the percentage and (since the 2021 amendments)
+no cap at all for accredited investors. The diagram reconstitutes that arithmetic as
+three control-flow branches into tasks named `Apply 5% Limit` and `Apply 10% Limit`.
+This is the "computation as branches" failure the [decision-table
+section](#decision-tables-the-strongest-rival-and-where-it-actually-runs-out) returns
+to: the honest home for `greater(floor, rate × base)` is a _cell_ or a _function_, not
+a gateway. (Note too the `$107,000` painted into the branch labels — a hard-coded
+dollar figure of the kind that silently drifts. Reg CF's thresholds have already moved
+since that number was current; the diagram has not.)
+
+**It fuses two kinds of law into one line, and serves neither.** Look where the flow
+goes _after_ the limits: `Prepare Disclosure Requirements → Select Intermediary →
+Comply with Advertising Restrictions → Prepare Ongoing Reporting → Understand Resale
+Restrictions`. That tail is not decision logic at all — it is _obligation and
+process_: some one-time, some continuing, some standing constraints on conduct with
+no natural position in a queue. "Understand resale restrictions" is not step twelve
+because "prepare ongoing reporting" was step eleven; they are sequenced only because
+a line has to run from somewhere to somewhere. So the front half is a **predicate
+mis-drawn as flow** and the back half is **genuine process flattened into a
+checklist**, and the one undifferentiated diagram is right about neither. This is
+precisely the split the section below on process insists on — decision logic and
+process are different semantic categories — and the reason a single picture cannot
+carry both.
+
+### The same number, twice, and only one of them updated
+
+The four defects above are ones you can reason your way to from the picture. This
+fifth one we found only by formalising the underlying regulation and comparing —
+and it is the most useful of the five, because it is not an argument. It is a
+measurement.
+
+The page states the investor-limit threshold as **$107,000** in its investor-limits
+group. Fourteen lines later, in its disclosure group, it states the financial-statement
+tier-1 threshold as **$124,000**. These are not two thresholds. They are the same
+figure, in two places, and they were moved by the **same amendatory instruction on the
+same day**:
+
+> a. In paragraph (a)(2)(i), removing reference to "$2,200" and adding in its place
+> "$2,500"; and removing "$107,000" and adding in its place "$124,000" […] 3. Amend Sec. 227.201 by: a. In paragraph (t)(1), removing reference to "$107,000"
+> and adding in its place "$124,000"
+>
+> — 87 FR 57394, 57398 (effective 2022-09-20)
+
+Half the page took the amendment. Half did not. The page now asserts two different
+values for one fact, and nothing on it can tell you which is current. (It is worse than
+staleness: elsewhere the same page states the limit as a percentage of _the lesser_ of
+income or net worth, which the rule stopped saying in March 2021 — so a reader cannot
+even assume the older number belongs to a coherent older rule.)
+
+**This is a named bug, and software engineering has named it more than once.** That is
+the point of raising it. It is not an exotic failure or a lapse in care; it is one of
+the first failure modes anyone teaches, with a smell name, a remedy, and in some cases
+a tool that finds it for you:
+
+| The frame                        | What it says about this page                                                                                                                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DRY / single source of truth** | Hunt & Thomas's formulation is about _knowledge_, not text: "every piece of knowledge must have a single, unambiguous, authoritative representation within a system." The cut point is knowledge. It has two representations and no authority.                                                            |
+| **Magic number**                 | `$124,000` appears as a bare literal with no name. Nothing on the page says these two occurrences _are_ the same quantity; a reader has to know the law to know they should move together.                                                                                                                |
+| **Shotgun surgery**              | Fowler's smell: one conceptual change forces many scattered small edits. Note who is committing it — the amendatory instruction quoted above _is_ a shotgun-surgery changelist. The regulator ships a textual diff against N sites, and the CFR is itself the unnormalised store.                         |
+| **Inconsistent clone update**    | The closest empirical analogue. Juergens et al. (ICSE 2009) studied whether clones actually matter and found that _inconsistently changed_ clones are a substantial fault source — copies are cheap to make and expensive to keep in step. Exactly what happened here.                                    |
+| **Update anomaly**               | The most precise frame, because this is data rather than code. Codd's point about unnormalised relations: store one fact in several places and an update touching only some of them leaves the store self-contradictory. Normalisation does not discipline the anomaly — it makes it **unrepresentable**. |
+
+**And the format guarantees it.** This is where the diagnosis stops being about
+Lexipedia and starts being about the substrate again. A DokuWiki page is prose plus a
+pasted `<bpmnio>` block. There is **no binding form** — nowhere to write
+_let the cut point be $124,000_ and refer to it twice. DRY is therefore not merely
+unobserved on that page; it is **unavailable**. A perfect editor with unlimited care
+cannot normalise a document that has no place to put the name. What they have instead
+is the "Notes for editors" section on their Charlottesville page, telling humans to
+keep the diagram and the text in sync — in safety-engineering terms an _administrative
+control_ (ask people to be careful) standing in for an _engineering control_ (make the
+failure impossible). Administrative controls are the weakest tier for a reason.
+
+**And it failed silently.** No test broke, because there is nothing that could break.
+The two occurrences are not connected by anything capable of noticing they disagree.
+The defect has been sitting on the flagship page of a project whose stated audience
+includes "legal engineers building automated systems," and it took formalising the
+regulation to see it.
+
+The contrast is not that we are more careful. It is that the question does not arise.
+In the Reg CF mirror corpus (`jl4/examples/legal/regcf/regcf.l4`)
+the figure is **bound once**, as `income or net worth cut point`, and read by both the
+investor-limit rule and the financial-statement tier. Name resolution — not editorial
+diligence — is what guarantees the two agree; a divergence is not a thing you can write
+down. The boundary cases either side of it are pinned by executable assertions, so even
+a deliberate attempt to duplicate the value gets caught. And because the binding carries
+its effective date, "what was the limit on 2021-06-01?" is a query rather than an
+exercise in page archaeology.
+
+That is what the previous paragraph meant by a derived view that _cannot drift_. Here is
+the drift, in the wild, on the flagship page, in a number that decides how much money a
+person is allowed to invest.
+
+### Not a knock on the people
+
+None of this is a knock on the people. It is, once again, the notation asking the
+same thing of everyone: pick an order, gate each step on the last, and terminate
+every path by hand. Lexipedia did it fluently, in the standard-issue tool, and the
+category error survived the competence — which is the whole argument of this page,
+now with a 2026 dateline instead of a 2021 one.
+
+And notice the one move Lexipedia gets exactly right, because it is the move worth
+keeping. Their processes are **open, shareable, forkable, versioned** — law you can
+send someone a pull request against. That instinct is correct, and this document
+should say so plainly. What is misplaced is only the _substrate_: fork a BPMN and you
+fork its ceiling with it — the invented order, the missing exits, the arithmetic you
+cannot write — because the diagram _is_ the source. The answer is not to draw a better
+diagram but to move the source: keep the rule in a language and let the BPMN, the DMN
+table and the ladder each be a _derived view_ that cannot drift from it or from one
+another. That is the [inversion](#why-this-matters-the-inversion) this page closes on
+— and Reg CF is a good place to watch it bite, because a faithful account of it needs
+a predicate, a function _and_ a process, and no one picture is all three.
+
+---
+
 ## The right pictures for logic
 
 Because the law here is set-theoretic and truth-functional, the fitting diagrams

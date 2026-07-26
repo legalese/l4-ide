@@ -1,0 +1,981 @@
+IMPORT prelude
+
+§ `SEC Regulation Crowdfunding — 17 CFR Part 227`
+
+-- ===========================================================================
+-- REGULATION CROWDFUNDING (17 CFR Part 227), as in force on 2026-07-23.
+--
+-- SCOPE. This module deliberately mirrors ONE external artifact: the Lexipedia
+-- wiki page `reg_cf_exemptions`, which presents Reg CF as eight numbered
+-- requirement groups. Those eight groups, and only those eight, are encoded
+-- here, in their order:
+--
+--   1. Issuer eligibility            -> Rule 100(b)          (17 CFR 227.100(b))
+--   2. Offering limit                -> Rule 100(a)(1)       (17 CFR 227.100(a)(1))
+--   3. Investor investment limits    -> Rule 100(a)(2)       (17 CFR 227.100(a)(2))
+--   4. Disclosure requirements       -> Rules 201, 201(t), 203(a)
+--   5. Intermediary obligations      -> Rules 100(a)(3), 301-303
+--   6. Advertising restrictions      -> Rule 204             (17 CFR 227.204)
+--   7. Ongoing reporting             -> Rules 202, 203(b)
+--   8. Resale restrictions           -> Rule 501             (17 CFR 227.501)
+--
+-- This is NOT a full formalisation of Part 227. Subpart C's funding-portal
+-- registration regime (Rules 400-404), the bad-actor disqualification detail
+-- (Rule 503), and the Rule 201 disclosure itemisation beyond the financial
+-- statement tiers are represented only to the depth the mirrored page reaches.
+--
+-- SOURCES. Every rule text quoted inline is verbatim from the eCFR rendering of
+-- Title 17 Part 227 at the 2026-07-23 issue date
+-- (https://www.ecfr.gov/current/title-17/chapter-II/part-227), cross-checked
+-- against the amending releases in the Federal Register. Nothing here was taken
+-- from the mirrored wiki page; where the two disagree, the CFR governs and the
+-- divergence is itemised in README.md.
+--
+-- THRESHOLDS AND THEIR CLOCKS. Every dollar figure is bound ONCE, as a named
+-- constant in the section below, with an `@ref` carrying the rule paragraph and
+-- the effective date of the figure now in force. Two amending events matter:
+--
+--   2021-03-15  Release 33-10884, "Facilitating Capital Formation and Expanding
+--               Investment Opportunities by Improving Access to Capital in
+--               Private Markets", 86 FR 3496 (Jan. 14, 2021). Raised the
+--               offering limit AND changed the SHAPE of the investor limit:
+--               "lesser of" -> "greater of", plus a new accredited-investor
+--               carve-out. See the note at `investment limit` below.
+--   2022-09-20  Release 33-11098, "Inflation Adjustments Under Titles I and III
+--               of the JOBS Act", 87 FR 57394 (Sept. 20, 2022). Adjusted every
+--               remaining Reg CF dollar figure. The offering limit was
+--               deliberately NOT adjusted: the Commission considered $5,000,000
+--               to "more than account for inflation" (87 FR at 57397).
+--
+-- MODELLING NOTE. Constitutive material (eligibility, limits, tiers) is encoded
+-- as `DECIDE`/`MEANS` predicates carrying the verbatim rule text inline as
+-- inert prose. The obligation tail (Forms C-U / C-AR / C-TR, the advertising
+-- prohibition, the resale restriction) is encoded as regulative rules.
+-- ===========================================================================
+
+§§ `Parties and acts`
+
+DECLARE Actor IS ONE OF
+    Issuer
+    Intermediary
+    Investor
+    Purchaser
+
+DECLARE Action IS ONE OF
+    `file a Form C offering statement`
+    `file a Form C-U progress update`
+    `file a Form C-AR annual report`
+    `file a Form C-TR termination of reporting`
+    `advertise the terms of the offering`
+    `transmit funds to the issuer`
+    `transfer the securities`
+
+§§ `Thresholds — every dollar figure, bound once`
+
+-- Raised from $1,070,000 to $5,000,000 by Release 33-10884, 86 FR 3496,
+-- effective 2021-03-15. Left unadjusted by the 2022 inflation release.
+@ref 17 CFR 227.100(a)(1) — offering maximum, $5,000,000, effective 2021-03-15 — https://www.ecfr.gov/current/title-17/section-227.100
+GIVETH A NUMBER
+`offering maximum in a 12-month period` MEANS 5000000
+
+-- $107,000 -> $124,000 by Release 33-11098, 87 FR 57394, effective 2022-09-20.
+-- The SAME amendatory instruction moved this figure and the Rule 201(t)(1) tier
+-- ceiling below, on the same day.
+@ref 17 CFR 227.100(a)(2)(i)-(ii) — income/net-worth cut point, $124,000, effective 2022-09-20 — https://www.federalregister.gov/d/2022-19867
+GIVETH A NUMBER
+`income or net worth cut point` MEANS 124000
+
+-- $2,200 -> $2,500 by Release 33-11098, effective 2022-09-20.
+@ref 17 CFR 227.100(a)(2)(i) — investment floor, $2,500, effective 2022-09-20
+GIVETH A NUMBER
+`minimum permitted investment` MEANS 2500
+
+-- $107,000 -> $124,000 by Release 33-11098, effective 2022-09-20.
+@ref 17 CFR 227.100(a)(2)(ii) — per-investor cap, $124,000, effective 2022-09-20
+GIVETH A NUMBER
+`maximum amount sold to any one investor in a 12-month period` MEANS 124000
+
+-- $107,000 -> $124,000 by Release 33-11098, effective 2022-09-20.
+@ref 17 CFR 227.201(t)(1) — tier 1 ceiling, $124,000, effective 2022-09-20
+GIVETH A NUMBER
+`tier 1 ceiling` MEANS 124000
+
+-- $535,000 -> $618,000 by Release 33-11098, effective 2022-09-20.
+@ref 17 CFR 227.201(t)(2) — tier 2 ceiling, $618,000, effective 2022-09-20
+GIVETH A NUMBER
+`tier 2 ceiling` MEANS 618000
+
+-- $1,070,000 -> $1,235,000 by Release 33-11098, effective 2022-09-20.
+@ref 17 CFR 227.201(t)(3) — first-time-issuer review ceiling, $1,235,000, effective 2022-09-20
+GIVETH A NUMBER
+`first-time issuer review ceiling` MEANS 1235000
+
+-- Unchanged since adoption, 80 FR 71537 (Nov. 16, 2015), effective 2016-05-16.
+@ref 17 CFR 227.202(b)(2) — holders-of-record threshold, 300, effective 2016-05-16
+GIVETH A NUMBER
+`holders of record threshold` MEANS 300
+
+-- Unchanged since adoption; NOT touched by either inflation release.
+@ref 17 CFR 227.202(b)(3) — total-assets threshold, $10,000,000, effective 2016-05-16
+GIVETH A NUMBER
+`total assets threshold` MEANS 10000000
+
+§§ `Periods — every deadline, bound once`
+
+@ref 17 CFR 227.303(a)(2) — minimum public availability before any sale
+GIVETH A NUMBER
+`minimum days publicly available before any sale` MEANS 21
+
+@ref 17 CFR 227.202(a) and 227.203(b)(1) — annual report deadline
+GIVETH A NUMBER
+`days to file the annual report after fiscal year end` MEANS 120
+
+@ref 17 CFR 227.203(b)(3) — Form C-TR deadline
+GIVETH A NUMBER
+`business days to file Form C-TR` MEANS 5
+
+@ref 17 CFR 227.203(a)(3)(i) — Form C-U progress update deadline
+GIVETH A NUMBER
+`business days to file a progress update` MEANS 5
+
+-- Rule 501(a) states the restriction as a "one-year period beginning when the
+-- securities were issued". Rendered in days for the deontic deadline; see the
+-- endpoint note at `transfer is within the one-year restricted period`.
+@ref 17 CFR 227.501(a) — resale restricted period
+GIVETH A NUMBER
+`days in the resale restricted period` MEANS 365
+
+§ `1. Issuer eligibility — Rule 100(b)`
+
+-- Rule 100(b) is drafted as a list of DISQUALIFIERS, not of qualifications:
+-- "The crowdfunding exemption shall not apply to transactions involving the
+-- offer or sale of securities by any issuer that: (1) ... (6) ...". Encoded
+-- isomorphically: six exclusion limbs, disjoined, then negated once.
+@ref 17 CFR 227.100(b) — applicability
+DECLARE IssuerProfile HAS
+    name                                                                          IS A STRING
+    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS A BOOLEAN
+    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS A BOOLEAN
+    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS A BOOLEAN
+    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS A BOOLEAN
+    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS A BOOLEAN
+    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS A BOOLEAN
+
+@ref 17 CFR 227.100(b)(1)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(1) — not organized under State or territorial law` issuer MEANS
+        "(1) Is not organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia;"
+    ... NOT issuer's `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
+
+@ref 17 CFR 227.100(b)(2)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(2) — an Exchange Act reporting company` issuer MEANS
+        "(2) Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934;"
+    ... issuer's `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
+
+@ref 17 CFR 227.100(b)(3)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(3) — an investment company` issuer MEANS
+        "(3) Is an investment company, as defined in section 3 of the Investment Company Act of 1940, or is excluded from the definition of investment company by section 3(b) or section 3(c) of that Act;"
+    ... issuer's `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`
+
+@ref 17 CFR 227.100(b)(4)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(4) — subject to a bad-actor disqualification` issuer MEANS
+        "(4) Is not eligible to offer or sell securities in reliance on section 4(a)(6) of the Securities Act as a result of a disqualification as specified in section 227.503(a);"
+    ... issuer's `is subject to a disqualification as specified in section 227.503(a)`
+
+-- The limb the mirrored page omits entirely: an issuer delinquent in its Reg CF
+-- ongoing reports is disqualified from making a NEW offering.
+@ref 17 CFR 227.100(b)(5)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(5) — delinquent in ongoing annual reports` issuer MEANS
+        "(5) Has sold securities in reliance on section 4(a)(6) of the Securities Act and has not filed with the Commission and provided to investors, to the extent required, the ongoing annual reports required by this part during the two years immediately preceding the filing of the required offering statement; or"
+    ... issuer's `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
+
+@ref 17 CFR 227.100(b)(6)
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`(b)(6) — no specific business plan, or a blank-check business plan` issuer MEANS
+        "(6) Has no specific business plan or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies."
+    ... issuer's `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
+
+@ref 17 CFR 227.100(b) — the disjunction of exclusions
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+`issuer is excluded by Rule 100(b)` issuer MEANS
+        "(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:"
+    ..  `(b)(1) — not organized under State or territorial law` issuer
+    ..  `(b)(2) — an Exchange Act reporting company` issuer
+    ..  `(b)(3) — an investment company` issuer
+    ..  `(b)(4) — subject to a bad-actor disqualification` issuer
+    ..  `(b)(5) — delinquent in ongoing annual reports` issuer
+    ..  `(b)(6) — no specific business plan, or a blank-check business plan` issuer
+
+@ref 17 CFR 227.100(b) — eligibility is the negation of the exclusions
+GIVEN issuer IS AN IssuerProfile
+GIVETH A BOOLEAN
+DECIDE `issuer is eligible` issuer IF
+    NOT `issuer is excluded by Rule 100(b)` issuer
+
+§ `2. Offering limit — Rule 100(a)(1)`
+
+@ref 17 CFR 227.100(a)(1) and 227.201(t) Instruction 1
+DECLARE Offering HAS
+    `target offering amount`                                                              IS A NUMBER
+    `maximum offering amount the issuer will accept`                                      IS A NUMBER
+    `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS A NUMBER
+    `the issuer has previously sold securities in reliance on section 4(a)(6)`            IS A BOOLEAN
+
+-- Rule 100(a)(1) counts prior 4(a)(6) sales in the preceding 12 months PLUS
+-- "the securities offered in such transaction". Instruction 1 to Rule 201(t)
+-- computes the SAME aggregate for the financial-statement tiers, and directs
+-- that an issuer accepting oversubscriptions use the MAXIMUM offering amount.
+-- Both consumers therefore read this one function.
+@ref 17 CFR 227.100(a)(1); 17 CFR 227.201(t) Instruction 1
+GIVEN offering IS AN Offering
+GIVETH A NUMBER
+`aggregate offering amount` offering MEANS
+        offering's `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months`
+    PLUS offering's `maximum offering amount the issuer will accept`
+
+-- NOTE ON SCOPE: the aggregate counts ONLY securities sold in reliance on
+-- section 4(a)(6). Sales under other exemptions are NOT added in. Whether a
+-- concurrent offering is integrated with this one is a separate question,
+-- referred out by Rule 100(e) to 17 CFR 230.152.
+@ref 17 CFR 227.100(a)(1); cf. 227.100(e) (integration -> 17 CFR 230.152)
+GIVEN offering IS AN Offering
+GIVETH A BOOLEAN
+DECIDE `offering is within the offering limit` offering IF
+        "(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;"
+    ... `aggregate offering amount` offering AT MOST `offering maximum in a 12-month period`
+
+§ `3. Investor investment limits — Rule 100(a)(2)`
+
+@ref 17 CFR 227.100(a)(2)
+DECLARE InvestorProfile HAS
+    name                                                     IS A STRING
+    `is an accredited investor as defined in Rule 501`       IS A BOOLEAN
+    `annual income`                                          IS A NUMBER
+    `net worth`                                              IS A NUMBER
+    `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS A NUMBER
+
+-- Rule 100(a)(2)(i) and (ii) both measure against "the GREATER of the investor's
+-- annual income or net worth".
+--
+-- SHAPE CHANGE, 2021-03-15 (Release 33-10884, 86 FR 3496). Before that date both
+-- limbs read "the LESSER of the investor's annual income or net worth". The
+-- amendment substituted "greater" for "lesser" in each limb, which raises the
+-- limit for every investor whose income and net worth differ. This is a change
+-- in the shape of the rule, not merely in a number, and it is the single most
+-- consequential edit in Reg CF's history for an individual investor.
+--
+-- Neither reading was ever compelled by the statute. Section 4(a)(6)(B) of the
+-- Securities Act says only "a given percentage of the annual income or net worth
+-- of such investor, as applicable"; the Commission notes that "[t]he statutory
+-- language does not expressly provide that the investor use the lesser of annual
+-- income or net worth" (86 FR 3496, n.460), and that in 2015 it "considered
+-- whether to use a 'greater of' or 'lesser of' standard ... and determined to use
+-- the 'lesser of' standard at that time due to concerns about investors incurring
+-- unaffordable losses". So the operative word here is a discretionary regulatory
+-- gloss on an ambiguous statute, held for five years and then reversed.
+@ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15
+GIVEN investor IS AN InvestorProfile
+GIVETH A NUMBER
+`greater of annual income or net worth` investor MEANS
+    IF   investor's `annual income` AT LEAST investor's `net worth`
+    THEN investor's `annual income`
+    ELSE investor's `net worth`
+
+-- The (i)/(ii) selector. Limb (i) applies "if EITHER the investor's annual
+-- income or net worth is less than $124,000"; limb (ii) applies "if BOTH ...
+-- are equal to or more than $124,000". The two are exhaustive and mutually
+-- exclusive, so one boolean selects between them.
+@ref 17 CFR 227.100(a)(2)(i)
+GIVEN investor IS AN InvestorProfile
+GIVETH A BOOLEAN
+`either annual income or net worth is less than the cut point` investor MEANS
+       investor's `annual income` LESS THAN `income or net worth cut point`
+    OR investor's `net worth`     LESS THAN `income or net worth cut point`
+
+@ref 17 CFR 227.100(a)(2)(i)-(ii) — the limit as a formula
+GIVEN investor IS AN InvestorProfile
+GIVETH A NUMBER
+`investment limit` investor MEANS
+    IF   `either annual income or net worth is less than the cut point` investor
+    THEN IF   `minimum permitted investment` AT LEAST `five percent of the greater`
+         THEN `minimum permitted investment`
+         ELSE `five percent of the greater`
+    ELSE IF   `ten percent of the greater` AT MOST `maximum amount sold to any one investor in a 12-month period`
+         THEN `ten percent of the greater`
+         ELSE `maximum amount sold to any one investor in a 12-month period`
+    WHERE
+        `five percent of the greater` MEANS 0.05 TIMES `greater of annual income or net worth` investor
+        `ten percent of the greater`  MEANS 0.10 TIMES `greater of annual income or net worth` investor
+
+@ref 17 CFR 227.100(a)(2) — aggregation across all issuers
+GIVEN investor IS AN InvestorProfile
+      `amount to be sold in this transaction` IS A NUMBER
+GIVETH A NUMBER
+`aggregate amount sold to this investor including this transaction` investor `amount to be sold in this transaction` MEANS
+        investor's `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months`
+    PLUS `amount to be sold in this transaction`
+
+-- The accredited-investor carve-out. The limit bites only "Where the purchaser
+-- is not an accredited investor"; an accredited purchaser is subject to no Reg
+-- CF investment limit at all. Added 2021-03-15 by Release 33-10884; before that
+-- date the limit applied to EVERY investor.
+@ref 17 CFR 227.100(a)(2) — accredited-investor carve-out, effective 2021-03-15
+GIVEN investor IS AN InvestorProfile
+      `amount to be sold in this transaction` IS A NUMBER
+GIVETH A BOOLEAN
+`investor is within the investment limit` investor `amount to be sold in this transaction` MEANS
+        "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:"
+    ..  investor's `is an accredited investor as defined in Rule 501`
+    ..      `aggregate amount sold to this investor including this transaction` investor `amount to be sold in this transaction`
+        AT MOST `investment limit` investor
+
+§ `4. Disclosure requirements — Rules 201, 201(t), 203(a)`
+
+@ref 17 CFR 227.201(t)
+DECLARE FinancialStatementRequirement IS ONE OF
+    `financial statements certified by the principal executive officer, with tax return information`
+    `financial statements reviewed by an independent public accountant`
+    `financial statements audited by an independent public accountant`
+
+-- The three tiers of Rule 201(t), plus the first-time-issuer relief inside tier
+-- 3. That relief is BOUNDED: it runs out at $1,235,000, above which even a
+-- first-time issuer must provide audited statements.
+@ref 17 CFR 227.201(t)(1)-(3)
+GIVEN offering IS AN Offering
+GIVETH A FinancialStatementRequirement
+`financial statements required` offering MEANS
+    IF   `aggregate` AT MOST `tier 1 ceiling`
+    THEN `financial statements certified by the principal executive officer, with tax return information`
+    ELSE IF   `aggregate` AT MOST `tier 2 ceiling`
+         THEN `financial statements reviewed by an independent public accountant`
+         ELSE IF   `first-time issuer relief applies`
+              THEN `financial statements reviewed by an independent public accountant`
+              ELSE `financial statements audited by an independent public accountant`
+    WHERE
+        `aggregate` MEANS `aggregate offering amount` offering
+        `first-time issuer relief applies` MEANS
+                NOT offering's `the issuer has previously sold securities in reliance on section 4(a)(6)`
+            AND `aggregate` AT MOST `first-time issuer review ceiling`
+
+-- Rule 201(t)(1) and (t)(2) each let an issuer discharge the tier by supplying
+-- a HIGHER-quality statement than the tier demands ("If financial statements of
+-- the issuer are available that have been audited ..., the issuer must provide
+-- those instead"). Encoded as an ordering on the requirement.
+@ref 17 CFR 227.201(t)(1)-(2); 227.201(t) Instruction 2
+GIVEN required IS A FinancialStatementRequirement
+GIVETH A NUMBER
+`assurance level` required MEANS
+    CONSIDER required
+    WHEN `financial statements certified by the principal executive officer, with tax return information` THEN 1
+    WHEN `financial statements reviewed by an independent public accountant`                              THEN 2
+    WHEN `financial statements audited by an independent public accountant`                               THEN 3
+
+@ref 17 CFR 227.201(t) Instruction 2 — an issuer may voluntarily meet a higher requirement
+GIVEN offering  IS AN Offering
+      supplied  IS A FinancialStatementRequirement
+GIVETH A BOOLEAN
+`financial statement requirement is satisfied` offering supplied MEANS
+        `assurance level` supplied
+    AT LEAST `assurance level` (`financial statements required` offering)
+
+-- The Form C itemisation of Rule 201 is a list of disclosure items, not a
+-- decision. Only the presence of a conforming filing is operative here; the
+-- itemisation itself is carried as inert prose.
+@ref 17 CFR 227.203(a)(1); 17 CFR 227.201(a)-(x)
+DECLARE FormCFiling HAS
+    `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` IS A BOOLEAN
+    `the Form C includes the information required by section 227.201`                                                                                             IS A BOOLEAN
+    `the financial statements supplied`                                                                                                                           IS A FinancialStatementRequirement
+
+@ref 17 CFR 227.203(a)(1)
+GIVEN filing   IS A FormCFiling
+      offering IS AN Offering
+GIVETH A BOOLEAN
+`disclosure requirements are met` filing offering MEANS
+        "(1) Offering statement. ... an issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act ... must file with the Commission and provide to investors and the relevant intermediary a Form C: Offering Statement prior to the commencement of the offering of securities. ... Every Form C must include the information required by section 227.201."
+    ... filing's `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering`
+    AND filing's `the Form C includes the information required by section 227.201`
+    AND `financial statement requirement is satisfied` offering (filing's `the financial statements supplied`)
+
+§ `5. Intermediary obligations — Rules 100(a)(3), 301, 302, 303`
+
+@ref 17 CFR 227.100(a)(3); 227.301; 227.302; 227.303
+DECLARE IntermediaryArrangement HAS
+    `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part` IS A BOOLEAN
+    `the transaction is conducted exclusively through the intermediary's platform`                                 IS A BOOLEAN
+    `the number of intermediaries used for the offering`                                                           IS A NUMBER
+    `the intermediary delivered educational materials in connection with establishing the investor's account`      IS A BOOLEAN
+    `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS A BOOLEAN
+    `the days the issuer information has been publicly available on the intermediary's platform before any sale`   IS A NUMBER
+
+@ref 17 CFR 227.100(a)(3) and its Instruction
+GIVEN arrangement IS AN IntermediaryArrangement
+GIVETH A BOOLEAN
+`(a)(3) — conducted through a single complying intermediary` arrangement MEANS
+        "(3) The transaction is conducted through an intermediary that complies with the requirements in section 4A(a) of the Securities Act and the related requirements in this part, and the transaction is conducted exclusively through the intermediary's platform; and"
+    ... arrangement's `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part`
+    AND arrangement's `the transaction is conducted exclusively through the intermediary's platform`
+    AND     "Instruction to paragraph (a)(3). An issuer shall not conduct an offering or concurrent offerings in reliance on section 4(a)(6) of the Securities Act of 1933 using more than one intermediary."
+        ... arrangement's `the number of intermediaries used for the offering` EQUALS 1
+
+@ref 17 CFR 227.303(a)(2)
+GIVEN arrangement IS AN IntermediaryArrangement
+GIVETH A BOOLEAN
+`the 21-day public availability period has run` arrangement MEANS
+        "(2) This information must be made publicly available on the intermediary's platform for a minimum of 21 days before any securities are sold in the offering, during which time the intermediary may accept investment commitments;"
+    ... arrangement's `the days the issuer information has been publicly available on the intermediary's platform before any sale`
+        AT LEAST `minimum days publicly available before any sale`
+
+@ref 17 CFR 227.302(b)(1); 227.303(b)(1)
+GIVEN arrangement IS AN IntermediaryArrangement
+GIVETH A BOOLEAN
+`the intermediary has discharged its investor-facing duties` arrangement MEANS
+        "(b) Educational materials. (1) In connection with establishing an account for an investor, an intermediary must deliver educational materials to such investor ..."
+    ... arrangement's `the intermediary delivered educational materials in connection with establishing the investor's account`
+    AND     "(b) Investor qualification. Each time before accepting any investment commitment ... an intermediary must: (1) Have a reasonable basis for believing that the investor satisfies the investment limitations established by section 4(a)(6)(B) of the Act and this part."
+        ... arrangement's `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations`
+
+@ref 17 CFR 227.100(a)(3); 227.302; 227.303
+GIVEN arrangement IS AN IntermediaryArrangement
+GIVETH A BOOLEAN
+DECIDE `intermediary obligations are met` arrangement IF
+        `(a)(3) — conducted through a single complying intermediary` arrangement
+    AND `the 21-day public availability period has run` arrangement
+    AND `the intermediary has discharged its investor-facing duties` arrangement
+
+§ `6. Advertising restrictions — Rule 204`
+
+@ref 17 CFR 227.204(b)
+DECLARE AdvertisingNotice HAS
+    `directs investors to the intermediary's platform`                                                                                                        IS A BOOLEAN
+    `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS A BOOLEAN
+    `states the terms of the offering`                                                                                                                        IS A BOOLEAN
+    `states factual information about the legal identity and business location of the issuer`                                                                 IS A BOOLEAN
+    `includes information beyond that permitted by paragraph (b)`                                                                                             IS A BOOLEAN
+
+-- Rule 204(b) is a CLOSED list: a conforming notice "includes no more than the
+-- following information". So compliance is (directs to the platform) AND (does
+-- not exceed the closed list). The three permitted content items are permissions,
+-- not requirements, and so are carried as inert prose rather than as conjuncts.
+@ref 17 CFR 227.204(b)(1)-(3)
+GIVEN notice IS AN AdvertisingNotice
+GIVETH A BOOLEAN
+`notice complies with Rule 204(b)` notice MEANS
+        "(b) A notice may advertise any of the terms of an issuer's offering made in reliance on section 4(a)(6) of the Securities Act if it directs investors to the intermediary's platform and includes no more than the following information:"
+    ... notice's `directs investors to the intermediary's platform`
+    AND     "(1) A statement that the issuer is conducting an offering pursuant to section 4(a)(6) of the Securities Act, the name of the intermediary through which the offering is being conducted, and information (including a link in any written communications) directing the potential investor to the intermediary's platform;"
+        ... "(2) The terms of the offering; and"
+        ... "(3) Factual information about the legal identity and business location of the issuer, limited to the name of the issuer of the security, the address, phone number and Web site of the issuer, the email address of a representative of the issuer and a brief description of the business of the issuer."
+        ... NOT notice's `includes information beyond that permitted by paragraph (b)`
+
+@ref 17 CFR 227.204(e) — definition of "terms of the offering"
+GIVETH A BOOLEAN
+`definition — terms of the offering` MEANS
+        "(e) Instruction to section 227.204. For purposes of this section, terms of the offering means the amount of securities offered, the nature of the securities, the price of the securities, the closing date of the offering period, the planned use of proceeds and the issuer's progress toward meeting its funding target."
+    ... TRUE
+
+-- Rule 204(a)(1) is a prohibition with an exception, so it is regulative: the
+-- issuer SHANT advertise, unless the communication is a conforming Rule 204(b)
+-- notice (or falls within Rule 206, which is outside the mirrored scope).
+@ref 17 CFR 227.204(a)(1)
+GIVEN notice IS AN AdvertisingNotice
+GIVETH A DEONTIC Actor Action
+`advertising restriction` notice MEANS
+    IF   `notice complies with Rule 204(b)` notice
+    THEN FULFILLED
+    ELSE PARTY Issuer SHANT `advertise the terms of the offering` WITHIN `days in the resale restricted period`
+
+§ `7. Ongoing reporting — Rules 202, 203(b)`
+
+@ref 17 CFR 227.202(b)
+DECLARE ReportingStatus HAS
+    `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act`  IS A BOOLEAN
+    `annual reports filed since the most recent sale of securities pursuant to this part`              IS A NUMBER
+    `holders of record`                                                                                IS A NUMBER
+    `total assets`                                                                                     IS A NUMBER
+    `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS A BOOLEAN
+    `the issuer has liquidated or dissolved its business in accordance with state law`                 IS A BOOLEAN
+
+@ref 17 CFR 227.202(b)(1)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`(b)(1) — became an Exchange Act reporting company` status MEANS
+        "(1) The issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act;"
+    ... status's `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act`
+
+@ref 17 CFR 227.202(b)(2)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`(b)(2) — one annual report filed and fewer than 300 holders of record` status MEANS
+        "(2) The issuer has filed, since its most recent sale of securities pursuant to this part, at least one annual report pursuant to this section and has fewer than 300 holders of record;"
+    ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 1
+    AND status's `holders of record` LESS THAN `holders of record threshold`
+
+@ref 17 CFR 227.202(b)(3)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` status MEANS
+        "(3) The issuer has filed, since its most recent sale of securities pursuant to this part, the annual reports required pursuant to this section for at least the three most recent years and has total assets that do not exceed $10,000,000;"
+    ... status's `annual reports filed since the most recent sale of securities pursuant to this part` AT LEAST 3
+    AND status's `total assets` AT MOST `total assets threshold`
+
+@ref 17 CFR 227.202(b)(4)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`(b)(4) — all securities repurchased` status MEANS
+        "(4) The issuer or another party repurchases all of the securities issued in reliance on section 4(a)(6) of the Securities Act, including any payment in full of debt securities or any complete redemption of redeemable securities; or"
+    ... status's `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)`
+
+@ref 17 CFR 227.202(b)(5)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`(b)(5) — liquidated or dissolved` status MEANS
+        "(5) The issuer liquidates or dissolves its business in accordance with state law."
+    ... status's `the issuer has liquidated or dissolved its business in accordance with state law`
+
+@ref 17 CFR 227.202(b)
+GIVEN status IS A ReportingStatus
+GIVETH A BOOLEAN
+`ongoing reporting obligation may terminate` status MEANS
+        "(b) An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:"
+    ..  `(b)(1) — became an Exchange Act reporting company` status
+    ..  `(b)(2) — one annual report filed and fewer than 300 holders of record` status
+    ..  `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` status
+    ..  `(b)(4) — all securities repurchased` status
+    ..  `(b)(5) — liquidated or dissolved` status
+
+-- The reporting spine. While no terminating condition has occurred, the issuer
+-- owes a Form C-AR within 120 days of each fiscal year end, and the duty
+-- renews. Once a condition occurs, the duty converts into a one-shot Form C-TR
+-- within five business days. `annual cycles` bounds the unrolling so the
+-- residual is finite.
+@ref 17 CFR 227.202(a); 227.203(b)(1); 227.203(b)(3)
+GIVEN status         IS A ReportingStatus
+      `annual cycles` IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`ongoing reporting obligation` status `annual cycles` MEANS
+    IF   `ongoing reporting obligation may terminate` status
+    THEN PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`
+    ELSE IF   `annual cycles` AT MOST 0
+         THEN FULFILLED
+         ELSE PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end`
+              HENCE `ongoing reporting obligation` status (`annual cycles` MINUS 1)
+
+§ `8. Resale restrictions — Rule 501`
+
+@ref 17 CFR 227.501(a)
+DECLARE Transfer HAS
+    `days since the securities were issued`                       IS A NUMBER
+    `is to the issuer of the securities`                          IS A BOOLEAN
+    `is to an accredited investor`                                IS A BOOLEAN
+    `is as part of an offering registered with the Commission`    IS A BOOLEAN
+    `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS A BOOLEAN
+
+-- ENDPOINT NOTE. Rule 501(a) restricts transfer "during the one-year period
+-- beginning when the securities were issued". The rule does not say whether the
+-- first anniversary itself falls inside or outside that period. Read here as a
+-- half-open interval [issuance, issuance + 365): day 364 is restricted, day 365
+-- is free. A drafter who cared could remove the question with four words; a
+-- reader who cares must litigate it. Flagged in README.md.
+@ref 17 CFR 227.501(a)
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+`transfer is within the one-year restricted period` transfer MEANS
+        "may not be transferred by any purchaser of such securities during the one-year period beginning when the securities were issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act,"
+    ... transfer's `days since the securities were issued` LESS THAN `days in the resale restricted period`
+
+@ref 17 CFR 227.501(a)(1)-(4)
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+`transfer falls within an exception in Rule 501(a)` transfer MEANS
+        "unless such securities are transferred:"
+    ..  "(1) To the issuer of the securities;"
+    ..  transfer's `is to the issuer of the securities`
+    ..  "(2) To an accredited investor;"
+    ..  transfer's `is to an accredited investor`
+    ..  "(3) As part of an offering registered with the Commission; or"
+    ..  transfer's `is as part of an offering registered with the Commission`
+    ..  "(4) To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance."
+    ..  transfer's `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
+
+@ref 17 CFR 227.501(a)
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+DECIDE `transfer is permitted` transfer IF
+       NOT `transfer is within the one-year restricted period` transfer
+    OR `transfer falls within an exception in Rule 501(a)` transfer
+
+@ref 17 CFR 227.501(a) — the restriction as a prohibition on the purchaser
+GIVEN transfer IS A Transfer
+GIVETH A DEONTIC Actor Action
+`resale restriction` transfer MEANS
+    IF   `transfer falls within an exception in Rule 501(a)` transfer
+    THEN FULFILLED
+    ELSE PARTY Purchaser SHANT `transfer the securities` WITHIN `days in the resale restricted period`
+
+§ `Top-level — does the transaction qualify for the section 4(a)(6) exemption?`
+
+-- Rule 100(a) conditions the exemption on four things at once. (a)(4) folds in
+-- compliance with section 4A(b) and the related rules — the disclosure limb —
+-- with a proviso that failure to comply with Rules 202, 203(a)(3) and 203(b)
+-- does NOT cost the issuer the exemption. So an ongoing-reporting default is a
+-- violation without being a disqualifier for the offering already made; it
+-- reappears as a Rule 100(b)(5) disqualifier for the NEXT offering.
+@ref 17 CFR 227.100(a)(1)-(4)
+GIVEN issuer      IS AN IssuerProfile
+      offering    IS AN Offering
+      investor    IS AN InvestorProfile
+      amount      IS A NUMBER
+      arrangement IS AN IntermediaryArrangement
+      filing      IS A FormCFiling
+GIVETH A BOOLEAN
+DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offering investor amount arrangement filing IF
+        "(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:"
+    ... `issuer is eligible` issuer
+    AND `offering is within the offering limit` offering
+    AND `investor is within the investment limit` investor amount
+    AND `intermediary obligations are met` arrangement
+    AND `disclosure requirements are met` filing offering
+
+§ `Tests`
+
+§§ `Fixtures`
+
+`a clean issuer` MEANS IssuerProfile WITH
+    name IS "Clean Co"
+    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
+    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
+    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
+    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
+    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+
+`a foreign issuer` MEANS IssuerProfile WITH
+    name IS "Ausland GmbH"
+    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS FALSE
+    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
+    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
+    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
+    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+
+-- The limb the mirrored page omits: everything else is clean, but the issuer is
+-- behind on its Reg CF annual reports.
+`a delinquent issuer` MEANS IssuerProfile WITH
+    name IS "Late Filer Inc"
+    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
+    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
+    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
+    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
+    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE
+    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+
+`a blank-check issuer` MEANS IssuerProfile WITH
+    name IS "SPAC-ish LLC"
+    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
+    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
+    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
+    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
+    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
+    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE
+
+GIVEN `prior sales`   IS A NUMBER
+      `maximum`       IS A NUMBER
+      `previously sold` IS A BOOLEAN
+GIVETH AN Offering
+`an offering of` `prior sales` `maximum` `previously sold` MEANS Offering WITH
+    `target offering amount`                                                              IS `maximum`
+    `maximum offering amount the issuer will accept`                                      IS `maximum`
+    `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS `prior sales`
+    `the issuer has previously sold securities in reliance on section 4(a)(6)`            IS `previously sold`
+
+GIVEN `accredited` IS A BOOLEAN
+      `income`     IS A NUMBER
+      `worth`      IS A NUMBER
+      `already`    IS A NUMBER
+GIVETH AN InvestorProfile
+`an investor with` `accredited` `income` `worth` `already` MEANS InvestorProfile WITH
+    name                                               IS "Test Investor"
+    `is an accredited investor as defined in Rule 501` IS `accredited`
+    `annual income`                                    IS `income`
+    `net worth`                                        IS `worth`
+    `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS `already`
+
+GIVEN `days available` IS A NUMBER
+      `intermediaries` IS A NUMBER
+GIVETH AN IntermediaryArrangement
+`an arrangement with` `days available` `intermediaries` MEANS IntermediaryArrangement WITH
+    `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part` IS TRUE
+    `the transaction is conducted exclusively through the intermediary's platform`                                 IS TRUE
+    `the number of intermediaries used for the offering`                                                           IS `intermediaries`
+    `the intermediary delivered educational materials in connection with establishing the investor's account`      IS TRUE
+    `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS TRUE
+    `the days the issuer information has been publicly available on the intermediary's platform before any sale`   IS `days available`
+
+GIVEN `annual reports` IS A NUMBER
+      `holders`        IS A NUMBER
+      `assets`         IS A NUMBER
+GIVETH A ReportingStatus
+`a reporting status with` `annual reports` `holders` `assets` MEANS ReportingStatus WITH
+    `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act`  IS FALSE
+    `annual reports filed since the most recent sale of securities pursuant to this part`              IS `annual reports`
+    `holders of record`                                                                                IS `holders`
+    `total assets`                                                                                     IS `assets`
+    `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS FALSE
+    `the issuer has liquidated or dissolved its business in accordance with state law`                 IS FALSE
+
+GIVEN `days since issue` IS A NUMBER
+      `to accredited`    IS A BOOLEAN
+GIVETH A Transfer
+`a transfer at` `days since issue` `to accredited` MEANS Transfer WITH
+    `days since the securities were issued`                    IS `days since issue`
+    `is to the issuer of the securities`                       IS FALSE
+    `is to an accredited investor`                             IS `to accredited`
+    `is as part of an offering registered with the Commission` IS FALSE
+    `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+
+§§ `Group 1 — issuer eligibility (Rule 100(b))`
+
+#ASSERT     `issuer is eligible` `a clean issuer`
+#ASSERT NOT `issuer is eligible` `a foreign issuer`
+#ASSERT NOT `issuer is eligible` `a delinquent issuer`
+#ASSERT NOT `issuer is eligible` `a blank-check issuer`
+
+-- Which limb bit, for each excluded issuer.
+#ASSERT     `(b)(1) — not organized under State or territorial law` `a foreign issuer`
+#ASSERT     `(b)(5) — delinquent in ongoing annual reports` `a delinquent issuer`
+#ASSERT     `(b)(6) — no specific business plan, or a blank-check business plan` `a blank-check issuer`
+
+§§ `Group 2 — offering limit (Rule 100(a)(1)), boundary at $5,000,000`
+
+-- No prior sales, raising exactly the maximum: within the limit.
+#ASSERT `offering is within the offering limit` (`an offering of` 0 5000000 FALSE)
+-- One dollar more: outside.
+#ASSERT NOT `offering is within the offering limit` (`an offering of` 0 5000001 FALSE)
+-- The aggregation limb: $4,000,000 already sold in the preceding 12 months, so
+-- only $1,000,000 of headroom remains.
+#ASSERT     `offering is within the offering limit` (`an offering of` 4000000 1000000 TRUE)
+#ASSERT NOT `offering is within the offering limit` (`an offering of` 4000000 1000001 TRUE)
+
+§§ `Group 3 — investor limits (Rule 100(a)(2)), boundaries at $124,000 and $2,500`
+
+-- Limb (i), floor case: income and net worth both $40,000. 5% of the greater is
+-- $2,000, below the $2,500 floor, so the floor governs.
+#EVAL   `investment limit` (`an investor with` FALSE 40000 40000 0)
+#ASSERT `investment limit` (`an investor with` FALSE 40000 40000 0) EQUALS 2500
+
+-- Limb (i), exactly at the floor: income $50,000, 5% = $2,500.
+#ASSERT `investment limit` (`an investor with` FALSE 50000 50000 0) EQUALS 2500
+
+-- Limb (i), percentage case: income $60,000, net worth $200,000. "GREATER of"
+-- selects $200,000; 5% = $10,000. Under the pre-2021 "LESSER of" rule this same
+-- investor was limited to 5% of $60,000 = $3,000.
+#ASSERT `investment limit` (`an investor with` FALSE 60000 200000 0) EQUALS 10000
+
+-- The (i)/(ii) boundary. Net worth exactly at the cut point but income one
+-- dollar below: "either ... is less than $124,000", so limb (i) still governs.
+#ASSERT     `either annual income or net worth is less than the cut point` (`an investor with` FALSE 123999 124000 0)
+#ASSERT NOT `either annual income or net worth is less than the cut point` (`an investor with` FALSE 124000 124000 0)
+
+-- Limb (ii), both exactly at the cut point: 10% of $124,000 = $12,400.
+#ASSERT `investment limit` (`an investor with` FALSE 124000 124000 0) EQUALS 12400
+
+-- Limb (ii), exactly at the cap: 10% of $1,240,000 = $124,000.
+#ASSERT `investment limit` (`an investor with` FALSE 1240000 1240000 0) EQUALS 124000
+
+-- Limb (ii), above the cap: 10% of $3,000,000 = $300,000, capped to $124,000.
+#ASSERT `investment limit` (`an investor with` FALSE 3000000 3000000 0) EQUALS 124000
+
+-- The aggregation and the carve-out. A non-accredited investor with a $10,000
+-- limit who has already put in $9,000 may invest $1,000 but not $1,001.
+#ASSERT     `investor is within the investment limit` (`an investor with` FALSE 60000 200000 9000) 1000
+#ASSERT NOT `investor is within the investment limit` (`an investor with` FALSE 60000 200000 9000) 1001
+
+-- The same investor, accredited: no limit at all (added 2021-03-15).
+#ASSERT `investor is within the investment limit` (`an investor with` TRUE 60000 200000 9000) 5000000
+
+§§ `Group 4 — disclosure (Rule 201(t)), boundaries at $124,000 / $618,000 / $1,235,000`
+
+-- Short aliases for the three requirement levels, so the boundary assertions fit
+-- on one line each.
+GIVETH A FinancialStatementRequirement
+`certified` MEANS `financial statements certified by the principal executive officer, with tax return information`
+
+GIVETH A FinancialStatementRequirement
+`reviewed` MEANS `financial statements reviewed by an independent public accountant`
+
+GIVETH A FinancialStatementRequirement
+`audited` MEANS `financial statements audited by an independent public accountant`
+
+-- Tier 1 ceiling.
+#ASSERT `financial statements required` (`an offering of` 0 124000 FALSE) EQUALS `certified`
+#ASSERT `financial statements required` (`an offering of` 0 124001 FALSE) EQUALS `reviewed`
+
+-- Tier 2 ceiling.
+#ASSERT `financial statements required` (`an offering of` 0 618000 FALSE) EQUALS `reviewed`
+
+-- Above tier 2, a REPEAT issuer must be audited.
+#ASSERT `financial statements required` (`an offering of` 0 618001 TRUE) EQUALS `audited`
+
+-- Above tier 2, a FIRST-TIME issuer may be reviewed — but only up to $1,235,000.
+#ASSERT `financial statements required` (`an offering of` 0 618001 FALSE) EQUALS `reviewed`
+#ASSERT `financial statements required` (`an offering of` 0 1235000 FALSE) EQUALS `reviewed`
+#ASSERT `financial statements required` (`an offering of` 0 1235001 FALSE) EQUALS `audited`
+
+-- Supplying a HIGHER assurance level than the tier demands discharges the tier;
+-- supplying a lower one does not.
+#ASSERT     `financial statement requirement is satisfied` (`an offering of` 0 124000 FALSE) `audited`
+#ASSERT NOT `financial statement requirement is satisfied` (`an offering of` 0 618001 TRUE) `reviewed`
+
+§§ `Group 5 — intermediary obligations, boundary at 21 days`
+
+#ASSERT     `the 21-day public availability period has run` (`an arrangement with` 21 1)
+#ASSERT NOT `the 21-day public availability period has run` (`an arrangement with` 20 1)
+#ASSERT     `intermediary obligations are met` (`an arrangement with` 21 1)
+-- Two intermediaries: the Instruction to Rule 100(a)(3) forbids it.
+#ASSERT NOT `intermediary obligations are met` (`an arrangement with` 21 2)
+#ASSERT NOT `(a)(3) — conducted through a single complying intermediary` (`an arrangement with` 21 2)
+
+§§ `Group 6 — advertising (Rule 204)`
+
+`a conforming notice` MEANS AdvertisingNotice WITH
+    `directs investors to the intermediary's platform`                                                                                                        IS TRUE
+    `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE
+    `states the terms of the offering`                                                                                                                        IS TRUE
+    `states factual information about the legal identity and business location of the issuer`                                                                 IS TRUE
+    `includes information beyond that permitted by paragraph (b)`                                                                                             IS FALSE
+
+`an overreaching notice` MEANS AdvertisingNotice WITH
+    `directs investors to the intermediary's platform`                                                                                                        IS TRUE
+    `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE
+    `states the terms of the offering`                                                                                                                        IS TRUE
+    `states factual information about the legal identity and business location of the issuer`                                                                 IS TRUE
+    `includes information beyond that permitted by paragraph (b)`                                                                                             IS TRUE
+
+`a notice with no platform link` MEANS AdvertisingNotice WITH
+    `directs investors to the intermediary's platform`                                                                                                        IS FALSE
+    `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS FALSE
+    `states the terms of the offering`                                                                                                                        IS TRUE
+    `states factual information about the legal identity and business location of the issuer`                                                                 IS TRUE
+    `includes information beyond that permitted by paragraph (b)`                                                                                             IS FALSE
+
+#ASSERT     `notice complies with Rule 204(b)` `a conforming notice`
+#ASSERT NOT `notice complies with Rule 204(b)` `an overreaching notice`
+#ASSERT NOT `notice complies with Rule 204(b)` `a notice with no platform link`
+
+-- The prohibition, exercised. A conforming notice leaves no prohibition
+-- standing, so publishing it is not a breach.
+#TRACE `advertising restriction` `a conforming notice` AT 0 WITH
+    PARTY Issuer DOES `advertise the terms of the offering` AT 10
+
+-- A non-conforming notice leaves a live prohibition; publishing it breaches.
+#TRACE `advertising restriction` `an overreaching notice` AT 0 WITH
+    PARTY Issuer DOES `advertise the terms of the offering` AT 10
+
+§§ `Group 7 — ongoing reporting (Rule 202), boundaries at 300 holders and $10,000,000`
+
+-- (b)(2): one annual report filed, 299 holders -> may terminate; 300 -> not.
+#ASSERT     `ongoing reporting obligation may terminate` (`a reporting status with` 1 299 50000000)
+#ASSERT NOT `ongoing reporting obligation may terminate` (`a reporting status with` 1 300 50000000)
+-- ... and one annual report is not enough on its own if the holder count is high.
+#ASSERT NOT `(b)(2) — one annual report filed and fewer than 300 holders of record` (`a reporting status with` 0 299 50000000)
+
+-- (b)(3): three annual reports filed, total assets exactly $10,000,000 -> may
+-- terminate ("do not exceed"); one dollar more -> not.
+#ASSERT     `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` (`a reporting status with` 3 400 10000000)
+#ASSERT NOT `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` (`a reporting status with` 3 400 10000001)
+-- Two annual reports is not "at least the three most recent years".
+#ASSERT NOT `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` (`a reporting status with` 2 400 10000000)
+
+-- The spine: still reporting, two cycles unrolled. The issuer files on time in
+-- year one and the duty renews; the second Form C-AR is what remains standing.
+#TRACE `ongoing reporting obligation` (`a reporting status with` 1 5000 50000000) 2 AT 0 WITH
+    PARTY Issuer DOES `file a Form C-AR annual report` AT 100
+
+-- A terminating condition has occurred: the duty converts to a one-shot Form
+-- C-TR within five business days, and filing it discharges the contract.
+#TRACE `ongoing reporting obligation` (`a reporting status with` 1 299 50000000) 2 AT 0 WITH
+    PARTY Issuer DOES `file a Form C-TR termination of reporting` AT 3
+
+-- Missing the C-TR deadline breaches.
+#TRACE `ongoing reporting obligation` (`a reporting status with` 1 299 50000000) 2 AT 0 WITH
+    PARTY Issuer DOES `file a Form C-TR termination of reporting` AT 30
+
+§§ `Group 8 — resale restrictions (Rule 501), boundary at one year`
+
+-- Inside the restricted period, to an ordinary buyer: not permitted.
+#ASSERT NOT `transfer is permitted` (`a transfer at` 364 FALSE)
+-- Day 365, read as outside the period (see the endpoint note).
+#ASSERT     `transfer is permitted` (`a transfer at` 365 FALSE)
+-- Inside the period, but to an accredited investor: exception (2) applies.
+#ASSERT     `transfer is permitted` (`a transfer at` 364 TRUE)
+#ASSERT     `transfer is within the one-year restricted period` (`a transfer at` 364 FALSE)
+#ASSERT NOT `transfer is within the one-year restricted period` (`a transfer at` 365 FALSE)
+
+-- The prohibition, exercised: an excepted transfer leaves no prohibition
+-- standing, so making it is not a breach.
+#TRACE `resale restriction` (`a transfer at` 364 TRUE) AT 0 WITH
+    PARTY Purchaser DOES `transfer the securities` AT 100
+
+-- A restricted transfer leaves a live prohibition that the transfer breaches.
+#TRACE `resale restriction` (`a transfer at` 100 FALSE) AT 0 WITH
+    PARTY Purchaser DOES `transfer the securities` AT 200
+
+§§ `Top level — the whole exemption`
+
+`a conforming filing` MEANS FormCFiling WITH
+    `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` IS TRUE
+    `the Form C includes the information required by section 227.201`                                                                                             IS TRUE
+    `the financial statements supplied`                                                                                                                           IS `reviewed`
+
+-- A $500,000 raise by a clean first-time issuer, sold to a non-accredited
+-- investor well inside their limit, through one intermediary after 21 days, on
+-- a conforming Form C with reviewed financials.
+GIVETH A BOOLEAN
+`the base case qualifies` MEANS
+    `the transaction qualifies for the section 4(a)(6) exemption`
+        `a clean issuer` (`an offering of` 0 500000 FALSE) (`an investor with` FALSE 60000 200000 0) 5000
+        (`an arrangement with` 21 1) `a conforming filing`
+
+-- The same transaction, varied one limb at a time.
+GIVETH A BOOLEAN
+`the delinquent-issuer case qualifies` MEANS
+    `the transaction qualifies for the section 4(a)(6) exemption`
+        `a delinquent issuer` (`an offering of` 0 500000 FALSE) (`an investor with` FALSE 60000 200000 0) 5000
+        (`an arrangement with` 21 1) `a conforming filing`
+
+GIVETH A BOOLEAN
+`the over-limit-investor case qualifies` MEANS
+    `the transaction qualifies for the section 4(a)(6) exemption`
+        `a clean issuer` (`an offering of` 0 500000 FALSE) (`an investor with` FALSE 60000 200000 9000) 5000
+        (`an arrangement with` 21 1) `a conforming filing`
+
+GIVETH A BOOLEAN
+`the short-availability case qualifies` MEANS
+    `the transaction qualifies for the section 4(a)(6) exemption`
+        `a clean issuer` (`an offering of` 0 500000 FALSE) (`an investor with` FALSE 60000 200000 0) 5000
+        (`an arrangement with` 20 1) `a conforming filing`
+
+-- At $700,000 a repeat issuer needs audited statements; reviewed no longer suffice.
+GIVETH A BOOLEAN
+`the under-assured-financials case qualifies` MEANS
+    `the transaction qualifies for the section 4(a)(6) exemption`
+        `a clean issuer` (`an offering of` 0 700000 TRUE) (`an investor with` FALSE 60000 200000 0) 5000
+        (`an arrangement with` 21 1) `a conforming filing`
+
+#ASSERT     `the base case qualifies`
+#ASSERT NOT `the delinquent-issuer case qualifies`
+#ASSERT NOT `the over-limit-investor case qualifies`
+#ASSERT NOT `the short-availability case qualifies`
+#ASSERT NOT `the under-assured-financials case qualifies`

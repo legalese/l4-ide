@@ -1,0 +1,83 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+prelude-min-max.l4:20:1-44:
+  9
+prelude-min-max.l4:21:1-55:
+  assertion satisfied
+prelude-min-max.l4:22:1-34:
+  assertion satisfied
+prelude-min-max.l4:23:1-44:
+  assertion satisfied
+prelude-min-max.l4:25:1-44:
+  1
+prelude-min-max.l4:26:1-55:
+  assertion satisfied
+prelude-min-max.l4:27:1-34:
+  assertion satisfied
+prelude-min-max.l4:28:1-44:
+  assertion satisfied
+prelude-min-max.l4:32:1-44:
+  9
+prelude-min-max.l4:33:1-55:
+  assertion satisfied
+prelude-min-max.l4:34:1-48:
+  assertion satisfied
+prelude-min-max.l4:35:1-36:
+  assertion satisfied
+prelude-min-max.l4:37:1-44:
+  1
+prelude-min-max.l4:38:1-55:
+  assertion satisfied
+prelude-min-max.l4:39:1-50:
+  assertion satisfied
+prelude-min-max.l4:40:1-36:
+  assertion satisfied
+prelude-min-max.l4:44:1-100:
+  JUST OF 9
+prelude-min-max.l4:45:1-116:
+  assertion satisfied
+prelude-min-max.l4:46:1-46:
+  assertion satisfied
+prelude-min-max.l4:48:1-100:
+  JUST OF 1
+prelude-min-max.l4:49:1-116:
+  assertion satisfied
+prelude-min-max.l4:50:1-46:
+  assertion satisfied
+prelude-min-max.l4:52:1-100:
+  JUST OF 9
+prelude-min-max.l4:53:1-116:
+  assertion satisfied
+prelude-min-max.l4:54:1-88:
+  assertion satisfied
+prelude-min-max.l4:55:1-48:
+  assertion satisfied
+prelude-min-max.l4:57:1-100:
+  JUST OF 1
+prelude-min-max.l4:58:1-116:
+  assertion satisfied
+prelude-min-max.l4:59:1-66:
+  assertion satisfied
+prelude-min-max.l4:60:1-48:
+  assertion satisfied
+prelude-min-max.l4:64:1-25:
+  assertion satisfied
+prelude-min-max.l4:65:1-25:
+  assertion satisfied
+prelude-min-max.l4:66:1-44:
+  assertion satisfied
+prelude-min-max.l4:67:1-44:
+  assertion satisfied
+prelude-min-max.l4:79:1-27:
+  NOTHING
+prelude-min-max.l4:80:1-27:
+  JUST OF 3
+prelude-min-max.l4:81:1-27:
+  NOTHING
+prelude-min-max.l4:82:1-27:
+  JUST OF 3
+prelude-min-max.l4:83:1-49:
+  JUST OF 5
+prelude-min-max.l4:84:1-49:
+  JUST OF 5

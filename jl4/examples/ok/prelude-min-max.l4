@@ -1,0 +1,84 @@
+IMPORT prelude
+
+§ `maximum, maximum1, minimum, minimum1`
+
+-- Regression coverage for the four extremum functions in the prelude, over
+-- BOTH of their overloads: `NUMBER` and `MAYBE NUMBER`.
+--
+-- The two families are copy-and-edit clones of each other, and the `MAYBE`
+-- copies of `maximum`/`maximum1` were once left computing minima (an
+-- inconsistent clone update). Pinning only the overload that broke would
+-- leave its three siblings unpinned, which is how the defect survived, so all
+-- four are asserted here for both overloads.
+--
+-- The inputs are deliberately unsorted, with the extremum in the interior of
+-- the list rather than at either end, so an implementation that returns the
+-- head, the last element, or the seed cannot pass by accident.
+
+§§ `NUMBER`
+
+#EVAL maximum (LIST 3, 1, 4, 1, 5, 9, 2, 6)
+#ASSERT maximum (LIST 3, 1, 4, 1, 5, 9, 2, 6) EQUALS 9
+#ASSERT maximum (LIST 7) EQUALS 7
+#ASSERT maximum (LIST -3, -1, -4) EQUALS -1
+
+#EVAL minimum (LIST 3, 1, 4, 1, 5, 9, 2, 6)
+#ASSERT minimum (LIST 3, 1, 4, 1, 5, 9, 2, 6) EQUALS 1
+#ASSERT minimum (LIST 7) EQUALS 7
+#ASSERT minimum (LIST -3, -1, -4) EQUALS -4
+
+-- maximum1/minimum1 take a seed. Three shapes: the seed loses, the seed wins,
+-- and the list is empty (the only case in which the seed is returned unchanged).
+#EVAL maximum1 3 (LIST 1, 4, 1, 5, 9, 2, 6)
+#ASSERT maximum1 3 (LIST 1, 4, 1, 5, 9, 2, 6) EQUALS 9
+#ASSERT maximum1 99 (LIST 1, 4, 1, 5) EQUALS 99
+#ASSERT maximum1 42 EMPTY EQUALS 42
+
+#EVAL minimum1 3 (LIST 1, 4, 1, 5, 9, 2, 6)
+#ASSERT minimum1 3 (LIST 1, 4, 1, 5, 9, 2, 6) EQUALS 1
+#ASSERT minimum1 -99 (LIST 1, 4, 1, 5) EQUALS -99
+#ASSERT minimum1 42 EMPTY EQUALS 42
+
+§§ `MAYBE NUMBER`
+
+#EVAL maximum (LIST (JUST 3), (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6))
+#ASSERT maximum (LIST (JUST 3), (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6)) EQUALS JUST 9
+#ASSERT maximum (LIST (JUST 7)) EQUALS JUST 7
+
+#EVAL minimum (LIST (JUST 3), (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6))
+#ASSERT minimum (LIST (JUST 3), (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6)) EQUALS JUST 1
+#ASSERT minimum (LIST (JUST 7)) EQUALS JUST 7
+
+#EVAL maximum1 (JUST 3) (LIST (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6))
+#ASSERT maximum1 (JUST 3) (LIST (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6)) EQUALS JUST 9
+#ASSERT maximum1 (JUST 99) (LIST (JUST 1), (JUST 4), (JUST 1), (JUST 5)) EQUALS JUST 99
+#ASSERT maximum1 (JUST 42) EMPTY EQUALS JUST 42
+
+#EVAL minimum1 (JUST 3) (LIST (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6))
+#ASSERT minimum1 (JUST 3) (LIST (JUST 1), (JUST 4), (JUST 1), (JUST 5), (JUST 9), (JUST 2), (JUST 6)) EQUALS JUST 1
+#ASSERT minimum1 (JUST 1) (LIST (JUST 4), (JUST 5)) EQUALS JUST 1
+#ASSERT minimum1 (JUST 42) EMPTY EQUALS JUST 42
+
+§§ `Pairwise max and min`
+
+#ASSERT max 3 5 EQUALS 5
+#ASSERT min 3 5 EQUALS 3
+#ASSERT max (JUST 3) (JUST 5) EQUALS JUST 5
+#ASSERT min (JUST 3) (JUST 5) EQUALS JUST 3
+
+§§ `NOTHING is currently incomparable`
+
+-- Recorded, not endorsed. Ordering on MAYBE NUMBER is not total: every
+-- comparison involving NOTHING is FALSE, including NOTHING <= NOTHING. So
+-- `max`/`min` fall through to their ELSE branch and return their second
+-- argument whenever NOTHING is involved, and an extremum over a list
+-- containing NOTHING is order-dependent. These #EVALs exist so that a future
+-- change to MAYBE ordering shows up as a golden diff rather than passing
+-- unnoticed.
+
+#EVAL max (JUST 3) NOTHING
+#EVAL max NOTHING (JUST 3)
+#EVAL min (JUST 3) NOTHING
+#EVAL min NOTHING (JUST 3)
+#EVAL maximum (LIST (JUST 3), NOTHING, (JUST 5))
+#EVAL minimum (LIST (JUST 3), NOTHING, (JUST 5))
