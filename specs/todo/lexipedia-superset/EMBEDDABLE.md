@@ -12,8 +12,7 @@ Track E gates **M2** ("a ladder embeds in an arbitrary web page"), which gates *
 mirror page). M3 is the exhibit the programme exists to produce, so everything below is on
 the critical path to the argument, not to a convenience.
 
-> **Two numbering namespaces meet in this document, and they collide.**
-> `S1`–`S11` are **seam** ids from E1-IDE-INTEGRATION.md §1 (S5 = "no DOM sink", S6 =
+> **Two numbering namespaces meet in this document, and they collide.** > `S1`–`S11` are **seam** ids from E1-IDE-INTEGRATION.md §1 (S5 = "no DOM sink", S6 =
 > pan/zoom, S8 = baked palettes). `S0`–`S3` are **surface** ids from SPEC.md §4 Track S
 > (surface S1 = the `/functions/:name/ladder` route). They are different things and the
 > overlap at "S1" is real. Below, every use is written **`seam S6`** or **`surface S1`**.
@@ -844,6 +843,7 @@ package being gutted** (EK2). Three consequences:
    **Its dependency inventory, corrected.** An earlier draft said "its imports are
    `@repo/ladder-core`, `@repo/viz-expr` (types) and the five surviving `eval/` modules",
    which understates the problem in three ways:
+
    - `ladder-model.ts:43,50-51` requires a `LadderModelDeps` of
      `{ l4Connection: L4Connection; verDocId: VersionedDocId }` — **a required constructor
      argument**, not an optional hook, used at `:127-128`. The only implementation of

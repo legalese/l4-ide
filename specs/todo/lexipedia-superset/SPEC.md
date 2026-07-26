@@ -222,8 +222,7 @@ blockquote here have been amended to match:**
 | **S2** | `jl4-service`: the export endpoints                                     | D1, P1     |
 | **S3** | Deployment-engine wiring                                                | S1, S2     |
 
-> **S1 is nearly free — but the reason given here was half wrong, and it is not a gate.**
-> ~~`L4.Viz.Ladder` lives in `jl4-core`, not `jl4-lsp` … the route is plumbing.~~ There are
+> **S1 is nearly free — but the reason given here was half wrong, and it is not a gate.** > ~~`L4.Viz.Ladder` lives in `jl4-core`, not `jl4-lsp` … the route is plumbing.~~ There are
 > **two** ladder implementations, and `jl4-service` uses the **`jl4-lsp`** one
 > (`Backend/DecisionQueryPlan.hs:42,181` — `LadderViz.doVisualize`), not the `jl4-core` one.
 > More importantly, `RenderAsLadderInfo` is **already served over HTTP today**:
