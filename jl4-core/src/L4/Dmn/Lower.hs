@@ -658,6 +658,28 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
     Gt        _ a b -> binary e 5 SFeel ">"  a b
     Geq       _ a b -> binary e 5 SFeel ">=" a b
     Equals    _ a b -> binary e 5 SFeel "="  a b
+    -- Inert text is grammatical scaffolding -- a quoted fragment of the statute
+    -- carried along for isomorphism -- whose VALUE is its context's identity
+    -- element. That is the evaluator's own definition
+    -- ("L4.EvaluateLazy.Machine": @InertCtxAnd -> ValBool True@,
+    -- @InertCtxOr -> ValBool False@, @InertCtxNone -> ValBool True@), and the
+    -- ladder reads it the same way. A boolean literal is S-FEEL, so this costs
+    -- nothing. The words are not lost: a guard's full source text is already the
+    -- rule's @\<description\>@. Before this case, 794 statute quotations in the
+    -- Charities corpus alone poisoned their enclosing guards into L4 source.
+    Inert _ _ ictx -> (atomPrec, inertText ictx, SFeel)
+    -- @n %@ is @n / 100@ ("L4.EvaluateLazy.Machine":
+    -- @UnaryPercent -> ValNumber (val / 100)@), and division is inside S-FEEL's
+    -- `arithmetic expression`, so the fragment claim is unchanged. Written at
+    -- division's own precedence rather than wrapped in parentheses, because
+    -- S-FEEL's grammar has no parenthesised-expression production (rules 2, 3,
+    -- 16-21): @(10 %) TIMES base@ becomes @10 / 100 * base@, which is how the
+    -- Reg CF exhibit already spells the same quantity.
+    Percent _ x ->
+      let (p, t, f) = go x
+      in if f == L4Verbatim
+           then verbatim e
+           else (7, parenIf (p < 7) t <> " / 100", max SFeel f)
     -- Legal FEEL, outside S-FEEL's `simple expression`.
     And    _ a b -> binary e 3 FullFeel "and" a b
     Or     _ a b -> binary e 2 FullFeel "or"  a b
@@ -667,6 +689,14 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
     -- gives a constitutive IMPLIES, and it is what the ladder's seam draws.
     Implies _ a b -> pair e FullFeel (\ta tb -> "(not(" <> ta <> ") or " <> tb <> ")") a b
     List _ xs -> nary e FullFeel (\ts -> "[" <> Text.intercalate ", " ts <> "]") xs
+    -- FEEL has no cons operator, but it has `concatenate` (DMN 1.1 §10.3.4), and
+    -- a one-element list literal is how you spell the head.
+    Cons _ x xs -> pair e FullFeel (\tx txs -> "concatenate([" <> tx <> "], " <> txs <> ")") x xs
+    -- Record construction (@Assessment WITH rate IS 40 …@) is a FEEL CONTEXT
+    -- literal. This is the one place FEEL has a structured value, and it lines up
+    -- with 'Proj' above: we render the projection side as @r.f@, so construction
+    -- and access round-trip through the same names.
+    AppNamed _ _ nes _ -> contextLit e nes
     -- A conditional whose arms ARE its comparison's operands is not a decision;
     -- it is `max` / `min`. Lower it to FEEL's own function rather than to an
     -- `if`, the way a compiler backend recognises a select pattern instead of
@@ -675,10 +705,27 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
       | Just (fn, a, b) <- selectIdiom e -> call e fn [a, b]
       | otherwise ->
           triple e FullFeel (\tc tt tf -> "(if " <> tc <> " then " <> tt <> " else " <> tf <> ")") c t f
-    App _ r args -> call e (feelIdent r) args
+    -- A call to an L4 function is NOT a FEEL function invocation, and this used
+    -- to be rendered @f(args)@ and labelled 'FullFeel' -- a claim of
+    -- executability the exporter cannot honour. FEEL resolves an invocation
+    -- against its own builtins or against a BKM in the same DRG, and this
+    -- exporter emits neither: an L4 @DECIDE@ becomes a 0-ary DMN decision
+    -- variable (Vandevelde et al.: "the 'variables' of standard DMN correspond
+    -- to constants"), so @f(x)@ names nothing an engine can resolve. Drools/KIE
+    -- 8.44 answers @Unknown variable 'JUST'@ for @JUST(40)@ -- which the shipped
+    -- Charities corpus emitted four times -- and the whole decision evaluates to
+    -- null. So it is verbatim, and the report says Blocking. The FEEL builtins
+    -- this backend DOES emit (@not@, @modulo@, @max@, @min@, @concatenate@) are
+    -- constructed here by name and never routed through this case.
+    App _ _ (_ : _) -> verbatim e
     _ -> verbatim e
    where
     atomPrec = 9 :: Int
+
+    inertText = \case
+      InertCtxAnd  -> "true"
+      InertCtxOr   -> "false"
+      InertCtxNone -> "true"
 
     unary whole frag build x =
       let (p, t, f) = go x
@@ -719,6 +766,18 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
 
     call whole fn args =
       nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " ts <> ")") args
+
+    -- Field ORDER is not reordered to the constructor's declaration order (the
+    -- @Maybe [Int]@ 'AppNamed' carries): a FEEL context is keyed, so order is
+    -- immaterial to its meaning, and keeping the drafter's order keeps the text
+    -- next to the source.
+    contextLit whole nes =
+      nary whole FullFeel
+        (\ts -> "{" <> Text.intercalate ", " (zipWith entry keys ts) <> "}")
+        [v | MkNamedExpr _ _ v <- nes]
+     where
+      keys = [feelIdent n | MkNamedExpr _ n _ <- nes]
+      entry k t = k <> ": " <> t
 
     verbatim whole = (atomPrec, prettyLayout whole, L4Verbatim)
 
@@ -995,6 +1054,35 @@ builtinType u
 -- said is gone; 'Advisory' means the emission is faithful but a /target-side/
 -- capability is forfeited. Most of these are Advisory, and that is the point —
 -- the losses are properties of DMN, not defects in the export.
+--
+-- The codes, and the line between the two severities that matters most here:
+--
+-- [@D-NONFEELINPUT@ (Blocking)] an input expression is L4 source, not FEEL
+--   ('L4Verbatim'). No engine can evaluate the table.
+-- [@D-NONFEELOUTPUT@ (Blocking)] an output entry is L4 source, not FEEL.
+-- [@D-LITERALEXPR@ (Blocking)] the decision has no table shape and became a
+--   boxed literal expression.
+-- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
+--   @inputData@ name.
+-- [@D-NONFEEL@ (Advisory)] the input expression is /valid/ FEEL but outside
+--   S-FEEL.
+-- [@D-COMPUTEDOUTPUT@ (Advisory)] the output entry is /valid/ FEEL but an
+--   expression rather than a constant.
+-- [@D-UNDECOMPOSABLE@, @D-HITPOLICY@, @D-ORDERDEPENDENT@, @D-INLINEDLOCAL@,
+--  @D-FLATTENCAP@, @D-LIFTEDTHRESHOLD@ (Advisory)] faithful emissions that
+--   forfeit a DMN-side capability.
+--
+-- __The @NONFEEL@\/valid-FEEL split is a soundness boundary, not a gradation.__
+-- Before it existed, an 'L4Verbatim' cell — DMN that no engine can execute —
+-- was reported by @D-COMPUTEDOUTPUT@, whose message ("an expression, not a
+-- constant") describes a much milder problem, and on the input side it could be
+-- suppressed entirely. A reader who acts on an Advisory note ships a model that
+-- fails at run time, and 18 of the 28 corpus instances failed /silently/ (a
+-- verbatim @defaultOutputEntry@ evaluates to @null@ with status @SUCCEEDED@ on
+-- Drools\/KIE 8.44). Each 'L4Verbatim' cell therefore raises exactly one
+-- Blocking note and never also the Advisory one: the pairs
+-- @D-NONFEELINPUT@\/@D-NONFEEL@ and @D-NONFEELOUTPUT@\/@D-COMPUTEDOUTPUT@ are
+-- mutually exclusive by construction.
 dmnNote :: Text -> FidelitySeverity -> Text -> Maybe SrcRange -> Text -> Text -> FidelityNote
 dmnNote c sev el rng msg lostWhat =
   MkFidelityNote
@@ -1005,6 +1093,20 @@ dmnNote c sev el rng msg lostWhat =
     , message  = msg
     , lost     = lostWhat
     }
+
+-- | The one Blocking note for an output position whose text is L4, not FEEL.
+--
+-- Shared by the decision-table path and the boxed-literal select-idiom path,
+-- because the failure is the same in both and a reader must not have to know
+-- which shape the exporter chose.
+nonFeelOutput :: Text -> Maybe SrcRange -> FeelExpr -> FidelityNote
+nonFeelOutput el rng fe =
+  dmnNote "D-NONFEELOUTPUT" Blocking el rng
+    ("the output entry `" <> fe.feText
+       <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text \
+          \was emitted verbatim and NO DMN engine can evaluate it")
+    "execution: an engine fails to compile the entry -- loudly when the rule fires, but \
+    \SILENTLY (a null result, reported as success) when it is the defaultOutputEntry"
 
 tableNotes
   :: TableCtx
@@ -1018,7 +1120,8 @@ tableNotes
   -> [FidelityNote]
 tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   dedupeNotes $
-    fallbackNotes <> sfeelNotes <> policyNotes <> outputNotes
+    fallbackNotes <> nonFeelInputNotes <> sfeelNotes <> policyNotes
+      <> nonFeelOutputNotes <> outputNotes
       <> inlineNotes <> capNotes <> thresholdNotes
  where
   here = ctx.tcIdPrefix
@@ -1035,13 +1138,33 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   -- A column born of a fallback already has a note; do not say it twice.
   fallbackKeys = Set.fromList [c.cellKey | row <- decomposed, c <- row, c.cellFallback]
 
+  -- The input-side half of the soundness boundary, and the reason it is NOT
+  -- filtered by 'fallbackKeys' the way 'sfeelNotes' is. That suppression is
+  -- right for D-NONFEEL, which reports a lost DMN capability the fallback note
+  -- has already reported in other words. It is wrong here: D-UNDECOMPOSABLE says
+  -- "no constant endpoint, so it became a boolean column", which is true of
+  -- perfectly executable columns and says nothing about executability. Three
+  -- verified corpus shapes reached the shipped DMN through that gap — one with
+  -- only D-UNDECOMPOSABLE, and two (a `Proj` of a verbatim object; a select
+  -- idiom over an unrenderable operand) with no note at all.
+  nonFeelInputNotes =
+    [ dmnNote "D-NONFEELINPUT" Blocking here (bestRange c.cellSubject)
+        ("the input expression `" <> col.icExpr.feText
+           <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the \
+              \text was emitted verbatim and NO DMN engine can evaluate this column")
+        "execution: the table is well-formed DMN but the engine fails to compile the column, \
+        \and every rule that tests it is silently treated as non-matching"
+    | (col, c) <- zip columns columnCells
+    , col.icExpr.feFragment == L4Verbatim
+    ]
+
   sfeelNotes =
     [ dmnNote "D-NONFEEL" Advisory here (bestRange c.cellSubject)
         ("the input expression `" <> col.icExpr.feText
            <> "` is outside S-FEEL (which admits only arithmetic, simple values and comparisons)")
         "completeness, consistency and overlap checking, all of which DMN's analysis is defined over S-FEEL only"
     | (col, c) <- zip columns columnCells
-    , col.icExpr.feFragment /= SFeel
+    , col.icExpr.feFragment == FullFeel
     , not (Set.member c.cellKey fallbackKeys)
     ]
 
@@ -1077,10 +1200,27 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
            <> "` is an expression, not a constant; DMN 8.2.9 permits that, but every published \
               \decision-table analysis defines an output entry as a constant")
         "gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it"
-    | body <- map snd rows.grRows <> maybeToList rows.grOtherwise
+    | body <- outputBodies
     , let fe = renderFeelIn ctx.tcConstructors body
+      -- MUTUALLY EXCLUSIVE with D-NONFEELOUTPUT. An L4Verbatim entry satisfies
+      -- `not . isConstantText` too, and used to be reported by this Advisory
+      -- note alone -- a note about ANALYSABILITY standing in for a failure of
+      -- EXECUTABILITY. That is the defect this split fixes.
+    , fe.feFragment /= L4Verbatim
     , not (isConstantText fe)
     ]
+
+  -- The output-side half of the soundness boundary. DMN 8.2.9 does say "a rule
+  -- output entry is an expression", so an expression here is legal -- but only
+  -- if it is a FEEL expression. This text is not.
+  nonFeelOutputNotes =
+    [ nonFeelOutput here (bestRange body) fe
+    | body <- outputBodies
+    , let fe = renderFeelIn ctx.tcConstructors body
+    , fe.feFragment == L4Verbatim
+    ]
+
+  outputBodies = map snd rows.grRows <> maybeToList rows.grOtherwise
 
   inlineNotes =
     [ dmnNote "D-INLINEDLOCAL" Advisory here tableRange
@@ -1104,7 +1244,7 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
         ("`" <> oneLine (prettyLayout sub) <> "` was lifted to " <> fn
            <> "(...): the threshold is now inside an output expression rather than a row of the table")
         "a compliance reader's ability to point at the threshold as a rule"
-    | body <- map snd rows.grRows <> maybeToList rows.grOtherwise
+    | body <- outputBodies
     , (fn, sub) <- liftedThresholds ctx body
     ]
 
@@ -1294,13 +1434,23 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- this is not a loss and gets no D-LITERALEXPR note -- only the threshold
       -- note, if a threshold went inside the expression.
       Right _ | isSelectIdiom body ->
-        ( LogicLiteral (renderFeelIn constructors body)
+        let rendered = renderFeelIn constructors body
+        in
+        ( LogicLiteral rendered
         , [ dmnNote "D-LIFTEDTHRESHOLD" Advisory did (bestRange sub)
               ("`" <> oneLine (prettyLayout sub) <> "` was lifted to " <> fn
                  <> "(...): the threshold is now inside an expression rather than a row of a table")
               "a compliance reader's ability to point at the threshold as a rule"
           | (fn, sub) <- liftedThresholds tctx body
           ]
+          -- ...and the third no-note hole. This branch deliberately emits no
+          -- D-LITERALEXPR (a formula IS a boxed expression, so nothing is lost),
+          -- which meant a max/min over an operand we cannot render shipped with
+          -- ZERO fidelity notes. Real corpus instance: `max(cash out, conversion
+          -- amount(liq))`, where the second operand is an L4 call.
+          <> [ nonFeelOutput did (bestRange body) rendered
+             | rendered.feFragment == L4Verbatim
+             ]
         )
       Right _ -> case normaliseGuarded body of
         Nothing -> literalFallback NotAGuardedChain

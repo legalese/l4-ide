@@ -86,7 +86,7 @@ renderDecision d = case d.dcnLogic of
 -- | Can this table be said in dmnmd's grammar at all?
 expressible :: DecisionTable -> Bool
 expressible t =
-  all (isLegalVarname . (.icExpr.feText)) t.dtInputs
+  all columnHeaderOk t.dtInputs
     && isLegalVarname t.dtOutput.ocName
     && all ruleOk t.dtRules
  where
@@ -216,6 +216,17 @@ isLegalVarname t = case Text.uncons stripped of
   isAlpha' c = isAlphaNum c && not (c `elem` ("0123456789" :: String))
   legalRest c = (isAscii c && isAlphaNum c) || c `elem` (" _\t" :: String)
 
+-- | 'isLegalVarname' is necessary but not sufficient for a column header.
+--
+-- Its grammar admits spaces, so an L4 phrase can satisfy it by accident:
+-- @double OF n@ is "a letter, then alphanumerics and spaces" and would have been
+-- written into a header as though it named a variable. It does not — it is L4
+-- source that this backend could not render as FEEL ('L4Verbatim'), and a dmnmd
+-- reader would silently take it for a column called @double OF n@. Consult the
+-- fragment, not just the spelling.
+columnHeaderOk :: InputColumn -> Bool
+columnHeaderOk c = isLegalVarname c.icExpr.feText && c.icExpr.feFragment /= L4Verbatim
+
 mdIdent :: Text -> Text
 mdIdent = Text.strip
 
@@ -256,12 +267,14 @@ markdownReport drg =
 
   tableNotes d t =
     [ note "D-MD-NONIDENTCOLUMN" Blocking d.dcnId
-        ("`" <> c.icExpr.feText
-           <> "` is an input EXPRESSION; a dmnmd column header is a variable name \
+        ("`" <> c.icExpr.feText <> "` is "
+           <> (if c.icExpr.feFragment == L4Verbatim
+                 then "L4 source, not FEEL" else "an input EXPRESSION")
+           <> "; a dmnmd column header is a variable name \
               \(letter, then alphanumerics/spaces/underscores), so this table is omitted")
         "the whole table"
     | c <- t.dtInputs
-    , not (isLegalVarname c.icExpr.feText)
+    , not (columnHeaderOk c)
     ]
       <> [ note "D-MD-CELLSYNTAX" Blocking d.dcnId
              ("rule " <> r.drId <> " has a cell dmnmd cannot read (a negation, a half-open or \

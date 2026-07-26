@@ -221,9 +221,24 @@ decisionChain =
   \fee MEANS\n\
   \  IF `is holiday` THEN 0 ELSE 10\n"
 
--- | A decomposable guard whose SUBJECT is a function invocation. The cell is a
--- perfectly ordinary constant endpoint, but the column's input expression is
--- outside S-FEEL, which is where every published DMN analysis result lives.
+-- | A decomposable guard whose SUBJECT is a FEEL BUILTIN invocation. The cell is
+-- a perfectly ordinary constant endpoint, and the column is genuinely
+-- executable — but @modulo(n, 2)@ is outside S-FEEL, which is where every
+-- published DMN analysis result lives. This is the Advisory case.
+fullFeelColumn :: Text
+fullFeelColumn =
+  "GIVEN n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \tier MEANS\n\
+  \  BRANCH\n\
+  \   IF n MODULO 2 AT LEAST 1 THEN 1\n\
+  \   OTHERWISE 0\n"
+
+-- | The Blocking case, and the same shape a reader would mistake for the one
+-- above: the subject is an L4 function call. FEEL resolves an invocation against
+-- its builtins or a BKM, and this backend emits neither — an L4 @DECIDE@ becomes
+-- a 0-ary DMN variable — so @double(n)@ names nothing and KIE says
+-- @Unknown variable 'double'@. The text is therefore L4 source, not FEEL.
 nonSFeelColumn :: Text
 nonSFeelColumn =
   "GIVEN n IS A NUMBER\n\
@@ -236,6 +251,115 @@ nonSFeelColumn =
   \  BRANCH\n\
   \   IF double n AT LEAST 10 THEN 1\n\
   \   OTHERWISE 0\n"
+
+-- | The same defect on the OUTPUT side of a rule that fires. KIE compiles the
+-- entry, fails, and the decision evaluates to null with status FAILED.
+verbatimOutput :: Text
+verbatimOutput =
+  "GIVEN n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVEN c IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \amount MEANS\n\
+  \  BRANCH\n\
+  \   IF c THEN double 5\n\
+  \   OTHERWISE 0\n"
+
+-- | The same defect in the @\<defaultOutputEntry\>@ — the position 18 of the 28
+-- corpus instances occupy, and the only one that fails SILENTLY: KIE returns
+-- null with status SUCCEEDED and no evaluation-time message.
+verbatimDefault :: Text
+verbatimDefault =
+  "GIVEN n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVEN c IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \amount MEANS\n\
+  \  BRANCH\n\
+  \   IF c THEN 1\n\
+  \   OTHERWISE double 5\n"
+
+-- | A select idiom (so: a boxed literal expression, deliberately without a
+-- D-LITERALEXPR note) one of whose operands cannot be rendered. Corpus instance:
+-- @max(cash out, conversion amount(liq))@ in @safe-post-new.l4@.
+verbatimSelect :: Text
+verbatimSelect =
+  "GIVEN n IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \double n MEANS n TIMES 2\n\
+  \\n\
+  \ASSUME cash IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \greater MEANS\n\
+  \  IF cash AT LEAST double 5 THEN cash ELSE double 5\n"
+
+-- | Quoted statute text carried along for isomorphism. A string literal in
+-- direct boolean-operand position becomes an 'Inert' node whose value is its
+-- context's identity element. 794 of these appear in the Charities corpus alone,
+-- and before they were rendered every guard containing one was poisoned into L4
+-- source.
+inertScaffolding :: Text
+inertScaffolding =
+  "GIVEN c IS A BOOLEAN\n\
+  \      d IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \amount MEANS\n\
+  \  BRANCH\n\
+  \   IF c OR \"subject to paragraph 3\" THEN 1\n\
+  \   IF d AND \"and for the avoidance of doubt\" THEN 2\n\
+  \   OTHERWISE 0\n"
+
+-- | Record construction. FEEL's context literal is the exact counterpart, and it
+-- is the one structured value FEEL has.
+recordConstruction :: Text
+recordConstruction =
+  "DECLARE Assessment\n\
+  \  HAS rate IS A NUMBER\n\
+  \      band IS A STRING\n\
+  \\n\
+  \GIVEN c IS A BOOLEAN\n\
+  \GIVETH AN Assessment\n\
+  \assess MEANS\n\
+  \  IF c\n\
+  \  THEN Assessment WITH rate IS 40, band IS \"high\"\n\
+  \  ELSE Assessment WITH rate IS 0, band IS \"low\"\n"
+
+-- | The other half of the pair: projection was always rendered @r.f@, so
+-- construction had to use the same field names or the two would not meet.
+recordProjection :: Text
+recordProjection =
+  "DECLARE Assessment\n\
+  \  HAS rate IS A NUMBER\n\
+  \      band IS A STRING\n\
+  \\n\
+  \GIVEN a IS AN Assessment\n\
+  \GIVETH A NUMBER\n\
+  \level MEANS\n\
+  \  BRANCH\n\
+  \   IF a's rate AT LEAST 10 THEN 1\n\
+  \   OTHERWISE 0\n"
+
+-- | A percentage. Division is inside S-FEEL, so this costs no fidelity at all.
+percentBody :: Text
+percentBody =
+  "GIVEN base IS A NUMBER\n\
+  \      c IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \charge MEANS\n\
+  \  IF c THEN (10 %) TIMES base ELSE 0\n"
+
+-- | A cons. FEEL has no cons operator but does have @concatenate@ (DMN 1.1).
+consBody :: Text
+consBody =
+  "GIVEN rest IS A LIST OF NUMBER\n\
+  \      c IS A BOOLEAN\n\
+  \GIVETH A LIST OF NUMBER\n\
+  \queue MEANS\n\
+  \  IF c THEN 1 FOLLOWED BY rest ELSE rest\n"
 
 -- | Tier-2 disjointness with a NON-constant endpoint. L4 knows these two guards
 -- are complementary, so @grDisjoint@ is True — but neither guard has a constant
@@ -542,7 +666,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   describe "fidelity: never say more than the L4 does" $ do
     it "an undecomposable guard becomes a boolean column AND is named in the report" $ do
       let t = tableOf "bonus" undecomposableGuard
-      map (.icExpr.feText) t.dtInputs `shouldBe` ["is even(n)"]
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["`is even` OF n"]
       map (.drInputs) t.dtRules `shouldBe` [[TestEq (VBool True)]]
       let notes = [n | n <- t.dtNotes, n.code == "D-UNDECOMPOSABLE"]
       map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`is even` OF n")
@@ -553,14 +677,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       map (.lost) notes `shouldSatisfy` all (not . Text.null)
 
     it "a column whose input expression leaves S-FEEL is named and located" $ do
-      let t = tableOf "tier" nonSFeelColumn
+      let t = tableOf "tier" fullFeelColumn
       -- the cell is a fine constant endpoint; it is the COLUMN that left the
-      -- analysable fragment, because S-FEEL has no function invocation.
-      map (.icExpr.feText) t.dtInputs `shouldBe` ["double(n)"]
+      -- analysable fragment, because S-FEEL has no function invocation. `modulo`
+      -- is a FEEL BUILTIN, so this is genuinely executable -- merely unanalysable.
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["modulo(n, 2)"]
       map (.icExpr.feFragment) t.dtInputs `shouldBe` [FullFeel]
-      map (.drInputs) t.dtRules `shouldBe` [[TestCmp OpGeq (VNum 10)]]
+      map (.drInputs) t.dtRules `shouldBe` [[TestCmp OpGeq (VNum 1)]]
       let notes = [n | n <- t.dtNotes, n.code == "D-NONFEEL"]
-      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "double(n)")
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "modulo(n, 2)")
       map (.range) notes `shouldSatisfy` all isJust
       map (.severity) notes `shouldBe` [Advisory]
 
@@ -602,6 +727,116 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     it "a clean numeric table has no fidelity losses at all" $
       (tableOf "amount" ifThenElseNumber).dtNotes `shouldBe` []
+
+  -- The line between "outside the analysable fragment" (Advisory) and "outside
+  -- FEEL" (Blocking). Everything in this block was previously reported Advisory
+  -- or not at all, and every one of these shapes was VERIFIED to fail on
+  -- Drools/KIE 8.44.0.Final -- loudly for an input expression or a firing rule,
+  -- SILENTLY (null, status SUCCEEDED) for a defaultOutputEntry.
+  describe "fidelity: L4 source in a <text> element is Blocking, not Advisory" $ do
+    it "an L4-source INPUT expression is Blocking, and does not merely say `outside S-FEEL`" $ do
+      let t = tableOf "tier" nonSFeelColumn
+      -- an L4 call is not a FEEL invocation: DMN decisions are 0-ary, so there
+      -- is nothing named `double` for an engine to resolve.
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["double OF n"]
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [L4Verbatim]
+      let blocking = [n | n <- t.dtNotes, n.code == "D-NONFEELINPUT"]
+      map (.severity) blocking `shouldBe` [Blocking]
+      map (.message) blocking `shouldSatisfy` all (Text.isInfixOf "L4 source, not FEEL")
+      map (.range) blocking `shouldSatisfy` all isJust
+      -- mutually exclusive with the Advisory note about the same column
+      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEEL"]
+
+    it "...even when the column was a fallback, which used to suppress the report" $ do
+      -- `fallbackKeys` silences D-NONFEEL for a fallback column, on the ground
+      -- that D-UNDECOMPOSABLE already covered it. D-UNDECOMPOSABLE is Advisory
+      -- and talks about endpoints, so that suppression must not extend here.
+      let t = tableOf "bonus" undecomposableGuard
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [L4Verbatim]
+      map (.code) t.dtNotes `shouldContain` ["D-UNDECOMPOSABLE"]
+      [n.severity | n <- t.dtNotes, n.code == "D-NONFEELINPUT"] `shouldBe` [Blocking]
+
+    it "an L4-source OUTPUT entry is Blocking, not a `computed output` advisory" $ do
+      let t = tableOf "amount" verbatimOutput
+      map (.drOutput.feText) t.dtRules `shouldBe` ["double OF 5"]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [L4Verbatim]
+      let blocking = [n | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"]
+      map (.severity) blocking `shouldBe` [Blocking]
+      map (.message) blocking `shouldSatisfy` all (Text.isInfixOf "L4 source, not FEEL")
+      -- the whole point: this used to be swallowed by an Advisory note whose
+      -- message ("an expression, not a constant") describes a milder problem.
+      map (.code) t.dtNotes `shouldNotContain` ["D-COMPUTEDOUTPUT"]
+
+    it "a verbatim defaultOutputEntry -- the silent case -- is reported too" $ do
+      -- 18 of the 28 corpus instances sat in exactly this position, where KIE
+      -- returns null with status SUCCEEDED and emits no evaluation-time message.
+      let t = tableOf "amount" verbatimDefault
+      fmap (.feFragment) t.dtOutput.ocDefault `shouldBe` Just L4Verbatim
+      [n.severity | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"] `shouldBe` [Blocking]
+      [n.lost | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"]
+        `shouldSatisfy` all (Text.isInfixOf "SILENTLY")
+
+    it "a valid-FEEL computed output stays Advisory: the split is a boundary, not a demotion" $ do
+      let t = tableOf "investment limit" liftedFloor
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
+      map (.code) t.dtNotes `shouldContain` ["D-COMPUTEDOUTPUT"]
+      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
+
+    it "a boxed max/min over an unrenderable operand no longer ships with ZERO notes" $ do
+      -- The select-idiom branch deliberately emits no D-LITERALEXPR, so this
+      -- shape used to carry no fidelity note at all.
+      let drg = drgOf verbatimSelect
+      case (decisionNamed "greater" drg).dcnLogic of
+        LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
+        LogicTable _   -> expectationFailure "expected a boxed literal expression"
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldContain` [("D-NONFEELOUTPUT", Blocking)]
+
+    it "dmnmd will not print an L4 phrase as a column header, even when it spells like a name" $ do
+      -- `double OF n` satisfies dmnmd's varname grammar (letters and spaces) by
+      -- accident. The fragment, not the spelling, is what decides.
+      let drg = drgOf nonSFeelColumn
+      emitMarkdown drg `shouldNotSatisfy` Text.isInfixOf "double"
+      let notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NONIDENTCOLUMN"]
+      map (.severity) notes `shouldBe` [Blocking]
+      map (.message) notes `shouldSatisfy` all (Text.isInfixOf "L4 source, not FEEL")
+
+  -- Four constructs that DMN can express exactly and that this backend simply
+  -- did not render, so they fell to the verbatim fallback and poisoned every
+  -- expression containing them. Each rendering is the evaluator's own
+  -- definition, and each was executed against KIE 8.44.0.Final.
+  describe "lowerings that remove the need for a fallback" $ do
+    it "Inert scaffolding is its context's identity element, which is S-FEEL" $ do
+      let t = tableOf "amount" inertScaffolding
+      -- OR context -> false (the OR identity); AND context -> true, except that
+      -- a top-level Inert conjunct is dropped from the table entirely, so the
+      -- second column is just `d`.
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["c or false", "d"]
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [FullFeel, SFeel]
+      -- and nothing is Blocking: the statute text survives in the rule's
+      -- <description>, which carries the guard's full source.
+      map (.severity) t.dtNotes `shouldNotContain` [Blocking]
+
+    it "record construction is a FEEL context literal, and pairs with the projection side" $ do
+      let t = tableOf "assess" recordConstruction
+      map (.drOutput.feText) t.dtRules `shouldBe` ["{rate: 40, band: \"high\"}"]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
+      fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "{rate: 0, band: \"low\"}"
+      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
+
+    it "a projection of a constructed record round-trips through the same field names" $ do
+      let t = tableOf "level" recordProjection
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["a.rate"]
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [SFeel]
+
+    it "PERCENT is division by 100, and stays inside S-FEEL" $ do
+      let t = tableOf "charge" percentBody
+      map (.drOutput.feText) t.dtRules `shouldBe` ["10 / 100 * base"]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [SFeel]
+
+    it "FOLLOWED BY is FEEL's concatenate over a one-element list" $ do
+      let t = tableOf "queue" consBody
+      map (.drOutput.feText) t.dtRules `shouldBe` ["concatenate([1], rest)"]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
 
   describe "the DRG" $ do
     it "a reference to another DECIDE is one informationRequirement, pointing at it" $ do
