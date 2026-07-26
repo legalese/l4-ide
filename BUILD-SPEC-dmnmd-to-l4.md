@@ -177,6 +177,7 @@ round-trip is a **semantic** equivalence check, not a byte-exact one (see §7).
   > the stated reason.
 
   Each arm (and the `OTHERWISE`) may return the record in any of three forms:
+
   - **inline one-line literal** — `<Name> WITH f1 IS v1, f2 IS v2`. Parses; simplest for a
     generator emitting one arm per line;
 
