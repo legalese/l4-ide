@@ -692,11 +692,33 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
     -- FEEL has no cons operator, but it has `concatenate` (DMN 1.1 §10.3.4), and
     -- a one-element list literal is how you spell the head.
     Cons _ x xs -> pair e FullFeel (\tx txs -> "concatenate([" <> tx <> "], " <> txs <> ")") x xs
-    -- Record construction (@Assessment WITH rate IS 40 …@) is a FEEL CONTEXT
-    -- literal. This is the one place FEEL has a structured value, and it lines up
-    -- with 'Proj' above: we render the projection side as @r.f@, so construction
-    -- and access round-trip through the same names.
-    AppNamed _ _ nes _ -> contextLit e nes
+    -- @AppNamed@ deliberately has NO case here: it falls to 'verbatim' below and
+    -- is therefore reported @D-NONFEELOUTPUT@ \/ Blocking.
+    --
+    -- It is tempting to render it as a FEEL context literal @{f: v, …}@, since
+    -- 'Proj' above renders the read side as @r.f@. That lowering was written and
+    -- REVERTED, because it is wrong four ways, each verified by running both
+    -- evaluators:
+    --
+    --   1. @AppNamed@ is L4\'s general NAMED-ARGUMENT APPLICATION, not record
+    --      construction. 'inferAppNamed' types it against any @Fun@, and the
+    --      evaluator reduces it to @App@. With @f MEANS x TIMES y@,
+    --      @f WITH x IS 3, y IS 4@ is @12@ in L4 and @{x: 3, y: 4}@ under that
+    --      lowering — which KIE compiles happily and returns as a context.
+    --   2. It drops the constructor tag, so @Paid WITH amount IS 40@ and
+    --      @Owed WITH amount IS 40@ both become @{amount: 40}@. L4 says those are
+    --      unequal; a DMN engine says they are equal.
+    --   3. Field names are not checked against FEEL\'s reserved words, so a field
+    --      called @for@ or @in@ emits @{for: 1}@, which KIE fails to compile while
+    --      still reporting the decision SUCCEEDED with an empty result.
+    --   4. Computed fields (@HAS f IS A T MEANS …@) are not supplied as arguments,
+    --      so they are absent from the context while 'Proj' still reads @r.f@ —
+    --      null in DMN, a value in L4.
+    --
+    -- Each of those turns an honest Blocking note into a silently wrong answer
+    -- reported Advisory, which is strictly worse than not lowering at all. A
+    -- correct version must check the head is a constructor, quote the tag,
+    -- validate keys, and supply computed fields; until then, verbatim is honest.
     -- A conditional whose arms ARE its comparison's operands is not a decision;
     -- it is `max` / `min`. Lower it to FEEL's own function rather than to an
     -- `if`, the way a compiler backend recognises a select pattern instead of
@@ -766,18 +788,6 @@ renderFeelIn ctors top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt)
 
     call whole fn args =
       nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " ts <> ")") args
-
-    -- Field ORDER is not reordered to the constructor's declaration order (the
-    -- @Maybe [Int]@ 'AppNamed' carries): a FEEL context is keyed, so order is
-    -- immaterial to its meaning, and keeping the drafter's order keeps the text
-    -- next to the source.
-    contextLit whole nes =
-      nary whole FullFeel
-        (\ts -> "{" <> Text.intercalate ", " (zipWith entry keys ts) <> "}")
-        [v | MkNamedExpr _ _ v <- nes]
-     where
-      keys = [feelIdent n | MkNamedExpr _ n _ <- nes]
-      entry k t = k <> ": " <> t
 
     verbatim whole = (atomPrec, prettyLayout whole, L4Verbatim)
 

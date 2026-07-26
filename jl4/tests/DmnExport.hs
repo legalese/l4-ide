@@ -816,14 +816,28 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- <description>, which carries the guard's full source.
       map (.severity) t.dtNotes `shouldNotContain` [Blocking]
 
-    it "record construction is a FEEL context literal, and pairs with the projection side" $ do
+    -- NOT a lowering, and deliberately so. A `{f: v, …}` context literal for
+    -- record construction was written and reverted: `AppNamed` is L4's general
+    -- named-argument APPLICATION, so `f WITH x IS 3, y IS 4` (with `f MEANS x
+    -- TIMES y`) is 12 in L4 and `{x: 3, y: 4}` under that lowering — which KIE
+    -- compiles without complaint. It also drops the constructor tag (`Paid WITH
+    -- amount IS 40` and `Owed WITH amount IS 40` collapse to one FEEL value that
+    -- L4 says are unequal), never checks field names against FEEL's reserved
+    -- words (`{for: 1}` fails to compile while the decision still reports
+    -- SUCCEEDED), and omits computed fields that `Proj` still reads.
+    --
+    -- Each of those is a silently wrong answer reported Advisory, which is worse
+    -- than the honest Blocking below. This test is the regression guard.
+    it "record construction stays verbatim and is Blocking, not a context literal" $ do
       let t = tableOf "assess" recordConstruction
-      map (.drOutput.feText) t.dtRules `shouldBe` ["{rate: 40, band: \"high\"}"]
-      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
-      fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "{rate: 0, band: \"low\"}"
-      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [L4Verbatim]
+      map (.drOutput.feText) t.dtRules
+        `shouldSatisfy` all (Text.isInfixOf "Assessment WITH")
+      map (.code) t.dtNotes `shouldContain` ["D-NONFEELOUTPUT"]
+      [n | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"]
+        `shouldSatisfy` all ((== Blocking) . (.severity))
 
-    it "a projection of a constructed record round-trips through the same field names" $ do
+    it "a projection off a record-typed parameter round-trips through the field names" $ do
       let t = tableOf "level" recordProjection
       map (.icExpr.feText) t.dtInputs `shouldBe` ["a.rate"]
       map (.icExpr.feFragment) t.dtInputs `shouldBe` [SFeel]
