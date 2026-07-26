@@ -1,8 +1,20 @@
 # GIVETH with Multiple Named Results
 
-**Status:** Proposal — **not accepted**, written to be reviewed and possibly rejected
-**Author:** drafted by Claude (session `lexipedia`), from a suggestion by Meng Wong
-**Date:** 2026-07-26
+**Status:** ❌ **REJECTED 2026-07-26** — adversarial review, 5/5 lenses, 4 fatal defects.
+Not deferred; dead as specified. Retained as the rejection record.
+**Successor:** [GIVETH-INLINE-TYPE-DECL-SPEC.md](./GIVETH-INLINE-TYPE-DECL-SPEC.md) — also rejected 5/5.
+
+> **Verdict summary.** §5.1's namespace relief is false twice over: section-local `DECLARE` already
+> works and is already corpus practice (57/70 Charities declarations are `§`-scoped), and projection
+> is module-scope selector-function application (`TypeCheck.hs:984`, `:1740-1764`), so the field
+> names land in that namespace regardless. The synthetic type name would leak into a deployed public
+> API via `FunctionSchema.hs`'s `x-l4-type`, and no naming scheme is simultaneously stable,
+> collision-free and readable. §5.3's symmetry argument is backwards: `GIVEN` names are
+> caller-invisible positional binders, the proposed `GIVETH` names would be caller-visible public
+> API. **Correction to §7 below** — its count is right, its gloss is wrong.
+
+**Author:** drafted by Claude (session `lexipedia`), from a suggestion by Meng Wong ·
+**Date:** 2026-07-26 ·
 **Related:** [DMN-EXPORT-PROGRAM-MODEL-SPEC.md](../todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md)
 
 ---
@@ -131,8 +143,18 @@ Stated as strongly as it deserves, because the reviewer should not have to const
 
 **The corpus does not want it.** Across all three legal corpora — Reg CF, Charities, Housing Act —
 there are **zero** record constructions in any `THEN`/`ELSE`/`OTHERWISE` position (verified; a
-positive control fires five hits on a synthetic probe). Not "few". None. The construct this sugar
-sweetens is currently **unused in every corpus we have**.
+positive control fires five hits on a synthetic probe). Not "few". None.
+
+> **Correction (review, 2026-07-26).** The count is confirmed — unanimously, and by a full AST
+> census (573 `AppNamed` nodes, none under `IfThenElse`/`Consider`/`MkBranch`). **The gloss that
+> followed it — "unused in every corpus we have" — was wrong.** Multi-result decisions are not
+> unused: the Housing Act flagship `@export` returns a 5-field record
+> (`housing-act-wizard.l4:173-181`) and Charities has four `GIVETH A MAYBE Part6Penalty` decisions
+> (`part-6-use-of-terms.l4:548-573`). What the corpus never does is write inline record literals
+> **in branch position**, because its idioms are better: whole-body construction with per-field
+> `@desc`, and `JUST <citation-named record constant>` in branches. Both are idioms this sugar
+> cannot express at parity. The corrected evidence makes rejection **stronger** — demand is real
+> and the incumbent idiom demonstrably wins.
 
 **The DMN motivation does not need it.** Everything in §3 is fixed by lowering nominal records to
 multi-output tables. This proposal adds nothing to that fix; it only removes a `DECLARE`.

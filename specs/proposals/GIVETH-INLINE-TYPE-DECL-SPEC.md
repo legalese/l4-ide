@@ -1,10 +1,48 @@
 # Inline Type Declarations in `GIVETH` Position
 
-**Status:** Proposal — **not accepted**, written to be attacked
-**Author:** drafted by Claude (session `lexipedia`), from suggestions by Meng Wong
-**Date:** 2026-07-26
-**Supersedes:** [GIVETH-MULTIPLE-RESULTS-SPEC.md](./GIVETH-MULTIPLE-RESULTS-SPEC.md) — **rejected
-5/5** by adversarial review, four fatal defects
+**Status:** ❌ **REJECTED 2026-07-26** — adversarial review, 5/5 lenses, 11 fatal findings.
+All three forms rejected, **including Alternative B′** (enum-only), which §9 had left standing.
+Retained as the rejection record.
+
+> **Verdict summary.** Both of §3's planks fail. §3.1's citation-transfer claim is **refuted**:
+> `Part6Penalty` is a **record** (`part-6-use-of-terms.l4:435`, four fields) whose citation-named
+> values are `MEANS Part6Penalty WITH` constants (`:445-475`) consumed by two field-projecting
+> comparators (`:477-493`) and a machine-checked `#ASSERT` (`:508`) — the corpus's own comment
+> (`:431-434`) says the record exists so the asymmetry is "a computable property of the Part and not
+> merely a comment". §3.1's enum rewrite destroys all of it. §3.2's DMN claim is a **zero
+> differential**: `<outputValues>` derives from the declared enum domain, which §2's own desugaring
+> produces, so a status-quo `DECLARE` supplies it identically — inline-ness contributes zero bits to
+> the exporter.
+>
+> **The blind spot**, prior to and independent of §5: the spec audited its evidence's _shape_
+> (`MAYBE`-wrapped) but never its **fan-out**. `Part6Penalty` has 4 producer `GIVETH`s + 2
+> comparators + 4 constants + 1 assert. A type used at more sites than one cannot be declared inline
+> at any of them, so **sharing disqualifies before wrapping is reached** and §5 — "the question that
+> decides the proposal" — is moot for its only real case.
+>
+> **Measured benefit**: of 162 `DECLARE`s across three corpora, exactly **one** (`Presider`,
+> `schedules-1-and-2.l4:287`) is the result type of exactly one decision and referenced nowhere
+> else — and it already sits 17 lines from its use. Net saving **17 characters**. 93% are referenced
+> outside `GIVETH` position; 34 are shared across two or more.
+>
+> **Prior art**: C permits nominal type definition at return position (verified, `clang -std=c17`);
+> **C++ banned it** — `[dcl.fct]/18`, "Types shall not be defined in return or parameter types",
+> still in the current working draft.
+>
+> **§5(iii) → Alternative C is a false exit.** A `WHERE`-local type can never be a `GIVETH` result
+> type without escaping its scope — the classic local-type-escape problem, which SML/OCaml resolve
+> by rejection. `LocalDeclare` cannot answer the multi-result question at all; if written later it
+> must be motivated by _intermediate values, never results_, and corpus demand for that is currently
+> zero.
+>
+> Recorded for any successor: the parenthesised attachment form
+> `GIVETH A MAYBE (Penalty IS ONE OF …)` cleanly answers §10's grammar question — but grammar was
+> never what this died on. The synonym form is rejected **with prejudice**: it converts today's clean
+> parse error into a silent category error and saves nothing over `GIVETH A NUMBER`.
+
+**Author:** drafted by Claude (session `lexipedia`), from suggestions by Meng Wong ·
+**Date:** 2026-07-26 ·
+**Supersedes:** [GIVETH-MULTIPLE-RESULTS-SPEC.md](./GIVETH-MULTIPLE-RESULTS-SPEC.md) (also rejected 5/5) ·
 **Related:** [DMN-EXPORT-PROGRAM-MODEL-SPEC.md](../todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md)
 
 ---
@@ -37,11 +75,11 @@ predecessor did not have (§5). This document is again written to be rejected if
 | 1   | **One-line `DECLARE` already works, in both forms.** `DECLARE Rec HAS \`a\` IS A NUMBER, \`b\` IS A STRING`and`DECLARE Verdict IS ONE OF \`granted\`, \`refused\``both give`Check succeeded.` | `l4 check`, scratch probe                               |
 | 2   | A `MAYBE`-wrapped user type as a result works and evaluates: `GIVETH A MAYBE Verdict`, `JUST \`granted\``→`JUST OF granted`                                                                   | `l4 run`                                                |
 | 3   | One-line **record literals** parse and evaluate: `Rec WITH \`a\` IS 1, \`b\` IS "hi"`→`Rec OF 1, "hi"`                                                                                        | `l4 run`                                                |
-| 4   | `TypeDecl` has exactly three forms: `RecordDecl` (`HAS`), `EnumDecl` (`IS ONE OF`), `SynonymDecl`                                                                                             | `Syntax.hs:190-193`                                     |
+| 4   | `TypeDecl` has exactly three forms: `RecordDecl` (`HAS`), `EnumDecl` (`IS ONE OF`), `SynonymDecl`                                                                                             | `Syntax.hs:191-196`                                     |
 | 5   | Section-local `DECLARE` resolves across `§`s via `withQualified`; 57/70 Charities declarations are already `§`-scoped                                                                         | `TypeCheck.hs:2531-2561`; review, verified by execution |
 | 6   | `WHERE`-local `DECLARE` does **not** exist — `LocalDecl` has only `LocalDecide`/`LocalAssume`                                                                                                 | `Syntax.hs:431-435`                                     |
 | 7   | Per-field `@desc` annotations on a `DECLARE` feed the exported JSON schema                                                                                                                    | `housing-act-wizard.l4:55-60`; `FunctionSchema.hs`      |
-| 8   | The corpus's real multi-result decisions are `GIVETH A MAYBE Part6Penalty` × 4, branches returning `JUST \<citation-named constant\>`                                                         | `part-6-use-of-terms.l4:548-573`                        |
+| 8   | The corpus's real multi-result decisions are `GIVETH A MAYBE Part6Penalty` × 4, branches returning `JUST \<citation-named **record** constant\>` — the record is load-bearing, see the banner | `part-6-use-of-terms.l4:548-573`                        |
 
 **Fact 1 sets the size of the prize.** The ceremony this proposal removes is not a multi-line
 block. It is the keyword `DECLARE` and one newline:
