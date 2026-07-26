@@ -55,7 +55,8 @@ module LSP.Core.Shake(
     GlobalIdeOptions(..),
     ideLogger,
     actionLogger,
-    getVirtualFile, addVirtualFile, addVirtualFileFromFS, getVirtualFileText,
+    getVirtualFile, addVirtualFile, addVirtualFileUri, addVirtualFileFromFS, getVirtualFileText,
+    embeddedLibraryUri,
     FileVersion(..),
     updatePositionMapping,
     updatePositionMappingHelper,
@@ -333,24 +334,59 @@ addPersistentRule k getVal = do
 
 class Typeable a => IsIdeGlobal a where
 
--- | Embedded libraries, keyed by the exact VFS URI under which import
--- resolution registers them (see 'LSP.L4.Rules'). Used as a fallback in
--- 'getVirtualFile' so that these built-in modules are always visible, even
--- before import resolution has explicitly 'addVirtualFile'd them. Without
--- this, a candidate URI can be probed (and memoized as "missing") before the
--- embedded library is registered under the same URI, permanently poisoning
--- that module's contents for the rest of the build. This bites transitively
--- imported embedded libraries whose importer is itself an embedded library:
--- the relative candidate URI then coincides with the embedded registration
--- URI. Seeding here is ordering-independent and keyed by the precise URI, so
--- it can never shadow a genuine on-disk or user-edited file (whose URI never
--- has this bare @file://<name>.l4@ form).
+-- | The URI scheme the binary's embedded stdlib is exposed under.
+--
+-- It is deliberately /not/ a @file:@ scheme. Import resolution probes
+-- speculative candidate URIs built from file paths — @rootDirectory \</\> mod
+-- \<.\> "l4"@ and @takeDirectory importer \</\> mod \<.\> "l4"@ (see
+-- 'LSP.L4.Rules.resolveImportShared') — and that VFS tier outranks the whole
+-- filesystem tier. So any file path the embedded copy occupies is a path a
+-- probe can forge, and forging it makes the embedded copy beat every
+-- project-scoped source, inverting the precedence order
+-- LIBRARY-RESOLUTION-SHADOW-SPEC (Option B′) defines.
+--
+-- The old @.\/\<name\>.l4@ key was forgeable in exactly that way, twice over:
+--
+--   * @l4 check main.l4@ (no directory component) makes @rootDirectory@ @"."@,
+--     so the root candidate for @prelude@ /is/ @.\/prelude.l4@ — the embedded
+--     prelude then silently beat the project's own @prelude.l4@;
+--   * an embedded importer's own URI was @file:\/\/\<name\>.l4@, so
+--     @takeDirectory@ of it was @"."@ and its dependencies' relative candidates
+--     hit the same keys — binding one module name to two different sources
+--     within a single build.
+--
+-- A scheme no file path can produce closes both. It also makes an embedded
+-- importer's 'uriToNormalizedFilePath' 'Nothing', which is what it should have
+-- been all along: an embedded library has no directory, so it contributes no
+-- importer-relative candidate and its imports are ranked by 'resolveLibrary'
+-- alone — the same ranking every other importer gets.
+embeddedLibraryUriScheme :: Text
+embeddedLibraryUriScheme = "jl4-embedded"
+
+-- | The canonical URI of an embedded library, given its module name (no
+-- extension). This is the single key under which the module is visible to the
+-- build graph, so every importer that resolves to the embedded copy names the
+-- same Shake node — one module name, one module.
+embeddedLibraryUri :: Text -> NormalizedUri
+embeddedLibraryUri name =
+  toNormalizedUri $ Uri $ embeddedLibraryUriScheme <> ":/" <> name <> ".l4"
+
+-- | Every embedded library, keyed by 'embeddedLibraryUri'. Consulted by
+-- 'getVirtualFile', so a built-in module is readable from the moment the build
+-- starts rather than from whenever some rule happened to register it.
+--
+-- That ordering-independence is the point. Import resolution probes candidate
+-- URIs through the memoizing @GetFileContents@ rule; a probe that lands on a
+-- not-yet-registered URI memoizes "missing", and 'addVirtualFile' does not
+-- invalidate an already-memoized key, so the miss persists for the rest of the
+-- build and the module's typecheck aborts with its exports never reaching any
+-- importer (smucclaw/l4-ide#906). A pure, always-present map cannot be
+-- poisoned. Because the keys are outside the @file:@ scheme it also cannot
+-- shadow an on-disk or user-edited file.
 embeddedLibraryVfs :: Map.Map NormalizedUri VirtualFile
 embeddedLibraryVfs =
   Map.fromList
-    [ ( normalizedFilePathToUri (toNormalizedFilePath ("./" <> Text.unpack name <.> "l4"))
-      , VirtualFile 0 0 (Rope.fromText content)
-      )
+    [ (embeddedLibraryUri name, VirtualFile 0 0 (Rope.fromText content))
     | (name, content) <- Map.toList EmbeddedLibraries.embeddedLibraries
     ]
 
@@ -360,14 +396,21 @@ getVirtualFile nf = do
   vfs <- fmap _vfsMap . liftIO . readTVarIO . vfsVar =<< getShakeExtras
   -- Prefer the live VFS (real / user-edited files win); fall back to the
   -- embedded library seed so built-ins are visible regardless of probe order.
+  -- The two key spaces are disjoint by construction (see 'embeddedLibraryUri'),
+  -- so the fallback can never displace a live entry.
   pure $! case Map.lookup nf vfs of -- Don't leak a reference to the entire map
     Just vf -> Just vf
     Nothing -> Map.lookup nf embeddedLibraryVfs
 
 addVirtualFile :: NormalizedFilePath -> Text -> Action Rope.Rope
-addVirtualFile nfp t = do
+addVirtualFile = addVirtualFileUri . normalizedFilePathToUri
+
+-- | 'addVirtualFile' for sources that are not file paths (e.g. the embedded
+-- stdlib, whose URIs live outside the @file:@ scheme).
+addVirtualFileUri :: NormalizedUri -> Text -> Action Rope.Rope
+addVirtualFileUri uri t = do
   let rope = Rope.fromText t
-      insertToVfs vfs =  ((), over vfsMap (Map.insert (normalizedFilePathToUri nfp) (VirtualFile 0 0 rope)) vfs)
+      insertToVfs vfs =  ((), over vfsMap (Map.insert uri (VirtualFile 0 0 rope)) vfs)
   liftIO . atomically . flip stateTVar insertToVfs . vfsVar =<< getShakeExtras
   pure rope
 

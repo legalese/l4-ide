@@ -371,7 +371,20 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
   -- VFS tier: project:/ scheme (Monaco), importer-relative, root-relative.
+  --
+  -- These candidates are /speculative/: they are probed before anything is
+  -- known to exist there. So the URIs they can name are exactly the URIs a
+  -- module can be hijacked at, and nothing that must rank below the filesystem
+  -- tier may be reachable from here. That is why the embedded stdlib lives
+  -- outside the @file:@ scheme ('Shake.embeddedLibraryUri') rather than at
+  -- @./<name>.l4@, which both @rootDirectory == "."@ and a bare embedded
+  -- importer URI used to forge.
   let projectUri = toNormalizedUri $ Uri $ Text.pack $ "project:/" <> modName <.> "l4"
+      -- 'Nothing' for a non-file importer — notably an embedded library, which
+      -- has no directory and so contributes no sibling candidate. Its imports
+      -- are then ranked by 'resolveLibrary' alone (project root above embedded,
+      -- per Option B′), the same ranking every other importer gets: one module
+      -- name stays bound to one source across the whole build.
       relativeUri = do
         nfp <- uriToNormalizedFilePath importerUri
         let dir = takeDirectory $ fromNormalizedFilePath nfp
@@ -444,10 +457,12 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
             "Found in embedded libraries (candidate " <> Text.pack (show ix) <> " of "
             <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack modName
           case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName) of
-            Just libContent -> do
-              let libPath = toNormalizedFilePath ("./" <> modName <.> "l4")
-              _ <- Shake.addVirtualFile libPath libContent
-              pure $ outcome $ Just $ normalizedFilePathToUri libPath
+            Just _ ->
+              -- No VFS write: the embedded copy is already readable at its
+              -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
+              -- here would only re-introduce the mid-rule VFS mutation whose
+              -- ordering-dependence caused #906 in the first place.
+              pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
             Nothing ->
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
               -- as existing when the lookup succeeds. Fail soft regardless.
