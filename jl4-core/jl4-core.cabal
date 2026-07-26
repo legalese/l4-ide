@@ -182,6 +182,7 @@ test-suite jl4-core-test
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
+    ResolutionCascadeSpec
     RefAnnotationSpec
     TracePostprocessSpec
     EdgeCrashSpec
