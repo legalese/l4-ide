@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_regulation_crowdfunding" name="Regulation Crowdfunding" namespace="https://legalese.com/l4/dmn/regulation_crowdfunding" exporter="jl4">
+  <inputData id="input_class" name="class">
+    <variable id="input_class_var" name="class" typeRef="string"/>
+  </inputData>
+  <inputData id="input_annual_income" name="annual income">
+    <variable id="input_annual_income_var" name="annual income" typeRef="number"/>
+  </inputData>
+  <inputData id="input_net_worth" name="net worth">
+    <variable id="input_net_worth_var" name="net worth" typeRef="number"/>
+  </inputData>
+  <inputData id="input_offering_amount" name="offering amount">
+    <variable id="input_offering_amount_var" name="offering amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_first_time_issuer" name="first-time issuer">
+    <variable id="input_first_time_issuer_var" name="first_time issuer" typeRef="boolean"/>
+  </inputData>
+  <decision id="decision_is_accredited_investor" name="is accredited investor">
+    <variable id="decision_is_accredited_investor_var" name="is accredited investor" typeRef="boolean"/>
+    <informationRequirement id="decision_is_accredited_investor_ir1">
+      <requiredInput href="#input_class"/>
+    </informationRequirement>
+    <decisionTable id="decision_is_accredited_investor_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="is accredited investor">
+      <input id="decision_is_accredited_investor_i1" label="class">
+        <inputExpression id="decision_is_accredited_investor_i1_expr" typeRef="string">
+          <text>class</text>
+        </inputExpression>
+      </input>
+      <output id="decision_is_accredited_investor_o1" name="is accredited investor" typeRef="boolean">
+        <defaultOutputEntry id="decision_is_accredited_investor_o1_default">
+          <text>false</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_is_accredited_investor_r1">
+        <description>class EQUALS accredited</description>
+        <inputEntry id="decision_is_accredited_investor_r1_i1">
+          <text>"accredited"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_accredited_investor_r1_o1">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_is_accredited_investor_r2">
+        <description>class EQUALS institutional</description>
+        <inputEntry id="decision_is_accredited_investor_r2_i1">
+          <text>"institutional"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_accredited_investor_r2_o1">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_combined_resources" name="combined resources">
+    <variable id="decision_combined_resources_var" name="combined resources" typeRef="number"/>
+    <informationRequirement id="decision_combined_resources_ir1">
+      <requiredInput href="#input_annual_income"/>
+    </informationRequirement>
+    <informationRequirement id="decision_combined_resources_ir2">
+      <requiredInput href="#input_net_worth"/>
+    </informationRequirement>
+    <literalExpression id="decision_combined_resources_literal">
+      <text>annual income + net worth</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_annual_limit_basis" name="annual limit basis">
+    <variable id="decision_annual_limit_basis_var" name="annual limit basis" typeRef="number"/>
+    <informationRequirement id="decision_annual_limit_basis_ir1">
+      <requiredInput href="#input_annual_income"/>
+    </informationRequirement>
+    <informationRequirement id="decision_annual_limit_basis_ir2">
+      <requiredInput href="#input_net_worth"/>
+    </informationRequirement>
+    <literalExpression id="decision_annual_limit_basis_literal">
+      <text>min(annual income, net worth)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_financial_statements_required" name="financial statements required">
+    <variable id="decision_financial_statements_required_var" name="financial statements required" typeRef="string"/>
+    <informationRequirement id="decision_financial_statements_required_ir1">
+      <requiredInput href="#input_first_time_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir2">
+      <requiredInput href="#input_offering_amount"/>
+    </informationRequirement>
+    <decisionTable id="decision_financial_statements_required_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="financial statements required">
+      <input id="decision_financial_statements_required_i1" label="`offering amount`">
+        <inputExpression id="decision_financial_statements_required_i1_expr" typeRef="number">
+          <text>offering amount</text>
+        </inputExpression>
+      </input>
+      <input id="decision_financial_statements_required_i2" label="`first-time issuer`">
+        <inputExpression id="decision_financial_statements_required_i2_expr" typeRef="boolean">
+          <text>first_time issuer</text>
+        </inputExpression>
+      </input>
+      <output id="decision_financial_statements_required_o1" name="financial statements required" typeRef="string"/>
+      <rule id="decision_financial_statements_required_r1">
+        <description>`offering amount` AT MOST 107000</description>
+        <inputEntry id="decision_financial_statements_required_r1_i1">
+          <text>&lt;= 107000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r1_o1">
+          <text>"certified by the principal executive officer"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r2">
+        <description>`offering amount` AT MOST 535000</description>
+        <inputEntry id="decision_financial_statements_required_r2_i1">
+          <text>&lt;= 535000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r2_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r2_o1">
+          <text>"reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r3">
+        <description>`first-time issuer` AND `offering amount` AT MOST 1070000</description>
+        <inputEntry id="decision_financial_statements_required_r3_i1">
+          <text>&lt;= 1070000</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r3_i2">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r3_o1">
+          <text>"reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r4">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_financial_statements_required_r4_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r4_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r4_o1">
+          <text>"audited by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_investor_limit" name="investor limit">
+    <variable id="decision_investor_limit_var" name="investor limit" typeRef="number"/>
+    <informationRequirement id="decision_investor_limit_ir1">
+      <requiredDecision href="#decision_annual_limit_basis"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investor_limit_ir2">
+      <requiredDecision href="#decision_is_accredited_investor"/>
+    </informationRequirement>
+    <decisionTable id="decision_investor_limit_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="investor limit">
+      <input id="decision_investor_limit_i1" label="`is accredited investor`">
+        <inputExpression id="decision_investor_limit_i1_expr" typeRef="boolean">
+          <text>is accredited investor</text>
+        </inputExpression>
+      </input>
+      <input id="decision_investor_limit_i2" label="`annual limit basis`">
+        <inputExpression id="decision_investor_limit_i2_expr" typeRef="number">
+          <text>annual limit basis</text>
+        </inputExpression>
+      </input>
+      <output id="decision_investor_limit_o1" name="investor limit" typeRef="number"/>
+      <rule id="decision_investor_limit_r1">
+        <description>`is accredited investor`</description>
+        <inputEntry id="decision_investor_limit_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_investor_limit_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_investor_limit_r1_o1">
+          <text>100000000</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_investor_limit_r2">
+        <description>`annual limit basis` LESS THAN 124000</description>
+        <inputEntry id="decision_investor_limit_r2_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_investor_limit_r2_i2">
+          <text>&lt; 124000</text>
+        </inputEntry>
+        <outputEntry id="decision_investor_limit_r2_o1">
+          <text>max(2500, annual limit basis)</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_investor_limit_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_investor_limit_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_investor_limit_r3_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_investor_limit_r3_o1">
+          <text>annual limit basis * 10 / 100</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_regulation_crowdfunding_diagram" name="Regulation Crowdfunding">
+      <dmndi:DMNShape id="input_class_shape" dmnElementRef="input_class">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_annual_income_shape" dmnElementRef="input_annual_income">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_net_worth_shape" dmnElementRef="input_net_worth">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_amount_shape" dmnElementRef="input_offering_amount">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_first_time_issuer_shape" dmnElementRef="input_first_time_issuer">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_is_accredited_investor_shape" dmnElementRef="decision_is_accredited_investor">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_combined_resources_shape" dmnElementRef="decision_combined_resources">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_annual_limit_basis_shape" dmnElementRef="decision_annual_limit_basis">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_financial_statements_required_shape" dmnElementRef="decision_financial_statements_required">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_investor_limit_shape" dmnElementRef="decision_investor_limit">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_is_accredited_investor_ir1_edge" dmnElementRef="decision_is_accredited_investor_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_combined_resources_ir1_edge" dmnElementRef="decision_combined_resources_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_combined_resources_ir2_edge" dmnElementRef="decision_combined_resources_ir2">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_annual_limit_basis_ir1_edge" dmnElementRef="decision_annual_limit_basis_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_annual_limit_basis_ir2_edge" dmnElementRef="decision_annual_limit_basis_ir2">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir1_edge" dmnElementRef="decision_financial_statements_required_ir1">
+        <di:waypoint x="1030" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir2_edge" dmnElementRef="decision_financial_statements_required_ir2">
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_limit_ir1_edge" dmnElementRef="decision_investor_limit_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_limit_ir2_edge" dmnElementRef="decision_investor_limit_ir2">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
