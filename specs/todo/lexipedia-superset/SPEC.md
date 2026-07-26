@@ -171,15 +171,38 @@ trailing. First action is **H2**: this branch is that fresh branch off `origin/u
 
 ### Track E — the embeddable component
 
+Build spec: [EMBEDDABLE.md](./EMBEDDABLE.md) — the element's API, the two data contracts, the
+bundle settings, and the open rulings. **It corrects four things below, and the table and
+blockquote here have been amended to match:**
+
+1. **E0** — there is no Svelte interaction controller to factor, so E0 is an acceptance
+   criterion on L Step 4, not a refactor (EMBEDDABLE §0, EK1).
+2. **E2 does not depend on S1.** `POST …/query-plan` already returns `.ladder`
+   unconditionally (`Backend/DecisionQueryPlan.hs:229,290`), so S1 is a GET-shaped alias, not
+   a gate (EMBEDDABLE §5.2).
+3. **The dependencies Track E really has** are ladder seams **S6** (pan/zoom) and **S8**
+   (baked palettes) from E1-IDE-INTEGRATION.md §1 — a different numbering namespace from
+   Track S's surfaces below (EMBEDDABLE §2).
+4. **"Zero adoption cost" was false**, and the blockquote below is rewritten. The interactive
+   embed costs one DokuWiki plugin install; only the non-interactive artifacts are free
+   (EMBEDDABLE §1.1).
+
 | ID     | Work                                                                                                                                                         | Depends on                       |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
 | **E0** | Factor the interaction controller (click-cycle, fold, FLIP, `viewBox` pan/zoom) as **vanilla TS** in `ladder-svg`, so the Svelte displayer is a thin wrapper | —, but must land _with_ L Step 4 |
-| **E1** | `<l4-ladder>` custom element + `mount(el, …)`; single-file ESM + IIFE; no framework                                                                          | E0                               |
-| **E2** | Two modes: **static** (given a `FunDecl` JSON) and **live** (pointed at a jl4-service deployment)                                                            | E1, S1                           |
+| **E1** | `<l4-ladder>` custom element + `mount(el, …)`; single-file ESM + IIFE; no framework                                                                          | E0; ladder seams S6, S8          |
+| **E2** | Two modes: **static** (given a `FunDecl` JSON) and **live** (pointed at a jl4-service deployment)                                                            | E1 (**not** S1 — see 2 above)    |
 
-> **Why this is strategic, not a convenience.** Their substrate accepts pasted blocks — that
-> is the entire distribution mechanism of a DokuWiki. A drop-in that renders a live ladder
-> and wizard inside a wiki page meets them exactly where they are, at zero adoption cost.
+> **Why this is strategic — and what it actually costs.** ~~Their substrate accepts pasted
+> blocks … at zero adoption cost.~~ **Withdrawn as false.** What the survey shows is that their
+> wiki accepts a _registered plugin's_ syntax (`<bpmnio>`), not pasted HTML or `<script>`;
+> DokuWiki disables HTML embedding by default and displays the code instead of executing it.
+> The corrected claim: **the interactive embed costs one plugin install — the same act they
+> already performed once, for `bpmnio` — and it needs no CSP change, because a DokuWiki plugin
+> serves its own `script.js` from the wiki's origin. The non-interactive artifacts (an ASCII
+> ladder in a `<code>` block, a rendered image) cost nothing at all and already exist in
+> `ladder-core`.** Meeting them where they are is still the point; it is one admin action
+> away, not zero. EMBEDDABLE §1 prices every channel and schedules the live check (E1d/E1e).
 
 ### Track C — the corpus
 
@@ -199,10 +222,17 @@ trailing. First action is **H2**: this branch is that fresh branch off `origin/u
 | **S2** | `jl4-service`: the export endpoints                                     | D1, P1     |
 | **S3** | Deployment-engine wiring                                                | S1, S2     |
 
-> **S1 is nearly free and should be taken early.** `L4.Viz.Ladder` lives in **`jl4-core`**,
-> not `jl4-lsp`, and `jl4-service` already depends on `jl4-core`. Ladder extraction is
-> therefore already available service-side; the route is plumbing. This is what makes Track E
-> mode 2 cheap, and it means the Haskell serves data while the TypeScript draws — no sidecar.
+> **S1 is nearly free — but the reason given here was half wrong, and it is not a gate.**
+> ~~`L4.Viz.Ladder` lives in `jl4-core`, not `jl4-lsp` … the route is plumbing.~~ There are
+> **two** ladder implementations, and `jl4-service` uses the **`jl4-lsp`** one
+> (`Backend/DecisionQueryPlan.hs:42,181` — `LadderViz.doVisualize`), not the `jl4-core` one.
+> More importantly, `RenderAsLadderInfo` is **already served over HTTP today**:
+> `QueryPlanResponse.ladder` is set unconditionally (`DecisionQueryPlan.hs:229,290`). So S1 is
+> a GET-shaped, cacheable alias for a payload the service already computes — a real ergonomic
+> win for a wiki embed, and **not a dependency of Track E's E2**. If built, it must return
+> `cached.ladderInfo` verbatim rather than calling `visualizeByName`: two endpoints
+> disagreeing about one diagram is worse than one endpoint. The conclusion survives — the
+> Haskell serves data while the TypeScript draws, no sidecar. See EMBEDDABLE §5.2.
 
 ---
 
@@ -212,7 +242,7 @@ trailing. First action is **H2**: this branch is that fresh branch off `origin/u
 | ------ | ----------------------------------------------------- | -------------- |
 | **M0** | Ribbons stop being the typical outcome                | D0             |
 | **M1** | The new ladder is the IDE default in both apps        | L, E0          |
-| **M2** | A ladder embeds in an arbitrary web page              | E1, E2, S1     |
+| **M2** | A ladder embeds in an arbitrary web page              | E1, E2         |
 | **M3** | **The mirror page** — parity exhibit, page for page   | C0, C2, M2     |
 | **M4** | DMN + BPMN out, each with its fidelity report         | D1, P1, S0     |
 | **M5** | **The superset page** — temporal, verified, queryable | C1, C3, S2, S3 |
