@@ -79,11 +79,13 @@ test-suite jl4-test
   hs-source-dirs: tests
   main-is: Main.hs
   other-modules:
+    BpmnExport
     Hover
     SemanticTokens
     VizAutoRefresh
     VizImplies
     VizGuardedRows
+    DmnExport
     Paths_jl4
   autogen-modules:
     Paths_jl4

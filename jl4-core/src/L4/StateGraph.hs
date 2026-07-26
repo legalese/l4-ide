@@ -291,9 +291,17 @@ extractExpr mFromState expr = case expr of
 
   _ -> pure ()  -- Skip other expressions
 
--- | Check if a name refers to Fulfilled
+-- | Check if a name refers to the FULFILLED terminal.
+--
+-- The keyword is spelled @FULFILLED@ in source; the builtin behind it is
+-- @fulfil@, renamed for presentation (see 'L4.TypeCheck.Environment'). Neither
+-- spelling is @\"Fulfilled\"@, which is what this predicate used to compare
+-- against — so an explicit @HENCE FULFILLED@ never matched, fell through to
+-- the \"unknown target\" case, and produced a dangling intermediate state
+-- called @next@ instead of an edge to the shared terminal. The mixed-case
+-- spelling is kept only because it costs nothing.
 isFulfilled :: Resolved -> Bool
-isFulfilled name = resolvedToText name == "Fulfilled"
+isFulfilled name = resolvedToText name `elem` ["FULFILLED", "fulfil", "Fulfilled"]
 
 --------------------------------------------------------------------------------
 -- Junctions (RAND / ROR)
@@ -487,7 +495,7 @@ data Target
 -- | Classify what a HENCE/LEST expression points to
 classifyTarget :: Expr Resolved -> Target
 classifyTarget = \case
-  App _ name [] | resolvedToText name == "Fulfilled" -> TargetFulfilled
+  App _ name [] | isFulfilled name -> TargetFulfilled
   Breach{} -> TargetBreach
   Regulative _ obl -> TargetDeonton obl
   Where _ e _ -> classifyTarget e

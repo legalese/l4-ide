@@ -65,6 +65,35 @@ Home for the ladder rework: **`specs/todo/ladder-diagrams-2026/DESIGN.md` on bra
 - Once the 4 implementers push, run an **ultracode hardening workflow** (adversarial review) across all ready branches, apply fixes, open + PR each to `unstable`.
 - Resolve L4-VERSIONING scope (see decision below).
 
+## ⬜ ASSUME → GIVEN migration (docs + example code) — NOT STARTED, parked 2026-07-26
+
+**Scope:** sweep the repo for top-level `ASSUME` and replace it with idiomatic record-threaded `GIVEN` style, in **documentation and example/corpus code**. Compiler test fixtures under `jl4/examples/ok`, `jl4/examples/not-ok/tc` and `jl4/examples/lsp` are **out of scope** — they exercise `ASSUME` deliberately and must keep doing so.
+
+**Why.** `ASSUME` is an uninterpreted constant: the evaluator binds it to `ValAssumed` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:3328`) and forcing it raises `Stuck` (`Machine.hs:449`). So an `ASSUME`-style module **typechecks but cannot be evaluated** — `l4 check` reports success and `l4 run` dies with _"I needed to know the value of `X` but it is an assumed term"_. The identical logic in `GIVEN` style runs. Every doc page or example that teaches `ASSUME` therefore teaches a shape that does not execute.
+
+**What idiomatic style actually is** (this is the part that is easy to get wrong): _not_ `GIVEN x IS A NUMBER` re-declared on each decision, but a **record declared once and threaded as one parameter** through every decision that needs it, with decisions calling each other by juxtaposition and passing the same record variable. Cross-module sharing nests one record inside another and projects through it. There is no `GIVEN`-on-a-section; genuine constants stay bare nullary `MEANS`.
+
+Reference encodings, all zero-`ASSUME`:
+
+- `../l4wt/regcf-corpus/jl4/examples/legal/regcf/regcf.l4` — 981 lines, 42 top-level `GIVEN`, 11 record `DECLARE`s, roll-up decision over 6 parameters (branch `mengwong/regcf-corpus`)
+- `paper/case-studies/charities-jersey-2014/` — 12 files, 12,762 lines
+- `jl4/experiments/housing-act-possession-decision.l4:83-161` — composite `CaseFile` threaded as `cf`
+
+**The decisive precedent:** the same statute encoded twice. `jl4/experiments/jerseyCharities.l4` has **102** top-level `ASSUME`s; its 2026 re-encoding under `paper/case-studies/charities-jersey-2014/` has **zero**. The migration has already been done once, by hand, and never written down.
+
+**Measured starting state** (625 `.l4` files, excluding `dist-newstyle`/`node_modules`): **79 files / 669 lines** with top-level `ASSUME` vs **356 files / 2495 lines** with top-level `GIVEN`. Of the 48 `ASSUME` files under `jl4/examples`, **41 are compiler tests** (out of scope) — so the real corpus surface is small: 7 legacy legal models, plus `doc/` (17 files) and `jl4/experiments` (13).
+
+**Work items:**
+
+1. **Docs.** `doc/reference/types/ASSUME.md` currently teaches `ASSUME` un-caveated as _"declare input variables for decision logic"_ (`:14-18`) with no mention that such modules don't evaluate. Either add the caveat + point at record threading, or demote the page to a reference for the legacy construct. Repo-wide `grep -rni deprecat --include=*.md` returns 21 hits, **none** about `ASSUME` — the deprecation is real in practice and entirely undocumented. The only codification is the `l4` authoring skill (0 mentions of `ASSUME` against 33 of `GIVEN`).
+2. **Example/corpus code.** Migrate the ~7 legacy legal models + `doc/` examples + `jl4/experiments` non-fixtures. Mechanical: one `DECLARE Facts HAS` + `GIVEN f IS A Facts` per decision + `f's` projections + an explicit argument at each internal call site.
+3. **Decide the fate of `extractImplicitAssumeParams`** (`jl4-core/src/L4/Export.hs:426-439`, tolerated at `jl4-service/src/Compiler.hs:147`). Its own doc comment says it exists so programs can _omit_ explicit `ASSUME`s, by repurposing typechecker `OutOfScopeError`s as parameters. If `ASSUME` is going away, this crutch wants a decision rather than inheritance.
+4. **Guard the regression.** A lint or corpus check that a non-fixture `.l4` has no top-level `ASSUME`.
+
+**Blocker to fix first (or at least to know about):** `l4 batch` breaks on any module where one top-level `GIVEN` decision calls another — i.e. on the target style. `jl4/app/L4/Cli/Batch.hs:206` round-trips the module through `prettyLayout` and the reprinted source re-parses with the wrong application/`AND` precedence (`__AND__` gets a NUMBER where it wants a BOOLEAN, and vice-versa at the call). Parens and `OF` do not help. `l4 check` passes throughout. `jl4-service` deliberately avoids the round-trip and is unaffected — so this is confined to the CLI, but it means the migration makes `l4 batch` worse before it gets better.
+
+**Known downstream consumer that assumes the `ASSUME` shape:** the DMN exporter (`jl4-core/src/L4/Dmn/Lower.hs`) models a module as global scalars + decisions over them. Under record-threaded `GIVEN` it emits duplicate-named `<inputData>`, unevaluable `f(x)` FEEL invocations, and erases record types to `Any`. Tracked separately on `mengwong/dmn-export`; the exporter's own exhibit `jl4/examples/dmn/reg-cf.l4` is itself `ASSUME`-style and wants re-cutting from the real Reg CF corpus.
+
 ## Infra loose ends
 
 ### ✅ RESOLVED 2026-07-09/10 — merge-queue cabal cache now WARM (Tier-1 warm-up shipped)
