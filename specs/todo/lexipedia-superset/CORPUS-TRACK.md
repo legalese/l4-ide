@@ -1273,6 +1273,7 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   is correct and fatal to stopping there: under that option **our wizard also presents one
   slider**, which collapses the very distinction §2.4.3 stakes the argument on. The
   resolution keeps the option and adds the missing third piece:
+
   1. **Ask the fact date** — "when did you (or will you) invest?" — the only question a
      citizen can answer.
   2. **Disclose the derived rule date in the answer card**: _"Applying the rules in force on
