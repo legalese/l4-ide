@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+cross-section-qualified.l4:60:1-13:
+  Verdict (qualified at section Section A)
+cross-section-qualified.l4:61:1-12:
+  BOOLEAN
+cross-section-qualified.l4:62:1-17:
+  Verdict
+cross-section-qualified.l4:64:1-13:
+  42
+cross-section-qualified.l4:65:1-12:
+  yes
+cross-section-qualified.l4:66:1-11:
+  TRUE
+cross-section-qualified.l4:67:1-34:
+  1
+cross-section-qualified.l4:68:1-33:
+  0
+cross-section-qualified.l4:69:1-14:
+  Wrapper OF yes
+cross-section-qualified.l4:70:1-16:
+  yes
+cross-section-qualified.l4:71:1-11:
+  no
+cross-section-qualified.l4:72:1-14:
+  green
+cross-section-qualified.l4:73:1-19:
+  43

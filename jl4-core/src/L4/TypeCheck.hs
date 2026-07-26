@@ -977,13 +977,18 @@ inferConDecl rappForm (MkConDecl ann n tns) = do
     conType = forall' (view appFormArgs rappForm) (fun (typedNameOptionallyNamedType <$> rtns) (appFormType rappForm))
     conInfo = KnownTerm conType Constructor
 
+  -- Data constructors are section-qualifiable too, so that @`Section`.yes@
+  -- names the constructor exactly as @`Section`.someValue@ names a value (#921).
+  -- Aliases only: see 'addQualifiedAliases' for why this must not also record a
+  -- section path for the constructor.
+  conCheckInfo <- addQualifiedAliases (makeKnown dn conInfo)
 
-  condecl <- extendKnownMany (makeKnown dn conInfo : concat extends) do
+  condecl <- extendKnownMany (conCheckInfo : concat extends) do
     -- See Note [Adding type information to all binders]
     MkConDecl ann
       <$> resolvedType dn
       <*> traverse (traverse resolvedType) rtns
-  pure (condecl, makeKnown dn conInfo : concat extends)
+  pure (condecl, conCheckInfo : concat extends)
 
 typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
 typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
@@ -1045,7 +1050,11 @@ inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
     Nothing -> pure ()
   -- Note: computed fields (MEANS clause) are desugared before type checking,
   -- so _mExpr is always Nothing here. We pass Nothing in the output.
-  pure (MkTypedName ann dn rt rTypically Nothing, [makeKnown dn selectorInfo])
+  -- Record selectors are section-qualifiable for the same reason constructors
+  -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
+  -- only, as for constructors (see 'addQualifiedAliases').
+  selCheckInfo <- addQualifiedAliases (makeKnown dn selectorInfo)
+  pure (MkTypedName ann dn rt rTypically Nothing, [selCheckInfo])
 
 -- | Infers / checks a type to be of kind TYPE.
 inferType :: Type' Name -> Check (Type' Resolved)
@@ -2584,6 +2593,15 @@ withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
 -- @
 --
 -- All of these can be used to refer to @foo@.
+--
+-- This function does two independent things, and callers care about the
+-- difference (see 'addQualifiedAliases'):
+--
+-- 1. it records each name's defining section path, which is what makes
+--    UNQUALIFIED references to it obey nearest-enclosing-section resolution
+--    ('selectByProximity'); and
+-- 2. it adds the qualified spellings, which is what makes QUALIFIED references
+--    to it resolve at all.
 withQualified :: [Resolved] -> CheckEntity -> Check CheckInfo
 withQualified rs ce = do
   sects <- asks (.sectionStack)
@@ -2592,8 +2610,22 @@ withQualified rs ce = do
   -- variants share the same 'Unique' as the original, so recording the original
   -- 'Unique's suffices. (A no-op at top level, where 'sects' is empty.)
   recordSectionPath sects (getUnique <$> rs)
+  qualRs <- qualifiedAliases rs
+  pure $ makeKnownMany (rs <> qualRs) ce
+
+-- | The section-qualified alias 'Resolved's of the given names, under the
+-- current section stack. Empty at top level, and empty for names that are
+-- already qualified or are predefined.
+--
+-- Each alias is a 'defAka' sharing the original's 'Unique', hence its
+-- 'CheckEntity' and its source range: it is the same entity under a second
+-- spelling, keyed in the environment under a 'QualifiedName' 'RawName' that no
+-- 'NormalName' lookup can ever reach.
+qualifiedAliases :: [Resolved] -> Check [Resolved]
+qualifiedAliases rs = do
+  sects <- asks (.sectionStack)
   case nonEmpty sects of
-    Nothing -> pure $ makeKnownMany rs ce
+    Nothing -> pure []
     Just (neSects :: NonEmpty (NonEmpty Text)) -> do
       let
         go :: Resolved -> Check [Resolved]
@@ -2613,8 +2645,30 @@ withQualified rs ce = do
             PreDef _ -> pure []
             QualifiedName _ _ -> pure []
 
-      qualRs <- Extra.concatMapM go rs
-      pure $ makeKnownMany (rs <> qualRs) ce
+      Extra.concatMapM go rs
+
+-- | Add the section-qualified spellings of every name an already-built
+-- 'CheckInfo' binds, and NOTHING else.
+--
+-- Deliberately not 'withQualified': that would additionally 'recordSectionPath'
+-- for the names, which is a change to how UNQUALIFIED references to them
+-- resolve, not merely a second way to spell them. Whether data constructors and
+-- record selectors should be ranked by section proximity the way values are is
+-- a real question — today they are not, and answering it is a separate change
+-- with its own spec and its own corpus fallout. #921 is only about giving them
+-- a qualified spelling, so this adds a qualified spelling and leaves
+-- 'sectionPaths' bit-for-bit as it was.
+--
+-- (Concretely: with the paths recorded, a constructor @yes@ declared in
+-- @§ Alpha@ stops being an ancestor of an unrelated @§ Gamma@, so a reference
+-- to @yes@ from @§ Gamma@ that used to pick the constructor becomes ambiguous
+-- against a same-typed value @yes@ in @§ Beta@ — and, in the other direction, a
+-- previously-ambiguous pair silently resolves to the top-level one. Neither
+-- belongs in a fix about spelling.)
+addQualifiedAliases :: CheckInfo -> Check CheckInfo
+addQualifiedAliases ci = do
+  qualRs <- qualifiedAliases ci.names
+  pure $ makeKnownMany (ci.names <> qualRs) ci.checkEntity
 
 -- ----------------------------------------------------------------------------
 -- Phase 1: Scan & Check Type Declarations (DECLARE & ASSUME)
@@ -2651,7 +2705,23 @@ inferTyDeclDeclare (MkDeclare ann _tysig appForm t) = prune $
   errorContext (WhileCheckingDeclare (getName appForm)) do
     lookupDeclTypeSigByAnno ann >>= \ declHead -> do
         extendKnownMany declHead.tyVars do
-          extendTySynonym <- inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
+          -- The section-qualified aliases must be regenerated here, not merely
+          -- inherited from 'scanTyDeclDeclare'. The scan-phase 'CheckInfo' (with
+          -- its qualified variants) is published only by 'withDeclareTypeSigs',
+          -- whose scope ends when the declare phase does; what survives into
+          -- 'inferProgram' is *this* 'CheckInfo', via 'withDeclares'. Without the
+          -- requalification a DECLARE'd type inside a section could not be named
+          -- as @`Section`.Type@ from anywhere outside the declare phase (#921).
+          -- We requalify the infer-phase entity rather than reuse
+          -- @declHead.name@ because only the former carries a type synonym's
+          -- expanded body (see 'inferTypeNameAndSynonym').
+          --
+          -- Aliases only ('addQualifiedAliases', not 'withQualified'): the type
+          -- name's section path was already recorded by 'scanTyDeclDeclare',
+          -- over the same 'Resolved's under the same section stack, so
+          -- re-recording it would be a no-op at best — and we want a guarantee,
+          -- not a coincidence, that this fix leaves resolution alone.
+          extendTySynonym <- addQualifiedAliases =<< inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
           (rt, extendsTyDecl) <- inferTypeDecl declHead.rappForm t
           -- See Note [Adding type information to all binders]
           -- TODO: if we did this later during typecheck, we would be
