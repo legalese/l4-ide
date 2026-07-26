@@ -385,7 +385,17 @@ combineResolvedImports uri imports =
          , TypeCheck.MkCheckEnv
              { TypeCheck.moduleUri = accEnv.moduleUri
              , TypeCheck.environment = Map.unionWith List.union accEnv.environment r.environment
-             , TypeCheck.entityInfo = Map.unionWith (\t1 t2 -> if t1 == t2 then t1 else t1) accEnv.entityInfo resolvedEntityInfo
+             -- Left-biased, deliberately. 'entityInfo' is keyed by 'Unique', so a
+             -- collision means the SAME entity reached us down two import paths (the
+             -- diamond case) and the two values agree; picking either is correct.
+             --
+             -- This was previously spelled @unionWith (\\t1 t2 -> if t1 == t2 then t1
+             -- else t1)@, which reads like a conflict check but has the same value in
+             -- both branches, so it was exactly 'Map.union' with extra steps. Written
+             -- out so nobody has to re-derive that. If genuine conflict DETECTION is
+             -- ever wanted here it is a real change, needs a diagnostic, and must be
+             -- tested against the diamond-import case.
+             , TypeCheck.entityInfo = Map.union accEnv.entityInfo resolvedEntityInfo
              , TypeCheck.functionTypeSigs = Map.empty
              , TypeCheck.declTypeSigs = Map.empty
              , TypeCheck.declareDeclarations = Map.empty

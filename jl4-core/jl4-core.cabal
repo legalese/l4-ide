@@ -103,6 +103,10 @@ library
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
+    L4.Dmn.IR
+    L4.Dmn.Lower
+    L4.Dmn.Emit
+    L4.Dmn.Markdown
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
