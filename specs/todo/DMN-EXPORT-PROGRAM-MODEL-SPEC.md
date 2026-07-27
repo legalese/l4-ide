@@ -1103,6 +1103,17 @@ nothing.
 
 ## 7. Fidelity notes
 
+> **Re-rule this section against
+> [`FIDELITY-SEVERITY-AXIS-SPEC.md`](./FIDELITY-SEVERITY-AXIS-SPEC.md) §5 before building any of
+> it** (that spec's W9). Two consequences to read first. (1) The `D-PARTIAL` and `D-RENAME` rows
+> below each assign **two severities to one code**; that is the effect axis smuggled into severity
+> before it had a name, and it becomes one severity plus one `FidelityEffect`. (2) The `D-SCOPE`
+> repurpose below would replace the predicate that is currently the tree's only detector of
+> duplicate `inputData/@name` — measured TP=185 / FP=0 / FN=0 over 507 artifacts, 36.5% of DMN
+> exports, not "universal". The type-conflict test may be **added** as a new, narrower code; the
+> existing predicate must not be deleted until something else reports the duplicate, because DMN 1.3
+> §7.3.4 makes that duplicate a violation of a normative `SHALL`.
+
 | Code               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                  | Rationale                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `D-SCOPE`          | **Repurpose.** Today it fires on "two Uniques, one FEEL name" (`Lower.hs:1245-1258`) — universal under GIVEN style, so pure noise. Replace the predicate with a **type conflict** test: two same-named terms with _different_ declared types.                                                                                                                                                                                           | `freeTermTypes` is a plain `Map.fromList` (`Lower.hs:1228`), i.e. **last-wins** — that is the genuine defect currently hidden behind the false positives. Also fix: the message hardcodes "two different terms" for 3+, anchors only to the first element's id, and its `lost:` text ("L4's lexical scoping of GIVEN parameters") is false when two global `ASSUME`s collide. |

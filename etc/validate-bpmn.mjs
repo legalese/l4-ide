@@ -6,10 +6,13 @@
 // specs/todo/lexipedia-superset/SPEC.md is exactly that claim, and this script
 // is the evidence for it.
 //
-// Run WITHOUT installing anything into this repo (its lockfile is drifted and a
-// new dependency would block CI):
+// Run WITHOUT installing anything into this repo:
 //
-//   npx --yes --package=bpmn-moddle node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/offering.bpmn
+//   npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/offering.bpmn
+//
+// PIN THE VERSION. Bare `--package=bpmn-moddle` resolves to whatever is newest
+// the day you run it, so the check silently changes underneath you; the version
+// asserted below is 10.x, and this invocation must agree with it.
 //
 // Exits non-zero on a parse error, a moddle warning, or a dangling reference.
 

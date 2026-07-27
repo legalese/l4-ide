@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_xor_join_after_rand"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:collaboration id="Collaboration_xor_join_after_rand">
+    <bpmn:participant id="Participant_xor_join_after_rand" name="an XOR join after a RAND" processRef="Process_xor_join_after_rand" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_xor_join_after_rand" name="an XOR join after a RAND" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_Resident" name="Resident">
+        <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2_Registrar" name="Registrar">
+        <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_3_Developer" name="Developer">
+        <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Join_0</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:parallelGateway id="Split_0" name="all of" gatewayDirection="Diverging">
+      <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_1" name="MAY file written comments">
+      <bpmn:documentation>PARTY Resident MAY file written comments</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:task id="Task_2" name="MAY publish the record">
+      <bpmn:documentation>PARTY Registrar MAY publish the record</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:endEvent id="End_3" name="Fulfilled" />
+    <bpmn:task id="Task_4" name="MAY file a response">
+      <bpmn:documentation>PARTY Developer MAY file a response</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Join_0" gatewayDirection="Converging">
+      <bpmn:documentation>THE DEFECT: an exclusive gateway used to merge the two branches of a
+        RAND. It passes each arriving token straight through instead of waiting
+        for both, so the RAND's two tokens each fire it once and everything
+        downstream of it happens TWICE.</bpmn:documentation>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_1" sourceRef="Split_0" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_4" sourceRef="Split_0" targetRef="Task_4" />
+    <bpmn:sequenceFlow id="Flow_Task_1__Task_2" sourceRef="Task_1" targetRef="Task_2" />
+    <bpmn:sequenceFlow id="Flow_Task_2__Join_0" sourceRef="Task_2" targetRef="Join_0" />
+    <bpmn:sequenceFlow id="Flow_Task_4__Join_0" sourceRef="Task_4" targetRef="Join_0" />
+    <bpmn:sequenceFlow id="Flow_Join_0__End_3" sourceRef="Join_0" targetRef="End_3" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_xor_join_after_rand">
+      <bpmndi:BPMNShape id="Shape_Participant_xor_join_after_rand" bpmnElement="Participant_xor_join_after_rand" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="1130" height="640" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_Resident" bpmnElement="Lane_1_Resident" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2_Registrar" bpmnElement="Lane_2_Registrar" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_3_Developer" bpmnElement="Lane_3_Developer" isHorizontal="true">
+        <dc:Bounds x="160" y="400" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="560" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="602" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
+        <dc:Bounds x="405" y="595" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="560" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
+        <dc:Bounds x="740" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
+        <dc:Bounds x="1132" y="602" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
+        <dc:Bounds x="560" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Join_0" bpmnElement="Join_0" isMarkerVisible="true">
+        <dc:Bounds x="945" y="595" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+        <di:waypoint x="268" y="620" />
+        <di:waypoint x="314" y="620" />
+        <di:waypoint x="405" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_1" bpmnElement="Flow_Split_0__Task_1">
+        <di:waypoint x="455" y="620" />
+        <di:waypoint x="494" y="620" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="560" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_4" bpmnElement="Flow_Split_0__Task_4">
+        <di:waypoint x="455" y="620" />
+        <di:waypoint x="546" y="620" />
+        <di:waypoint x="546" y="460" />
+        <di:waypoint x="560" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__Task_2" bpmnElement="Flow_Task_1__Task_2">
+        <di:waypoint x="660" y="140" />
+        <di:waypoint x="674" y="140" />
+        <di:waypoint x="674" y="300" />
+        <di:waypoint x="740" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_2__Join_0" bpmnElement="Flow_Task_2__Join_0">
+        <di:waypoint x="840" y="300" />
+        <di:waypoint x="854" y="300" />
+        <di:waypoint x="854" y="620" />
+        <di:waypoint x="945" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__Join_0" bpmnElement="Flow_Task_4__Join_0">
+        <di:waypoint x="660" y="460" />
+        <di:waypoint x="726" y="460" />
+        <di:waypoint x="726" y="520" />
+        <di:waypoint x="906" y="520" />
+        <di:waypoint x="906" y="620" />
+        <di:waypoint x="945" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Join_0__End_3" bpmnElement="Flow_Join_0__End_3">
+        <di:waypoint x="995" y="620" />
+        <di:waypoint x="1034" y="620" />
+        <di:waypoint x="1132" y="620" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
