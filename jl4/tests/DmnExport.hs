@@ -223,6 +223,20 @@ decisionChain =
   \fee MEANS\n\
   \  IF `is holiday` THEN 0 ELSE 10\n"
 
+-- | Names of the kind an L4 drafter actually writes, and that FEEL cannot carry
+-- verbatim: a space, a hyphen, and both at once. Every engine-facing naming
+-- assertion in this file runs over this fixture.
+spacedNames :: Text
+spacedNames =
+  "ASSUME `annual income` IS A NUMBER\n\
+  \ASSUME `first-time issuer` IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \`investor limit` MEANS\n\
+  \  BRANCH\n\
+  \    IF `first-time issuer` THEN 0\n\
+  \    IF `annual income` AT LEAST 1000 THEN 1\n\
+  \    OTHERWISE 2\n"
+
 -- | A decomposable guard whose SUBJECT is a FEEL BUILTIN invocation. The cell is
 -- a perfectly ordinary constant endpoint, and the column is genuinely
 -- executable — but @modulo(n, 2)@ is outside S-FEEL, which is where every
@@ -702,7 +716,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- and the inlined local's own conjuncts get decomposed too, so the third
       -- tier shares the `offering amount` column rather than hiding inside an
       -- opaque boolean one
-      map (.icExpr.feText) t.dtInputs `shouldBe` ["offering amount", "first time"]
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["offering_amount", "first_time"]
       map cellTexts t.dtRules
         `shouldBe` [ ["<= 100000", "-"]
                    , ["<= 500000", "-"]
@@ -1072,6 +1086,93 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       xml `shouldSatisfy` Text.isInfixOf "xmlns=\"https://www.omg.org/spec/DMN/20191111/MODEL/\""
       xml `shouldSatisfy` Text.isInfixOf "hitPolicy=\"UNIQUE\""
 
+  -- Every assertion here corresponds to a measured engine failure, not to a
+  -- reading of the DMN specification. See
+  -- specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §13.2, and etc/kie-dmn-check +
+  -- etc/camunda-dmn-check, which run the real engines over the golden.
+  describe "FEEL names an engine can actually resolve" $ do
+    it "maps a space and a hyphen to _, and never leaves either in a FEEL name" $ do
+      feelIdentText "annual income" `shouldBe` "annual_income"
+      feelIdentText "first-time issuer" `shouldBe` "first_time_issuer"
+      -- A dot used to pass through, which silently injects a FEEL PATH
+      -- expression and shadows a genuine record projection.
+      feelIdentText "a.b" `shouldBe` "a_b"
+      -- Runs collapse and the ends are trimmed, so the result is never `__`.
+      feelIdentText "  a  --  b  " `shouldBe` "a_b"
+      feelIdentText "" `shouldBe` "_"
+      feelIdentText "---" `shouldBe` "_"
+      feelIdentText "2nd tranche" `shouldBe` "_2nd_tranche"
+
+    it "gives a node and its variable the SAME @name (the engines read different ones)" $ do
+      -- KIE resolves an inputData by the NODE's @name; Camunda by the
+      -- <variable>'s. The emitter used to mangle only the latter, so the same
+      -- file was rejected by both, for opposite reasons: KIE fired
+      -- VARIABLE_NAME_MISMATCH and then failed to build, Camunda 8 rejected the
+      -- whole DRG at parse().
+      let xml = emitDrg (drgOf spacedNames)
+      xml `shouldSatisfy` Text.isInfixOf
+        "<inputData id=\"input_first_time_issuer\" name=\"first_time_issuer\" \
+        \label=\"first-time issuer\">"
+      xml `shouldSatisfy` Text.isInfixOf
+        "<variable id=\"input_first_time_issuer_var\" name=\"first_time_issuer\" \
+        \label=\"first-time issuer\" typeRef=\"boolean\"/>"
+
+    it "puts the verbatim L4 name in @label, so mangling costs nothing to read" $ do
+      let xml = emitDrg (drgOf spacedNames)
+      xml `shouldSatisfy` Text.isInfixOf "label=\"annual income\""
+      xml `shouldSatisfy` Text.isInfixOf "label=\"investor limit\""
+
+    it "omits @label when the FEEL name is the L4 name" $
+      -- `class`, `score`, `fee`: no mangling happened, so there is nothing to
+      -- record, and a label repeating the name would be noise in every diff.
+      emitDrg (drgOf considerConstructors) `shouldNotSatisfy` Text.isInfixOf "label=\"score\""
+
+    it "leaves no space in any emitted FEEL text" $ do
+      -- The Camunda failure mode is silent, not loud: `annual income` parses as
+      -- `annual` `in` `come` and evaluates to false. A name-shaped FEEL text
+      -- with a space in it is therefore a wrong answer waiting to happen.
+      let xml = emitDrg (drgOf spacedNames)
+      xml `shouldNotSatisfy` Text.isInfixOf "annual income<"
+      xml `shouldNotSatisfy` Text.isInfixOf "first-time issuer<"
+      xml `shouldSatisfy` Text.isInfixOf "<text>annual_income</text>"
+
+    it "gives a single-output table's <output> no @name and no @typeRef" $ do
+      -- DMN 8.2.11: an output clause is named only so a MULTI-output result can
+      -- be keyed. KIE fires ILLEGAL_USE_OF_NAME and ILLEGAL_USE_OF_TYPEREF
+      -- otherwise -- six warnings on the Reg CF exhibit alone.
+      let xml = emitDrg (drgOf spacedNames)
+      xml `shouldSatisfy` Text.isInfixOf "<output id=\"decision_investor_limit_o1\"/>"
+      xml `shouldNotSatisfy` Text.isInfixOf "<output id=\"decision_investor_limit_o1\" name="
+      -- ...but the IR still carries both, because dmnmd's header needs them and
+      -- a multi-output table will.
+      (tableOf "investor limit" spacedNames).dtOutput.ocName `shouldBe` "investor_limit"
+
+  describe "engine flavors (R7)" $ do
+    it "defaults to camunda" $ do
+      defaultDmnFlavor `shouldBe` FlavorCamunda
+      (drgOf spacedNames).drgFlavor `shouldBe` FlavorCamunda
+
+    it "names the flavor in the fidelity report, not just the notation" $ do
+      -- The report is generated from the same Drg the document is. One that said
+      -- only "DMN 1.3 (XML)" would be describing a file the reader cannot
+      -- identify, which is the failure class this exporter exists to close.
+      (dmnReport (drgFlavored FlavorCamunda "T" spacedNames)).target
+        `shouldBe` "DMN 1.3 (XML), camunda flavor"
+      (dmnReport (drgFlavored FlavorKie "T" spacedNames)).target
+        `shouldBe` "DMN 1.3 (XML), kie flavor"
+
+    it "EXPECTED TO FAIL AT PHASE 5: the two flavors are still byte-identical" $ do
+      -- The one thing the flavors differ on is whether a <decisionService> may
+      -- be the target of a <knowledgeRequirement> (§13.4), and neither
+      -- decision services nor BKMs are emitted yet. So today the bit has no
+      -- observable effect -- which is exactly the trap this test exists to
+      -- spring. When Phase 5 lands, THIS TEST MUST FAIL, and the fix is to
+      -- split the goldens (reg-cf.kie.dmn beside reg-cf.dmn), not to delete it.
+      emitDrg (drgFlavored FlavorCamunda "T" spacedNames)
+        `shouldBe` emitDrg (drgFlavored FlavorKie "T" spacedNames)
+      emitDrg (drgFlavored FlavorCamunda "Regulation Crowdfunding" considerConstructors)
+        `shouldBe` emitDrg (drgFlavored FlavorKie "Regulation Crowdfunding" considerConstructors)
+
   describe "dmnmd markdown (the second emitter over the same IR)" $ do
     it "renders a table as a pipe table, with the hit policy as the first header cell" $ do
       let md = emitMarkdown (drgOf considerConstructors)
@@ -1244,8 +1345,27 @@ drgNamed name src = case checkWithImports emptyVFS src of
           )
     | otherwise ->
         lowerModule
-          MkDmnLowerOptions {dloModelName = name, dloSubstitution = tc.tcdSubstitution}
+          MkDmnLowerOptions
+            { dloModelName    = name
+            , dloSubstitution = tc.tcdSubstitution
+            , dloFlavor       = defaultDmnFlavor
+            }
           tc.tcdModule
+
+-- | As 'drgNamed', for the one flavor that is not the default. Kept separate so
+-- that every other test in this file continues to exercise what the CLI emits
+-- when the caller says nothing.
+drgFlavored :: DmnFlavor -> Text -> Text -> Drg
+drgFlavored flavor name src = case checkWithImports emptyVFS src of
+  Left errs -> error ("source failed to parse: " <> show errs)
+  Right tc ->
+    lowerModule
+      MkDmnLowerOptions
+        { dloModelName    = name
+        , dloSubstitution = tc.tcdSubstitution
+        , dloFlavor       = flavor
+        }
+      tc.tcdModule
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of

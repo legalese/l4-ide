@@ -72,7 +72,7 @@ import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Dmn.Emit (emitDrg)
-import L4.Dmn.IR (dmnReport, drgDecisions)
+import L4.Dmn.IR (DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
@@ -112,6 +112,7 @@ data ExportOptions = ExportOptions
   , exportFidelity     :: Bool
   , exportRule         :: Maybe Text
   , exportModelName    :: Maybe Text
+  , exportFlavor       :: Maybe DmnFlavor
   , exportDeadlineUnit :: Maybe DeadlineUnitPolicy
   , exportFailOn       :: FidelityGate
   }
@@ -126,6 +127,19 @@ exportTargetReader = eitherReader \input ->
     other      -> Left $
       "Invalid export target: " <> Text.unpack other
         <> " (expected dmn|dmn-md|bpmn)"
+
+-- | @drools@ is accepted as a synonym for @kie@ because that is what the engine
+-- is called in half its own documentation; @camunda@ means Camunda 8, which is
+-- an unrelated implementation to Camunda 7 and the only one of the two that can
+-- execute a BKM (see 'DmnFlavor').
+dmnFlavorReader :: ReadM DmnFlavor
+dmnFlavorReader = eitherReader \input ->
+  case Text.toLower (Text.pack input) of
+    "camunda" -> Right FlavorCamunda
+    "kie"     -> Right FlavorKie
+    "drools"  -> Right FlavorKie
+    other     -> Left $
+      "Invalid --flavor: " <> Text.unpack other <> " (expected camunda|kie)"
 
 deadlineUnitReader :: ReadM DeadlineUnitPolicy
 deadlineUnitReader = eitherReader \input ->
@@ -187,6 +201,18 @@ exportOptionsParser = ExportOptions
             )
         )
   <*> optional
+        ( option dmnFlavorReader
+            ( long "flavor"
+           <> metavar "ENGINE"
+           <> showDefaultWith (const "camunda")
+           <> help
+                "DMN only: which engine to shape the document for. camunda (the default, \
+                \= Camunda 8) | kie (= Drools). The two differ on exactly one thing: whether a \
+                \<decisionService> may be the target of a <knowledgeRequirement>. Camunda 8 \
+                \rejects the whole file at parse() if it is, so that shape is kie-only."
+            )
+        )
+  <*> optional
         ( option deadlineUnitReader
             ( long "deadline-unit"
            <> metavar "POLICY"
@@ -239,7 +265,7 @@ exportCmd opts = do
       hPutStrLn stderr "Type checking failed — cannot export"
       exitFailure
 
--- | Three of the flags belong to exactly one side of the command. Silently
+-- | Four of the flags belong to exactly one side of the command. Silently
 -- ignoring one the caller took the trouble to type is a small lie of the same
 -- family the fidelity report exists to stop, so say so and stop.
 checkTargetFlags :: ExportOptions -> IO ()
@@ -253,7 +279,11 @@ checkTargetFlags opts = case misplaced of
  where
   (owner, candidates) = case opts.exportTarget of
     TargetBpmn ->
-      ("--to=dmn / --to=dmn-md", [("--model-name", isJust opts.exportModelName)])
+      ( "--to=dmn / --to=dmn-md"
+      , [ ("--model-name", isJust opts.exportModelName)
+        , ("--flavor",     isJust opts.exportFlavor)
+        ]
+      )
     _ ->
       ( "--to=bpmn"
       , [ ("--rule",          isJust opts.exportRule)
@@ -281,6 +311,7 @@ exportDmn opts tcRes = do
           MkDmnLowerOptions
             { dloModelName    = modelName
             , dloSubstitution = tcRes.substitution
+            , dloFlavor       = fromMaybe defaultDmnFlavor opts.exportFlavor
             }
           tcRes.module'
   when (null (drgDecisions drg)) do

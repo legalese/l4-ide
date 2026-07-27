@@ -192,6 +192,62 @@ runL4EmbeddedOnlyIn mCwd bin args = do
   createDirectoryIfMissing True emptyXdg
   runL4WithXdgHomeIn mCwd emptyXdg bin args
 
+----------------------------------------------------------------------------
+-- The DMN engine harnesses
+----------------------------------------------------------------------------
+
+-- | Run one of the committed engine checkers over the shipped DMN golden.
+--
+-- __Why this is opt-in.__ @cabal test all@ must stay hermetic and network-free:
+-- these harnesses need a JDK and Maven, and on a cold cache Maven reaches the
+-- network. So the block runs only under @L4_DMN_ENGINE_CHECK=1@, which makes it
+-- a deliberate choice rather than an accident of what happens to be installed.
+--
+-- __Why the assertion is on the banner and not on the exit code.__ A checker
+-- that cannot run exits 0 — that is the skip contract, and it is the right
+-- behaviour on a laptop without Java. But "exit 0" is then ambiguous between
+-- \"the engine looked at the file and was happy\" and \"nothing happened\". The
+-- harnesses print a @VERDICT@ line only when they actually ran, so asserting the
+-- banner closes that gap. A skip is reported through 'pendingWith', which hspec
+-- renders as @# PENDING@ and counts separately from a pass.
+--
+-- __Why CI cannot skip.__ The CI job sets @KIE_CHECK_REQUIRED=1@ and
+-- @CAMUNDA_CHECK_REQUIRED=1@, which turn every skip path inside the scripts into
+-- exit 1. In CI, an unavailable checker is a failure.
+--
+-- __Why a missing script is a failure even locally.__ Absent /tooling/ is a fact
+-- about the machine; an absent /harness/ is a fact about the repo, and would
+-- mean this test has silently stopped testing anything.
+dmnEngineCheck :: String -> FilePath -> String -> (String -> Expectation) -> Expectation
+dmnEngineCheck label script requiredVar assertBanner = do
+  enabled <- lookupEnv "L4_DMN_ENGINE_CHECK"
+  case enabled of
+    Just "1" -> do
+      haveScript <- doesFileExist script
+      unless haveScript $
+        expectationFailure (label ++ " harness missing from the repo: " ++ script)
+      Output code sout serr <- runL4In Nothing Nothing script [dmnGolden, "--ctx", dmnEngineContext]
+      let banner = "VERDICT:"
+      if banner `isInfixOf` sout
+        then do
+          unless (code == ExitSuccess) $
+            expectationFailure
+              (label ++ " reported a problem in " ++ dmnGolden
+                 ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+          assertBanner sout
+        else
+          -- No banner: the harness skipped (or died before running). Locally
+          -- that is a pending; in CI the script itself has already exited 1
+          -- because <requiredVar> is set, so we never reach here.
+          pendingWith
+            (label ++ " UNEXERCISED: the checker did not run (set " ++ requiredVar
+               ++ "=1 to make this a failure). " ++ oneLineOf serr)
+    _ ->
+      pendingWith
+        (label ++ " UNEXERCISED: set L4_DMN_ENGINE_CHECK=1 to run the engine checks")
+ where
+  oneLineOf = unwords . words
+
 -- | Assert the CLI exited 0 with a given substring on stdout.
 expectOk :: FilePath -> [String] -> String -> IO ()
 expectOk bin args expectedSubstring = do
@@ -346,6 +402,18 @@ dmnMarkdownGolden = "examples/dmn/expected/reg-cf.dmn.md"
 dmnModelName :: String
 dmnModelName = "Regulation Crowdfunding"
 
+-- The two committed engine harnesses, and the input context they evaluate the
+-- golden against. These paths are relative to jl4/, which is this suite's
+-- working directory.
+--
+-- The context's KEYS ARE FEEL NAMES, not L4 names: `annual_income`, not
+-- `annual income`. That is not a detail of the harness, it is the thing being
+-- checked — see specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §5.2 and §13.2.
+kieCheckScript, camundaCheckScript, dmnEngineContext :: FilePath
+kieCheckScript     = ".." </> "etc" </> "kie-dmn-check" </> "run.sh"
+camundaCheckScript = ".." </> "etc" </> "camunda-dmn-check" </> "run.sh"
+dmnEngineContext   = "examples/dmn/reg-cf.ctx.json"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -386,7 +454,7 @@ main = do
        , shadowExtraEntry, shadowImporterEntry
        , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
-       , dmnSource, dmnGolden, dmnMarkdownGolden ] \fp -> do
+       , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineContext ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1078,6 +1146,82 @@ spec bin = do
 
     it "fails on a file that does not typecheck" $
       expectFail bin ["export", "--to=dmn", errorFixture]
+
+    -- --flavor (R7). The two flavors differ on exactly one construct, and that
+    -- construct is not emitted until Phase 5, so today the flag is observable
+    -- only in the fidelity report's target line. That is deliberate: the seam
+    -- and its goldens land before the divergence does, so that when the
+    -- divergence arrives it has somewhere to be checked.
+    describe "--flavor" $ do
+      it "defaults to camunda, and says so in the report rather than just 'DMN'" $ do
+        Output code _ serr <- runL4 bin
+          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("DMN 1.3 (XML), camunda flavor" `isInfixOf`)
+
+      it "accepts kie, and drools as a synonym for it" $
+        for_ ["kie", "drools"] \flavor -> do
+          Output code _ serr <- runL4 bin
+            [ "export", "--to=dmn", dmnSource, "--model-name", dmnModelName
+            , "--flavor=" ++ flavor, "--fidelity-report" ]
+          code `shouldBe` ExitSuccess
+          serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
+
+      it "EXPECTED TO FAIL AT PHASE 5: the two flavors still emit the same bytes" $ do
+        -- The companion of the identity test in jl4/tests/DmnExport.hs, through
+        -- the CLI rather than the library. When decision services land this
+        -- must go red; the fix is to split the goldens, not to delete the test.
+        Output _ camunda _ <- runL4 bin
+          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
+        Output _ kie _ <- runL4 bin
+          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+        kie `shouldBe` camunda
+        golden <- readUtf8 dmnGolden
+        camunda `shouldBe` golden
+
+      it "is legal on --to=dmn-md, because the flavor lives in the IR both emitters read" $ do
+        Output code sout _ <- runL4 bin
+          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+        code `shouldBe` ExitSuccess
+        golden <- readUtf8 dmnMarkdownGolden
+        sout `shouldBe` golden
+
+      it "rejects --flavor on a BPMN export instead of ignoring it" $ do
+        Output code _ serr <- runL4 bin
+          ["export", "--to=bpmn", bpmnOfferingSource, "--flavor=kie"]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
+        serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+
+      it "rejects an unknown flavor, naming the accepted ones" $ do
+        Output code _ serr <- runL4 bin
+          ["export", "--to=dmn", dmnSource, "--flavor=camunda7"]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("Invalid --flavor" `isInfixOf`)
+        serr `shouldSatisfy` ("camunda|kie" `isInfixOf`)
+
+  -- The two real DMN engines, over the shipped golden. See
+  -- `dmnEngineCheck` below for the skip contract and why the assertion is on
+  -- the harness's VERDICT banner rather than on its exit code.
+  describe "DMN engine checks (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "Drools/KIE 8.44.0.Final validates, builds and evaluates the golden" $
+      dmnEngineCheck "KIE" kieCheckScript "KIE_CHECK_REQUIRED" \out -> do
+        -- Not just "0 errors": the emitted names used to fire six
+        -- ILLEGAL_USE_OF_NAME / ILLEGAL_USE_OF_TYPEREF warnings and then two
+        -- hard errors, and the file did not build at all. Pinning the warning
+        -- count here (rather than inside the harness, whose validator is known
+        -- to over-report) means relaxing it takes a visible edit.
+        out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+        out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+        out `shouldSatisfy` ("5/5 decision(s) SUCCEEDED" `isInfixOf`)
+
+    it "Camunda 8.7.6 parses and evaluates the golden" $
+      dmnEngineCheck "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" \out -> do
+        -- Camunda 8 fails whole-file at parse(), so "1 parsed" is the load-bearing
+        -- claim; the golden used to be rejected outright.
+        out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+        out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+        out `shouldSatisfy` ("5/5 decision(s) evaluated" `isInfixOf`)
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

@@ -129,29 +129,41 @@ definitionsXml drg =
     ]
     (map nodeXml drg.drgNodes <> [dmndiXml drg])
 
+-- | @id@, a FEEL-safe @name@, and — only when mangling changed something — the
+-- verbatim L4 name as @label@.
+--
+-- __The node's @\@name@ and its variable's @\@name@ must be the same string.__
+-- The two engines bind the FEEL name off different attributes: KIE resolves an
+-- @inputData@ by the node's @\@name@, Camunda by the @\<variable\>@'s. This
+-- emitter used to mangle only the latter, which is why the shipped golden was
+-- rejected by both, for opposite reasons — KIE with @VARIABLE_NAME_MISMATCH@ and
+-- then a build failure, Camunda 8 at @parse()@. Measured; see
+-- @specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@ §13.2.
+--
+-- @label@ is an attribute of @tDMNElement@, so it is available on every element
+-- type this emitter names. It is what makes the mangling cost nothing in
+-- readability: the L4 name is still in the file, just not in the place FEEL
+-- reads.
+namedAttrs :: Text -> Text -> [(Text, Text)]
+namedAttrs eid nm =
+  [("id", eid), ("name", feel)] <> [("label", nm) | feel /= nm]
+ where
+  feel = feelIdentText nm
+
 nodeXml :: DrgNode -> Xml
 nodeXml = \case
   NodeInputData i ->
-    Elem "inputData" [("id", i.idId), ("name", i.idName)]
-      -- The element's `name` is the L4 name as written, for a human; the
-      -- variable's is the FEEL name a decision's expressions actually use.
-      -- These differ only for names FEEL cannot carry verbatim.
+    Elem "inputData" (namedAttrs i.idId i.idName)
       [ Elem "variable"
-          [ ("id", i.idId <> "_var")
-          , ("name", feelIdentText i.idName)
-          , ("typeRef", dmnTypeAttr i.idType)
-          ]
+          (namedAttrs (i.idId <> "_var") i.idName <> [("typeRef", dmnTypeAttr i.idType)])
           []
       ]
   NodeDecision d ->
-    Elem "decision" [("id", d.dcnId), ("name", d.dcnName)] $
+    Elem "decision" (namedAttrs d.dcnId d.dcnName) $
       -- tDecision is an xsd:sequence: variable, then informationRequirement*,
       -- then the expression.
       [ Elem "variable"
-          [ ("id", d.dcnId <> "_var")
-          , ("name", feelIdentText d.dcnName)
-          , ("typeRef", dmnTypeAttr d.dcnType)
-          ]
+          (namedAttrs (d.dcnId <> "_var") d.dcnName <> [("typeRef", dmnTypeAttr d.dcnType)])
           []
       ]
         <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
@@ -192,9 +204,23 @@ inputXml c =
         [Elem "text" [] [Chars c.icExpr.feText]]
     ]
 
+-- | The single output clause.
+--
+-- __No @\@name@ and no @\@typeRef@.__ DMN 8.2.11 gives an output clause a name
+-- only so that a multi-output table's result can be keyed; with one output the
+-- result /is/ the value, and KIE says so out loud — @ILLEGAL_USE_OF_NAME@ and
+-- @ILLEGAL_USE_OF_TYPEREF@, six warnings on the Reg CF exhibit alone. Dropping
+-- both takes KIE to 0 errors and 0 warnings, leaves Camunda 8 byte-for-byte
+-- unchanged in its answers, and loses nothing a reader needs: the decision's own
+-- @\<variable typeRef\>@ carries the type, and @decisionTable\/\@outputLabel@
+-- carries the name. (Measured on all three engines; §13.2.)
+--
+-- 'OutputColumn' keeps both fields regardless, because "L4.Dmn.Markdown" needs
+-- them — a dmnmd header is @name (out) : Type@ — and because a multi-output
+-- table is a live Phase 4 item.
 outputXml :: OutputColumn -> Xml
 outputXml o =
-  Elem "output" [("id", o.ocId), ("name", o.ocName), ("typeRef", dmnTypeAttr o.ocType)] $
+  Elem "output" [("id", o.ocId)] $
     -- tOutputClause: outputValues? then defaultOutputEntry?. We never emit
     -- outputValues, because we only know the values a table happens to mention,
     -- not the domain -- and asserting a domain we have not checked is exactly the

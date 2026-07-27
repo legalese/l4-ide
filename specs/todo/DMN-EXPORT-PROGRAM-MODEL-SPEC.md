@@ -982,6 +982,13 @@ names), not a correctness fix. What _is_ broken today is narrower and worse:
    place that does not go through it. KIE fires `VARIABLE_NAME_MISMATCH` **and then fails to
    build**. Added 2026-07-27; measured, see §13.2.
 
+> **Status, 2026-07-27.** Items **1 and 4 are FIXED** and both engines are green on the
+> re-blessed golden (§13.7). Items **2 and 3 are still open**: type names still go through the
+> same function, and no reserved-word suffix is applied. §5.2's stage 1 is implemented as far as
+> step 5; step 6 and the whole of stage 2 (`uniquifyIn`) remain Phase 2 work, so distinct L4
+> names can still collapse onto one FEEL name. The `@label` pairing means such a collision is
+> visible in the file rather than silent, which it was not before.
+
 ### 5.2 The policy
 
 `@name` carries a FEEL-safe identifier; `@label` carries the verbatim L4 name. `label` is an
@@ -1609,13 +1616,39 @@ against the goldens and probes while writing this section, from a clean Maven re
 
 ### 13.7 Sequencing consequences
 
-| Phase | Added or changed by R7                                                                                                                                                                                                                        |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **0** | `feelBase` uniformly on node `@name`, `variable/@name` and references (§5.2, §13.2). **Currently a red gate: the shipped golden fails both engines.** Drop `output/@name` + `output/@typeRef` on single-output tables. Re-bless `reg-cf.dmn`. |
-| **0** | Commit `etc/kie-dmn-check/` and `etc/camunda-dmn-check/`, wire both into `l4-cli-test`, add the CI job. Ordered **with** the naming fix, not after it — the harness is what proves the fix.                                                   |
-| **0** | `DmnFlavor`, `dloFlavor`, `drgFlavor`, `--flavor`, and the byte-identity test of §13.6. No output change.                                                                                                                                     |
-| **2** | Unchanged: §5.2 is now known to be a shared fix, so no flavor branch here.                                                                                                                                                                    |
-| **5** | BKM emission for **both** flavors (§13.3 retires the gate). `decisionService` per `§` for both flavors as grouping; `knowledgeRequirement` → service for `kie` only; `D-FLAVOR-NOSERVICE`. **This is where the goldens split.**               |
+| Phase    | Added or changed by R7                                                                                                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0** ✅ | `feelBase` uniformly on node `@name`, `variable/@name` and references (§5.2, §13.2). Was a red gate: the shipped golden failed both engines. Drop `output/@name` + `output/@typeRef` on single-output tables. Re-bless goldens. |
+| **0** ✅ | Commit `etc/kie-dmn-check/` and `etc/camunda-dmn-check/`, wire both into `l4-cli-test`, add the CI job. Ordered **with** the naming fix, not after it — the harness is what proves the fix.                                     |
+| **0** ✅ | `DmnFlavor`, `dloFlavor`, `drgFlavor`, `--flavor`, and the byte-identity test of §13.6. No output change.                                                                                                                       |
+| **2**    | Unchanged: §5.2 is now known to be a shared fix, so no flavor branch here.                                                                                                                                                      |
+| **5**    | BKM emission for **both** flavors (§13.3 retires the gate). `decisionService` per `§` for both flavors as grouping; `knowledgeRequirement` → service for `kie` only; `D-FLAVOR-NOSERVICE`. **This is where the goldens split.** |
+
+**Phase 0 landed 2026-07-27.** Verbatim, from the committed harnesses over the re-blessed
+`jl4/examples/dmn/expected/reg-cf.dmn`:
+
+```
+KIE 8.44.0.Final VERDICT: 1 file(s), 0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 1 parsed, 0 error(s), 5/5 decision(s) evaluated
+```
+
+Three deviations from the letter of §13.5/§13.6, all deliberate:
+
+1. **`feelIdentText` implements steps 2–5 of §5.2's stage 1, not all six, and no stage 2.**
+   NFC normalisation, the reserved-word suffix and `uniquifyIn` stay in Phase 2: the first
+   two are independent of R7, and `uniquifyIn` needs a whole-DRG traversal rather than a
+   per-name function. Two L4 names can therefore still collapse onto one FEEL name. That is
+   pre-existing (the old mapping was also non-injective), it is not what either engine was
+   failing on, and every mangled `@name` now carries a verbatim `@label` so a reader can see
+   which L4 name a node came from.
+2. **Spelling: `flavor`, not `flavour`** — §13.5 wrote the report target as
+   `"DMN 1.3 (XML), camunda flavour"` once, against the American spelling used by `--flavor`
+   and by every heading in this section. The code says `flavor` throughout.
+3. **The CI job runs the two scripts directly, not `cabal test l4-cli-test` with
+   `L4_DMN_ENGINE_CHECK=1`.** Same check, same file, but the script route needs no GHC, so
+   the gate is a small Java job rather than a second full Haskell build. The hspec leg is
+   still wired and is the developer-facing entry point; `KIE_CHECK_REQUIRED` /
+   `CAMUNDA_CHECK_REQUIRED` do the not-allowed-to-skip work either way.
 
 ### 13.8 What was not measured
 

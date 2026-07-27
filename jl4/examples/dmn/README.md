@@ -3,16 +3,21 @@
 The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-superset
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
-| File                              | What it is                                                              |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `reg-cf.l4`                       | the source: five decisions, one of each shape the exporter can produce  |
-| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                 |
-| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                     |
-| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                       |
-| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list         |
+| File                              | What it is                                                             |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `reg-cf.l4`                       | the source: five decisions, one of each shape the exporter can produce |
+| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                |
+| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                    |
+| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                      |
+| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list        |
+| `reg-cf.ctx.json`                 | the input context the two engine harnesses evaluate the XML against    |
 
 Both goldens are produced by `jl4/tests/DmnExport.hs`; regenerate them by deleting the
 file and re-running `cabal test jl4:jl4-test`.
+
+`reg-cf.ctx.json` is hand-written, not generated, and its keys are **FEEL** names
+(`annual_income`, not `annual income`). That is not a quirk of the harness — it is the
+thing being checked; see "Running it through the real engines" below.
 
 ## The pipeline
 
@@ -123,6 +128,52 @@ markdown rests on dmnmd alone. They are not two independent checks of the same t
 Set `DMNMD=<path to the cabal-built dmnmd>` to make the script exercise the markdown leg
 too; without it that leg is skipped.
 
+## Running it through the real engines
+
+Two committed harnesses take `expected/reg-cf.dmn` to the two engines that matter and
+report what the **engine** says, which is a different question from what a schema or a
+metamodel parser says:
+
+```sh
+etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --ctx jl4/examples/dmn/reg-cf.ctx.json
+etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn --ctx jl4/examples/dmn/reg-cf.ctx.json
+```
+
+| Harness                    | Engine                                | Legs                                                                 | JDK  |
+| -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ---- |
+| `etc/kie-dmn-check/`       | Drools/KIE `8.44.0.Final`             | Xerces XSD, KIE validator, `KieBuilder`, `evaluateAll` + services    | 17   |
+| `etc/camunda-dmn-check/`   | Camunda 8 `8.7.6` (`io.camunda:zeebe-dmn`) | `parse()` + `isValid()`, `evaluateDecisionById`                      | 21+  |
+
+Zero-install, exactly like `etc/validate-dmn.mjs`: Maven resolves each classpath into
+`$TMPDIR`, nothing is written into the repo, and `package.json` and the lockfile are
+untouched. Both **skip loudly** — `SKIP <checker>: <reason>` on stderr and exit 0 — when
+the toolchain is absent, and neither prints its `VERDICT` banner when it skips. Set
+`KIE_CHECK_REQUIRED=1` / `CAMUNDA_CHECK_REQUIRED=1` to turn every skip path into a
+failure; the `dmn-engines` CI job does, so **in CI an unavailable checker is a failure**.
+
+The same two harnesses are wired into `l4-cli-test` behind `L4_DMN_ENGINE_CHECK=1`:
+
+```sh
+cd jl4 && L4_DMN_ENGINE_CHECK=1 cabal test l4-cli-test
+```
+
+Absent the variable those two examples are reported `PENDING … UNEXERCISED`, never as
+passes, so a green run always says which engine actually looked at the artifact.
+
+**Why this exists.** Until 2026-07-27 this exhibit was checked by `dmn-moddle` and by an
+ad-hoc KIE run that was never committed — and the committed golden was, at that point,
+rejected by **both** engines: KIE fired `VARIABLE_NAME_MISMATCH` and then failed to
+build, and Camunda 8 rejected the whole DRG at `parse()`. The cause was that FEEL names
+kept their spaces and only half of each name was mangled. The engines bind the FEEL name
+off different attributes — KIE off the node's `@name`, Camunda off the `<variable>`'s —
+so doing half of each fails both, for opposite reasons. `@name` now carries a FEEL-safe
+identifier and `@label` the verbatim L4 name. See
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §5.2 and §13.
+
+The Camunda failure was the bad kind: `annual income` does not fail to resolve, it parses
+as `annual` `in` `come`. That is why the harnesses count a decision that evaluates to
+`null` as a failure rather than reading statuses alone.
+
 ## From the CLI
 
 Track **S0** is wired: both goldens in this directory are reproducible byte-for-byte
@@ -147,5 +198,16 @@ A one-line tally goes to stderr either way, whether or not the flag was passed.
 report holds `blocking` notes — `blocking` describes what DMN cannot express (see
 below), and this exhibit has one. Pass `--fail-on=blocking|lossy|advisory` if a
 pipeline wants a gate.
+
+`--flavor camunda|kie` picks which engine the document is shaped for; `camunda` (meaning
+Camunda 8) is the default, and `drools` is accepted as a synonym for `kie`. The two
+differ on exactly one thing: whether a `<decisionService>` may be the target of a
+`<knowledgeRequirement>`. Camunda 8 rejects the whole file at `parse()` if it is, and KIE
+runs that shape correctly — so it is `kie`-only. **Neither construct is emitted yet**
+(that is Phase 5), so today the two flavors produce identical bytes and the flag is
+visible only in the fidelity report's target line. Both `jl4/tests/DmnExport.hs` and
+`jl4/tests-cli/Main.hs` pin that identity as a test which is _expected to fail_ when
+Phase 5 lands; the fix then is to split the goldens, not to delete the test. The ruling
+is `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §13.
 
 The **service** surface (track **S2**) is still to come.

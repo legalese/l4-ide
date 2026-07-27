@@ -30,6 +30,7 @@ jobs:
       haskell: ${{ steps.filter.outputs.haskell }}
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
+      dmn: ${{ steps.filter.outputs.dmn }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -66,6 +67,17 @@ jobs:
             docs:
               - 'doc/**'
               - 'specs/**'
+            # The DMN artifacts and the two engine harnesses that read them. A
+            # change to the emitter shows up under 'haskell' as well, but the
+            # goldens themselves are .dmn/.json and the harnesses are Java and
+            # shell, none of which any other filter matches — and it is exactly
+            # a hand-edited golden that most needs an engine to look at it.
+            dmn:
+              - 'jl4-core/src/L4/Dmn/**'
+              - 'jl4/examples/dmn/**'
+              - 'etc/kie-dmn-check/**'
+              - 'etc/camunda-dmn-check/**'
+              - 'etc/validate-dmn.mjs'
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
@@ -277,6 +289,82 @@ jobs:
         with:
           path: dist-newstyle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+  # ============================================
+  # DMN: both engines, over the committed goldens
+  # ============================================
+  #
+  # THE POINT OF THIS JOB IS THAT IT CANNOT SKIP. Both harnesses skip loudly and
+  # exit 0 when the toolchain is missing, which is right on a laptop and wrong in
+  # CI; KIE_CHECK_REQUIRED / CAMUNDA_CHECK_REQUIRED turn every one of those paths
+  # into exit 1. If the JDKs or Maven are not there, this job fails rather than
+  # quietly reporting green.
+  #
+  # It runs the scripts DIRECTLY rather than through `cabal test l4-cli-test`
+  # with L4_DMN_ENGINE_CHECK=1. The two do the same check on the same file, but
+  # the script route needs no GHC, so this stays a small Java job instead of a
+  # second full Haskell build. The hspec leg in jl4/tests-cli/Main.hs remains the
+  # developer-facing entry point (one command, same harnesses); neither pretends
+  # to be the other.
+  #
+  # Two JDKs, on purpose: KIE/Drools 8.x is measured on 17, and zeebe-dmn 8.7.x
+  # is compiled to class file 65 and needs 21+. They also must not share a
+  # classpath — feel-engine 1.19.x-scala-shaded (Camunda 7) and 1.18.3 (Camunda
+  # 8) collide — which is why there are two directories under etc/.
+  dmn-engines:
+    name: DMN Engine Checks (KIE + Camunda)
+    needs: changes
+    if: needs.changes.outputs.dmn == 'true' || needs.changes.outputs.haskell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17 (KIE/Drools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21 (Camunda 8 / zeebe-dmn)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache the Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: dmn-engines-m2-${{ hashFiles('etc/kie-dmn-check/pom.xml', 'etc/camunda-dmn-check/pom.xml') }}
+          restore-keys: |
+            dmn-engines-m2-
+
+      - name: Drools/KIE 8.44.0.Final
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --ctx jl4/examples/dmn/reg-cf.ctx.json | tee kie.log
+          # The harness prints VERDICT only when it actually ran, so grepping for
+          # it is what stops "exited 0 and did nothing" reading as a pass.
+          grep -q 'VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED' kie.log
+
+      - name: Camunda 8.7.6 (zeebe-dmn)
+        env:
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --ctx jl4/examples/dmn/reg-cf.ctx.json | tee camunda.log
+          grep -q 'VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated' camunda.log
+
+      - name: dmn-moddle (DMN 1.3 metamodel)
+        run: npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
 
   # ============================================
   # WASM Build & Test (only when Haskell changes)

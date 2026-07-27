@@ -212,12 +212,23 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- ^ the typechecker's final substitution, used to resolve inference
     -- variables into @typeRef@s. 'Map.empty' is fine; every unresolved type
     -- simply becomes @Any@.
+  , dloFlavor       :: !DmnFlavor
+    -- ^ which engine the document is aimed at. It is a __lowering__ option and
+    -- not a post-hoc XML rewrite for three reasons, in order of force
+    -- (@specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@ §13.5): the FEEL /text/ of
+    -- a call site differs and cannot be recovered from a @\<text\>@ node after
+    -- the fact; the fidelity report is generated from this same IR, so a rewrite
+    -- would ship a report describing a different artifact — the "valid per the
+    -- validator, wrong in the engine" failure this whole exercise exists to
+    -- close, one layer up; and Camunda 8 fails at @parse()@ whole-file, so "emit
+    -- the rich form and strip later" has no safe intermediate.
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
 defaultDmnLowerOptions = MkDmnLowerOptions
   { dloModelName    = "L4"
   , dloSubstitution = Map.empty
+  , dloFlavor       = defaultDmnFlavor
   }
 
 ------------------------------------------------------------------------
@@ -1502,6 +1513,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     { drgId        = "definitions_" <> modelId
     , drgName      = opts.dloModelName
     , drgNamespace = "https://legalese.com/l4/dmn/" <> modelId
+    , drgFlavor    = opts.dloFlavor
     , drgNodes     = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
     , drgNotes     = sharedInputNotes <> concatMap snd lowered
     }

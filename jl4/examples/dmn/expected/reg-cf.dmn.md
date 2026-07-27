@@ -4,7 +4,7 @@
 
 ## `is accredited investor`
 
-| F | class : String | is accredited investor (out) : Boolean |
+| F | class : String | is_accredited_investor (out) : Boolean |
 | --- | --- | --- |
 | 1 | accredited | true |
 | 2 | institutional | true |
@@ -12,7 +12,7 @@
 
 ## `financial statements required`
 
-| F | offering amount : Number | first_time issuer : Boolean | financial statements required (out) : String |
+| F | offering_amount : Number | first_time_issuer : Boolean | financial_statements_required (out) : String |
 | --- | --- | --- | --- |
 | 1 | <= 107000 | - | certified by the principal executive officer |
 | 2 | <= 535000 | - | reviewed by an independent public accountant |
