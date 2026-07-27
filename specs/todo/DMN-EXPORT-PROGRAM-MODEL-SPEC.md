@@ -1181,6 +1181,7 @@ may be obsolete by the time either side ships.
   exists in the session scratchpad; run it, with a genuinely-gapped table as positive control.
 
   **Phrase the resulting claim carefully.** Two different things get called "DMN's analysis":
+
   1. the **analysable fragment** — a mathematical property (Calvanese et al.), vendor-independent
      and true of the artifact whether or not anyone runs a checker;
   2. an **implementation** of completeness/overlap checking, which appears to vary by vendor and
