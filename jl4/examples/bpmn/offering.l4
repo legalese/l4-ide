@@ -1,0 +1,44 @@
+-- A miniature of the Reg CF obligation tail, written to exercise the BPMN
+-- exporter on the shape that matters.
+--
+-- Lexipedia draws this tail as a straight line: check limits -> prepare
+-- disclosures -> select intermediary -> comply with advertising restrictions ->
+-- prepare ongoing reporting -> understand resale restrictions. It is not a
+-- line. These are concurrent obligations with different bearers and different
+-- temporal extents: one is a filing with a deadline, one is a standing
+-- prohibition on the issuer for the life of the offering, and the resale
+-- restriction binds a different party altogether for a period afterwards.
+-- Drawing them in sequence invents an ordering the regulation does not impose.
+--
+-- So the tail is RAND, and the exporter has to say so with a parallel gateway.
+--
+-- This file is a fixture for `jl4/tests/BpmnExport.hs`, not a formalisation of
+-- 17 CFR 227. The figures and periods are illustrative.
+
+DECLARE Party IS ONE OF Issuer, Intermediary, Investor
+
+DECLARE Step IS ONE OF
+  `file the offering statement`
+  `check the investor limit`
+  `advertise the terms`
+  `file the annual report`
+  `resell the securities`
+
+`the offering` MEANS
+  PARTY Issuer
+  MUST `file the offering statement`
+  WITHIN 21
+  HENCE
+        (PARTY Intermediary MUST `check the investor limit` WITHIN 7
+          HENCE FULFILLED
+          LEST BREACH BY Intermediary BECAUSE "the investor limit was not checked")
+   RAND (PARTY Issuer SHANT `advertise the terms` WITHIN 30
+          HENCE FULFILLED
+          LEST BREACH BY Issuer BECAUSE "advertised the terms of the offering")
+   RAND (PARTY Issuer MUST `file the annual report` WITHIN 120
+          HENCE FULFILLED
+          LEST BREACH BY Issuer BECAUSE "no annual report was filed")
+   RAND (PARTY Investor SHANT `resell the securities` WITHIN 365
+          HENCE FULFILLED
+          LEST BREACH BY Investor BECAUSE "resold within the restricted period")
+  LEST BREACH BY Issuer BECAUSE "no offering statement was filed"

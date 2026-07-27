@@ -1,6 +1,34 @@
 # BUILD SPEC — `dmnmd --to=l4` (BRANCH + ditto) and the l4-ide ditto codegen tweak
 
-Status: design / build plan. Two coordinated deliverables across two repos.
+> ## Status: **DISCHARGED — retained as reference, not as a plan**
+>
+> Both parts shipped. Part A is `languages/haskell/src/DMN/Translate/L4.hs` in `smucclaw/dmnmd`
+> (merged in its PR #15); Part B is `jl4-core/src/L4/Print/Columnar.hs` here. The golden
+> round-trip of §7 exists as `languages/haskell/test/TranslateL4Spec.hs` in dmnmd.
+>
+> **This document is kept because the code cites it.** dmnmd's `L4.hs` refers to numbered
+> sections of this spec in more than twenty comments (§1.2, §1.4, §3, §8, §9.6 …), so the
+> section numbers are load-bearing: deleting the file orphans those references, and renumbering
+> breaks them. Read the cited section before changing behaviour it pins.
+>
+> **Do not read the imperative voice below as current intent.** Where it says "CREATE",
+> "MODIFY" or "wired into `stack test`", that describes work already done, and in one case done
+> differently: dmnmd's test suite now runs under `cabal test`, dmnmd having become cabal-only.
+> Sections 4 and 5 are a record of how the code got its shape, not a to-do list.
+>
+> Known drift, not worth rewriting the body for:
+>
+> - §4.4 says to modify `dmnmd.cabal`; that is now correct, but was not while the file was
+>   generated from `package.yaml` by hpack.
+> - §7's `stack test` is `cabal test`.
+> - §1.6 defers Collect to "v1.1". It is still deferred, and deliberately: `L4.hs` `error`s on
+>   the list-valued hit policies rather than collapsing them to a scalar `BRANCH`, which is
+>   pinned by `test/corpus/cases/policy/md-l4-refuses-collect`.
+>
+> This header mirrors the one added to dmnmd's copy in `2e510eb`; that commit's "both build
+> specs" meant both specs **in dmnmd**, and this copy was missed.
+
+Two coordinated deliverables across two repos.
 
 - **Part A — dmnmd:** a new `--to=l4` backend that transpiles a DMN decision table to L4
   source text, emitting a `BRANCH` expression with column-aligned **ditto (`^`)**.
@@ -143,11 +171,13 @@ round-trip is a **semantic** equivalence check, not a byte-exact one (see §7).
   > **Erratum (2026-07-26).** This section previously asserted that _"inline multi-field record
   > literals on one line do NOT parse — L4 record literals are layout-sensitive."_ **That is
   > false.** A record literal's fields are a comma-separated `NamedExpr` list (`Parser.hs:2082`),
-  > and the one-line form parses and evaluates: `Rec WITH \`a\` IS 1, \`b\` IS "hi"`gives`Check succeeded.`and evaluates to`Rec OF 1, "hi"` (verified by execution). The guidance
+  > and the one-line form parses and evaluates — ``Rec WITH `a` IS 1, `b` IS "hi"`` gives
+  > `Check succeeded.` and evaluates to `Rec OF 1, "hi"` (verified by execution). The guidance
   > below still stands on its own merits — see the note at the end of this section — but not for
   > the stated reason.
 
   Each arm (and the `OTHERWISE`) may return the record in any of three forms:
+
   - **inline one-line literal** — `<Name> WITH f1 IS v1, f2 IS v2`. Parses; simplest for a
     generator emitting one arm per line;
 

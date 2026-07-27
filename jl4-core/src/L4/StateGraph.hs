@@ -16,12 +16,15 @@
 --   - Fulfilled → terminal success state
 --   - Breach → terminal failure state
 --   - WITHIN deadline → temporal guard on transition
+--   - RAND → an @AllOf@ junction: every branch runs
+--   - ROR  → a @OneOf@ junction: exactly one branch runs
 module L4.StateGraph
   ( -- * Types
     StateGraph(..)
   , ContractState(..)
   , StateId
   , StateType(..)
+  , FanKind(..)
   , Transition(..)
   , TransitionLabel(..)
   , TransitionType(..)
@@ -80,6 +83,7 @@ data ContractState = ContractState
   { stateId   :: StateId
   , stateName :: Text      -- ^ Human-readable name (e.g., "purchase template", "Fulfilled")
   , stateType :: StateType
+  , stateFan  :: FanKind   -- ^ How this state's outgoing transitions relate
   } deriving (Eq, Show)
 
 -- | Classification of states for rendering
@@ -88,6 +92,26 @@ data StateType
   | IntermediateState      -- ^ Normal intermediate state
   | TerminalFulfilled      -- ^ Success terminal (double circle, green)
   | TerminalBreach         -- ^ Failure terminal (double circle, red)
+  deriving (Eq, Show)
+
+-- | How the transitions leaving a state relate to one another.
+--
+-- A 'Linear' state is an ordinary automaton state: its outgoing transitions
+-- are the HENCE\/LEST alternatives of a single obligation, and exactly one of
+-- them fires depending on what the party does.
+--
+-- A junction ('AllOf' or 'OneOf') is not an obligation at all but a control
+-- point introduced by regulative @RAND@ \/ @ROR@. Its outgoing transitions are
+-- unlabelled and each leads to the /entry state of one branch/, so the branch
+-- set is exactly the junction's out-edges — which is what a downstream
+-- exporter needs in order to choose a parallel versus an exclusive gateway.
+--
+-- Without this the two operators are indistinguishable in the IR: both simply
+-- fan transitions out of one state, and a reader has to supply the intent.
+data FanKind
+  = Linear   -- ^ Ordinary state; not a junction
+  | AllOf    -- ^ @RAND@: every branch is entered (concurrent obligations)
+  | OneOf    -- ^ @ROR@: exactly one branch is entered (choice)
   deriving (Eq, Show)
 
 -- | A transition between states
@@ -152,14 +176,24 @@ data ExtractState = ExtractState
 
 type ExtractM = St.State ExtractState
 
--- | Create a new state and return its ID
+-- | Create a new state and return its ID. States start out 'Linear'; a state
+-- becomes a junction only when 'markFan' is applied to it.
 newState :: Text -> StateType -> ExtractM StateId
 newState name stype = do
   st <- St.get
   let sid = st.esNextId
-      s = ContractState sid name stype
+      s = ContractState sid name stype Linear
   St.put st { esNextId = sid + 1, esStates = s : st.esStates }
   pure sid
+
+-- | Turn an existing state into a junction of the given kind.
+markFan :: StateId -> FanKind -> ExtractM ()
+markFan sid kind = St.modify $ \st ->
+  st { esStates = map retag st.esStates }
+  where
+    retag s
+      | s.stateId == sid = s { stateFan = kind }
+      | otherwise        = s
 
 -- | Add a transition
 addTransition :: StateId -> StateId -> TransitionLabel -> TransitionType -> ExtractM ()
@@ -237,15 +271,11 @@ extractExpr :: Maybe StateId -> Expr Resolved -> ExtractM ()
 extractExpr mFromState expr = case expr of
   Regulative _ obl -> extractDeonton mFromState obl
 
-  RAnd _ e1 e2 -> do
-    -- Parallel composition: both obligations must be fulfilled
-    extractExpr mFromState e1
-    extractExpr mFromState e2
+  -- Parallel composition: every branch must be fulfilled.
+  RAnd{} -> extractFan AllOf mFromState (flattenRAnd expr)
 
-  ROr _ e1 e2 -> do
-    -- Choice: either obligation can be fulfilled
-    extractExpr mFromState e1
-    extractExpr mFromState e2
+  -- Choice: exactly one branch is taken.
+  ROr{}  -> extractFan OneOf mFromState (flattenROr expr)
 
   Where _ e _ -> extractExpr mFromState e
   LetIn _ _ e -> extractExpr mFromState e
@@ -261,9 +291,95 @@ extractExpr mFromState expr = case expr of
 
   _ -> pure ()  -- Skip other expressions
 
--- | Check if a name refers to Fulfilled
+-- | Check if a name refers to the FULFILLED terminal.
+--
+-- The keyword is spelled @FULFILLED@ in source; the builtin behind it is
+-- @fulfil@, renamed for presentation (see 'L4.TypeCheck.Environment'). Neither
+-- spelling is @\"Fulfilled\"@, which is what this predicate used to compare
+-- against — so an explicit @HENCE FULFILLED@ never matched, fell through to
+-- the \"unknown target\" case, and produced a dangling intermediate state
+-- called @next@ instead of an edge to the shared terminal. The mixed-case
+-- spelling is kept only because it costs nothing.
 isFulfilled :: Resolved -> Bool
-isFulfilled name = resolvedToText name == "Fulfilled"
+isFulfilled name = resolvedToText name `elem` ["FULFILLED", "fulfil", "Fulfilled"]
+
+--------------------------------------------------------------------------------
+-- Junctions (RAND / ROR)
+--------------------------------------------------------------------------------
+
+-- | Flatten an associative chain of @RAND@ into its branches, so that
+-- @a RAND b RAND c@ yields one three-way junction rather than two nested
+-- two-way ones. Works for either associativity.
+flattenRAnd :: Expr Resolved -> [Expr Resolved]
+flattenRAnd = \case
+  RAnd _ e1 e2 -> flattenRAnd e1 <> flattenRAnd e2
+  e            -> [e]
+
+-- | As 'flattenRAnd', for @ROR@.
+flattenROr :: Expr Resolved -> [Expr Resolved]
+flattenROr = \case
+  ROr _ e1 e2 -> flattenROr e1 <> flattenROr e2
+  e           -> [e]
+
+-- | Extract a regulative @RAND@ \/ @ROR@ as an explicit junction.
+--
+-- The state we arrive in /becomes/ the junction — arriving somewhere and then
+-- splitting is one event, not two — and each branch gets its own entry state
+-- hanging off it. That keeps the branch set recoverable: the junction's
+-- out-edges are exactly the branches, one apiece, and nothing else.
+extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
+extractFan kind mFromState branches = do
+  junction <- case mFromState of
+    Just sid -> pure sid
+    Nothing  -> newState "initial" InitialState
+  markFan junction kind
+  traverse_ (extractBranch junction) branches
+
+-- | Extract one branch of a junction, wiring the junction to its entry state.
+extractBranch :: StateId -> Expr Resolved -> ExtractM ()
+extractBranch junction branch = case classifyTarget branch of
+  -- A branch that is just FULFILLED or BREACH has no work in it, so it needs
+  -- no entry state: the junction points straight at the terminal.
+  TargetFulfilled -> do
+    fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+    addTransition junction fulfilledId fanLabel DefaultTransition
+
+  TargetBreach -> do
+    breachId <- getTerminalState "Breach" TerminalBreach
+    addTransition junction breachId fanLabel DefaultTransition
+
+  TargetDeonton obl -> do
+    entryId <- newState (describeDeonton obl) IntermediateState
+    addTransition junction entryId fanLabel DefaultTransition
+    extractDeonton (Just entryId) obl
+
+  TargetOther -> do
+    entryId <- newState (branchStateName branch) IntermediateState
+    addTransition junction entryId fanLabel DefaultTransition
+    -- A nested RAND/ROR marks this very state as the inner junction.
+    extractExpr (Just entryId) branch
+
+-- | Name for the entry state of a branch that is neither a bare obligation
+-- nor a terminal.
+branchStateName :: Expr Resolved -> Text
+branchStateName expr = case expr of
+  RAnd{}      -> "all of"
+  ROr{}       -> "one of"
+  App _ n _   -> resolvedToText n
+  Where _ e _ -> branchStateName e
+  LetIn _ _ e -> branchStateName e
+  _           -> "branch"
+
+-- | The edge from a junction to a branch entry carries no action of its own:
+-- a junction is a control point, not a task.
+fanLabel :: TransitionLabel
+fanLabel = TransitionLabel
+  { labelParty    = Nothing
+  , labelModal    = Nothing
+  , labelAction   = ""
+  , labelDeadline = Nothing
+  , labelGuard    = Nothing
+  }
 
 -- | Extract an obligation as a state transition
 extractDeonton :: Maybe StateId -> Deonton Resolved -> ExtractM ()
@@ -379,7 +495,7 @@ data Target
 -- | Classify what a HENCE/LEST expression points to
 classifyTarget :: Expr Resolved -> Target
 classifyTarget = \case
-  App _ name [] | resolvedToText name == "Fulfilled" -> TargetFulfilled
+  App _ name [] | isFulfilled name -> TargetFulfilled
   Breach{} -> TargetBreach
   Regulative _ obl -> TargetDeonton obl
   Where _ e _ -> classifyTarget e
@@ -438,40 +554,73 @@ stateGraphToDot opts sg =
 -- | Build an FGL graph from a StateGraph
 buildFGLGraph :: StateGraphOptions -> StateGraph -> ContractGraph
 buildFGLGraph opts StateGraph{..} =
-  let nodes = map (stateToNode opts) sgStates
-      edges = map (transitionToEdge opts) sgTransitions
+  let fanOf sid = maybe Linear (.stateFan) (find (\s -> s.stateId == sid) sgStates)
+      nodes = map (stateToNode opts) sgStates
+      edges = map (\t -> transitionToEdge opts (fanOf t.transFrom) t) sgTransitions
   in FGL.mkGraph nodes edges
 
 -- | Convert a ContractState to an FGL node
 stateToNode :: StateGraphOptions -> ContractState -> LNode NodeAttrs
 stateToNode _ ContractState{..} =
-  let (fillColor, shape, style) = case stateType of
-        InitialState       -> ("#e8f4fd", "ellipse", "filled")
-        IntermediateState  -> ("#ffffff", "ellipse", "filled")
-        TerminalFulfilled  -> ("#d4edda", "doublecircle", "filled")
-        TerminalBreach     -> ("#f8d7da", "doublecircle", "filled")
+  let (fillColor, shape, style) = case (stateFan, stateType) of
+        -- Junctions are drawn as diamonds and say outright which kind they
+        -- are; the fan-out is the whole point of the node.
+        (AllOf, _)                    -> (allOfColor, "diamond", "filled")
+        (OneOf, _)                    -> (oneOfColor, "diamond", "filled")
+        (Linear, InitialState)        -> ("#e8f4fd", "ellipse", "filled")
+        (Linear, IntermediateState)   -> ("#ffffff", "ellipse", "filled")
+        (Linear, TerminalFulfilled)   -> ("#d4edda", "doublecircle", "filled")
+        (Linear, TerminalBreach)      -> ("#f8d7da", "doublecircle", "filled")
       attrs = NodeAttrs
-        { naLabel     = stateName
+        { naLabel     = stateName <> fanSuffix stateFan
         , naFillColor = fillColor
         , naShape     = shape
         , naStyle     = style
         }
   in (stateId, attrs)
 
--- | Convert a Transition to an FGL edge
-transitionToEdge :: StateGraphOptions -> Transition -> LEdge EdgeAttrs
-transitionToEdge opts Transition{..} =
+-- | Fill colour for an @RAND@ junction (violet).
+allOfColor :: Text
+allOfColor = "#e6dcf5"
+
+-- | Fill colour for an @ROR@ junction (amber).
+oneOfColor :: Text
+oneOfColor = "#fde8cc"
+
+-- | The junction kind, spelled out on the node label so no reader has to
+-- infer it from the shape alone.
+fanSuffix :: FanKind -> Text
+fanSuffix = \case
+  Linear -> ""
+  AllOf  -> "\nALL OF"
+  OneOf  -> "\nONE OF"
+
+-- | Convert a Transition to an FGL edge. The 'FanKind' is that of the
+-- transition's source state: edges leaving a junction are branch selections,
+-- not obligations, and are drawn to match the junction.
+transitionToEdge :: StateGraphOptions -> FanKind -> Transition -> LEdge EdgeAttrs
+transitionToEdge opts fromFan Transition{..} =
   let label = formatTransitionLabel opts transLabel
-      (color, style) = case transType of
-        HenceTransition   -> ("#28a745", "solid")      -- Green for success
-        LestTransition    -> ("#dc3545", "dashed")     -- Red dashed for failure
-        DefaultTransition -> ("#6c757d", "solid")      -- Gray for neutral
+      (color, style) = case (transType, fromFan) of
+        (DefaultTransition, AllOf) -> (allOfEdgeColor, "solid")  -- Violet: every branch
+        (DefaultTransition, OneOf) -> (oneOfEdgeColor, "dotted") -- Amber: one branch
+        (HenceTransition, _)       -> ("#28a745", "solid")       -- Green for success
+        (LestTransition, _)        -> ("#dc3545", "dashed")      -- Red dashed for failure
+        (DefaultTransition, _)     -> ("#6c757d", "solid")       -- Gray for neutral
       attrs = EdgeAttrs
         { eaLabel = label
         , eaColor = color
         , eaStyle = style
         }
   in (transFrom, transTo, attrs)
+
+-- | Edge colour out of an @RAND@ junction.
+allOfEdgeColor :: Text
+allOfEdgeColor = "#6f42c1"
+
+-- | Edge colour out of an @ROR@ junction.
+oneOfEdgeColor :: Text
+oneOfEdgeColor = "#e8850c"
 
 -- | Format a transition label for display
 formatTransitionLabel :: StateGraphOptions -> TransitionLabel -> Text

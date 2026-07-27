@@ -25,6 +25,7 @@ import System.Directory
   , createFileLink
   , doesFileExist
   , getTemporaryDirectory
+  , makeAbsolute
   , removeFile
   , removePathForcibly
   )
@@ -53,8 +54,15 @@ import Test.Hspec
 -- 1. @L4_BIN@ environment variable (useful in CI and for manual runs).
 -- 2. @cabal list-bin exe:l4@ output (when running under cabal).
 -- 3. Walk up from the test binary's path to @dist-newstyle/.../l4@.
+--
+-- The result is always absolute: some tests run the binary from a different
+-- working directory (to exercise the @l4 check main.l4@ invocation form), and a
+-- relative binary path would not survive that.
 locateL4Binary :: IO FilePath
-locateL4Binary = do
+locateL4Binary = makeAbsolute =<< locateL4Binary'
+
+locateL4Binary' :: IO FilePath
+locateL4Binary' = do
   fromEnv <- lookupEnv "L4_BIN"
   case fromEnv of
     Just p -> do
@@ -116,12 +124,26 @@ runL4 = runL4WithEnv Nothing
 -- (e.g. dropping @JL4_LIBRARY_PATH@ to exercise the embedded-library fallback)
 -- regardless of what CI happens to export into the parent process.
 runL4WithEnv :: Maybe [(String, String)] -> FilePath -> [String] -> IO Output
-runL4WithEnv mEnv bin args = do
+runL4WithEnv = runL4In Nothing
+
+-- | Like 'runL4WithEnv', but also lets a test choose the child's working
+-- directory.
+--
+-- This matters for library resolution: the CLI derives its root directory from
+-- @takeDirectory@ of the entry path, so @l4 check main.l4@ run from inside the
+-- project (root directory @"."@) exercises a different resolution path than
+-- @l4 check some/dir/main.l4@ run from the package root. Every fixture path in
+-- this suite carries a directory component, so without this the @"."@ case is
+-- never covered — which is how the embedded stdlib came to outrank
+-- project-local libraries for a whole release without a red test.
+runL4In :: Maybe FilePath -> Maybe [(String, String)] -> FilePath -> [String] -> IO Output
+runL4In mCwd mEnv bin args = do
   let cp = (proc bin args)
         { std_in  = CreatePipe
         , std_out = CreatePipe
         , std_err = CreatePipe
         , env     = mEnv
+        , cwd     = mCwd
         }
   (Just hin, Just hout, Just herr, ph) <- createProcess cp
   hClose hin
@@ -142,24 +164,33 @@ runL4WithEnv mEnv bin args = do
 -- the ambient tiers). This is the dev regime the LIBRARY-RESOLUTION-SHADOW
 -- tests exercise — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
 runL4WithXdgHome :: FilePath -> FilePath -> [String] -> IO Output
-runL4WithXdgHome xdgHome bin args = do
+runL4WithXdgHome = runL4WithXdgHomeIn Nothing
+
+runL4WithXdgHomeIn :: Maybe FilePath -> FilePath -> FilePath -> [String] -> IO Output
+runL4WithXdgHomeIn mCwd xdgHome bin args = do
   parentEnv <- getEnvironment
   let childEnv =
         ("XDG_DATA_HOME", xdgHome)
           : filter (\(k, _) -> k /= "JL4_LIBRARY_PATH" && k /= "XDG_DATA_HOME")
                    parentEnv
-  runL4WithEnv (Just childEnv) bin args
+  runL4In mCwd (Just childEnv) bin args
 
 -- | Run l4 with library resolution forced onto the embedded-library fallback:
 -- no @JL4_LIBRARY_PATH@, and an /empty/ XDG store (so no user-level
 -- @~/.local/share/jl4/libraries@ on the runner interferes). This is the exact
 -- regime issue #906 is about.
 runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
-runL4EmbeddedOnly bin args = do
+runL4EmbeddedOnly = runL4EmbeddedOnlyIn Nothing
+
+-- | 'runL4EmbeddedOnly' from a caller-chosen working directory. Used to run the
+-- CLI the way a user does — @l4 check main.l4@ from inside the project — which
+-- makes the resolver's root directory @"."@.
+runL4EmbeddedOnlyIn :: Maybe FilePath -> FilePath -> [String] -> IO Output
+runL4EmbeddedOnlyIn mCwd bin args = do
   tmp <- getTemporaryDirectory
   let emptyXdg = tmp </> "l4-embedded-only-xdg"
   createDirectoryIfMissing True emptyXdg
-  runL4WithXdgHome emptyXdg bin args
+  runL4WithXdgHomeIn mCwd emptyXdg bin args
 
 -- | Assert the CLI exited 0 with a given substring on stdout.
 expectOk :: FilePath -> [String] -> String -> IO ()
@@ -289,6 +320,18 @@ shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "m
 shadowSiblingEntry  = fixtureDir </> "library-shadow" </> "sibling-wins"  </> "main.l4"
 shadowExtraEntry    = fixtureDir </> "library-shadow" </> "xdg-extra"     </> "main.l4"
 
+-- Directories of the shadow fixtures, for the tests that run the CLI from
+-- INSIDE the project (@l4 check main.l4@) rather than naming the fixture by a
+-- path with a directory component.
+shadowEmbeddedDir, shadowSiblingDir, shadowImporterDir :: FilePath
+shadowEmbeddedDir = fixtureDir </> "library-shadow" </> "embedded-wins"
+shadowSiblingDir  = fixtureDir </> "library-shadow" </> "sibling-wins"
+shadowImporterDir = fixtureDir </> "library-shadow" </> "embedded-importer"
+
+-- A project-local override of a module that an EMBEDDED library imports.
+shadowImporterEntry :: FilePath
+shadowImporterEntry = shadowImporterDir </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -305,7 +348,7 @@ main = do
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
-       , shadowExtraEntry ] \fp -> do
+       , shadowExtraEntry, shadowImporterEntry ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -711,6 +754,86 @@ spec bin = do
       -- must be called out.
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` ("Multiple differing copies of module `shadow-extra`" `isInfixOf`)
+
+  -- Precedence has to survive HOW THE ENTRY FILE IS SPELLED, and it has to
+  -- reach embedded importers, not just the top-level module. Neither property
+  -- was covered: every fixture path above carries a directory component, so
+  -- @rootDirectory@ was never "."; and no fixture put a project copy of a module
+  -- that an EMBEDDED library imports. Both gaps hid live precedence inversions.
+  describe "l4 library resolution: entry-path spelling and embedded importers" $ do
+    -- `l4 check main.l4`, run from inside the project — the ordinary way a user
+    -- invokes the CLI, and the one that makes the resolver's root directory ".".
+    let checkFrom dir = do
+          absDir <- makeAbsolute dir
+          runL4EmbeddedOnlyIn (Just absDir) bin ["check", "main.l4"]
+
+    it "a project-local prelude override wins when the entry file is named bare" $ do
+      -- Byte-for-byte the sibling-wins fixture the test above already uses, run
+      -- as `l4 check main.l4` instead of `l4 check <dir>/main.l4`. The verdict
+      -- must not depend on the spelling: main.l4 uses `shadow marker`, which
+      -- only the fixture's own prelude.l4 defines.
+      --
+      -- It used to. With rootDirectory ".", the root candidate URI for `prelude`
+      -- normalised to exactly the key the embedded stdlib was registered under,
+      -- and the VFS tier hit it before library resolution ran — so this exited 1
+      -- with "I could not find a definition for the identifier `shadow marker`".
+      Output code sout serr <- checkFrom shadowSiblingDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win for a bare entry\
+          \ path too, but l4 exited " ++ show n
+          ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+    it "the embedded stdlib still wins with a bare entry path when nothing shadows it" $ do
+      -- The other direction, so the fix above cannot be "never consult the
+      -- embedded stdlib": embedded-wins/main.l4 has no project-local prelude, so
+      -- the embedded copy must serve it.
+      Output code sout serr <- checkFrom shadowEmbeddedDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the embedded prelude to serve a bare entry path, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout
+          ++ "\n--- stderr ---\n" ++ serr
+
+    -- One module name, one source — including for importers that are themselves
+    -- embedded libraries. embedded-importer/daydate.l4 is a deliberately
+    -- narrower override of a module the embedded `actus-schedule` imports and
+    -- uses; binding `actus-schedule` to it must surface an arity error against
+    -- `actus-schedule` itself. Before the fix this checked CLEAN: `main` saw the
+    -- project `daydate` while `actus-schedule` quietly kept the embedded one.
+    --
+    -- The positive control is the `embedded-diamond` test above: the same
+    -- embedded closure with no project override checks clean.
+    let expectEmbeddedImporterSeesOverride label run =
+          it label $ do
+            Output code sout serr <- run
+            case code of
+              ExitFailure _ -> pure ()
+              ExitSuccess -> expectationFailure $
+                "Expected the embedded importer to be type-checked against the\
+                \ project-local daydate override (and so to report an arity\
+                \ error), but l4 exited 0 — one module name resolved to two\
+                \ different sources in one build."
+                ++ "\n--- stdout ---\n" ++ sout
+                ++ "\n--- stderr ---\n" ++ serr
+            -- The diagnostic must land on the EMBEDDED importer, which is the
+            -- whole point: that is the module that changed source.
+            serr `shouldSatisfy` ("actus-schedule" `isInfixOf`)
+            -- ...and the shadow warning must be telling the truth when it says
+            -- the chosen copy is used wherever the module is imported.
+            serr `shouldSatisfy` ("Multiple differing copies of module `daydate`" `isInfixOf`)
+            serr `shouldSatisfy` ("[chosen]   project root" `isInfixOf`)
+
+    expectEmbeddedImporterSeesOverride
+      "an embedded library sees the project-local override too"
+      (runL4EmbeddedOnly bin ["check", shadowImporterEntry])
+
+    expectEmbeddedImporterSeesOverride
+      "...and also when the entry file is named bare"
+      (checkFrom shadowImporterDir)
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $
