@@ -25,9 +25,6 @@ index.
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Who May Change the Rules** _(working title)_ | [`yc-safe/`](../specs/todo/yc-safe/SPEC-NOTES.md) · [`corporate-resolutions/`](../specs/todo/corporate-resolutions/SPEC-NOTES.md) · [`godel-loophole/`](../specs/todo/godel-loophole/SPEC-NOTES.md) | Self-reference in normative systems, across three worked instruments. **No directory yet, by design.** |
 
-_The first two spec-note links resolve once `docs/yc-safe-spec` and
-`docs/corporate-resolutions-spec` merge; only `docs/godel-loophole-spec` is on this branch._
-
 Three arcs that look unrelated are one problem. The YC SAFE's value depends on the valuation that
 depends on the SAFE — an **arithmetic fixpoint**. Corporate governance asks who may change the rule
 that says who may change the rules — **layered amendment authority**. Article V applies the amendment
