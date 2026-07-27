@@ -93,11 +93,21 @@ jobs:
   # is pure Node with no dependencies and no network, so this needs neither
   # `npm ci` nor a Haskell toolchain and cannot be blocked by lockfile drift.
   #
-  # NOT RUN HERE: `etc/check-bpmn-kie.sh` (the jBPM second opinion), because it
-  # downloads ~44 MB from Maven Central and is corroboration rather than a gate —
-  # see jl4/examples/bpmn/README.md. It is run by hand, and it SKIPS LOUDLY with
-  # a non-zero exit when its toolchain is absent, so it can be added here later
-  # without any risk of it passing silently.
+  # `etc/check-bpmn-kie.sh` (the jBPM second opinion) IS run here now. It was
+  # held back on cost — ~44 MB of jars from Maven Central — which the cache
+  # below reduces to a one-off per pom change. The artifacts are the community
+  # jBPM/Drools releases on **Maven Central** (`repo.maven.apache.org`); the pom
+  # declares no `<repositories>`, so nothing is fetched from Red Hat's own
+  # repository or from a GitHub URL, and every version is hard-pinned
+  # (`jbpm.version`, and the dependency *plugin* too, so `dependency:*` cannot
+  # resolve "whatever is newest today"). That pinning is what makes the cache
+  # key stable.
+  #
+  # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
+  # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
+  # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
+  # which is precisely what we want to hear about. Exit 4 is unsilenceable by
+  # design and stays that way.
   bpmn:
     name: BPMN Soundness
     needs: changes
@@ -126,6 +136,68 @@ jobs:
       # with. Pinned, and never added to package.json or the lockfile.
       - name: Validate against bpmn-moddle (the K4 acceptance signal)
         run: npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/*.bpmn jl4/examples/bpmn/sound/*.bpmn
+
+      # The independent second opinion. jBPM shares no code with bpmn-js, so its
+      # agreement that a diagram deadlocks is evidence our own token semantics
+      # are right rather than merely self-consistent.
+      #
+      # JDK 17: the harness accepts 11+, but Drools/jBPM 8.x is not happy on the
+      # newest JDKs, and an unpinned `java` has already once produced a stale
+      # JDK 14 that failed in a way which read as a diagram defect.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Keyed on every pom under etc/, so the DMN engine harnesses share this
+      # cache the moment they land rather than needing their own entry.
+      - name: Cache the pinned engine jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/l4-engines/repo
+          key: l4-engines-m2-${{ runner.os }}-${{ hashFiles('etc/**/pom.xml') }}
+
+      # `$HOME`, not `~`: an `env:` value is not shell-expanded, so `~` would
+      # reach Maven literally as `-Dmaven.repo.local=~/...` and create a
+      # directory called `~` in the checkout — while `actions/cache` above DOES
+      # expand `~`. The two would silently point at different places and the
+      # cache would miss on every run while appearing to work.
+      # Split deliberately, because the two fixture sets have different contracts
+      # and collapsing them would either block the repo or hide a regression.
+      #
+      #   sound/     MUST be clean. Measured exit 0 today. A finding here is a
+      #              regression and fails the build.
+      #   expected/  is real exporter output and reports ONE known finding today
+      #              (offering.bpmn, which the harness itself annotates "a
+      #              modelled terminal state, not a liveness defect" — and then
+      #              counts anyway). Measured exit 1. There is no baseline
+      #              mechanism in the harness, so exit 1 is tolerated HERE and
+      #              only here, while 2/3/4 still fail.
+      #
+      # Tolerating 1 loses the new-finding signal on expected/ until a baseline
+      # exists. That is a real gap, recorded rather than papered over; it does
+      # NOT weaken the toolchain gate, which is the reason this job exists.
+      - name: Second opinion — does an independent engine agree? (jBPM/KIE)
+        run: |
+          export L4_KIE_CACHE="$HOME/.cache/l4-engines"
+
+          echo "::group::sound/ — must be clean"
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/sound/*.bpmn
+          echo "::endgroup::"
+
+          echo "::group::expected/ — real exporter output"
+          set +e
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn
+          rc=$?
+          set -e
+          echo "::endgroup::"
+
+          case "$rc" in
+            0) ;;
+            1) echo "::notice::jBPM reported findings on expected/ (exit 1). Known and tolerated until the harness grows a baseline." ;;
+            *) echo "::error::jBPM check exited $rc — 2=usage, 3=SKIPPED (nothing was checked), 4=BROKEN (toolchain present, harness failed)."
+               exit "$rc" ;;
+          esac
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
