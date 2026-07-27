@@ -123,8 +123,29 @@ markdown rests on dmnmd alone. They are not two independent checks of the same t
 Set `DMNMD=<path to the cabal-built dmnmd>` to make the script exercise the markdown leg
 too; without it that leg is skipped.
 
-## Not yet wired
+## From the CLI
 
-There is no `l4 export --to=dmn` yet: the CLI and service surfaces are track **S0**/**S2**,
-which the programme spec sequences after both exporters land. For now `L4.Dmn.Emit.emitDrg`
-is a library entry point, exercised by the test suite.
+Track **S0** is wired: both goldens in this directory are reproducible byte-for-byte
+through `l4 export`, from a repo checkout with `jl4/` as the working directory.
+
+```sh
+l4 export --to=dmn    reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn
+l4 export --to=dmn-md reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn.md
+```
+
+`--model-name` matters: `lowerModule` takes the `<definitions>` name as a parameter
+rather than reading it off the module's URI, precisely so the emitted bytes do not
+depend on where the file lives. Without it the name defaults to the file's base name
+(`reg-cf`), and the `id`/`namespace` attributes change with it.
+
+Add `--fidelity-report` for the loss list — written to `<output>.fidelity.txt` when
+`-o` is given, and to stderr otherwise, so that a redirected document stays a document.
+A one-line tally goes to stderr either way, whether or not the flag was passed.
+
+`l4 export --to=dmn` refuses a module with no decisions in it, rather than emitting a
+`<definitions>` that opens as an empty canvas. It does **not** fail merely because the
+report holds `blocking` notes — `blocking` describes what DMN cannot express (see
+below), and this exhibit has one. Pass `--fail-on=blocking|lossy|advisory` if a
+pipeline wants a gate.
+
+The **service** surface (track **S2**) is still to come.

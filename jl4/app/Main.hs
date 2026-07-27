@@ -29,6 +29,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
+import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
@@ -49,6 +50,7 @@ data Command
   | CmdTrace      TraceOptions
   | CmdStateGraph StateGraphOptions
   | CmdRender     RenderOptions
+  | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
 
 commandParser :: Parser Command
@@ -83,6 +85,9 @@ commandParser =
       <> command "render"
            (info (CmdRender <$> renderOptionsParser)
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
+      <> command "export"
+           (info (CmdExport <$> exportOptionsParser)
+             (progDesc "Export an L4 file to a foreign interchange notation (dmn|dmn-md|bpmn) with a fidelity report"))
       <> command "openfisca"
            (info (CmdOpenFisca <$> openFiscaOptionsParser)
              (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
@@ -127,6 +132,7 @@ main = do
     CmdTrace      opts -> traceCmd      opts
     CmdStateGraph opts -> stateGraphCmd opts
     CmdRender     opts -> renderCmd     opts
+    CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
 
 -- Silence unused-imports warning when we only import Options for types

@@ -222,6 +222,12 @@ iterate until the check passes.
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
   graphs as GraphViz DOT.
+- `l4 export --to=dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
+  module out as DMN 1.3 XML, dmnmd markdown, or BPMN 2.0 XML. The
+  document goes to stdout (or `-o FILE`); `--fidelity-report` adds the
+  list of what the target notation could not carry, to `FILE.fidelity.txt`
+  beside `-o` or to stderr otherwise. A one-line tally of the losses is
+  printed to stderr either way.
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 

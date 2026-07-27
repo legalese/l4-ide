@@ -68,6 +68,7 @@ type DeploymentRoutesForSchema =
   :<|> "functions" :> Capture "name" Text :> "evaluation" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] FnArguments :> Post '[JSON] SimpleResponse
   :<|> "functions" :> Capture "name" Text :> "evaluation" :> "batch" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] BatchRequest :> Post '[JSON] BatchResponse
   :<|> "functions" :> Capture "name" Text :> "query-plan" :> ReqBody '[JSON] FnArguments :> Post '[JSON] QueryPlanResponse
+  :<|> "functions" :> Capture "name" Text :> "ladder" :> Get '[JSON] VizExpr.RenderAsLadderInfo
   :<|> "functions" :> Capture "name" Text :> "state-graphs" :> Get '[JSON] StateGraphListResponse
   :<|> "functions" :> Capture "name" Text :> "state-graphs" :> Capture "graphName" Text :> Get '[PlainText] Text
   :<|> "openapi.json" :> Get '[JSON] DeploymentMetadata

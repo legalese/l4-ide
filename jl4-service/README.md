@@ -129,6 +129,7 @@ Evaluate functions within a deployment. All routes are available in both short f
 | `POST` | `/deployments/{id}/functions/{fn}/evaluation`          | `/{id}/{fn}/evaluation`          |
 | `POST` | `/deployments/{id}/functions/{fn}/evaluation/batch`    | `/{id}/{fn}/evaluation/batch`    |
 | `POST` | `/deployments/{id}/functions/{fn}/query-plan`          | `/{id}/{fn}/query-plan`          |
+| `GET`  | `/deployments/{id}/functions/{fn}/ladder`              | `/{id}/{fn}/ladder`              |
 | `GET`  | `/deployments/{id}/functions/{fn}/state-graphs`        | `/{id}/{fn}/state-graphs`        |
 | `GET`  | `/deployments/{id}/functions/{fn}/state-graphs/{name}` | `/{id}/{fn}/state-graphs/{name}` |
 | `GET`  | `/deployments/{id}/openapi.json`                       | `/{id}/openapi.json`             |
@@ -220,6 +221,31 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+### Ladder Diagrams
+
+Fetch the AND/OR structure of a boolean `DECIDE` on its own, without posting an
+argument set:
+
+```bash
+curl http://localhost:8080/deployments/my-rules/functions/compute_qualifies/ladder
+```
+
+Returns a `RenderAsLadderInfo` — `{"verDocId": …, "funDecl": {"name", "params", "body"}}` —
+where `body` is the `And`/`Or`/`Not`/`Implies`/`UBoolVar`/`App` tree the IDE's ladder
+renderer consumes.
+
+This is **the same value** that every `query-plan` 200 already returns in its
+`ladder` field; both read one memoised structure per function, so the GET adds
+no information the POST did not already expose. Only `@export`ed,
+boolean-returning `DECIDE`s can be visualized — anything else is a `400`, as is
+any decision whose ladder exceeds `--max-ladder-nodes` (see [Resource
+Limits](#resource-limits)).
+
+> **Caveat.** The `atomId` on each ladder leaf is not currently in the same
+> namespace as the keys of `query-plan`'s `impactByAtomId`, so the two cannot be
+> joined. See `ladderHandler` in `src/DataPlane.hs` for why, and the `KNOWN GAP`
+> case in `test/IntegrationSpec.hs` for the pinned behaviour.
 
 ### MCP (Model Context Protocol)
 
@@ -317,11 +343,11 @@ The script registers tools based on the `data-tools` attribute. By default (`aut
 
 The proxy injects these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
 
-| Header                | Controls                                                               | Proxy permission |
-| --------------------- | ---------------------------------------------------------------------- | ---------------- |
-| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP | `l4:rules`       |
-| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`        |
-| `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate`    |
+| Header                | Controls                                                                     | Proxy permission |
+| --------------------- | ---------------------------------------------------------------------------- | ---------------- |
+| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP       | `l4:rules`       |
+| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP              | `l4:read`        |
+| `X-Include-Evaluate`  | Evaluation/batch/query-plan/ladder paths in OpenAPI, evaluation tools in MCP | `l4:evaluate`    |
 
 > **Note:** The legacy path `/webmcp.js` is redirected to `/.webmcp/embed.js` with a 301. Update existing embeds when convenient.
 
@@ -368,6 +394,7 @@ All options can also be set via environment variables. CLI arguments take preced
 | `--max-eval-memory-mb`      | `JL4_MAX_EVAL_MEMORY_MB`      | Per-evaluation allocation limit in MB                                                                                                                                                    | `256`            |
 | `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
 | `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
+| `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
@@ -397,6 +424,7 @@ The service enforces several resource limits to protect against abuse:
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
+- **Ladder size**: `query-plan` and `ladder` return `400` if the decision's ladder diagram exceeds `--max-ladder-nodes`. This bounds a _response_, not a runtime, which is why no timeout covers it: a ladder is drawn in AND/OR normal form, and reaching that form distributes OR over AND, so `(a AND b) OR (c AND d) OR …` over 2n variables becomes 2^n clauses. Eight variables serialize to 12 KB, sixteen to 366 KB, thirty-two to tens of megabytes. The default is far above any diagram a person could read and far below the pathological cases; raise it if a legitimate model meets it. The check short-circuits, so an oversized decision is refused in milliseconds rather than measured at length.
 
 ## Persistence
 

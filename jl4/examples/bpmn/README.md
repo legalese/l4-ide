@@ -44,7 +44,33 @@ real limitation of what this exporter draws today and it is stated here rather
 than left for a reader to infer from two goldens that both decline. Whether it
 can be relaxed is an open question recorded in the PR, not a settled one.
 
-Each produces two goldens under `expected/`:
+## From the CLI
+
+Track **S0** is wired, and "exactly as `l4` would write it" below is now literal
+rather than aspirational — both goldens for each fixture are reproducible
+byte-for-byte through `l4 export`, from a repo checkout with `jl4/` as the working
+directory:
+
+```sh
+l4 export --to=bpmn offering.l4 -o /tmp/offering.bpmn --fidelity-report
+diff /tmp/offering.bpmn          expected/offering.bpmn
+diff /tmp/offering.fidelity.txt  expected/offering.fidelity.txt
+```
+
+Without `-o` the XML goes to stdout and the report to stderr, so a redirected
+document stays a document. A one-line tally of the losses goes to stderr whether or
+not `--fidelity-report` was passed.
+
+Two flags are specific to this side:
+
+- `--rule NAME` picks which regulative rule to draw. A BPMN document holds exactly
+  one process and `renderBpmn` writes its own XML prolog, so a file with more than
+  one rule is refused rather than concatenated; the refusal names the candidates.
+- `--deadline-unit=days|refuse` is the `DeadlineUnitPolicy` knob. `days` (the
+  default) reads a bare `WITHIN 30` as `P30D` and records `P-DEADLINE-UNIT`;
+  `refuse` emits no timer at all and records `P-DEADLINE`.
+
+Each fixture produces two goldens under `expected/`:
 
 - `<name>.bpmn` — the XML, exactly as `l4` would write it. Openable in Camunda
   Modeler as-is.
