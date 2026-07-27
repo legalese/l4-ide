@@ -90,6 +90,21 @@
         color: #888;
         font-style: italic;
       }
+      .diagnostics {
+        margin: 12px;
+        padding: 12px 14px;
+        font:
+          12px/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        white-space: pre-wrap;
+        color: #8a1c1c;
+        background: #fdf3f3;
+        border: 1px solid #f0d4d4;
+        border-left: 3px solid #c74a4a;
+        border-radius: 4px;
+      }
       .pane-out {
         display: flex;
         flex-direction: column;
@@ -104,10 +119,43 @@
         font-size: 12.5px;
         color: #444;
       }
+      .toolbar-epi {
+        gap: 12px;
+        background: #fafbfc;
+      }
+      .toolbar-epi label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .toolbar-epi label.sep {
+        border-left: 1px solid #dde1e4;
+        padding-left: 14px;
+        margin-left: 2px;
+      }
+      .toolbar-epi input {
+        margin: 0;
+      }
       #ladder {
         padding: 22px 24px;
         overflow: auto;
         flex: 1;
+      }
+      /* the epistemic banner — says, in words, what reading the picture is under */
+      #epi-note {
+        padding: 7px 24px;
+        font-size: 12px;
+        border-bottom: 1px solid #eee;
+      }
+      #epi-note.assumed {
+        background: #eef4f9;
+        color: #33556e;
+      }
+      #epi-note.grounded {
+        background: #fff;
+        color: #8a9096;
       }
       #sentences-wrap {
         border-top: 1px solid #eee;
@@ -201,6 +249,32 @@
           <button id="all-true" type="button">all true</button>
           <button id="reset" type="button">reset</button>
         </div>
+        <!-- The two EPISTEMIC knobs. Deliberately separate controls, because they are
+             independent axes: `grounding` is the Just/Nothing of the four-cell default
+             model (how to read an unanswered atom), `respect defaults` is its Left/Right
+             (whether the source's own presumption is in play at all). -->
+        <div class="toolbar toolbar-epi">
+          <span class="grp" title="How should an atom nobody answered be read?"
+            >unanswered atoms</span
+          >
+          <label
+            ><input type="radio" name="grounding" value="none" checked /> show
+            what's known</label
+          >
+          <label title="negation as failure — `holds`"
+            ><input type="radio" name="grounding" value="closed" /> closed world
+            (false)</label
+          >
+          <label title="`presumed`"
+            ><input type="radio" name="grounding" value="open" /> open world
+            (true)</label
+          >
+          <label class="sep" title="TYPICALLY presumptions from the L4 source"
+            ><input type="checkbox" id="respect-defaults" checked /> respect
+            <code>TYPICALLY</code> defaults</label
+          >
+        </div>
+        <div id="epi-note" class="grounded"></div>
         <div id="ladder"></div>
         <div id="sentences-wrap">
           <div class="sent-head">

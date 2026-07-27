@@ -13,7 +13,7 @@
  */
 import { createServer } from "node:http";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
@@ -98,6 +98,11 @@ let ws = null;
 let nextId = 1;
 const pending = new Map();
 let docSeq = 0;
+/** uri -> the last `textDocument/publishDiagnostics` payload for it. The server
+ *  reports parse/typecheck failures ONLY here; a broken document still answers
+ *  `codeLens` with an opaque `BadDependency`, so without this the page could say
+ *  nothing more useful than "500". */
+const diagnostics = new Map();
 
 function connectLsp() {
   return new Promise((res, rej) => {
@@ -122,6 +127,9 @@ function connectLsp() {
               ? (m.params?.items ?? []).map(() => ({}))
               : null;
           ws.send(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: res }));
+        } else if (m.method === "textDocument/publishDiagnostics") {
+          // a notification: no id, so the branches above never see it
+          diagnostics.set(m.params?.uri, m.params?.diagnostics ?? []);
         }
       }
     });
@@ -161,10 +169,28 @@ async function initLsp() {
  *  list "Show decision graph" lenses and execute each; return the funDecls. */
 async function renderL4(l4) {
   const uri = "file://" + resolve(LIBS, `_playground_${++docSeq}.l4`);
+  diagnostics.delete(uri);
   notify("textDocument/didOpen", {
     textDocument: { uri, languageId: "l4", version: 1, text: l4 },
   });
-  await new Promise((r) => setTimeout(r, 600)); // settle typecheck
+  // Wait for the server's own verdict rather than a flat 600ms: diagnostics
+  // arrive when the typecheck settles, and an EMPTY array is a real answer
+  // (a clean file), so poll for the key's presence, not its truthiness.
+  for (let i = 0; i < 40 && !diagnostics.has(uri); i++)
+    await new Promise((r) => setTimeout(r, 50));
+  const diags = (diagnostics.get(uri) ?? []).map((d) => ({
+    severity: d.severity ?? 1, // 1 Error, 2 Warning, 3 Information, 4 Hint
+    line: (d.range?.start?.line ?? 0) + 1, // LSP is 0-based; editors are 1-based
+    column: (d.range?.start?.character ?? 0) + 1,
+    message: d.message ?? "",
+  }));
+  const errors = diags.filter((d) => d.severity === 1);
+
+  // A file that does not typecheck cannot produce a decision graph; asking anyway
+  // yields the opaque `BadDependency`. Return the diagnostics instead — they are
+  // the actual answer to "why is there no ladder?".
+  if (errors.length) return { funcs: [], diagnostics: diags };
+
   const lenses =
     (await rpc("textDocument/codeLens", { textDocument: { uri } })) || [];
   const viz = lenses.filter((l) => l.command?.title === "Show decision graph");
@@ -185,7 +211,8 @@ async function renderL4(l4) {
     }
   }
   notify("textDocument/didClose", { textDocument: { uri } });
-  return funcs;
+  diagnostics.delete(uri);
+  return { funcs, diagnostics: diags };
 }
 
 /* ---- curated inert-style examples (the point: inert L4 → interactive ladder) */
@@ -193,24 +220,38 @@ const EXAMPLES = [
   {
     id: "cheating",
     label: "s415 cheating (Poh Yuan Nie)",
-    path: "jl4/ok/inert/cheating-415-poh-yuan-nie.l4",
+    path: "jl4/examples/ok/inert/cheating-415-poh-yuan-nie.l4",
   },
-  { id: "basic", label: "inert: basic", path: "jl4/ok/inert/basic.l4" },
-  { id: "simple", label: "inert: simple", path: "jl4/ok/inert/simple.l4" },
+  {
+    id: "basic",
+    label: "inert: basic",
+    path: "jl4/examples/ok/inert/basic.l4",
+  },
   {
     id: "asyndetic",
     label: "inert: asyndetic disjunction",
-    path: "jl4/ok/inert/asyndetic-disjunction.l4",
+    path: "jl4/examples/ok/inert/asyndetic-disjunction.l4",
   },
   {
     id: "nested",
     label: "inert: nested context",
-    path: "jl4/ok/inert/nested-context.l4",
+    path: "jl4/examples/ok/inert/nested-context.l4",
+  },
+  {
+    id: "context",
+    label: "inert: context-aware",
+    path: "jl4/examples/ok/inert/context-aware.l4",
   },
   {
     id: "typically",
     label: "TYPICALLY defaults (may purchase alcohol)",
     path: "jl4/examples/ok/typically-basic.l4",
+  },
+  {
+    id: "grounding",
+    label:
+      "grounding variants (permission vs obligation, defaults, permutations)",
+    path: "jl4/examples/ok/inert/grounding-variants.l4",
   },
 ];
 
@@ -243,9 +284,11 @@ const server = createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const { l4 } = JSON.parse(body || "{}");
-        const funcs = await renderL4(String(l4 ?? ""));
+        const { funcs, diagnostics } = await renderL4(String(l4 ?? ""));
+        // 200 even when the file does not typecheck: "your L4 has an error on
+        // line 4" is a successful answer to the request, not a server fault.
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ funcs }));
+        res.end(JSON.stringify({ funcs, diagnostics }));
       } catch (e) {
         res.writeHead(500, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: String(e) }));
@@ -256,7 +299,17 @@ const server = createServer(async (req, res) => {
   // static
   const rel = req.url === "/" ? "/playground.html" : req.url.split("?")[0];
   const candidates = [resolve(DIST, "." + rel), resolve(HERE, "." + rel)];
-  const file = candidates.find((f) => existsSync(f) && !f.endsWith("/"));
+  // isFile(), not existsSync() — `resolve` strips trailing slashes, so the old
+  // `!f.endsWith("/")` guard tested the STRING and happily matched a directory, and
+  // `readFileSync` on a directory throws EISDIR from inside the request handler, which
+  // took the whole dev server down. One stray URL should not end the session.
+  const file = candidates.find((f) => {
+    try {
+      return statSync(f).isFile();
+    } catch {
+      return false;
+    }
+  });
   if (file) {
     res.writeHead(200, { "content-type": MIME[extname(file)] || "text/plain" });
     res.end(readFileSync(file));
@@ -264,6 +317,13 @@ const server = createServer(async (req, res) => {
     res.writeHead(404).end("not found");
   }
 });
+
+// Belt and braces: a dev server that dies on one bad request costs more than the bug it
+// dies on. Log and carry on.
+server.on("clientError", (_e, socket) => socket.destroy());
+process.on("uncaughtException", (e) =>
+  console.error("[playground] uncaught (continuing):", e),
+);
 
 process.on("SIGINT", () => (lspChild?.kill(), process.exit(0)));
 process.on("exit", () => lspChild?.kill());

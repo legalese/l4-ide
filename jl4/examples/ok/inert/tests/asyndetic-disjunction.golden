@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+asyndetic-disjunction.l4:13:1-34:
+  TRUE
+asyndetic-disjunction.l4:16:1-34:
+  TRUE
+asyndetic-disjunction.l4:19:1-34:
+  TRUE
+asyndetic-disjunction.l4:22:1-35:
+  FALSE
+asyndetic-disjunction.l4:34:1-39:
+  TRUE
+asyndetic-disjunction.l4:37:1-39:
+  TRUE
+asyndetic-disjunction.l4:40:1-40:
+  FALSE
+asyndetic-disjunction.l4:43:1-39:
+  FALSE
+asyndetic-disjunction.l4:57:1-42:
+  TRUE
+asyndetic-disjunction.l4:60:1-42:
+  TRUE
+asyndetic-disjunction.l4:63:1-42:
+  TRUE
+asyndetic-disjunction.l4:66:1-42:
+  TRUE
+asyndetic-disjunction.l4:69:1-43:
+  FALSE

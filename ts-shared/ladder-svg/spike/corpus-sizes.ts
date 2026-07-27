@@ -33,7 +33,7 @@ const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5017);
 const GHCUP = "/Users/mengwong/.ghcup/bin";
 const ROOTS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["jl4/ok", "jl4/examples/ok"];
+  : ["jl4/examples/ok"];
 
 /* ------------------------------------------------------------- collect the corpus */
 

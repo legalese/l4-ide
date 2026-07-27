@@ -1,0 +1,13 @@
+`basic or` with `TRUE`, `FALSE` and `FALSE`
+`basic or` with `FALSE`, `TRUE` and `FALSE`
+`basic or` with `FALSE`, `FALSE` and `TRUE`
+`basic or` with `FALSE`, `FALSE` and `FALSE`
+`mixed ellipsis` with `TRUE`, `TRUE` and `FALSE`
+`mixed ellipsis` with `TRUE`, `FALSE` and `TRUE`
+`mixed ellipsis` with `TRUE`, `FALSE` and `FALSE`
+`mixed ellipsis` with `FALSE`, `TRUE` and `TRUE`
+`chained or` with `TRUE`, `FALSE`, `FALSE` and `FALSE`
+`chained or` with `FALSE`, `TRUE`, `FALSE` and `FALSE`
+`chained or` with `FALSE`, `FALSE`, `TRUE` and `FALSE`
+`chained or` with `FALSE`, `FALSE`, `FALSE` and `TRUE`
+`chained or` with `FALSE`, `FALSE`, `FALSE` and `FALSE`
