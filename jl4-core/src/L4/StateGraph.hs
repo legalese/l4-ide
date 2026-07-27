@@ -12,7 +12,8 @@
 --   - Each obligation chain creates states and transitions
 --   - PARTY X MUST/MAY action → transition label
 --   - HENCE → success transition (green)
---   - LEST → failure/timeout transition (red, dashed)
+--   - LEST → reparation transition (red, dashed); what reaches it depends on
+--     the modal, so its caption does too — see 'lestArmWording'
 --   - Fulfilled → terminal success state
 --   - Breach → terminal failure state
 --   - WITHIN deadline → temporal guard on transition
@@ -40,6 +41,9 @@ module L4.StateGraph
   , extractStateGraphs
     -- * Rendering
   , stateGraphToDot
+    -- * Arm vocabulary
+  , lestArmWording
+  , noTriggerWording
   ) where
 
 import Base
@@ -146,9 +150,83 @@ data TransitionLabel = TransitionLabel
 -- | Classification of transitions for rendering
 data TransitionType
   = HenceTransition        -- ^ Success path (solid, green)
-  | LestTransition         -- ^ Failure/timeout path (dashed, red)
+  | LestTransition         -- ^ Reparation\/failure path (dashed, red). What
+                           --   /reaches/ it depends on the modal — see
+                           --   'lestArmWording'.
   | DefaultTransition      -- ^ Neutral transition
   deriving (Eq, Show)
+
+-- | The caption for an arm that /nothing can take/.
+--
+-- Three of the four modals reach their @LEST@ arm by the deadline running out
+-- (see 'lestArmWording'), so a rule with no @WITHIN@ leaves that arm with no
+-- trigger at all. The spec says so — the LEST table in
+-- @doc\/reference\/regulative\/README.md@ defines every non-@SHANT@ trigger as
+-- the deadline passing — and the evaluator agrees: @Contract4@ takes the
+-- @Left Nothing@ branch on a missing @WITHIN@ and skips the timing step
+-- entirely, so @Contract5@, the only frame that consults @lest@ on expiry,
+-- never runs. Measured, on @jl4:exe:l4 run@:
+--
+-- @
+-- PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
+-- \#TRACE ... AT 0 WITH (\`WAIT UNTIL\` 1000)
+--   ==> PARTY Alice MUST pay HENCE FULFILLED LEST ...   -- residual, not Bob's refund
+-- @
+--
+-- with the same rule plus @WITHIN 30@ yielding @PARTY Bob MUST refund WITHIN 5@,
+-- i.e. the arm taken. The same holds for @MAY@ and for @DO@; @SHANT@ is the
+-- exception, because its trigger is the act, not the clock.
+--
+-- The edge is still drawn, because the drafter wrote a @LEST@ body and dropping
+-- the edge would orphan every state extracted from it. What it must not do is
+-- name an event: @\"timeout\"@ asserts a deadline the rule never set, and
+-- @\"not performed\"@ asserts a transition the runtime never makes. Naming the
+-- absence is the only caption here that survives being checked.
+noTriggerWording :: Text
+noTriggerWording = "unreachable: no WITHIN"
+
+-- | What reaching an obligation's @LEST@ arm /means/, in the fewest words that
+-- are true. This is the caption on the @LEST@ edge.
+--
+-- It is __not__ the whole vocabulary of the pipeline, and claiming so would be
+-- the kind of tidy overstatement this function exists to remove.
+-- 'L4.Bpmn.Lower' has words of its own for a prohibition — @triggerName@,
+-- @boundaryDoc@, @taskArmNote@ — and it needs them, because @raceArms@ puts a
+-- @SHANT@'s boundary event on the /HENCE/ arm, which is a different arm from
+-- the one captioned here. What this function owns is the @LEST@ arm's own
+-- words, everywhere they appear: @Lower@ imports it for the synthesised
+-- @MAY@-lapse timer and shares 'noTriggerWording' with it, rather than
+-- respelling either.
+--
+-- Both arguments are load-bearing.
+--
+-- The __modal__ decides which event takes the arm at all
+-- (@L4.EvaluateLazy.Machine@, and the LEST table in
+-- @doc\/reference\/regulative\/README.md@):
+--
+-- * @MUST@ \/ @DO@: the deadline passes without the act — a missed deadline;
+-- * @MAY@: the deadline passes without the permission being exercised, which
+--   is not a failure at all (its default consequence is @FULFILLED@);
+-- * @SHANT@: __the prohibited act is performed__. Nothing to do with time.
+--   Calling this a timeout says the opposite of what the rule says, since for
+--   a prohibition it is the deadline running out that means /compliance/.
+--
+-- The __deadline__ decides whether there is an arm to caption at all. Only
+-- @SHANT@ short-circuits it, and only because @SHANT@ is the one modal whose
+-- trigger is not temporal: measured, a prohibition with no @WITHIN@ still
+-- reaches @LEST@ the moment the act is performed. For the other three, no
+-- @WITHIN@ means no trigger — see 'noTriggerWording' for the measurement.
+lestArmWording ::
+  DeonticModal ->
+  -- | the obligation's @WITHIN@, if it has one. Only its presence is read, so
+  -- this is deliberately polymorphic: callers pass the deadline expression
+  -- itself and nobody has to pre-render it just to be asked a yes\/no question.
+  Maybe deadline ->
+  Text
+lestArmWording DMustNot _        = "violation"
+lestArmWording DMay     (Just _) = "lapses"
+lestArmWording _        (Just _) = "timeout"
+lestArmWording _        Nothing  = noTriggerWording
 
 -- | The complete state graph for a contract
 data StateGraph = StateGraph
@@ -517,6 +595,25 @@ extractDeonton mFromState MkDeonton{..} = do
         , labelGuard    = guardText
         }
 
+      -- The caption for whichever LEST arm this obligation turns out to have.
+      -- It carries the modal too: without it a consumer holding only this edge
+      -- cannot tell a missed deadline from a prohibition that was breached,
+      -- which is the whole of smucclaw/l4-ide#927. The party, deadline and
+      -- guard are deliberately absent — they belong to the obligation, which
+      -- the HENCE edge already restates, and repeating them here would read as
+      -- a second, contradictory copy of the rule.
+      lestLabel = TransitionLabel
+        { labelParty    = Nothing
+        , labelModal    = modalVal
+        , labelAction   = lestArmWording action.modal due
+        , labelDeadline = Nothing
+        , labelGuard    = Nothing
+        }
+
+      defaultToBreach = do
+        breachId <- getTerminalState "Breach" TerminalBreach
+        addTransition fromState breachId lestLabel LestTransition
+
   self <- St.gets (.esSelf)
 
   -- Handle HENCE (success path)
@@ -549,37 +646,43 @@ extractDeonton mFromState MkDeonton{..} = do
           addTransition fromState nextStateId label HenceTransition
           extractExpr (Just nextStateId) henceExpr
 
+    -- No HENCE specified. Every modal defaults it to FULFILLED — see the HENCE
+    -- table in doc/reference/regulative/README.md and @fromMaybe fulfilExpr@ in
+    -- L4.EvaluateLazy.Machine — so there is one branch, not four. (This used to
+    -- be a @case@ on the modal with two byte-identical arms, split MAY from the
+    -- rest, and differing only in a comment.)
+    --
+    -- The seam a reader might come looking for is not here. For a prohibition
+    -- this edge is taken by the deadline /expiring/ with the act not performed,
+    -- so its caption reads backwards — but the caption is 'label', which is the
+    -- obligation restated, and downstream that is the record BPMN builds its
+    -- task name and lane from ("SHANT notify"). Rewording it here would rename
+    -- elements in another exporter. L4.Bpmn.Lower names the prohibition's
+    -- compliance arm itself; see 'L4.Bpmn.Lower.raceArms'.
     Nothing -> do
-      -- No HENCE specified - use default based on modal
-      case action.modal of
-        DMay -> do
-          -- MAY without HENCE defaults to Fulfilled
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId label HenceTransition
-        _ -> do
-          -- MUST/DO without HENCE defaults to Fulfilled
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId label HenceTransition
+      fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+      addTransition fromState fulfilledId label HenceTransition
 
-  -- Handle LEST (failure/timeout path)
+  -- Handle LEST (the reparation path). Which of these four targets it points at
+  -- is orthogonal to what takes the arm, so all four share one caption, derived
+  -- from the modal by 'lestArmWording'. They used to share the literal word
+  -- "timeout" instead, which on a prohibition asserted the exact opposite of
+  -- the rule.
   case lest of
     Just lestExpr -> do
       case classifyTarget self lestExpr of
         TargetFulfilled -> do
           fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState fulfilledId timeoutLabel LestTransition
+          addTransition fromState fulfilledId lestLabel LestTransition
 
         TargetBreach -> do
           breachId <- getTerminalState "Breach" TerminalBreach
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState breachId timeoutLabel LestTransition
+          addTransition fromState breachId lestLabel LestTransition
 
         TargetDeonton nextObl -> do
           let nextStateName = describeDeonton nextObl
           nextStateId <- newState nextStateName IntermediateState
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState nextStateId timeoutLabel LestTransition
+          addTransition fromState nextStateId lestLabel LestTransition
           extractDeonton (Just nextStateId) nextObl
 
         TargetSelf -> do
@@ -588,25 +691,48 @@ extractDeonton mFromState MkDeonton{..} = do
 
         TargetOther -> do
           nextStateId <- newState "failure" IntermediateState
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState nextStateId timeoutLabel LestTransition
+          addTransition fromState nextStateId lestLabel LestTransition
           extractExpr (Just nextStateId) lestExpr
 
     Nothing -> do
       -- No LEST specified - use default based on modal
       case action.modal of
-        DMay -> pure ()  -- MAY without LEST: no failure path needed
-        DMust -> do
-          -- MUST without LEST defaults to Breach
-          breachId <- getTerminalState "Breach" TerminalBreach
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
-          addTransition fromState breachId timeoutLabel LestTransition
-        DMustNot -> do
-          -- SHANT without LEST defaults to Breach (if action IS done)
-          breachId <- getTerminalState "Breach" TerminalBreach
-          let violationLabel = TransitionLabel Nothing Nothing "violation" Nothing Nothing
-          addTransition fromState breachId violationLabel LestTransition
-        DDo -> pure ()  -- DO requires explicit HENCE/LEST
+        -- MAY without LEST: the permission lapses to FULFILLED, and for the
+        -- common shape — no HENCE, or HENCE FULFILLED — that is where the HENCE
+        -- edge already goes, so there is no second arrow to draw.
+        --
+        -- NOTE (not fixed here): when a bare MAY's HENCE points at another
+        -- OBLIGATION the two arms genuinely part company, and this draws only
+        -- one of them. Measured:
+        --
+        --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
+        --     (`WAIT UNTIL` 100)          ==> FULFILLED
+        --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
+        --
+        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@) while HENCE
+        -- reaches Bob's obligation, and the graph shows no route to FULFILLED at
+        -- all. L4.Bpmn.Lower inherits the gap and makes it worse, sending its
+        -- synthesised lapse timer "wherever HENCE lands" — which in this shape
+        -- is the wrong place. Fixing it means emitting a real lapse edge here
+        -- and retiring that synthesis, which moves BPMN output for every
+        -- permission; it is a separate change from smucclaw/l4-ide#927.
+        DMay -> pure ()
+        -- MUST/SHANT without LEST default to Breach; only the way in differs,
+        -- and 'lestArmWording' is where that difference is spelled.
+        DMust -> defaultToBreach
+        DMustNot -> defaultToBreach
+        -- DO is documented as requiring an explicit LEST, and this used to take
+        -- the documentation at its word and draw nothing. The evaluator does not
+        -- require it: @Contract5@'s @_ -> case lest of Nothing -> ValBreached@
+        -- covers DDo alongside DMust, and measured,
+        --
+        --   PARTY Alice DO pay WITHIN 5    (`WAIT UNTIL` 100)  ==> DEONTIC BREACHED
+        --
+        -- so the graph drew a rule whose only outcome was Fulfilled for a rule
+        -- that breaches. It is the same defect as the caption bug one level up —
+        -- the picture contradicting the runtime — so it is fixed the same way,
+        -- and 'lestArmWording' gives DO the MUST wording it shares.
+        DDo -> defaultToBreach
 
 -- | Classification of HENCE/LEST targets
 data Target
@@ -766,9 +892,18 @@ oneOfEdgeColor = "#e8850c"
 -- | Format a transition label for display
 formatTransitionLabel :: StateGraphOptions -> TransitionLabel -> Text
 formatTransitionLabel opts TransitionLabel{..} =
-  let parts = catMaybes
+  let -- The modal is a qualifier on a party's action — "Alice MUST pay" — so it
+      -- is drawn only where there is a party to qualify. A LEST edge carries the
+      -- modal for consumers that hold only that edge, but its caption is not a
+      -- restatement of the rule; it names what became of it. "SHANT violation"
+      -- would read as a second and contradictory copy of the obligation.
+      modalPart
+        | not opts.showModal = Nothing
+        | isNothing labelParty = Nothing
+        | otherwise = fmap formatModal labelModal
+      parts = catMaybes
         [ labelParty
-        , if opts.showModal then fmap formatModal labelModal else Nothing
+        , modalPart
         , Just labelAction
         , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing

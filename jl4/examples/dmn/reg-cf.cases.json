@@ -1,0 +1,117 @@
+{
+  "note": [
+    "Input contexts for the shipped DMN golden, each paired with the value EVERY",
+    "decision must produce under it. Both committed engine harnesses",
+    "(etc/kie-dmn-check, etc/camunda-dmn-check) read this file and fail on any",
+    "mismatch, on any decision present in the model but absent from `expect`, and",
+    "on any expectation naming a decision the model does not have.",
+    "",
+    "WHY EXPECTED VALUES AND NOT JUST STATUSES. The failure this whole exercise is",
+    "about is silent: Camunda 8 tokenises a space-bearing FEEL name `annual income`",
+    "as `annual` `in` `come` and answers `true` -- a wrong NON-NULL value. Measured",
+    "(DMN-EXPORT-PROGRAM-MODEL-SPEC.md 13.2). A harness that fails only on FAILED,",
+    "SKIPPED and null passes such a file.",
+    "",
+    "THE KEYS ARE FEEL NAMES, not L4 names: `annual_income`, not `annual income`.",
+    "That is the invariant under test, not an accident of the fixture.",
+    "",
+    "COVERAGE. Between them these five cases fire every one of the nine <rule>",
+    "elements in the golden, plus both <defaultOutputEntry> paths. Case A alone --",
+    "which is what reg-cf.ctx.json holds, and what the harnesses used to be given --",
+    "leaves six of the nine unevaluated.",
+    "",
+    "WHAT THESE CASES CANNOT CATCH, stated so absence is not read as evidence:",
+    "`annual income` and `net worth` are consumed only by `+` and `min`, both",
+    "commutative, so exchanging their two bindings is invisible to any context on",
+    "this exhibit. That is faithful to the statute (17 CFR 227.100(a)(2) is",
+    "symmetric in the two) rather than a gap in the fixture, and no additional case",
+    "can close it. Every other mis-binding does change an answer here."
+  ],
+  "cases": [
+    {
+      "name": "A. retail investor, first-time issuer, mid-size offering",
+      "context": {
+        "class": "retail",
+        "annual_income": 100000,
+        "net_worth": 80000,
+        "offering_amount": 600000,
+        "first_time_issuer": true
+      },
+      "expect": {
+        "is_accredited_investor": false,
+        "combined_resources": 180000,
+        "annual_limit_basis": 80000,
+        "financial_statements_required": "reviewed by an independent public accountant",
+        "investor_limit": 80000
+      }
+    },
+    {
+      "name": "B. accredited investor, small offering (accredited rule + the certified arm)",
+      "context": {
+        "class": "accredited",
+        "annual_income": 500000,
+        "net_worth": 250000,
+        "offering_amount": 50000,
+        "first_time_issuer": false
+      },
+      "expect": {
+        "is_accredited_investor": true,
+        "combined_resources": 750000,
+        "annual_limit_basis": 250000,
+        "financial_statements_required": "certified by the principal executive officer",
+        "investor_limit": 100000000
+      }
+    },
+    {
+      "name": "C. institutional investor (the second accredited rule)",
+      "context": {
+        "class": "institutional",
+        "annual_income": 2000,
+        "net_worth": 1000,
+        "offering_amount": 300000,
+        "first_time_issuer": false
+      },
+      "expect": {
+        "is_accredited_investor": true,
+        "combined_resources": 3000,
+        "annual_limit_basis": 1000,
+        "financial_statements_required": "reviewed by an independent public accountant",
+        "investor_limit": 100000000
+      }
+    },
+    {
+      "name": "D. retail, large offering, not first-time (the audited arm + the 10% arm)",
+      "context": {
+        "class": "retail",
+        "annual_income": 1000000,
+        "net_worth": 124000,
+        "offering_amount": 2000000,
+        "first_time_issuer": false
+      },
+      "expect": {
+        "is_accredited_investor": false,
+        "combined_resources": 1124000,
+        "annual_limit_basis": 124000,
+        "financial_statements_required": "audited by an independent public accountant",
+        "investor_limit": 12400
+      }
+    },
+    {
+      "name": "E. retail, tiny resources (the lifted $2,500 floor)",
+      "context": {
+        "class": "retail",
+        "annual_income": 1000,
+        "net_worth": 500,
+        "offering_amount": 100000,
+        "first_time_issuer": false
+      },
+      "expect": {
+        "is_accredited_investor": false,
+        "combined_resources": 1500,
+        "annual_limit_basis": 500,
+        "financial_statements_required": "certified by the principal executive officer",
+        "investor_limit": 2500
+      }
+    }
+  ]
+}

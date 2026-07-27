@@ -1253,6 +1253,17 @@ spec = describe "integration" do
                     statusCode' dotResp `shouldBe` 200
                     let dotText = Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody dotResp))
                     dotText `shouldSatisfy` Text.isInfixOf "digraph"
+                    -- This endpoint is how the captions reach a user, and until
+                    -- now "digraph" was the whole of what it asserted — a
+                    -- caption inverted the way smucclaw/l4-ide#927 describes
+                    -- would have travelled the entire HTTP surface untested.
+                    -- `the sale contract` is two nested MUSTs, each with a
+                    -- WITHIN and an explicit LEST BREACH, so both LEST arms are
+                    -- reached by the clock and both read "timeout".
+                    dotText `shouldSatisfy` Text.isInfixOf "label=timeout"
+                    -- and nothing here is a prohibition or a deadline-less rule
+                    dotText `shouldNotSatisfy` Text.isInfixOf "violation"
+                    dotText `shouldNotSatisfy` Text.isInfixOf "unreachable"
                   _ -> expectationFailure "Graph object missing graphName"
               _ -> expectationFailure "Expected graph object in array"
           _ -> expectationFailure "Expected non-empty graphs array"

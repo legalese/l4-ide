@@ -13,11 +13,11 @@ digraph {
       ,style=filled
       ,shape=ellipse
       ,fillcolor="#e8f4fd"];
-    1 [label=next
+    1 [label=Fulfilled
       ,fillcolor=white
       ,style=filled
-      ,shape=ellipse
-      ,fillcolor="#ffffff"];
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
     2 [label=Breach
       ,fillcolor=white
       ,style=filled
@@ -26,8 +26,7 @@ digraph {
     0 -> 1 [label="Spouse1 MUST love and cherish"
            ,color="#28a745"
            ,style=solid];
-    0 -> 2 [label=timeout
+    0 -> 2 [label="unreachable: no WITHIN"
            ,color="#dc3545"
            ,style=dashed];
 }
-

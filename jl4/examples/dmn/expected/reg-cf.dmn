@@ -3,20 +3,20 @@
   <inputData id="input_class" name="class">
     <variable id="input_class_var" name="class" typeRef="string"/>
   </inputData>
-  <inputData id="input_annual_income" name="annual income">
-    <variable id="input_annual_income_var" name="annual income" typeRef="number"/>
+  <inputData id="input_annual_income" name="annual_income" label="annual income">
+    <variable id="input_annual_income_var" name="annual_income" label="annual income" typeRef="number"/>
   </inputData>
-  <inputData id="input_net_worth" name="net worth">
-    <variable id="input_net_worth_var" name="net worth" typeRef="number"/>
+  <inputData id="input_net_worth" name="net_worth" label="net worth">
+    <variable id="input_net_worth_var" name="net_worth" label="net worth" typeRef="number"/>
   </inputData>
-  <inputData id="input_offering_amount" name="offering amount">
-    <variable id="input_offering_amount_var" name="offering amount" typeRef="number"/>
+  <inputData id="input_offering_amount" name="offering_amount" label="offering amount">
+    <variable id="input_offering_amount_var" name="offering_amount" label="offering amount" typeRef="number"/>
   </inputData>
-  <inputData id="input_first_time_issuer" name="first-time issuer">
-    <variable id="input_first_time_issuer_var" name="first_time issuer" typeRef="boolean"/>
+  <inputData id="input_first_time_issuer" name="first_time_issuer" label="first-time issuer">
+    <variable id="input_first_time_issuer_var" name="first_time_issuer" label="first-time issuer" typeRef="boolean"/>
   </inputData>
-  <decision id="decision_is_accredited_investor" name="is accredited investor">
-    <variable id="decision_is_accredited_investor_var" name="is accredited investor" typeRef="boolean"/>
+  <decision id="decision_is_accredited_investor" name="is_accredited_investor" label="is accredited investor">
+    <variable id="decision_is_accredited_investor_var" name="is_accredited_investor" label="is accredited investor" typeRef="boolean"/>
     <informationRequirement id="decision_is_accredited_investor_ir1">
       <requiredInput href="#input_class"/>
     </informationRequirement>
@@ -26,7 +26,7 @@
           <text>class</text>
         </inputExpression>
       </input>
-      <output id="decision_is_accredited_investor_o1" name="is accredited investor" typeRef="boolean">
+      <output id="decision_is_accredited_investor_o1">
         <defaultOutputEntry id="decision_is_accredited_investor_o1_default">
           <text>false</text>
         </defaultOutputEntry>
@@ -51,8 +51,8 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_combined_resources" name="combined resources">
-    <variable id="decision_combined_resources_var" name="combined resources" typeRef="number"/>
+  <decision id="decision_combined_resources" name="combined_resources" label="combined resources">
+    <variable id="decision_combined_resources_var" name="combined_resources" label="combined resources" typeRef="number"/>
     <informationRequirement id="decision_combined_resources_ir1">
       <requiredInput href="#input_annual_income"/>
     </informationRequirement>
@@ -60,11 +60,11 @@
       <requiredInput href="#input_net_worth"/>
     </informationRequirement>
     <literalExpression id="decision_combined_resources_literal">
-      <text>annual income + net worth</text>
+      <text>annual_income + net_worth</text>
     </literalExpression>
   </decision>
-  <decision id="decision_annual_limit_basis" name="annual limit basis">
-    <variable id="decision_annual_limit_basis_var" name="annual limit basis" typeRef="number"/>
+  <decision id="decision_annual_limit_basis" name="annual_limit_basis" label="annual limit basis">
+    <variable id="decision_annual_limit_basis_var" name="annual_limit_basis" label="annual limit basis" typeRef="number"/>
     <informationRequirement id="decision_annual_limit_basis_ir1">
       <requiredInput href="#input_annual_income"/>
     </informationRequirement>
@@ -72,11 +72,11 @@
       <requiredInput href="#input_net_worth"/>
     </informationRequirement>
     <literalExpression id="decision_annual_limit_basis_literal">
-      <text>min(annual income, net worth)</text>
+      <text>min(annual_income, net_worth)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_financial_statements_required" name="financial statements required">
-    <variable id="decision_financial_statements_required_var" name="financial statements required" typeRef="string"/>
+  <decision id="decision_financial_statements_required" name="financial_statements_required" label="financial statements required">
+    <variable id="decision_financial_statements_required_var" name="financial_statements_required" label="financial statements required" typeRef="string"/>
     <informationRequirement id="decision_financial_statements_required_ir1">
       <requiredInput href="#input_first_time_issuer"/>
     </informationRequirement>
@@ -86,15 +86,15 @@
     <decisionTable id="decision_financial_statements_required_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="financial statements required">
       <input id="decision_financial_statements_required_i1" label="`offering amount`">
         <inputExpression id="decision_financial_statements_required_i1_expr" typeRef="number">
-          <text>offering amount</text>
+          <text>offering_amount</text>
         </inputExpression>
       </input>
       <input id="decision_financial_statements_required_i2" label="`first-time issuer`">
         <inputExpression id="decision_financial_statements_required_i2_expr" typeRef="boolean">
-          <text>first_time issuer</text>
+          <text>first_time_issuer</text>
         </inputExpression>
       </input>
-      <output id="decision_financial_statements_required_o1" name="financial statements required" typeRef="string"/>
+      <output id="decision_financial_statements_required_o1"/>
       <rule id="decision_financial_statements_required_r1">
         <description>`offering amount` AT MOST 107000</description>
         <inputEntry id="decision_financial_statements_required_r1_i1">
@@ -145,8 +145,8 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_investor_limit" name="investor limit">
-    <variable id="decision_investor_limit_var" name="investor limit" typeRef="number"/>
+  <decision id="decision_investor_limit" name="investor_limit" label="investor limit">
+    <variable id="decision_investor_limit_var" name="investor_limit" label="investor limit" typeRef="number"/>
     <informationRequirement id="decision_investor_limit_ir1">
       <requiredDecision href="#decision_annual_limit_basis"/>
     </informationRequirement>
@@ -156,15 +156,15 @@
     <decisionTable id="decision_investor_limit_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="investor limit">
       <input id="decision_investor_limit_i1" label="`is accredited investor`">
         <inputExpression id="decision_investor_limit_i1_expr" typeRef="boolean">
-          <text>is accredited investor</text>
+          <text>is_accredited_investor</text>
         </inputExpression>
       </input>
       <input id="decision_investor_limit_i2" label="`annual limit basis`">
         <inputExpression id="decision_investor_limit_i2_expr" typeRef="number">
-          <text>annual limit basis</text>
+          <text>annual_limit_basis</text>
         </inputExpression>
       </input>
-      <output id="decision_investor_limit_o1" name="investor limit" typeRef="number"/>
+      <output id="decision_investor_limit_o1"/>
       <rule id="decision_investor_limit_r1">
         <description>`is accredited investor`</description>
         <inputEntry id="decision_investor_limit_r1_i1">
@@ -186,7 +186,7 @@
           <text>&lt; 124000</text>
         </inputEntry>
         <outputEntry id="decision_investor_limit_r2_o1">
-          <text>max(2500, annual limit basis)</text>
+          <text>max(2500, annual_limit_basis)</text>
         </outputEntry>
       </rule>
       <rule id="decision_investor_limit_r3">
@@ -198,7 +198,7 @@
           <text>-</text>
         </inputEntry>
         <outputEntry id="decision_investor_limit_r3_o1">
-          <text>annual limit basis * 10 / 100</text>
+          <text>annual_limit_basis * 10 / 100</text>
         </outputEntry>
       </rule>
     </decisionTable>

@@ -51,6 +51,10 @@ module L4.Dmn.IR
   , quoteFeelString
   , feelIdentText
   , oneLine
+    -- * Engine flavors
+  , DmnFlavor (..)
+  , defaultDmnFlavor
+  , dmnFlavorName
     -- * The decision requirements graph
   , Drg (..)
   , DrgNode (..)
@@ -252,22 +256,56 @@ renderNumber r
 
 -- | An L4 name as a FEEL name.
 --
--- FEEL names may contain spaces (grammar rule 30), so an L4 name usually
--- survives intact; characters FEEL cannot carry are replaced rather than
--- dropped. Every place a name is /referenced/ (an input expression, an output
--- entry) and every place one is /declared/ (an @inputData@ or @decision@
--- variable) goes through this same function, so the two always agree.
+-- Every place a name is /referenced/ (an input expression, an output entry) and
+-- every place one is /declared/ (an @inputData@ or @decision@ node and its
+-- @\<variable\>@) goes through this same function, so the two always agree.
+--
+-- __Spaces and dots do not survive__, and that is a correctness fix rather than
+-- a portability preference (@specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@
+-- §5.2, §13.2). FEEL names may contain spaces (grammar rule 30) and KIE, feelin
+-- and @dmn-eval-js@ all honour that — but Camunda's @feel-scala@ does not, and
+-- it fails in the /silent/ direction: @annual income@ is tokenised as
+-- @annual@ @in@ @come@, i.e. as the membership operator, and answers a
+-- __boolean__ rather than the number. That is measured, not inferred: in a
+-- model declaring @annual income = 100000@, @annual = 5@ and @come = [1,2,5]@,
+-- Camunda 8.7.6 answers @true@ to both @annual income@ and @annual in come@,
+-- while KIE 8.44 answers @100000@ and @true@ respectively (§13.2). Note the
+-- value: @true@, not @null@ — a wrong /non-null/ answer, which is why the
+-- engine harnesses under @etc\/@ compare against expected values and not merely
+-- against null. (The boolean is whatever the membership test yields, so it is
+-- the /type/ of the answer that is the tell, not the constant @false@ an
+-- earlier draft of this comment named.) A dot is worse still, because it
+-- injects a FEEL path expression that silently shadows a genuine record
+-- projection.
+--
+-- This is stage 1 of §5.2's policy, minus three parts that belong to Phase 2
+-- and are deliberately __not__ done here: NFC normalisation, the reserved-word
+-- suffix, and @uniquifyIn@ (which is what makes the mapping injective within a
+-- scope, and which needs a whole-DRG traversal rather than a per-name
+-- function). Until then two L4 names can still collapse onto one FEEL name. The
+-- emitter pairs every mangled @\@name@ with a verbatim @\@label@ so a reader can
+-- always see which L4 name a node came from, and 'L4.Dmn.Lower' raises a
+-- @D-FEELNAME@ note, at 'Blocking', when a collision actually happens — because
+-- on Camunda 8 a collision is a silently wrong answer rather than a rejection.
 feelIdentText :: Text -> Text
 feelIdentText t
-  | Text.null cleaned           = "_"
-  | isDigit (Text.head cleaned) = "_" <> cleaned
-  | otherwise                   = cleaned
+  | Text.null squashed           = "_"
+  | isDigit (Text.head squashed) = "_" <> squashed
+  | otherwise                    = squashed
  where
-  cleaned = Text.strip (Text.map keep t)
+  -- Every non-ASCII-alphanumeric becomes '_', INCLUDING whitespace, so a run of
+  -- whitespace becomes a run of '_' and is then collapsed by `squashed` along
+  -- with every other run. Two L4 names an engine would read as one therefore
+  -- cannot come out of here looking distinct. (An earlier draft pre-collapsed
+  -- whitespace with `Text.unwords . Text.words`; that was a no-op for every
+  -- input, since `squashed` already does the collapsing and the trimming, and
+  -- it read as a load-bearing step. Removed rather than left to mislead.)
+  underscored = Text.map keep t
+  -- Collapse runs of '_' and strip them from both ends, in one pass.
+  squashed = Text.intercalate "_" (filter (not . Text.null) (Text.splitOn "_" underscored))
   keep c
-    | isAscii c && isAlphaNum c  = c
-    | c `elem` (" _." :: String) = c
-    | otherwise                  = '_'
+    | isAscii c && isAlphaNum c = c
+    | otherwise                 = '_'
 
 ------------------------------------------------------------------------
 -- Decision tables
@@ -358,6 +396,61 @@ data DecisionTable = MkDecisionTable
   deriving stock (Eq, Show, Generic)
 
 ------------------------------------------------------------------------
+-- Engine flavors
+------------------------------------------------------------------------
+
+-- | Which DMN engine the emitted document is aimed at.
+--
+-- __One bit, and it is narrower than "which engine do you use".__ The three
+-- axes R7 nominated were measured against Drools\/KIE 8.44.0.Final, Camunda
+-- 7.23\/7.24 and Camunda 8.7.6, and two of them turned out not to diverge at all
+-- (@specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@ §13):
+--
+--   * __naming__ (§13.2) — one policy is right everywhere. The apparent split
+--     was two of our own bugs, fixed in 'feelIdentText' and "L4.Dmn.Emit".
+--   * __business knowledge models__ (§13.3) — KIE and Camunda 8 both execute
+--     them in every probed form. Only Camunda 7 is silently BKM-less, and
+--     Camunda 7 is end-of-life and not a target.
+--   * __decision services__ (§13.4) — the one real divergence, and not "does
+--     the engine support them": a bare @\<decisionService\>@ is inert-but-safe
+--     everywhere. What Camunda 8 cannot take is a @\<knowledgeRequirement\>@
+--     whose @requiredKnowledge@ points at one, which makes its @parse()@ throw
+--     @ClassCastException@ and reject the __whole file__ before any decision
+--     runs. KIE runs that shape correctly, and it is the shape an invocable @§@
+--     needs.
+--
+-- So the bit exists to answer exactly one question: may a @decisionService@ be
+-- the target of a @knowledgeRequirement@? 'FlavorKie' says yes, 'FlavorCamunda'
+-- says no and routes such call sites elsewhere.
+--
+-- __Nothing observable turns on it yet.__ Neither construct is emitted today
+-- (that is Phase 5), so the two flavors are byte-identical, and
+-- @jl4\/tests\/DmnExport.hs@ pins that identity as a test which is /expected/ to
+-- fail the day Phase 5 lands. A knob with no effect is a trap; a test that
+-- announces the day it acquires one is the cheapest defence.
+data DmnFlavor
+  = FlavorCamunda
+    -- ^ Camunda 8 (@io.camunda:zeebe-dmn@ → dmn-scala + feel-engine), the
+    -- default. Chosen because @specs\/todo\/lexipedia-superset\/SPEC.md@ K4
+    -- commits the BPMN side to Camunda Modeler import — a DMN file a Camunda
+    -- user cannot open breaks the pairing — and because the failure modes are
+    -- unequal: this flavor on KIE is degraded but sound, the other on Camunda
+    -- loads nothing at all.
+  | FlavorKie
+    -- ^ Drools\/KIE. Not Camunda 7: that is an unrelated implementation which
+    -- cannot execute a BKM at all, and it is end-of-life.
+  deriving stock (Eq, Show, Generic)
+
+defaultDmnFlavor :: DmnFlavor
+defaultDmnFlavor = FlavorCamunda
+
+-- | The spelling the CLI accepts and the fidelity report prints.
+dmnFlavorName :: DmnFlavor -> Text
+dmnFlavorName = \case
+  FlavorCamunda -> "camunda"
+  FlavorKie     -> "kie"
+
+------------------------------------------------------------------------
 -- The decision requirements graph
 ------------------------------------------------------------------------
 
@@ -412,6 +505,12 @@ data Drg = MkDrg
   { drgId        :: !Text
   , drgName      :: !Text
   , drgNamespace :: !Text
+  , drgFlavor    :: !DmnFlavor
+    -- ^ which engine this graph was lowered /for/. It lives on the IR rather
+    -- than on the emitter's argument list so that 'L4.Dmn.Emit.emitDrg',
+    -- 'L4.Dmn.Markdown.emitMarkdown', 'dmnReport' and
+    -- 'L4.Dmn.Markdown.markdownReport' all stay one-argument functions over one
+    -- IR, and so that the fidelity report can name the artifact it describes.
   , drgNodes     :: ![DrgNode]
   , drgNotes     :: ![FidelityNote]  -- ^ module-level notes; per-table ones live on the table
   }
@@ -490,8 +589,16 @@ drgNotesAll drg =
        ]
 
 -- | The XML backend\'s report.
+--
+-- The target names the /flavor/, not just the notation, because the report is
+-- generated from the same 'Drg' the document is: a report that did not say which
+-- engine the artifact beside it was shaped for would be describing a file the
+-- reader cannot identify.
 dmnReport :: Drg -> FidelityReport
-dmnReport drg = foldl' (flip addNote) (emptyReport "DMN 1.3 (XML)") (drgNotesAll drg)
+dmnReport drg =
+  foldl' (flip addNote) (emptyReport target) (drgNotesAll drg)
+ where
+  target = "DMN 1.3 (XML), " <> dmnFlavorName drg.drgFlavor <> " flavor"
 
 -- | Collapse newlines and runs of whitespace. A DMN cell is a one-liner, and an
 -- SVG @\<text\>@ collapses newlines to spaces anyway — better to do it where it

@@ -42,14 +42,14 @@
   <inputData id="input_investor_4" name="investor">
     <variable id="input_investor_4_var" name="investor" typeRef="Any"/>
   </inputData>
-  <inputData id="input_amount_to_be_sold_in_this_transaction" name="amount to be sold in this transaction">
-    <variable id="input_amount_to_be_sold_in_this_transaction_var" name="amount to be sold in this transaction" typeRef="number"/>
+  <inputData id="input_amount_to_be_sold_in_this_transaction" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
+    <variable id="input_amount_to_be_sold_in_this_transaction_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
   </inputData>
   <inputData id="input_investor_5" name="investor">
     <variable id="input_investor_5_var" name="investor" typeRef="Any"/>
   </inputData>
-  <inputData id="input_amount_to_be_sold_in_this_transaction_2" name="amount to be sold in this transaction">
-    <variable id="input_amount_to_be_sold_in_this_transaction_2_var" name="amount to be sold in this transaction" typeRef="number"/>
+  <inputData id="input_amount_to_be_sold_in_this_transaction_2" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
+    <variable id="input_amount_to_be_sold_in_this_transaction_2_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
   </inputData>
   <inputData id="input_offering_3" name="offering">
     <variable id="input_offering_3_var" name="offering" typeRef="Any"/>
@@ -108,8 +108,8 @@
   <inputData id="input_status_7" name="status">
     <variable id="input_status_7_var" name="status" typeRef="Any"/>
   </inputData>
-  <inputData id="input_annual_cycles" name="annual cycles">
-    <variable id="input_annual_cycles_var" name="annual cycles" typeRef="number"/>
+  <inputData id="input_annual_cycles" name="annual_cycles" label="annual cycles">
+    <variable id="input_annual_cycles_var" name="annual_cycles" label="annual cycles" typeRef="number"/>
   </inputData>
   <inputData id="input_transfer" name="transfer">
     <variable id="input_transfer_var" name="transfer" typeRef="Any"/>
@@ -144,11 +144,11 @@
   <inputData id="input_maximum" name="maximum">
     <variable id="input_maximum_var" name="maximum" typeRef="number"/>
   </inputData>
-  <inputData id="input_prior_sales" name="prior sales">
-    <variable id="input_prior_sales_var" name="prior sales" typeRef="number"/>
+  <inputData id="input_prior_sales" name="prior_sales" label="prior sales">
+    <variable id="input_prior_sales_var" name="prior_sales" label="prior sales" typeRef="number"/>
   </inputData>
-  <inputData id="input_previously_sold" name="previously sold">
-    <variable id="input_previously_sold_var" name="previously sold" typeRef="boolean"/>
+  <inputData id="input_previously_sold" name="previously_sold" label="previously sold">
+    <variable id="input_previously_sold_var" name="previously_sold" label="previously sold" typeRef="boolean"/>
   </inputData>
   <inputData id="input_accredited" name="accredited">
     <variable id="input_accredited_var" name="accredited" typeRef="boolean"/>
@@ -165,11 +165,11 @@
   <inputData id="input_intermediaries" name="intermediaries">
     <variable id="input_intermediaries_var" name="intermediaries" typeRef="number"/>
   </inputData>
-  <inputData id="input_days_available" name="days available">
-    <variable id="input_days_available_var" name="days available" typeRef="number"/>
+  <inputData id="input_days_available" name="days_available" label="days available">
+    <variable id="input_days_available_var" name="days_available" label="days available" typeRef="number"/>
   </inputData>
-  <inputData id="input_annual_reports" name="annual reports">
-    <variable id="input_annual_reports_var" name="annual reports" typeRef="number"/>
+  <inputData id="input_annual_reports" name="annual_reports" label="annual reports">
+    <variable id="input_annual_reports_var" name="annual_reports" label="annual reports" typeRef="number"/>
   </inputData>
   <inputData id="input_holders" name="holders">
     <variable id="input_holders_var" name="holders" typeRef="number"/>
@@ -177,152 +177,152 @@
   <inputData id="input_assets" name="assets">
     <variable id="input_assets_var" name="assets" typeRef="number"/>
   </inputData>
-  <inputData id="input_days_since_issue" name="days since issue">
-    <variable id="input_days_since_issue_var" name="days since issue" typeRef="number"/>
+  <inputData id="input_days_since_issue" name="days_since_issue" label="days since issue">
+    <variable id="input_days_since_issue_var" name="days_since_issue" label="days since issue" typeRef="number"/>
   </inputData>
-  <inputData id="input_to_accredited" name="to accredited">
-    <variable id="input_to_accredited_var" name="to accredited" typeRef="boolean"/>
+  <inputData id="input_to_accredited" name="to_accredited" label="to accredited">
+    <variable id="input_to_accredited_var" name="to_accredited" label="to accredited" typeRef="boolean"/>
   </inputData>
-  <decision id="decision_offering_maximum_in_a_12_month_period" name="offering maximum in a 12-month period">
-    <variable id="decision_offering_maximum_in_a_12_month_period_var" name="offering maximum in a 12_month period" typeRef="number"/>
+  <decision id="decision_offering_maximum_in_a_12_month_period" name="offering_maximum_in_a_12_month_period" label="offering maximum in a 12-month period">
+    <variable id="decision_offering_maximum_in_a_12_month_period_var" name="offering_maximum_in_a_12_month_period" label="offering maximum in a 12-month period" typeRef="number"/>
     <literalExpression id="decision_offering_maximum_in_a_12_month_period_literal">
       <text>5000000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_income_or_net_worth_cut_point" name="income or net worth cut point">
-    <variable id="decision_income_or_net_worth_cut_point_var" name="income or net worth cut point" typeRef="number"/>
+  <decision id="decision_income_or_net_worth_cut_point" name="income_or_net_worth_cut_point" label="income or net worth cut point">
+    <variable id="decision_income_or_net_worth_cut_point_var" name="income_or_net_worth_cut_point" label="income or net worth cut point" typeRef="number"/>
     <literalExpression id="decision_income_or_net_worth_cut_point_literal">
       <text>124000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_minimum_permitted_investment" name="minimum permitted investment">
-    <variable id="decision_minimum_permitted_investment_var" name="minimum permitted investment" typeRef="number"/>
+  <decision id="decision_minimum_permitted_investment" name="minimum_permitted_investment" label="minimum permitted investment">
+    <variable id="decision_minimum_permitted_investment_var" name="minimum_permitted_investment" label="minimum permitted investment" typeRef="number"/>
     <literalExpression id="decision_minimum_permitted_investment_literal">
       <text>2500</text>
     </literalExpression>
   </decision>
-  <decision id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period" name="maximum amount sold to any one investor in a 12-month period">
-    <variable id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_var" name="maximum amount sold to any one investor in a 12_month period" typeRef="number"/>
+  <decision id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period" name="maximum_amount_sold_to_any_one_investor_in_a_12_month_period" label="maximum amount sold to any one investor in a 12-month period">
+    <variable id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_var" name="maximum_amount_sold_to_any_one_investor_in_a_12_month_period" label="maximum amount sold to any one investor in a 12-month period" typeRef="number"/>
     <literalExpression id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_literal">
       <text>124000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_tier_1_ceiling" name="tier 1 ceiling">
-    <variable id="decision_tier_1_ceiling_var" name="tier 1 ceiling" typeRef="number"/>
+  <decision id="decision_tier_1_ceiling" name="tier_1_ceiling" label="tier 1 ceiling">
+    <variable id="decision_tier_1_ceiling_var" name="tier_1_ceiling" label="tier 1 ceiling" typeRef="number"/>
     <literalExpression id="decision_tier_1_ceiling_literal">
       <text>124000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_tier_2_ceiling" name="tier 2 ceiling">
-    <variable id="decision_tier_2_ceiling_var" name="tier 2 ceiling" typeRef="number"/>
+  <decision id="decision_tier_2_ceiling" name="tier_2_ceiling" label="tier 2 ceiling">
+    <variable id="decision_tier_2_ceiling_var" name="tier_2_ceiling" label="tier 2 ceiling" typeRef="number"/>
     <literalExpression id="decision_tier_2_ceiling_literal">
       <text>618000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_first_time_issuer_review_ceiling" name="first-time issuer review ceiling">
-    <variable id="decision_first_time_issuer_review_ceiling_var" name="first_time issuer review ceiling" typeRef="number"/>
+  <decision id="decision_first_time_issuer_review_ceiling" name="first_time_issuer_review_ceiling" label="first-time issuer review ceiling">
+    <variable id="decision_first_time_issuer_review_ceiling_var" name="first_time_issuer_review_ceiling" label="first-time issuer review ceiling" typeRef="number"/>
     <literalExpression id="decision_first_time_issuer_review_ceiling_literal">
       <text>1235000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_holders_of_record_threshold" name="holders of record threshold">
-    <variable id="decision_holders_of_record_threshold_var" name="holders of record threshold" typeRef="number"/>
+  <decision id="decision_holders_of_record_threshold" name="holders_of_record_threshold" label="holders of record threshold">
+    <variable id="decision_holders_of_record_threshold_var" name="holders_of_record_threshold" label="holders of record threshold" typeRef="number"/>
     <literalExpression id="decision_holders_of_record_threshold_literal">
       <text>300</text>
     </literalExpression>
   </decision>
-  <decision id="decision_total_assets_threshold" name="total assets threshold">
-    <variable id="decision_total_assets_threshold_var" name="total assets threshold" typeRef="number"/>
+  <decision id="decision_total_assets_threshold" name="total_assets_threshold" label="total assets threshold">
+    <variable id="decision_total_assets_threshold_var" name="total_assets_threshold" label="total assets threshold" typeRef="number"/>
     <literalExpression id="decision_total_assets_threshold_literal">
       <text>10000000</text>
     </literalExpression>
   </decision>
-  <decision id="decision_minimum_days_publicly_available_before_any_sale" name="minimum days publicly available before any sale">
-    <variable id="decision_minimum_days_publicly_available_before_any_sale_var" name="minimum days publicly available before any sale" typeRef="number"/>
+  <decision id="decision_minimum_days_publicly_available_before_any_sale" name="minimum_days_publicly_available_before_any_sale" label="minimum days publicly available before any sale">
+    <variable id="decision_minimum_days_publicly_available_before_any_sale_var" name="minimum_days_publicly_available_before_any_sale" label="minimum days publicly available before any sale" typeRef="number"/>
     <literalExpression id="decision_minimum_days_publicly_available_before_any_sale_literal">
       <text>21</text>
     </literalExpression>
   </decision>
-  <decision id="decision_days_to_file_the_annual_report_after_fiscal_year_end" name="days to file the annual report after fiscal year end">
-    <variable id="decision_days_to_file_the_annual_report_after_fiscal_year_end_var" name="days to file the annual report after fiscal year end" typeRef="number"/>
+  <decision id="decision_days_to_file_the_annual_report_after_fiscal_year_end" name="days_to_file_the_annual_report_after_fiscal_year_end" label="days to file the annual report after fiscal year end">
+    <variable id="decision_days_to_file_the_annual_report_after_fiscal_year_end_var" name="days_to_file_the_annual_report_after_fiscal_year_end" label="days to file the annual report after fiscal year end" typeRef="number"/>
     <literalExpression id="decision_days_to_file_the_annual_report_after_fiscal_year_end_literal">
       <text>120</text>
     </literalExpression>
   </decision>
-  <decision id="decision_business_days_to_file_form_c_tr" name="business days to file Form C-TR">
-    <variable id="decision_business_days_to_file_form_c_tr_var" name="business days to file Form C_TR" typeRef="number"/>
+  <decision id="decision_business_days_to_file_form_c_tr" name="business_days_to_file_Form_C_TR" label="business days to file Form C-TR">
+    <variable id="decision_business_days_to_file_form_c_tr_var" name="business_days_to_file_Form_C_TR" label="business days to file Form C-TR" typeRef="number"/>
     <literalExpression id="decision_business_days_to_file_form_c_tr_literal">
       <text>5</text>
     </literalExpression>
   </decision>
-  <decision id="decision_business_days_to_file_a_progress_update" name="business days to file a progress update">
-    <variable id="decision_business_days_to_file_a_progress_update_var" name="business days to file a progress update" typeRef="number"/>
+  <decision id="decision_business_days_to_file_a_progress_update" name="business_days_to_file_a_progress_update" label="business days to file a progress update">
+    <variable id="decision_business_days_to_file_a_progress_update_var" name="business_days_to_file_a_progress_update" label="business days to file a progress update" typeRef="number"/>
     <literalExpression id="decision_business_days_to_file_a_progress_update_literal">
       <text>5</text>
     </literalExpression>
   </decision>
-  <decision id="decision_days_in_the_resale_restricted_period" name="days in the resale restricted period">
-    <variable id="decision_days_in_the_resale_restricted_period_var" name="days in the resale restricted period" typeRef="number"/>
+  <decision id="decision_days_in_the_resale_restricted_period" name="days_in_the_resale_restricted_period" label="days in the resale restricted period">
+    <variable id="decision_days_in_the_resale_restricted_period_var" name="days_in_the_resale_restricted_period" label="days in the resale restricted period" typeRef="number"/>
     <literalExpression id="decision_days_in_the_resale_restricted_period_literal">
       <text>365</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_1_not_organized_under_state_or_territorial_law" name="(b)(1) — not organized under State or territorial law">
-    <variable id="decision_b_1_not_organized_under_state_or_territorial_law_var" name="_b__1_ _ not organized under State or territorial law" typeRef="boolean"/>
+  <decision id="decision_b_1_not_organized_under_state_or_territorial_law" name="b_1_not_organized_under_State_or_territorial_law" label="(b)(1) — not organized under State or territorial law">
+    <variable id="decision_b_1_not_organized_under_state_or_territorial_law_var" name="b_1_not_organized_under_State_or_territorial_law" label="(b)(1) — not organized under State or territorial law" typeRef="boolean"/>
     <informationRequirement id="decision_b_1_not_organized_under_state_or_territorial_law_ir1">
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_1_not_organized_under_state_or_territorial_law_literal">
-      <text>true and not(issuer.is organized under_ and subject to_ the laws of a State or territory of the United States or the District of Columbia)</text>
+      <text>true and not(issuer.is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_2_an_exchange_act_reporting_company" name="(b)(2) — an Exchange Act reporting company">
-    <variable id="decision_b_2_an_exchange_act_reporting_company_var" name="_b__2_ _ an Exchange Act reporting company" typeRef="boolean"/>
+  <decision id="decision_b_2_an_exchange_act_reporting_company" name="b_2_an_Exchange_Act_reporting_company" label="(b)(2) — an Exchange Act reporting company">
+    <variable id="decision_b_2_an_exchange_act_reporting_company_var" name="b_2_an_Exchange_Act_reporting_company" label="(b)(2) — an Exchange Act reporting company" typeRef="boolean"/>
     <informationRequirement id="decision_b_2_an_exchange_act_reporting_company_ir1">
       <requiredInput href="#input_issuer_2"/>
     </informationRequirement>
     <literalExpression id="decision_b_2_an_exchange_act_reporting_company_literal">
-      <text>true and issuer.is subject to the requirement to file reports pursuant to section 13 or section 15_d_ of the Exchange Act</text>
+      <text>true and issuer.is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_3_an_investment_company" name="(b)(3) — an investment company">
-    <variable id="decision_b_3_an_investment_company_var" name="_b__3_ _ an investment company" typeRef="boolean"/>
+  <decision id="decision_b_3_an_investment_company" name="b_3_an_investment_company" label="(b)(3) — an investment company">
+    <variable id="decision_b_3_an_investment_company_var" name="b_3_an_investment_company" label="(b)(3) — an investment company" typeRef="boolean"/>
     <informationRequirement id="decision_b_3_an_investment_company_ir1">
       <requiredInput href="#input_issuer_3"/>
     </informationRequirement>
     <literalExpression id="decision_b_3_an_investment_company_literal">
-      <text>true and issuer.is an investment company_ or is excluded from the definition of investment company by section 3_b_ or section 3_c_</text>
+      <text>true and issuer.is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_4_subject_to_a_bad_actor_disqualification" name="(b)(4) — subject to a bad-actor disqualification">
-    <variable id="decision_b_4_subject_to_a_bad_actor_disqualification_var" name="_b__4_ _ subject to a bad_actor disqualification" typeRef="boolean"/>
+  <decision id="decision_b_4_subject_to_a_bad_actor_disqualification" name="b_4_subject_to_a_bad_actor_disqualification" label="(b)(4) — subject to a bad-actor disqualification">
+    <variable id="decision_b_4_subject_to_a_bad_actor_disqualification_var" name="b_4_subject_to_a_bad_actor_disqualification" label="(b)(4) — subject to a bad-actor disqualification" typeRef="boolean"/>
     <informationRequirement id="decision_b_4_subject_to_a_bad_actor_disqualification_ir1">
       <requiredInput href="#input_issuer_4"/>
     </informationRequirement>
     <literalExpression id="decision_b_4_subject_to_a_bad_actor_disqualification_literal">
-      <text>true and issuer.is subject to a disqualification as specified in section 227.503_a_</text>
+      <text>true and issuer.is_subject_to_a_disqualification_as_specified_in_section_227_503_a</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_5_delinquent_in_ongoing_annual_reports" name="(b)(5) — delinquent in ongoing annual reports">
-    <variable id="decision_b_5_delinquent_in_ongoing_annual_reports_var" name="_b__5_ _ delinquent in ongoing annual reports" typeRef="boolean"/>
+  <decision id="decision_b_5_delinquent_in_ongoing_annual_reports" name="b_5_delinquent_in_ongoing_annual_reports" label="(b)(5) — delinquent in ongoing annual reports">
+    <variable id="decision_b_5_delinquent_in_ongoing_annual_reports_var" name="b_5_delinquent_in_ongoing_annual_reports" label="(b)(5) — delinquent in ongoing annual reports" typeRef="boolean"/>
     <informationRequirement id="decision_b_5_delinquent_in_ongoing_annual_reports_ir1">
       <requiredInput href="#input_issuer_5"/>
     </informationRequirement>
     <literalExpression id="decision_b_5_delinquent_in_ongoing_annual_reports_literal">
-      <text>true and issuer.has sold securities in reliance on section 4_a__6_ and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement</text>
+      <text>true and issuer.has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan" name="(b)(6) — no specific business plan, or a blank-check business plan">
-    <variable id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_var" name="_b__6_ _ no specific business plan_ or a blank_check business plan" typeRef="boolean"/>
+  <decision id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan" name="b_6_no_specific_business_plan_or_a_blank_check_business_plan" label="(b)(6) — no specific business plan, or a blank-check business plan">
+    <variable id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_var" name="b_6_no_specific_business_plan_or_a_blank_check_business_plan" label="(b)(6) — no specific business plan, or a blank-check business plan" typeRef="boolean"/>
     <informationRequirement id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_ir1">
       <requiredInput href="#input_issuer_6"/>
     </informationRequirement>
     <literalExpression id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_literal">
-      <text>true and issuer.has no specific business plan_ or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies</text>
+      <text>true and issuer.has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies</text>
     </literalExpression>
   </decision>
-  <decision id="decision_issuer_is_excluded_by_rule_100_b" name="issuer is excluded by Rule 100(b)">
-    <variable id="decision_issuer_is_excluded_by_rule_100_b_var" name="issuer is excluded by Rule 100_b_" typeRef="boolean"/>
+  <decision id="decision_issuer_is_excluded_by_rule_100_b" name="issuer_is_excluded_by_Rule_100_b" label="issuer is excluded by Rule 100(b)">
+    <variable id="decision_issuer_is_excluded_by_rule_100_b_var" name="issuer_is_excluded_by_Rule_100_b" label="issuer is excluded by Rule 100(b)" typeRef="boolean"/>
     <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir1">
       <requiredDecision href="#decision_b_1_not_organized_under_state_or_territorial_law"/>
     </informationRequirement>
@@ -348,8 +348,8 @@
       <text>... "(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:" OR `(b)(1) — not organized under State or territorial law` OF issuer OR `(b)(2) — an Exchange Act reporting company` OF issuer OR `(b)(3) — an investment company` OF issuer OR `(b)(4) — subject to a bad-actor disqualification` OF issuer OR `(b)(5) — delinquent in ongoing annual reports` OF issuer OR `(b)(6) — no specific business plan, or a blank-check business plan` OF issuer</text>
     </literalExpression>
   </decision>
-  <decision id="decision_issuer_is_eligible" name="issuer is eligible">
-    <variable id="decision_issuer_is_eligible_var" name="issuer is eligible" typeRef="boolean"/>
+  <decision id="decision_issuer_is_eligible" name="issuer_is_eligible" label="issuer is eligible">
+    <variable id="decision_issuer_is_eligible_var" name="issuer_is_eligible" label="issuer is eligible" typeRef="boolean"/>
     <informationRequirement id="decision_issuer_is_eligible_ir1">
       <requiredDecision href="#decision_issuer_is_excluded_by_rule_100_b"/>
     </informationRequirement>
@@ -360,17 +360,17 @@
       <text>NOT `issuer is excluded by Rule 100(b)` OF issuer</text>
     </literalExpression>
   </decision>
-  <decision id="decision_aggregate_offering_amount" name="aggregate offering amount">
-    <variable id="decision_aggregate_offering_amount_var" name="aggregate offering amount" typeRef="number"/>
+  <decision id="decision_aggregate_offering_amount" name="aggregate_offering_amount" label="aggregate offering amount">
+    <variable id="decision_aggregate_offering_amount_var" name="aggregate_offering_amount" label="aggregate offering amount" typeRef="number"/>
     <informationRequirement id="decision_aggregate_offering_amount_ir1">
       <requiredInput href="#input_offering"/>
     </informationRequirement>
     <literalExpression id="decision_aggregate_offering_amount_literal">
-      <text>offering.aggregate amount sold in reliance on section 4_a__6_ during the preceding 12 months + offering.maximum offering amount the issuer will accept</text>
+      <text>offering.aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months + offering.maximum_offering_amount_the_issuer_will_accept</text>
     </literalExpression>
   </decision>
-  <decision id="decision_offering_is_within_the_offering_limit" name="offering is within the offering limit">
-    <variable id="decision_offering_is_within_the_offering_limit_var" name="offering is within the offering limit" typeRef="boolean"/>
+  <decision id="decision_offering_is_within_the_offering_limit" name="offering_is_within_the_offering_limit" label="offering is within the offering limit">
+    <variable id="decision_offering_is_within_the_offering_limit_var" name="offering_is_within_the_offering_limit" label="offering is within the offering limit" typeRef="boolean"/>
     <informationRequirement id="decision_offering_is_within_the_offering_limit_ir1">
       <requiredDecision href="#decision_aggregate_offering_amount"/>
     </informationRequirement>
@@ -384,17 +384,17 @@
       <text>... "(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;" AND (`aggregate offering amount` OF offering) AT MOST `offering maximum in a 12-month period`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_greater_of_annual_income_or_net_worth" name="greater of annual income or net worth">
-    <variable id="decision_greater_of_annual_income_or_net_worth_var" name="greater of annual income or net worth" typeRef="number"/>
+  <decision id="decision_greater_of_annual_income_or_net_worth" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth">
+    <variable id="decision_greater_of_annual_income_or_net_worth_var" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth" typeRef="number"/>
     <informationRequirement id="decision_greater_of_annual_income_or_net_worth_ir1">
       <requiredInput href="#input_investor"/>
     </informationRequirement>
     <literalExpression id="decision_greater_of_annual_income_or_net_worth_literal">
-      <text>max(investor.annual income, investor.net worth)</text>
+      <text>max(investor.annual_income, investor.net_worth)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point" name="either annual income or net worth is less than the cut point">
-    <variable id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_var" name="either annual income or net worth is less than the cut point" typeRef="boolean"/>
+  <decision id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point">
+    <variable id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_var" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point" typeRef="boolean"/>
     <informationRequirement id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1">
       <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
     </informationRequirement>
@@ -402,11 +402,11 @@
       <requiredInput href="#input_investor_2"/>
     </informationRequirement>
     <literalExpression id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_literal">
-      <text>investor.annual income &lt; income or net worth cut point or investor.net worth &lt; income or net worth cut point</text>
+      <text>investor.annual_income &lt; income_or_net_worth_cut_point or investor.net_worth &lt; income_or_net_worth_cut_point</text>
     </literalExpression>
   </decision>
-  <decision id="decision_investment_limit" name="investment limit">
-    <variable id="decision_investment_limit_var" name="investment limit" typeRef="number"/>
+  <decision id="decision_investment_limit" name="investment_limit" label="investment limit">
+    <variable id="decision_investment_limit_var" name="investment_limit" label="investment limit" typeRef="number"/>
     <informationRequirement id="decision_investment_limit_ir1">
       <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
     </informationRequirement>
@@ -428,7 +428,7 @@
           <text>`either annual income or net worth is less than the cut point` OF investor</text>
         </inputExpression>
       </input>
-      <output id="decision_investment_limit_o1" name="investment limit" typeRef="number">
+      <output id="decision_investment_limit_o1">
         <defaultOutputEntry id="decision_investment_limit_o1_default">
           <text>IF ((0.1 TIMES (`greater of annual income or net worth` OF investor)) AT MOST `maximum amount sold to any one investor in a 12-month period`) THEN (0.1 TIMES (`greater of annual income or net worth` OF investor)) ELSE `maximum amount sold to any one investor in a 12-month period`</text>
         </defaultOutputEntry>
@@ -444,8 +444,8 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction" name="aggregate amount sold to this investor including this transaction">
-    <variable id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_var" name="aggregate amount sold to this investor including this transaction" typeRef="number"/>
+  <decision id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction" name="aggregate_amount_sold_to_this_investor_including_this_transaction" label="aggregate amount sold to this investor including this transaction">
+    <variable id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_var" name="aggregate_amount_sold_to_this_investor_including_this_transaction" label="aggregate amount sold to this investor including this transaction" typeRef="number"/>
     <informationRequirement id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1">
       <requiredInput href="#input_amount_to_be_sold_in_this_transaction"/>
     </informationRequirement>
@@ -453,11 +453,11 @@
       <requiredInput href="#input_investor_4"/>
     </informationRequirement>
     <literalExpression id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_literal">
-      <text>investor.aggregate amount already sold to this investor across all issuers in reliance on section 4_a__6_ during the preceding 12 months + amount to be sold in this transaction</text>
+      <text>investor.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction</text>
     </literalExpression>
   </decision>
-  <decision id="decision_investor_is_within_the_investment_limit" name="investor is within the investment limit">
-    <variable id="decision_investor_is_within_the_investment_limit_var" name="investor is within the investment limit" typeRef="boolean"/>
+  <decision id="decision_investor_is_within_the_investment_limit" name="investor_is_within_the_investment_limit" label="investor is within the investment limit">
+    <variable id="decision_investor_is_within_the_investment_limit_var" name="investor_is_within_the_investment_limit" label="investor is within the investment limit" typeRef="boolean"/>
     <informationRequirement id="decision_investor_is_within_the_investment_limit_ir1">
       <requiredDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
     </informationRequirement>
@@ -474,8 +474,8 @@
       <text>... "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:" OR investor's `is an accredited investor as defined in Rule 501` OR (`aggregate amount sold to this investor including this transaction` OF investor, `amount to be sold in this transaction`) AT MOST (`investment limit` OF investor)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_financial_statements_required" name="financial statements required">
-    <variable id="decision_financial_statements_required_var" name="financial statements required" typeRef="string"/>
+  <decision id="decision_financial_statements_required" name="financial_statements_required" label="financial statements required">
+    <variable id="decision_financial_statements_required_var" name="financial_statements_required" label="financial statements required" typeRef="string"/>
     <informationRequirement id="decision_financial_statements_required_ir1">
       <requiredDecision href="#decision_aggregate_offering_amount"/>
     </informationRequirement>
@@ -504,7 +504,7 @@
       </input>
       <input id="decision_financial_statements_required_i3" label="offering&apos;s `the issuer has previously sold securities in reliance on section 4(a)(6)`">
         <inputExpression id="decision_financial_statements_required_i3_expr" typeRef="boolean">
-          <text>offering.the issuer has previously sold securities in reliance on section 4_a__6_</text>
+          <text>offering.the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6</text>
         </inputExpression>
       </input>
       <input id="decision_financial_statements_required_i4" label="(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`">
@@ -512,7 +512,7 @@
           <text>(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`</text>
         </inputExpression>
       </input>
-      <output id="decision_financial_statements_required_o1" name="financial statements required" typeRef="string"/>
+      <output id="decision_financial_statements_required_o1"/>
       <rule id="decision_financial_statements_required_r1">
         <description>(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`</description>
         <inputEntry id="decision_financial_statements_required_r1_i1">
@@ -587,8 +587,8 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_assurance_level" name="assurance level">
-    <variable id="decision_assurance_level_var" name="assurance level" typeRef="number"/>
+  <decision id="decision_assurance_level" name="assurance_level" label="assurance level">
+    <variable id="decision_assurance_level_var" name="assurance_level" label="assurance level" typeRef="number"/>
     <informationRequirement id="decision_assurance_level_ir1">
       <requiredInput href="#input_required"/>
     </informationRequirement>
@@ -598,7 +598,7 @@
           <text>required</text>
         </inputExpression>
       </input>
-      <output id="decision_assurance_level_o1" name="assurance level" typeRef="number"/>
+      <output id="decision_assurance_level_o1"/>
       <rule id="decision_assurance_level_r1">
         <description>required EQUALS `financial statements certified by the principal executive officer, with tax return information`</description>
         <inputEntry id="decision_assurance_level_r1_i1">
@@ -628,8 +628,8 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_financial_statement_requirement_is_satisfied" name="financial statement requirement is satisfied">
-    <variable id="decision_financial_statement_requirement_is_satisfied_var" name="financial statement requirement is satisfied" typeRef="boolean"/>
+  <decision id="decision_financial_statement_requirement_is_satisfied" name="financial_statement_requirement_is_satisfied" label="financial statement requirement is satisfied">
+    <variable id="decision_financial_statement_requirement_is_satisfied_var" name="financial_statement_requirement_is_satisfied" label="financial statement requirement is satisfied" typeRef="boolean"/>
     <informationRequirement id="decision_financial_statement_requirement_is_satisfied_ir1">
       <requiredDecision href="#decision_assurance_level"/>
     </informationRequirement>
@@ -646,8 +646,8 @@
       <text>(`assurance level` OF supplied) AT LEAST (`assurance level` OF (`financial statements required` OF offering))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_disclosure_requirements_are_met" name="disclosure requirements are met">
-    <variable id="decision_disclosure_requirements_are_met_var" name="disclosure requirements are met" typeRef="boolean"/>
+  <decision id="decision_disclosure_requirements_are_met" name="disclosure_requirements_are_met" label="disclosure requirements are met">
+    <variable id="decision_disclosure_requirements_are_met_var" name="disclosure_requirements_are_met" label="disclosure requirements are met" typeRef="boolean"/>
     <informationRequirement id="decision_disclosure_requirements_are_met_ir1">
       <requiredDecision href="#decision_financial_statement_requirement_is_satisfied"/>
     </informationRequirement>
@@ -661,17 +661,17 @@
       <text>... "(1) Offering statement. ... an issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act ... must file with the Commission and provide to investors and the relevant intermediary a Form C: Offering Statement prior to the commencement of the offering of securities. ... Every Form C must include the information required by section 227.201." AND filing's `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` AND filing's `the Form C includes the information required by section 227.201` AND `financial statement requirement is satisfied` OF offering, (filing's `the financial statements supplied`)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_3_conducted_through_a_single_complying_intermediary" name="(a)(3) — conducted through a single complying intermediary">
-    <variable id="decision_a_3_conducted_through_a_single_complying_intermediary_var" name="_a__3_ _ conducted through a single complying intermediary" typeRef="boolean"/>
+  <decision id="decision_a_3_conducted_through_a_single_complying_intermediary" name="a_3_conducted_through_a_single_complying_intermediary" label="(a)(3) — conducted through a single complying intermediary">
+    <variable id="decision_a_3_conducted_through_a_single_complying_intermediary_var" name="a_3_conducted_through_a_single_complying_intermediary" label="(a)(3) — conducted through a single complying intermediary" typeRef="boolean"/>
     <informationRequirement id="decision_a_3_conducted_through_a_single_complying_intermediary_ir1">
       <requiredInput href="#input_arrangement"/>
     </informationRequirement>
     <literalExpression id="decision_a_3_conducted_through_a_single_complying_intermediary_literal">
-      <text>true and (arrangement.the intermediary complies with section 4A_a_ of the Securities Act and the related requirements in this part and (arrangement.the transaction is conducted exclusively through the intermediary_s platform and (true and arrangement.the number of intermediaries used for the offering = 1)))</text>
+      <text>true and (arrangement.the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part and (arrangement.the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform and (true and arrangement.the_number_of_intermediaries_used_for_the_offering = 1)))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_21_day_public_availability_period_has_run" name="the 21-day public availability period has run">
-    <variable id="decision_the_21_day_public_availability_period_has_run_var" name="the 21_day public availability period has run" typeRef="boolean"/>
+  <decision id="decision_the_21_day_public_availability_period_has_run" name="the_21_day_public_availability_period_has_run" label="the 21-day public availability period has run">
+    <variable id="decision_the_21_day_public_availability_period_has_run_var" name="the_21_day_public_availability_period_has_run" label="the 21-day public availability period has run" typeRef="boolean"/>
     <informationRequirement id="decision_the_21_day_public_availability_period_has_run_ir1">
       <requiredDecision href="#decision_minimum_days_publicly_available_before_any_sale"/>
     </informationRequirement>
@@ -679,20 +679,20 @@
       <requiredInput href="#input_arrangement_2"/>
     </informationRequirement>
     <literalExpression id="decision_the_21_day_public_availability_period_has_run_literal">
-      <text>true and arrangement.the days the issuer information has been publicly available on the intermediary_s platform before any sale &gt;= minimum days publicly available before any sale</text>
+      <text>true and arrangement.the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale &gt;= minimum_days_publicly_available_before_any_sale</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_intermediary_has_discharged_its_investor_facing_duties" name="the intermediary has discharged its investor-facing duties">
-    <variable id="decision_the_intermediary_has_discharged_its_investor_facing_duties_var" name="the intermediary has discharged its investor_facing duties" typeRef="boolean"/>
+  <decision id="decision_the_intermediary_has_discharged_its_investor_facing_duties" name="the_intermediary_has_discharged_its_investor_facing_duties" label="the intermediary has discharged its investor-facing duties">
+    <variable id="decision_the_intermediary_has_discharged_its_investor_facing_duties_var" name="the_intermediary_has_discharged_its_investor_facing_duties" label="the intermediary has discharged its investor-facing duties" typeRef="boolean"/>
     <informationRequirement id="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1">
       <requiredInput href="#input_arrangement_3"/>
     </informationRequirement>
     <literalExpression id="decision_the_intermediary_has_discharged_its_investor_facing_duties_literal">
-      <text>true and (arrangement.the intermediary delivered educational materials in connection with establishing the investor_s account and (true and arrangement.the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations))</text>
+      <text>true and (arrangement.the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account and (true and arrangement.the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_intermediary_obligations_are_met" name="intermediary obligations are met">
-    <variable id="decision_intermediary_obligations_are_met_var" name="intermediary obligations are met" typeRef="boolean"/>
+  <decision id="decision_intermediary_obligations_are_met" name="intermediary_obligations_are_met" label="intermediary obligations are met">
+    <variable id="decision_intermediary_obligations_are_met_var" name="intermediary_obligations_are_met" label="intermediary obligations are met" typeRef="boolean"/>
     <informationRequirement id="decision_intermediary_obligations_are_met_ir1">
       <requiredDecision href="#decision_a_3_conducted_through_a_single_complying_intermediary"/>
     </informationRequirement>
@@ -709,23 +709,23 @@
       <text>`(a)(3) — conducted through a single complying intermediary` OF arrangement AND `the 21-day public availability period has run` OF arrangement AND `the intermediary has discharged its investor-facing duties` OF arrangement</text>
     </literalExpression>
   </decision>
-  <decision id="decision_notice_complies_with_rule_204_b" name="notice complies with Rule 204(b)">
-    <variable id="decision_notice_complies_with_rule_204_b_var" name="notice complies with Rule 204_b_" typeRef="boolean"/>
+  <decision id="decision_notice_complies_with_rule_204_b" name="notice_complies_with_Rule_204_b" label="notice complies with Rule 204(b)">
+    <variable id="decision_notice_complies_with_rule_204_b_var" name="notice_complies_with_Rule_204_b" label="notice complies with Rule 204(b)" typeRef="boolean"/>
     <informationRequirement id="decision_notice_complies_with_rule_204_b_ir1">
       <requiredInput href="#input_notice"/>
     </informationRequirement>
     <literalExpression id="decision_notice_complies_with_rule_204_b_literal">
-      <text>true and (notice.directs investors to the intermediary_s platform and (true and (true and (true and not(notice.includes information beyond that permitted by paragraph _b_)))))</text>
+      <text>true and (notice.directs_investors_to_the_intermediary_s_platform and (true and (true and (true and not(notice.includes_information_beyond_that_permitted_by_paragraph_b)))))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_definition_terms_of_the_offering" name="definition — terms of the offering">
-    <variable id="decision_definition_terms_of_the_offering_var" name="definition _ terms of the offering" typeRef="boolean"/>
+  <decision id="decision_definition_terms_of_the_offering" name="definition_terms_of_the_offering" label="definition — terms of the offering">
+    <variable id="decision_definition_terms_of_the_offering_var" name="definition_terms_of_the_offering" label="definition — terms of the offering" typeRef="boolean"/>
     <literalExpression id="decision_definition_terms_of_the_offering_literal">
       <text>true and true</text>
     </literalExpression>
   </decision>
-  <decision id="decision_advertising_restriction" name="advertising restriction">
-    <variable id="decision_advertising_restriction_var" name="advertising restriction" typeRef="Any"/>
+  <decision id="decision_advertising_restriction" name="advertising_restriction" label="advertising restriction">
+    <variable id="decision_advertising_restriction_var" name="advertising_restriction" label="advertising restriction" typeRef="Any"/>
     <informationRequirement id="decision_advertising_restriction_ir1">
       <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
     </informationRequirement>
@@ -739,17 +739,17 @@
       <text>IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering` WITHIN `days in the resale restricted period`)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_1_became_an_exchange_act_reporting_company" name="(b)(1) — became an Exchange Act reporting company">
-    <variable id="decision_b_1_became_an_exchange_act_reporting_company_var" name="_b__1_ _ became an Exchange Act reporting company" typeRef="boolean"/>
+  <decision id="decision_b_1_became_an_exchange_act_reporting_company" name="b_1_became_an_Exchange_Act_reporting_company" label="(b)(1) — became an Exchange Act reporting company">
+    <variable id="decision_b_1_became_an_exchange_act_reporting_company_var" name="b_1_became_an_Exchange_Act_reporting_company" label="(b)(1) — became an Exchange Act reporting company" typeRef="boolean"/>
     <informationRequirement id="decision_b_1_became_an_exchange_act_reporting_company_ir1">
       <requiredInput href="#input_status"/>
     </informationRequirement>
     <literalExpression id="decision_b_1_became_an_exchange_act_reporting_company_literal">
-      <text>true and status.the issuer is required to file reports under section 13_a_ or section 15_d_ of the Exchange Act</text>
+      <text>true and status.the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" name="(b)(2) — one annual report filed and fewer than 300 holders of record">
-    <variable id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_var" name="_b__2_ _ one annual report filed and fewer than 300 holders of record" typeRef="boolean"/>
+  <decision id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" name="b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" label="(b)(2) — one annual report filed and fewer than 300 holders of record">
+    <variable id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_var" name="b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" label="(b)(2) — one annual report filed and fewer than 300 holders of record" typeRef="boolean"/>
     <informationRequirement id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1">
       <requiredDecision href="#decision_holders_of_record_threshold"/>
     </informationRequirement>
@@ -757,11 +757,11 @@
       <requiredInput href="#input_status_2"/>
     </informationRequirement>
     <literalExpression id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_literal">
-      <text>true and (status.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 1 and status.holders of record &lt; holders of record threshold)</text>
+      <text>true and (status.annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part &gt;= 1 and status.holders_of_record &lt; holders_of_record_threshold)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" name="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000">
-    <variable id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_var" name="_b__3_ _ three annual reports filed and total assets not exceeding _10_000_000" typeRef="boolean"/>
+  <decision id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" name="b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" label="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000">
+    <variable id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_var" name="b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" label="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000" typeRef="boolean"/>
     <informationRequirement id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1">
       <requiredDecision href="#decision_total_assets_threshold"/>
     </informationRequirement>
@@ -769,29 +769,29 @@
       <requiredInput href="#input_status_3"/>
     </informationRequirement>
     <literalExpression id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_literal">
-      <text>true and (status.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 3 and status.total assets &lt;= total assets threshold)</text>
+      <text>true and (status.annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part &gt;= 3 and status.total_assets &lt;= total_assets_threshold)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_4_all_securities_repurchased" name="(b)(4) — all securities repurchased">
-    <variable id="decision_b_4_all_securities_repurchased_var" name="_b__4_ _ all securities repurchased" typeRef="boolean"/>
+  <decision id="decision_b_4_all_securities_repurchased" name="b_4_all_securities_repurchased" label="(b)(4) — all securities repurchased">
+    <variable id="decision_b_4_all_securities_repurchased_var" name="b_4_all_securities_repurchased" label="(b)(4) — all securities repurchased" typeRef="boolean"/>
     <informationRequirement id="decision_b_4_all_securities_repurchased_ir1">
       <requiredInput href="#input_status_4"/>
     </informationRequirement>
     <literalExpression id="decision_b_4_all_securities_repurchased_literal">
-      <text>true and status.the issuer or another party has repurchased all of the securities issued in reliance on section 4_a__6_</text>
+      <text>true and status.the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6</text>
     </literalExpression>
   </decision>
-  <decision id="decision_b_5_liquidated_or_dissolved" name="(b)(5) — liquidated or dissolved">
-    <variable id="decision_b_5_liquidated_or_dissolved_var" name="_b__5_ _ liquidated or dissolved" typeRef="boolean"/>
+  <decision id="decision_b_5_liquidated_or_dissolved" name="b_5_liquidated_or_dissolved" label="(b)(5) — liquidated or dissolved">
+    <variable id="decision_b_5_liquidated_or_dissolved_var" name="b_5_liquidated_or_dissolved" label="(b)(5) — liquidated or dissolved" typeRef="boolean"/>
     <informationRequirement id="decision_b_5_liquidated_or_dissolved_ir1">
       <requiredInput href="#input_status_5"/>
     </informationRequirement>
     <literalExpression id="decision_b_5_liquidated_or_dissolved_literal">
-      <text>true and status.the issuer has liquidated or dissolved its business in accordance with state law</text>
+      <text>true and status.the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law</text>
     </literalExpression>
   </decision>
-  <decision id="decision_ongoing_reporting_obligation_may_terminate" name="ongoing reporting obligation may terminate">
-    <variable id="decision_ongoing_reporting_obligation_may_terminate_var" name="ongoing reporting obligation may terminate" typeRef="boolean"/>
+  <decision id="decision_ongoing_reporting_obligation_may_terminate" name="ongoing_reporting_obligation_may_terminate" label="ongoing reporting obligation may terminate">
+    <variable id="decision_ongoing_reporting_obligation_may_terminate_var" name="ongoing_reporting_obligation_may_terminate" label="ongoing reporting obligation may terminate" typeRef="boolean"/>
     <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir1">
       <requiredDecision href="#decision_b_1_became_an_exchange_act_reporting_company"/>
     </informationRequirement>
@@ -814,8 +814,8 @@
       <text>... "(b) An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:" OR `(b)(1) — became an Exchange Act reporting company` OF status OR `(b)(2) — one annual report filed and fewer than 300 holders of record` OF status OR `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` OF status OR `(b)(4) — all securities repurchased` OF status OR `(b)(5) — liquidated or dissolved` OF status</text>
     </literalExpression>
   </decision>
-  <decision id="decision_ongoing_reporting_obligation" name="ongoing reporting obligation">
-    <variable id="decision_ongoing_reporting_obligation_var" name="ongoing reporting obligation" typeRef="Any"/>
+  <decision id="decision_ongoing_reporting_obligation" name="ongoing_reporting_obligation" label="ongoing reporting obligation">
+    <variable id="decision_ongoing_reporting_obligation_var" name="ongoing_reporting_obligation" label="ongoing reporting obligation" typeRef="Any"/>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir1">
       <requiredDecision href="#decision_business_days_to_file_form_c_tr"/>
     </informationRequirement>
@@ -835,8 +835,8 @@
       <text>IF (`ongoing reporting obligation may terminate` OF status) THEN (PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`) ELSE (IF (`annual cycles` AT MOST 0) THEN FULFILLED ELSE (PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_transfer_is_within_the_one_year_restricted_period" name="transfer is within the one-year restricted period">
-    <variable id="decision_transfer_is_within_the_one_year_restricted_period_var" name="transfer is within the one_year restricted period" typeRef="boolean"/>
+  <decision id="decision_transfer_is_within_the_one_year_restricted_period" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period">
+    <variable id="decision_transfer_is_within_the_one_year_restricted_period_var" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period" typeRef="boolean"/>
     <informationRequirement id="decision_transfer_is_within_the_one_year_restricted_period_ir1">
       <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
     </informationRequirement>
@@ -844,20 +844,20 @@
       <requiredInput href="#input_transfer"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_is_within_the_one_year_restricted_period_literal">
-      <text>true and transfer.days since the securities were issued &lt; days in the resale restricted period</text>
+      <text>true and transfer.days_since_the_securities_were_issued &lt; days_in_the_resale_restricted_period</text>
     </literalExpression>
   </decision>
-  <decision id="decision_transfer_falls_within_an_exception_in_rule_501_a" name="transfer falls within an exception in Rule 501(a)">
-    <variable id="decision_transfer_falls_within_an_exception_in_rule_501_a_var" name="transfer falls within an exception in Rule 501_a_" typeRef="boolean"/>
+  <decision id="decision_transfer_falls_within_an_exception_in_rule_501_a" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)">
+    <variable id="decision_transfer_falls_within_an_exception_in_rule_501_a_var" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)" typeRef="boolean"/>
     <informationRequirement id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
       <requiredInput href="#input_transfer_2"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_falls_within_an_exception_in_rule_501_a_literal">
-      <text>false or (false or (transfer.is to the issuer of the securities or (false or (transfer.is to an accredited investor or (false or (transfer.is as part of an offering registered with the Commission or (false or transfer.is to a member of the family of the purchaser or the equivalent_ to a trust controlled by the purchaser_ to a trust created for the benefit of a member of the family of the purchaser or the equivalent_ or in connection with the death or divorce of the purchaser or other similar circumstance)))))))</text>
+      <text>false or (false or (transfer.is_to_the_issuer_of_the_securities or (false or (transfer.is_to_an_accredited_investor or (false or (transfer.is_as_part_of_an_offering_registered_with_the_Commission or (false or transfer.is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))))))</text>
     </literalExpression>
   </decision>
-  <decision id="decision_transfer_is_permitted" name="transfer is permitted">
-    <variable id="decision_transfer_is_permitted_var" name="transfer is permitted" typeRef="boolean"/>
+  <decision id="decision_transfer_is_permitted" name="transfer_is_permitted" label="transfer is permitted">
+    <variable id="decision_transfer_is_permitted_var" name="transfer_is_permitted" label="transfer is permitted" typeRef="boolean"/>
     <informationRequirement id="decision_transfer_is_permitted_ir1">
       <requiredDecision href="#decision_transfer_falls_within_an_exception_in_rule_501_a"/>
     </informationRequirement>
@@ -871,8 +871,8 @@
       <text>NOT `transfer is within the one-year restricted period` OF transfer OR `transfer falls within an exception in Rule 501(a)` OF transfer</text>
     </literalExpression>
   </decision>
-  <decision id="decision_resale_restriction" name="resale restriction">
-    <variable id="decision_resale_restriction_var" name="resale restriction" typeRef="Any"/>
+  <decision id="decision_resale_restriction" name="resale_restriction" label="resale restriction">
+    <variable id="decision_resale_restriction_var" name="resale_restriction" label="resale restriction" typeRef="Any"/>
     <informationRequirement id="decision_resale_restriction_ir1">
       <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
     </informationRequirement>
@@ -886,8 +886,8 @@
       <text>IF (`transfer falls within an exception in Rule 501(a)` OF transfer) THEN FULFILLED ELSE (PARTY Purchaser MUST NOT `transfer the securities` WITHIN `days in the resale restricted period`)</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption" name="the transaction qualifies for the section 4(a)(6) exemption">
-    <variable id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_var" name="the transaction qualifies for the section 4_a__6_ exemption" typeRef="boolean"/>
+  <decision id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption" name="the_transaction_qualifies_for_the_section_4_a_6_exemption" label="the transaction qualifies for the section 4(a)(6) exemption">
+    <variable id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_var" name="the_transaction_qualifies_for_the_section_4_a_6_exemption" label="the transaction qualifies for the section 4(a)(6) exemption" typeRef="boolean"/>
     <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1">
       <requiredDecision href="#decision_disclosure_requirements_are_met"/>
     </informationRequirement>
@@ -925,32 +925,32 @@
       <text>... "(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:" AND `issuer is eligible` OF issuer AND `offering is within the offering limit` OF offering AND `investor is within the investment limit` OF investor, amount AND `intermediary obligations are met` OF arrangement AND `disclosure requirements are met` OF filing, offering</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_clean_issuer" name="a clean issuer">
-    <variable id="decision_a_clean_issuer_var" name="a clean issuer" typeRef="Any"/>
+  <decision id="decision_a_clean_issuer" name="a_clean_issuer" label="a clean issuer">
+    <variable id="decision_a_clean_issuer_var" name="a_clean_issuer" label="a clean issuer" typeRef="Any"/>
     <literalExpression id="decision_a_clean_issuer_literal">
       <text>IssuerProfile WITH name IS "Clean Co" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_foreign_issuer" name="a foreign issuer">
-    <variable id="decision_a_foreign_issuer_var" name="a foreign issuer" typeRef="Any"/>
+  <decision id="decision_a_foreign_issuer" name="a_foreign_issuer" label="a foreign issuer">
+    <variable id="decision_a_foreign_issuer_var" name="a_foreign_issuer" label="a foreign issuer" typeRef="Any"/>
     <literalExpression id="decision_a_foreign_issuer_literal">
       <text>IssuerProfile WITH name IS "Ausland GmbH" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS FALSE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_delinquent_issuer" name="a delinquent issuer">
-    <variable id="decision_a_delinquent_issuer_var" name="a delinquent issuer" typeRef="Any"/>
+  <decision id="decision_a_delinquent_issuer" name="a_delinquent_issuer" label="a delinquent issuer">
+    <variable id="decision_a_delinquent_issuer_var" name="a_delinquent_issuer" label="a delinquent issuer" typeRef="Any"/>
     <literalExpression id="decision_a_delinquent_issuer_literal">
       <text>IssuerProfile WITH name IS "Late Filer Inc" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_blank_check_issuer" name="a blank-check issuer">
-    <variable id="decision_a_blank_check_issuer_var" name="a blank_check issuer" typeRef="Any"/>
+  <decision id="decision_a_blank_check_issuer" name="a_blank_check_issuer" label="a blank-check issuer">
+    <variable id="decision_a_blank_check_issuer_var" name="a_blank_check_issuer" label="a blank-check issuer" typeRef="Any"/>
     <literalExpression id="decision_a_blank_check_issuer_literal">
       <text>IssuerProfile WITH name IS "SPAC-ish LLC" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_an_offering_of" name="an offering of">
-    <variable id="decision_an_offering_of_var" name="an offering of" typeRef="Any"/>
+  <decision id="decision_an_offering_of" name="an_offering_of" label="an offering of">
+    <variable id="decision_an_offering_of_var" name="an_offering_of" label="an offering of" typeRef="Any"/>
     <informationRequirement id="decision_an_offering_of_ir1">
       <requiredInput href="#input_maximum"/>
     </informationRequirement>
@@ -964,8 +964,8 @@
       <text>Offering WITH `target offering amount` IS maximum `maximum offering amount the issuer will accept` IS maximum `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS `prior sales` `the issuer has previously sold securities in reliance on section 4(a)(6)` IS `previously sold`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_an_investor_with" name="an investor with">
-    <variable id="decision_an_investor_with_var" name="an investor with" typeRef="Any"/>
+  <decision id="decision_an_investor_with" name="an_investor_with" label="an investor with">
+    <variable id="decision_an_investor_with_var" name="an_investor_with" label="an investor with" typeRef="Any"/>
     <informationRequirement id="decision_an_investor_with_ir1">
       <requiredInput href="#input_accredited"/>
     </informationRequirement>
@@ -982,8 +982,8 @@
       <text>InvestorProfile WITH name IS "Test Investor" `is an accredited investor as defined in Rule 501` IS accredited `annual income` IS income `net worth` IS worth `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS already</text>
     </literalExpression>
   </decision>
-  <decision id="decision_an_arrangement_with" name="an arrangement with">
-    <variable id="decision_an_arrangement_with_var" name="an arrangement with" typeRef="Any"/>
+  <decision id="decision_an_arrangement_with" name="an_arrangement_with" label="an arrangement with">
+    <variable id="decision_an_arrangement_with_var" name="an_arrangement_with" label="an arrangement with" typeRef="Any"/>
     <informationRequirement id="decision_an_arrangement_with_ir1">
       <requiredInput href="#input_days_available"/>
     </informationRequirement>
@@ -994,8 +994,8 @@
       <text>IntermediaryArrangement WITH `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part` IS TRUE `the transaction is conducted exclusively through the intermediary's platform` IS TRUE `the number of intermediaries used for the offering` IS intermediaries `the intermediary delivered educational materials in connection with establishing the investor's account` IS TRUE `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS TRUE `the days the issuer information has been publicly available on the intermediary's platform before any sale` IS `days available`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_reporting_status_with" name="a reporting status with">
-    <variable id="decision_a_reporting_status_with_var" name="a reporting status with" typeRef="Any"/>
+  <decision id="decision_a_reporting_status_with" name="a_reporting_status_with" label="a reporting status with">
+    <variable id="decision_a_reporting_status_with_var" name="a_reporting_status_with" label="a reporting status with" typeRef="Any"/>
     <informationRequirement id="decision_a_reporting_status_with_ir1">
       <requiredInput href="#input_annual_reports"/>
     </informationRequirement>
@@ -1009,8 +1009,8 @@
       <text>ReportingStatus WITH `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act` IS FALSE `annual reports filed since the most recent sale of securities pursuant to this part` IS `annual reports` `holders of record` IS holders `total assets` IS assets `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS FALSE `the issuer has liquidated or dissolved its business in accordance with state law` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_transfer_at" name="a transfer at">
-    <variable id="decision_a_transfer_at_var" name="a transfer at" typeRef="Any"/>
+  <decision id="decision_a_transfer_at" name="a_transfer_at" label="a transfer at">
+    <variable id="decision_a_transfer_at_var" name="a_transfer_at" label="a transfer at" typeRef="Any"/>
     <informationRequirement id="decision_a_transfer_at_ir1">
       <requiredInput href="#input_days_since_issue"/>
     </informationRequirement>
@@ -1039,26 +1039,26 @@
       <text>"financial statements audited by an independent public accountant"</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_conforming_notice" name="a conforming notice">
-    <variable id="decision_a_conforming_notice_var" name="a conforming notice" typeRef="Any"/>
+  <decision id="decision_a_conforming_notice" name="a_conforming_notice" label="a conforming notice">
+    <variable id="decision_a_conforming_notice_var" name="a_conforming_notice" label="a conforming notice" typeRef="Any"/>
     <literalExpression id="decision_a_conforming_notice_literal">
       <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS TRUE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_an_overreaching_notice" name="an overreaching notice">
-    <variable id="decision_an_overreaching_notice_var" name="an overreaching notice" typeRef="Any"/>
+  <decision id="decision_an_overreaching_notice" name="an_overreaching_notice" label="an overreaching notice">
+    <variable id="decision_an_overreaching_notice_var" name="an_overreaching_notice" label="an overreaching notice" typeRef="Any"/>
     <literalExpression id="decision_an_overreaching_notice_literal">
       <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS TRUE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS TRUE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_notice_with_no_platform_link" name="a notice with no platform link">
-    <variable id="decision_a_notice_with_no_platform_link_var" name="a notice with no platform link" typeRef="Any"/>
+  <decision id="decision_a_notice_with_no_platform_link" name="a_notice_with_no_platform_link" label="a notice with no platform link">
+    <variable id="decision_a_notice_with_no_platform_link_var" name="a_notice_with_no_platform_link" label="a notice with no platform link" typeRef="Any"/>
     <literalExpression id="decision_a_notice_with_no_platform_link_literal">
       <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS FALSE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS FALSE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS FALSE</text>
     </literalExpression>
   </decision>
-  <decision id="decision_a_conforming_filing" name="a conforming filing">
-    <variable id="decision_a_conforming_filing_var" name="a conforming filing" typeRef="Any"/>
+  <decision id="decision_a_conforming_filing" name="a_conforming_filing" label="a conforming filing">
+    <variable id="decision_a_conforming_filing_var" name="a_conforming_filing" label="a conforming filing" typeRef="Any"/>
     <informationRequirement id="decision_a_conforming_filing_ir1">
       <requiredDecision href="#decision_reviewed"/>
     </informationRequirement>
@@ -1066,8 +1066,8 @@
       <text>FormCFiling WITH `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` IS TRUE `the Form C includes the information required by section 227.201` IS TRUE `the financial statements supplied` IS reviewed</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_base_case_qualifies" name="the base case qualifies">
-    <variable id="decision_the_base_case_qualifies_var" name="the base case qualifies" typeRef="boolean"/>
+  <decision id="decision_the_base_case_qualifies" name="the_base_case_qualifies" label="the base case qualifies">
+    <variable id="decision_the_base_case_qualifies_var" name="the_base_case_qualifies" label="the base case qualifies" typeRef="boolean"/>
     <informationRequirement id="decision_the_base_case_qualifies_ir1">
       <requiredDecision href="#decision_a_clean_issuer"/>
     </informationRequirement>
@@ -1090,8 +1090,8 @@
       <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_delinquent_issuer_case_qualifies" name="the delinquent-issuer case qualifies">
-    <variable id="decision_the_delinquent_issuer_case_qualifies_var" name="the delinquent_issuer case qualifies" typeRef="boolean"/>
+  <decision id="decision_the_delinquent_issuer_case_qualifies" name="the_delinquent_issuer_case_qualifies" label="the delinquent-issuer case qualifies">
+    <variable id="decision_the_delinquent_issuer_case_qualifies_var" name="the_delinquent_issuer_case_qualifies" label="the delinquent-issuer case qualifies" typeRef="boolean"/>
     <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir1">
       <requiredDecision href="#decision_a_conforming_filing"/>
     </informationRequirement>
@@ -1114,8 +1114,8 @@
       <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a delinquent issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_over_limit_investor_case_qualifies" name="the over-limit-investor case qualifies">
-    <variable id="decision_the_over_limit_investor_case_qualifies_var" name="the over_limit_investor case qualifies" typeRef="boolean"/>
+  <decision id="decision_the_over_limit_investor_case_qualifies" name="the_over_limit_investor_case_qualifies" label="the over-limit-investor case qualifies">
+    <variable id="decision_the_over_limit_investor_case_qualifies_var" name="the_over_limit_investor_case_qualifies" label="the over-limit-investor case qualifies" typeRef="boolean"/>
     <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir1">
       <requiredDecision href="#decision_a_clean_issuer"/>
     </informationRequirement>
@@ -1138,8 +1138,8 @@
       <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 9000), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_short_availability_case_qualifies" name="the short-availability case qualifies">
-    <variable id="decision_the_short_availability_case_qualifies_var" name="the short_availability case qualifies" typeRef="boolean"/>
+  <decision id="decision_the_short_availability_case_qualifies" name="the_short_availability_case_qualifies" label="the short-availability case qualifies">
+    <variable id="decision_the_short_availability_case_qualifies_var" name="the_short_availability_case_qualifies" label="the short-availability case qualifies" typeRef="boolean"/>
     <informationRequirement id="decision_the_short_availability_case_qualifies_ir1">
       <requiredDecision href="#decision_a_clean_issuer"/>
     </informationRequirement>
@@ -1162,8 +1162,8 @@
       <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 20, 1), `a conforming filing`</text>
     </literalExpression>
   </decision>
-  <decision id="decision_the_under_assured_financials_case_qualifies" name="the under-assured-financials case qualifies">
-    <variable id="decision_the_under_assured_financials_case_qualifies_var" name="the under_assured_financials case qualifies" typeRef="boolean"/>
+  <decision id="decision_the_under_assured_financials_case_qualifies" name="the_under_assured_financials_case_qualifies" label="the under-assured-financials case qualifies">
+    <variable id="decision_the_under_assured_financials_case_qualifies_var" name="the_under_assured_financials_case_qualifies" label="the under-assured-financials case qualifies" typeRef="boolean"/>
     <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir1">
       <requiredDecision href="#decision_a_clean_issuer"/>
     </informationRequirement>

@@ -49,11 +49,12 @@ header says its figures are illustrative. Both are kept, and both are labelled, 
 a shape exhibit and this is the real thing. `expected/reg-cf.*` is the toy; `expected/regcf-corpus.*`
 is the corpus.
 
-### Fidelity: 75 blocking, 9 lossy, 7 advisory
+### Fidelity: 84 blocking, 9 lossy, 9 advisory
 
 | Code                 | ×  | Severity | What it means here                                                                       |
 | -------------------- | -- | -------- | ---------------------------------------------------------------------------------------- |
 | `D-LITERALEXPR`      | 69 | blocking | not a guarded chain, so a boxed literal expression, not a table                            |
+| `D-FEELNAME`         | 9  | blocking | one FEEL name for several elements the module keeps apart; the flat namespace collapses them |
 | `D-SCOPE`            | 9  | lossy    | e.g. **nine** different terms all named `issuer`                                           |
 | `D-NONFEELINPUT`     | 4  | blocking | column text is L4 source, not FEEL; no engine can compile it                               |
 | `D-UNDECOMPOSABLE`   | 4  | advisory | guard has no constant endpoint, so no interval analysis                                    |
@@ -96,7 +97,7 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn.md --fidelity-report
 ```
 
-**981 lines of law become two markdown tables**, and 244 lines of loss report. This is the most
+**981 lines of law become two markdown tables**, and 235 lines of loss report. This is the most
 honest artifact in the set and the least useful one, which is why it ships.
 
 | Code                   | ×  | What it costs                                                     |
@@ -141,10 +142,17 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
 
 - **The base case.** `Split_0 → End_2` carries
   `NOT (…may terminate…) AND \`annual cycles\` AT MOST 0`, the arm that imposes no duty at all.
-- **The renewal loop.** `Task_4 → Start_0`. `HENCE <this rule> <state> (<cycles> MINUS 1)` is an
+- **The renewal loop.** `Task_4 → Split_0`. `HENCE <this rule> <state> (<cycles> MINUS 1)` is an
   application _with arguments_; it used to fall through to "unknown target" and produce a state
   literally named `next` with no successor, so the loop was reported as a dangling path and
   `P-CYCLE` could never fire. It now fires.
+
+  The edge lands on the **gateway**, not on `Start_0`, and that is load-bearing rather than
+  cosmetic: a `<startEvent>` is instance creation and BPMN gives it no incoming sequence flow. An
+  earlier revision of this file drew `Task_4 → Start_0`, and two independent engines refused it —
+  `etc/check-bpmn-soundness.mjs` with _"no start event to put a token on"_, and jBPM with
+  _"A start node [Start_0, null] may not have an incoming connection!"_. Landing on the gateway is
+  also what the rule says: the renewal re-tests the guards, it does not re-start the process.
 - **Conditioned gateways.** Every branch flow out of an exclusive gateway carries a
   `conditionExpression`. They were emitted unconditioned, so the diagram read: pick an arm at
   random, do the work, _then_ test the condition that decided which arm applied.
@@ -174,6 +182,15 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
   overlap — which is precisely what the `IF`/`ELSE` chain they came from _does_ say.
 - **Left-to-right stops meaning time.** `P-CYCLE` on the reporting process: this layout ranks a node
   by its longest path from the start, and a node on a loop has none.
+- **A loop makes the gateway mixed, and not every engine has that shape.** With the renewal edge
+  drawn, `Split_0` has two incoming flows (`Start_0` and `Task_4`) and three outgoing. BPMN 2.0
+  permits it — §10.5.2 allows a gateway to be mixed — and `bpmn-moddle` reports 0 warnings, but
+  jBPM models a gateway as either a split or a join and refuses: _"This type of node [Split_0, one
+  of] cannot have more than one incoming connection!"_ Drawing an explicit converging gateway
+  before the split would satisfy both; it would also put a node in the diagram that the state graph
+  does not have, so it is recorded here rather than done silently. Measured with jBPM/Drools
+  8.44.0.Final on JDK 17; `etc/check-bpmn-kie.sh` reports it, and the `expected/` leg of that gate
+  is tolerated at exit 1 in CI, as `handover.bpmn` already is for an unrelated reason.
 - **A lane is not a bearer.** `F2`: a lane says who _performs_; L4's `PARTY` says who _owes_. They
   come apart whenever an agent acts for a principal.
 - **There is no as-of date.** `F5`. Any number that _does_ appear is a value someone must remember

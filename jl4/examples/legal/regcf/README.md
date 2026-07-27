@@ -383,7 +383,10 @@ with **zero warnings**. It is also, as a program, nearly inert:
   (`D-SCOPE`, lossy, ×9 — and the note now counts the collision, rather than saying
   "two" for a nine-way one). Every one has `typeRef="Any"`: there is no
   `<itemDefinition>` for a record, so `issuer.<field>` binds to nothing.
-- **75 blocking, 9 lossy, 7 advisory** notes in total.
+- **84 blocking, 9 lossy, 9 advisory** notes in total. Nine of the blocking notes are
+  `D-FEELNAME`: the FEEL name that 9 `issuer` binders — and 7 `status`, 6 `offering`,
+  6 `investor` — all mangle down to is one name in a flat namespace, so no FEEL
+  reference can pick one of them.
 
 The cause is one sentence: **a DMN decision is a 0-ary variable**, so every
 cross-decision call `f x` — which is every reference in this corpus, because the
@@ -392,7 +395,7 @@ emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter 
 right to refuse to invent a rendering; the report says so at each site.
 
 The `dmnmd` markdown leg makes the same point in one glance: 981 lines of law become
-**two tables**, plus 244 lines of loss report.
+**two tables**, plus 235 lines of loss report.
 
 An earlier revision of this section reported two further defects that the fidelity
 report did not catch — a section heading spliced into FEEL as a path step (22

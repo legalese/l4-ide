@@ -72,7 +72,7 @@ import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Dmn.Emit (emitDrg)
-import L4.Dmn.IR (dmnReport, drgDecisions)
+import L4.Dmn.IR (DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
@@ -112,6 +112,7 @@ data ExportOptions = ExportOptions
   , exportFidelity     :: Bool
   , exportRule         :: Maybe Text
   , exportModelName    :: Maybe Text
+  , exportFlavor       :: Maybe DmnFlavor
   , exportDeadlineUnit :: Maybe DeadlineUnitPolicy
   , exportFailOn       :: FidelityGate
   }
@@ -126,6 +127,19 @@ exportTargetReader = eitherReader \input ->
     other      -> Left $
       "Invalid export target: " <> Text.unpack other
         <> " (expected dmn|dmn-md|bpmn)"
+
+-- | @drools@ is accepted as a synonym for @kie@ because that is what the engine
+-- is called in half its own documentation; @camunda@ means Camunda 8, which is
+-- an unrelated implementation to Camunda 7 and the only one of the two that can
+-- execute a BKM (see 'DmnFlavor').
+dmnFlavorReader :: ReadM DmnFlavor
+dmnFlavorReader = eitherReader \input ->
+  case Text.toLower (Text.pack input) of
+    "camunda" -> Right FlavorCamunda
+    "kie"     -> Right FlavorKie
+    "drools"  -> Right FlavorKie
+    other     -> Left $
+      "Invalid --flavor: " <> Text.unpack other <> " (expected camunda|kie)"
 
 deadlineUnitReader :: ReadM DeadlineUnitPolicy
 deadlineUnitReader = eitherReader \input ->
@@ -187,6 +201,18 @@ exportOptionsParser = ExportOptions
             )
         )
   <*> optional
+        ( option dmnFlavorReader
+            ( long "flavor"
+           <> metavar "ENGINE"
+           <> showDefaultWith (const "camunda")
+           <> help
+                "DMN only: which engine to shape the document for. camunda (the default, \
+                \= Camunda 8) | kie (= Drools). The two differ on exactly one thing: whether a \
+                \<decisionService> may be the target of a <knowledgeRequirement>. Camunda 8 \
+                \rejects the whole file at parse() if it is, so that shape is kie-only."
+            )
+        )
+  <*> optional
         ( option deadlineUnitReader
             ( long "deadline-unit"
            <> metavar "POLICY"
@@ -239,28 +265,43 @@ exportCmd opts = do
       hPutStrLn stderr "Type checking failed — cannot export"
       exitFailure
 
--- | Three of the flags belong to exactly one side of the command. Silently
--- ignoring one the caller took the trouble to type is a small lie of the same
--- family the fidelity report exists to stop, so say so and stop.
+-- | Four of the flags belong to some proper subset of the three targets.
+-- Silently ignoring one the caller took the trouble to type is a small lie of
+-- the same family the fidelity report exists to stop, so say so and stop.
+--
+-- __@--flavor@ is legal on @--to=dmn@ only.__ It was briefly admitted on
+-- @--to=dmn-md@ too, on the theory that "the flavor lives in the @Drg@, which
+-- both emitters read". Review checked, and the markdown side reads it nowhere:
+-- @emitMarkdown@ mentions no field of it, and @markdownReport@ hard-codes the
+-- target string @"dmnmd"@ rather than naming the flavor the way 'dmnReport'
+-- does. So @--flavor=kie --to=dmn-md@ produced a byte-identical document /and/
+-- a byte-identical fidelity report — the exact silent ignore the paragraph
+-- above refuses. Nor does that self-heal at Phase 5: the one divergence is
+-- whether a @\<decisionService\>@ may be invocable, and dmnmd is a table format
+-- with no graph at all (it already says so, via @D-MD-NODRG@).
 checkTargetFlags :: ExportOptions -> IO ()
 checkTargetFlags opts = case misplaced of
   [] -> pure ()
   fs -> do
-    hPutStrLn stderr $
-      intercalate ", " fs <> ": no meaning for --to=" <> targetFlagName opts.exportTarget
-        <> "; " <> (if length fs == 1 then "it belongs" else "they belong") <> " to " <> owner
+    for_ fs \(f, owner) ->
+      hPutStrLn stderr $
+        f <> ": no meaning for --to=" <> targetFlagName opts.exportTarget
+          <> "; it belongs to " <> owner
     exitFailure
  where
-  (owner, candidates) = case opts.exportTarget of
-    TargetBpmn ->
-      ("--to=dmn / --to=dmn-md", [("--model-name", isJust opts.exportModelName)])
-    _ ->
-      ( "--to=bpmn"
-      , [ ("--rule",          isJust opts.exportRule)
-        , ("--deadline-unit", isJust opts.exportDeadlineUnit)
-        ]
-      )
-  misplaced = [f | (f, given) <- candidates, given]
+  -- flag, was it given, where it IS legal, and how to say that
+  candidates =
+    [ ("--model-name",    isJust opts.exportModelName,    [TargetDmn, TargetDmnMarkdown], "--to=dmn / --to=dmn-md")
+    , ("--flavor",        isJust opts.exportFlavor,       [TargetDmn],                    "--to=dmn")
+    , ("--rule",          isJust opts.exportRule,         [TargetBpmn],                   "--to=bpmn")
+    , ("--deadline-unit", isJust opts.exportDeadlineUnit, [TargetBpmn],                   "--to=bpmn")
+    ]
+  misplaced =
+    [ (f, owner)
+    | (f, given, legalOn, owner) <- candidates
+    , given
+    , opts.exportTarget `notElem` legalOn
+    ]
 
 targetFlagName :: ExportTarget -> String
 targetFlagName = \case
@@ -289,6 +330,7 @@ exportDmn opts tcRes = do
           MkDmnLowerOptions
             { dloModelName    = modelName
             , dloSubstitution = tcRes.substitution
+            , dloFlavor       = fromMaybe defaultDmnFlavor opts.exportFlavor
             }
           tcRes.module'
   when (null (drgDecisions drg)) do
