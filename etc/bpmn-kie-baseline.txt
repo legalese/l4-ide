@@ -1,0 +1,24 @@
+# jBPM/KIE baseline for jl4/examples/bpmn/expected/
+#
+# Measured, not intended. Regenerate with:
+#
+#   etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn > /tmp/kie.log
+#   node etc/check-bpmn-kie-baseline.mjs /tmp/kie.log --update
+#
+# A change here is a claim that the exporter's standing with an independent
+# engine has moved. Say in the commit message WHICH WAY and why, and never
+# regenerate merely to make a red build green.
+#
+# verdict=REJECTED means jBPM refused to compile the file, so it was never
+# executed; the errors= count is the size of that refusal. It is NOT a
+# liveness defect. See jl4/examples/bpmn/unsound/README.md for which axes
+# are flavor differences and which are real gaps.
+
+consultation.bpmn       errors=0 warnings=0 verdict=COMPLETED
+handover.bpmn           errors=4 warnings=0 verdict=REJECTED
+offering.bpmn           errors=0 warnings=0 verdict=ABORTED
+regcf-advertising.bpmn  errors=4 warnings=0 verdict=REJECTED
+regcf-reporting.bpmn    errors=1 warnings=0 verdict=REJECTED
+regcf-resale.bpmn       errors=6 warnings=0 verdict=REJECTED
+
+RESULT 4

@@ -140,6 +140,14 @@ jobs:
       - name: Self-test (the gate must still be able to fail, and to pass)
         run: node etc/check-bpmn-soundness.selftest.mjs
 
+      # Same argument, one level up. The jBPM baseline comparator below is the
+      # only thing standing between "expected/ has four known findings" and
+      # "expected/ has any number of findings and nobody notices", so it gets
+      # the same treatment: mutate a real transcript eight ways and assert it
+      # objects, then two ways and assert it does NOT.
+      - name: Self-test the jBPM baseline comparator
+        run: node etc/check-bpmn-kie-baseline.selftest.mjs
+
       # The gate itself, over the emitted goldens.
       - name: Soundness-check the emitted BPMN
         run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
@@ -208,16 +216,17 @@ jobs:
       #              version of this comment said expected/ reported ONE finding
       #              and named offering.bpmn — wrong on both halves.
       #
-      #              There is no baseline mechanism in the harness, so exit 1 is
-      #              tolerated HERE and only here, while 2/3/4 still fail.
+      #              Exit 1 is therefore EXPECTED on expected/ and cannot itself
+      #              be the gate. What gates it is etc/bpmn-kie-baseline.txt,
+      #              compared below.
       #
-      # SAY IT PLAINLY: because any exit 1 is tolerated, a NEW finding in
-      # expected/ is INVISIBLE. The count above is documentation, not an
-      # assertion — nothing compares it to what the run actually prints, so a
-      # fifth rejected golden, or a regression that turns a passing golden into a
-      # rejected one, would land green. Only a move to 2/3/4 fails. Closing that
-      # needs a committed baseline the harness does not have yet. It does NOT
-      # weaken the toolchain gate, which is the reason this job exists.
+      # The list above is a summary for a human reader. It is NOT the assertion —
+      # etc/bpmn-kie-baseline.txt is, and it is machine-compared every run. Until
+      # 2026-07-28 there was no such file, exit 1 was tolerated unconditionally,
+      # and a fifth rejected golden (or a regression turning a clean golden into
+      # a rejected one) would have landed green. The comparator closes both that
+      # and the coverage half: a file the baseline names but the run never
+      # reached now fails, so a narrowed glob can no longer pass by doing less.
       - name: Second opinion — does an independent engine agree? (jBPM/KIE)
         run: |
           export L4_KIE_CACHE="$HOME/.cache/l4-engines"
@@ -228,17 +237,23 @@ jobs:
 
           echo "::group::expected/ — real exporter output"
           set +e
-          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn
-          rc=$?
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn | tee kie-expected.log
+          rc=${PIPESTATUS[0]}
           set -e
           echo "::endgroup::"
 
+          # 0 and 1 are both verdicts, and which one it is carries no information
+          # the baseline does not carry better: the comparator reads the
+          # transcript. 2/3/4 mean no verdict was reached, so there is nothing to
+          # compare and the baseline must not be consulted — a SKIPPED run whose
+          # empty transcript "matched" would be the original bug wearing a hat.
           case "$rc" in
-            0) ;;
-            1) echo "::notice::jBPM reported findings on expected/ (exit 1). Known and tolerated until the harness grows a baseline." ;;
+            0 | 1) ;;
             *) echo "::error::jBPM check exited $rc — 2=usage, 3=SKIPPED (nothing was checked), 4=BROKEN (toolchain present, harness failed)."
                exit "$rc" ;;
           esac
+
+          node etc/check-bpmn-kie-baseline.mjs kie-expected.log
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
