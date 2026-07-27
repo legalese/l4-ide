@@ -119,7 +119,16 @@ data NodeKind
 data GatewayKind = ExclusiveGateway | ParallelGateway
   deriving stock (Eq, Show)
 
-data GatewayFlow = Diverging | Converging
+-- | BPMN 2.0 §10.5.1 Table 10.100 makes @gatewayDirection@ a /claim about the
+-- edges/, not a caption: @Diverging@ MUST NOT have multiple incoming flows,
+-- @Converging@ MUST NOT have multiple outgoing, @Mixed@ has both, and
+-- @Unspecified@ (the XSD default) constrains nothing.
+--
+-- It is the one attribute in an emitted file that is a statement /about the
+-- rest of the file/, so it is never chosen by the pass that creates the node —
+-- which runs before any edge exists — but recomputed from the flows actually
+-- drawn. See 'L4.Bpmn.Lower.gatewayFlowFor'.
+data GatewayFlow = Unspecified | Diverging | Converging | Mixed
   deriving stock (Eq, Show)
 
 -- | The trigger on an interrupting boundary event.

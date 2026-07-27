@@ -169,11 +169,14 @@ stateGraphToBpmn opts sg =
       | s.stateType == InitialState
       ]
 
+    -- 'Unspecified' is a placeholder, not a decision: no edge exists yet, and
+    -- @gatewayDirection@ is a claim about edges. 'withGatewayDirections'
+    -- overwrites every one of these once the flows are known.
     gatewayNodes =
       [ FlowNode
         { nodeId = "Split_" <> tag
         , nodeName = fanName s.stateFan
-        , nodeKind = Gateway (fanGateway s.stateFan) Diverging
+        , nodeKind = Gateway (fanGateway s.stateFan) Unspecified
         , nodeDoc = Just (fanDoc s.stateFan)
         , nodeLane = Nothing
         }
@@ -520,7 +523,13 @@ stateGraphToBpmn opts sg =
 
   allFlows = numberFlows joinedEdges
 
-  (allNodes, joinedEdges, joinFindings) =
+  -- Last, because @gatewayDirection@ is the one attribute that describes the
+  -- rest of the file rather than its own node: it cannot be settled until every
+  -- edge — including the ones 'addJoin' redirects — is final.
+  allNodes :: [FlowNode]
+  allNodes = withGatewayDirections allFlows rawNodes
+
+  (rawNodes, joinedEdges, joinFindings) =
     foldl' addJoin (baseNodes, chainFlows <> transitionFlows, []) allOfJunctions
 
   allOfJunctions :: [StateId]
@@ -593,7 +602,7 @@ stateGraphToBpmn opts sg =
                     FlowNode
                       { nodeId = jid
                       , nodeName = ""
-                      , nodeKind = Gateway ParallelGateway Converging
+                      , nodeKind = Gateway ParallelGateway Unspecified
                       , nodeDoc =
                           Just
                             "every branch of the RAND must complete; each \
@@ -932,6 +941,57 @@ isErrorEnd :: FlowNode -> Bool
 isErrorEnd n = case n.nodeKind of
   EndEvent isError -> isError
   _ -> False
+
+-- | Restate every gateway's @gatewayDirection@ as what its edges actually say.
+--
+-- @gatewayDirection@ is not a caption on a shape: BPMN 2.0 §10.5.1 Table 10.100
+-- makes it a constraint the rest of the file has to satisfy, and a file whose
+-- gateway declares a direction its own sequence flows contradict is malformed
+-- even though no schema validator will say so — the attribute is a plain
+-- enumeration in the XSD, so @bpmn-moddle@ and Xerces both wave it through.
+--
+-- The pass that creates a gateway cannot know the answer, because it runs
+-- before any edge exists, and 'addJoin' moves edges afterwards. Guessing there
+-- is what shipped @regcf-reporting.bpmn@ with @Diverging@ on a gateway holding
+-- two incoming flows: the @HENCE \<this rule\>@ renewal loop hands the fan-out
+-- gateway a second arrival, and a guess made one pass earlier had no way to
+-- learn about it.
+--
+-- So the only place this can be decided correctly is here, once 'allFlows' is
+-- final. It is total: every gateway is rewritten, so no earlier guess survives.
+withGatewayDirections :: [SequenceFlow] -> [FlowNode] -> [FlowNode]
+withGatewayDirections flows = map redirect
+ where
+  incoming = tally (.flowTo)
+  outgoing = tally (.flowFrom)
+
+  tally :: (SequenceFlow -> Text) -> Map Text Int
+  tally f = Map.fromListWith (+) [(f fl, 1) | fl <- flows]
+
+  arity m nid = Map.findWithDefault 0 nid m
+
+  redirect n = case n.nodeKind of
+    Gateway kind _ ->
+      n
+        { nodeKind =
+            Gateway kind (gatewayFlowFor (arity incoming n.nodeId) (arity outgoing n.nodeId))
+        }
+    _ -> n
+
+-- | The direction BPMN 2.0 §10.5.1 Table 10.100 permits for a gateway with this
+-- many incoming and outgoing sequence flows.
+--
+-- @Diverging@ requires multiple outgoing and forbids multiple incoming;
+-- @Converging@ is its mirror; a gateway with multiple of both is @Mixed@ (which
+-- §10.5.2 permits, whatever any one engine makes of it); and a gateway with
+-- multiple of neither can only be @Unspecified@, the XSD default, since the
+-- other three all /require/ a multiplicity it does not have.
+gatewayFlowFor :: Int -> Int -> GatewayFlow
+gatewayFlowFor ins outs = case (ins > 1, outs > 1) of
+  (True, True) -> Mixed
+  (True, False) -> Converging
+  (False, True) -> Diverging
+  (False, False) -> Unspecified
 
 -- | A sequence flow before it has an id: source node, target node, and the
 -- condition (if any) from a @PROVIDED@ guard. Ids are assigned last, after the

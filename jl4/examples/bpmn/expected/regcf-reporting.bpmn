@@ -28,7 +28,7 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Diverging">
+    <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Mixed">
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
     <bpmn:task id="Task_1" name="MUST file a Form C-TR termination of reporting">
