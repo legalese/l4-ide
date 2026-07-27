@@ -27,6 +27,7 @@ import type {
   Flow,
   Implies,
   Grounding,
+  Orient,
 } from "./types.js";
 import type { Verdict } from "@repo/boolean-analysis";
 
@@ -96,6 +97,59 @@ export const PIXEL_GEOMETRY: Geometry = {
   COIL_LABEL: 74,
 };
 
+/**
+ * Which way the circuit runs (`ViewSpec.orient`, DESIGN §5). LR is the original; TB turns
+ * the whole diagram a quarter turn so a series runs DOWN the page — which is what
+ * AND-heavy logic wants, since a long conjunction reads as a column and paginates, where
+ * horizontally it just runs off the right edge.
+ *
+ * The reason this is a projection rather than a rewrite: the BBE box model is already
+ * axis-symmetric. "Align, then stack" never mentions x or y — a series ACCUMULATES along
+ * one axis and CENTRES on the other, and which is which is the only difference between the
+ * two orientations. So the measure functions are written in (main, cross) and this maps
+ * that pair to a real point at the last moment.
+ *
+ * LEAVES are the exception and stay in real w/h, because text does not rotate: a box is
+ * sized by the label inside it either way. In TB that box's HEIGHT is what accumulates
+ * down the column while its WIDTH is what gets centred — which is exactly `main`/`cross`
+ * reading the other field.
+ */
+interface Axis {
+  readonly orient: Orient;
+  /** Extent along the axis a series accumulates on. */
+  main(m: { w: number; h: number }): number;
+  /** Extent along the axis a series centres on (and a parallel accumulates on). */
+  cross(m: { w: number; h: number }): number;
+  /** Rebuild a real {w,h} from a (main, cross) extent pair. */
+  size(main: number, cross: number): { w: number; h: number };
+  /** Project a (main, cross) coordinate to a real point. */
+  pt(main: number, cross: number): Pt;
+  mainOf(p: Pt): number;
+  crossOf(p: Pt): number;
+}
+
+const LR_AXIS: Axis = {
+  orient: "LR",
+  main: (m) => m.w,
+  cross: (m) => m.h,
+  size: (main, cross) => ({ w: main, h: cross }),
+  pt: (main, cross) => ({ x: main, y: cross }),
+  mainOf: (p) => p.x,
+  crossOf: (p) => p.y,
+};
+
+const TB_AXIS: Axis = {
+  orient: "TB",
+  main: (m) => m.h,
+  cross: (m) => m.w,
+  size: (main, cross) => ({ w: cross, h: main }),
+  pt: (main, cross) => ({ x: cross, y: main }),
+  mainOf: (p) => p.y,
+  crossOf: (p) => p.x,
+};
+
+const axisFor = (o: Orient): Axis => (o === "TB" ? TB_AXIS : LR_AXIS);
+
 /** Half-width of the open-contact glyph's bar pair, plus a hair. A dead leaf's break sits
  *  this far past its right edge so BOTH bars clear the box (see `leafBox`). Every context a
  *  leaf can sit in leaves more room than this downstream: GAP_SERIES 44, LEAD 40, SEAM_W 66. */
@@ -116,6 +170,8 @@ interface Ctx {
   vs: ViewSpec;
   tm: TextMetrics;
   k: Geometry;
+  /** LR or TB, as a projection (see `Axis`). */
+  axis: Axis;
   /** HONEST three-valued evaluation — what is actually known. Drives RENDER STATE only
    *  (box ink, the open-contact break), so the picture never forges a tested contact out
    *  of an assumption. */
@@ -720,25 +776,23 @@ function inertInline(
 /** A cubic Bézier connector with horizontal tangents (leaves the source rightward,
  *  enters the target from the left) — the Layman / box-model fan (DESIGN §17a). */
 type Curve = Extract<ScenePrim, { kind: "curve" }>;
-function hCurve(from: Pt, to: Pt, state: State): Curve {
+function hCurve(from: Pt, to: Pt, state: State, A: Axis = LR_AXIS): Curve {
   // Control-point reach = how far the curve stays HORIZONTAL out of each port before it
   // banks toward the bus. A stronger reach reads as a deliberate thrust off the box rather
   // than an immediate diagonal — the fan looks sprung, not slack. The vertical-spread term
   // dominates the fan (rungs far off the axis get more thrust); the cap keeps the tallest
   // fans from overshooting into an S.
-  const t = Math.min(
-    120,
-    Math.max(
-      Math.abs(to.x - from.x) * 0.75,
-      Math.abs(to.y - from.y) * 0.55,
-      30,
-    ),
-  );
+  // The reach is along MAIN (the direction the fan travels) and the spread along CROSS,
+  // so in TB the curve leaves the port DOWNWARD and banks sideways — the same sprung fan,
+  // rotated with everything else.
+  const dMain = Math.abs(A.mainOf(to) - A.mainOf(from));
+  const dCross = Math.abs(A.crossOf(to) - A.crossOf(from));
+  const t = Math.min(120, Math.max(dMain * 0.75, dCross * 0.55, 30));
   return {
     kind: "curve",
     from,
-    c1: { x: from.x + t, y: from.y },
-    c2: { x: to.x - t, y: to.y },
+    c1: A.pt(A.mainOf(from) + t, A.crossOf(from)),
+    c2: A.pt(A.mainOf(to) - t, A.crossOf(to)),
     to,
     role: "conn",
     state,
@@ -905,19 +959,25 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
  *  ride the wire; a leading inert thus sits to the LEFT of the next element. */
 function measureAnd(e: And, ctx: Ctx): Measured {
   const { GAP_SERIES } = ctx.k;
+  const A = ctx.axis;
   const kids = e.args.map((a) => measure(a, ctx));
-  const h = Math.max(...kids.map((m) => m.h));
-  const w = kids.reduce((s, m) => s + m.w, 0) + GAP_SERIES * (kids.length - 1);
+  // The series ACCUMULATES on main and CENTRES on cross — which axis is which is the
+  // whole of the LR/TB difference (DESIGN §5.3, and see `Axis`).
+  const crossE = Math.max(...kids.map((m) => A.cross(m)));
+  const mainE =
+    kids.reduce((s, m) => s + A.main(m), 0) + GAP_SERIES * (kids.length - 1);
   return {
-    w,
-    h,
+    ...A.size(mainE, crossE),
     state: "inert",
     emit(ox, oy, out) {
-      let x = ox;
+      const origin = { x: ox, y: oy };
+      let mainPos = A.mainOf(origin);
+      const crossO = A.crossOf(origin);
       const ports = kids.map((m) => {
-        const cy = oy + (h - m.h) / 2; // <-- centered on the cross axis
-        const p = m.emit(x, cy, out);
-        x += m.w + GAP_SERIES;
+        const c = crossO + (crossE - A.cross(m)) / 2; // <-- centered on the cross axis
+        const at = A.pt(mainPos, c);
+        const p = m.emit(at.x, at.y, out);
+        mainPos += A.main(m) + GAP_SERIES;
         return p;
       });
       const fold = { t: "fold", id: e.id } as const;
@@ -1273,7 +1333,17 @@ export function layout(
   // Current flows under the READING, not under the bare facts — that is what makes the
   // knob visible at all. Render state below still reads `values`.
   if (em) energize(fn.body, true, gvalues, em);
-  const ctx: Ctx = { vs, tm, k, values, gvalues, assumed, strict, em };
+  const ctx: Ctx = {
+    vs,
+    tm,
+    k,
+    axis: axisFor(vs.orient),
+    values,
+    gvalues,
+    assumed,
+    strict,
+    em,
+  };
   const m = measure(fn.body, ctx);
   const ox = MARGIN + LEAD;
   const oy = MARGIN;
