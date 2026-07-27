@@ -108,6 +108,61 @@ through unrelated nodes, all at zero warnings, while the Haskell suite was green
 at 1581 examples. Run it to catch a regression in the XML; read
 `BpmnExport.hs` for whether the XML says what the rule says.
 
+## Checking the diagram can actually finish
+
+A parser cannot see a process that never completes, so there is a second and
+independent check that plays the token game instead of reading the tags. Zero
+install, zero dependencies, no network:
+
+```sh
+node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+node etc/check-bpmn-soundness.selftest.mjs   # asserts both directions
+```
+
+It translates the process to a workflow net — places are sequence flows, plus
+one "this activity is running" place per activity carrying a boundary event —
+and explores every reachable marking. Four properties, in van der Aalst's
+vocabulary: **S1** option to complete, **S2** no deadlock, **S3** no dead flow
+node, **S4** safe. All three fixtures pass all four.
+
+Two things it deliberately does not do. It does not use `bpmn-moddle`, so a
+disagreement with `validate-bpmn.mjs` about what the graph even is shows up
+rather than being inherited. And it does not demand *proper completion* in the
+WF-net sense of one token in one sink: BPMN completes when every token has been
+consumed, several end events may each consume one, and the fork-without-join
+that `P-NOJOIN` describes is precisely that shape. Peak concurrent tokens is
+reported as information instead — `offering.bpmn` peaks at four, by design.
+
+S1 and S2 are the properties the deadlocking join violated, and
+`unsound/` holds two reconstructions of that shape to prove the check fires on
+it. `validate-bpmn.mjs` passes both at zero warnings; this one fails both with a
+witness trace naming the flow whose token never arrives.
+
+### The `incoming`/`outgoing` flavor axis
+
+The exporter writes connectivity only as `sourceRef`/`targetRef` on
+`<bpmn:sequenceFlow>`, and omits the optional `<bpmn:incoming>` /
+`<bpmn:outgoing>` back-references BPMN also allows on a flow node. Both are
+legal; the elements are `minOccurs="0"` in the XSD, and `bpmn-js` derives the
+connections from the refs, which is why Camunda Modeler renders the fixtures
+correctly and why K4 holds.
+
+Not every consumer derives them. **`bpmnlint`, Camunda's own linter, reads the
+back-references only**, and without them reports every node in every fixture —
+including the sound ones — as `no-disconnected`, `no-implicit-start` and
+`no-implicit-end`: 65 findings across three good files. Adding the
+back-references drops that to 3, all of them `label-required` on the unnamed
+start event.
+
+So this is a fidelity note about the emitted XML rather than a defect in it, and
+the fix is small if it is ever wanted. Recorded here for the same reason the DMN
+flavor axis is recorded: a construct one conforming tool accepts and another
+rejects is a property of the interchange, not of either tool.
+
+(`bpmnlint` finds nothing else on the fixtures, and — once the noise is removed
+— nothing at all on either deadlocking diagram. A linter is not an engine
+either.)
+
 ## How the defects in here were actually found
 
 Worth recording, because the two methods are different and neither would have
