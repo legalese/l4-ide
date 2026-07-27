@@ -42,7 +42,9 @@
     </bpmn:task>
     <bpmn:boundaryEvent id="Lapse_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
       <bpmn:documentation>the permission lapses; a second, mutually exclusive arrival</bpmn:documentation>
-      <bpmn:timerEventDefinition id="TimerDef_Lapse_2" />
+      <bpmn:timerEventDefinition id="TimerDef_Lapse_2">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Fulfilled" />
     <bpmn:task id="Task_4" name="MAY file a response">

@@ -15,12 +15,24 @@
 //
 // WHAT IT DOES
 //   PHASE 0  adapt   jBPM will not even look at the exporter's output as
-//                    emitted. Every adaptation is applied in memory and PRINTED,
-//                    because each printed line IS a flavor axis between jBPM and
-//                    Camunda. Nothing structural is touched: no node, no
-//                    sequence flow and no gateway is added, removed or rewired,
-//                    with the single exception of A2, which BPMN 2.0 itself
-//                    defines as equivalent.
+//                    emitted. Every adaptation is applied in memory and PRINTED.
+//                    NOT every adaptation is a flavor axis, and the printed line
+//                    now says which is which: A0/A1/A2 are engine-vs-modeller
+//                    differences, A3 is a real gap in the emitted XML that no
+//                    engine could execute, and A5 is defensive — it has ZERO
+//                    occurrences on exporter output (every emitted
+//                    timerEventDefinition carries a timeDuration; verified by
+//                    grep over ../../jl4/examples/bpmn/expected/). Nothing
+//                    structural is touched: no node, no sequence flow and no
+//                    gateway is added, removed or rewired, with the single
+//                    exception of A2, which BPMN 2.0 itself defines as
+//                    equivalent.
+//
+//                    Be clear about what that means for independence: jBPM never
+//                    sees the file as emitted. It sees a document THIS harness
+//                    produced. A2 in particular is a structural rewrite —
+//                    'fanOutEndEvents' clones end events and re-targets sequence
+//                    flows at the clones.
 //   PHASE 1  compile through KieBuilder, which runs jBPM's own
 //                    RuleFlowProcessValidator.
 //   PHASE 2  execute in a KieSession with every work item auto-completing, and
@@ -44,21 +56,29 @@
 //   * Nothing about the DIAGRAM. jBPM ignores BPMNDI entirely, so every layout
 //     defect in the exporter's history is invisible here. `validate-bpmn.mjs` is
 //     what covers drawing, and only for presence, not sanity.
-//   * Only ONE execution path. Work items auto-complete and boundary timers are
-//     therefore never reached, so this explores a single interleaving. It can
-//     prove a deadlock exists; it can NEVER prove one absent. That is precisely
-//     what `check-bpmn-soundness.mjs` does instead, by exhausting every reachable
+//   * Only ONE execution path, AND THIS HARNESS CHOOSES IT. Work items
+//     auto-complete, so boundary timers are never reached; and because the
+//     exporter emits no branch guards at all (A3), `addMissingGuards` below
+//     supplies them, sending every multi-way exclusive gateway down its FIRST
+//     OUTGOING FLOW IN DOCUMENT ORDER. The explored interleaving is therefore an
+//     artifact of our adaptation, not a representative run. It can prove a
+//     deadlock exists; it can NEVER prove one absent. That is precisely what
+//     `check-bpmn-soundness.mjs` does instead, by exhausting every reachable
 //     marking — which is why the soundness check, not this one, is the gate.
 //   * Safeness in general. The duplication rule above is a single-run
-//     approximation of S4, and it is the check jBPM's own "did it complete?"
-//     verdict is blind to: an XOR join placed after a parallel split completes
-//     happily while running its whole tail twice.
+//     approximation of S4, and it is NOT jBPM's own verdict: jBPM says COMPLETED
+//     on the unsafe fixture and sees nothing wrong. The finding comes from our
+//     listener counting node firings, plus the join exclusion documented at
+//     `run` below. Treat it as one tool plus our heuristic, not as a second
+//     opinion.
 //   * Whether the adapted file still means what the original meant. A1 and A5
 //     supply bindings the exporter never emits; if the exporter starts emitting
 //     them, these adaptations must be revisited.
 //   * Anything at all about a file it refused in PHASE 0 or PHASE 1.
 //
-// Exit: 0 = every file compiled and reached an accepted terminal state.
+// Exit: 0 = every file compiled, EXECUTED, and reached an accepted terminal
+//           state. A file from which zero processes were executed is a FINDING,
+//           not a pass — see `check`.
 //       1 = a finding. 2 = usage. Never silent.
 
 import java.io.ByteArrayOutputStream;
@@ -107,10 +127,15 @@ public class KieBpmnCheck {
   static final String XSI = "http://www.w3.org/2001/XMLSchema-instance";
 
   static int problems = 0;
+  /** --census prints every node's firing count, which is how the join
+   *  exclusion in `run` was verified and how it can be re-verified after a
+   *  jBPM version bump. */
+  static boolean census = false;
 
   public static void main(String[] args) throws Exception {
     List<String> files = new ArrayList<>();
     for (String a : args) {
+      if (a.equals("--census")) { census = true; continue; }
       if (a.startsWith("-")) continue;
       files.add(a);
     }
@@ -160,15 +185,32 @@ public class KieBpmnCheck {
     db.setEntityResolver((pub, sys) -> new org.xml.sax.InputSource(new java.io.StringReader("")));
     Document doc = db.parse(file);
 
+    // A file with no <process> has nothing to execute. Saying "no findings"
+    // about it would be a sentence with no referent, so refuse here rather than
+    // sail through PHASE 1 with an empty KieBase. See `check`'s tail for the
+    // same guard applied to the KieBase itself.
+    if (first(doc, BPMN, "process") == null) {
+      problems++;
+      System.out.println("[PHASE 0 adapt] NOT CHECKED — no <bpmn:process> element in this file.");
+      System.out.println("   -> nothing to compile and nothing to execute. This is a finding, not a pass.");
+      return;
+    }
+
     List<String> adaptations = adapt(doc);
-    System.out.println("[PHASE 0 adapt] " + adaptations.size() + " adaptation(s) — each one is a jBPM-vs-Camunda flavor axis");
+    System.out.println("[PHASE 0 adapt] " + adaptations.size()
+        + " adaptation(s) — see the header for which are flavor axes and which are gaps");
     for (String a : adaptations) System.out.println("   " + a);
 
     String xml = serialize(doc);
 
     // ---------- PHASE 1: compile ----------
     KieServices ks = KieServices.Factory.get();
-    ReleaseId rid = ks.newReleaseId("l4.check", "c" + Math.abs(file.getName().hashCode()), "1.0");
+    // Key the artifact on the FULL path: KieRepository is a process-wide
+    // singleton, so two same-named fixtures in different directories would
+    // otherwise collide and the second would silently reuse the first's build.
+    // Integer.toUnsignedString, because Math.abs(Integer.MIN_VALUE) is negative.
+    String key = "c" + Integer.toUnsignedString(file.getAbsolutePath().hashCode());
+    ReleaseId rid = ks.newReleaseId("l4.check", key, "1.0");
     KieFileSystem kfs = ks.newKieFileSystem();
     kfs.generateAndWritePomXML(rid);
     kfs.write("src/main/resources/proc.bpmn2", xml.getBytes(StandardCharsets.UTF_8));
@@ -177,9 +219,14 @@ public class KieBpmnCheck {
     kb.buildAll();
     Results res = kb.getResults();
     List<Message> errs = res.getMessages(Message.Level.ERROR);
+    List<Message> warns = res.getMessages(Message.Level.WARNING);
 
-    System.out.println("[PHASE 1 compile] errors=" + errs.size());
+    System.out.println("[PHASE 1 compile] errors=" + errs.size() + " warnings=" + warns.size());
     for (Message m : errs) System.out.println("   ERROR   " + firstLine(m.getText()));
+    // Warnings are printed but do NOT fail the file: jBPM warns about things
+    // Camunda is happy with. Discarding them silently, though, would hide the
+    // one class of evidence most likely to name the next flavor axis.
+    for (Message m : warns) System.out.println("   warning " + firstLine(m.getText()));
     if (!errs.isEmpty()) {
       problems++;
       System.out.println("   -> jBPM REJECTS this file. NOT EXECUTED, so nothing below was checked.");
@@ -191,7 +238,19 @@ public class KieBpmnCheck {
     if (!acyclic)
       System.out.println("   note: the process has a cycle, so the duplication rule is not applied");
 
-    for (Process p : kc.getKieBase().getProcesses()) run(kc, p, acyclic);
+    // THE GUARD THAT MAKES A PASS MEAN SOMETHING. Zero registered processes ==
+    // zero run() calls == zero problems == exit 0 and the sentence "every file
+    // compiled and reached an accepted terminal state", which would be false.
+    // An exporter regression that emits the pool and drops the process is
+    // exactly what a second opinion is for, so it must not read as a pass.
+    Collection<Process> procs = kc.getKieBase().getProcesses();
+    if (procs.isEmpty()) {
+      problems++;
+      System.out.println("[PHASE 2 execute] NOT EXECUTED — jBPM compiled the file but registered"
+          + " ZERO processes, so nothing ran. This is a finding, not a pass.");
+      return;
+    }
+    for (Process p : procs) run(kc, p, acyclic);
   }
 
   /** Keep multi-line Drools stack dumps from swamping the report. */
@@ -243,15 +302,59 @@ public class KieBpmnCheck {
     int guards = addMissingGuards(doc, proc);
     if (guards > 0)
       log.add("A3  supplied " + guards + " missing conditionExpression(s) on diverging exclusive gateway(s)"
-          + "  — NOT a flavor axis: the exporter emits no guard at all, so no engine could decide the branch");
+          + "  — NOT a flavor axis: the exporter emits no guard at all, so no engine could decide the branch."
+          + " THE PATH BELOW IS OURS: each gateway takes its first outgoing flow in document order");
 
     // A5  a timer event definition with no timeDuration/timeCycle/timeDate has
-    //     no trigger for jBPM to bind.
+    //     no trigger for jBPM to bind. DEFENSIVE ONLY, and NOT a flavor axis:
+    //     the exporter always emits a timeDuration (grep timerEventDefinition
+    //     over ../../jl4/examples/bpmn/expected/ — every one has a body), so on
+    //     real exporter output this fires zero times. It is kept so a
+    //     hand-written fixture cannot fail compilation for a reason unrelated to
+    //     the defect it exists to show.
     int timers = addMissingTimerBodies(doc);
     if (timers > 0)
-      log.add("A5  supplied " + timers + " missing timeDuration(s) on timer event definition(s)");
+      log.add("A5  supplied " + timers + " missing timeDuration(s) on timer event definition(s)"
+          + "  — NOT a flavor axis and NOT an exporter gap: exporter output never needs this,"
+          + " so a file that triggers it is hand-written");
+
+    // A6  jBPM refuses a gateway with no gatewayDirection ("Unknown gateway
+    //     direction: null"). BPMN 2.0 makes the attribute optional, defaulting
+    //     to Unspecified, and Camunda accepts its absence — so this IS a flavor
+    //     axis, just one the exporter never reaches: every emitted gateway
+    //     carries the attribute. Kept so a hand-written probe is not rejected
+    //     for a reason unrelated to what it was written to show.
+    int dirs = addMissingGatewayDirections(doc);
+    if (dirs > 0)
+      log.add("A6  supplied " + dirs + " missing gatewayDirection attribute(s)"
+          + "  (flavor axis: BPMN 2.0 defaults it, Camunda accepts its absence, jBPM refuses;"
+          + " exporter output always sets it, so a file that triggers it is hand-written)");
 
     return log;
+  }
+
+  /** Diverging/Converging inferred from the flow counts, which is what the
+   *  attribute is supposed to record anyway. */
+  static int addMissingGatewayDirections(Document doc) {
+    Map<String, Integer> nIn = new HashMap<>(), nOut = new HashMap<>();
+    for (Element f : all(doc, BPMN, "sequenceFlow")) {
+      nOut.merge(f.getAttribute("sourceRef"), 1, Integer::sum);
+      nIn.merge(f.getAttribute("targetRef"), 1, Integer::sum);
+    }
+    int added = 0;
+    for (String kind : new String[] {
+        "exclusiveGateway", "parallelGateway", "inclusiveGateway",
+        "eventBasedGateway", "complexGateway" }) {
+      for (Element gw : all(doc, BPMN, kind)) {
+        if (!gw.getAttribute("gatewayDirection").isEmpty()) continue;
+        String id = gw.getAttribute("id");
+        int in = nIn.getOrDefault(id, 0), out = nOut.getOrDefault(id, 0);
+        gw.setAttribute("gatewayDirection",
+            out > in ? "Diverging" : in > out ? "Converging" : "Unspecified");
+        added++;
+      }
+    }
+    return added;
   }
 
   static int fanOutEndEvents(Document doc, Element proc) {
@@ -363,16 +466,26 @@ public class KieBpmnCheck {
       for (String n : workNames) mgr.registerWorkItemHandler(n, new AutoComplete());
 
       final List<String> faults = new ArrayList<>();
-      final Map<String, Integer> fires = new LinkedHashMap<>();
+      // KEYED ON NODE IDENTITY, NOT NAME. Keying on the name was a real false
+      // positive: A2 clones a multi-incoming end event and every clone KEEPS THE
+      // NAME, so two distinct nodes each firing once were counted as one node
+      // firing twice. That made a sound `RAND` with an unjoined fan-in — the
+      // exporter's own sanctioned P-NOJOIN shape — report DUPLICATION, and made
+      // the verdict on `offering.bpmn` depend on how many other files were on
+      // the command line, because jBPM's single explored interleaving varies in
+      // length between JVM invocations.
+      final Map<Long, int[]> fireCount = new LinkedHashMap<>();
+      final Map<Long, String[]> fireWhat = new LinkedHashMap<>(); // id -> {name, kind}
       ks.addEventListener(new DefaultProcessEventListener() {
         @Override
         public void beforeNodeTriggered(ProcessNodeTriggeredEvent e) {
           org.kie.api.definition.process.Node n = e.getNodeInstance().getNode();
           if (n == null) return;
           String kind = n.getClass().getSimpleName();
-          String label = (n.getName() == null || n.getName().isEmpty() ? "(unnamed)" : n.getName())
-              + " [" + kind + "]";
-          fires.merge(label, 1, Integer::sum);
+          Long id = n.getId();
+          fireCount.computeIfAbsent(id, k -> new int[1])[0]++;
+          fireWhat.put(id, new String[] {
+              n.getName() == null || n.getName().isEmpty() ? "(unnamed)" : n.getName(), kind });
           if (kind.equals("FaultNode")) faults.add(n.getName() == null ? kind : n.getName());
         }
       });
@@ -402,17 +515,34 @@ public class KieBpmnCheck {
       // Join nodes are EXCLUDED, and getting this wrong is an easy false
       // positive. jBPM triggers a converging gateway once per ARRIVING TOKEN --
       // a correct synchronising AND-join is therefore triggered n times and
-      // activates once, which is exactly what `consultation.bpmn` does. The
-      // signal that separates a real merge defect from a correct join is
-      // therefore what happens DOWNSTREAM of it: after a sound AND-join the
-      // successor fires once, whereas an XOR gateway used to merge parallel
-      // branches passes each token straight through and the successor fires
-      // twice. So count every node except the joins themselves.
+      // activates once, which is exactly what `consultation.bpmn` does. (jBPM
+      // classes a converging EXCLUSIVE gateway as a Join too, so the exclusion
+      // covers both.) The signal that separates a real merge defect from a
+      // correct join is therefore what happens DOWNSTREAM of it: after a sound
+      // AND-join the successor fires once, whereas an XOR gateway used to merge
+      // parallel branches passes each token straight through and the successor
+      // fires twice. So count every node except the joins themselves.
+      //
+      // The exclusion tests the jBPM class name, which is a 7.74.1 internal. A
+      // version bump that renames Join would silently turn the exclusion off and
+      // false-positive every sound file, so `run` prints the full census under
+      // --census and the self-test pins the sound fixtures at zero findings.
       List<String> dup = new ArrayList<>();
       if (acyclic)
-        for (Map.Entry<String, Integer> e : fires.entrySet())
-          if (e.getValue() > 1 && !e.getKey().endsWith("[Join]"))
-            dup.add(e.getKey() + " fired " + e.getValue() + "x");
+        for (Map.Entry<Long, int[]> e : fireCount.entrySet()) {
+          String[] what = fireWhat.get(e.getKey());
+          if (e.getValue()[0] > 1 && !"Join".equals(what[1]))
+            dup.add(what[0] + " [" + what[1] + "] {id=" + e.getKey() + "} fired "
+                + e.getValue()[0] + "x");
+        }
+      if (census) {
+        System.out.println("   [fire census]");
+        for (Map.Entry<Long, int[]> e : fireCount.entrySet()) {
+          String[] what = fireWhat.get(e.getKey());
+          System.out.println("      " + e.getValue()[0] + "x  " + what[0] + " [" + what[1]
+              + "] {id=" + e.getKey() + "}");
+        }
+      }
 
       if (state == ProcessInstance.STATE_ABORTED && !faults.isEmpty())
         System.out.println("[PHASE 2 execute] ABORTED via error end event " + faults

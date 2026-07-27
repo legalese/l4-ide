@@ -35,6 +35,23 @@
 // (see jl4/examples/bpmn/README.md). Flagging it would be flagging the design.
 // Peak concurrent tokens is reported as information instead.
 //
+// AN ERROR OR TERMINATE END EVENT CLEARS EVERY TOKEN. An uncaught error at the
+// top level ends the process instance; it does not consume one token and leave
+// its siblings running. The exporter says the same thing in its own words —
+// `P-NOJOIN` in jl4/examples/bpmn/expected/offering.fidelity.txt reads "a branch
+// here can reach BREACH, whose error end abandons its siblings rather than
+// waiting for them" — and jBPM confirms it by ABORTING the instance the moment
+// `offering.bpmn`'s BREACH fires, three branches still unrun.
+//
+// An earlier version of this file modelled every end event as a plain one-token
+// sink, which was wrong in the *conservative* direction: terminate-as-sink can
+// only leave extra tokens stranded, so it never turned an unsound diagram sound.
+// It would, though, have called the first diagram that put a joined branch
+// beside a BREACH branch UNSOUND for a defect in this checker rather than in the
+// diagram — and `P-NOJOIN` exists precisely to approach that shape. Modelled
+// properly now, and reported: because completion can then be reached by
+// terminating, the report says how many markings can complete ONLY that way.
+//
 // ZERO INSTALL, ZERO DEPENDENCIES. Node only, no network:
 //
 //   node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
@@ -69,6 +86,14 @@ const ACTIVITIES = new Set([
   "businessRuleTask",
   "sendTask",
   "receiveTask",
+  // A callActivity is atomic HERE, and a subProcess is refused, which looks
+  // inconsistent until you look at the reader. The asymmetry is not about token
+  // scope — both return to their single outgoing flow — it is that this reader
+  // is FLAT. A `<subProcess>`'s children live in the same document, so its inner
+  // start event and tasks would be scanned straight into the parent process's
+  // node map and played as if they were siblings. A callActivity's callee is a
+  // different document this checker never opens, so treating the call as one
+  // opaque step is exactly right. The exporter emits neither today.
   "callActivity",
 ]);
 const PASSTHROUGH = new Set([
@@ -122,6 +147,7 @@ function readBpmn(xml) {
   const stack = [];
   let current = null; // the process being filled
   let inDiagram = 0;
+  let openEnd = null; // the <endEvent> currently open, if any
 
   for (const m of text.matchAll(TAG_RE)) {
     const [, closing, qname, attrChunk] = m;
@@ -140,11 +166,24 @@ function readBpmn(xml) {
     if (closing) {
       const popped = stack.pop();
       if (popped === "process") current = null;
+      if (popped === "endEvent") openEnd = null;
       continue;
     }
     if (!isLeaf) stack.push(name);
 
     const a = attrsOf(attrChunk);
+
+    // An uncaught error end, and a terminate end, both END THE INSTANCE: every
+    // remaining token is discarded rather than left running. Recorded on the end
+    // event that encloses the definition.
+    if (
+      openEnd &&
+      (name === "errorEventDefinition" || name === "terminateEventDefinition")
+    ) {
+      openEnd.terminating = true;
+      openEnd.terminatingVia = name;
+      continue;
+    }
 
     if (name === "process") {
       current = {
@@ -159,7 +198,10 @@ function readBpmn(xml) {
     }
     if (!current) continue; // laneSet inside collaboration, extensions, etc.
 
-    if (name in REFUSED) {
+    // Object.hasOwn, not `in`: `in` walks Object.prototype, so an element named
+    // `constructor` or `toString` would "match" and yield a function body as its
+    // refusal reason.
+    if (Object.hasOwn(REFUSED, name)) {
       refusals.push(`${name} ${a.id ?? "(no id)"}: ${REFUSED[name]}`);
       continue;
     }
@@ -193,7 +235,9 @@ function readBpmn(xml) {
       XOR_GATEWAYS.has(name) ||
       AND_GATEWAYS.has(name)
     ) {
-      current.nodes.set(a.id, { id: a.id, kind: name, name: a.name ?? "" });
+      const node = { id: a.id, kind: name, name: a.name ?? "" };
+      current.nodes.set(a.id, node);
+      if (name === "endEvent" && !isLeaf) openEnd = node;
     }
   }
   return { processes, refusals };
@@ -254,9 +298,10 @@ function buildNet(proc) {
 
   const P = (f) => `flow:${f.id}`;
   const A = (id) => `act:${id}`;
-  const transitions = []; // { id, node, label, consume: [], produce: [] }
+  const transitions = []; // { id, node, label, consume: [], produce: [], clears? }
   const initial = new Map();
   const starts = [];
+  const terminators = []; // end events that discard every remaining token
 
   for (const node of proc.nodes.values()) {
     const id = node.id;
@@ -280,13 +325,18 @@ function buildNet(proc) {
     if (node.kind === "endEvent") {
       if (outs.length > 0)
         problems.push(`end event ${id} has an outgoing sequence flow`);
+      if (node.terminating) terminators.push(node);
       for (const f of ins)
         transitions.push({
           id: `${id}@${f.id}`,
           node: id,
-          label: `${describe(node)} (consume ${f.id})`,
+          label: node.terminating
+            ? `${describe(node)} (consume ${f.id}, TERMINATES the instance)`
+            : `${describe(node)} (consume ${f.id})`,
           consume: [P(f)],
           produce: [],
+          // Discards every remaining token, everywhere. See the header.
+          clears: !!node.terminating,
         });
       if (ins.length === 0)
         problems.push(`end event ${id} is unreachable: no incoming flow`);
@@ -335,6 +385,8 @@ function buildNet(proc) {
     if (outs.length === 0 && bnds.length === 0)
       problems.push(`${node.kind} ${id} has no outgoing flow (implicit end)`);
 
+    // A start event with no incoming flow was seeded and `continue`d above, so
+    // anything reaching here has at least one incoming flow.
     if (bnds.length === 0) {
       for (const f of ins)
         transitions.push({
@@ -344,8 +396,6 @@ function buildNet(proc) {
           consume: [P(f)],
           produce: outs.map(P),
         });
-      if (node.kind === "startEvent" && ins.length === 0)
-        /* already seeded above */ void 0;
       continue;
     }
 
@@ -357,7 +407,6 @@ function buildNet(proc) {
         consume: [P(f)],
         produce: [A(id)],
       });
-    if (node.kind === "startEvent" && ins.length === 0) initial.set(A(id), 1);
     transitions.push({
       id: `${id}:complete`,
       node: id,
@@ -384,6 +433,7 @@ function buildNet(proc) {
     transitions,
     initial,
     starts,
+    terminators,
     problems,
     incoming,
     outgoing,
@@ -410,6 +460,11 @@ function explore(net) {
   const states = new Map(); // key -> { marking, from, via }
   states.set(t0, { marking: net.initial, from: null, via: null });
   const preds = new Map([[t0, []]]);
+  // The same predecessor graph with the terminating end events left out. The
+  // difference between the two backward closures is exactly "which markings can
+  // only reach completion by aborting the instance", which is worth saying out
+  // loud rather than letting a terminate silently satisfy S1.
+  const predsLive = new Map([[t0, []]]);
   const succCount = new Map();
   const fired = new Set(); // transition ids
   const firedNodes = new Set();
@@ -440,16 +495,26 @@ function explore(net) {
 
       const next = new Map(marking);
       for (const p of t.consume) next.set(p, next.get(p) - 1);
-      for (const p of t.produce) {
-        const c = (next.get(p) ?? 0) + 1;
-        if (c > 1) unsafePlaces.add(p);
-        if (c > MAX_TOKENS_PER_PLACE) overflowed = true;
-        next.set(p, c);
+      if (t.clears) {
+        // An uncaught error end / terminate end ends the instance: every token
+        // still in flight is discarded, not left running.
+        for (const p of next.keys()) next.set(p, 0);
+      } else {
+        for (const p of t.produce) {
+          const c = (next.get(p) ?? 0) + 1;
+          if (c > 1) unsafePlaces.add(p);
+          if (c > MAX_TOKENS_PER_PLACE) overflowed = true;
+          next.set(p, c);
+        }
       }
       if (overflowed) break;
       const nk = markingKey(next);
       if (!preds.has(nk)) preds.set(nk, []);
       preds.get(nk).push(key);
+      if (!t.clears) {
+        if (!predsLive.has(nk)) predsLive.set(nk, []);
+        predsLive.get(nk).push(key);
+      }
       if (!states.has(nk)) {
         if (states.size >= MAX_STATES) {
           overflowed = true;
@@ -464,25 +529,31 @@ function explore(net) {
   }
 
   // Which markings can still reach "every token consumed"?
-  const canComplete = new Set();
-  if (states.has("")) {
+  const backwardFrom = (edges) => {
+    const seen = new Set();
+    if (!states.has("")) return seen;
     const back = [""];
-    canComplete.add("");
+    seen.add("");
     while (back.length) {
       const k = back.pop();
-      for (const p of preds.get(k) ?? [])
-        if (!canComplete.has(p)) {
-          canComplete.add(p);
+      for (const p of edges.get(k) ?? [])
+        if (!seen.has(p)) {
+          seen.add(p);
           back.push(p);
         }
     }
-  }
+    return seen;
+  };
+  const canComplete = backwardFrom(preds);
+  const canCompleteLive = backwardFrom(predsLive);
 
   const deadlocks = [];
   const stuck = [];
+  let onlyViaTerminate = 0;
   for (const [k] of states) {
     if (succCount.get(k) === 0 && k !== "") deadlocks.push(k);
     if (!canComplete.has(k)) stuck.push(k);
+    else if (!canCompleteLive.has(k)) onlyViaTerminate++;
   }
   return {
     states,
@@ -494,6 +565,7 @@ function explore(net) {
     overflowed,
     deadlocks,
     stuck,
+    onlyViaTerminate,
     completable: states.has(""),
   };
 }
@@ -614,6 +686,18 @@ for (const file of files) {
       `  info  ${r.states.size} reachable markings, peak ${r.peak} concurrent token(s), ` +
         `${net.transitions.length} net transitions`,
     );
+    // Say this out loud. Terminating end events make S1 satisfiable by aborting,
+    // so a reader must be able to tell "completes" from "gives up".
+    if (net.terminators.length) {
+      console.log(
+        `  info  ${net.terminators.length} terminating end event(s): ` +
+          net.terminators.map((n) => describe(n)).join(", ") +
+          " — reaching one discards every remaining token",
+      );
+      console.log(
+        `  info  ${r.onlyViaTerminate} marking(s) can reach completion ONLY by terminating`,
+      );
+    }
 
     for (const p of net.problems) console.log(`  STRUCTURE  ${p}`);
 

@@ -30,6 +30,7 @@ jobs:
       haskell: ${{ steps.filter.outputs.haskell }}
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
+      bpmn: ${{ steps.filter.outputs.bpmn }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -55,17 +56,76 @@ jobs:
               - '**/*.ts'
               - '**/*.tsx'
               - '**/*.js'
+              # '**/*.js' does NOT match '.mjs'. etc/ is full of .mjs checkers
+              # and, before this entry, a PR touching only them ran ZERO jobs —
+              # including the typescript job that hosts `prettier --check .`,
+              # so even the format gate on those files was unreachable and an
+              # unformatted file would merge here and break the next PR that
+              # happened to touch a .ts file.
+              - '**/*.mjs'
+              - 'etc/**'
               - '**/*.svelte'
               - 'package.json'
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+            # The BPMN interchange checkers and their fixtures. Kept as its own
+            # filter so the (zero-dependency, node-only) soundness gate runs
+            # when a fixture changes, which no other filter would catch:
+            # prettier's .prettierignore excludes jl4/ entirely.
+            bpmn:
+              - 'etc/check-bpmn-*'
+              - 'etc/validate-bpmn.mjs'
+              - 'etc/kie/**'
+              - 'jl4/examples/bpmn/**'
+              - 'jl4-core/src/L4/Bpmn/**'
             # specs/** must trigger doc checks too: a spec-only PR that skips
             # both this filter and 'haskell' never runs test-docs.sh or
             # prettier, so a broken link or unformatted file merges silently.
             docs:
               - 'doc/**'
               - 'specs/**'
+
+  # ============================================
+  # BPMN interchange: soundness gate over the emitted fixtures
+  # ============================================
+  # Deliberately its own job, and deliberately tiny. `etc/check-bpmn-soundness*`
+  # is pure Node with no dependencies and no network, so this needs neither
+  # `npm ci` nor a Haskell toolchain and cannot be blocked by lockfile drift.
+  #
+  # NOT RUN HERE: `etc/check-bpmn-kie.sh` (the jBPM second opinion), because it
+  # downloads ~44 MB from Maven Central and is corroboration rather than a gate —
+  # see jl4/examples/bpmn/README.md. It is run by hand, and it SKIPS LOUDLY with
+  # a non-zero exit when its toolchain is absent, so it can be added here later
+  # without any risk of it passing silently.
+  bpmn:
+    name: BPMN Soundness
+    needs: changes
+    if: needs.changes.outputs.bpmn == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+
+      # Proves the gate can still FAIL, by asserting every fixture in
+      # jl4/examples/bpmn/unsound/ is caught on the specific property it exists
+      # to exercise — and that every fixture in sound/ is NOT flagged, because a
+      # gate that invents defects is as broken as one that misses them. A checker
+      # whose only observed behaviour is "PASS" is indistinguishable from one
+      # that has been quietly broken.
+      - name: Self-test (the gate must still be able to fail, and to pass)
+        run: node etc/check-bpmn-soundness.selftest.mjs
+
+      # The gate itself, over the emitted goldens.
+      - name: Soundness-check the emitted BPMN
+        run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+
+      # K4: will Camunda Modeler open these? bpmn-moddle is what bpmn-js parses
+      # with. Pinned, and never added to package.json or the lockfile.
+      - name: Validate against bpmn-moddle (the K4 acceptance signal)
+        run: npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/*.bpmn jl4/examples/bpmn/sound/*.bpmn
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
