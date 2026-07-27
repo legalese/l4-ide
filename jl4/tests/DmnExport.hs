@@ -30,6 +30,8 @@ import L4.Dmn.IR
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
+import qualified L4.TypeCheck as TC
+import L4.TypeCheck.Types (Severity (..))
 
 import System.FilePath ((</>))
 import Test.Hspec
@@ -426,11 +428,109 @@ maxIdiom =
   \`the greater` MEANS\n\
   \  IF a AT LEAST b THEN a ELSE b\n"
 
--- | The same idiom over DATE. FEEL's min/max are defined over comparable items,
--- so the lowering must not assume numbers.
+-- | The same SHAPE over STRING. L4's comparisons are overloaded — @__GEQ__@ has
+-- variants over NUMBER, STRING and BOOLEAN — so the syntactic match says nothing
+-- about the operand type, and this is a well-typed L4 program over any of them.
+-- STRING is a type FEEL orders (DMN 1.3 §10.3.2.13, Table 54, has a @string@ row
+-- defining lexicographic @\<@), so it is a "comparable item" for @min@\/@max@
+-- (§10.3.4.4, Table 75) and the fold is in-domain. It has to be: the un-folded
+-- fallthrough would be @(if s >= t then s else t)@, whose @\>=@ is legal by that
+-- same Table 54 row. Declining @max@ while emitting @\>=@ would not be
+-- conservative, only inconsistent.
+stringSelect :: Text
+stringSelect =
+  "ASSUME s IS A STRING\n\
+  \ASSUME t IS A STRING\n\
+  \GIVETH A STRING\n\
+  \`the later name` MEANS\n\
+  \  IF s AT LEAST t THEN s ELSE t\n"
+
+-- | ...and over BOOLEAN, which is the one type with no defence: Table 54 has
+-- rows for number, string, date, time, date-and-time and the two durations, and
+-- __none for boolean__, under a sentence that says the ordering operators "are
+-- defined only for the datatypes listed in Table 54". So @max(true, false)@ is
+-- outside the builtin's domain (§10.3.4: an out-of-domain parameter gives
+-- @null@) — and, the point the first version of this fix missed, so is the
+-- @p >= q@ it would fall through to. Neither spelling is FEEL, so the fallthrough
+-- is not a safe harbour: the comparison itself must go out verbatim, under a
+-- Blocking note. (KIE answers @true@ for @max(true, false)@ anyway, because its
+-- domain is Java's @Comparable@ — exactly the engine-specific luck an exporter
+-- must not depend on.)
+booleanSelect :: Text
+booleanSelect =
+  "ASSUME p IS A BOOLEAN\n\
+  \ASSUME q IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \`the stronger claim` MEANS\n\
+  \  IF p AT LEAST q THEN p ELSE q\n"
+
+-- | The select in a position 'renderFeelIn' renders as an EXPRESSION rather than
+-- decomposing into rows: the subject of a guard. STRING is orderable, so the
+-- peephole fires here exactly as it does for NUMBER.
+stringSelectAsSubject :: Text
+stringSelectAsSubject =
+  "ASSUME s IS A STRING\n\
+  \ASSUME t IS A STRING\n\
+  \GIVETH A NUMBER\n\
+  \`tier` MEANS\n\
+  \  BRANCH\n\
+  \   IF (IF s AT LEAST t THEN s ELSE t) EQUALS \"zulu\" THEN 1\n\
+  \   OTHERWISE 0\n"
+
+-- | The numeric twin of 'stringSelectAsSubject', in the same position.
+numberSelectAsSubject :: Text
+numberSelectAsSubject =
+  "ASSUME a IS A NUMBER\n\
+  \ASSUME b IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \`tier` MEANS\n\
+  \  BRANCH\n\
+  \   IF (IF a AT LEAST b THEN a ELSE b) EQUALS 100 THEN 1\n\
+  \   OTHERWISE 0\n"
+
+-- | The BOOLEAN twin, in the same position. Here the gate declines, and the
+-- un-folded @if@ carries a boolean @\>=@ — so what must appear is L4 source and
+-- a Blocking note, not @(if p >= q then p else q)@ tagged S-FEEL.
+booleanSelectAsSubject :: Text
+booleanSelectAsSubject =
+  "ASSUME p IS A BOOLEAN\n\
+  \ASSUME q IS A BOOLEAN\n\
+  \GIVETH A NUMBER\n\
+  \`tier` MEANS\n\
+  \  BRANCH\n\
+  \   IF (IF p AT LEAST q THEN p ELSE q) THEN 1\n\
+  \   OTHERWISE 0\n"
+
+-- | A select as a ROW BODY — the position @childOf@ governs, and the only one
+-- where the peephole's /structural/ job shows. This one cannot fold (BOOLEAN),
+-- which is precisely why it is the test: 'L4.Dmn.Lower.flattenGuarded' must
+-- still refuse to splice it, or the table gains two rules the source never
+-- stated and drops from @U@ to @F@.
+booleanSelectAsBody :: Text
+booleanSelectAsBody =
+  "ASSUME p IS A BOOLEAN\n\
+  \ASSUME q IS A BOOLEAN\n\
+  \ASSUME late IS A BOOLEAN\n\
+  \GIVETH A BOOLEAN\n\
+  \`claim` MEANS\n\
+  \  BRANCH\n\
+  \   IF late THEN IF p AT LEAST q THEN p ELSE q\n\
+  \   OTHERWISE p\n"
+
+-- | The same idiom over DATE — the shape @daydate.l4@'s @the earlier of@ and
+-- @the later of@ have, and the reason this test imports that library rather than
+-- writing the comparison bare. L4's comparison BUILTINS are @NUMBER@, @STRING@
+-- and @BOOLEAN@ only, so a bare @start AT MOST end@ over DATE is not a DATE
+-- comparison at all: it is an ambiguous overload, which the typechecker rejects
+-- with "There are multiple definitions for the identifier @__LEQ__@". Asserting
+-- on that would pin the exporter's treatment of a module L4 refuses.
+-- @daydate.l4@ supplies real @DATE@ variants of @__LEQ__@ \/ @__GEQ__@ \/
+-- @__LT__@ \/ @__GT__@, and DMN Table 54 has a @date@ row, so this one both
+-- typechecks and folds.
 minIdiomDate :: Text
 minIdiomDate =
-  "ASSUME `start` IS A DATE\n\
+  "IMPORT daydate\n\
+  \ASSUME `start` IS A DATE\n\
   \ASSUME `end` IS A DATE\n\
   \GIVETH A DATE\n\
   \`the earlier of` MEANS\n\
@@ -634,12 +734,81 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral e -> e.feText `shouldBe` "max(a, b)"
         LogicTable _   -> expectationFailure "expected max(a, b), got a decision table"
 
-    it "and the same over DATE, since FEEL's max is over comparables" $ do
+    -- The SHAPE is not the whole idiom: L4's `<` / `<=` / `>` / `>=` are
+    -- overloaded over NUMBER, STRING and BOOLEAN (and daydate.l4 adds DATE), so
+    -- `IF s AT LEAST t THEN s ELSE t` is a well-typed program over any of them
+    -- and the syntax says nothing about which. What decides the fold is whether
+    -- FEEL can ORDER the operands: min/max take "comparable items" (DMN 1.3
+    -- §10.3.4.4 Table 75) and §10.3.2.13 fixes what is comparable -- "the other
+    -- comparison operators are defined only for the datatypes listed in
+    -- Table 54", whose rows are number, string, date, date-and-time, time and
+    -- the two durations. So NUMBER, STRING and DATE fold; BOOLEAN does not.
+    --
+    -- The line has to fall there and not one type earlier, because the
+    -- fallthrough for a declined fold is `(if s >= t then s else t)` -- and that
+    -- `>=` is legal in exactly the same rows of exactly the same table. Refusing
+    -- `min` over dates while emitting `<=` over dates would not be conservative,
+    -- just inconsistent.
+    it "fires over STRING, which Table 54 orders lexicographically" $ do
+      let d = decisionNamed "the later name" (drgOf stringSelect)
+      case d.dcnLogic of
+        LogicLiteral e -> e.feText `shouldBe` "max(s, t)"
+        LogicTable _   -> expectationFailure "expected max(s, t), got a decision table"
+      d.dcnType `shouldBe` DmnString
+
+    it "fires over DATE, which Table 54 orders too (daydate's `the earlier of`)" $ do
       let d = decisionNamed "the earlier of" (drgOf minIdiomDate)
       case d.dcnLogic of
         LogicLiteral e -> e.feText `shouldBe` "min(start, end)"
         LogicTable _   -> expectationFailure "expected min(start, end), got a decision table"
       d.dcnType `shouldBe` DmnDate
+
+    -- BOOLEAN is the one type L4 orders and FEEL does not, and the un-folded
+    -- `if` is NOT a safe harbour for it: `p >= q` is outside FEEL by the same
+    -- clause as `max(p, q)`. So declining the fold is only half the job -- the
+    -- comparison has to leave as L4 source, under a Blocking note, rather than
+    -- as an S-FEEL claim that an engine will evaluate it.
+    it "does not fire over BOOLEAN, which FEEL has no ordering for at all" $ do
+      mustNotBeSelect "the stronger claim" booleanSelect
+      let t = tableOf "the stronger claim" booleanSelect
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["p AT LEAST q"]
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [L4Verbatim]
+      map (.code) t.dtNotes `shouldContain` ["D-NONFEELINPUT"]
+      [n.severity | n <- t.dtNotes, n.code == "D-NONFEELINPUT"] `shouldBe` [Blocking]
+      -- and in particular NOT the transliteration that reads as executable FEEL
+      -- (escaped or not: `>` leaves the emitter as `&gt;` in a <text> element)
+      emitDrg (drgOf booleanSelect)
+        `shouldSatisfy` (\x -> not (Text.isInfixOf "p &gt;= q" x) && not (Text.isInfixOf "p >= q" x))
+
+    it "a STRING select in expression position folds, like its NUMBER twin" $ do
+      let t = tableOf "tier" stringSelectAsSubject
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["max(s, t)"]
+      map (.drInputs) t.dtRules `shouldBe` [[TestEq (VStr "zulu")]]
+
+    it "...as does the NUMBER twin in the same position" $ do
+      let t = tableOf "tier" numberSelectAsSubject
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["max(a, b)"]
+      map (.drInputs) t.dtRules `shouldBe` [[TestEq (VNum 100)]]
+
+    it "...while the BOOLEAN twin becomes a verbatim column, reported Blocking" $ do
+      let t = tableOf "tier" booleanSelectAsSubject
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["IF (p AT LEAST q) THEN p ELSE q"]
+      map (.icExpr.feFragment) t.dtInputs `shouldBe` [L4Verbatim]
+      map (.code) t.dtNotes `shouldContain` ["D-NONFEELINPUT"]
+
+    -- The peephole has a second, purely structural job: keeping a select OUT of
+    -- the row splicer. That job does not depend on the fold firing, so the test
+    -- for it uses the operand type that cannot fold. Expanding this body turns
+    -- one rule into three -- the comparison becomes a second column, `late AND
+    -- p >= q` and `late` become separate rules, and the OTHERWISE becomes an
+    -- all-`-` row -- which forces First: two case distinctions the source never
+    -- draws, plus DMN 8.2.10 order dependence, in exchange for nothing.
+    it "a select as a ROW BODY is never spliced into rows, even when it cannot fold" $ do
+      let t = tableOf "claim" booleanSelectAsBody
+      t.dtHitPolicy `shouldBe` HitUnique
+      length t.dtRules `shouldBe` 1
+      map (.icExpr.feText) t.dtInputs `shouldBe` ["late"]
+      map (.code) t.dtNotes `shouldSatisfy` notElem "D-ORDERDEPENDENT"
 
     it "does not fire when an arm is an operand PLUS a term" $
       mustNotBeSelect "new pool" nearMissPlusTerm
@@ -1053,13 +1222,30 @@ isUniqueTable = \case
 drgOf :: Text -> Drg
 drgOf = drgNamed "Test"
 
+-- | Lower a source, INSISTING that L4 accepted it first.
+--
+-- @checkWithImports@ returns 'Left' only for a parse or import-resolution
+-- failure; a module that parses but does not typecheck comes back 'Right' with
+-- the diagnostics in @tcdErrors@ and @tcdSuccess = False@. Reading only the
+-- 'Left' meant a source could be asserted on while L4 was rejecting it — and
+-- one was: the DATE select in this file used to be written without
+-- @IMPORT daydate@, which makes @start AT MOST end@ an ambiguous overload
+-- ("multiple definitions for the identifier @__LEQ__@"), so the test that
+-- claimed to pin DATE behaviour was pinning the exporter's treatment of a failed
+-- overload resolution. Warnings and infos are left alone; only errors are fatal.
 drgNamed :: Text -> Text -> Drg
 drgNamed name src = case checkWithImports emptyVFS src of
-  Left errs -> error ("source failed to typecheck: " <> show errs)
-  Right tc ->
-    lowerModule
-      MkDmnLowerOptions {dloModelName = name, dloSubstitution = tc.tcdSubstitution}
-      tc.tcdModule
+  Left errs -> error ("source failed to parse: " <> show errs)
+  Right tc
+    | errs@(_ : _) <- filter ((== SError) . TC.severity) tc.tcdErrors ->
+        error
+          ( "source failed to typecheck: "
+              <> Text.unpack (Text.unlines (concatMap TC.prettyCheckErrorWithContext errs))
+          )
+    | otherwise ->
+        lowerModule
+          MkDmnLowerOptions {dloModelName = name, dloSubstitution = tc.tcdSubstitution}
+          tc.tcdModule
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of
