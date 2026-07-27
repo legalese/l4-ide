@@ -159,9 +159,9 @@ mustSrc =
 
 -- | The same pair again, but with a deadline that is a /name/, so no ISO
 -- duration can be built and the boundary event falls back to naming itself
--- after the LEST edge's own label. That label is the extractor's bare
--- \"timeout\" (or \"violation\") for every modal alike, which is where the
--- wrong word leaks onto a prohibition's compliance arm.
+-- after the LEST edge's own label ('L4.StateGraph.lestArmWording'). That is
+-- the only path on which the fallback is visible, so it is the only path that
+-- can show a caption meant for one arm leaking onto the other.
 shantOpaqueSrc, mustOpaqueSrc :: [Text]
 shantOpaqueSrc =
   [ "`grace` MEANS 30"
@@ -962,14 +962,16 @@ spec = do
         `shouldSatisfy` all (maybe False (Text.isInfixOf "LEST arm"))
 
     -- <documentation> is not what a reader sees. The boundary's NAME is drawn
-    -- on the diagram, and it used to be whatever the extractor put on the LEST
-    -- edge — the bare word "timeout", or "violation" where a SHANT defaulted
-    -- its own LEST. On the arm that means the prohibition was RESPECTED, both
-    -- of those are false, and no amount of correct wiring underneath fixes a
-    -- label that says the opposite of what the arm means.
+    -- on the diagram, and if it simply took whatever the extractor put on the
+    -- LEST edge it would read "violation" — which is the right word for that
+    -- edge (L4.StateGraph.lestArmWording) and the wrong one for this node,
+    -- because raceArms puts this node on the arm that means the prohibition was
+    -- RESPECTED. No amount of correct wiring underneath fixes a label that says
+    -- the opposite of what the arm means, which is why triggerName names a
+    -- prohibition's boundary itself instead of borrowing.
     --
     -- The opaque-deadline pair is what pins this: with a parseable WITHIN the
-    -- name is "after P30D" and the leak never shows.
+    -- name is "after P30D" and the borrowing never shows.
     describe "and the label a reader actually sees says so too" $ do
       let shantO = exportOf defaultBpmnOptions "rule" shantOpaqueSrc
           mustO = exportOf defaultBpmnOptions "rule" mustOpaqueSrc
@@ -997,14 +999,81 @@ spec = do
       -- BPMN has no untriggered one. Naming that "deadline passes" would assert
       -- a deadline the rule does not have — the same class of mistake as the
       -- one above, in the opposite direction.
+      --
+      -- It went further than that. This node is the COMPLIANCE arm, reached
+      -- only by the deadline passing, and with no WITHIN nothing reaches it at
+      -- all: measured, `PARTY Alice SHANT notify LEST …` run to
+      -- (`WAIT UNTIL` 1000) leaves the prohibition standing as a residual. So
+      -- both halves of the element have to say that, and they now do — where
+      -- once the name said "the act is not performed" and the condition
+      -- underneath it said "violation", one element asserting both arms.
       it "and claims no deadline where the rule set none" $ do
         let bare =
               exportOf
                 defaultBpmnOptions
                 "rule"
                 ["`rule` MEANS", "  PARTY Alice", "  SHANT notify"]
-        map (.nodeName) (boundaries bare) `shouldBe` ["the act is not performed"]
+        map (.nodeName) (boundaries bare) `shouldBe` [noTriggerWording]
+        map (.nodeKind) (boundaries bare)
+          `shouldBe` [Boundary "Task_0" (WhenCondition noTriggerWording)]
         raceOutcome bare `shouldBe` (ToBreach, ToFulfilled)
+
+      it "does not let the LEST caption leak onto the compliance arm" $ do
+        -- The SHANT's own LEST edge says "violation" (lestArmWording). That is
+        -- the right word for the edge and the wrong one for this node.
+        let bare =
+              exportOf
+                defaultBpmnOptions
+                "rule"
+                [ "`rule` MEANS"
+                , "  PARTY Alice"
+                , "  SHANT notify"
+                , "  LEST (PARTY Bob MUST pay WITHIN 5)"
+                ]
+            firstBoundary = take 1 (boundaries bare)
+        map (.nodeName) firstBoundary `shouldBe` [noTriggerWording]
+        map (.nodeKind) firstBoundary
+          `shouldBe` [Boundary "Task_0" (WhenCondition noTriggerWording)]
+        renderBpmn bare
+          `shouldNotSatisfy` Text.isInfixOf "<bpmn:condition xsi:type=\"bpmn:tFormalExpression\">violation<"
+
+  -- The BPMN goldens do NOT pin these. Measured: replacing every case of
+  -- lestArmWording with a distinct nonsense string and re-exporting the three
+  -- committed examples moves exactly ONE line — handover.bpmn:41's
+  -- name="timeout" — and leaves offering.bpmn and consultation.bpmn
+  -- byte-identical. offering's prohibitions never reach the fallback
+  -- (triggerName's DMustNot clause matches first) and consultation is all-MAY
+  -- with no LEST. So the goldens would survive any wrong caption for SHANT, for
+  -- MAY, and for every no-WITHIN shape; only these assertions catch those.
+  describe "the LEST caption where BPMN actually consumes it" $ do
+    -- An opaque WITHIN is the only path on which an obligation's boundary is
+    -- named after the LEST caption; a parseable one becomes "after P30D".
+    let named nm src = map (.nodeName) (boundaries (exportOf defaultBpmnOptions nm src))
+        rule modal extra =
+          ["`rule` MEANS", "  PARTY Alice", "  " <> modal <> " notify"] <> extra
+
+    it "gives an obligation with an opaque deadline the word timeout" $
+      named "rule" (["`grace` MEANS 30", ""] <> rule "MUST" ["  WITHIN grace", "  LEST BREACH"])
+        `shouldBe` ["timeout"]
+
+    it "gives a permission with an opaque deadline the word lapses" $
+      named "rule" (["`grace` MEANS 30", ""] <> rule "MAY" ["  WITHIN grace", "  LEST BREACH"])
+        `shouldBe` ["lapses"]
+
+    -- The synthesised lapse timer takes its word from lestArmWording too,
+    -- rather than spelling it a second time here.
+    it "spells the synthesised MAY lapse timer the same way" $
+      map (.nodeName) (boundaries (exportOf defaultBpmnOptions "optional" mayNoLestSrc))
+        `shouldBe` ["after P30D"]
+
+    it "names no trigger on an obligation the rule gave no deadline" $ do
+      named "rule" (rule "MUST" ["  LEST BREACH"]) `shouldBe` [noTriggerWording]
+      named "rule" (rule "MAY" ["  LEST BREACH"]) `shouldBe` [noTriggerWording]
+
+    -- The default-LEST × no-WITHIN cell. Nothing asserted this before, and it
+    -- is the shape that moved most of the checked-in state-graph diagrams.
+    it "does the same when the LEST was defaulted rather than written" $
+      named "rule" (rule "MUST" []) `shouldBe` [noTriggerWording]
 
   describe "a permission that lapses" $ do
     let bx = exportOf defaultBpmnOptions "optional" mayNoLestSrc
