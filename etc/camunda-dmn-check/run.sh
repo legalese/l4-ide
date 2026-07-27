@@ -5,7 +5,7 @@
 # every decision. See src/main/java/CamundaDmnCheck.java.
 #
 #   etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn \
-#     --ctx jl4/examples/dmn/reg-cf.ctx.json
+#     --cases jl4/examples/dmn/reg-cf.cases.json
 #
 # NOT CAMUNDA 7 (see pom.xml), and deliberately NOT sharing a classpath with
 # etc/kie-dmn-check: the two feel-engine builds collide.
@@ -36,6 +36,14 @@ skip() {
     exit 1
   fi
   exit 0
+}
+
+# NOT a skip: see the identical note in etc/kie-dmn-check/run.sh. A harness that
+# does not compile is a repo defect and fails on every machine.
+broken() {
+  echo "BROKEN  Camunda DMN check: $1" >&2
+  echo "        This is a defect in the repo, not a missing toolchain; it fails everywhere." >&2
+  exit 1
 }
 
 command -v mvn >/dev/null 2>&1 || skip "mvn not on PATH (brew install maven)"
@@ -76,9 +84,18 @@ src="$here/src/main/java/CamundaDmnCheck.java"
 if [ ! -s "$out/classes/CamundaDmnCheck.class" ] || [ "$src" -nt "$out/classes/CamundaDmnCheck.class" ]; then
   mkdir -p "$out/classes"
   "$JAVA_HOME/bin/javac" -nowarn -cp "$(cat "$cp")" -d "$out/classes" "$src" \
-    || skip "javac failed (see above)"
+    || broken "javac failed on $src (see above)"
 fi
 
+# The pin, read out of the pom rather than duplicated in this script, and handed
+# to the checker ONLY so it can compare it against the version it observed off
+# the classpath. The banner prints the observed one. Review caught the earlier
+# arrangement, in which the banner printed this constant and no engine ever
+# produced the number in it.
+pinned="$(sed -n 's/.*<zeebe\.version>\(.*\)<\/zeebe\.version>.*/\1/p' "$here/pom.xml" | head -1)"
+[ "$pinned" = "$ZEEBE_VERSION" ] \
+  || broken "pom.xml pins $pinned but run.sh says $ZEEBE_VERSION; reconcile them"
+
 exec "$JAVA_HOME/bin/java" -Dorg.slf4j.simpleLogger.defaultLogLevel=off \
-  -Dl4.camunda.version="$ZEEBE_VERSION" \
+  -Dl4.camunda.version.expected="$pinned" \
   -cp "$out/classes:$(cat "$cp")" CamundaDmnCheck "$@"

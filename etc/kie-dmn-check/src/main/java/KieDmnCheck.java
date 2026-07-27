@@ -41,7 +41,18 @@ import java.util.Map;
  * Take an emitted DMN file to Drools/KIE and report what the ENGINE says, as
  * opposed to what a schema or a metamodel parser says.
  *
- *   java KieDmnCheck FILE.dmn [--ctx ctx.json] [FILE2.dmn ...]
+ *   java KieDmnCheck FILE.dmn [--ctx ctx.json | --cases cases.json] [FILE2.dmn ...]
+ *
+ * --ctx supplies one input context and checks only that the model RAN. --cases
+ * supplies a list of {name, context, expect} and additionally checks WHAT IT
+ * ANSWERED. Prefer --cases: "5/5 SUCCEEDED" is a liveness claim, and the failure
+ * this harness exists for is a wrong non-null value, not a missing one. The
+ * Camunda misparse of `annual income` answers `true`, which every status check
+ * and every null check in here would wave through (see 13.2 of the spec).
+ *
+ * Under --cases the check is symmetric: every decision the model evaluates must
+ * be named in `expect`, and every name in `expect` must be a decision. Adding a
+ * decision without an expectation is therefore a failure, not a silent gap.
  *
  * Four legs, in the order a real deployment meets them:
  *
@@ -90,42 +101,67 @@ public final class KieDmnCheck {
   private static int decisions = 0;
   private static int succeeded = 0;
   private static int files = 0;
+  private static int cases = 0;
+  private static int checked = 0;
+  private static int matched = 0;
 
   public static void main(String[] argv) throws Exception {
-    // FILE.dmn [--ctx ctx.json] ...: --ctx attaches to the file before it, so
-    // several files can be checked in one JVM with a context each.
-    List<String[]> jobs = new ArrayList<>(); // {file, ctxOrNull}
+    // FILE.dmn [--ctx c.json | --cases cs.json] ...: the flag attaches to the
+    // file before it, so several files can be checked in one JVM.
+    List<String[]> jobs = new ArrayList<>(); // {file, ctxOrNull, casesOrNull}
     for (int i = 0; i < argv.length; i++) {
-      if (argv[i].equals("--ctx")) {
+      if (argv[i].equals("--ctx") || argv[i].equals("--cases")) {
+        int slot = argv[i].equals("--ctx") ? 1 : 2;
         if (jobs.isEmpty() || i + 1 >= argv.length) {
-          System.err.println("KieDmnCheck: --ctx must follow a .dmn file and name a .json file");
+          System.err.println(
+              "KieDmnCheck: " + argv[i] + " must follow a .dmn file and name a .json file");
           System.exit(2);
         }
-        jobs.get(jobs.size() - 1)[1] = argv[++i];
+        jobs.get(jobs.size() - 1)[slot] = argv[++i];
         continue;
       }
-      jobs.add(new String[] {argv[i], null});
+      jobs.add(new String[] {argv[i], null, null});
     }
     if (jobs.isEmpty()) {
-      System.err.println("usage: KieDmnCheck FILE.dmn [--ctx ctx.json] ...");
+      System.err.println("usage: KieDmnCheck FILE.dmn [--ctx c.json | --cases cs.json] ...");
       System.exit(2);
     }
 
     Schema schema = loadSchema();
+    // OBSERVED, not echoed: read off the jar that is actually on the classpath.
+    // The version in the banner has to be evidence about which engine looked at
+    // the file, which a constant passed in by the launcher is not.
     String version = KieServices.Factory.get().getClass().getPackage().getImplementationVersion();
     if (version == null) {
       version = "unknown";
     }
-
-    for (String[] job : jobs) {
-      run(schema, new File(job[0]), job[1] == null ? null : new File(job[1]));
+    // ...and cross-checked against the pin in pom.xml, so that a stale cached
+    // classpath or an edited pom cannot leave the banner naming a version that
+    // was never loaded.
+    String expected = System.getProperty("l4.kie.version.expected", "");
+    if (!expected.isEmpty() && !expected.equals(version)) {
+      System.out.println(
+          "VERSION MISMATCH: pom.xml pins " + expected + " but the classpath loaded " + version
+              + " -- delete the cached cp.txt (see run.sh) or reconcile the pin.");
+      errors++;
     }
 
-    boolean ok = errors == 0 && decisions > 0 && succeeded == decisions;
+    for (String[] job : jobs) {
+      run(
+          schema,
+          new File(job[0]),
+          job[1] == null ? null : new File(job[1]),
+          job[2] == null ? null : new File(job[2]));
+    }
+
+    boolean ok =
+        errors == 0 && decisions > 0 && succeeded == decisions && matched == checked;
     System.out.println();
     System.out.println(
-        "KIE " + version + " VERDICT: " + files + " file(s), " + errors + " error(s), "
-            + warnings + " warning(s), " + succeeded + "/" + decisions + " decision(s) SUCCEEDED"
+        "KIE " + version + " VERDICT: " + files + " file(s), " + cases + " case(s), "
+            + errors + " error(s), " + warnings + " warning(s), "
+            + succeeded + "/" + decisions + " decision(s) SUCCEEDED, "
+            + matched + "/" + checked + " value(s) as expected"
             + (ok ? "" : "   <<< FAILED"));
     System.exit(ok ? 0 : 1);
   }
@@ -152,7 +188,7 @@ public final class KieDmnCheck {
     }
   }
 
-  private static void run(Schema schema, File f, File ctxFile) throws Exception {
+  private static void run(Schema schema, File f, File ctxFile, File casesFile) throws Exception {
     files++;
     System.out.println();
     System.out.println("=== " + f.getName() + " ===");
@@ -245,7 +281,14 @@ public final class KieDmnCheck {
       return;
     }
 
-    Map<String, Object> ctx = readContext(ctxFile);
+    List<Case> jobCases = new ArrayList<>();
+    if (casesFile != null) {
+      jobCases.addAll(readCases(casesFile));
+    }
+    if (ctxFile != null || jobCases.isEmpty()) {
+      // --ctx, or neither: one unnamed case with no expectations.
+      jobCases.add(new Case("(context only)", readContext(ctxFile), null));
+    }
 
     for (DMNModel model : models) {
       System.out.println("MODEL  " + model.getName() + "  ns=" + model.getNamespace());
@@ -273,62 +316,195 @@ public final class KieDmnCheck {
       }
       System.out.println("       decisionSvcs  " + svcs);
 
-      System.out.println("EVAL   context " + ctx);
-      DMNContext dctx = rt.newContext();
-      ctx.forEach(dctx::set);
-      DMNResult r;
-      try {
-        r = rt.evaluateAll(model, dctx);
-      } catch (Throwable t) {
-        System.out.println("       evaluateAll THREW " + t);
-        errors++;
-        continue;
-      }
-      for (DMNMessage m : r.getMessages()) {
-        System.out.println("       msg " + m.getSeverity() + " " + m.getText());
-        // A DMNResult-level ERROR is the ONLY signal a cyclic decision service
-        // gives: every decision still reports SUCCEEDED.
-        if (m.getSeverity() == DMNMessage.Severity.ERROR) {
-          errors++;
-        }
-      }
-      for (DMNDecisionResult dr : r.getDecisionResults()) {
-        decisions++;
-        Object val = dr.getResult();
-        DMNDecisionResult.DecisionEvaluationStatus st = dr.getEvaluationStatus();
-        String flag = "";
-        if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED && val == null) {
-          flag = "   <<< SUCCEEDED-BUT-NULL";
-        } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SKIPPED) {
-          flag = "   <<< SKIPPED";
-        } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED) {
-          succeeded++;
-        } else {
-          flag = "   <<< " + st;
-        }
-        System.out.println(
-            "       " + pad(dr.getDecisionName(), 34) + " " + pad(String.valueOf(st), 22)
-                + " = " + show(val) + flag);
-      }
-
-      for (DecisionServiceNode n : model.getDecisionServices()) {
-        DMNContext c2 = rt.newContext();
-        ctx.forEach(c2::set);
+      for (Case c : jobCases) {
+        cases++;
+        Map<String, Object> ctx = c.context;
+        System.out.println("CASE   " + c.name);
+        System.out.println("EVAL   context " + ctx);
+        DMNContext dctx = rt.newContext();
+        ctx.forEach(dctx::set);
+        DMNResult r;
         try {
-          DMNResult rs = rt.evaluateDecisionService(model, c2, n.getName());
-          System.out.println("SVC    " + n.getName() + " -> " + show(rs.getContext().getAll()));
-          for (DMNMessage m : rs.getMessages()) {
-            System.out.println("       msg " + m.getSeverity() + " " + m.getText());
-            if (m.getSeverity() == DMNMessage.Severity.ERROR) {
+          r = rt.evaluateAll(model, dctx);
+        } catch (Throwable t) {
+          System.out.println("       evaluateAll THREW " + t);
+          errors++;
+          continue;
+        }
+        for (DMNMessage m : r.getMessages()) {
+          System.out.println("       msg " + m.getSeverity() + " " + m.getText());
+          // A DMNResult-level ERROR is the ONLY signal a cyclic decision service
+          // gives: every decision still reports SUCCEEDED.
+          if (m.getSeverity() == DMNMessage.Severity.ERROR) {
+            errors++;
+          }
+        }
+        List<String> seen = new ArrayList<>();
+        for (DMNDecisionResult dr : r.getDecisionResults()) {
+          decisions++;
+          seen.add(dr.getDecisionName());
+          Object val = dr.getResult();
+          DMNDecisionResult.DecisionEvaluationStatus st = dr.getEvaluationStatus();
+          String flag = "";
+          if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED && val == null) {
+            flag = "   <<< SUCCEEDED-BUT-NULL";
+          } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SKIPPED) {
+            flag = "   <<< SKIPPED";
+          } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED) {
+            succeeded++;
+          } else {
+            flag = "   <<< " + st;
+          }
+          // The value check. A status of SUCCEEDED says the decision ran; only
+          // this says it was right.
+          if (c.expect != null) {
+            if (!c.expect.containsKey(dr.getDecisionName())) {
+              flag += "   <<< NO EXPECTATION for this decision";
+              errors++;
+            } else {
+              checked++;
+              Object want = c.expect.get(dr.getDecisionName());
+              if (sameValue(want, val)) {
+                matched++;
+              } else {
+                flag += "   <<< EXPECTED " + show(want);
+              }
+            }
+          }
+          System.out.println(
+              "       " + pad(dr.getDecisionName(), 34) + " " + pad(String.valueOf(st), 22)
+                  + " = " + show(val) + flag);
+        }
+        if (c.expect != null) {
+          for (String want : c.expect.keySet()) {
+            if (!seen.contains(want)) {
+              System.out.println("       " + pad(want, 34) + "   <<< EXPECTED but the model has no such decision");
               errors++;
             }
           }
-        } catch (Throwable t) {
-          System.out.println("SVC    " + n.getName() + " THREW " + t);
-          errors++;
+        }
+
+        for (DecisionServiceNode n : model.getDecisionServices()) {
+          DMNContext c2 = rt.newContext();
+          ctx.forEach(c2::set);
+          try {
+            DMNResult rs = rt.evaluateDecisionService(model, c2, n.getName());
+            System.out.println("SVC    " + n.getName() + " -> " + show(rs.getContext().getAll()));
+            for (DMNMessage m : rs.getMessages()) {
+              System.out.println("       msg " + m.getSeverity() + " " + m.getText());
+              if (m.getSeverity() == DMNMessage.Severity.ERROR) {
+                errors++;
+              }
+            }
+          } catch (Throwable t) {
+            System.out.println("SVC    " + n.getName() + " THREW " + t);
+            errors++;
+          }
         }
       }
     }
+  }
+
+  /**
+   * One named input context, plus the value every decision must produce under it.
+   *
+   * <p>{@code expect} is null for a bare {@code --ctx}, which checks only that the model RAN.
+   */
+  private static final class Case {
+    final String name;
+    final Map<String, Object> context;
+    final Map<String, Object> expect;
+
+    Case(String name, Map<String, Object> context, Map<String, Object> expect) {
+      this.name = name;
+      this.context = context;
+      this.expect = expect;
+    }
+  }
+
+  /**
+   * Read {@code {"cases": [{name, context, expect}, ...]}}. Any other key at the top level (such as
+   * the {@code note} the shipped fixture carries) is ignored.
+   */
+  private static List<Case> readCases(File casesFile) throws Exception {
+    List<Case> out = new ArrayList<>();
+    JsonNode root = new ObjectMapper().readTree(casesFile);
+    JsonNode arr = root.get("cases");
+    if (arr == null || !arr.isArray() || arr.size() == 0) {
+      System.err.println("KieDmnCheck: " + casesFile + " has no non-empty `cases` array");
+      System.exit(2);
+    }
+    int i = 0;
+    for (JsonNode c : arr) {
+      i++;
+      String name = c.hasNonNull("name") ? c.get("name").asText() : ("case " + i);
+      Map<String, Object> ctx = objToFeel(c.get("context"));
+      // A case with no `expect` would silently degrade to a liveness check, which
+      // is the very thing --cases exists to replace. Refuse it.
+      if (!c.hasNonNull("expect")) {
+        System.err.println("KieDmnCheck: case `" + name + "` has no `expect` block");
+        System.exit(2);
+      }
+      out.add(new Case(name, ctx, objToFeel(c.get("expect"))));
+    }
+    return out;
+  }
+
+  private static Map<String, Object> objToFeel(JsonNode n) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    if (n == null) {
+      return m;
+    }
+    Iterator<Map.Entry<String, JsonNode>> it = n.fields();
+    while (it.hasNext()) {
+      Map.Entry<String, JsonNode> e = it.next();
+      m.put(e.getKey(), jsonToFeel(e.getValue()));
+    }
+    return m;
+  }
+
+  /**
+   * Expected-vs-actual, across the representation gap.
+   *
+   * <p>KIE hands numbers back as {@link BigDecimal}; the fixture supplies them through the same
+   * {@code jsonToFeel} path, so both sides are BigDecimal — but {@code equals} on BigDecimal is
+   * scale-sensitive ({@code 2500} != {@code 2500.0}), which would make an expectation fail for a
+   * reason that has nothing to do with the answer. {@code compareTo} is the right comparison.
+   */
+  private static boolean sameValue(Object want, Object got) {
+    if (want == null || got == null) {
+      return want == got;
+    }
+    if (want instanceof BigDecimal && got instanceof BigDecimal) {
+      return ((BigDecimal) want).compareTo((BigDecimal) got) == 0;
+    }
+    if (want instanceof List && got instanceof List) {
+      List<?> a = (List<?>) want;
+      List<?> b = (List<?>) got;
+      if (a.size() != b.size()) {
+        return false;
+      }
+      for (int i = 0; i < a.size(); i++) {
+        if (!sameValue(a.get(i), b.get(i))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (want instanceof Map && got instanceof Map) {
+      Map<?, ?> a = (Map<?, ?>) want;
+      Map<?, ?> b = (Map<?, ?>) got;
+      if (!a.keySet().equals(b.keySet())) {
+        return false;
+      }
+      for (Map.Entry<?, ?> e : a.entrySet()) {
+        if (!sameValue(e.getValue(), b.get(e.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return want.equals(got);
   }
 
   private static Map<String, Object> readContext(File ctxFile) throws Exception {

@@ -1515,7 +1515,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgNamespace = "https://legalese.com/l4/dmn/" <> modelId
     , drgFlavor    = opts.dloFlavor
     , drgNodes     = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
-    , drgNotes     = sharedInputNotes <> concatMap snd lowered
+    , drgNotes     = sharedInputNotes <> feelNameCollisionNotes <> concatMap snd lowered
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -1621,6 +1621,65 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   sharedNames = Map.fromListWith (flip (<>))
     [ (feelIdentText tnm, [u]) | (u, tnm) <- freeTerms ]
+
+  -- TWO DIFFERENT DRG ELEMENTS THAT SPELL THE SAME FEEL NAME -- the whole
+  -- namespace, not just the inputData half of it.
+  --
+  -- 'sharedInputNotes' above covers exactly one of the three ways this happens
+  -- (inputData x inputData) because it is computed from 'freeTerms'. The other
+  -- two -- inputData x decision, and decision x decision -- had no note at all,
+  -- and they are the worse pair. Measured, on the two engines this exporter
+  -- targets, with three two-element modules (base = 100, `net worth` = 7):
+  --
+  --   inputData x inputData   L4 says 10 + 200. KIE: validator 2x ERROR
+  --                           [DUPLICATE_NAME], BUILD CLEAN, answers 20 --
+  --                           both inputs read the one supplied value.
+  --                           Camunda 8: parses clean, 0 errors, answers 20.
+  --   inputData x decision    L4 says 7 + 101 = 108. KIE: validator 2x ERROR,
+  --                           build clean, the decision is NOT_EVALUATED and
+  --                           the answer is 14 -- the INPUT won. Camunda 8:
+  --                           silent, and answers 202 -- the DECISION won.
+  --   decision  x decision    L4 says 101 + 102 = 203. KIE: validator 2x ERROR,
+  --                           one decision NOT_EVALUATED, answers 202.
+  --                           Camunda 8: silent, answers 204.
+  --
+  -- Note what that table does NOT say. KIE does not /reject/ any of these: the
+  -- DUPLICATE_NAME errors come from the validator leg, the KieBuilder leg is
+  -- clean, and the model deploys and answers. So neither engine refuses the
+  -- file, neither returns what L4 said, and the two do not even agree with each
+  -- other on which element wins. Camunda -- the default flavor -- is the one
+  -- that says nothing at all.
+  --
+  -- Blocking rather than Lossy for that reason: nothing was approximated, an
+  -- answer was changed, and it survived every other check we have (the file is
+  -- schema-valid, dmn-moddle-clean, and reports every decision as evaluated).
+  --
+  -- The fix that makes the collision go away rather than merely loud is §5.2's
+  -- stage-2 @uniquifyIn@, which has to rename REFERENCES too and therefore
+  -- needs a whole-DRG map from 'Unique' to FEEL name rather than the per-name
+  -- 'feelIdentText'. That is Phase 2. Detecting is not resolving, and this note
+  -- is the detection.
+  declaredFeelNames :: [(Text, (Text, Text, Text))]
+  declaredFeelNames =
+    [ (feelIdentText n.idName, ("inputData", n.idName, n.idId)) | n <- inputNodes ]
+      <> [ (feelIdentText (decideName d), ("decision", decideName d, did))
+         | (d, did) <- zip decides decideIds
+         ]
+
+  feelNameCollisionNotes =
+    [ dmnNote "D-FEELNAME" Blocking eid Nothing
+        ("`" <> fname <> "` is the FEEL name of " <> Text.pack (show (length grp))
+           <> " elements this module keeps apart ("
+           <> Text.intercalate ", " [kind <> " `" <> l4name <> "`" | (kind, l4name, _) <- grp]
+           <> "); DMN's variable namespace is flat, so no FEEL reference can pick one of them. \
+              \Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still \
+              \builds and answers, and Camunda 8 says nothing at all. Both answer with whichever \
+              \element they resolved first, and they do not agree on which that is")
+        "the distinction between them; every reference to either now reaches one of them"
+    | (fname, grp@((_, _, eid) : _ : _)) <- Map.toAscList feelNameGroups
+    ]
+
+  feelNameGroups = Map.fromListWith (flip (<>)) [(f, [x]) | (f, x) <- declaredFeelNames]
 
   lowered = zipWith lowerOne decides decideIds
 

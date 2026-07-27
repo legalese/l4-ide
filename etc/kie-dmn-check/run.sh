@@ -5,7 +5,7 @@
 # src/main/java/KieDmnCheck.java for why all four legs are needed.
 #
 #   etc/kie-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn \
-#     --ctx jl4/examples/dmn/reg-cf.ctx.json
+#     --cases jl4/examples/dmn/reg-cf.cases.json
 #
 # ZERO-INSTALL, like etc/validate-dmn.mjs. Nothing is written into the repo and
 # nothing is added to package.json or the lockfile: Maven resolves the classpath
@@ -30,6 +30,20 @@ skip() {
     exit 1
   fi
   exit 0
+}
+
+# NOT a skip. Absent tooling is a fact about the machine and is forgiven locally;
+# a harness that does not compile is a fact about the REPO and is a defect on
+# every machine, so it exits non-zero whether or not KIE_CHECK_REQUIRED is set.
+#
+# This is not hypothetical. `javac failed` used to call skip(), and a KieDmnCheck
+# with an unbalanced brace in it therefore reported "SKIP ... javac failed" and
+# exited 0 -- i.e. the review finding about broken harnesses taking the
+# machine-absent path was demonstrated by this very file.
+broken() {
+  echo "BROKEN  KIE DMN check: $1" >&2
+  echo "        This is a defect in the repo, not a missing toolchain; it fails everywhere." >&2
+  exit 1
 }
 
 command -v mvn >/dev/null 2>&1 || skip "mvn not on PATH (brew install maven)"
@@ -65,8 +79,15 @@ src="$here/src/main/java/KieDmnCheck.java"
 if [ ! -s "$out/classes/KieDmnCheck.class" ] || [ "$src" -nt "$out/classes/KieDmnCheck.class" ]; then
   mkdir -p "$out/classes"
   "$JAVA_HOME/bin/javac" -nowarn --release 11 -cp "$(cat "$cp")" -d "$out/classes" "$src" \
-    || skip "javac failed (see above)"
+    || broken "javac failed on $src (see above)"
 fi
 
+# The pin, read out of the pom rather than duplicated here, and handed to the
+# checker so it can compare it against the version it ACTUALLY loaded. Without
+# this the banner would be echoing a constant: a stale cached cp.txt, or an
+# edited pom, would leave it naming a version that was never on the classpath.
+pinned="$(sed -n 's/.*<kie\.version>\(.*\)<\/kie\.version>.*/\1/p' "$here/pom.xml" | head -1)"
+
 exec "$JAVA_HOME/bin/java" -Dorg.slf4j.simpleLogger.defaultLogLevel=off \
+  -Dl4.kie.version.expected="$pinned" \
   -cp "$out/classes:$(cat "$cp")" KieDmnCheck "$@"

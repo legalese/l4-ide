@@ -237,6 +237,37 @@ spacedNames =
   \    IF `annual income` AT LEAST 1000 THEN 1\n\
   \    OTHERWISE 2\n"
 
+-- | Two free terms whose FEEL names collide once the hyphen and the space both
+-- become @_@. This is the one collision class the pre-existing @D-SCOPE@ note
+-- already covered.
+collidingInputs :: Text
+collidingInputs =
+  "ASSUME `first-time issuer` IS A NUMBER\n\
+  \ASSUME `first time issuer` IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \total MEANS `first-time issuer` PLUS `first time issuer`\n"
+
+-- | An @inputData@ and a @decision@ that collide. Nothing reported this before.
+collidingInputAndDecision :: Text
+collidingInputAndDecision =
+  "ASSUME `net worth` IS A NUMBER\n\
+  \ASSUME base IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \net_worth MEANS base PLUS 1\n\
+  \GIVETH A NUMBER\n\
+  \total MEANS `net worth` PLUS net_worth\n"
+
+-- | Two decisions that collide. Likewise previously silent.
+collidingDecisions :: Text
+collidingDecisions =
+  "ASSUME base IS A NUMBER\n\
+  \GIVETH A NUMBER\n\
+  \`net worth` MEANS base PLUS 1\n\
+  \GIVETH A NUMBER\n\
+  \net_worth MEANS base PLUS 2\n\
+  \GIVETH A NUMBER\n\
+  \total MEANS `net worth` PLUS net_worth\n"
+
 -- | A decomposable guard whose SUBJECT is a FEEL BUILTIN invocation. The cell is
 -- a perfectly ordinary constant endpoint, and the column is genuinely
 -- executable — but @modulo(n, 2)@ is outside S-FEEL, which is where every
@@ -1089,7 +1120,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   -- Every assertion here corresponds to a measured engine failure, not to a
   -- reading of the DMN specification. See
   -- specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §13.2, and etc/kie-dmn-check +
-  -- etc/camunda-dmn-check, which run the real engines over the golden.
+  -- etc/camunda-dmn-check, which run the real engines over the golden. Where a
+  -- comment below states a DMN clause as well, the clause is marked as a
+  -- reading; the engine sentence beside it is the measurement.
   describe "FEEL names an engine can actually resolve" $ do
     it "maps a space and a hyphen to _, and never leaves either in a FEEL name" $ do
       feelIdentText "annual income" `shouldBe` "annual_income"
@@ -1128,24 +1161,64 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       emitDrg (drgOf considerConstructors) `shouldNotSatisfy` Text.isInfixOf "label=\"score\""
 
     it "leaves no space in any emitted FEEL text" $ do
-      -- The Camunda failure mode is silent, not loud: `annual income` parses as
-      -- `annual` `in` `come` and evaluates to false. A name-shaped FEEL text
-      -- with a space in it is therefore a wrong answer waiting to happen.
+      -- The Camunda failure mode is silent, not loud: `annual income` is
+      -- tokenised as `annual` `in` `come` -- the membership operator -- and
+      -- answers a BOOLEAN. Measured: in a model declaring `annual income` =
+      -- 100000, `annual` = 5 and `come` = [1,2,5], Camunda 8.7.6 answers `true`
+      -- to both `annual income` and `annual in come`, where KIE answers 100000
+      -- and `true` respectively. A name-shaped FEEL text with a space in it is
+      -- therefore a wrong NON-NULL answer waiting to happen.
       let xml = emitDrg (drgOf spacedNames)
       xml `shouldNotSatisfy` Text.isInfixOf "annual income<"
       xml `shouldNotSatisfy` Text.isInfixOf "first-time issuer<"
       xml `shouldSatisfy` Text.isInfixOf "<text>annual_income</text>"
 
     it "gives a single-output table's <output> no @name and no @typeRef" $ do
-      -- DMN 8.2.11: an output clause is named only so a MULTI-output result can
-      -- be keyed. KIE fires ILLEGAL_USE_OF_NAME and ILLEGAL_USE_OF_TYPEREF
-      -- otherwise -- six warnings on the Reg CF exhibit alone.
+      -- READING, DMN 8.2.11: an output clause is named only so a MULTI-output
+      -- result can be keyed. MEASUREMENT: KIE fires ILLEGAL_USE_OF_NAME and
+      -- ILLEGAL_USE_OF_TYPEREF otherwise -- six warnings on the Reg CF exhibit
+      -- alone -- and dropping both leaves Camunda 8's answers unchanged.
       let xml = emitDrg (drgOf spacedNames)
       xml `shouldSatisfy` Text.isInfixOf "<output id=\"decision_investor_limit_o1\"/>"
       xml `shouldNotSatisfy` Text.isInfixOf "<output id=\"decision_investor_limit_o1\" name="
       -- ...but the IR still carries both, because dmnmd's header needs them and
       -- a multi-output table will.
       (tableOf "investor limit" spacedNames).dtOutput.ocName `shouldBe` "investor_limit"
+
+    -- D-FEELNAME. `feelIdentText` is §5.2 stage 1 only: it is deliberately
+    -- non-injective, and stage 2 (`uniquifyIn`, which has to rename references
+    -- as well as declarations) is Phase 2. Until then a collision has to be
+    -- LOUD, because it is measured to be a silently wrong answer on the DEFAULT
+    -- flavor -- Camunda 8 loads the file and reads the wrong element, while KIE
+    -- at least rejects it with DUPLICATE_NAME. Detecting is not resolving; this
+    -- is the detection, and it must not regress to silence.
+    describe "two elements, one FEEL name (D-FEELNAME)" $ do
+      let feelNameNotes src =
+            [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-FEELNAME"]
+
+      it "reports inputData x inputData (Camunda reads one value twice)" $ do
+        let notes = feelNameNotes collidingInputs
+        map (.severity) notes `shouldBe` [Blocking]
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`first_time_issuer`")
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "inputData `first-time issuer`")
+
+      it "reports inputData x decision -- which had NO note at all before" $ do
+        -- Measured: L4 says 7 + 101; Camunda 8 answers 202, because the
+        -- reference to the INPUT resolves to the DECISION.
+        let notes = feelNameNotes collidingInputAndDecision
+        map (.severity) notes `shouldBe` [Blocking]
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "inputData `net worth`")
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "decision `net_worth`")
+
+      it "reports decision x decision -- likewise previously silent" $ do
+        -- Measured: L4 says 101 + 102; Camunda 8 answers 204.
+        let notes = feelNameNotes collidingDecisions
+        map (.severity) notes `shouldBe` [Blocking]
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "decision `net worth`")
+
+      it "says nothing when the names are distinct after mangling" $ do
+        feelNameNotes spacedNames `shouldBe` []
+        feelNameNotes considerConstructors `shouldBe` []
 
   describe "engine flavors (R7)" $ do
     it "defaults to camunda" $ do
@@ -1323,6 +1396,10 @@ isUniqueTable = \case
 drgOf :: Text -> Drg
 drgOf = drgNamed "Test"
 
+-- | Lower a source at the default flavor, INSISTING that L4 accepted it first.
+drgNamed :: Text -> Text -> Drg
+drgNamed = drgFlavored defaultDmnFlavor
+
 -- | Lower a source, INSISTING that L4 accepted it first.
 --
 -- @checkWithImports@ returns 'Left' only for a parse or import-resolution
@@ -1334,8 +1411,15 @@ drgOf = drgNamed "Test"
 -- ("multiple definitions for the identifier @__LEQ__@"), so the test that
 -- claimed to pin DATE behaviour was pinning the exporter's treatment of a failed
 -- overload resolution. Warnings and infos are left alone; only errors are fatal.
-drgNamed :: Text -> Text -> Drg
-drgNamed name src = case checkWithImports emptyVFS src of
+--
+-- __There is exactly one of these, taking the flavor as a parameter.__ The
+-- flavor helper was briefly a second copy without the @tcdErrors@ guard, which
+-- put the hole above straight back — and put it precisely under the
+-- byte-identity tripwire, where a fixture that stopped typechecking would
+-- degrade /both/ sides equally, keep the equality true, and let the one test
+-- whose job is to announce Phase 5 go green on garbage.
+drgFlavored :: DmnFlavor -> Text -> Text -> Drg
+drgFlavored flavor name src = case checkWithImports emptyVFS src of
   Left errs -> error ("source failed to parse: " <> show errs)
   Right tc
     | errs@(_ : _) <- filter ((== SError) . TC.severity) tc.tcdErrors ->
@@ -1348,24 +1432,9 @@ drgNamed name src = case checkWithImports emptyVFS src of
           MkDmnLowerOptions
             { dloModelName    = name
             , dloSubstitution = tc.tcdSubstitution
-            , dloFlavor       = defaultDmnFlavor
+            , dloFlavor       = flavor
             }
           tc.tcdModule
-
--- | As 'drgNamed', for the one flavor that is not the default. Kept separate so
--- that every other test in this file continues to exercise what the CLI emits
--- when the caller says nothing.
-drgFlavored :: DmnFlavor -> Text -> Text -> Drg
-drgFlavored flavor name src = case checkWithImports emptyVFS src of
-  Left errs -> error ("source failed to parse: " <> show errs)
-  Right tc ->
-    lowerModule
-      MkDmnLowerOptions
-        { dloModelName    = name
-        , dloSubstitution = tc.tcdSubstitution
-        , dloFlavor       = flavor
-        }
-      tc.tcdModule
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of

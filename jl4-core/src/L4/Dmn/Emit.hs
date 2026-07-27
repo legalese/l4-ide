@@ -206,14 +206,18 @@ inputXml c =
 
 -- | The single output clause.
 --
--- __No @\@name@ and no @\@typeRef@.__ DMN 8.2.11 gives an output clause a name
--- only so that a multi-output table's result can be keyed; with one output the
--- result /is/ the value, and KIE says so out loud — @ILLEGAL_USE_OF_NAME@ and
--- @ILLEGAL_USE_OF_TYPEREF@, six warnings on the Reg CF exhibit alone. Dropping
--- both takes KIE to 0 errors and 0 warnings, leaves Camunda 8 byte-for-byte
--- unchanged in its answers, and loses nothing a reader needs: the decision's own
--- @\<variable typeRef\>@ carries the type, and @decisionTable\/\@outputLabel@
--- carries the name. (Measured on all three engines; §13.2.)
+-- __No @\@name@ and no @\@typeRef@.__ /Read from/ DMN 8.2.11: an output clause
+-- is named so that a multi-output table's result can be keyed, and with one
+-- output the result /is/ the value. /Measured/, which is the part that decides
+-- it: KIE says so out loud — @ILLEGAL_USE_OF_NAME@ and @ILLEGAL_USE_OF_TYPEREF@,
+-- six warnings on the Reg CF exhibit alone — and dropping both takes KIE to 0
+-- errors and 0 warnings and leaves Camunda 8's answers unchanged. Camunda 7
+-- loses only the result-map /key/ (@{investor limit=80000}@ becomes
+-- @{null=80000}@), and is not a target anyway. Nothing a reader needs is lost:
+-- the decision's own @\<variable typeRef\>@ carries the type and
+-- @decisionTable\/\@outputLabel@ carries the name. (§13.2. The DMN-clause
+-- sentence is a reading of the specification; only the engine sentences are
+-- measurements.)
 --
 -- 'OutputColumn' keeps both fields regardless, because "L4.Dmn.Markdown" needs
 -- them — a dmnmd header is @name (out) : Type@ — and because a multi-output

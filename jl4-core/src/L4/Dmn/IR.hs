@@ -264,28 +264,43 @@ renderNumber r
 -- a portability preference (@specs\/todo\/DMN-EXPORT-PROGRAM-MODEL-SPEC.md@
 -- §5.2, §13.2). FEEL names may contain spaces (grammar rule 30) and KIE, feelin
 -- and @dmn-eval-js@ all honour that — but Camunda's @feel-scala@ does not, and
--- it fails in the /silent/ direction: @annual income@ parses as @annual@ @in@
--- @come@ and evaluates to @false@, not to the number. A dot is worse still,
--- because it injects a FEEL path expression that silently shadows a genuine
--- record projection.
+-- it fails in the /silent/ direction: @annual income@ is tokenised as
+-- @annual@ @in@ @come@, i.e. as the membership operator, and answers a
+-- __boolean__ rather than the number. That is measured, not inferred: in a
+-- model declaring @annual income = 100000@, @annual = 5@ and @come = [1,2,5]@,
+-- Camunda 8.7.6 answers @true@ to both @annual income@ and @annual in come@,
+-- while KIE 8.44 answers @100000@ and @true@ respectively (§13.2). Note the
+-- value: @true@, not @null@ — a wrong /non-null/ answer, which is why the
+-- engine harnesses under @etc\/@ compare against expected values and not merely
+-- against null. (The boolean is whatever the membership test yields, so it is
+-- the /type/ of the answer that is the tell, not the constant @false@ an
+-- earlier draft of this comment named.) A dot is worse still, because it
+-- injects a FEEL path expression that silently shadows a genuine record
+-- projection.
 --
 -- This is stage 1 of §5.2's policy, minus three parts that belong to Phase 2
 -- and are deliberately __not__ done here: NFC normalisation, the reserved-word
 -- suffix, and @uniquifyIn@ (which is what makes the mapping injective within a
 -- scope, and which needs a whole-DRG traversal rather than a per-name
--- function). Until then two L4 names can still collapse onto one FEEL name; the
+-- function). Until then two L4 names can still collapse onto one FEEL name. The
 -- emitter pairs every mangled @\@name@ with a verbatim @\@label@ so a reader can
--- always see which L4 name a node came from.
+-- always see which L4 name a node came from, and 'L4.Dmn.Lower' raises a
+-- @D-FEELNAME@ note, at 'Blocking', when a collision actually happens — because
+-- on Camunda 8 a collision is a silently wrong answer rather than a rejection.
 feelIdentText :: Text -> Text
 feelIdentText t
   | Text.null squashed           = "_"
   | isDigit (Text.head squashed) = "_" <> squashed
   | otherwise                    = squashed
  where
-  -- Collapse whitespace runs first: engines normalise them, so two L4 names an
-  -- engine would read as one must not come out of here looking distinct.
-  spaced = Text.unwords (Text.words t)
-  underscored = Text.map keep spaced
+  -- Every non-ASCII-alphanumeric becomes '_', INCLUDING whitespace, so a run of
+  -- whitespace becomes a run of '_' and is then collapsed by `squashed` along
+  -- with every other run. Two L4 names an engine would read as one therefore
+  -- cannot come out of here looking distinct. (An earlier draft pre-collapsed
+  -- whitespace with `Text.unwords . Text.words`; that was a no-op for every
+  -- input, since `squashed` already does the collapsing and the trimming, and
+  -- it read as a load-bearing step. Removed rather than left to mislead.)
+  underscored = Text.map keep t
   -- Collapse runs of '_' and strip them from both ends, in one pass.
   squashed = Text.intercalate "_" (filter (not . Text.null) (Text.splitOn "_" underscored))
   keep c

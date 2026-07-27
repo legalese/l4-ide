@@ -10,12 +10,12 @@ programme (`specs/todo/lexipedia-superset/SPEC.md`).
 | `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                    |
 | `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                      |
 | `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list        |
-| `reg-cf.ctx.json`                 | the input context the two engine harnesses evaluate the XML against    |
+| `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each  |
 
 Both goldens are produced by `jl4/tests/DmnExport.hs`; regenerate them by deleting the
 file and re-running `cabal test jl4:jl4-test`.
 
-`reg-cf.ctx.json` is hand-written, not generated, and its keys are **FEEL** names
+`reg-cf.cases.json` is hand-written, not generated, and its keys are **FEEL** names
 (`annual_income`, not `annual income`). That is not a quirk of the harness — it is the
 thing being checked; see "Running it through the real engines" below.
 
@@ -135,14 +135,18 @@ report what the **engine** says, which is a different question from what a schem
 metamodel parser says:
 
 ```sh
-etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --ctx jl4/examples/dmn/reg-cf.ctx.json
-etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn --ctx jl4/examples/dmn/reg-cf.ctx.json
+etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
+etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
 ```
 
-| Harness                    | Engine                                | Legs                                                                 | JDK  |
-| -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ---- |
-| `etc/kie-dmn-check/`       | Drools/KIE `8.44.0.Final`             | Xerces XSD, KIE validator, `KieBuilder`, `evaluateAll` + services    | 17   |
-| `etc/camunda-dmn-check/`   | Camunda 8 `8.7.6` (`io.camunda:zeebe-dmn`) | `parse()` + `isValid()`, `evaluateDecisionById`                      | 21+  |
+| Harness                  | Engine                                     | Legs                                                                                | JDK |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------- | --- |
+| `etc/kie-dmn-check/`     | Drools/KIE `8.44.0.Final`                  | Xerces XSD, KIE validator, `KieBuilder`, `evaluateAll` + services, **expected values** | 17  |
+| `etc/camunda-dmn-check/` | Camunda 8 `8.7.6` (`io.camunda:zeebe-dmn`) | `parse()` + `isValid()`, `evaluateDecisionById`, **expected values**                  | 21+ |
+
+Each harness reports the engine version it **observed off its own classpath** (not one its
+launcher passed in) and fails if that disagrees with the pin in its `pom.xml`, so the
+version in a `VERDICT` banner is evidence about which engine looked at the file.
 
 Zero-install, exactly like `etc/validate-dmn.mjs`: Maven resolves each classpath into
 `$TMPDIR`, nothing is written into the repo, and `package.json` and the lockfile are
@@ -150,6 +154,17 @@ untouched. Both **skip loudly** — `SKIP <checker>: <reason>` on stderr and exi
 the toolchain is absent, and neither prints its `VERDICT` banner when it skips. Set
 `KIE_CHECK_REQUIRED=1` / `CAMUNDA_CHECK_REQUIRED=1` to turn every skip path into a
 failure; the `dmn-engines` CI job does, so **in CI an unavailable checker is a failure**.
+
+A missing toolchain skips; a **broken harness does not**. If `javac` fails, both scripts
+exit 1 whether or not `*_CHECK_REQUIRED` is set, because absent tooling is a fact about
+the machine while a harness that will not compile is a fact about the repo. That
+distinction is not theoretical: it was added after a `KieDmnCheck.java` with an
+unbalanced brace in it reported `SKIP … javac failed` and exited 0.
+
+> **The `dmn-engines` job is not yet a required status check** on the `unstable` ruleset
+> (`gh api repos/legalese/l4-ide/rulesets/18543507` lists only TypeScript, Haskell, WASM
+> and Nix). Until its context is added there, a failure of this job — including the
+> deliberate `exit 1` the skip contract is built on — does not block a merge.
 
 The same two harnesses are wired into `l4-cli-test` behind `L4_DMN_ENGINE_CHECK=1`:
 
@@ -170,9 +185,24 @@ so doing half of each fails both, for opposite reasons. `@name` now carries a FE
 identifier and `@label` the verbatim L4 name. See
 `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §5.2 and §13.
 
-The Camunda failure was the bad kind: `annual income` does not fail to resolve, it parses
-as `annual` `in` `come`. That is why the harnesses count a decision that evaluates to
-`null` as a failure rather than reading statuses alone.
+The Camunda failure was the bad kind, and the exact shape of it decides what the harnesses
+have to check. `annual income` does not fail to resolve: it is tokenised as `annual` `in`
+`come`, the membership operator. Measured — in a model declaring `annual income` = 100000,
+`annual` = 5 and `come` = [1,2,5], Camunda 8.7.6 answers `true` to `annual income`,
+identically to `annual in come`, where KIE 8.44 answers `100000`.
+
+`true` is not `null`, so a harness that failed only on `FAILED`, `SKIPPED` and `null`
+would wave that file through. That is why both harnesses take `--cases` and compare
+against **expected values**: `25/25 decision(s) SUCCEEDED` is a liveness claim, and only
+`25/25 value(s) as expected` says the answers were right. The null check is kept as well,
+but it is necessary rather than sufficient.
+
+Between them the five cases fire all nine `<rule>` elements and both
+`<defaultOutputEntry>` paths; one context alone leaves six of the nine unevaluated. What
+they cannot catch is stated in the fixture itself: `annual income` and `net worth` are
+consumed only by `+` and `min`, both commutative, so exchanging those two bindings is
+invisible on this exhibit — faithful to a statute that is symmetric in the two rather
+than a gap a further case could close.
 
 ## From the CLI
 
