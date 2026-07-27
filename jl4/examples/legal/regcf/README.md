@@ -394,7 +394,7 @@ house style threads a record through `GIVEN` — leaves the FEEL fragment and is
 emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter is
 right to refuse to invent a rendering; the report says so at each site.
 
-The `dmnmd` markdown leg makes the same point in one glance: 981 lines of law become
+The `dmnmd` markdown leg makes the same point in one glance: 992 lines of law become
 **two tables**, plus 235 lines of loss report.
 
 An earlier revision of this section reported two further defects that the fidelity

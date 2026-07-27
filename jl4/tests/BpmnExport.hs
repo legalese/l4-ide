@@ -1540,7 +1540,7 @@ spec = do
   -- regulative rules and a BPMN document holds exactly one process, so one
   -- source yields three pairs of goldens.
   --
-  -- The Reg CF rows read from @legal\/regcf\/regcf.l4@ — the 981-line corpus
+  -- The Reg CF rows read from @legal\/regcf\/regcf.l4@ — the 992-line corpus
   -- itself, not a fixture beside it. There used to be a hand-written
   -- @bpmn\/regcf.l4@ standing in for it, because the extractor could not see
   -- past an @IfThenElse@ to the deontic head and every corpus duty is written

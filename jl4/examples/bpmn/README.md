@@ -14,12 +14,12 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
-| `../legal/regcf/regcf.l4` | The real 981-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
+| `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
 
 ## The Reg CF goldens are cut from the corpus itself
 
 The three `regcf-*` golden pairs are exported from
-`jl4/examples/legal/regcf/regcf.l4` — the real 981-line formalisation of 17 CFR
+`jl4/examples/legal/regcf/regcf.l4` — the real 992-line formalisation of 17 CFR
 Part 227 — not from a fixture beside it:
 
 ```
@@ -219,19 +219,48 @@ correctly and why K4 holds.
 
 Not every consumer derives them. **`bpmnlint`, Camunda's own linter, reads the
 back-references only**, and without them reports every node in every fixture —
-including the sound ones — as `no-disconnected`, `no-implicit-start` and
-`no-implicit-end`: 65 findings across three good files. Adding the
-back-references drops that to 3, all of them `label-required` on the unnamed
-start event.
+including the sound ones — as disconnected. Measured 2026-07-28 with
+`bpmnlint` **11.12.1** and `bpmnlint:recommended` over the **six** files in
+`expected/`:
 
-So this is a fidelity note about the emitted XML rather than a defect in it, and
-the fix is small if it is ever wanted. Recorded here for the same reason the DMN
-flavor axis is recorded: a construct one conforming tool accepts and another
-rejects is a property of the interchange, not of either tool.
+| | without back-refs (the tree as it stands) | with back-refs injected |
+| --- | --- | --- |
+| `no-disconnected`      | 55  | 0 |
+| `no-implicit-end`      | 45  | 0 |
+| `no-implicit-start`    | 35  | 0 |
+| `label-required`       | 13  | 13 |
+| `fake-join`            | 0   | 7 (warnings) |
+| `no-gateway-join-fork` | 0   | 1 |
+| **total**              | **148** | **21** (14 errors, 7 warnings) |
 
-(`bpmnlint` finds nothing else on the fixtures, and — once the noise is removed
-— nothing at all on either deadlocking diagram. A linter is not an engine
-either.)
+**No golden in the tree carries back-references** — `grep -c '<bpmn:incoming>'`
+returns 0 for all six in `expected/` and for `sound/joined-beside-breach.bpmn`.
+So the right-hand column is a *prediction*, measured by injecting the
+back-references into scratch copies, not a state this repo has ever shipped.
+
+The residue is not what an earlier version of this paragraph claimed. It said
+"65 findings across three good files", dropping to "3, all of them
+`label-required` on the unnamed start event" — wrong on the file count (three,
+now six), wrong on both totals, and wrong on the character of what survives:
+the 13 `label-required` are on start events **and** unnamed sequence flows, and
+adding the back-references *introduces* 7 `fake-join` warnings and a
+`no-gateway-join-fork` that the disconnected reading had masked. Supplying them
+would not be a pure improvement.
+
+So this is a fidelity note about the emitted XML rather than a defect in it.
+The emitter change is small if it is ever wanted, but the table above is the
+reason to decide it on purpose rather than reflexively: it trades 135 findings
+away and 8 findings in.
+
+Recorded here for the same reason the DMN flavor axis is recorded: a construct
+one conforming tool accepts and another rejects is a property of the
+interchange, not of either tool.
+
+(And a linter is not an engine. With back-references supplied, `bpmnlint`
+reports exactly one `label-required` on each of the two deadlocking diagrams in
+`unsound/` — and **nothing whatever about the deadlock**, which
+`check-bpmn-soundness.mjs` catches with a witness trace and jBPM confirms
+independently.)
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 

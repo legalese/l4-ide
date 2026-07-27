@@ -1348,7 +1348,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --   goldens show every outcome the exporter has, written module-level-scalar
 --   (@ASSUME@) style because that is the program model DMN itself has. Its
 --   figures are illustrative and its own header says so.
--- * @legal\/regcf\/regcf.l4@ is the REAL 981-line corpus, 73 decisions, written
+-- * @legal\/regcf\/regcf.l4@ is the REAL 992-line corpus, 73 decisions, written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
 --   that costs: a DMN decision is a 0-ary variable, so every cross-decision
 --   call @f x@ leaves the FEEL fragment, and every @GIVEN@ binder becomes a

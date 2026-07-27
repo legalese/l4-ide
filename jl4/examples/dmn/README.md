@@ -13,7 +13,7 @@ There are **two** subjects, and the difference between them is the deliverable.
 | `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                                           |
 | `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list                             |
 | `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each                       |
-| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 981-line corpus at `../legal/regcf/regcf.l4` |
+| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 992-line corpus at `../legal/regcf/regcf.l4` |
 
 Both sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
 deleting a golden and re-running `cabal test jl4:jl4-test` twice.

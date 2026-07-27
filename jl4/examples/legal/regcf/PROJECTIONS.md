@@ -1,6 +1,6 @@
 # Projections of the Reg CF corpus
 
-Everything on this page is **cut from `regcf.l4`**, the 981-line formalisation of 17 CFR Part 227.
+Everything on this page is **cut from `regcf.l4`**, the 992-line formalisation of 17 CFR Part 227.
 Nothing here is transcribed. If a threshold changes in the corpus, it changes in every artifact
 below on the next run, because no artifact below holds a second copy of it.
 
@@ -97,7 +97,7 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn.md --fidelity-report
 ```
 
-**981 lines of law become two markdown tables**, and 235 lines of loss report. This is the most
+**992 lines of law become two markdown tables**, and 235 lines of loss report. This is the most
 honest artifact in the set and the least useful one, which is why it ships.
 
 | Code                   | ×  | What it costs                                                     |
