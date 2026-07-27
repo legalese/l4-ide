@@ -183,14 +183,36 @@ That file is deleted. The extractor now reads `IF`/`ELSE` chains directly
 - **Left-to-right stops meaning time.** `P-CYCLE` on the reporting process: this layout ranks a node
   by its longest path from the start, and a node on a loop has none.
 - **A loop makes the gateway mixed, and not every engine has that shape.** With the renewal edge
-  drawn, `Split_0` has two incoming flows (`Start_0` and `Task_4`) and three outgoing. BPMN 2.0
-  permits it — §10.5.2 allows a gateway to be mixed — and `bpmn-moddle` reports 0 warnings, but
-  jBPM models a gateway as either a split or a join and refuses: _"This type of node [Split_0, one
-  of] cannot have more than one incoming connection!"_ Drawing an explicit converging gateway
-  before the split would satisfy both; it would also put a node in the diagram that the state graph
-  does not have, so it is recorded here rather than done silently. Measured with jBPM/Drools
-  8.44.0.Final on JDK 17; `etc/check-bpmn-kie.sh` reports it, and the `expected/` leg of that gate
-  is tolerated at exit 1 in CI, as `handover.bpmn` already is for an unrelated reason.
+  drawn, `Split_0` has two incoming flows (`Start_0` and `Task_4`) and three outgoing, so its
+  `gatewayDirection` is `Mixed`. BPMN 2.0 permits that — §10.5.2 allows a gateway to be mixed —
+  and `bpmn-moddle` reports 0 warnings. jBPM does not implement it: `Unknown gateway direction:
+  Mixed`.
+
+  The shipped file used to say `Diverging` here, which was simply false — §10.5.1 Table 10.100 says
+  `Diverging` MUST NOT have multiple incoming — and neither script looked at the attribute, so it
+  passed. `withGatewayDirections` now derives it from the edges, and
+  `etc/check-bpmn-soundness.mjs` fails a file whose declared direction contradicts its own edge
+  counts. Fixture: `jl4/examples/bpmn/unsound/mislabelled-gateway-direction.bpmn`.
+
+  **jBPM's objection is to the shape, not to the word, and the earlier note here read the wrong
+  constraint off its message.** The same three-node fixture, run three times with only
+  `gatewayDirection` changed (`etc/check-bpmn-kie.sh`, jbpm-bpmn2 7.74.1.Final, JDK 17.0.20):
+
+  | declared     | jBPM says                                                                            |
+  | ------------ | ------------------------------------------------------------------------------------ |
+  | `Diverging`  | `This type of node [Split_0, one of] cannot have more than one incoming connection!`  |
+  | `Converging` | `This type of node [Split_0, one of] cannot have more than one outgoing connection!`  |
+  | `Mixed`      | `Unknown gateway direction: Mixed`                                                    |
+
+  So jBPM builds a `Split` or a `Join` from this attribute and enforces that node type's arity
+  invariant; the `Diverging` message is about **incoming arity**, and quoting it as "jBPM refuses
+  mixed gateways" attributes the rejection to the wrong thing. No value of the attribute makes jBPM
+  accept a gateway with multiple of both.
+
+  Drawing an explicit converging gateway before the split would satisfy it; it would also put a
+  node in the diagram that the state graph does not have, so it is recorded here rather than done
+  silently. `etc/check-bpmn-kie.sh` reports the rejection, and the `expected/` leg of that gate is
+  tolerated at exit 1 in CI, as `handover.bpmn` already is for an unrelated reason.
 - **A lane is not a bearer.** `F2`: a lane says who _performs_; L4's `PARTY` says who _owes_. They
   come apart whenever an agent acts for a principal.
 - **There is no as-of date.** `F5`. Any number that _does_ appear is a value someone must remember

@@ -147,6 +147,17 @@ Two committed harnesses take `expected/reg-cf.dmn` to the two engines that matte
 report what the **engine** says, which is a different question from what a schema or a
 metamodel parser says:
 
+> **They run the toy, not the corpus.** Both commands below, and both `dmn-engines` CI
+> steps, name `expected/reg-cf.dmn` literally. **`expected/regcf-corpus.dmn` has never
+> been through KIE or Camunda at all** — the only tool that opens it is
+> `etc/validate-dmn.mjs` (dmn-moddle, a metamodel parser). So `25/25 value(s) as
+> expected` is a statement about the five-decision shape exhibit and says nothing
+> whatever about the 73-decision corpus projection, whose 84 blocking notes predict
+> that most of it would not evaluate. Do not read the engine banners as covering it.
+> Running the corpus through an engine needs a `regcf-corpus.cases.json` that does not
+> exist yet, and would first need the `f(x)` problem in `../legal/regcf/PROJECTIONS.md`
+> §1 solved; until then this is a gap, recorded rather than papered over.
+
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
 etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json

@@ -153,9 +153,16 @@ jobs:
       # agreement that a diagram deadlocks is evidence our own token semantics
       # are right rather than merely self-consistent.
       #
-      # JDK 17: the harness accepts 11+, but Drools/jBPM 8.x is not happy on the
+      # JDK 17: the harness accepts 11+, but the pinned stack is not happy on the
       # newest JDKs, and an unpinned `java` has already once produced a stale
       # JDK 14 that failed in a way which read as a diagram defect.
+      #
+      # That stack is jbpm-bpmn2 / jbpm-flow-builder / drools-compiler, ALL at
+      # 7.74.1.Final (etc/kie/pom.xml). It is NOT the 8.44.0.Final used by the
+      # DMN harnesses below: 8.44.0.Final is real for kie-dmn and does not exist
+      # for org.jbpm:jbpm-bpmn2. Different product lines; do not harmonise them.
+      # The harness prints the version it observed off its own classpath, so the
+      # banner in the log is the authority, not this comment.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -179,16 +186,38 @@ jobs:
       #
       #   sound/     MUST be clean. Measured exit 0 today. A finding here is a
       #              regression and fails the build.
-      #   expected/  is real exporter output and reports ONE known finding today
-      #              (offering.bpmn, which the harness itself annotates "a
-      #              modelled terminal state, not a liveness defect" — and then
-      #              counts anyway). Measured exit 1. There is no baseline
-      #              mechanism in the harness, so exit 1 is tolerated HERE and
-      #              only here, while 2/3/4 still fail.
+      #   expected/  is real exporter output, and the harness reports
+      #              `RESULT: 4 file(s) with findings.` today — measured exit 1.
+      #              All four are jBPM COMPILE rejections, not liveness defects:
       #
-      # Tolerating 1 loses the new-finding signal on expected/ until a baseline
-      # exists. That is a real gap, recorded rather than papered over; it does
-      # NOT weaken the toolchain gate, which is the reason this job exists.
+      #                handover.bpmn           axis A4: an L4 name inside a
+      #                                        conditionExpression declared as a
+      #                                        formal expression; Drools parses
+      #                                        it as DRL and refuses
+      #                regcf-advertising.bpmn  A4's defect class, on a gateway guard
+      #                regcf-resale.bpmn       A4's defect class, on a gateway guard
+      #                regcf-reporting.bpmn    `Unknown gateway direction: Mixed` —
+      #                                        the renewal loop makes that gateway
+      #                                        genuinely mixed (2 in, 3 out), which
+      #                                        BPMN 2.0 §10.5.2 permits and jBPM
+      #                                        does not implement
+      #
+      #              offering.bpmn is NOT among them: it logs an ABORTED-via-
+      #              error-end, which the harness annotates "a modelled terminal
+      #              state, not a liveness defect" and does not count. An earlier
+      #              version of this comment said expected/ reported ONE finding
+      #              and named offering.bpmn — wrong on both halves.
+      #
+      #              There is no baseline mechanism in the harness, so exit 1 is
+      #              tolerated HERE and only here, while 2/3/4 still fail.
+      #
+      # SAY IT PLAINLY: because any exit 1 is tolerated, a NEW finding in
+      # expected/ is INVISIBLE. The count above is documentation, not an
+      # assertion — nothing compares it to what the run actually prints, so a
+      # fifth rejected golden, or a regression that turns a passing golden into a
+      # rejected one, would land green. Only a move to 2/3/4 fails. Closing that
+      # needs a committed baseline the harness does not have yet. It does NOT
+      # weaken the toolchain gate, which is the reason this job exists.
       - name: Second opinion — does an independent engine agree? (jBPM/KIE)
         run: |
           export L4_KIE_CACHE="$HOME/.cache/l4-engines"
