@@ -234,6 +234,12 @@ expectGolden bin args goldenPath = do
     ExitFailure n -> expectationFailure $
       "Expected success but exited " ++ show n ++ "\n--- stderr ---\n" ++ serr
 
+-- | Read a file as UTF-8 regardless of the ambient locale — same reasoning as
+-- 'runL4': the fidelity goldens are full of em-dashes and typographic quotes,
+-- which a CP1252 Windows runner cannot decode through 'readFile'.
+readUtf8 :: FilePath -> IO String
+readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
+
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
@@ -311,6 +317,35 @@ cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 embeddedDiamondEntry :: FilePath
 embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 
+-- `l4 export` (track S0). The two golden-bearing exhibits live under
+-- examples/, alongside the openfisca ones; the refusal and severity fixtures
+-- are local.
+--
+-- The two --fail-on fixtures are a matched pair, and both are needed: the
+-- `export-two-rules` DMN report is blocking-ONLY and the `export-advisory-only`
+-- DMN report is advisory-ONLY, so between them every @FidelityGate@ value has
+-- both a case that must trip and a case that must not.
+exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture :: FilePath
+exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
+exportNothingFixture      = fixtureDir </> "export-nothing.l4"
+exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
+
+bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
+bpmnOfferingSource   = "examples/bpmn/offering.l4"
+bpmnOfferingGolden   = "examples/bpmn/expected/offering.bpmn"
+bpmnOfferingFidelity = "examples/bpmn/expected/offering.fidelity.txt"
+
+dmnSource, dmnGolden, dmnMarkdownGolden :: FilePath
+dmnSource         = "examples/dmn/reg-cf.l4"
+dmnGolden         = "examples/dmn/expected/reg-cf.dmn"
+dmnMarkdownGolden = "examples/dmn/expected/reg-cf.dmn.md"
+
+-- The model name the DMN goldens were generated under. `lowerModule` takes it
+-- as a parameter precisely so the emitted bytes do not depend on where the file
+-- lives, so passing it here reproduces the suite's output exactly.
+dmnModelName :: String
+dmnModelName = "Regulation Crowdfunding"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -348,7 +383,10 @@ main = do
        , batchEscapeFixture, batchEscapeInput, evalTraceFixture
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
-       , shadowExtraEntry, shadowImporterEntry ] \fp -> do
+       , shadowExtraEntry, shadowImporterEntry
+       , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
+       , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
+       , dmnSource, dmnGolden, dmnMarkdownGolden ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -371,6 +409,7 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+      sout `shouldSatisfy` ("export" `isInfixOf`)
       sout `shouldSatisfy` ("openfisca" `isInfixOf`)
 
   describe "l4 run" $ do
@@ -834,6 +873,211 @@ spec bin = do
     expectEmbeddedImporterSeesOverride
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
+
+  -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
+  --
+  -- The interesting property of these goldens is that they are not new files.
+  -- `jl4/tests/BpmnExport.hs` and `jl4/tests/DmnExport.hs` build the same
+  -- artifacts through the library API (`checkWithImports`), and the CLI reaches
+  -- them through a completely different front end (the LSP one-shot Shake
+  -- pipeline). Byte equality across those two paths is the actual claim.
+  describe "l4 export" $ do
+    it "reproduces the BPMN golden byte-for-byte on stdout" $
+      expectGolden bin ["export", "--to=bpmn", bpmnOfferingSource] bpmnOfferingGolden
+
+    it "reproduces the DMN 1.3 XML golden byte-for-byte on stdout" $
+      expectGolden bin ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName]
+                       dmnGolden
+
+    it "reproduces the dmnmd markdown golden byte-for-byte on stdout" $
+      expectGolden bin ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
+                       dmnMarkdownGolden
+
+    it "writes the fidelity report as a sibling file, not into the document" $ do
+      -- The goldens under examples/ are pairs (X.bpmn beside X.fidelity.txt),
+      -- and that is the shape --output + --fidelity-report reproduces.
+      tmp <- getTemporaryDirectory
+      let outDir  = tmp </> "l4-export-sidecar"
+          outFile = outDir </> "offering.bpmn"
+          sidecar = outDir </> "offering.fidelity.txt"
+      removePathForcibly outDir
+      createDirectoryIfMissing True outDir
+      Output code sout serr <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` null                       -- the document went to the file
+      serr `shouldSatisfy` ("fidelity report written to" `isInfixOf`)
+      xml <- readUtf8 outFile
+      goldenXml <- readUtf8 bpmnOfferingGolden
+      xml `shouldBe` goldenXml
+      report <- readUtf8 sidecar
+      goldenReport <- readUtf8 bpmnOfferingFidelity
+      report `shouldBe` goldenReport
+      -- Nothing of the report leaked into the document.
+      xml `shouldSatisfy` (not . ("fidelity report" `isInfixOf`))
+      removePathForcibly outDir
+
+    it "keeps stdout a pure document when --fidelity-report goes to stderr" $ do
+      -- `l4 export --to=bpmn f.l4 --fidelity-report > f.bpmn` must still
+      -- produce an importable file.
+      Output code sout serr <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "--fidelity-report"]
+      code `shouldBe` ExitSuccess
+      goldenXml <- readUtf8 bpmnOfferingGolden
+      sout `shouldBe` goldenXml
+      serr `shouldSatisfy` ("fidelity report — BPMN 2.0" `isInfixOf`)
+      serr `shouldSatisfy` ("[F1]" `isInfixOf`)
+
+    it "tallies what was lost on stderr even without --fidelity-report" $ do
+      -- The report is not optional in spirit: an export never silently drops
+      -- what the source said just because the caller did not know to ask.
+      Output code _ serr <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("could not carry everything" `isInfixOf`)
+      serr `shouldSatisfy` ("blocking" `isInfixOf`)
+      serr `shouldSatisfy` ("--fidelity-report" `isInfixOf`)
+      -- ... but the tally alone is not the located list.
+      serr `shouldSatisfy` (not . ("lost:" `isInfixOf`))
+
+    it "exits 0 on a Blocking note by default" $ do
+      -- Blocking means "the target notation has no form for this", which is
+      -- true of every realistic export (F1 fires for every task in every BPMN
+      -- file). A gate that always fires would be no gate at all.
+      Output code _ _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      code `shouldBe` ExitSuccess
+
+    it "exits non-zero on a Blocking note under --fail-on=blocking" $
+      expectFail bin ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+
+    -- --fail-on is a THRESHOLD ("a note this severe or worse"), over a lattice
+    -- ordered Blocking < Lossy < Advisory. `expectFail ... --fail-on=blocking`
+    -- above cannot see the threshold at all: it is satisfied by any gate that
+    -- trips on anything, and by one whose comparison runs backwards. The two
+    -- fixtures below are the discriminating inputs — one report that is
+    -- blocking-ONLY, one that is advisory-ONLY — so every gate value gets both
+    -- a case that must trip and a case that must not.
+    --
+    -- Concretely: flip `tripsGate`'s `<=` to `>=` and the blocking-only
+    -- `--fail-on=lossy`/`=advisory` rows go green→red; make the gate trip on
+    -- any note regardless of severity and the advisory-only
+    -- `--fail-on=blocking`/`=lossy` rows do.
+    describe "--fail-on thresholds" $ do
+      let dmnGate fixture gate = runL4 bin (["export", "--to=dmn", fixture] <> gate)
+          exitsNonZero fixture gate = do
+            Output code _ _ <- dmnGate fixture gate
+            code `shouldSatisfy` (/= ExitSuccess)
+          exitsZero fixture gate = do
+            Output code _ _ <- dmnGate fixture gate
+            code `shouldBe` ExitSuccess
+
+      it "a blocking-only report is caught by every threshold" $ do
+        -- `l4 export --to=dmn export-two-rules.l4` reports 2 blocking, 0 lossy,
+        -- 0 advisory: the pure-Blocking end of the lattice. Assert that first,
+        -- so the rows below cannot go green for the wrong reason if the
+        -- fixture's notes ever change severity.
+        Output tally _ serr <- dmnGate exportTwoRulesFixture []
+        tally `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("lossy" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("advisory" `isInfixOf`))
+        mapM_ (\g -> exitsNonZero exportTwoRulesFixture ["--fail-on=" ++ g])
+          ["blocking", "lossy", "advisory"]
+
+      it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
+        -- `l4 export --to=dmn export-advisory-only.l4` reports 1 advisory and
+        -- nothing else. Notes ARE present throughout, so "exit 0" here means
+        -- "no note reached the threshold", not "no notes".
+        Output tally _ serr <- dmnGate exportAdvisoryOnlyFixture []
+        tally `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("1 advisory" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("blocking" `isInfixOf`))
+        mapM_ (\g -> exitsZero exportAdvisoryOnlyFixture ["--fail-on=" ++ g])
+          ["blocking", "lossy"]
+        exitsNonZero exportAdvisoryOnlyFixture ["--fail-on=advisory"]
+
+      it "--fail-on=none never trips, and is the default" $
+        mapM_ (\fixture -> do
+                 exitsZero fixture ["--fail-on=none"]
+                 exitsZero fixture [])
+          [exportTwoRulesFixture, exportAdvisoryOnlyFixture]
+
+    it "still writes the document when --fail-on trips" $ do
+      Output code sout _ <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      goldenXml <- readUtf8 bpmnOfferingGolden
+      sout `shouldBe` goldenXml
+
+    it "honours --deadline-unit=refuse (no invented ISO duration)" $ do
+      Output code _ serr <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+      code `shouldBe` ExitSuccess
+      -- Under the default the unitless WITHINs are read as days and reported as
+      -- P-DEADLINE-UNIT advisories; under `refuse` they become P-DEADLINE.
+      serr `shouldSatisfy` ("P-DEADLINE" `isInfixOf`)
+      Output _ soutDefault _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output _ soutRefuse  _ <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+      soutDefault `shouldSatisfy` ("timerEventDefinition" `isInfixOf`)
+      soutRefuse `shouldSatisfy` (not . ("timerEventDefinition" `isInfixOf`))
+
+    it "rejects an unknown --to with a message naming the accepted targets" $ do
+      Output code _ serr <- runL4 bin ["export", "--to=xml", dmnSource]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("Invalid export target" `isInfixOf`)
+      serr `shouldSatisfy` ("dmn|dmn-md|bpmn" `isInfixOf`)
+
+    it "requires --to" $
+      expectFail bin ["export", dmnSource]
+
+    it "refuses BPMN when the module has no regulative rules" $ do
+      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportNothingFixture]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+    it "refuses DMN when the module has no decisions" $ do
+      Output code _ serr <- runL4 bin ["export", "--to=dmn", exportNothingFixture]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
+
+    it "refuses to guess which process to draw, and names the candidates" $ do
+      -- renderBpmn writes its own XML prolog, so two processes concatenated is
+      -- not a document. Refusing beats emitting something no tool can read.
+      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportTwoRulesFixture]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("--rule" `isInfixOf`)
+      serr `shouldSatisfy` ("the filing" `isInfixOf`)
+      serr `shouldSatisfy` ("the fee" `isInfixOf`)
+
+    it "selects one process with --rule" $ do
+      Output code sout _ <- runL4 bin
+        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "the fee"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("<?xml" `isInfixOf`)
+      sout `shouldSatisfy` ("the fee" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("the filing" `isInfixOf`))
+
+    it "fails on an unknown --rule and lists what is available" $ do
+      Output code _ serr <- runL4 bin
+        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("no such rule" `isInfixOf`)
+      serr `shouldSatisfy` ("the filing" `isInfixOf`)
+
+    it "rejects --rule on a DMN export instead of ignoring it" $ do
+      Output code _ serr <- runL4 bin ["export", "--to=dmn", dmnSource, "--rule", "x"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("--rule" `isInfixOf`)
+      serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+
+    it "rejects --model-name on a BPMN export instead of ignoring it" $ do
+      Output code _ serr <- runL4 bin
+        ["export", "--to=bpmn", bpmnOfferingSource, "--model-name", "X"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("--model-name" `isInfixOf`)
+
+    it "fails on a file that does not typecheck" $
+      expectFail bin ["export", "--to=dmn", errorFixture]
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

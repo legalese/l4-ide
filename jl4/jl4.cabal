@@ -51,6 +51,7 @@ executable l4
     L4.Cli.Batch
     L4.Cli.Check
     L4.Cli.Common
+    L4.Cli.Export
     L4.Cli.Format
     L4.Cli.OpenFisca
     L4.Cli.Render
