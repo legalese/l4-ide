@@ -1465,26 +1465,42 @@ spec = do
       goldenCase stem ruleName out ".fidelity.txt" \_ bx ->
         renderReport bx.bxFidelity
  where
-  -- (source stem, rule name, golden stem). The third component exists because
-  -- @regcf.l4@ holds the corpus's WHOLE regulative inventory — three rules —
-  -- and a BPMN document holds exactly one process, so one source yields three
-  -- pairs of goldens.
+  -- (source path relative to examples\/, rule name, golden stem).
+  --
+  -- The third component exists because the Reg CF corpus holds THREE
+  -- regulative rules and a BPMN document holds exactly one process, so one
+  -- source yields three pairs of goldens.
+  --
+  -- The Reg CF rows read from @legal\/regcf\/regcf.l4@ — the 981-line corpus
+  -- itself, not a fixture beside it. There used to be a hand-written
+  -- @bpmn\/regcf.l4@ standing in for it, because the extractor could not see
+  -- past an @IfThenElse@ to the deontic head and every corpus duty is written
+  -- that way. That copy re-declared three deadline constants, renamed four
+  -- predicates, dropped the statutory chapeau, invented two @LEST@ clauses the
+  -- CFR does not contain, and — because a @ROR@ arm needs an obligation to
+  -- hang a @PROVIDED@ on — silently dropped the annual cycle's base case, so
+  -- the shipped diagram asserted a duty the corpus discharges. Cutting from
+  -- the corpus is what makes all five of those unrepresentable rather than
+  -- merely disclosed. See 'L4.StateGraph.guardedIfBranches'.
   goldenCases =
-    [ ("offering", "the offering", "offering")
-    , ("handover", "the handover", "handover")
-    , ("consultation", "the consultation", "consultation")
-    , ("regcf", "the ongoing reporting obligation", "regcf-reporting")
-    , ("regcf", "the advertising restriction", "regcf-advertising")
-    , ("regcf", "the resale restriction", "regcf-resale")
+    [ ("bpmn" </> "offering.l4", "the offering", "offering")
+    , ("bpmn" </> "handover.l4", "the handover", "handover")
+    , ("bpmn" </> "consultation.l4", "the consultation", "consultation")
+    , (regcfCorpus, "ongoing reporting obligation", "regcf-reporting")
+    , (regcfCorpus, "advertising restriction", "regcf-advertising")
+    , (regcfCorpus, "resale restriction", "regcf-resale")
     ]
 
-  goldenCase stem ruleName out ext render = do
+  regcfCorpus = "legal" </> "regcf" </> "regcf.l4"
+
+  goldenCase srcPath ruleName out ext render = do
     dataDir <- Paths_jl4.getDataDir
-    let root = dataDir </> "examples" </> "bpmn"
-    src <- Text.readFile (root </> stem <> ".l4")
+    let examples = dataDir </> "examples"
+        root = examples </> "bpmn"
+    src <- Text.readFile (examples </> srcPath)
     let sg = case [g | g <- graphsOf src, g.sgName == ruleName] of
           (g : _) -> g
-          [] -> error (stem <> ".l4: no state graph named " <> show ruleName)
+          [] -> error (srcPath <> ": no state graph named " <> show ruleName)
         bx = stateGraphToBpmn defaultBpmnOptions sg
     pure
       Golden

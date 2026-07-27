@@ -1,19 +1,16 @@
 fidelity report — BPMN 2.0
-  [F1] blocking — Task_0
+  [P-BRANCHGUARD] lossy — Split_0
+      The gateway's arms are selected by ‘`transfer falls within an exception in Rule 501(a)` OF transfer’, ‘NOT (`transfer falls within an exception in Rule 501(a)` OF transfer)’, written into each outgoing flow as an opaque conditionExpression: BPMN has no way to say that these exhaust the cases and cannot overlap, which is what the L4 IF/ELSE chain they came from does say.
+      lost: exhaustiveness and mutual exclusion as properties of the gateway — and whatever decision structure backed each condition, for which DMN, not BPMN, is the right home
+  [F1] blocking — Task_2
       A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
       lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force
-  [F4] lossy — Task_0
-      The PROVIDED condition ‘NOT `the transfer falls within an exception in Rule 501(a)` OF transfer’ becomes an opaque conditionExpression on the task's outgoing flow, because BPMN has no activity precondition.
-      lost: whatever decision structure backed the guard — DMN would be its right home, and the DMN/BPMN link is an association, not a semantics
-  [F3] blocking — Task_0
-      This obligation can fail to become applicable at all, and BPMN has only one kind of ‘did not happen’.
-      lost: the difference between an obligation that was never reached and one that was discharged
-  [P-DEADLINE] blocking — Boundary_0
+  [P-DEADLINE] blocking — Boundary_2
       Deadline ‘`days in the resale restricted period`’ is not an ISO 8601 duration and no unit could be read from it, so the boundary event carries the text verbatim as a condition rather than a timer carrying a duration we invented.
       lost: the deadline as a machine-checkable timer
-  [F2] lossy — Process_the_resale_restriction
+  [F2] lossy — Process_resale_restriction
       A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: Purchaser).
       lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
-  [F5] advisory — Process_the_resale_restriction
+  [F5] advisory — Process_resale_restriction
       BPMN has no as-of date, so any threshold or deadline that does appear in this diagram is a value someone must remember to edit when the rule changes.
       lost: asking the same question as of a different rule date, which the L4 source can still answer

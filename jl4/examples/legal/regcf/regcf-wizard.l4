@@ -149,9 +149,9 @@ DECLARE RaiseAssessment HAS
 
 DECLARE InvestmentLimitAnswer HAS
     `you have no limit`      IS A BOOLEAN @desc Regulation Crowdfunding sets no investment limit for an accredited investor
-    `your 12 month limit`    IS A NUMBER  @desc The Rule 100(a)(2) limit computed from your income and net worth. Ignore it if you have no limit.
+    `your 12 month limit`    IS A MAYBE NUMBER @desc The Rule 100(a)(2) limit computed from your income and net worth, or absent if no limit applies to you
     `you have already used`  IS A NUMBER  @desc What you told us you have already invested in the last 12 months
-    `you can still invest`   IS A NUMBER  @desc What is left of that limit, in dollars
+    `you can still invest`   IS A MAYBE NUMBER @desc What is left of that limit in dollars, or absent if no limit applies to you
     `we measured against`    IS A NUMBER  @desc The GREATER of your annual income and your net worth — the figure the rule actually uses
     `which limb applies`     IS A STRING  @desc Which paragraph of Rule 100(a)(2) governs you
     `how this is worked out` IS A STRING  @desc The calculation, in full, with the rule cited
@@ -366,14 +366,43 @@ GIVETH A STRING
 
 §§ `Group 3 — the investor's own limit`
 
+-- The hypothetical limb: what Rule 100(a)(2) would give this investor if the
+-- carve-out did not apply. Used to explain the accredited case as well as to
+-- answer the ordinary one, which is why it is not itself carve-out aware.
 GIVEN facts IS AN InvestorFacts
 GIVETH A NUMBER
 `limit for` facts MEANS `investment limit` (`investor profile from` facts)
 
+-- THE CARVE-OUT, APPLIED. Rule 100(a)(2) bites only "Where the purchaser is
+-- not an accredited investor"; for an accredited purchaser Reg CF sets no
+-- investment limit at all, which the corpus states outright — regcf.l4:806
+-- asserts the very investor below is within the limit at $5,000,000.
+--
+-- These two answers were plain NUMBERs until 2026-07-27, computed from
+-- `limit for` with the carve-out ignored, so an accredited investor was told
+-- `your 12 month limit: 10000` and `you can still invest: 10000`. The prose
+-- field said the right thing and the numbers did not, and a wizard rendering
+-- the number as its headline — or an LLM reading the structured fields —
+-- reported a cap that does not exist in law. A citizen asking "may I invest
+-- $50,000?" would have read 10000 and concluded no, when the answer is yes.
+--
+-- MAYBE is the fix rather than a sentinel: NOTHING serialises to JSON `null`
+-- (L4.Evaluate.ValueLazyJSON), and there is no number a client can mistake for
+-- a limit.
 GIVEN facts IS AN InvestorFacts
-GIVETH A NUMBER
+GIVETH A MAYBE NUMBER
+`limit if any for` facts MEANS
+    IF   facts's `is an accredited investor`
+    THEN NOTHING
+    ELSE JUST (`limit for` facts)
+
+GIVEN facts IS AN InvestorFacts
+GIVETH A MAYBE NUMBER
 `still investable for` facts MEANS
-    `never below zero` ((`limit for` facts) MINUS facts's `invested under Reg CF in the last 12 months`)
+    IF   facts's `is an accredited investor`
+    THEN NOTHING
+    ELSE JUST (`never below zero`
+                  ((`limit for` facts) MINUS facts's `invested under Reg CF in the last 12 months`))
 
 GIVEN facts IS AN InvestorFacts
 GIVETH A STRING
@@ -530,7 +559,7 @@ GIVETH AN InvestmentLimitAnswer
 DECIDE `investment limit check` IS
     InvestmentLimitAnswer WITH
         `you have no limit`      IS facts's `is an accredited investor`
-        `your 12 month limit`    IS `limit for` facts
+        `your 12 month limit`    IS `limit if any for` facts
         `you have already used`  IS facts's `invested under Reg CF in the last 12 months`
         `you can still invest`   IS `still investable for` facts
         `we measured against`    IS `greater of annual income or net worth` (`investor profile from` facts)

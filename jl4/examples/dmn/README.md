@@ -24,8 +24,8 @@ and it is here to be honest about what the real thing costs: **73 decisions, 3 t
 70 boxed literal expressions, 61 `inputData` under 27 names, 75 blocking notes.** The
 diagnosis is one sentence — a DMN decision is a 0-ary variable, so the house
 `GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
-and it is written up at `../legal/regcf/README.md` §6.1, including two failures the
-fidelity report does *not* catch. Read that before citing either file.
+and it is written up at `../legal/regcf/PROJECTIONS.md` §1, which also records what
+the projection *cannot* say. Read that before citing either file.
 
 ## The pipeline
 
@@ -142,14 +142,27 @@ Track **S0** is wired: both goldens in this directory are reproducible byte-for-
 through `l4 export`, from a repo checkout with `jl4/` as the working directory.
 
 ```sh
-l4 export --to=dmn    reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn
-l4 export --to=dmn-md reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn.md
+l4 export --to=dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
+l4 export --to=dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
+
+# the corpus, likewise with no flags
+l4 export --to=dmn    ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
+l4 export --to=dmn-md ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
 ```
 
-`--model-name` matters: `lowerModule` takes the `<definitions>` name as a parameter
-rather than reading it off the module's URI, precisely so the emitted bytes do not
-depend on where the file lives. Without it the name defaults to the file's base name
-(`reg-cf`), and the `id`/`namespace` attributes change with it.
+No `--model-name` is needed, and that is the point. `lowerModule` takes the
+`<definitions>` name as a parameter rather than reading it off the module's URI, so
+the emitted bytes do not depend on where the file lives; the CLI supplies it from the
+module's own outermost `§` heading, falling back to the file's base name. Both files
+here carry such a heading, so each names its own model exactly once, in the file that
+*is* the model.
+
+The flag still exists and still overrides. It used to be *required* for the corpus
+golden, whose title was consequently hand-typed in `jl4/tests/DmnExport.hs` — so one
+model had three names at once (`SEC Regulation Crowdfunding — 17 CFR Part 227` in the
+corpus, `Regulation Crowdfunding (17 CFR Part 227)` in the test, `regcf` from a bare
+CLI run). A title duplicated across three files and stale in two of them is exactly
+the defect this exhibit exists to criticise.
 
 Add `--fidelity-report` for the loss list — written to `<output>.fidelity.txt` when
 `-o` is given, and to stderr otherwise, so that a redirected document stays a document.

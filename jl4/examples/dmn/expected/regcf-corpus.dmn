@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_regulation_crowdfunding_17_cfr_part_227" name="Regulation Crowdfunding (17 CFR Part 227)" namespace="https://legalese.com/l4/dmn/regulation_crowdfunding_17_cfr_part_227" exporter="jl4">
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_sec_regulation_crowdfunding_17_cfr_part_227" name="SEC Regulation Crowdfunding — 17 CFR Part 227" namespace="https://legalese.com/l4/dmn/sec_regulation_crowdfunding_17_cfr_part_227" exporter="jl4">
   <inputData id="input_issuer" name="issuer">
     <variable id="input_issuer_var" name="issuer" typeRef="Any"/>
   </inputData>
@@ -273,7 +273,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_1_not_organized_under_state_or_territorial_law_literal">
-      <text>true and not(issuer._1. Issuer eligibility _ Rule 100_b_.is organized under_ and subject to_ the laws of a State or territory of the United States or the District of Columbia)</text>
+      <text>true and not(issuer.is organized under_ and subject to_ the laws of a State or territory of the United States or the District of Columbia)</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_2_an_exchange_act_reporting_company" name="(b)(2) — an Exchange Act reporting company">
@@ -282,7 +282,7 @@
       <requiredInput href="#input_issuer_2"/>
     </informationRequirement>
     <literalExpression id="decision_b_2_an_exchange_act_reporting_company_literal">
-      <text>true and issuer._1. Issuer eligibility _ Rule 100_b_.is subject to the requirement to file reports pursuant to section 13 or section 15_d_ of the Exchange Act</text>
+      <text>true and issuer.is subject to the requirement to file reports pursuant to section 13 or section 15_d_ of the Exchange Act</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_3_an_investment_company" name="(b)(3) — an investment company">
@@ -291,7 +291,7 @@
       <requiredInput href="#input_issuer_3"/>
     </informationRequirement>
     <literalExpression id="decision_b_3_an_investment_company_literal">
-      <text>true and issuer._1. Issuer eligibility _ Rule 100_b_.is an investment company_ or is excluded from the definition of investment company by section 3_b_ or section 3_c_</text>
+      <text>true and issuer.is an investment company_ or is excluded from the definition of investment company by section 3_b_ or section 3_c_</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_4_subject_to_a_bad_actor_disqualification" name="(b)(4) — subject to a bad-actor disqualification">
@@ -300,7 +300,7 @@
       <requiredInput href="#input_issuer_4"/>
     </informationRequirement>
     <literalExpression id="decision_b_4_subject_to_a_bad_actor_disqualification_literal">
-      <text>true and issuer._1. Issuer eligibility _ Rule 100_b_.is subject to a disqualification as specified in section 227.503_a_</text>
+      <text>true and issuer.is subject to a disqualification as specified in section 227.503_a_</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_5_delinquent_in_ongoing_annual_reports" name="(b)(5) — delinquent in ongoing annual reports">
@@ -309,7 +309,7 @@
       <requiredInput href="#input_issuer_5"/>
     </informationRequirement>
     <literalExpression id="decision_b_5_delinquent_in_ongoing_annual_reports_literal">
-      <text>true and issuer._1. Issuer eligibility _ Rule 100_b_.has sold securities in reliance on section 4_a__6_ and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement</text>
+      <text>true and issuer.has sold securities in reliance on section 4_a__6_ and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan" name="(b)(6) — no specific business plan, or a blank-check business plan">
@@ -318,7 +318,7 @@
       <requiredInput href="#input_issuer_6"/>
     </informationRequirement>
     <literalExpression id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_literal">
-      <text>true and issuer._1. Issuer eligibility _ Rule 100_b_.has no specific business plan_ or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies</text>
+      <text>true and issuer.has no specific business plan_ or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies</text>
     </literalExpression>
   </decision>
   <decision id="decision_issuer_is_excluded_by_rule_100_b" name="issuer is excluded by Rule 100(b)">
@@ -366,7 +366,7 @@
       <requiredInput href="#input_offering"/>
     </informationRequirement>
     <literalExpression id="decision_aggregate_offering_amount_literal">
-      <text>offering._2. Offering limit _ Rule 100_a__1_.aggregate amount sold in reliance on section 4_a__6_ during the preceding 12 months + offering._2. Offering limit _ Rule 100_a__1_.maximum offering amount the issuer will accept</text>
+      <text>offering.aggregate amount sold in reliance on section 4_a__6_ during the preceding 12 months + offering.maximum offering amount the issuer will accept</text>
     </literalExpression>
   </decision>
   <decision id="decision_offering_is_within_the_offering_limit" name="offering is within the offering limit">
@@ -390,7 +390,7 @@
       <requiredInput href="#input_investor"/>
     </informationRequirement>
     <literalExpression id="decision_greater_of_annual_income_or_net_worth_literal">
-      <text>max(investor._3. Investor investment limits _ Rule 100_a__2_.annual income, investor._3. Investor investment limits _ Rule 100_a__2_.net worth)</text>
+      <text>max(investor.annual income, investor.net worth)</text>
     </literalExpression>
   </decision>
   <decision id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point" name="either annual income or net worth is less than the cut point">
@@ -402,7 +402,7 @@
       <requiredInput href="#input_investor_2"/>
     </informationRequirement>
     <literalExpression id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_literal">
-      <text>investor._3. Investor investment limits _ Rule 100_a__2_.annual income &lt; SEC Regulation Crowdfunding _ 17 CFR Part 227.Thresholds _ every dollar figure_ bound once.income or net worth cut point or investor._3. Investor investment limits _ Rule 100_a__2_.net worth &lt; SEC Regulation Crowdfunding _ 17 CFR Part 227.Thresholds _ every dollar figure_ bound once.income or net worth cut point</text>
+      <text>investor.annual income &lt; income or net worth cut point or investor.net worth &lt; income or net worth cut point</text>
     </literalExpression>
   </decision>
   <decision id="decision_investment_limit" name="investment limit">
@@ -453,7 +453,7 @@
       <requiredInput href="#input_investor_4"/>
     </informationRequirement>
     <literalExpression id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_literal">
-      <text>investor._3. Investor investment limits _ Rule 100_a__2_.aggregate amount already sold to this investor across all issuers in reliance on section 4_a__6_ during the preceding 12 months + amount to be sold in this transaction</text>
+      <text>investor.aggregate amount already sold to this investor across all issuers in reliance on section 4_a__6_ during the preceding 12 months + amount to be sold in this transaction</text>
     </literalExpression>
   </decision>
   <decision id="decision_investor_is_within_the_investment_limit" name="investor is within the investment limit">
@@ -504,7 +504,7 @@
       </input>
       <input id="decision_financial_statements_required_i3" label="offering&apos;s `the issuer has previously sold securities in reliance on section 4(a)(6)`">
         <inputExpression id="decision_financial_statements_required_i3_expr" typeRef="boolean">
-          <text>offering._2. Offering limit _ Rule 100_a__1_.the issuer has previously sold securities in reliance on section 4_a__6_</text>
+          <text>offering.the issuer has previously sold securities in reliance on section 4_a__6_</text>
         </inputExpression>
       </input>
       <input id="decision_financial_statements_required_i4" label="(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`">
@@ -528,7 +528,7 @@
           <text>-</text>
         </inputEntry>
         <outputEntry id="decision_financial_statements_required_r1_o1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements certified by the principal executive officer, with tax return information"</text>
+          <text>"financial statements certified by the principal executive officer, with tax return information"</text>
         </outputEntry>
       </rule>
       <rule id="decision_financial_statements_required_r2">
@@ -546,7 +546,7 @@
           <text>-</text>
         </inputEntry>
         <outputEntry id="decision_financial_statements_required_r2_o1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements reviewed by an independent public accountant"</text>
+          <text>"financial statements reviewed by an independent public accountant"</text>
         </outputEntry>
       </rule>
       <rule id="decision_financial_statements_required_r3">
@@ -564,7 +564,7 @@
           <text>true</text>
         </inputEntry>
         <outputEntry id="decision_financial_statements_required_r3_o1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements reviewed by an independent public accountant"</text>
+          <text>"financial statements reviewed by an independent public accountant"</text>
         </outputEntry>
       </rule>
       <rule id="decision_financial_statements_required_r4">
@@ -582,7 +582,7 @@
           <text>-</text>
         </inputEntry>
         <outputEntry id="decision_financial_statements_required_r4_o1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements audited by an independent public accountant"</text>
+          <text>"financial statements audited by an independent public accountant"</text>
         </outputEntry>
       </rule>
     </decisionTable>
@@ -602,7 +602,7 @@
       <rule id="decision_assurance_level_r1">
         <description>required EQUALS `financial statements certified by the principal executive officer, with tax return information`</description>
         <inputEntry id="decision_assurance_level_r1_i1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements certified by the principal executive officer, with tax return information"</text>
+          <text>"financial statements certified by the principal executive officer, with tax return information"</text>
         </inputEntry>
         <outputEntry id="decision_assurance_level_r1_o1">
           <text>1</text>
@@ -611,7 +611,7 @@
       <rule id="decision_assurance_level_r2">
         <description>required EQUALS `financial statements reviewed by an independent public accountant`</description>
         <inputEntry id="decision_assurance_level_r2_i1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements reviewed by an independent public accountant"</text>
+          <text>"financial statements reviewed by an independent public accountant"</text>
         </inputEntry>
         <outputEntry id="decision_assurance_level_r2_o1">
           <text>2</text>
@@ -620,7 +620,7 @@
       <rule id="decision_assurance_level_r3">
         <description>required EQUALS `financial statements audited by an independent public accountant`</description>
         <inputEntry id="decision_assurance_level_r3_i1">
-          <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements audited by an independent public accountant"</text>
+          <text>"financial statements audited by an independent public accountant"</text>
         </inputEntry>
         <outputEntry id="decision_assurance_level_r3_o1">
           <text>3</text>
@@ -667,7 +667,7 @@
       <requiredInput href="#input_arrangement"/>
     </informationRequirement>
     <literalExpression id="decision_a_3_conducted_through_a_single_complying_intermediary_literal">
-      <text>true and (arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the intermediary complies with section 4A_a_ of the Securities Act and the related requirements in this part and (arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the transaction is conducted exclusively through the intermediary_s platform and (true and arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the number of intermediaries used for the offering = 1)))</text>
+      <text>true and (arrangement.the intermediary complies with section 4A_a_ of the Securities Act and the related requirements in this part and (arrangement.the transaction is conducted exclusively through the intermediary_s platform and (true and arrangement.the number of intermediaries used for the offering = 1)))</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_21_day_public_availability_period_has_run" name="the 21-day public availability period has run">
@@ -679,7 +679,7 @@
       <requiredInput href="#input_arrangement_2"/>
     </informationRequirement>
     <literalExpression id="decision_the_21_day_public_availability_period_has_run_literal">
-      <text>true and arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the days the issuer information has been publicly available on the intermediary_s platform before any sale &gt;= SEC Regulation Crowdfunding _ 17 CFR Part 227.Periods _ every deadline_ bound once.minimum days publicly available before any sale</text>
+      <text>true and arrangement.the days the issuer information has been publicly available on the intermediary_s platform before any sale &gt;= minimum days publicly available before any sale</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_intermediary_has_discharged_its_investor_facing_duties" name="the intermediary has discharged its investor-facing duties">
@@ -688,7 +688,7 @@
       <requiredInput href="#input_arrangement_3"/>
     </informationRequirement>
     <literalExpression id="decision_the_intermediary_has_discharged_its_investor_facing_duties_literal">
-      <text>true and (arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the intermediary delivered educational materials in connection with establishing the investor_s account and (true and arrangement._5. Intermediary obligations _ Rules 100_a__3__ 301_ 302_ 303.the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations))</text>
+      <text>true and (arrangement.the intermediary delivered educational materials in connection with establishing the investor_s account and (true and arrangement.the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations))</text>
     </literalExpression>
   </decision>
   <decision id="decision_intermediary_obligations_are_met" name="intermediary obligations are met">
@@ -715,7 +715,7 @@
       <requiredInput href="#input_notice"/>
     </informationRequirement>
     <literalExpression id="decision_notice_complies_with_rule_204_b_literal">
-      <text>true and (notice._6. Advertising restrictions _ Rule 204.directs investors to the intermediary_s platform and (true and (true and (true and not(notice._6. Advertising restrictions _ Rule 204.includes information beyond that permitted by paragraph _b_)))))</text>
+      <text>true and (notice.directs investors to the intermediary_s platform and (true and (true and (true and not(notice.includes information beyond that permitted by paragraph _b_)))))</text>
     </literalExpression>
   </decision>
   <decision id="decision_definition_terms_of_the_offering" name="definition — terms of the offering">
@@ -745,7 +745,7 @@
       <requiredInput href="#input_status"/>
     </informationRequirement>
     <literalExpression id="decision_b_1_became_an_exchange_act_reporting_company_literal">
-      <text>true and status._7. Ongoing reporting _ Rules 202_ 203_b_.the issuer is required to file reports under section 13_a_ or section 15_d_ of the Exchange Act</text>
+      <text>true and status.the issuer is required to file reports under section 13_a_ or section 15_d_ of the Exchange Act</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" name="(b)(2) — one annual report filed and fewer than 300 holders of record">
@@ -757,7 +757,7 @@
       <requiredInput href="#input_status_2"/>
     </informationRequirement>
     <literalExpression id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_literal">
-      <text>true and (status._7. Ongoing reporting _ Rules 202_ 203_b_.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 1 and status._7. Ongoing reporting _ Rules 202_ 203_b_.holders of record &lt; SEC Regulation Crowdfunding _ 17 CFR Part 227.Thresholds _ every dollar figure_ bound once.holders of record threshold)</text>
+      <text>true and (status.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 1 and status.holders of record &lt; holders of record threshold)</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" name="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000">
@@ -769,7 +769,7 @@
       <requiredInput href="#input_status_3"/>
     </informationRequirement>
     <literalExpression id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_literal">
-      <text>true and (status._7. Ongoing reporting _ Rules 202_ 203_b_.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 3 and status._7. Ongoing reporting _ Rules 202_ 203_b_.total assets &lt;= SEC Regulation Crowdfunding _ 17 CFR Part 227.Thresholds _ every dollar figure_ bound once.total assets threshold)</text>
+      <text>true and (status.annual reports filed since the most recent sale of securities pursuant to this part &gt;= 3 and status.total assets &lt;= total assets threshold)</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_4_all_securities_repurchased" name="(b)(4) — all securities repurchased">
@@ -778,7 +778,7 @@
       <requiredInput href="#input_status_4"/>
     </informationRequirement>
     <literalExpression id="decision_b_4_all_securities_repurchased_literal">
-      <text>true and status._7. Ongoing reporting _ Rules 202_ 203_b_.the issuer or another party has repurchased all of the securities issued in reliance on section 4_a__6_</text>
+      <text>true and status.the issuer or another party has repurchased all of the securities issued in reliance on section 4_a__6_</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_5_liquidated_or_dissolved" name="(b)(5) — liquidated or dissolved">
@@ -787,7 +787,7 @@
       <requiredInput href="#input_status_5"/>
     </informationRequirement>
     <literalExpression id="decision_b_5_liquidated_or_dissolved_literal">
-      <text>true and status._7. Ongoing reporting _ Rules 202_ 203_b_.the issuer has liquidated or dissolved its business in accordance with state law</text>
+      <text>true and status.the issuer has liquidated or dissolved its business in accordance with state law</text>
     </literalExpression>
   </decision>
   <decision id="decision_ongoing_reporting_obligation_may_terminate" name="ongoing reporting obligation may terminate">
@@ -844,7 +844,7 @@
       <requiredInput href="#input_transfer"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_is_within_the_one_year_restricted_period_literal">
-      <text>true and transfer._8. Resale restrictions _ Rule 501.days since the securities were issued &lt; SEC Regulation Crowdfunding _ 17 CFR Part 227.Periods _ every deadline_ bound once.days in the resale restricted period</text>
+      <text>true and transfer.days since the securities were issued &lt; days in the resale restricted period</text>
     </literalExpression>
   </decision>
   <decision id="decision_transfer_falls_within_an_exception_in_rule_501_a" name="transfer falls within an exception in Rule 501(a)">
@@ -853,7 +853,7 @@
       <requiredInput href="#input_transfer_2"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_falls_within_an_exception_in_rule_501_a_literal">
-      <text>false or (false or (transfer._8. Resale restrictions _ Rule 501.is to the issuer of the securities or (false or (transfer._8. Resale restrictions _ Rule 501.is to an accredited investor or (false or (transfer._8. Resale restrictions _ Rule 501.is as part of an offering registered with the Commission or (false or transfer._8. Resale restrictions _ Rule 501.is to a member of the family of the purchaser or the equivalent_ to a trust controlled by the purchaser_ to a trust created for the benefit of a member of the family of the purchaser or the equivalent_ or in connection with the death or divorce of the purchaser or other similar circumstance)))))))</text>
+      <text>false or (false or (transfer.is to the issuer of the securities or (false or (transfer.is to an accredited investor or (false or (transfer.is as part of an offering registered with the Commission or (false or transfer.is to a member of the family of the purchaser or the equivalent_ to a trust controlled by the purchaser_ to a trust created for the benefit of a member of the family of the purchaser or the equivalent_ or in connection with the death or divorce of the purchaser or other similar circumstance)))))))</text>
     </literalExpression>
   </decision>
   <decision id="decision_transfer_is_permitted" name="transfer is permitted">
@@ -1024,19 +1024,19 @@
   <decision id="decision_certified" name="certified">
     <variable id="decision_certified_var" name="certified" typeRef="string"/>
     <literalExpression id="decision_certified_literal">
-      <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements certified by the principal executive officer, with tax return information"</text>
+      <text>"financial statements certified by the principal executive officer, with tax return information"</text>
     </literalExpression>
   </decision>
   <decision id="decision_reviewed" name="reviewed">
     <variable id="decision_reviewed_var" name="reviewed" typeRef="string"/>
     <literalExpression id="decision_reviewed_literal">
-      <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements reviewed by an independent public accountant"</text>
+      <text>"financial statements reviewed by an independent public accountant"</text>
     </literalExpression>
   </decision>
   <decision id="decision_audited" name="audited">
     <variable id="decision_audited_var" name="audited" typeRef="string"/>
     <literalExpression id="decision_audited_literal">
-      <text>"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements audited by an independent public accountant"</text>
+      <text>"financial statements audited by an independent public accountant"</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_conforming_notice" name="a conforming notice">
@@ -1187,7 +1187,7 @@
     </literalExpression>
   </decision>
   <dmndi:DMNDI>
-    <dmndi:DMNDiagram id="definitions_regulation_crowdfunding_17_cfr_part_227_diagram" name="Regulation Crowdfunding (17 CFR Part 227)">
+    <dmndi:DMNDiagram id="definitions_sec_regulation_crowdfunding_17_cfr_part_227_diagram" name="SEC Regulation Crowdfunding — 17 CFR Part 227">
       <dmndi:DMNShape id="input_issuer_shape" dmnElementRef="input_issuer">
         <dc:Bounds x="60" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>

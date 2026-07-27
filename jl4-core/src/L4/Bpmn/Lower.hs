@@ -147,6 +147,7 @@ stateGraphToBpmn opts sg =
       , scLapse = lapse
       , scFindings =
           taskFindings
+            <> branchGuardFindings
             <> boundaryFindings
             <> lapseFindings
             <> undrawnDeadlineFindings
@@ -299,6 +300,35 @@ stateGraphToBpmn opts sg =
       (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
       _ -> []
 
+    -- The @IF@ that chose between arms. This is the branch-edge counterpart of
+    -- @F4@: @F4@ accounts for a @PROVIDED@ on one obligation, this accounts
+    -- for the condition on a gateway's outgoing flow. Both end as opaque text
+    -- in a @conditionExpression@ and both are reported, because a guard that
+    -- an engine cannot evaluate is exactly the loss a reader needs to be told
+    -- about — and until the extractor could see an @IF@-headed rule at all,
+    -- there was no shape here to report on.
+    branchGuardFindings =
+      [ MkFidelityNote
+        { code = "P-BRANCHGUARD"
+        , severity = Lossy
+        , element = gw.nodeId
+        , range = Nothing
+        , message =
+            "The gateway's arms are selected by \8216"
+              <> Text.intercalate "\8217, \8216" guards
+              <> "\8217, written into each outgoing flow as an opaque \
+                 \conditionExpression: BPMN has no way to say that these \
+                 \exhaust the cases and cannot overlap, which is what the L4 \
+                 \IF/ELSE chain they came from does say."
+        , lost =
+            "exhaustiveness and mutual exclusion as properties of the \
+            \gateway — and whatever decision structure backed each condition, \
+            \for which DMN, not BPMN, is the right home"
+        }
+      | gw <- take 1 gatewayNodes
+      , guards@(_ : _) <- [mapMaybe (.transLabel.labelGuard) (defaultsOf sid)]
+      ]
+
     danglingFindings =
       [ MkFidelityNote
         { code = "P-DANGLING"
@@ -388,8 +418,15 @@ stateGraphToBpmn opts sg =
             , Just src <- [lestSrc]
             , Just tgt <- [entryOf t.transTo]
             ]
+          -- A branch edge out of a junction carries a guard when the junction
+          -- came from an @IF@ rather than from @RAND@ \/ @ROR@, and that guard
+          -- is the whole reason the gateway is readable: without it the
+          -- diagram says "pick an arm", then does the work, and only then
+          -- tests the condition that decided which arm applied. Dropping it
+          -- (which is what this did until 2026-07-27) turns a fact-driven
+          -- exclusive gateway into a free choice.
           branches =
-            [ (src, tgt, Nothing)
+            [ (src, tgt, t.transLabel.labelGuard)
             | t <- defaultsOf sid
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]

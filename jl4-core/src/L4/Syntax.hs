@@ -88,6 +88,24 @@ rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
 
+-- | As 'rawNameToText', but dropping any section qualification.
+--
+-- A constructor or stored record selector declared inside a @§@ gets a
+-- section-qualified /spelling/ as well as its bare one (see
+-- @specs\/todo\/SECTION-RANKING-SPEC.md@). 'rawNameToText' renders that by
+-- joining the section path with @.@, which is right inside L4 and wrong in
+-- every export format that gives @.@ its own meaning: in FEEL @.@ is path
+-- traversal into a value, and in a diagram label a section heading is noise
+-- that crowds out the act. Exporters should therefore ask for the base name
+-- and let their own fidelity report account for any collision that creates.
+unqualifiedRawNameToText :: RawName -> Text
+unqualifiedRawNameToText (QualifiedName _ n) = n
+unqualifiedRawNameToText rn                  = rawNameToText rn
+
+-- | As 'nameToText', dropping any section qualification.
+unqualifiedNameToText :: Name -> Text
+unqualifiedNameToText = unqualifiedRawNameToText . rawName
+
 data Type' n =
     Type   Anno -- ^ the type of types
   | TyApp  Anno n [Type' n] -- ^ an application of a type constructor
@@ -782,8 +800,18 @@ data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The human-readable text of a @\@desc@, trimmed.
+--
+-- The lexer keeps the annotation's line verbatim, separator included, because
+-- the exact-printer reprints it as @\"\@desc\" <> t@ and must round-trip byte
+-- for byte. Every /reader/ of the text wants the sentence, though, so the space
+-- after @\@desc@ was surfacing in JSON Schema @description@s, in the deployed
+-- function schema and in hovers: every field of the Reg CF wizard was
+-- described as @\" Does your company already file …\"@. Trim here, once, rather
+-- than at each of the four call sites — and not in the lexer, where it would
+-- break exact printing.
 getDesc :: Desc -> Text
-getDesc (MkDesc _ t) = t
+getDesc (MkDesc _ t) = Text.strip t
 
 -- | A fixity annotation ('@infixl N' / '@infixr N' / '@infix N') attached to
 -- the definition of a binary identifier operator. The 'Text' is the raw

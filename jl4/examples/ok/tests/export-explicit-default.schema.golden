@@ -3,7 +3,7 @@
     "description": "Calculate the cube of a number",
     "properties": {
         "n": {
-            "description": " The input number",
+            "description": "The input number",
             "type": "number"
         }
     },

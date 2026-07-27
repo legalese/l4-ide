@@ -1,12 +1,26 @@
 # Reg CF ladder figures
 
-Generated, never hand-drawn. Six decisions from `../regcf.l4`, three carriers each:
+Generated, never hand-drawn. Six decisions from `../regcf.l4`, four carriers each:
 
-| File   | Carrier                                | Made by                                     |
-| ------ | -------------------------------------- | ------------------------------------------- |
-| `.svg` | page/print figure, `ink` theme         | `@repo/ladder-svg` `sceneToSvg(scene,"ink")` |
-| `.txt` | monospace grid — pasteable and diffable | `@repo/ladder-core` `sceneToAscii`          |
-| `.mmd` | Mermaid `railroad-beta`                | `@repo/ladder-core` `toMermaidRailroad`     |
+| File         | Carrier                                 | Made by                                      |
+| ------------ | --------------------------------------- | -------------------------------------------- |
+| `.svg`       | page/print figure, `ink` theme          | `@repo/ladder-svg` `sceneToSvg(scene,"ink")`  |
+| `.txt`       | monospace grid — pasteable and diffable | `@repo/ladder-core` `sceneToAscii`           |
+| `.mmd`       | Mermaid `railroad-beta`                 | `@repo/ladder-core` `toMermaidRailroad`      |
+| `.sentences` | **readable prose** — one per way to satisfy | `@repo/ladder-core` `expandSentences`     |
+
+**The four are not interchangeable.** `toMermaidRailroad` deliberately drops medial
+inert glue inside an `OR` (a railroad `choice` branch is a live path, and
+prose-as-branch would make the disjunction trivially satisfiable — correct, and
+documented in `mermaid.ts`), so `regcf-resale-exceptions.mmd` carries the chapeau and
+**none** of limbs (2)(3)(4)'s captions while the other three carry all four. Do not
+treat one carrier as a stand-in for another.
+
+The `.sentences` carrier is a **disjunction** view and degrades on conjunctions:
+`regcf-rule-100b.sentences` is six clean numbered limbs, while
+`regcf-exemption.sentences` is one sentence with all five conjuncts run together,
+because an `And` cross-joins into a single product. Use the sentences for OR-rooted
+rules and the ladder for AND-rooted ones.
 
 ## Regenerating
 
@@ -29,6 +43,21 @@ too wide to put on a page — see below.
 
 The generator fails loudly (exit 1) if a named decision is not found, so renaming
 a decision in `regcf.l4` breaks the build rather than silently dropping a figure.
+
+### …but only if someone runs it
+
+"Nothing is retyped, so nothing can drift" is true of the **generator** and was, until
+2026-07-27, false of the twenty-four committed **files**. `demo:regcf` needs a running
+`jl4-lsp`, so it is not in `turbo.json` and CI never ran it; unlike the DMN and BPMN
+goldens, which `cabal test` re-derives from the same corpus on every run, these could
+have sat stale beside a renamed corpus indefinitely.
+
+`ts-shared/ladder-svg/test/regcf-figures.test.ts` closes the realistic half of that
+hole **without** the LSP: every boxed leaf label in every `.txt`, and every
+`.sentences` title, must still be findable in `regcf.l4`. It runs under
+`turbo run test`. It is deliberately **one-directional** — a leaf *added* to the L4 and
+absent from a figure still passes, and layout is not checked at all. Run
+`demo:regcf` for the real thing.
 
 ## What was generated
 

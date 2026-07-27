@@ -73,7 +73,7 @@ import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (dmnReport, drgDecisions)
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule)
+import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
@@ -183,7 +183,7 @@ exportOptionsParser = ExportOptions
         ( strOption
             ( long "model-name"
            <> metavar "NAME"
-           <> help "DMN only: the <definitions> name and namespace seed (default: the file's base name)"
+           <> help "DMN only: the <definitions> name and namespace seed (default: the module's outermost section heading, else the file's base name)"
             )
         )
   <*> optional
@@ -274,8 +274,16 @@ targetFlagName = \case
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do
+  -- Precedence: what the caller asked for, else the module's own outermost @§@
+  -- heading, else the file's base name. The middle step is what lets a corpus
+  -- name its own model once, in the corpus, instead of having the title
+  -- retyped into every caller.
   let modelName =
-        fromMaybe (Text.pack (takeBaseName opts.exportFile)) opts.exportModelName
+        fromMaybe
+          (fromMaybe
+             (Text.pack (takeBaseName opts.exportFile))
+             (moduleTitle tcRes.module'))
+          opts.exportModelName
       drg =
         lowerModule
           MkDmnLowerOptions

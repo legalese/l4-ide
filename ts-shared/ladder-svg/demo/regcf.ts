@@ -15,10 +15,26 @@
  * `spike/corpus-sizes.ts`, which is lifted from `standalone/serve.mjs`. Do not
  * write a fourth copy.
  *
- * Three emits per subject, all off the same `Scene`:
- *   *.svg      sceneToSvg(scene, "ink")            — print/page figure
- *   *.txt      sceneToAscii(scene)                 — pasteable, and DIFFABLE
- *   *.mmd      toMermaidRailroad(fn, {theme:"ink"}) — for markdown that renders it
+ * Four emits per subject, all off the same decoded `FunDecl`:
+ *   *.svg        sceneToSvg(scene, "ink")             — print/page figure
+ *   *.txt        sceneToAscii(scene)                  — pasteable, and DIFFABLE
+ *   *.mmd        toMermaidRailroad(fn, {theme:"ink"}) — for markdown that renders it
+ *   *.sentences  expandSentences(fn)                  — READABLE PROSE
+ *
+ * The fourth carrier exists because the page this exhibit is measured against
+ * is prose, and until 2026-07-27 every artifact here was a diagram, an XML
+ * model or a loss report: the only scannable English in the deliverable was
+ * hand-written README commentary, which is itself a second source. One
+ * sentence per way the rule can be satisfied is the surplusage view a
+ * compliance reader actually reads, and it is a projection, so it cannot
+ * drift.
+ *
+ * The four carriers are NOT interchangeable, and the sentence file is where
+ * that is easiest to see. `toMermaidRailroad` deliberately drops the medial
+ * inert glue inside an OR — a railroad `choice` branch is a live path, and
+ * prose-as-branch would make the disjunction trivially satisfiable — so
+ * `regcf-resale-exceptions.mmd` carries the chapeau and none of limbs (2)-(4)'s
+ * captions, while the SVG, the ASCII and the sentences carry all four.
  *
  * Run (from ts-shared/ladder-svg):  npx tsx demo/regcf.ts
  * Env: JL4_LSP_PORT (default 5019). Writes jl4/examples/legal/regcf/figures/.
@@ -38,6 +54,7 @@ import {
   fromVizFunDecl,
   sceneToAscii,
   toMermaidRailroad,
+  expandSentences,
 } from "@repo/ladder-core";
 import type { IRExpr } from "@repo/ladder-core";
 import { sceneToSvg } from "../src/index.js";
@@ -289,15 +306,25 @@ async function main() {
       toMermaidRailroad(decoded.fn, { theme: "ink" }) + "\n",
     );
 
+    const lines = expandSentences(decoded.fn, vs.foldSet);
+    writeFileSync(
+      `${OUT}/${s.slug}.sentences`,
+      `${s.decision}\n${"=".repeat(s.decision.length)}\n\n` +
+        `${lines.length} way${lines.length === 1 ? "" : "s"} this can be satisfied.\n\n` +
+        lines.map((l, i) => `${String(i + 1).padStart(3)}. ${l}`).join("\n") +
+        "\n",
+    );
+
     const leaf = longestLeaf(decoded.fn.body);
     const w = Math.round(scene.size.w);
     const h = Math.round(scene.size.h);
     rows.push(
       `${s.slug.padEnd(28)} ${String(w).padStart(6)}x${String(h).padEnd(5)}` +
+        `  ${String(lines.length).padStart(3)} sentence(s)` +
         `  longest leaf ${String(leaf.length).padStart(4)} chars`,
     );
     console.log(
-      `wrote ${s.slug}.{svg,txt,mmd}  ${w}x${h}  longest leaf ${leaf.length} chars` +
+      `wrote ${s.slug}.{svg,txt,mmd,sentences}  ${w}x${h}  ${lines.length} sentence(s)  longest leaf ${leaf.length} chars` +
         (leaf.length > 90 ? `\n        "${leaf.slice(0, 90)}…"` : ""),
     );
   }
@@ -311,7 +338,7 @@ async function main() {
     lspChild?.kill();
     process.exit(1);
   }
-  console.log(`\nwrote ${SUBJECTS.length * 3} files to ${OUT}`);
+  console.log(`\nwrote ${SUBJECTS.length * 4} files to ${OUT}`);
   lspChild?.kill();
   process.exit(0);
 }

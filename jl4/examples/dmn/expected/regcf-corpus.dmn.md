@@ -1,4 +1,4 @@
-# Regulation Crowdfunding (17 CFR Part 227)
+# SEC Regulation Crowdfunding — 17 CFR Part 227
 
 <!-- Generated from L4. One table per decision; hit policy is the first header cell. -->
 
@@ -6,6 +6,6 @@
 
 | U | required : String | assurance level (out) : Number |
 | --- | --- | --- |
-| 1 | 4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements certified by the principal executive officer, with tax return information | 1 |
-| 2 | 4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements reviewed by an independent public accountant | 2 |
-| 3 | 4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements audited by an independent public accountant | 3 |
+| 1 | financial statements certified by the principal executive officer, with tax return information | 1 |
+| 2 | financial statements reviewed by an independent public accountant | 2 |
+| 3 | financial statements audited by an independent public accountant | 3 |

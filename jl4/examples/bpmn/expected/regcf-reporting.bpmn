@@ -4,15 +4,15 @@
                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
                   xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  id="Definitions_the_ongoing_reporting_obligation"
+                  id="Definitions_ongoing_reporting_obligation"
                   targetNamespace="https://l4.legalese.com/bpmn"
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
-  <bpmn:collaboration id="Collaboration_the_ongoing_reporting_obligation">
-    <bpmn:participant id="Participant_the_ongoing_reporting_obligation" name="the ongoing reporting obligation" processRef="Process_the_ongoing_reporting_obligation" />
+  <bpmn:collaboration id="Collaboration_ongoing_reporting_obligation">
+    <bpmn:participant id="Participant_ongoing_reporting_obligation" name="ongoing reporting obligation" processRef="Process_ongoing_reporting_obligation" />
   </bpmn:collaboration>
-  <bpmn:process id="Process_the_ongoing_reporting_obligation" name="the ongoing reporting obligation" isExecutable="false">
+  <bpmn:process id="Process_ongoing_reporting_obligation" name="ongoing reporting obligation" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_Issuer" name="Issuer">
         <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
@@ -25,7 +25,6 @@
         <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>End_5</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
@@ -33,7 +32,7 @@
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
     <bpmn:task id="Task_1" name="MUST file a Form C-TR termination of reporting">
-      <bpmn:documentation>PARTY Issuer MUST file a Form C-TR termination of reporting WITHIN `business days to file Form C-TR` PROVIDED `a terminating condition in Rule 202(b) has occurred` OF status</bpmn:documentation>
+      <bpmn:documentation>PARTY Issuer MUST file a Form C-TR termination of reporting WITHIN `business days to file Form C-TR`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="timeout" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `business days to file Form C-TR`</bpmn:documentation>
@@ -46,7 +45,7 @@
       <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
     </bpmn:endEvent>
     <bpmn:task id="Task_4" name="MUST file a Form C-AR annual report">
-      <bpmn:documentation>PARTY Issuer MUST file a Form C-AR annual report WITHIN `days to file the annual report after fiscal year end` PROVIDED NOT `a terminating condition in Rule 202(b) has occurred` OF status</bpmn:documentation>
+      <bpmn:documentation>PARTY Issuer MUST file a Form C-AR annual report WITHIN `days to file the annual report after fiscal year end`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_4" name="timeout" attachedToRef="Task_4" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `days to file the annual report after fiscal year end`</bpmn:documentation>
@@ -54,99 +53,103 @@
         <bpmn:condition xsi:type="bpmn:tFormalExpression">`days to file the annual report after fiscal year end`</bpmn:condition>
       </bpmn:conditionalEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:endEvent id="End_5" name="next">
-      <bpmn:documentation>no outgoing transition in the source state graph</bpmn:documentation>
-    </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
-    <bpmn:sequenceFlow id="Flow_Split_0__Task_1" sourceRef="Split_0" targetRef="Task_1" />
-    <bpmn:sequenceFlow id="Flow_Split_0__Task_4" sourceRef="Split_0" targetRef="Task_4" />
-    <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`a terminating condition in Rule 202(b) has occurred` OF status</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_1" sourceRef="Split_0" targetRef="Task_1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`ongoing reporting obligation may terminate` OF status</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Split_0__End_2" sourceRef="Split_0" targetRef="End_2">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT (`ongoing reporting obligation may terminate` OF status) AND `annual cycles` AT MOST 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_4" sourceRef="Split_0" targetRef="Task_4">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT (`ongoing reporting obligation may terminate` OF status) AND NOT (`annual cycles` AT MOST 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2" />
     <bpmn:sequenceFlow id="Flow_Boundary_1__End_3" sourceRef="Boundary_1" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Task_4__End_5" sourceRef="Task_4" targetRef="End_5">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT `a terminating condition in Rule 202(b) has occurred` OF status</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Task_4__Start_0" sourceRef="Task_4" targetRef="Start_0" />
     <bpmn:sequenceFlow id="Flow_Boundary_4__End_3" sourceRef="Boundary_4" targetRef="End_3" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_ongoing_reporting_obligation">
-      <bpmndi:BPMNShape id="Shape_Participant_the_ongoing_reporting_obligation" bpmnElement="Participant_the_ongoing_reporting_obligation" isHorizontal="true">
-        <dc:Bounds x="130" y="80" width="770" height="680" />
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_ongoing_reporting_obligation">
+      <bpmndi:BPMNShape id="Shape_Participant_ongoing_reporting_obligation" bpmnElement="Participant_ongoing_reporting_obligation" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="1670" height="680" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_1_Issuer" bpmnElement="Lane_1_Issuer" isHorizontal="true">
-        <dc:Bounds x="160" y="80" width="740" height="280" />
+        <dc:Bounds x="160" y="80" width="1640" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
-        <dc:Bounds x="160" y="360" width="740" height="400" />
+        <dc:Bounds x="160" y="360" width="1640" height="400" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
-        <dc:Bounds x="232" y="402" width="36" height="36" />
+        <dc:Bounds x="1672" y="402" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
-        <dc:Bounds x="405" y="395" width="50" height="50" />
+        <dc:Bounds x="1665" y="515" width="50" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
-        <dc:Bounds x="560" y="100" width="100" height="80" />
+        <dc:Bounds x="1640" y="100" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
-        <dc:Bounds x="614" y="162" width="36" height="36" />
+        <dc:Bounds x="1694" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
-        <dc:Bounds x="772" y="402" width="36" height="36" />
+        <dc:Bounds x="1672" y="642" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
-        <dc:Bounds x="772" y="522" width="36" height="36" />
+        <dc:Bounds x="1492" y="402" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
-        <dc:Bounds x="560" y="220" width="100" height="80" />
+        <dc:Bounds x="1640" y="220" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Boundary_4" bpmnElement="Boundary_4">
-        <dc:Bounds x="614" y="282" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_End_5" bpmnElement="End_5">
-        <dc:Bounds x="772" y="642" width="36" height="36" />
+        <dc:Bounds x="1694" y="282" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
-        <di:waypoint x="268" y="420" />
-        <di:waypoint x="314" y="420" />
-        <di:waypoint x="405" y="420" />
+        <di:waypoint x="1708" y="420" />
+        <di:waypoint x="1754" y="420" />
+        <di:waypoint x="1754" y="540" />
+        <di:waypoint x="1665" y="540" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_1" bpmnElement="Flow_Split_0__Task_1">
-        <di:waypoint x="455" y="420" />
-        <di:waypoint x="494" y="420" />
-        <di:waypoint x="494" y="140" />
-        <di:waypoint x="560" y="140" />
+        <di:waypoint x="1715" y="540" />
+        <di:waypoint x="1764" y="540" />
+        <di:waypoint x="1764" y="140" />
+        <di:waypoint x="1640" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__End_2" bpmnElement="Flow_Split_0__End_2">
+        <di:waypoint x="1715" y="540" />
+        <di:waypoint x="1774" y="540" />
+        <di:waypoint x="1774" y="660" />
+        <di:waypoint x="1672" y="660" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_4" bpmnElement="Flow_Split_0__Task_4">
-        <di:waypoint x="455" y="420" />
-        <di:waypoint x="511" y="420" />
-        <di:waypoint x="511" y="260" />
-        <di:waypoint x="560" y="260" />
+        <di:waypoint x="1715" y="540" />
+        <di:waypoint x="1784" y="540" />
+        <di:waypoint x="1784" y="260" />
+        <di:waypoint x="1640" y="260" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_1__End_2" bpmnElement="Flow_Task_1__End_2">
-        <di:waypoint x="660" y="140" />
-        <di:waypoint x="674" y="140" />
-        <di:waypoint x="674" y="420" />
-        <di:waypoint x="772" y="420" />
+        <di:waypoint x="1740" y="140" />
+        <di:waypoint x="1794" y="140" />
+        <di:waypoint x="1794" y="660" />
+        <di:waypoint x="1672" y="660" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__End_3" bpmnElement="Flow_Boundary_1__End_3">
-        <di:waypoint x="632" y="198" />
-        <di:waypoint x="691" y="198" />
-        <di:waypoint x="691" y="540" />
-        <di:waypoint x="772" y="540" />
+        <di:waypoint x="1712" y="198" />
+        <di:waypoint x="1574" y="198" />
+        <di:waypoint x="1574" y="420" />
+        <di:waypoint x="1492" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__End_5" bpmnElement="Flow_Task_4__End_5">
-        <di:waypoint x="660" y="260" />
-        <di:waypoint x="708" y="260" />
-        <di:waypoint x="708" y="660" />
-        <di:waypoint x="772" y="660" />
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__Start_0" bpmnElement="Flow_Task_4__Start_0">
+        <di:waypoint x="1740" y="260" />
+        <di:waypoint x="1804" y="260" />
+        <di:waypoint x="1804" y="420" />
+        <di:waypoint x="1672" y="420" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_3" bpmnElement="Flow_Boundary_4__End_3">
-        <di:waypoint x="632" y="318" />
-        <di:waypoint x="725" y="318" />
-        <di:waypoint x="725" y="540" />
-        <di:waypoint x="772" y="540" />
+        <di:waypoint x="1712" y="318" />
+        <di:waypoint x="1584" y="318" />
+        <di:waypoint x="1584" y="420" />
+        <di:waypoint x="1492" y="420" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

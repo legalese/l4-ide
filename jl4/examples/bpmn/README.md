@@ -14,35 +14,52 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
-| `regcf.l4`        | The real Reg CF regulative spine — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a recursive obligation the extractor cannot close into a loop, `PROVIDED` guards on both arms of a `ROR`, named deadlines, two prohibitions |
+| `../legal/regcf/regcf.l4` | The real 981-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
 
-## `regcf.l4` is a workaround, and says so
+## The Reg CF goldens are cut from the corpus itself
 
-`jl4/examples/legal/regcf/regcf.l4` — the real 981-line corpus — **cannot be exported
-to BPMN at all**:
+The three `regcf-*` golden pairs are exported from
+`jl4/examples/legal/regcf/regcf.l4` — the real 981-line formalisation of 17 CFR
+Part 227 — not from a fixture beside it:
 
 ```
-$ l4 export --to=bpmn jl4/examples/legal/regcf/regcf.l4
-No regulative rules found in module — nothing to export as BPMN
+$ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn \
+     --rule "ongoing reporting obligation" --fidelity-report
 ```
 
-`L4.StateGraph.findRegulativeExpr` descends through `Where` and `LetIn` but not
-`IfThenElse`, and all three of the corpus's regulative rules are `IfThenElse`-headed
-because the CFR writes the guard outside the duty. `regcf.l4` here is the same three
-rules with the guard hoisted into `PROVIDED`; its header records what that
-re-expression costs, and it should be deleted the day the extractor learns
-`IfThenElse`. Two defects it exposes, neither of which any fidelity note covers:
+Until 2026-07-27 that command failed with "No regulative rules found in module",
+because `L4.StateGraph.findRegulativeExpr` descended through `Where` and `LetIn`
+but not `IfThenElse`, and all three of the corpus's duties are `IF`-headed — the
+CFR writes its guard outside the duty ("**unless** such securities are
+transferred: …"). A hand-written `regcf.l4` lived here as the workaround, with the
+guard hoisted into `PROVIDED` and the reporting spine rewritten as a `ROR`.
 
-- **the recursion is not drawn.** `HENCE` back into the rule is an `App` with
-  arguments, which `classifyTarget` does not classify, so no back-edge is built and
-  the loop appears as a dead-end state named `next`. `P-CYCLE` cannot fire — there is
-  no cycle in the graph to detect. You get `P-DANGLING` at *advisory*, whose "lost:
-  nothing the source said" is true of the state and false of the loop.
-- **the exclusive gateway is unconditioned.** `Lower.hs`'s `branches` passes `Nothing`
-  for the guard on a junction's out-edges, so a `ROR` of two `PROVIDED`-guarded
-  obligations draws a free choice, and the condition lands on the flow *out of the
-  task*. `F4` says where the guard went; nothing says the gateway is therefore
-  nondeterministic.
+**That file is deleted.** It was a second source, and it had drifted from the
+corpus on its first commit: it re-declared three deadline constants, renamed four
+predicates, dropped the statutory chapeau, invented two `LEST` breach clauses the
+CFR does not contain, and — because a `ROR` arm needs an obligation to hang a
+`PROVIDED` on — silently dropped the annual cycle's base case, so the shipped
+diagram asserted a duty the corpus discharges. Citation is not a drift control;
+projection is.
+
+Three things the extractor learned in the process, all visible in the goldens:
+
+- **`IF`/`ELSE` over regulative arms is a guarded `OneOf` junction.**
+  `guardedIfBranches` peels the chain, conjoining each arm's condition with the
+  negation of every condition above it, so the branch set stays exhaustive and
+  mutually exclusive by construction. `regcf-reporting.bpmn` has **three** arms,
+  including the one that imposes no duty at all.
+- **A `HENCE` back into the rule being extracted is a loop.** It is an `App` with
+  arguments, which used to fall through to "unknown target" and produce a dead-end
+  state named `next`; `P-CYCLE` could not fire because there was no cycle in the
+  graph to detect. `TargetSelf` now edges back to the initial state, and `P-CYCLE`
+  fires.
+- **A junction's branch edges carry their guards.** `Lower.hs`'s `branches` passed
+  `Nothing`, so an exclusive gateway drew a free choice and the condition landed on
+  the flow *out of the task* — the diagram read "pick an arm, do the work, then test
+  what decided it". The guards are now `conditionExpression`s on the branch flows,
+  and the new `P-BRANCHGUARD` note records what BPMN still cannot say about them:
+  that they exhaust the cases and cannot overlap.
 
 ## What can be joined, and why so little of it
 
@@ -84,6 +101,12 @@ directory:
 l4 export --to=bpmn offering.l4 -o /tmp/offering.bpmn --fidelity-report
 diff /tmp/offering.bpmn          expected/offering.bpmn
 diff /tmp/offering.fidelity.txt  expected/offering.fidelity.txt
+
+# the Reg CF trio, from the corpus in examples/legal/ rather than from here
+l4 export ../legal/regcf/regcf.l4 --to bpmn --rule "ongoing reporting obligation" \
+   -o /tmp/regcf-reporting.bpmn --fidelity-report
+diff /tmp/regcf-reporting.bpmn         expected/regcf-reporting.bpmn
+diff /tmp/regcf-reporting.fidelity.txt expected/regcf-reporting.fidelity.txt
 ```
 
 Without `-o` the XML goes to stdout and the report to stderr, so a redirected
@@ -109,8 +132,9 @@ Each fixture produces two goldens under `expected/`:
   per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
   writing more Haskell; codes `P-…` are this exporter's own doing — an
   approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
-  (`P-NOJOIN`), or a shape the `StateGraph` types permit that BPMN has no honest
-  drawing for at all (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
+  (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), or a
+  shape the `StateGraph` types permit that BPMN has no honest drawing for at all
+  (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
   (DMN uses `D-…`, so a combined report never confuses the two.)
 
 ## Checking the XML is really importable
