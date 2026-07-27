@@ -17,10 +17,14 @@
 >
 > Known drift, not worth rewriting the body for:
 >
-> - §4.4 says to modify `dmnmd.cabal` directly. Do **not**: that file is generated from
->   `package.yaml` by hpack, and a hand-edit is overwritten. (A move to cabal-only, which
->   would make §4.4 correct, is proposed but has **not** landed.)
-> - §7's "wired into `stack test`" is accurate today — dmnmd's CI runs `stack test`.
+> - §4.4 says to modify `dmnmd.cabal` directly. That is now **correct advice**: dmnmd went
+>   cabal-only in its PR #23 (merged 2026-07-27, `05f5a74`), `package.yaml` is gone, and
+>   `dmnmd.cabal` is hand-maintained. Nothing auto-discovers modules any more, so §4.4's
+>   `exposed-modules` edit is load-bearing rather than cosmetic.
+> - Every `stack` command in the body — §7.1's heading, the §9 build recipe, the §7.1
+>   invocation — is **stale as written**. Read `stack test` as `cabal test`, `stack build` as
+>   `cabal build`, `stack run -- --to=l4 F` as `cabal run -- dmnmd --to=l4 F`. dmnmd's CI runs
+>   `cabal test` and then `make corpus`. The golden round-trip itself is unaffected.
 > - §1.6 defers Collect to "v1.1". It is still deferred, and deliberately: `L4.hs` `error`s on
 >   the list-valued hit policies rather than collapsing them to a scalar `BRANCH`, which is
 >   pinned by `test/corpus/cases/policy/md-l4-refuses-collect`.
@@ -33,7 +37,15 @@
 > This header mirrors the one added to dmnmd's copy in `2e510eb`; that commit's "both build
 > specs" meant both specs **in dmnmd**, and this copy was missed. It also carries dmnmd's
 > `7fd0b96`, which corrected `2e510eb`'s assertion that dmnmd had "become cabal-only" — an
-> assertion this copy inherited and shipped for a day. Cabal-only is proposed, not landed.
+> assertion this copy inherited and shipped for a day.
+>
+> **And then cabal-only landed anyway**, in dmnmd's PR #23 on 2026-07-27, about an hour after
+> the commit that corrected the claim here. So this file has now been wrong about the same
+> sentence in both directions inside two days: first asserting a migration that had not
+> happened, then denying one that had. The lesson is not "check harder" — both checks were
+> correct when made. It is that a claim about **another repo's tree** goes stale without
+> anything here changing, and nothing in this repo can notice. Prefer pointing at dmnmd's
+> `CLAUDE.md` and `test/corpus/` over restating what they say.
 
 Two coordinated deliverables across two repos.
 
