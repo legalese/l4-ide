@@ -14,6 +14,35 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
+| `regcf.l4`        | The real Reg CF regulative spine — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a recursive obligation the extractor cannot close into a loop, `PROVIDED` guards on both arms of a `ROR`, named deadlines, two prohibitions |
+
+## `regcf.l4` is a workaround, and says so
+
+`jl4/examples/legal/regcf/regcf.l4` — the real 981-line corpus — **cannot be exported
+to BPMN at all**:
+
+```
+$ l4 export --to=bpmn jl4/examples/legal/regcf/regcf.l4
+No regulative rules found in module — nothing to export as BPMN
+```
+
+`L4.StateGraph.findRegulativeExpr` descends through `Where` and `LetIn` but not
+`IfThenElse`, and all three of the corpus's regulative rules are `IfThenElse`-headed
+because the CFR writes the guard outside the duty. `regcf.l4` here is the same three
+rules with the guard hoisted into `PROVIDED`; its header records what that
+re-expression costs, and it should be deleted the day the extractor learns
+`IfThenElse`. Two defects it exposes, neither of which any fidelity note covers:
+
+- **the recursion is not drawn.** `HENCE` back into the rule is an `App` with
+  arguments, which `classifyTarget` does not classify, so no back-edge is built and
+  the loop appears as a dead-end state named `next`. `P-CYCLE` cannot fire — there is
+  no cycle in the graph to detect. You get `P-DANGLING` at *advisory*, whose "lost:
+  nothing the source said" is true of the state and false of the loop.
+- **the exclusive gateway is unconditioned.** `Lower.hs`'s `branches` passes `Nothing`
+  for the guard on a junction's out-edges, so a `ROR` of two `PROVIDED`-guarded
+  obligations draws a free choice, and the condition lands on the flow *out of the
+  task*. `F4` says where the guard went; nothing says the gateway is therefore
+  nondeterministic.
 
 ## What can be joined, and why so little of it
 

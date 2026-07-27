@@ -3,16 +3,29 @@
 The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-superset
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
+There are **two** subjects, and the difference between them is the deliverable.
+
 | File                              | What it is                                                              |
 | --------------------------------- | ----------------------------------------------------------------------- |
-| `reg-cf.l4`                       | the source: five decisions, one of each shape the exporter can produce  |
+| `reg-cf.l4`                       | the **shape** exhibit: five decisions, one of each shape the exporter can produce |
 | `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                 |
 | `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                     |
 | `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                       |
 | `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list         |
+| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 981-line corpus at `../legal/regcf/regcf.l4` |
 
-Both goldens are produced by `jl4/tests/DmnExport.hs`; regenerate them by deleting the
-file and re-running `cabal test jl4:jl4-test`.
+Both sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
+deleting a golden and re-running `cabal test jl4:jl4-test` twice.
+
+`reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program
+model DMN itself has, and its **figures are illustrative** — its own header says so, and
+it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
+and it is here to be honest about what the real thing costs: **73 decisions, 3 tables,
+70 boxed literal expressions, 61 `inputData` under 27 names, 75 blocking notes.** The
+diagnosis is one sentence — a DMN decision is a 0-ary variable, so the house
+`GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
+and it is written up at `../legal/regcf/README.md` §6.1, including two failures the
+fidelity report does *not* catch. Read that before citing either file.
 
 ## The pipeline
 

@@ -1136,67 +1136,61 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       emitMarkdown drg `shouldSatisfy` Text.isInfixOf "200000"
       emitDrg drg `shouldSatisfy` Text.isInfixOf "&gt;= 200000"
 
-  describe "golden" $ do
-    it "the Reg CF exhibit, as DMN 1.3 XML" $ goldenDmn examplesRoot
-    it "the Reg CF exhibit's fidelity report" $ goldenFidelity examplesRoot
-    it "the Reg CF exhibit, as dmnmd markdown" $ goldenMarkdown examplesRoot
-    it "the Reg CF exhibit's markdown fidelity report" $ goldenMarkdownFidelity examplesRoot
+  describe "golden" $ forM_ goldenSubjects \(srcPath, stem, modelName, label) -> do
+    it (label <> ", as DMN 1.3 XML") $
+      goldenOf examplesRoot srcPath (stem <> ".dmn") modelName emitDrg
+    it (label <> "'s fidelity report") $
+      goldenOf examplesRoot srcPath (stem <> ".fidelity.txt") modelName
+        (renderReport . dmnReport)
+    it (label <> ", as dmnmd markdown") $
+      goldenOf examplesRoot srcPath (stem <> ".dmn.md") modelName emitMarkdown
+    it (label <> "'s markdown fidelity report") $
+      goldenOf examplesRoot srcPath (stem <> ".md.fidelity.txt") modelName
+        (renderReport . markdownReport)
 
 ------------------------------------------------------------------------
 -- golden
 ------------------------------------------------------------------------
 
--- | A realistic multi-decision module, in the shape of the regulation the
--- Lexipedia page describes: a boolean eligibility test, a computed measure, and
--- an investor limit that returns a NUMBER. Goldens live beside the source, the
--- way the OpenFisca ones do.
-goldenDmn :: FilePath -> IO (Golden Text)
-goldenDmn examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  let output = emitDrg (drgNamed "Regulation Crowdfunding" src)
-  pure
-    Golden
-      { output
-      , encodePretty = Text.unpack
-      , writeToFile = Text.writeFile
-      , readFromFile = Text.readFile
-      , goldenFile = examplesRoot </> "dmn" </> "expected" </> "reg-cf.dmn"
-      , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> "reg-cf.dmn.actual")
-      , failFirstTime = True
-      }
-
--- | The other half of the deliverable, and the more interesting one: every place
--- the emitted model left the fragment DMN can analyse, named and located.
-goldenFidelity :: FilePath -> IO (Golden Text)
-goldenFidelity examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  let output = renderReport (dmnReport (drgNamed "Regulation Crowdfunding" src))
-  pure
-    Golden
-      { output
-      , encodePretty = Text.unpack
-      , writeToFile = Text.writeFile
-      , readFromFile = Text.readFile
-      , goldenFile = examplesRoot </> "dmn" </> "expected" </> "reg-cf.fidelity.txt"
-      , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> "reg-cf.fidelity.actual")
-      , failFirstTime = True
-      }
-
--- | The markdown emitter's two goldens. Kept separate from the XML pair on
--- purpose: the whole demonstration is that ONE IR produces TWO artifacts with
--- TWO different loss lists.
-goldenMarkdown :: FilePath -> IO (Golden Text)
-goldenMarkdown examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  pure (mkGolden examplesRoot "reg-cf.dmn.md" (emitMarkdown (drgNamed "Regulation Crowdfunding" src)))
-
-goldenMarkdownFidelity :: FilePath -> IO (Golden Text)
-goldenMarkdownFidelity examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  pure
-    ( mkGolden examplesRoot "reg-cf.md.fidelity.txt"
-        (renderReport (markdownReport (drgNamed "Regulation Crowdfunding" src)))
+-- | @(source, golden stem, DMN model name, spec label)@.
+--
+-- Two subjects, and the difference between them is the whole point:
+--
+-- * @dmn\/reg-cf.l4@ is the SHAPE exhibit — five decisions chosen so the
+--   goldens show every outcome the exporter has, written module-level-scalar
+--   (@ASSUME@) style because that is the program model DMN itself has. Its
+--   figures are illustrative and its own header says so.
+-- * @legal\/regcf\/regcf.l4@ is the REAL 981-line corpus, 73 decisions, written
+--   in the house @GIVEN@ + record style. It is here to be honest about what
+--   that costs: a DMN decision is a 0-ary variable, so every cross-decision
+--   call @f x@ leaves the FEEL fragment, and every @GIVEN@ binder becomes a
+--   global @inputData@ — nine of which are called @issuer@. The XML is
+--   well-formed and a real engine will load it; almost none of it will
+--   evaluate. That is a fact about the DMN program model, and it belongs in a
+--   golden rather than in a paragraph nobody can regression-test.
+goldenSubjects :: [(FilePath, FilePath, Text, String)]
+goldenSubjects =
+  [ ( "dmn" </> "reg-cf.l4"
+    , "reg-cf"
+    , "Regulation Crowdfunding"
+    , "the Reg CF shape exhibit"
     )
+  , ( "legal" </> "regcf" </> "regcf.l4"
+    , "regcf-corpus"
+    , "Regulation Crowdfunding (17 CFR Part 227)"
+    , "the Reg CF corpus"
+    )
+  ]
+
+-- | One golden: read the source, lower it under @modelName@, render it with
+-- @render@, and compare against @expected\/\<name\>@. Goldens all live under
+-- @examples\/dmn\/expected@ even when the source does not, so
+-- @etc\/validate-dmn.mjs@ with no arguments still finds every emitted model.
+goldenOf
+  :: FilePath -> FilePath -> FilePath -> Text -> (Drg -> Text) -> IO (Golden Text)
+goldenOf examplesRoot srcPath name modelName render = do
+  src <- Text.readFile (examplesRoot </> srcPath)
+  pure (mkGolden examplesRoot name (render (drgNamed modelName src)))
 
 mkGolden :: FilePath -> FilePath -> Text -> Golden Text
 mkGolden examplesRoot name output =

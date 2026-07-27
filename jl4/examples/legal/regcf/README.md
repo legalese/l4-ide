@@ -348,6 +348,118 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    the investor limit on 2020-06-01?". That is Track C1 (`temporal-rule-version`), and it is
    the demonstration SPEC §8/M5 is built around.
 
+## 6. Projections: what comes out of this corpus, and what does not
+
+The mirrored page is prose plus **one** hand-drawn BPMN diagram pasted from Camunda
+Modeler, with nothing connecting the prose to the XML — which is why the investor
+threshold appears twice on it and is stale in both. Everything in this section is cut
+from `regcf.l4` by a program. None of it was drawn.
+
+| Target     | Artifact                                                                                 | Status                                                        |
+| ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Ladder** | `figures/*.{svg,txt,mmd}`, 6 decisions × 3 carriers                                       | works; 3 of 6 too wide for a page — see `figures/README.md`    |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`               | emits, validates, **does not evaluate** — see below            |
+| **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}`            | **cannot be cut from this file at all** — see below            |
+
+### 6.1 DMN: 73 decisions, 3 tables, and a model no engine can bind
+
+`l4 export --to=dmn` on this file succeeds and the XML parses under `dmn-moddle`
+with **zero warnings**. It is also, as a program, nearly inert:
+
+- **73 `<decision>`** elements — every top-level `DECIDE`/`MEANS` including the nine
+  record fixtures and the five test scenarios — of which **3** are decision tables
+  and **70** are boxed literal expressions (`D-LITERALEXPR`, blocking, ×69).
+- **61 `<inputData>`** elements under **27 distinct names**. Nine are called `issuer`,
+  seven `status`, six `offering`, six `investor`. `assignIds` disambiguates the XML
+  `id` but the `name` is the L4 binder, so a FEEL expression cannot tell them apart
+  (`D-SCOPE`, lossy, ×9). Every one has `typeRef="Any"`: there is no
+  `<itemDefinition>` for a record, so `issuer.<field>` binds to nothing.
+- **75 blocking, 9 lossy, 9 advisory** notes in total.
+
+The cause is one sentence: **a DMN decision is a 0-ary variable**, so every
+cross-decision call `f x` — which is every reference in this corpus, because the
+house style threads a record through `GIVEN` — leaves the FEEL fragment and is
+emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter is
+right to refuse to invent a rendering; the report says so at each site.
+
+Two things the report does **not** say, found by reading the emitted XML:
+
+1. **A record field selector inside a `§` section emits FEEL that is not FEEL.**
+   `financial statements required`'s third input column is emitted as
+
+   ```
+   offering._2. Offering limit _ Rule 100_a__1_.the issuer has previously sold securities in reliance on section 4_a__6_
+   ```
+
+   The section title is spliced in as a path step, and because the title begins
+   `2.` the emitted path contains an extra `.` — so it is four path steps, one of
+   which is `_2`. No engine parses this, and **no fidelity note fires for it**: the
+   text renders as structured FEEL, so it never reaches the verbatim path that
+   raises `D-NONFEELINPUT`. Its three sibling columns each do raise one. This is the
+   worst failure mode in the file — silently unevaluable rather than loudly so.
+
+2. **The one clean table is unbindable for the same reason.** `assurance level`
+   (`regcf.l4:378`) is the only decision in 981 lines that lowers to an executable
+   `U` table with constant outputs and no fidelity note — because its `GIVEN` is a
+   scalar enum, not a record. Its cells are nevertheless
+   `"4. Disclosure requirements — Rules 201, 201(t), 203(a).financial statements
+   certified by …"`: the constructor name, section-qualified. A caller would have to
+   know the section heading to match a rule.
+
+The `dmnmd` markdown leg makes the same point in one glance: the whole 981-line
+corpus becomes **one table**, `assurance level`, plus 244 lines of loss report.
+
+`jl4/examples/dmn/reg-cf.l4` is kept as a **separate, deliberately different**
+exhibit: 101 lines of `ASSUME`-style scalars chosen so the goldens show every
+outcome the exporter has. Its figures are illustrative and it says so. It is not
+this corpus and must not be read as it.
+
+### 6.2 BPMN: the corpus does not export, and the workaround has a defect
+
+```
+$ l4 export --to=bpmn jl4/examples/legal/regcf/regcf.l4
+No regulative rules found in module — nothing to export as BPMN
+```
+
+`L4.StateGraph.findRegulativeExpr` (`StateGraph.hs:243-250`) descends through
+`Where` and `LetIn` on its way to a `Regulative`, and **not** through `IfThenElse`.
+All three regulative rules here are `IfThenElse`-headed — `advertising restriction`
+(:494), `ongoing reporting obligation` (:567), `resale restriction` (:622) — because
+the CFR writes the guard outside the duty ("unless such securities are
+transferred: …"). So `extractStateGraphs` returns `[]`, and with it the CLI,
+`l4 state-graph`, and `jl4-service`'s `/state-graphs` route all return nothing.
+
+`jl4/examples/bpmn/regcf.l4` is the workaround: the same three rules with the guard
+hoisted from `IF` into `PROVIDED`, and the two-armed reporting spine written as an
+`ROR`. Its header says what that re-expression costs. Three findings from it:
+
+1. **The annual renewal is not drawn.** `HENCE` back into the rule itself is an
+   `App` with arguments; `classifyTarget` has no case for that, so no back-edge is
+   built and the loop surfaces as a state literally named `next` with no successor.
+   `P-CYCLE` exists precisely for a cycle and **cannot fire**, because the cycle
+   never reaches the state graph to be detected. What you get instead is
+   `P-DANGLING` at *advisory* severity, whose text — "lost: nothing the source said;
+   this is an artefact of extraction" — is true of the state and false of the loop.
+2. **The exclusive gateway is emitted unconditioned.** `Lower.hs:391` passes
+   `Nothing` for the guard on a junction's branch flows, and the `PROVIDED`
+   condition is attached to the flow **out of the task** instead
+   (`Flow_Task_1__End_2`). So the diagram reads: choose an arm at random, do the
+   work, and only then test the condition that decided which arm applied. `F4`
+   accurately reports where the guard went; nothing reports that the gateway
+   above it is therefore a free choice.
+3. **Single-sourcing costs the timer.** Every deadline here is a *name*
+   (`business days to file Form C-TR`), because the corpus binds each period once
+   and every consumer reads the binding. `P-DEADLINE` fires on every boundary
+   event: no ISO 8601 duration could be read, so it is a conditional event carrying
+   the text. Inlining `5` and `120` would draw real timers by reintroducing exactly
+   the duplication this corpus exists to remove.
+
+Also worth stating plainly, because it is the honest version of the complaint this
+programme levels at the mirrored page: **there is at present no BPMN of this corpus
+that is single-sourced from it.** `jl4/examples/bpmn/regcf.l4` is a second source,
+kept honest by citation and by a header that says so, and it should be deleted the
+day `findRegulativeExpr` learns `IfThenElse`.
+
 ## Attribution
 
 The mirrored page is © its authors under **CC BY-SA 4.0** (Center for Civic Innovation,

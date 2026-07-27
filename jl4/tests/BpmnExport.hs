@@ -1457,21 +1457,28 @@ spec = do
       crossings bx `shouldBe` []
       verticalMerges bx `shouldBe` []
 
-  describe "golden" $ forM_ goldenCases \(stem, ruleName) -> do
-    it (stem <> " lowers to stable XML") $
-      goldenCase stem ruleName ".bpmn" \_ bx -> renderBpmn bx
+  describe "golden" $ forM_ goldenCases \(stem, ruleName, out) -> do
+    it (out <> " lowers to stable XML") $
+      goldenCase stem ruleName out ".bpmn" \_ bx -> renderBpmn bx
 
-    it (stem <> " lowers to a stable fidelity report") $
-      goldenCase stem ruleName ".fidelity.txt" \_ bx ->
+    it (out <> " lowers to a stable fidelity report") $
+      goldenCase stem ruleName out ".fidelity.txt" \_ bx ->
         renderReport bx.bxFidelity
  where
+  -- (source stem, rule name, golden stem). The third component exists because
+  -- @regcf.l4@ holds the corpus's WHOLE regulative inventory — three rules —
+  -- and a BPMN document holds exactly one process, so one source yields three
+  -- pairs of goldens.
   goldenCases =
-    [ ("offering", "the offering")
-    , ("handover", "the handover")
-    , ("consultation", "the consultation")
+    [ ("offering", "the offering", "offering")
+    , ("handover", "the handover", "handover")
+    , ("consultation", "the consultation", "consultation")
+    , ("regcf", "the ongoing reporting obligation", "regcf-reporting")
+    , ("regcf", "the advertising restriction", "regcf-advertising")
+    , ("regcf", "the resale restriction", "regcf-resale")
     ]
 
-  goldenCase stem ruleName ext render = do
+  goldenCase stem ruleName out ext render = do
     dataDir <- Paths_jl4.getDataDir
     let root = dataDir </> "examples" </> "bpmn"
     src <- Text.readFile (root </> stem <> ".l4")
@@ -1485,8 +1492,8 @@ spec = do
         , encodePretty = Text.unpack
         , writeToFile = Text.writeFile
         , readFromFile = Text.readFile
-        , goldenFile = root </> "expected" </> (stem <> ext)
-        , actualFile = Just (root </> "expected" </> (stem <> ext <> ".actual"))
+        , goldenFile = root </> "expected" </> (out <> ext)
+        , actualFile = Just (root </> "expected" </> (out <> ext <> ".actual"))
         , failFirstTime = True
         }
 

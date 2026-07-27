@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_the_resale_restriction"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:collaboration id="Collaboration_the_resale_restriction">
+    <bpmn:participant id="Participant_the_resale_restriction" name="the resale restriction" processRef="Process_the_resale_restriction" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_the_resale_restriction" name="the resale restriction" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_Purchaser" name="Purchaser">
+        <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:task id="Task_0" name="SHANT transfer the securities">
+      <bpmn:documentation>PARTY Purchaser SHANT transfer the securities WITHIN `days in the resale restricted period` PROVIDED NOT `the transfer falls within an exception in Rule 501(a)` OF transfer — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_0" name="deadline passes, not performed" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>the deadline passes (`days in the resale restricted period`) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
+      <bpmn:conditionalEventDefinition id="Cond_Boundary_0">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">`days in the resale restricted period`</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_1" name="Fulfilled" />
+    <bpmn:endEvent id="End_2" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_2" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
+    <bpmn:sequenceFlow id="Flow_Boundary_0__End_1" sourceRef="Boundary_0" targetRef="End_1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT `the transfer falls within an exception in Rule 501(a)` OF transfer</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Task_0__End_2" sourceRef="Task_0" targetRef="End_2" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_resale_restriction">
+      <bpmndi:BPMNShape id="Shape_Participant_the_resale_restriction" bpmnElement="Participant_the_resale_restriction" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="590" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_Purchaser" bpmnElement="Lane_1_Purchaser" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="560" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="560" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
+        <dc:Bounds x="380" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
+        <dc:Bounds x="434" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_1" bpmnElement="End_1">
+        <dc:Bounds x="592" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
+        <dc:Bounds x="592" y="402" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
+        <di:waypoint x="268" y="300" />
+        <di:waypoint x="314" y="300" />
+        <di:waypoint x="314" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_1" bpmnElement="Flow_Boundary_0__End_1">
+        <di:waypoint x="452" y="198" />
+        <di:waypoint x="494" y="198" />
+        <di:waypoint x="494" y="300" />
+        <di:waypoint x="592" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__End_2" bpmnElement="Flow_Task_0__End_2">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="546" y="140" />
+        <di:waypoint x="546" y="420" />
+        <di:waypoint x="592" y="420" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
