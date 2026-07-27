@@ -1,0 +1,32 @@
+`investment limit` with `an investor with income and net worth both` with `limb (i) probe` is greater than `minimum permitted investment`
+`investment limit` with `an investor with income and net worth both` with `limb (ii) probe` is less than `maximum amount sold to any one investor in a 12-month period`
+`limb (i) percentage`
+`limb (ii) percentage`
+`can this company raise` with `a clean plan`
+not `can this company raise` with `a delinquent plan`
+not `can this company raise` with `an over-limit plan`
+`limit for` with `the README 3.1 investor` is equal to 10000
+`limit for` with `a wealthy investor` is equal to 124000
+`headroom left` with `an over-limit plan` is equal to 1000000
+`headroom left` with `a clean plan` is equal to 5000000
+`blockers for` with `a clean plan` is equal to `EMPTY`
+`count` with `blockers for` with `a delinquent plan` is equal to 1
+`count` with `blockers for` with `an over-limit plan` is equal to 1
+not `transfer is permitted` with `transfer from` with `a restricted holding`
+`days still to wait for` with `a restricted holding` is equal to 265
+`transfer is permitted` with `transfer from` with `a holding sold to an accredited buyer`
+`days still to wait for` with `a holding sold to an accredited buyer` is equal to 0
+`ongoing reporting obligation may terminate` with `reporting status from` with `a filer who may stop`
+not `ongoing reporting obligation may terminate` with `reporting status from` with `a filer who must keep going`
+`count` with `termination conditions met by` with `a filer who may stop` is equal to 1
+`termination conditions met by` with `a filer who must keep going` is equal to `EMPTY`
+`raise check` with `a clean plan`
+`raise check` with `a delinquent plan`
+`raise check` with `an over-limit plan`
+`investment limit check` with `the README 3.1 investor`
+`investment limit check` with `a wealthy investor`
+`investment limit check` with `an accredited investor`
+`resale check` with `a restricted holding`
+`resale check` with `a holding sold to an accredited buyer`
+`reporting exit check` with `a filer who may stop`
+`reporting exit check` with `a filer who must keep going`

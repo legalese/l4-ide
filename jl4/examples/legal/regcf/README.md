@@ -460,6 +460,140 @@ that is single-sourced from it.** `jl4/examples/bpmn/regcf.l4` is a second sourc
 kept honest by citation and by a header that says so, and it should be deleted the
 day `findRegulativeExpr` learns `IfThenElse`.
 
+## 7. Deployment: `regcf-wizard.l4`, the façade
+
+`regcf.l4` carries **no `@export` annotations**, so nothing in it is deployable. `regcf-wizard.l4`
+is the deployable surface: it `IMPORT`s the corpus, routes flat plain-English inputs into the
+corpus's own record types, calls the corpus's own predicates, and presents the result as flat
+records a form can render. It re-implements no law. The corpus is untouched.
+
+Five `@export`s, each a question a reader of the mirrored page actually has:
+
+| Export                   | Route                            | Answers                                             |
+| ------------------------ | -------------------------------- | --------------------------------------------------- |
+| `raise check` (default)  | `/regcf/raise-check`             | groups 1, 2, 4 — eligibility, limit, financials      |
+| `investment limit check` | `/regcf/investment-limit-check`  | group 3 — the investor's own limit (§3.1)            |
+| `resale check`           | `/regcf/resale-check`            | group 8 — may these securities be transferred yet    |
+| `reporting exit check`   | `/regcf/reporting-exit-check`    | group 7 — when the annual reporting duty may end     |
+| `can this company raise` | `/regcf/can-this-company-raise`  | the same question as a `BOOLEAN`, for `/ladder`      |
+
+### 7.1 Why a façade, and not `@export` on the corpus
+
+Three reasons, each measured rather than assumed.
+
+1. **Field names.** `jl4-service` sanitises schema property names — every non-alphanumeric
+   becomes `-`, runs collapse — and then **truncates to 60 characters**
+   (`jl4-service/src/Shared.hs`). **23 of the corpus's 41 record fields exceed that**, because
+   they are the CFR's own sentences; the longest is 291 characters. Deployed and read back off
+   the live MCP endpoint:
+
+   ```
+   60  is-subject-to-a-disqualification-as-specified-in-section-227
+   59  the-Form-C-includes-the-information-required-by-section-227
+   ```
+
+   Both citations lose their paragraph number at the same cut: `227.503(a)` and `227.201` both
+   arrive as `section-227`. A form built off the corpus records would be labelled in amputated
+   CFR-ese. Every one of the façade's 49 fields sanitises to **43 characters or fewer**, so
+   nothing is truncated and nothing collides.
+
+2. **Six declared corpus fields are inputs no rule reads** — `target offering amount`, `name` on
+   `IssuerProfile` and `InvestorProfile`, and the three "states …" booleans on
+   `AdvertisingNotice` (Rule 204(b) makes them permissions, not requirements). A schema-driven
+   form off the corpus records would ask six questions that cannot change any answer.
+
+3. **The corpus's top-level `DECIDE` takes six records** and the regulative rules return
+   `DEONTIC`, which `jl4-service` will only evaluate against a hand-built event trace. Neither
+   shape is a citizen form.
+
+### 7.2 No figure is typed twice — including in the prose
+
+Every threshold, deadline and percentage that appears in a façade description or answer string is
+**spliced from the corpus constant**, so an amendment to `regcf.l4` rewrites the façade's
+sentences without anyone editing them. Live output, with the figures the corpus supplied:
+
+```
+"Rule 100(a)(2)(i) governs, because at least one of your annual income ($60,000) and your net
+ worth ($200,000) is below $124,000. Your limit is 5% of the greater of the two ($200,000), or
+ $2,500, whichever is the larger — which comes to $10,000."
+```
+
+That is §3.1's investor, answered by machine. Typing "5%" or "$124,000" into that sentence would
+have reproduced, inside our own artifact, exactly the duplication §3.3 convicts the mirrored page
+of.
+
+**The corpus has one single-sourcing gap, and it is the two percentages.** `regcf.l4` binds every
+dollar figure once, as a named constant with an `@ref`. It does **not** do that for `0.05` and
+`0.10`: both are inlined in a `WHERE` local inside `investment limit`. Rather than re-type them,
+the façade recovers them from the corpus by probing `investment limit` at a point where neither
+the floor nor the cap binds, and dividing out (`limb (i) percentage`). Two `#ASSERT`s, stated in
+corpus constants only, pin the conditions that make the derivation valid. The proper fix is to
+bind the two rates in `regcf.l4` the way every other figure is bound; that is a corpus edit, and
+this file does not make it.
+
+### 7.3 What the local deploy proved, and what it did not
+
+Verified against a live `jl4-service` (5 functions, deploy job `applied`): the function list, the
+parameter schema, evaluation on all five exports, `?trace=full` (a 76 KB reasoning tree), batch
+evaluation, `query-plan`, `ladder`, MCP discovery + `tools/list` + `tools/call` on both the
+scoped and org-wide endpoints, WebMCP discovery and `embed.js`, OpenAPI, and file browsing.
+Field names round-trip in **both** forms — `"organized in the United States"` and
+`"organized-in-the-United-States"` are both accepted, on REST, batch and MCP alike.
+
+Three things the deploy showed that reading the types would not have:
+
+1. **`/state-graphs` returns `{"graphs":[]}`** on every export, for the same reason §6.2 gives:
+   `findRegulativeExpr` does not descend into `IfThenElse`. A façade cannot fix this — a wrapper
+   that calls the imported rule is an `App`, not a `Regulative`.
+
+2. **A properly single-sourced façade has a two-leaf ladder, and an empty query plan.** The
+   `/ladder` route returns exactly what `can this company raise` says:
+
+   ```
+   funDecl.body  $type = And
+     args[0]     $type = UBoolVar   name.label = `issuer is eligible` OF (`issuer profile from` OF plan)
+     args[1]     $type = UBoolVar   name.label = `offering is within the offering limit` OF (`offering from` OF plan)
+   ```
+
+   The six Rule 100(b) limbs are inside `issuer is eligible`, which is an `App` over a record, so
+   the ladder cannot see through it. Correspondingly `query-plan` returns `"asks": []` and
+   `"inputs": []`: it can name no citizen question, only the two derived predicates. **This is a
+   structural tension, not an oversight.** Any decision body that delegates to the corpus is one
+   opaque leaf; getting an interesting ladder means restating the statutory connectives in the
+   façade, which is the duplication the whole exercise exists to avoid. The six-limb picture
+   already exists, cut from the corpus itself, at `figures/regcf-rule-100b.svg`.
+
+3. **The `atomId`s on `/ladder` and on `query-plan`'s `impactByAtomId` are different UUIDs** for
+   the same two atoms, so the two cannot be joined. This is the `KNOWN GAP` pinned in
+   `jl4-service/README.md`; it reproduces here exactly.
+
+### 7.4 Defects found in `jl4-service` while deploying
+
+Reported, not fixed — all are outside this corpus.
+
+- **An enum return value does not validate against its own declared schema.** `returnSchema`
+  declares `"enum": ["financial statements reviewed by an independent public accountant", …]`,
+  but evaluation returns `` "`financial statements reviewed by an independent public accountant`" ``
+  — with the L4 backticks inside the JSON string. A client validating the response against the
+  schema it was given will reject it.
+- **`@desc` on a record field is emitted with a leading space**, and if the description is
+  backtick-quoted the backticks survive into the JSON `description`. `@desc` on a `GIVEN`
+  parameter has neither problem. The façade therefore writes field descriptions **unquoted**;
+  the leading space remains.
+- **Org-wide MCP tool names are not namespaced.** `jl4-service/README.md` documents
+  `{"name":"my-rules/compute_qualifies"}`; the server actually emits the bare sanitised function
+  name and puts the deployment in the description as `[regcf/raise check]`. Calling
+  `regcf/raise-check` on `/.mcp` returns `-32602 Unknown tool`. (The naming is deliberate —
+  `buildToolNames` disambiguates with a `-<depPrefix>` suffix only on collision — so this is a
+  documentation defect, not a collision hazard.)
+- **`GET /webmcp.js` 404s.** The README says it is a 301 to `/.webmcp/embed.js`; the string does
+  not appear anywhere in `jl4-service/src`.
+- **`POST /deployments` with a new `id` but identical bundle bytes silently ignores the id.**
+  Content-hash deduplication returns the *existing* deployment (200, `"id":"regcf"`), and the
+  requested id is never created (`GET` → 404).
+- **`evaluation/batch` ignores `outcomes`.** The full return record comes back for every case
+  whatever is listed.
+
 ## Attribution
 
 The mirrored page is © its authors under **CC BY-SA 4.0** (Center for Civic Innovation,

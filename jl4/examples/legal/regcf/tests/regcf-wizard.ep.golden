@@ -1,0 +1,720 @@
+IMPORT prelude
+IMPORT regcf
+
+§ `Regulation Crowdfunding — founder and investor façade`
+
+-- ===========================================================================
+-- THE DEPLOYABLE SURFACE for the Reg CF corpus.
+--
+-- This module re-implements NO law. `regcf.l4` is the single source of truth;
+-- this file only
+--   (a) ROUTES flat, plain-English inputs into the corpus's own record types,
+--   (b) CALLS the corpus's own predicates, and
+--   (c) PRESENTS the result as flat records a form can render and a JSON client
+--       can read, with the reasons written in the reader's vocabulary.
+--
+-- WHY A FAÇADE, rather than exporting `regcf.l4` directly. Three reasons, each
+-- checked against the corpus:
+--
+--   1. `regcf.l4` carries ZERO `@export` annotations, so nothing in it is
+--      deployable at all. Adding them there would put presentation concerns in
+--      the authoritative text.
+--   2. Its record field names are the CFR's own sentences — up to 291
+--      characters. jl4-service sanitises schema property names and TRUNCATES
+--      them to 60, so `is subject to a disqualification as specified in section
+--      227.503(a)` reaches the wire as
+--      `is-subject-to-a-disqualification-as-specified-in-section-227`, with the
+--      paragraph number severed. A form built off those records would be
+--      labelled in amputated CFR-ese. Every field declared below stays well
+--      inside 60 characters.
+--   3. Six declared corpus fields are inputs no rule reads (`target offering
+--      amount`, `name` on IssuerProfile and InvestorProfile, and the three
+--      "states ..." booleans on AdvertisingNotice, which Rule 204(b) makes
+--      permissions rather than requirements). A schema-driven form off the
+--      corpus records would ask six questions that cannot change any answer.
+--      This façade asks none of them.
+--
+-- WHO IS ASKING. The mirrored page's reader is two people. Groups 1, 2, 4, 6
+-- and 7 are the issuer's questions ("can I raise, how much, what then");
+-- group 3 is the investor's; group 8 is the security holder's. So there are
+-- four entry points, not one, plus a fifth boolean decision that exists to make
+-- the /ladder and /query-plan routes reachable.
+--
+-- SINGLE-SOURCING RULE OBSERVED HERE. No threshold, deadline or percentage is
+-- typed into any description or answer string in this file. Every figure that
+-- appears in prose is spliced from the corpus constant, so an amendment to
+-- `regcf.l4` rewrites this file's sentences without anyone editing them. That
+-- is the whole argument against the mirrored page, which types its investor
+-- threshold twice and is stale in both places; a façade that re-typed the
+-- figures would refute the argument inside our own artifact.
+--
+-- The two percentages in Rule 100(a)(2) are the one hard case: `regcf.l4`
+-- inlines `0.05` and `0.10` inside a `WHERE` local rather than binding them as
+-- named constants the way it binds every dollar figure. They are DERIVED here
+-- by probing the corpus's own `investment limit` (see `limb (i) percentage`),
+-- not re-typed. See README §7.
+--
+-- INTERPRETATION CALLS, flagged rather than hidden:
+--   * `target offering amount` and `maximum offering amount the issuer will
+--     accept` are both set to the one amount the founder gives. Instruction 1
+--     to Rule 201(t) directs an issuer accepting oversubscriptions to use the
+--     MAXIMUM, so the form asks for that figure; nothing here reads the target.
+--   * `name` on IssuerProfile and InvestorProfile is fixed, because no rule
+--     reads it.
+--   * The intermediary and Form C facts (Rules 100(a)(3), 301-303, 203(a)(1))
+--     are portal-side and filing-side facts a founder cannot answer at planning
+--     time. They are not asked; they reappear, in full, as authored items in
+--     `what you must still line up`.
+-- ===========================================================================
+
+§§ `Number formatting — dollars, for the prose below`
+
+-- Comma grouping is done for whole dollars only. MODULO rejects a fractional
+-- number, and a computed limit can be fractional (5% of $123,999 is $6,199.95),
+-- so a fractional figure falls back to the plain rendering rather than being
+-- rounded: a limit must not be displayed as a cent more than it is.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`three digits of` n MEANS
+    IF   n LESS THAN 10
+    THEN CONCAT "00", (n AS STRING)
+    ELSE IF   n LESS THAN 100
+         THEN CONCAT "0", (n AS STRING)
+         ELSE n AS STRING
+
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`grouped` n MEANS
+    IF   n LESS THAN 1000
+    THEN n AS STRING
+    ELSE CONCAT (`grouped` (FLOOR (n DIVIDED BY 1000))), ",", (`three digits of` (n MODULO 1000))
+
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`dollars` n MEANS
+    IF   n EQUALS FLOOR n
+    THEN CONCAT "$", (`grouped` n)
+    ELSE CONCAT "$", (n AS STRING)
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`never below zero` n MEANS IF n AT LEAST 0 THEN n ELSE 0
+
+§§ `Citizen inputs — flat records, plain-English @desc on every field`
+
+DECLARE RaisePlan HAS
+    `organized in the United States`            IS A BOOLEAN @desc Is your company organized under, and subject to, the laws of a US State or territory, or the District of Columbia?
+    `already files Exchange Act reports`        IS A BOOLEAN @desc Does your company already file reports with the SEC under section 13 or section 15(d) of the Securities Exchange Act of 1934?
+    `is an investment company`                  IS A BOOLEAN @desc Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?
+    `has a bad actor disqualification`          IS A BOOLEAN @desc Is your company, or anyone covered by the rule, subject to a bad-actor disqualification? Get advice before answering: this is a regime in its own right.
+    `behind on past Reg CF annual reports`      IS A BOOLEAN @desc Have you raised under Regulation Crowdfunding before and missed an annual report in the two years since?
+    `has no specific business plan`             IS A BOOLEAN @desc Does your company lack a specific business plan, or is its plan to merge with or acquire a company it has not yet identified?
+    `amount you want to raise`                  IS A NUMBER  @desc How much do you want to raise, in dollars? Use the largest amount you would accept, not your target.
+    `raised under Reg CF in the last 12 months` IS A NUMBER  @desc How much have you already sold under Regulation Crowdfunding in the last 12 months, in dollars? Enter 0 if none.
+    `has raised under Reg CF before`            IS A BOOLEAN @desc Has your company ever sold securities under Regulation Crowdfunding before?
+
+DECLARE InvestorFacts HAS
+    `is an accredited investor`                   IS A BOOLEAN @desc Are you an accredited investor, as Rule 501 of Regulation D defines that term?
+    `your annual income`                          IS A NUMBER  @desc Your annual income, in dollars
+    `your net worth`                              IS A NUMBER  @desc Your net worth, in dollars
+    `invested under Reg CF in the last 12 months` IS A NUMBER  @desc How much have you already invested under Regulation Crowdfunding in the last 12 months, across every company, in dollars?
+
+DECLARE ResaleFacts HAS
+    `days since issue`                      IS A NUMBER  @desc How many days ago were the securities issued to you?
+    `selling back to the issuer`            IS A BOOLEAN @desc Are you transferring the securities back to the company that issued them?
+    `buyer is an accredited investor`       IS A BOOLEAN @desc Is the person receiving the securities an accredited investor?
+    `part of a registered offering`         IS A BOOLEAN @desc Is this transfer part of an offering registered with the SEC?
+    `family transfer death or divorce`      IS A BOOLEAN @desc Is this a transfer to a family member or the equivalent, to a trust you control or one for a family member's benefit, or in connection with death or divorce?
+
+DECLARE ReportingFacts HAS
+    `now files Exchange Act reports`         IS A BOOLEAN @desc Does your company now file reports under section 13(a) or section 15(d) of the Securities Exchange Act of 1934?
+    `annual reports filed since last sale`   IS A NUMBER  @desc How many Regulation Crowdfunding annual reports have you filed since your most recent sale under this Part?
+    `your holders of record`                 IS A NUMBER  @desc How many holders of record does your company have?
+    `your total assets`                      IS A NUMBER  @desc Your company's total assets, in dollars
+    `all securities repurchased`             IS A BOOLEAN @desc Have all the securities you issued under Regulation Crowdfunding been repurchased?
+    `liquidated or dissolved`                IS A BOOLEAN @desc Has the company liquidated or dissolved its business under state law?
+
+§§ `Answers — flat records carrying the result, the reasons and the caveats`
+
+DECLARE RaiseAssessment HAS
+    `you can use Reg CF`                    IS A BOOLEAN @desc Is your company eligible, and is the raise within the 12-month offering limit?
+    `the most you can raise now`            IS A NUMBER  @desc What is left of your 12-month Regulation Crowdfunding headroom, in dollars
+    `blockers`                              IS A LIST OF STRING @desc What stops you, in plain English, each with the rule that says so
+    `financial statements you must provide` IS A FinancialStatementRequirement @desc The level of assurance Rule 201(t) requires at this size
+    `why those financial statements`        IS A STRING  @desc How that tier was reached, with the ceilings that fixed it
+    `what you must still line up`           IS A LIST OF STRING @desc Conditions this check did not ask about, which still have to be satisfied
+    `after you raise you must`              IS A LIST OF STRING @desc What you owe once the offering closes
+    `caveats`                               IS A LIST OF STRING @desc Where this model is thinner than the law
+    `law as in force`                       IS A STRING  @desc The date as at which this answer states the law
+
+DECLARE InvestmentLimitAnswer HAS
+    `you have no limit`      IS A BOOLEAN @desc Regulation Crowdfunding sets no investment limit for an accredited investor
+    `your 12 month limit`    IS A NUMBER  @desc The Rule 100(a)(2) limit computed from your income and net worth. Ignore it if you have no limit.
+    `you have already used`  IS A NUMBER  @desc What you told us you have already invested in the last 12 months
+    `you can still invest`   IS A NUMBER  @desc What is left of that limit, in dollars
+    `we measured against`    IS A NUMBER  @desc The GREATER of your annual income and your net worth — the figure the rule actually uses
+    `which limb applies`     IS A STRING  @desc Which paragraph of Rule 100(a)(2) governs you
+    `how this is worked out` IS A STRING  @desc The calculation, in full, with the rule cited
+    `caveats`                IS A LIST OF STRING @desc Where this model is thinner than the law
+
+DECLARE ResaleAnswer HAS
+    `you may transfer`         IS A BOOLEAN @desc May the securities be transferred as described?
+    `days you must still wait` IS A NUMBER  @desc Days left in the one-year restricted period, or 0 if none
+    `why`                      IS A STRING  @desc Which exception applies, or why the restriction still bites
+    `caveats`                  IS A LIST OF STRING @desc Where this model is thinner than the law
+
+DECLARE ReportingExitAnswer HAS
+    `you may stop reporting`           IS A BOOLEAN @desc Has one of the five conditions in Rule 202(b) occurred?
+    `the conditions that let you stop` IS A LIST OF STRING @desc Which of the five conditions you meet
+    `while the duty runs you must`     IS A LIST OF STRING @desc What you owe for as long as the duty stands
+    `caveats`                          IS A LIST OF STRING @desc Where this model is thinner than the law
+
+§§ `Routing — flat inputs into the corpus's own record types`
+
+GIVEN plan IS A RaisePlan
+GIVETH AN IssuerProfile
+`issuer profile from` plan MEANS
+    IssuerProfile WITH
+        -- No rule reads `name`; fixed rather than asked.
+        name                                                                                                         IS "the company"
+        `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS plan's `organized in the United States`
+        `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`   IS plan's `already files Exchange Act reports`
+        `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `is an investment company`
+        `is subject to a disqualification as specified in section 227.503(a)`                                         IS plan's `has a bad actor disqualification`
+        `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
+        `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `has no specific business plan`
+
+GIVEN plan IS A RaisePlan
+GIVETH AN Offering
+`offering from` plan MEANS
+    Offering WITH
+        -- Instruction 1 to Rule 201(t): an issuer that will accept
+        -- oversubscriptions aggregates on the MAXIMUM, so the form asks for the
+        -- maximum and the target is set to the same figure. Nothing reads it.
+        `target offering amount`                                                              IS plan's `amount you want to raise`
+        `maximum offering amount the issuer will accept`                                      IS plan's `amount you want to raise`
+        `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS plan's `raised under Reg CF in the last 12 months`
+        `the issuer has previously sold securities in reliance on section 4(a)(6)`            IS plan's `has raised under Reg CF before`
+
+GIVEN facts IS AN InvestorFacts
+GIVETH AN InvestorProfile
+`investor profile from` facts MEANS
+    InvestorProfile WITH
+        name                                               IS "you"
+        `is an accredited investor as defined in Rule 501` IS facts's `is an accredited investor`
+        `annual income`                                    IS facts's `your annual income`
+        `net worth`                                        IS facts's `your net worth`
+        `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS facts's `invested under Reg CF in the last 12 months`
+
+GIVEN holding IS A ResaleFacts
+GIVETH A Transfer
+`transfer from` holding MEANS
+    Transfer WITH
+        `days since the securities were issued`                    IS holding's `days since issue`
+        `is to the issuer of the securities`                       IS holding's `selling back to the issuer`
+        `is to an accredited investor`                             IS holding's `buyer is an accredited investor`
+        `is as part of an offering registered with the Commission` IS holding's `part of a registered offering`
+        `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
+
+GIVEN filer IS A ReportingFacts
+GIVETH A ReportingStatus
+`reporting status from` filer MEANS
+    ReportingStatus WITH
+        `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act` IS filer's `now files Exchange Act reports`
+        `annual reports filed since the most recent sale of securities pursuant to this part`             IS filer's `annual reports filed since last sale`
+        `holders of record`                                                                               IS filer's `your holders of record`
+        `total assets`                                                                                    IS filer's `your total assets`
+        `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS filer's `all securities repurchased`
+        `the issuer has liquidated or dissolved its business in accordance with state law`                IS filer's `liquidated or dissolved`
+
+§§ `The two percentages in Rule 100(a)(2), derived rather than re-typed`
+
+-- `regcf.l4` binds every dollar figure once, as a named constant. It does NOT
+-- do that for the two percentages in Rule 100(a)(2): `0.05` and `0.10` are
+-- inlined inside the `WHERE` of `investment limit`. Rather than re-type them
+-- here — which would be exactly the duplication this corpus exists to remove —
+-- they are recovered by probing the corpus's own function at a point where
+-- neither the floor nor the cap is binding, and dividing out.
+--
+-- The two `#ASSERT`s below pin the conditions that make the derivation valid,
+-- and are stated in corpus constants only.
+
+GIVEN x IS A NUMBER
+GIVETH AN InvestorProfile
+`an investor with income and net worth both` x MEANS
+    InvestorProfile WITH
+        name                                               IS "probe"
+        `is an accredited investor as defined in Rule 501` IS FALSE
+        `annual income`                                    IS x
+        `net worth`                                        IS x
+        `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS 0
+
+-- One dollar below the cut point, so limb (i) governs.
+GIVETH A NUMBER
+`limb (i) probe` MEANS `income or net worth cut point` MINUS 1
+
+-- Exactly at the cut point, so neither figure is less than it and limb (ii) governs.
+GIVETH A NUMBER
+`limb (ii) probe` MEANS `income or net worth cut point`
+
+GIVETH A NUMBER
+`limb (i) percentage` MEANS
+    (100 TIMES (`investment limit` (`an investor with income and net worth both` `limb (i) probe`)))
+    DIVIDED BY `limb (i) probe`
+
+GIVETH A NUMBER
+`limb (ii) percentage` MEANS
+    (100 TIMES (`investment limit` (`an investor with income and net worth both` `limb (ii) probe`)))
+    DIVIDED BY `limb (ii) probe`
+
+§§ `Group 1 and 2 — can this company raise, and how much`
+
+GIVEN plan IS A RaisePlan
+GIVETH A NUMBER
+`aggregate for this raise` plan MEANS `aggregate offering amount` (`offering from` plan)
+
+GIVEN plan IS A RaisePlan
+GIVETH A NUMBER
+`headroom left` plan MEANS
+    `never below zero`
+        (`offering maximum in a 12-month period` MINUS plan's `raised under Reg CF in the last 12 months`)
+
+-- The blockers, each keyed to the corpus's own limb predicate. Only the
+-- offering-limit item carries figures, and both of them are spliced.
+GIVEN plan IS A RaisePlan
+GIVETH A LIST OF PAIR STRING BOOLEAN
+`blockers considered` plan MEANS
+    LIST (PAIR "Your company is not organized under, and subject to, the laws of a US State or territory or the District of Columbia, so Regulation Crowdfunding is not available to it (17 CFR 227.100(b)(1))."
+               (`(b)(1) — not organized under State or territorial law` (`issuer profile from` plan)))
+       , (PAIR "Your company already files reports under section 13 or section 15(d) of the Securities Exchange Act of 1934, so it may not use Regulation Crowdfunding (17 CFR 227.100(b)(2))."
+               (`(b)(2) — an Exchange Act reporting company` (`issuer profile from` plan)))
+       , (PAIR "Your company is an investment company, or is excluded from that definition by section 3(b) or section 3(c) of the Investment Company Act of 1940, so it may not use Regulation Crowdfunding (17 CFR 227.100(b)(3))."
+               (`(b)(3) — an investment company` (`issuer profile from` plan)))
+       , (PAIR "Your company is subject to a bad-actor disqualification, so it may not offer or sell in reliance on section 4(a)(6) (17 CFR 227.100(b)(4), 227.503(a))."
+               (`(b)(4) — subject to a bad-actor disqualification` (`issuer profile from` plan)))
+       , (PAIR "Your company has sold under Regulation Crowdfunding before and has not filed the annual reports it owed in the two years before this offering statement, so it may not raise again until it has caught up (17 CFR 227.100(b)(5))."
+               (`(b)(5) — delinquent in ongoing annual reports` (`issuer profile from` plan)))
+       , (PAIR "Your company has no specific business plan, or its plan is to merge with or acquire a company it has not identified, so it may not use Regulation Crowdfunding (17 CFR 227.100(b)(6))."
+               (`(b)(6) — no specific business plan, or a blank-check business plan` (`issuer profile from` plan)))
+       , (PAIR (CONCAT "What you want to raise, added to what you have already sold under Regulation Crowdfunding in the last 12 months, comes to ",
+                       (`dollars` (`aggregate for this raise` plan)),
+                       ", which is more than the ",
+                       (`dollars` `offering maximum in a 12-month period`),
+                       " an issuer may sell in reliance on section 4(a)(6) in any 12-month period (17 CFR 227.100(a)(1)).")
+               (NOT (`offering is within the offering limit` (`offering from` plan))))
+
+GIVEN plan IS A RaisePlan
+GIVETH A LIST OF STRING
+`blockers for` plan MEANS
+    mapMaybe `label if it bites` (`blockers considered` plan)
+    WHERE
+        `label if it bites` item MEANS
+            IF item's snd THEN JUST (item's fst) ELSE NOTHING
+
+GIVEN plan IS A RaisePlan
+GIVETH A STRING
+`why those financial statements for` plan MEANS
+    CONSIDER `financial statements required` (`offering from` plan)
+    WHEN `financial statements certified by the principal executive officer, with tax return information` THEN
+        CONCAT "Your raise aggregates to ", (`dollars` (`aggregate for this raise` plan)),
+               ", which is at or below the tier-1 ceiling of ", (`dollars` `tier 1 ceiling`),
+               ", so financial statements certified by your principal executive officer, together with the tax return information the rule lists, are enough (17 CFR 227.201(t)(1))."
+    WHEN `financial statements reviewed by an independent public accountant` THEN
+        CONCAT "Your raise aggregates to ", (`dollars` (`aggregate for this raise` plan)),
+               ", above the tier-1 ceiling of ", (`dollars` `tier 1 ceiling`),
+               ". A review by an independent public accountant is required up to ", (`dollars` `tier 2 ceiling`),
+               "; a first-time issuer may stay on a review up to ", (`dollars` `first-time issuer review ceiling`),
+               " (17 CFR 227.201(t)(2)-(3))."
+    WHEN `financial statements audited by an independent public accountant` THEN
+        CONCAT "Your raise aggregates to ", (`dollars` (`aggregate for this raise` plan)),
+               ", past the point at which a review will do: above ", (`dollars` `tier 2 ceiling`),
+               " a repeat issuer must be audited, and even a first-time issuer must be audited above ",
+               (`dollars` `first-time issuer review ceiling`), " (17 CFR 227.201(t)(3))."
+
+GIVETH A LIST OF STRING
+`what you must still line up` MEANS
+    LIST "Run the offering through exactly one intermediary — a registered broker or funding portal — that complies with section 4A(a) of the Securities Act, and conduct it exclusively on that intermediary's platform. Using more than one intermediary costs you the exemption (17 CFR 227.100(a)(3) and its Instruction)."
+       , (CONCAT "Have your offering information publicly available on the intermediary's platform for at least ",
+                 (`minimum days publicly available before any sale` AS STRING),
+                 " days before any securities are sold (17 CFR 227.303(a)(2)).")
+       , "File a Form C offering statement with the Commission, and provide it to investors and to the intermediary, before the offering begins. It must carry everything section 227.201 requires (17 CFR 227.203(a)(1))."
+       , "The intermediary must deliver educational materials when it opens an investor's account, and must have a reasonable basis for believing each investor is within their own investment limits (17 CFR 227.302(b)(1), 227.303(b)(1)). Those are the intermediary's to satisfy, and this check does not ask about them."
+       , "Each investor must be within their own 12-month Regulation Crowdfunding limit (17 CFR 227.100(a)(2)). Use the investment-limit check for that."
+
+GIVETH A LIST OF STRING
+`after you raise you must` MEANS
+    LIST (CONCAT "File a Form C-AR annual report within ",
+                 (`days to file the annual report after fiscal year end` AS STRING),
+                 " days of the end of each fiscal year, and keep filing until one of the five conditions in Rule 202(b) occurs (17 CFR 227.202(a), 227.203(b)(1)).")
+       , (CONCAT "Once one of those conditions occurs, file a Form C-TR within ",
+                 (`business days to file Form C-TR` AS STRING),
+                 " business days to bring the reporting duty to an end (17 CFR 227.203(b)(3)).")
+       , (CONCAT "File a Form C-U progress update within ",
+                 (`business days to file a progress update` AS STRING),
+                 " business days of reaching the relevant point in the offering (17 CFR 227.203(a)(3)(i)).")
+       , "Miss the annual reports and you are disqualified from your NEXT Regulation Crowdfunding offering for two years (17 CFR 227.100(b)(5)) — though the default does not cost you the exemption for an offering already made (17 CFR 227.100(a)(4))."
+
+GIVETH A LIST OF STRING
+`raise caveats` MEANS
+    LIST "This check answers two of the four conditions in Rule 100(a): that your company is eligible, and that the raise is within the 12-month offering limit. The other two — the single complying intermediary, and each investor's own limit — are under 'what you must still line up'."
+       , "The bad-actor disqualification is a single yes/no question here. Rule 503(a) is a regime in its own right: which people are covered, how far the look-back runs, and a reasonable-care exception. Take advice before answering it."
+       , "The offering limit aggregates only what was sold in reliance on section 4(a)(6). Sales under other exemptions are not added in. Whether a concurrent offering is integrated with this one is a separate question, which Rule 100(e) refers out to 17 CFR 230.152."
+       , "Rules 201(t)(1) and (t)(2) say that if higher-assurance financial statements are already available, the issuer must provide those instead. That trigger turns on what your company happens to hold, and is not modelled here."
+
+GIVETH A STRING
+`law as in force` MEANS "17 CFR Part 227 as in force on 2026-07-23. The dollar figures are adjusted for inflation on roughly a five-yearly cycle; the last adjustment took effect 2022-09-20 and the next is due around 2027."
+
+§§ `Group 3 — the investor's own limit`
+
+GIVEN facts IS AN InvestorFacts
+GIVETH A NUMBER
+`limit for` facts MEANS `investment limit` (`investor profile from` facts)
+
+GIVEN facts IS AN InvestorFacts
+GIVETH A NUMBER
+`still investable for` facts MEANS
+    `never below zero` ((`limit for` facts) MINUS facts's `invested under Reg CF in the last 12 months`)
+
+GIVEN facts IS AN InvestorFacts
+GIVETH A STRING
+`which limb for` facts MEANS
+    IF   facts's `is an accredited investor`
+    THEN "None. Rule 100(a)(2) bites only where the purchaser is not an accredited investor — a carve-out added on 2021-03-15."
+    ELSE IF   `either annual income or net worth is less than the cut point` (`investor profile from` facts)
+         THEN "17 CFR 227.100(a)(2)(i)"
+         ELSE "17 CFR 227.100(a)(2)(ii)"
+
+GIVEN facts IS AN InvestorFacts
+GIVETH A STRING
+`how the limit is worked out for` facts MEANS
+    IF   facts's `is an accredited investor`
+    THEN CONCAT "You are an accredited investor, so Regulation Crowdfunding sets no limit on what you may invest (17 CFR 227.100(a)(2), as amended with effect from 2021-03-15). The figure shown is what your limit would be if you were not: ",
+                (`dollars` (`limit for` facts)), "."
+    ELSE IF   `either annual income or net worth is less than the cut point` (`investor profile from` facts)
+         THEN CONCAT "Rule 100(a)(2)(i) governs, because at least one of your annual income (",
+                     (`dollars` (facts's `your annual income`)), ") and your net worth (",
+                     (`dollars` (facts's `your net worth`)), ") is below ",
+                     (`dollars` `income or net worth cut point`), ". Your limit is ",
+                     (`limb (i) percentage` AS STRING), "% of the greater of the two (",
+                     (`dollars` (`greater of annual income or net worth` (`investor profile from` facts))),
+                     "), or ", (`dollars` `minimum permitted investment`),
+                     ", whichever is the larger — which comes to ", (`dollars` (`limit for` facts)), "."
+         ELSE CONCAT "Rule 100(a)(2)(ii) governs, because both your annual income (",
+                     (`dollars` (facts's `your annual income`)), ") and your net worth (",
+                     (`dollars` (facts's `your net worth`)), ") are at least ",
+                     (`dollars` `income or net worth cut point`), ". Your limit is ",
+                     (`limb (ii) percentage` AS STRING), "% of the greater of the two (",
+                     (`dollars` (`greater of annual income or net worth` (`investor profile from` facts))),
+                     "), capped at ", (`dollars` `maximum amount sold to any one investor in a 12-month period`),
+                     " — which comes to ", (`dollars` (`limit for` facts)), "."
+
+GIVETH A LIST OF STRING
+`investment caveats` MEANS
+    LIST "The limit is measured against the GREATER of your annual income and your net worth. Until 2021-03-15 it was measured against the LESSER, and Release 33-10884 substituted the word. A guide that still says 'lesser' is not carrying a stale number; it is carrying a policy the Commission abandoned, and it will understate what you may lawfully invest whenever your income and your net worth differ."
+       , "The limit runs across ALL Regulation Crowdfunding offerings you invest in during the 12 months before the transaction, not just this one."
+       , "Rule 100(a)(2) does not define 'annual income' or 'net worth'. Instruction 1 sends you to the accredited-investor calculation in Rule 501, and Instruction 2 allows spouses to calculate jointly subject to a per-individual cap. Neither is modelled here: the figures are read as your own."
+       , "'Accredited investor' takes its meaning from Rule 501 of Regulation D. This check takes your answer at face value."
+
+§§ `Group 8 — may these securities be transferred yet`
+
+GIVEN holding IS A ResaleFacts
+GIVETH A NUMBER
+`days still to wait for` holding MEANS
+    IF   `transfer falls within an exception in Rule 501(a)` (`transfer from` holding)
+    THEN 0
+    ELSE `never below zero`
+             (`days in the resale restricted period` MINUS holding's `days since issue`)
+
+GIVEN holding IS A ResaleFacts
+GIVETH A STRING
+`why the transfer stands or falls for` holding MEANS
+    IF   holding's `selling back to the issuer`
+    THEN "You are transferring back to the issuer of the securities, which Rule 501(a)(1) excepts from the restriction."
+    ELSE IF   holding's `buyer is an accredited investor`
+         THEN "The transferee is an accredited investor, which Rule 501(a)(2) excepts from the restriction."
+         ELSE IF   holding's `part of a registered offering`
+              THEN "The transfer is part of an offering registered with the Commission, which Rule 501(a)(3) excepts from the restriction."
+              ELSE IF   holding's `family transfer death or divorce`
+                   THEN "The transfer is to a family member or the equivalent, to a trust you control or one created for a family member's benefit, or in connection with death or divorce, which Rule 501(a)(4) excepts from the restriction."
+                   ELSE IF   NOT (`transfer is within the one-year restricted period` (`transfer from` holding))
+                        THEN CONCAT "The one-year restricted period has run: the securities were issued ",
+                                    ((holding's `days since issue`) AS STRING),
+                                    " days ago, and Rule 501(a) restricts transfer for ",
+                                    (`days in the resale restricted period` AS STRING), " days."
+                        ELSE CONCAT "The securities were issued ",
+                                    ((holding's `days since issue`) AS STRING),
+                                    " days ago. Rule 501(a) restricts transfer for ",
+                                    (`days in the resale restricted period` AS STRING),
+                                    " days from issuance, and none of the four exceptions in Rule 501(a)(1)-(4) applies."
+
+GIVETH A LIST OF STRING
+`resale caveats` MEANS
+    LIST (CONCAT "The one-year period is measured here as ",
+                 (`days in the resale restricted period` AS STRING),
+                 " days from issuance, and the last of those days is read as OUTSIDE the period. Rule 501(a) says only 'the one-year period beginning when the securities were issued' and does not say whether the first anniversary falls inside it. That ambiguity is in the rule, not in this model, and no encoding can settle it.")
+       , "A leap year inside the period would make the true anniversary a day later than the count used here."
+       , "'Accredited investor' takes its meaning from Rule 501 of Regulation D. This check takes your answer at face value."
+       , "Rule 501 restricts transfer by a purchaser in the crowdfunding transaction. It does not, by itself, tell you what a subsequent holder may do."
+
+§§ `Group 7 — when the annual reporting duty ends`
+
+GIVEN filer IS A ReportingFacts
+GIVETH A LIST OF PAIR STRING BOOLEAN
+`termination conditions considered` filer MEANS
+    LIST (PAIR "Your company is now required to file reports under section 13(a) or section 15(d) of the Securities Exchange Act of 1934 (17 CFR 227.202(b)(1))."
+               (`(b)(1) — became an Exchange Act reporting company` (`reporting status from` filer)))
+       , (PAIR (CONCAT "Your company has filed at least one annual report since its most recent sale under this Part, and has fewer than ",
+                       (`holders of record threshold` AS STRING),
+                       " holders of record (17 CFR 227.202(b)(2)).")
+               (`(b)(2) — one annual report filed and fewer than 300 holders of record` (`reporting status from` filer)))
+       , (PAIR (CONCAT "Your company has filed annual reports for at least the three most recent years since its most recent sale under this Part, and its total assets do not exceed ",
+                       (`dollars` `total assets threshold`), " (17 CFR 227.202(b)(3)).")
+               (`(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` (`reporting status from` filer)))
+       , (PAIR "All of the securities issued in reliance on section 4(a)(6) have been repurchased (17 CFR 227.202(b)(4))."
+               (`(b)(4) — all securities repurchased` (`reporting status from` filer)))
+       , (PAIR "The company has liquidated or dissolved its business in accordance with state law (17 CFR 227.202(b)(5))."
+               (`(b)(5) — liquidated or dissolved` (`reporting status from` filer)))
+
+GIVEN filer IS A ReportingFacts
+GIVETH A LIST OF STRING
+`termination conditions met by` filer MEANS
+    mapMaybe `label if met` (`termination conditions considered` filer)
+    WHERE
+        `label if met` item MEANS
+            IF item's snd THEN JUST (item's fst) ELSE NOTHING
+
+GIVETH A LIST OF STRING
+`while the duty runs you must` MEANS
+    LIST (CONCAT "File a Form C-AR annual report within ",
+                 (`days to file the annual report after fiscal year end` AS STRING),
+                 " days of the end of each fiscal year, and post it on your website (17 CFR 227.202(a), 227.203(b)(1)).")
+       , (CONCAT "When one of the five conditions occurs, file a Form C-TR within ",
+                 (`business days to file Form C-TR` AS STRING),
+                 " business days. Until you do, the duty stands (17 CFR 227.203(b)(3)).")
+
+GIVETH A LIST OF STRING
+`reporting caveats` MEANS
+    LIST (CONCAT "The Form C-TR deadline is ",
+                 (`business days to file Form C-TR` AS STRING),
+                 " BUSINESS days, and the annual report deadline is ",
+                 (`days to file the annual report after fiscal year end` AS STRING),
+                 " plain days. The corpus counts both in plain days, because the deadline arithmetic has no business-day calendar. Where a weekend or a holiday falls inside the window, the true business-day deadline is later than the count used here.")
+       , "This check answers whether the duty MAY come to an end. It does not end by itself: filing the Form C-TR is what ends it."
+       , "Failing to file does not cost you the exemption for an offering already made (17 CFR 227.100(a)(4)), but it does disqualify you from your next Regulation Crowdfunding offering for two years (17 CFR 227.100(b)(5))."
+
+§ `The exported entry points`
+
+-- Five exports. Four are the four questions a reader of the mirrored page
+-- actually has; the fifth returns a BOOLEAN, which is what jl4-service's
+-- /ladder and /query-plan routes require.
+
+@export default Check whether a company can raise money under SEC Regulation Crowdfunding, how much it may raise now, what financial statements it must provide, and what it will owe afterwards.
+GIVEN plan IS A RaisePlan @desc Your company, and what you want to raise
+GIVETH A RaiseAssessment
+DECIDE `raise check` IS
+    RaiseAssessment WITH
+        `you can use Reg CF`                    IS      `issuer is eligible` (`issuer profile from` plan)
+                                                    AND `offering is within the offering limit` (`offering from` plan)
+        `the most you can raise now`            IS `headroom left` plan
+        `blockers`                              IS `blockers for` plan
+        `financial statements you must provide` IS `financial statements required` (`offering from` plan)
+        `why those financial statements`        IS `why those financial statements for` plan
+        `what you must still line up`           IS `what you must still line up`
+        `after you raise you must`              IS `after you raise you must`
+        `caveats`                               IS `raise caveats`
+        `law as in force`                       IS `law as in force`
+
+@export Work out the most you may invest across all SEC Regulation Crowdfunding offerings in a 12-month period, and how much of that you have left.
+GIVEN facts IS AN InvestorFacts @desc Your income, your net worth, and what you have already invested under Regulation Crowdfunding
+GIVETH AN InvestmentLimitAnswer
+DECIDE `investment limit check` IS
+    InvestmentLimitAnswer WITH
+        `you have no limit`      IS facts's `is an accredited investor`
+        `your 12 month limit`    IS `limit for` facts
+        `you have already used`  IS facts's `invested under Reg CF in the last 12 months`
+        `you can still invest`   IS `still investable for` facts
+        `we measured against`    IS `greater of annual income or net worth` (`investor profile from` facts)
+        `which limb applies`     IS `which limb for` facts
+        `how this is worked out` IS `how the limit is worked out for` facts
+        `caveats`                IS `investment caveats`
+
+@export Check whether securities bought through SEC Regulation Crowdfunding may be transferred yet, and if not, how much longer the restriction runs.
+GIVEN holding IS A ResaleFacts @desc When the securities were issued, and who they would go to
+GIVETH A ResaleAnswer
+DECIDE `resale check` IS
+    ResaleAnswer WITH
+        `you may transfer`         IS `transfer is permitted` (`transfer from` holding)
+        `days you must still wait` IS `days still to wait for` holding
+        `why`                      IS `why the transfer stands or falls for` holding
+        `caveats`                  IS `resale caveats`
+
+@export Check whether an issuer may stop filing SEC Regulation Crowdfunding annual reports, and what it owes until it may.
+GIVEN filer IS A ReportingFacts @desc Your filing history, your holders of record and your total assets
+GIVETH A ReportingExitAnswer
+DECIDE `reporting exit check` IS
+    ReportingExitAnswer WITH
+        `you may stop reporting`           IS `ongoing reporting obligation may terminate` (`reporting status from` filer)
+        `the conditions that let you stop` IS `termination conditions met by` filer
+        `while the duty runs you must`     IS `while the duty runs you must`
+        `caveats`                          IS `reporting caveats`
+
+-- The BOOLEAN entry point. jl4-service will only build a ladder diagram, or run
+-- a query plan, for an @export that returns a BOOLEAN, so without this one the
+-- deployment has neither. Its body is the conjunction the founder actually
+-- asks — eligible AND within the limit — over two corpus predicates.
+@export Can this company raise under SEC Regulation Crowdfunding right now — is it eligible, and is the raise within the 12-month offering limit?
+GIVEN plan IS A RaisePlan @desc Your company, and what you want to raise
+GIVETH A BOOLEAN
+DECIDE `can this company raise` IS
+        `issuer is eligible` (`issuer profile from` plan)
+    AND `offering is within the offering limit` (`offering from` plan)
+
+§ `Tests`
+
+§§ `Fixtures`
+
+-- A clean US startup raising $500,000, having raised nothing before.
+`a clean plan` MEANS RaisePlan WITH
+    `organized in the United States`            IS TRUE
+    `already files Exchange Act reports`        IS FALSE
+    `is an investment company`                  IS FALSE
+    `has a bad actor disqualification`          IS FALSE
+    `behind on past Reg CF annual reports`      IS FALSE
+    `has no specific business plan`             IS FALSE
+    `amount you want to raise`                  IS 500000
+    `raised under Reg CF in the last 12 months` IS 0
+    `has raised under Reg CF before`            IS FALSE
+
+-- The limb the mirrored page omits: everything else clean, but behind on the
+-- Reg CF annual reports.
+`a delinquent plan` MEANS RaisePlan WITH
+    `organized in the United States`            IS TRUE
+    `already files Exchange Act reports`        IS FALSE
+    `is an investment company`                  IS FALSE
+    `has a bad actor disqualification`          IS FALSE
+    `behind on past Reg CF annual reports`      IS TRUE
+    `has no specific business plan`             IS FALSE
+    `amount you want to raise`                  IS 500000
+    `raised under Reg CF in the last 12 months` IS 0
+    `has raised under Reg CF before`            IS TRUE
+
+-- $4,000,000 already sold in the last 12 months, asking for $1,500,000 more:
+-- over the $5,000,000 cap by $500,000.
+`an over-limit plan` MEANS RaisePlan WITH
+    `organized in the United States`            IS TRUE
+    `already files Exchange Act reports`        IS FALSE
+    `is an investment company`                  IS FALSE
+    `has a bad actor disqualification`          IS FALSE
+    `behind on past Reg CF annual reports`      IS FALSE
+    `has no specific business plan`             IS FALSE
+    `amount you want to raise`                  IS 1500000
+    `raised under Reg CF in the last 12 months` IS 4000000
+    `has raised under Reg CF before`            IS TRUE
+
+-- README §3.1's investor: $60,000 income, $200,000 net worth. Limit $10,000
+-- under the rule in force; $3,000 under the rule the mirrored page states.
+`the README 3.1 investor` MEANS InvestorFacts WITH
+    `is an accredited investor`                   IS FALSE
+    `your annual income`                          IS 60000
+    `your net worth`                              IS 200000
+    `invested under Reg CF in the last 12 months` IS 0
+
+`a wealthy investor` MEANS InvestorFacts WITH
+    `is an accredited investor`                   IS FALSE
+    `your annual income`                          IS 3000000
+    `your net worth`                              IS 3000000
+    `invested under Reg CF in the last 12 months` IS 0
+
+`an accredited investor` MEANS InvestorFacts WITH
+    `is an accredited investor`                   IS TRUE
+    `your annual income`                          IS 60000
+    `your net worth`                              IS 200000
+    `invested under Reg CF in the last 12 months` IS 9000
+
+`a restricted holding` MEANS ResaleFacts WITH
+    `days since issue`                      IS 100
+    `selling back to the issuer`            IS FALSE
+    `buyer is an accredited investor`       IS FALSE
+    `part of a registered offering`         IS FALSE
+    `family transfer death or divorce`      IS FALSE
+
+`a holding sold to an accredited buyer` MEANS ResaleFacts WITH
+    `days since issue`                      IS 100
+    `selling back to the issuer`            IS FALSE
+    `buyer is an accredited investor`       IS TRUE
+    `part of a registered offering`         IS FALSE
+    `family transfer death or divorce`      IS FALSE
+
+`a filer who may stop` MEANS ReportingFacts WITH
+    `now files Exchange Act reports`       IS FALSE
+    `annual reports filed since last sale` IS 1
+    `your holders of record`               IS 299
+    `your total assets`                    IS 50000000
+    `all securities repurchased`           IS FALSE
+    `liquidated or dissolved`              IS FALSE
+
+`a filer who must keep going` MEANS ReportingFacts WITH
+    `now files Exchange Act reports`       IS FALSE
+    `annual reports filed since last sale` IS 1
+    `your holders of record`               IS 5000
+    `your total assets`                    IS 50000000
+    `all securities repurchased`           IS FALSE
+    `liquidated or dissolved`              IS FALSE
+
+§§ `The derived percentages, and the conditions that make the derivation valid`
+
+-- Limb (i)'s probe must sit above the floor, or the floor would govern and the
+-- division would recover the wrong figure.
+#ASSERT (`investment limit` (`an investor with income and net worth both` `limb (i) probe`)) GREATER THAN `minimum permitted investment`
+
+-- Limb (ii)'s probe must sit below the per-investor cap, for the same reason.
+#ASSERT (`investment limit` (`an investor with income and net worth both` `limb (ii) probe`)) LESS THAN `maximum amount sold to any one investor in a 12-month period`
+
+#EVAL `limb (i) percentage`
+#EVAL `limb (ii) percentage`
+
+§§ `The exports agree with the corpus`
+
+#ASSERT     `can this company raise` `a clean plan`
+#ASSERT NOT `can this company raise` `a delinquent plan`
+#ASSERT NOT `can this company raise` `an over-limit plan`
+
+-- README §3.1, through the façade: $10,000, not $3,000.
+#ASSERT (`limit for` `the README 3.1 investor`) EQUALS 10000
+
+-- The per-investor cap still bites at the top.
+#ASSERT (`limit for` `a wealthy investor`) EQUALS 124000
+
+-- Headroom arithmetic: $5,000,000 less the $4,000,000 already sold.
+#ASSERT (`headroom left` `an over-limit plan`) EQUALS 1000000
+#ASSERT (`headroom left` `a clean plan`) EQUALS 5000000
+
+-- The blocker list picks out exactly the limb that bit.
+#ASSERT (`blockers for` `a clean plan`) EQUALS EMPTY
+#ASSERT (count (`blockers for` `a delinquent plan`)) EQUALS 1
+#ASSERT (count (`blockers for` `an over-limit plan`)) EQUALS 1
+
+-- Resale: inside the period to an ordinary buyer, 265 days left of the 365.
+#ASSERT NOT `transfer is permitted` (`transfer from` `a restricted holding`)
+#ASSERT (`days still to wait for` `a restricted holding`) EQUALS 265
+#ASSERT     `transfer is permitted` (`transfer from` `a holding sold to an accredited buyer`)
+#ASSERT (`days still to wait for` `a holding sold to an accredited buyer`) EQUALS 0
+
+-- Reporting: 299 holders and one annual report is a way out; 5,000 is not.
+#ASSERT     `ongoing reporting obligation may terminate` (`reporting status from` `a filer who may stop`)
+#ASSERT NOT `ongoing reporting obligation may terminate` (`reporting status from` `a filer who must keep going`)
+#ASSERT (count (`termination conditions met by` `a filer who may stop`)) EQUALS 1
+#ASSERT (`termination conditions met by` `a filer who must keep going`) EQUALS EMPTY
+
+§§ `The prose, rendered — every figure in it came from the corpus`
+
+#EVAL `raise check` `a clean plan`
+#EVAL `raise check` `a delinquent plan`
+#EVAL `raise check` `an over-limit plan`
+#EVAL `investment limit check` `the README 3.1 investor`
+#EVAL `investment limit check` `a wealthy investor`
+#EVAL `investment limit check` `an accredited investor`
+#EVAL `resale check` `a restricted holding`
+#EVAL `resale check` `a holding sold to an accredited buyer`
+#EVAL `reporting exit check` `a filer who may stop`
+#EVAL `reporting exit check` `a filer who must keep going`
