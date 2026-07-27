@@ -297,7 +297,12 @@ const server = createServer(async (req, res) => {
     return;
   }
   // static
-  const rel = req.url === "/" ? "/playground.html" : req.url.split("?")[0];
+  // Strip the query FIRST. Testing `req.url === "/"` before doing so meant a
+  // cache-busted root — `/?v=3`, exactly what one reaches for when iterating — missed
+  // the index and resolved to the dist DIRECTORY instead, which is what used to take the
+  // server down with EISDIR.
+  const path = req.url.split("?")[0];
+  const rel = path === "/" ? "/playground.html" : path;
   const candidates = [resolve(DIST, "." + rel), resolve(HERE, "." + rel)];
   // isFile(), not existsSync() — `resolve` strips trailing slashes, so the old
   // `!f.endsWith("/")` guard tested the STRING and happily matched a directory, and

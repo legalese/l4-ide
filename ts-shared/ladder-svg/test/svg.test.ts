@@ -433,3 +433,50 @@ test("a made circuit resting on assumptions is muted green, not the made green",
   // provisional without completion changes nothing: there is no made-circuit claim yet
   assert.equal(sceneToSvg(s), sceneToSvg({ ...s, provisional: true }));
 });
+
+/* -------------------------------------------- state reads as AREA, not just outline */
+
+/** A 1.5px border is sub-pixel once a wide diagram is scaled to fit a phone, so the
+ *  T/F/U cycle looked like it did nothing. State now fills the box as well as outlining
+ *  it — area survives downscaling in a way a hairline does not. */
+test("each leaf state gets its own interior wash, in both themes", () => {
+  const box = (state: "live" | "dead" | "inert" | "eliminable"): ScenePrim => ({
+    kind: "box",
+    id: 1,
+    rect: { x: 0, y: 0, w: 100, h: 30 },
+    role: "leaf",
+    state,
+  });
+  for (const theme of ["screen", "ink"] as const) {
+    const fills = (["live", "dead", "inert", "eliminable"] as const).map(
+      // anchor on the BOX, not the first fill in the doc — that one is the page background
+      (s) =>
+        sceneToSvg(scene(box(s)), theme).match(
+          /data-fnid="1"[^>]*?fill="(#[0-9a-f]{3,6})"/,
+        )![1],
+    );
+    assert.equal(
+      new Set(fills).size,
+      4,
+      `${theme}: washes collapsed to ${fills.join(",")}`,
+    );
+  }
+});
+
+test("a folded placeholder keeps its neutral only while UNKNOWN — a pinned fold shows its verdict", () => {
+  const ph = (state: "live" | "inert"): ScenePrim => ({
+    kind: "box",
+    id: 1,
+    rect: { x: 0, y: 0, w: 100, h: 30 },
+    role: "placeholder",
+    state,
+  });
+  assert.match(
+    sceneToSvg(scene(ph("inert"))),
+    /data-fnid="1"[^>]*?fill="#eef1f6"/,
+  );
+  assert.match(
+    sceneToSvg(scene(ph("live"))),
+    /data-fnid="1"[^>]*?fill="#e8f5ec"/,
+  );
+});

@@ -15,6 +15,12 @@ interface Palette {
   rail: string;
   ink: string;
   bg: string;
+  /** Interior wash per state. A 1.5px border is the whole of a box's state signal, and at
+   *  phone scale that border is sub-pixel after downscaling — the diagram reads as a row of
+   *  identical white boxes and the T/F/U cycle looks like it did nothing. Filling the box
+   *  puts the state on an area rather than an outline, which survives any scale. Kept pale
+   *  enough that Georgia-on-white body text loses no contrast. */
+  fill: Record<State, string>;
 }
 
 // DESIGN §6/§15.1 gives four leaf states four appearances, and the difference between
@@ -36,6 +42,12 @@ const SCREEN: Palette = {
   rail: "#3a3a3a",
   ink: "#222",
   bg: "#ffffff",
+  fill: {
+    live: "#e8f5ec", // pale green — carries current
+    dead: "#e4e8ec", // pale slate — tested, did not bite
+    inert: "#ffffff", // white — nobody asked; an empty box for an open question
+    eliminable: "#f6f7f8",
+  },
 };
 const INK: Palette = {
   ...SCREEN,
@@ -45,6 +57,14 @@ const INK: Palette = {
   ghost: "#999",
   rail: "#222",
   ink: "#111",
+  // Print drops hue but keeps the ordering, so the wash still separates the states in
+  // greyscale and on a mono laser.
+  fill: {
+    live: "#ededed",
+    dead: "#e0e0e0",
+    inert: "#ffffff",
+    eliminable: "#f6f7f8",
+  },
 };
 
 // current-flow style (DESIGN §20): closed (leader) thick+dark, streamer (local
@@ -101,8 +121,14 @@ function prim(
       const { x, y, w, h } = p.rect;
       const a = ` data-fnid="${p.id}"${actAttr(p.act)} class="lad-box${p.act ? " lad-clickable" : ""}"`;
       if (p.state === "eliminable")
-        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="#f6f7f8" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`;
-      const fill = p.role === "placeholder" ? "#eef1f6" : "#ffffff";
+        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${pal.fill.eliminable}" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`;
+      // A folded placeholder keeps its own bluish neutral ONLY while its value is unknown;
+      // once it has one, the state wash wins — a fold must not hide the verdict it stands in
+      // for, which is the whole point of being able to pin a folded group (§19).
+      const fill =
+        p.role === "placeholder" && p.state === "inert"
+          ? "#eef1f6"
+          : pal.fill[p.state];
       // tentative (DESIGN §22): fine dots + normal ink — a presumption, not a ghost.
       // Finer dash (1.5 3) distinguishes it from eliminable's coarser dashes (5 4).
       const tent = p.tentative ? ' stroke-dasharray="1.5 3"' : "";
