@@ -258,15 +258,34 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
         pure (filepath, Right (fns, [bundle]))
 
--- | Rebuild ValidatedFunctions from deserialized CBOR bundles,
--- skipping the expensive typecheck step.
+-- | Rebuild ValidatedFunctions from deserialized CBOR bundles.
 --
--- This is the fast restart path: the Module Resolved, Environment, and
--- EntityInfo are loaded from CBOR, and only the evaluator import environment
--- needs to be rebuilt (which requires the sources).
+-- This is the restart path: the 'ExportedFunction' list and the DECLARE map —
+-- the parts that describe the deployment's API surface — are read straight
+-- back out of @bundle.cbor@ rather than re-derived.
 --
--- Uses a single Shake session for all import environment evaluations,
--- sharing work across the import graph.
+-- == Why the AST is NOT taken from CBOR
+--
+-- 'L4.Instances.Serialise' encodes every 'L4.Annotation.Anno_' as @()@ and
+-- decodes it as 'L4.Annotation.emptyAnno', to keep bundles small. That throws
+-- away the source tokens (which nothing here wants) /and/ the typechecker's
+-- @resolvedInfo@ (which several things do): 'L4.Viz.Ladder.hasBooleanType'
+-- reads the result type of a DECIDE's body off exactly that field, so a
+-- CBOR-rehydrated 'Decide' looks like a non-boolean DECIDE and both
+-- @\/query-plan@ and @\/ladder@ answered 400 for every deployment served by a
+-- process that had restarted since the deploy — while @\/evaluation@, which
+-- needs no type annotations, kept working. That is the sort of divergence a
+-- restart-blind test suite cannot see, so this function no longer has one:
+-- 'typecheckAndEvalBundle' below already runs @Rules.TypeCheck@ over every
+-- bundle file (it has to, to build the evaluator import environments), so a
+-- fully annotated AST is in hand at no extra cost and is simply used. The
+-- module, environment, entity info and DECIDE are then all taken from one
+-- typecheck result, exactly as on the fresh-compile path in
+-- 'processTypecheckedFile' — never mixed across passes, since 'Unique's are
+-- only meaningful within the resolution that minted them.
+--
+-- Uses a single Shake session for all typechecking and import environment
+-- evaluation, sharing work across the import graph.
 buildFromCborBundle
   :: Logger
   -> Text  -- ^ deployment ID for logging
@@ -280,15 +299,17 @@ buildFromCborBundle logger deployId bundles sources storedMeta = do
       bundleFiles = [bundle.sbFilePath | bundle <- bundles, Map.member bundle.sbFilePath sources]
 
   -- Build all import environments in a single Shake session
-  (_errs, _tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
+  (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
 
   -- Process each bundle using the shared eval environments
   allFnsWithFile <- fmap concat $ forM bundles $ \bundle -> do
-    let resolvedModule = bundle.sbModule
-        env = bundle.sbEnvironment
-        ei = bundle.sbEntityInfo
+    let filepath = bundle.sbFilePath
+        -- All three together or none of them: see the note above.
+        (resolvedModule, env, ei) = case Map.lookup filepath tcMap of
+          Just (Just tcResult) ->
+            (tcResult.module', tcResult.environment, tcResult.entityInfo)
+          _ -> (bundle.sbModule, bundle.sbEnvironment, bundle.sbEntityInfo)
         exports = bundle.sbExports
-        filepath = bundle.sbFilePath
 
     case Map.lookup filepath sources of
       Nothing -> pure []
