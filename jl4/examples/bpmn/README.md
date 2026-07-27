@@ -394,7 +394,24 @@ differences and are **not** defects:
   | `Converging` | a `Join`    | `This type of node [Split_0, one of] cannot have more than one outgoing connection!` |
   | `Mixed`      | nothing     | `Unknown gateway direction: Mixed`                                                   |
 
-  This one **is** reached by exporter output: `expected/regcf-reporting.bpmn`'s
+  And the fourth value, measured separately by putting the literal string on
+  `consultation.bpmn`'s `Split_0` — a gateway jBPM otherwise runs to COMPLETED:
+
+  | declared        | jBPM builds | and says                                 |
+  | --------------- | ----------- | ---------------------------------------- |
+  | `Unspecified`   | nothing     | `Unknown gateway direction: Unspecified` |
+  | (attribute absent) | nothing  | `Unknown gateway direction: null`        |
+
+  So jBPM accepts **only** `Diverging` and `Converging` — it rejects the XSD's
+  own default both by name and by omission. Nothing emitted today is affected:
+  `grep -ho 'gatewayDirection="[A-Za-z]*"'` over `expected/`, `sound/` and
+  `unsound/` returns 15 `Diverging`, 6 `Converging`, 1 `Mixed` and **no**
+  `Unspecified`. It is a latent hazard rather than a live one, recorded so that
+  the first gateway with one incoming and one outgoing flow — which
+  `gatewayFlowFor` would correctly call `Unspecified` — is a known cost and not
+  a surprise.
+
+  The `Mixed` case **is** reached by exporter output: `expected/regcf-reporting.bpmn`'s
   renewal loop makes its gateway genuinely mixed, so the file now says `Mixed`
   and jBPM will not read it. Unlike A0–A2, the harness cannot adapt around it —
   the shape, not the spelling, is what jBPM has no node for. Before this was
