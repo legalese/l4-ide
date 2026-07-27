@@ -163,6 +163,89 @@ rejects is a property of the interchange, not of either tool.
 — nothing at all on either deadlocking diagram. A linter is not an engine
 either.)
 
+## Asking an actual engine: the jBPM/KIE second opinion
+
+Both checks above are ours. `etc/check-bpmn-kie.sh` runs somebody else's — jBPM
+7.74.1.Final, a genuinely independent implementation that shares no code with
+`bpmn-js` — and it **executes** the process rather than reading it.
+
+```sh
+etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn
+```
+
+It needs `mvn` and a JDK 11+, downloads ~44 MB of pinned jars into a cache
+outside the repo on first run, and **exits 3 with a loud banner when that
+toolchain is absent** — never a silent pass. Nothing is added to
+`package.json` or the lockfile.
+
+**It is not the gate, and it is not a replacement for either check above.**
+Work items auto-complete, so it explores exactly one interleaving: it can prove
+a deadlock exists but can never prove one absent. `check-bpmn-soundness.mjs`
+exhausts every reachable marking, which is why that one is the gate. What KIE
+adds is corroboration — when a foreign engine independently parks a token at the
+same join our token game names, that is evidence our hand-written semantics are
+right.
+
+### It agrees, everywhere it can run
+
+| fixture                          | `validate-bpmn.mjs` | `check-bpmn-soundness.mjs` | jBPM execution                       |
+| -------------------------------- | ------------------- | -------------------------- | ------------------------------------ |
+| `consultation.bpmn`              | OK, 0 warnings      | SOUND                      | COMPLETED                            |
+| `offering.bpmn`                  | OK, 0 warnings      | SOUND                      | ABORTED via error end event `Breach` |
+| `handover.bpmn`                  | OK, 0 warnings      | SOUND                      | **rejected, see A4**                 |
+| `unsound/deadlock-boundary-in-rand.bpmn` | OK, 0 warnings | UNSOUND (S2)          | **DEADLOCK, token parked at `Join`** |
+| `unsound/deadlock-ror-in-rand.bpmn`      | OK, 0 warnings | UNSOUND (S2)          | **DEADLOCK, token parked at `Join`** |
+| `unsound/unsafe-xor-join-after-rand.bpmn`| OK, 0 warnings | UNSOUND (S4)          | **DUPLICATION, `Fulfilled` fired 2x** |
+
+Full agreement on all five files jBPM can compile, in both directions.
+
+**The load-bearing detail: jBPM's _compile_ phase caught none of the three
+defects.** Once the missing bindings below were supplied it passed all three at
+zero errors, and only execution found them. A KIE gate that merely compiled
+would have been parse-level agreement — nearly free, and worth nearly nothing.
+That is why this harness runs the process.
+
+### Flavor axes, recorded the way the DMN axis is
+
+Every adaptation the harness applies is printed, because each printed line is a
+difference between what Camunda accepts and what an engine demands. The first
+three are engine-vs-modeller and are **not** defects:
+
+- **A0 `isExecutable="false"` → `true`.** Deliberate in the exporter (see
+  `L4/Bpmn/Emit.hs`) so Camunda will not apply executable-process validation to
+  a picture. Flipped in memory only; flipping it in the exporter would rewrite
+  three goldens.
+- **A1 abstract `<bpmn:task>` → `<bpmn:userTask>`.** jBPM needs an
+  implementation binding; Camunda and `bpmn-moddle` accept the abstract form.
+- **A2 end event with more than one incoming flow.** Spec-legal implicit merge,
+  accepted by Camunda; jBPM's `EndNode`/`FaultNode` both reject it. Splitting it
+  into N single-incoming copies is exactly equivalent, since each arriving token
+  ends independently.
+
+The remaining two are **real gaps in the emitted XML**, not tool disagreements:
+
+- **A3 — a diverging `exclusiveGateway` with no guard at all.**
+  `grep -c conditionExpression` over every fixture returns 0, and none sets
+  `default` either. `ROR` ("one of") emits a bare XOR split, so **no** engine can
+  decide the branch — this is not something Camunda accepts and jBPM rejects, it
+  is something nothing can execute. This is precisely the **F4 seam**: those
+  guards are what a referenced DMN decision would supply. The harness injects a
+  deterministic stand-in purely so execution can proceed.
+- **A4 — `handover.bpmn`'s conditional boundary event is L4 source text labelled
+  as a formal expression.** The body is
+  `<bpmn:condition xsi:type="bpmn:tFormalExpression">` `` `grace period` ``
+  `</bpmn:condition>` — a backticked L4 name, with no `language` attribute and no
+  `expressionLanguage` on `<definitions>`. So the file asserts this is a formal
+  expression in the default language while it is in fact an identifier. Camunda
+  Modeler renders it happily; Drools takes the claim at face value, tries to
+  parse it as DRL, and rejects the whole file with an ANTLR error. **This is the
+  one fixture no engine can run**, and it is a fidelity defect rather than a
+  flavor axis: the honest emission would set `language` to something naming L4,
+  or drop the `tFormalExpression` type.
+
+Also seen and deliberately ignored: non-fatal XSD chatter on stderr about
+`bpmn:tFormalExpression` for `timeDuration`, which does not stop compilation.
+
 ## How the defects in here were actually found
 
 Worth recording, because the two methods are different and neither would have

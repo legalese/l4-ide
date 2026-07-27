@@ -6,12 +6,19 @@
 // this asserts both directions:
 //
 //   jl4/examples/bpmn/expected/*.bpmn   MUST be reported SOUND   (exit 0)
-//   jl4/examples/bpmn/unsound/*.bpmn    MUST be reported UNSOUND (exit 1) with
-//                                       S2 (no deadlock) FAILING specifically
+//   jl4/examples/bpmn/unsound/*.bpmn    MUST be reported UNSOUND (exit 1), AND
+//                                       must fail the SPECIFIC property it was
+//                                       written to exercise, per EXERCISES below
 //
-// The second pile is the demonstration that this route catches the defect it
-// was added for: those two files are the historical deadlock shapes, and
-// bpmn-moddle passes both at zero warnings. See jl4/examples/bpmn/unsound/.
+// The second pile is the demonstration that this route catches the defects it
+// was added for, all of which bpmn-moddle passes at zero warnings. See
+// jl4/examples/bpmn/unsound/.
+//
+// Naming the property per fixture, rather than accepting any failure, is what
+// stops a fixture from "passing" for an incidental reason — a typo'd id would
+// make almost any file unsound and would otherwise look like proof. It also
+// forces every unsound fixture to be declared here: an undeclared one is a
+// failure, so the S-properties cannot silently drift out of coverage.
 //
 // Zero install, zero dependencies:
 //
@@ -31,6 +38,14 @@ const piles = [
   { dir: join(repo, "jl4/examples/bpmn/expected"), verdict: "SOUND", code: 0 },
   { dir: join(repo, "jl4/examples/bpmn/unsound"), verdict: "UNSOUND", code: 1 },
 ];
+
+// Which property each unsound fixture exists to make fail. Every .bpmn in the
+// unsound pile must appear here; see the header for why.
+const EXERCISES = {
+  "deadlock-boundary-in-rand.bpmn": "S2 no deadlock",
+  "deadlock-ror-in-rand.bpmn": "S2 no deadlock",
+  "unsafe-xor-join-after-rand.bpmn": "S4 safe (1-bounded)",
+};
 
 let failures = 0;
 let checked = 0;
@@ -69,12 +84,19 @@ for (const { dir, verdict, code } of piles) {
     if (status !== code) problems.push(`exit ${status}, expected ${code}`);
     if (!out.includes(`: ${verdict}`))
       problems.push(`did not report ${verdict}`);
-    // The unsound pile exists for one property; make sure it is that property
-    // that fires, not some incidental complaint.
-    if (verdict === "UNSOUND" && !/FAIL\s+S2 no deadlock/.test(out))
-      problems.push(
-        "S2 (no deadlock) did not fail — this fixture is a deadlock",
-      );
+    // Each unsound fixture exists for one property; make sure it is that
+    // property that fires, not some incidental complaint.
+    if (verdict === "UNSOUND") {
+      const want = EXERCISES[f];
+      if (!want)
+        problems.push(
+          `not listed in EXERCISES — declare which property this fixture exists to fail`,
+        );
+      else if (!out.includes(`FAIL  ${want}`))
+        problems.push(
+          `${want} did not fail — that is what this fixture is for`,
+        );
+    }
     if (verdict === "SOUND" && /FAIL/.test(out))
       problems.push("a property failed on a fixture expected to be sound");
 
