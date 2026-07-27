@@ -15,6 +15,14 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 
+Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
+
+| directory   | what it holds                    | required verdict                             |
+| ----------- | -------------------------------- | -------------------------------------------- |
+| `expected/` | exporter goldens, reproducible byte-for-byte by `l4 export` | SOUND       |
+| `sound/`    | hand-written diagrams the gate must **not** flag            | SOUND       |
+| `unsound/`  | hand-written and historical diagrams the gate **must** catch | UNSOUND, on a named property |
+
 ## What can be joined, and why so little of it
 
 `consultation.l4` exists because the other two decline, for two different and
@@ -107,6 +115,206 @@ deadlocked, four dropped `WITHIN` windows, and twelve edges drawn straight
 through unrelated nodes, all at zero warnings, while the Haskell suite was green
 at 1581 examples. Run it to catch a regression in the XML; read
 `BpmnExport.hs` for whether the XML says what the rule says.
+
+## Checking the diagram can actually finish
+
+A parser cannot see a process that never completes, so there is a second and
+independent check that plays the token game instead of reading the tags. Zero
+install, zero dependencies, no network:
+
+```sh
+node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+node etc/check-bpmn-soundness.selftest.mjs   # asserts both directions
+```
+
+It translates the process to a workflow net — places are sequence flows, plus
+one "this activity is running" place per activity carrying a boundary event —
+and explores every reachable marking. Four properties, in van der Aalst's
+vocabulary: **S1** option to complete, **S2** no deadlock, **S3** no dead flow
+node, **S4** safe. All three fixtures pass all four.
+
+Two things it deliberately does not do. It does not use `bpmn-moddle`, so a
+disagreement with `validate-bpmn.mjs` about what the graph even is shows up
+rather than being inherited. And it does not demand *proper completion* in the
+WF-net sense of one token in one sink: BPMN completes when every token has been
+consumed, several end events may each consume one, and the fork-without-join
+that `P-NOJOIN` describes is precisely that shape. Peak concurrent tokens is
+reported as information instead — `offering.bpmn` peaks at four, by design.
+
+S1 and S2 are the properties the deadlocking join violated, and
+`unsound/` holds two reconstructions of that shape to prove the check fires on
+it. `validate-bpmn.mjs` passes both at zero warnings; this one fails both with a
+witness trace naming the flow whose token never arrives.
+
+### The `incoming`/`outgoing` flavor axis
+
+The exporter writes connectivity only as `sourceRef`/`targetRef` on
+`<bpmn:sequenceFlow>`, and omits the optional `<bpmn:incoming>` /
+`<bpmn:outgoing>` back-references BPMN also allows on a flow node. Both are
+legal; the elements are `minOccurs="0"` in the XSD, and `bpmn-js` derives the
+connections from the refs, which is why Camunda Modeler renders the fixtures
+correctly and why K4 holds.
+
+Not every consumer derives them. **`bpmnlint`, Camunda's own linter, reads the
+back-references only**, and without them reports every node in every fixture —
+including the sound ones — as `no-disconnected`, `no-implicit-start` and
+`no-implicit-end`: 65 findings across three good files. Adding the
+back-references drops that to 3, all of them `label-required` on the unnamed
+start event.
+
+So this is a fidelity note about the emitted XML rather than a defect in it, and
+the fix is small if it is ever wanted. Recorded here for the same reason the DMN
+flavor axis is recorded: a construct one conforming tool accepts and another
+rejects is a property of the interchange, not of either tool.
+
+(`bpmnlint` finds nothing else on the fixtures, and — once the noise is removed
+— nothing at all on either deadlocking diagram. A linter is not an engine
+either.)
+
+## Asking an actual engine: the jBPM/KIE second opinion
+
+Both checks above are ours. `etc/check-bpmn-kie.sh` runs somebody else's — jBPM
+7.74.1.Final, a genuinely independent implementation that shares no code with
+`bpmn-js` — and it **executes** the process rather than reading it.
+
+```sh
+etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn
+```
+
+It needs `mvn` and a JDK 11+, downloads ~44 MB of pinned jars into a cache
+outside the repo on first run, and **exits 3 with a loud banner when that
+toolchain is absent** — never a silent pass. Nothing is added to `package.json`
+or the lockfile, and the Maven plugin is pinned as well as the dependencies.
+
+"Absent toolchain" and "broken harness" are deliberately **different exit
+codes**, because they have different owners and only one of them is ever
+tolerable: 3 is absent (and `--allow-skip` turns it into 0), 4 is broken, and
+`--allow-skip` does **not** silence a 4. A typo in the pinned pom, a compile
+error in `etc/kie/KieBpmnCheck.java`, and a JVM that dies before printing a
+verdict all exit 4. The verdict line itself is the sentinel: exit 1 is only
+trusted if the checker actually printed a `RESULT:`, because an
+`UnsupportedClassVersionError` also exits 1 and would otherwise be reported as a
+defect in a diagram.
+
+**It is not the gate, and it is not a replacement for either check above.**
+Work items auto-complete, so it explores exactly one interleaving: it can prove
+a deadlock exists but can never prove one absent. `check-bpmn-soundness.mjs`
+exhausts every reachable marking, which is why that one is the gate. What KIE
+adds is corroboration — when a foreign engine independently parks a token at the
+same join our token game names, that is evidence our hand-written semantics are
+right.
+
+How much exporter output it actually exercises is worth measuring rather than
+assuming, and the answer is: not much. Across the three goldens there is exactly
+**one** `exclusiveGateway` (in `handover.bpmn`) and **zero**
+`conditionExpression`s and **zero** `default` flows anywhere — so branching has
+never been exercised on exporter output at all, and the single fixture that has a
+real branch is the one jBPM rejects. Most of what the engine confirms, it
+confirms on files written by hand for this purpose.
+
+### It agrees, everywhere it can run
+
+| fixture                                       | `validate-bpmn.mjs` | `check-bpmn-soundness.mjs` | jBPM execution                       |
+| --------------------------------------------- | ------------------- | -------------------------- | ------------------------------------ |
+| `consultation.bpmn`                           | OK, 0 warnings      | SOUND                      | COMPLETED                            |
+| `offering.bpmn`                               | OK, 0 warnings      | SOUND                      | ABORTED via error end event `Breach` |
+| `handover.bpmn`                               | OK, 0 warnings      | SOUND                      | **rejected, see A4**                 |
+| `sound/joined-beside-breach.bpmn`             | OK, 0 warnings      | SOUND                      | COMPLETED                            |
+| `unsound/historical-handover-edge-counted-join.bpmn` | OK, 0 warnings | UNSOUND (S2)           | **rejected, see A4**                 |
+| `unsound/deadlock-boundary-in-rand.bpmn`      | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`** |
+| `unsound/deadlock-ror-in-rand.bpmn`           | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`** |
+| `unsound/unsafe-xor-join-after-rand.bpmn`     | OK, 0 warnings      | UNSOUND (S4)               | **DUPLICATION, `Fulfilled` fired 2x** |
+
+Agreement on all six files jBPM can compile, in both directions — with the
+`unsafe-xor-join` row carrying a caveat, because DUPLICATION is our firing-count
+heuristic layered on top of jBPM rather than jBPM's own verdict (which is
+COMPLETED). See `unsound/README.md`.
+
+**The load-bearing detail: jBPM's _compile_ phase caught none of the defects.**
+Once the missing guard below was supplied it passed all three compilable
+fixtures at zero errors, and only execution found anything. A KIE gate that
+merely compiled would have been parse-level agreement — nearly free, and worth
+nearly nothing. That is why this harness runs the process.
+
+**And the sharpest limit, stated plainly: the one fixture that is _real_ pre-fix
+exporter output is one jBPM cannot read.** `historical-handover-edge-counted-join.bpmn`
+is what the exporter actually emitted before `addJoin` was fixed, and it
+genuinely deadlocks; jBPM rejects it at compile time for axis A4, an unrelated
+expression-language problem. The soundness checker caught it. The engine could
+not be asked. Two hand-written reconstructions of the *same class* of defect are
+what jBPM does confirm.
+
+An earlier version of this table said "full agreement in both directions". That
+was overstated in two ways worth keeping on the record: `offering.bpmn` was
+producing a spurious DUPLICATION finding whose appearance depended on how many
+other files were on the command line (the firing census was keyed on node
+**name**, and adaptation A2 clones end events while keeping their names — so two
+distinct nodes firing once each were counted as one node firing twice); and the
+two tools' agreement on `offering.bpmn` was over different behaviours, since the
+soundness checker modelled its error end event as an ordinary sink while jBPM
+terminated the instance. Both are fixed; the second is described under
+`sound/joined-beside-breach.bpmn`.
+
+### Flavor axes, recorded the way the DMN axis is
+
+Every adaptation the harness applies is printed. **Not every printed line is a
+flavor axis**, and an earlier version of this section said otherwise; the
+printed labels now say which is which. A0, A1, A2 and A6 are engine-vs-modeller
+differences and are **not** defects:
+
+- **A0 `isExecutable="false"` → `true`.** Deliberate in the exporter (see
+  `L4/Bpmn/Emit.hs`) so Camunda will not apply executable-process validation to
+  a picture. Flipped in memory only; flipping it in the exporter would rewrite
+  three goldens.
+- **A1 abstract `<bpmn:task>` → `<bpmn:userTask>`.** jBPM needs an
+  implementation binding; Camunda and `bpmn-moddle` accept the abstract form.
+- **A2 end event with more than one incoming flow.** Spec-legal implicit merge,
+  accepted by Camunda; jBPM's `EndNode`/`FaultNode` both reject it. Splitting it
+  into N single-incoming copies is exactly equivalent, since each arriving token
+  ends independently. This is the one **structural** rewrite the harness makes,
+  and it is why "jBPM checks the emitted file" is not quite true: jBPM checks a
+  document this harness produced from it.
+- **A6 gateway with no `gatewayDirection`.** BPMN 2.0 makes the attribute
+  optional and defaults it to `Unspecified`; Camunda accepts its absence; jBPM
+  refuses outright with `Unknown gateway direction: null`. A genuine flavor axis
+  that **exporter output never reaches**, since every emitted gateway sets it —
+  so in practice this only ever fires on a hand-written file.
+
+A5 is neither, and used to be filed with the gaps below by mistake:
+
+- **A5 timer event definition with no `timeDuration`/`timeCycle`/`timeDate`.**
+  Purely defensive. The exporter emits a body on **every** timer event
+  definition, so this fires zero times across every fixture in this repository;
+  the only file that ever triggered it was a hand-written one that has since been
+  given the shape the exporter really emits. A binding the exporter never omits
+  is not a gap in the exporter, and not a disagreement between tools either.
+
+The remaining two are **real gaps in the emitted XML**, not tool disagreements:
+
+- **A3 — a diverging `exclusiveGateway` with no guard at all.**
+  `grep -c conditionExpression` over every fixture returns 0, and none sets
+  `default` either. `ROR` ("one of") emits a bare XOR split, so **no** engine can
+  decide the branch — this is not something Camunda accepts and jBPM rejects, it
+  is something nothing can execute. This is precisely the **F4 seam**: those
+  guards are what a referenced DMN decision would supply. The harness injects a
+  deterministic stand-in purely so execution can proceed — **which means the
+  single path jBPM explores is chosen by our own adaptation**, not by the file:
+  every multi-way exclusive gateway takes its first outgoing flow in document
+  order. Do not read the explored interleaving as representative.
+- **A4 — `handover.bpmn`'s conditional boundary event is L4 source text labelled
+  as a formal expression.** The body is
+  `<bpmn:condition xsi:type="bpmn:tFormalExpression">` `` `grace period` ``
+  `</bpmn:condition>` — a backticked L4 name, with no `language` attribute and no
+  `expressionLanguage` on `<definitions>`. So the file asserts this is a formal
+  expression in the default language while it is in fact an identifier. Camunda
+  Modeler renders it happily; Drools takes the claim at face value, tries to
+  parse it as DRL, and rejects the whole file with an ANTLR error. **This is the
+  one fixture no engine can run**, and it is a fidelity defect rather than a
+  flavor axis: the honest emission would set `language` to something naming L4,
+  or drop the `tFormalExpression` type.
+
+Also seen and deliberately ignored: non-fatal XSD chatter on stderr about
+`bpmn:tFormalExpression` for `timeDuration`, which does not stop compilation.
 
 ## How the defects in here were actually found
 
