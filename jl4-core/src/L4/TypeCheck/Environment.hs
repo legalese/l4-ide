@@ -3,6 +3,7 @@
 module L4.TypeCheck.Environment where
 
 import qualified Base.Map as Map
+import qualified Data.List as List
 import L4.Annotation
 import L4.Syntax
 import L4.TypeCheck.Types
@@ -903,9 +904,27 @@ waitUntilInfo :: CheckEntity
 waitUntilInfo = KnownTerm (forall' [a'Def, b'Def] (fun [MkOptionallyNamedType emptyAnno Nothing number] $ event (tyvar a'Ref) (tyvar b'Ref))) Computable
   where tyvar r = TyApp emptyAnno r []
 
+-- | The builtin scope: surface name -> the uniques it may denote.
+--
+-- Built with 'Map.fromListWith' rather than a plain 'Map.fromList', because two
+-- builtins may legitimately share one surface name across the term and type
+-- levels -- that is what 'rename' exists for (see the NOTE at the top of this
+-- module). A plain 'Map.fromList' resolves such a pun by keeping only the last
+-- entry, silently, which is exactly how the EVENT /type/ went missing behind
+-- its own EVENT constructor and left @GIVEN e IS AN EVENT ...@ unresolvable
+-- (issue #915).
+--
+-- Merging instead of overwriting is also what the rest of the subsystem already
+-- does: 'extendEnv' conses onto the candidate list, and the cross-module and
+-- LSP environment merges use @Map.unionWith List.union@. 'Environment' is an
+-- over-approximating candidate index by design; the resolvers narrow it, since
+-- 'resolveType' keeps only 'KnownType'/'KnownTypeVariable' candidates and
+-- term/constructor resolution keeps only 'KnownTerm' ones. @flip List.union@
+-- preserves the source order of this table and does not duplicate a unique
+-- listed twice.
 initialEnvironment :: Environment
 initialEnvironment =
-  Map.fromList
+  Map.fromListWith (flip List.union)
     [ (rawName booleanName,      [booleanUnique     ])
     , (rawName falseName,        [falseUnique       ])
     , (rawName trueName,         [trueUnique        ])
@@ -924,12 +943,12 @@ initialEnvironment =
     , (NormalName "PROVISION",   [contractUnique    ])  -- Deprecated alias for DEONTIC
     -- EVENT puns the type and its sole constructor: the un-renamed "event"
     -- builtin surfaces (uppercased) as "EVENT", the same surface name that
-    -- "eventC" is renamed to. Both uniques must therefore share the one key --
-    -- as two separate entries the Map.fromList silently dropped the type, so
-    -- `GIVEN e IS AN EVENT ...` was unresolvable (issue #915). Listing both is
-    -- safe: resolveType keeps only the type, term/constructor resolution keeps
-    -- only the constructor.
-    , (rawName eventName,        [eventUnique, eventCUnique])
+    -- "eventC" is renamed to, so the next two entries share one key. They both
+    -- survive only because of the 'Map.fromListWith' above; under the plain
+    -- 'Map.fromList' this table used to use, the constructor (listed second)
+    -- silently won and the EVENT type was dropped -- issue #915.
+    , (rawName eventName,        [eventUnique       ])
+    , (rawName eventCName,       [eventCUnique      ])
     , (rawName evalContractName, [evalContractUnique])
     , (rawName fulfilName,       [fulfilUnique      ])
     , (rawName isIntegerName,    [isIntegerUnique ])

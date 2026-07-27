@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: same-name-type-mismatch.l4
+  Hidden: no
+  Range: 27:9-27:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at same-name-type-mismatch.l4:26:8-17, namely
+
+      Verdict (Verdict defined at same-name-type-mismatch.l4:20:9-16)
+
+    but is here of type
+
+      Verdict (Verdict defined at same-name-type-mismatch.l4:23:9-16)

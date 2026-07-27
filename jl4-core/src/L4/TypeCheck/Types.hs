@@ -597,6 +597,92 @@ ambiguousType n xs = do
   u <- newUnique
   pure (OutOfScope u n)
 
+-- | Is this 'Resolved' the sentinel that 'outOfScope', 'ambiguousTerm' and
+-- 'ambiguousType' mint to make progress after a name-resolution failure?
+--
+-- Such a sentinel is only ever created *after* the corresponding
+-- 'OutOfScopeError' \/ 'AmbiguousTermError' \/ 'AmbiguousTypeError' has been
+-- reported, and its 'Unique' is deliberately never registered in the
+-- 'EntityInfo'. Anything we subsequently derive from it is therefore known
+-- garbage, and diagnostics about that garbage are cascade, not news.
+isOutOfScope :: Resolved -> Bool
+isOutOfScope OutOfScope{} = True
+isOutOfScope _            = False
+
+-- | Every 'Resolved' occurring in head (type constructor \/ type variable)
+-- position within a type, outermost first.
+--
+-- Deliberately hand-written rather than derived via @gplate@: we want exactly
+-- the names the type is *built from*, not whatever 'Resolved's may additionally
+-- be squirrelled away inside 'Anno' payloads.
+typeHeads :: Type' Resolved -> [Resolved]
+typeHeads (Type _)        = []
+typeHeads (TyApp _ n ts)  = n : concatMap typeHeads ts
+typeHeads (Fun _ onts t)  =
+  concatMap (typeHeads . optionallyNamedTypeType) onts ++ typeHeads t
+typeHeads (Forall _ _ t)  = typeHeads t
+typeHeads (InfVar _ _ _)  = []
+
+-- | Does this type mention a name-resolution failure sentinel anywhere?
+-- Such a type is poisoned: we do not know what it was supposed to be.
+mentionsOutOfScope :: Type' Resolved -> Bool
+mentionsOutOfScope = any isOutOfScope . typeHeads
+
+-- | Are these two types the same once every name-resolution sentinel is read as
+-- a wildcard matching anything?
+--
+-- This is the test for \"the mismatch between them is /caused by/ a resolution
+-- failure\", and it is much stronger than \"one of them /mentions/ a resolution
+-- failure somewhere\" — which is all 'mentionsOutOfScope' can say, being a
+-- whole-type predicate. A single poisoned sub-term is not licence to delete a
+-- diagnostic whose actual discrepancy lies between two types we did resolve:
+--
+-- @
+--   GIVEN xs IS A LIST OF Typo   -- Typo undeclared: LIST OF ⊥
+--   GIVETH A NUMBER
+--   h MEANS xs
+-- @
+--
+-- reports both the undeclared @Typo@ /and/ NUMBER-versus-LIST, and the latter
+-- is a genuine second defect: it survives verbatim once @Typo@ is declared. So
+-- @NUMBER@ vs @LIST OF ⊥@ is not compatible here (the heads differ, and neither
+-- head is a sentinel), whereas @⊥@ vs @Verdict@, @LIST OF ⊥@ vs
+-- @LIST OF NUMBER@ and @FUNCTION FROM ⊥ TO NUMBER@ vs
+-- @FUNCTION FROM Verdict TO NUMBER@ all are.
+--
+-- Conservative in the direction that matters: anything we cannot show to be
+-- pure fallout (differing arities, differing shapes, 'Forall's we do not
+-- alpha-rename) compares unequal, and the diagnostic is kept.
+sameModuloOutOfScope :: Type' Resolved -> Type' Resolved -> Bool
+sameModuloOutOfScope t1 t2
+  | poisonedHead t1 || poisonedHead t2 = True
+  | otherwise = case (t1, t2) of
+      (Type _, Type _) -> True
+      (TyApp _ r1 as1, TyApp _ r2 as2) ->
+        getUnique r1 == getUnique r2
+          && length as1 == length as2
+          && and (zipWith sameModuloOutOfScope as1 as2)
+      (Fun _ onts1 res1, Fun _ onts2 res2) ->
+        length onts1 == length onts2
+          && and
+               ( zipWith
+                   sameModuloOutOfScope
+                   (optionallyNamedTypeType <$> onts1)
+                   (optionallyNamedTypeType <$> onts2)
+               )
+          && sameModuloOutOfScope res1 res2
+      (Forall _ vs1 body1, Forall _ vs2 body2) ->
+        length vs1 == length vs2 && sameModuloOutOfScope body1 body2
+      (InfVar _ _ i1, InfVar _ _ i2) -> i1 == i2
+      _ -> False
+  where
+    -- Only a 'TyApp' can be headed by a sentinel: 'outOfScope' \/
+    -- 'ambiguousType' hand back a 'Resolved', and the only way one enters a
+    -- type is in type-constructor position.
+    poisonedHead :: Type' Resolved -> Bool
+    poisonedHead (TyApp _ r _) = isOutOfScope r
+    poisonedHead _             = False
+
 -- ----------------------------------------------------------------------------
 -- Info Map
 -- ----------------------------------------------------------------------------
@@ -1002,15 +1088,30 @@ type ToResolved = Optics.GPlate Resolved
 toResolved :: ToResolved a => a -> [Resolved]
 toResolved = Optics.toListOf Optics.gplate
 
--- | Should never return 'Nothing' if our system is OK.
+-- | Look up the entity a 'Resolved' refers to.
+--
+-- Returns 'Nothing' for an 'OutOfScope' sentinel *without* complaining: those
+-- 'Unique's are minted fresh by 'outOfScope' \/ 'ambiguousTerm' \/
+-- 'ambiguousType' and are deliberately never registered in the 'EntityInfo', so
+-- a miss is expected error recovery after an already-reported name-resolution
+-- failure — not an invariant violation. Reporting 'MissingEntityInfo' for them
+-- turned every unresolved or ambiguous name into a spurious "this is an error
+-- in this system and should be reported as a bug" (issue #920).
+--
+-- For every other 'Resolved' a miss really is an internal invariant violation
+-- ('extendEnv' registers 'environment' and 'entityInfo' together, so every
+-- 'Ref' \/ 'Def' unique has an entry), and we keep reporting it. After this
+-- change, 'MissingEntityInfo' means what its message claims.
 getEntityInfo :: Resolved -> Check (Maybe CheckEntity)
 getEntityInfo r = do
   ei <- asks (.entityInfo)
   case Map.lookup (getUnique r) ei of
-    Nothing       -> do
-      addError (MissingEntityInfo r)
-      pure Nothing
     Just (_n, ce) -> pure (Just ce)
+    Nothing
+      | isOutOfScope r -> pure Nothing
+      | otherwise      -> do
+          addError (MissingEntityInfo r)
+          pure Nothing
 
 -- | Given a substitution from uniques to types, substitute
 -- all occurrences of the given uniques. There's no scoping

@@ -194,7 +194,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 exportErrs = Export.validateExportInputs rprog
             in MkCheckResult
               { program = rprog
-              , errors = substErrs ++ moreErrs ++ exportErrs
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -204,6 +204,62 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
               }
+
+-- | Drop diagnostics that are pure fallout from a name-resolution failure that
+-- has already been reported (issue #920).
+--
+-- When 'resolveType' \/ 'resolveTerm'' cannot pick a binding, they report the
+-- real error ('OutOfScopeError', 'AmbiguousTermError', 'AmbiguousTypeError')
+-- and hand back an 'OutOfScope' sentinel so that checking can continue. Any
+-- type built on such a sentinel is poisoned: it unifies with nothing, so every
+-- 'expect' against it fails and emits a 'TypeMismatch' that tells the user
+-- nothing they were not already told — classically rendered as the useless
+-- "must match ... namely Verdict but is here of type Verdict".
+--
+-- Why filter here, at the boundary, instead of not raising the error in
+-- 'expect'? Because @addError@ is what makes a candidate of the backtracking
+-- 'Check' monad a failure. Silencing 'expect' would turn failing overload
+-- candidates into successes, and a set of poisoned candidates that all succeed
+-- is reported as 'InternalAmbiguityError' — trading one internal-error-grade
+-- message for another. Filtering the finished list leaves resolution, pruning
+-- and overload selection bit-for-bit unchanged and only removes the message.
+--
+-- Two properties keep this from hiding genuine errors:
+--
+-- * We only drop a 'TypeMismatch' that a sentinel /accounts for/: one whose two
+--   sides agree everywhere except at or under a sentinel
+--   ('sameModuloOutOfScope'). Merely /mentioning/ a sentinel is not enough, and
+--   deliberately so. @GIVEN xs IS A LIST OF Typo@ \/ @GIVETH A NUMBER@ \/
+--   @h MEANS xs@ mismatches NUMBER against @LIST OF ⊥@; both heads are
+--   resolved, they genuinely differ, and that error survives verbatim once
+--   @Typo@ is declared — so it is news, and it stays. Likewise
+--   @FUNCTION FROM ⊥ TO BOOLEAN@ against @FUNCTION FROM ⊥ TO NUMBER@: the
+--   poisoned argument matches, the BOOLEAN\/NUMBER return does not, and the
+--   mismatch is reported. What we drop is only the contentless kind: @⊥@
+--   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
+--
+-- * We only filter at all when a resolution failure is present in the same
+--   list, and resolution failures are themselves never dropped. So the error
+--   list can never be emptied by this function: a file that failed to check
+--   still fails to check, and still says why.
+suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
+suppressResolutionCascade errs
+  | any (isResolutionFailure . (.kind)) errs = filter (not . isCascade . (.kind)) errs
+  | otherwise                                = errs
+  where
+    isResolutionFailure :: CheckError -> Bool
+    isResolutionFailure = \ case
+      OutOfScopeError    {} -> True
+      AmbiguousTermError {} -> True
+      AmbiguousTypeError {} -> True
+      _                     -> False
+
+    isCascade :: CheckError -> Bool
+    isCascade = \ case
+      TypeMismatch _ec expected given ->
+        (mentionsOutOfScope expected || mentionsOutOfScope given)
+          && sameModuloOutOfScope expected given
+      _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
@@ -921,13 +977,18 @@ inferConDecl rappForm (MkConDecl ann n tns) = do
     conType = forall' (view appFormArgs rappForm) (fun (typedNameOptionallyNamedType <$> rtns) (appFormType rappForm))
     conInfo = KnownTerm conType Constructor
 
+  -- Data constructors are section-qualifiable too, so that @`Section`.yes@
+  -- names the constructor exactly as @`Section`.someValue@ names a value (#921).
+  -- Aliases only: see 'addQualifiedAliases' for why this must not also record a
+  -- section path for the constructor.
+  conCheckInfo <- addQualifiedAliases (makeKnown dn conInfo)
 
-  condecl <- extendKnownMany (makeKnown dn conInfo : concat extends) do
+  condecl <- extendKnownMany (conCheckInfo : concat extends) do
     -- See Note [Adding type information to all binders]
     MkConDecl ann
       <$> resolvedType dn
       <*> traverse (traverse resolvedType) rtns
-  pure (condecl, makeKnown dn conInfo : concat extends)
+  pure (condecl, conCheckInfo : concat extends)
 
 typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
 typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
@@ -989,7 +1050,11 @@ inferSelector rappForm (MkTypedName ann n t mTypically _mMeans) = do
     Nothing -> pure ()
   -- Note: computed fields (MEANS clause) are desugared before type checking,
   -- so _mExpr is always Nothing here. We pass Nothing in the output.
-  pure (MkTypedName ann dn rt rTypically Nothing, [makeKnown dn selectorInfo])
+  -- Record selectors are section-qualifiable for the same reason constructors
+  -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
+  -- only, as for constructors (see 'addQualifiedAliases').
+  selCheckInfo <- addQualifiedAliases (makeKnown dn selectorInfo)
+  pure (MkTypedName ann dn rt rTypically Nothing, [selCheckInfo])
 
 -- | Infers / checks a type to be of kind TYPE.
 inferType :: Type' Name -> Check (Type' Resolved)
@@ -2528,6 +2593,15 @@ withScanTypeAndSigEnvironment preScanDecls scanDecl scanTySig a act = do
 -- @
 --
 -- All of these can be used to refer to @foo@.
+--
+-- This function does two independent things, and callers care about the
+-- difference (see 'addQualifiedAliases'):
+--
+-- 1. it records each name's defining section path, which is what makes
+--    UNQUALIFIED references to it obey nearest-enclosing-section resolution
+--    ('selectByProximity'); and
+-- 2. it adds the qualified spellings, which is what makes QUALIFIED references
+--    to it resolve at all.
 withQualified :: [Resolved] -> CheckEntity -> Check CheckInfo
 withQualified rs ce = do
   sects <- asks (.sectionStack)
@@ -2536,8 +2610,22 @@ withQualified rs ce = do
   -- variants share the same 'Unique' as the original, so recording the original
   -- 'Unique's suffices. (A no-op at top level, where 'sects' is empty.)
   recordSectionPath sects (getUnique <$> rs)
+  qualRs <- qualifiedAliases rs
+  pure $ makeKnownMany (rs <> qualRs) ce
+
+-- | The section-qualified alias 'Resolved's of the given names, under the
+-- current section stack. Empty at top level, and empty for names that are
+-- already qualified or are predefined.
+--
+-- Each alias is a 'defAka' sharing the original's 'Unique', hence its
+-- 'CheckEntity' and its source range: it is the same entity under a second
+-- spelling, keyed in the environment under a 'QualifiedName' 'RawName' that no
+-- 'NormalName' lookup can ever reach.
+qualifiedAliases :: [Resolved] -> Check [Resolved]
+qualifiedAliases rs = do
+  sects <- asks (.sectionStack)
   case nonEmpty sects of
-    Nothing -> pure $ makeKnownMany rs ce
+    Nothing -> pure []
     Just (neSects :: NonEmpty (NonEmpty Text)) -> do
       let
         go :: Resolved -> Check [Resolved]
@@ -2557,8 +2645,30 @@ withQualified rs ce = do
             PreDef _ -> pure []
             QualifiedName _ _ -> pure []
 
-      qualRs <- Extra.concatMapM go rs
-      pure $ makeKnownMany (rs <> qualRs) ce
+      Extra.concatMapM go rs
+
+-- | Add the section-qualified spellings of every name an already-built
+-- 'CheckInfo' binds, and NOTHING else.
+--
+-- Deliberately not 'withQualified': that would additionally 'recordSectionPath'
+-- for the names, which is a change to how UNQUALIFIED references to them
+-- resolve, not merely a second way to spell them. Whether data constructors and
+-- record selectors should be ranked by section proximity the way values are is
+-- a real question — today they are not, and answering it is a separate change
+-- with its own spec and its own corpus fallout. #921 is only about giving them
+-- a qualified spelling, so this adds a qualified spelling and leaves
+-- 'sectionPaths' bit-for-bit as it was.
+--
+-- (Concretely: with the paths recorded, a constructor @yes@ declared in
+-- @§ Alpha@ stops being an ancestor of an unrelated @§ Gamma@, so a reference
+-- to @yes@ from @§ Gamma@ that used to pick the constructor becomes ambiguous
+-- against a same-typed value @yes@ in @§ Beta@ — and, in the other direction, a
+-- previously-ambiguous pair silently resolves to the top-level one. Neither
+-- belongs in a fix about spelling.)
+addQualifiedAliases :: CheckInfo -> Check CheckInfo
+addQualifiedAliases ci = do
+  qualRs <- qualifiedAliases ci.names
+  pure $ makeKnownMany (ci.names <> qualRs) ci.checkEntity
 
 -- ----------------------------------------------------------------------------
 -- Phase 1: Scan & Check Type Declarations (DECLARE & ASSUME)
@@ -2595,7 +2705,23 @@ inferTyDeclDeclare (MkDeclare ann _tysig appForm t) = prune $
   errorContext (WhileCheckingDeclare (getName appForm)) do
     lookupDeclTypeSigByAnno ann >>= \ declHead -> do
         extendKnownMany declHead.tyVars do
-          extendTySynonym <- inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
+          -- The section-qualified aliases must be regenerated here, not merely
+          -- inherited from 'scanTyDeclDeclare'. The scan-phase 'CheckInfo' (with
+          -- its qualified variants) is published only by 'withDeclareTypeSigs',
+          -- whose scope ends when the declare phase does; what survives into
+          -- 'inferProgram' is *this* 'CheckInfo', via 'withDeclares'. Without the
+          -- requalification a DECLARE'd type inside a section could not be named
+          -- as @`Section`.Type@ from anywhere outside the declare phase (#921).
+          -- We requalify the infer-phase entity rather than reuse
+          -- @declHead.name@ because only the former carries a type synonym's
+          -- expanded body (see 'inferTypeNameAndSynonym').
+          --
+          -- Aliases only ('addQualifiedAliases', not 'withQualified'): the type
+          -- name's section path was already recorded by 'scanTyDeclDeclare',
+          -- over the same 'Resolved's under the same section stack, so
+          -- re-recording it would be a no-op at best — and we want a guarantee,
+          -- not a coincidence, that this fix leaves resolution alone.
+          extendTySynonym <- addQualifiedAliases =<< inferTypeNameAndSynonym declHead.rappForm declHead.typeSynonym
           (rt, extendsTyDecl) <- inferTypeDecl declHead.rappForm t
           -- See Note [Adding type information to all binders]
           -- TODO: if we did this later during typecheck, we would be
@@ -4176,6 +4302,7 @@ prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
 prettyTypeMismatch ExpectConsArgument2Context expected given =
   standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
   , "The expression being matched here is"
   , ""
@@ -4183,41 +4310,44 @@ prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   , ""
   , "of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the type of this pattern is"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectIfBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "Both the THEN and the ELSE branch of an IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs must have the same type."
   , "From looking at the context, if have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectConsiderBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All branches in a CONSIDER construct must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectHomogeneousListContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All elements in a LIST literal must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this element is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectDecideSignatureContext Nothing) expected given =
   standardTypeMismatch [ "From looking at the context, I have inferred that the type of this definition must be" ] expected given
@@ -4299,14 +4429,56 @@ prettyOrdinal n = Text.pack (show n) <> "th"
 
 standardTypeMismatch :: [Text] -> Type' Resolved -> Type' Resolved -> [Text]
 standardTypeMismatch prefix expected given =
-  prefix ++
-  [ ""
-  , "  " <> prettyLayout expected
-  , ""
-  , "but is here of type"
-  , ""
-  , "  " <> prettyLayout given
-  ]
+  let (e, g) = prettyMismatchedTypes expected given
+  in prefix ++
+     [ ""
+     , "  " <> e
+     , ""
+     , "but is here of type"
+     , ""
+     , "  " <> g
+     ]
+
+-- | Render the two sides of a type mismatch so that they can be told apart.
+--
+-- 'prettyLayout' prints a type from its surface names only — 'Unique's are
+-- never part of any rendering — so two distinct types that happen to be spelled
+-- the same (two @DECLARE Verdict@s in sibling sections, say) produced the
+-- famously unhelpful
+--
+-- > must match ... namely
+-- >   Verdict
+-- > but is here of type
+-- >   Verdict
+--
+-- When the two renderings collide we therefore append, to each side, where the
+-- user-defined names it is built from were declared. Predefined names carry no
+-- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
+-- if nothing can be said we fall back to the plain rendering rather than emit
+-- an empty parenthesis. Sentinels from failed resolution are skipped too: their
+-- 'getOriginal' is the *reference* site, so labelling it "defined at" would lie
+-- (those mismatches are normally suppressed by 'suppressResolutionCascade'
+-- anyway).
+prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
+prettyMismatchedTypes expected given
+  | e /= g    = (e, g)
+  | otherwise = (annotate expected e, annotate given g)
+  where
+    e = prettyLayout expected
+    g = prettyLayout given
+
+    annotate :: Type' Resolved -> Text -> Text
+    annotate t rendered =
+      case mapMaybe describeHead (nubOrdOn getUnique (typeHeads t)) of
+        []          -> rendered
+        descriptions -> rendered <> " (" <> Text.intercalate ", " descriptions <> ")"
+
+    describeHead :: Resolved -> Maybe Text
+    describeHead r
+      | isOutOfScope r = Nothing
+      | otherwise      = do
+          range <- rangeOf (getOriginal r)
+          pure (prettyLayout r <> " defined at " <> prettySrcRange range)
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =

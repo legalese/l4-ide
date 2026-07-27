@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+cross-section-qualified-additive.l4:59:1-13:
+  yes
+cross-section-qualified-additive.l4:60:1-32:
+  5
+cross-section-qualified-additive.l4:61:1-17:
+  no
+cross-section-qualified-additive.l4:62:1-16:
+  yes
+cross-section-qualified-additive.l4:63:1-16:
+  7
