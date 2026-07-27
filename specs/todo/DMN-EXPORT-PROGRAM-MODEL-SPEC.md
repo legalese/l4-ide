@@ -1351,8 +1351,7 @@ payload constructor with `AppNamed`, **15** pass it on, **13** merely thread the
 
 > **The leaning's stated reason was wrong; recorded rather than quietly dropped.** §11-R4 read
 > "leaning refusal for v1; the corpora do not need it." True for Reg CF and Charities. **False for
-> Housing**, where three grounds model a statutory alternation as typed data deliberately — **[E]**
-> `housing-act-ground-1A.l4:51-57` says so: _"as TYPED DATA (not reflection) … Whether a granted
+> Housing**, where three grounds model a statutory alternation as typed data deliberately — **[E]** > `housing-act-ground-1A.l4:51-57` says so: _"as TYPED DATA (not reflection) … Whether a granted
 > lease counts as a 'long lease' … is a STRUCTURAL PROPERTY of the intended instrument's data."_ The
 > conclusion survives in narrowed form; its premise does not.
 
@@ -2421,6 +2420,7 @@ may be obsolete by the time either side ships.
   exists in the session scratchpad; run it, with a genuinely-gapped table as positive control.
 
   **Phrase the resulting claim carefully.** Two different things get called "DMN's analysis":
+
   1. the **analysable fragment** — a mathematical property (Calvanese et al.), vendor-independent
      and true of the artifact whether or not anyone runs a checker;
   2. an **implementation** of completeness/overlap checking, which appears to vary by vendor and
