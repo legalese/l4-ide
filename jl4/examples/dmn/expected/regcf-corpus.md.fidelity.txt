@@ -1,6 +1,6 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_sec_regulation_crowdfunding_17_cfr_part_227
-      dmnmd is a table format, not a graph: the 141 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 140 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOLITERAL] blocking — decision_offering_maximum_in_a_12_month_period
       `offering maximum in a 12-month period` is a formula (5000000), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -132,7 +132,7 @@ fidelity report — dmnmd
       `definition — terms of the offering` is a formula (true and true), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_advertising_restriction
-      `advertising restriction` is a formula (IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering` WITHIN `days in the resale restricted period`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `advertising restriction` is a formula (IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_b_1_became_an_exchange_act_reporting_company
       `(b)(1) — became an Exchange Act reporting company` is a formula (true and status.the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

@@ -488,13 +488,24 @@ GIVETH A BOOLEAN
 -- Rule 204(a)(1) is a prohibition with an exception, so it is regulative: the
 -- issuer SHANT advertise, unless the communication is a conforming Rule 204(b)
 -- notice (or falls within Rule 206, which is outside the mirrored scope).
+--
+-- Deliberately UNDEADLINED. §227.204 contains no temporal limit at all — its
+-- only temporal word is "period", inside the phrase "the closing date of the
+-- offering period" in the 204(e) definition, which bounds nothing. An earlier
+-- draft wrote `WITHIN `days in the resale restricted period``, borrowing the
+-- 365 days from Rule 501(a); that is a different rule about a different party
+-- (resale by a Purchaser, not advertising by the Issuer). It was not merely
+-- decorative: `SHANT ... WITHIN n` SUNSETS at n, so the borrowed deadline made
+-- the prohibition expire after a year and an issuer advertising on day 400
+-- evaluated to FULFILLED. Removed 2026-07-28. An unqualified SHANT holds for
+-- the life of the contract, which is what the rule says.
 @ref 17 CFR 227.204(a)(1)
 GIVEN notice IS AN AdvertisingNotice
 GIVETH A DEONTIC Actor Action
 `advertising restriction` notice MEANS
     IF   `notice complies with Rule 204(b)` notice
     THEN FULFILLED
-    ELSE PARTY Issuer SHANT `advertise the terms of the offering` WITHIN `days in the resale restricted period`
+    ELSE PARTY Issuer SHANT `advertise the terms of the offering`
 
 § `7. Ongoing reporting — Rules 202, 203(b)`
 

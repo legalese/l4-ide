@@ -158,106 +158,106 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_definition_terms_of_the_offering  (main.l4:485:9-486:13)
       `definition — terms of the offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_advertising_restriction  (main.l4:495:5-497:112)
+  [D-LITERALEXPR] blocking — decision_advertising_restriction  (main.l4:506:5-508:66)
       `advertising restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:514:9-515:115)
+  [D-LITERALEXPR] blocking — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:525:9-526:115)
       `(b)(1) — became an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:521:9-523:77)
+  [D-LITERALEXPR] blocking — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:532:9-534:77)
       `(b)(2) — one annual report filed and fewer than 300 holders of record` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:529:9-531:65)
+  [D-LITERALEXPR] blocking — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:540:9-542:65)
       `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_4_all_securities_repurchased  (main.l4:537:9-538:123)
+  [D-LITERALEXPR] blocking — decision_b_4_all_securities_repurchased  (main.l4:548:9-549:123)
       `(b)(4) — all securities repurchased` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_5_liquidated_or_dissolved  (main.l4:544:9-545:100)
+  [D-LITERALEXPR] blocking — decision_b_5_liquidated_or_dissolved  (main.l4:555:9-556:100)
       `(b)(5) — liquidated or dissolved` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation_may_terminate  (main.l4:551:9-556:50)
+  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation_may_terminate  (main.l4:562:9-567:50)
       `ongoing reporting obligation may terminate` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation  (main.l4:568:5-573:84)
+  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation  (main.l4:579:5-584:84)
       `ongoing reporting obligation` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:595:9-596:108)
+  [D-LITERALEXPR] blocking — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:606:9-607:108)
       `transfer is within the one-year restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:602:9-610:313)
+  [D-LITERALEXPR] blocking — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:613:9-621:313)
       `transfer falls within an exception in Rule 501(a)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_is_permitted  (main.l4:616:8-617:68)
+  [D-LITERALEXPR] blocking — decision_transfer_is_permitted  (main.l4:627:8-628:68)
       `transfer is permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_resale_restriction  (main.l4:623:5-625:103)
+  [D-LITERALEXPR] blocking — decision_resale_restriction  (main.l4:634:5-636:103)
       `resale restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:644:9-649:58)
+  [D-LITERALEXPR] blocking — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:655:9-660:58)
       `the transaction qualifies for the section 4(a)(6) exemption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_clean_issuer  (main.l4:655:24-662:168)
+  [D-LITERALEXPR] blocking — decision_a_clean_issuer  (main.l4:666:24-673:168)
       `a clean issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_foreign_issuer  (main.l4:664:26-671:168)
+  [D-LITERALEXPR] blocking — decision_a_foreign_issuer  (main.l4:675:26-682:168)
       `a foreign issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_delinquent_issuer  (main.l4:675:29-682:168)
+  [D-LITERALEXPR] blocking — decision_a_delinquent_issuer  (main.l4:686:29-693:168)
       `a delinquent issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_blank_check_issuer  (main.l4:684:30-691:167)
+  [D-LITERALEXPR] blocking — decision_a_blank_check_issuer  (main.l4:695:30-702:167)
       `a blank-check issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_offering_of  (main.l4:697:66-701:111)
+  [D-LITERALEXPR] blocking — decision_an_offering_of  (main.l4:708:66-712:111)
       `an offering of` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_investor_with  (main.l4:708:66-713:147)
+  [D-LITERALEXPR] blocking — decision_an_investor_with  (main.l4:719:66-724:147)
       `an investor with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_arrangement_with  (main.l4:718:63-724:135)
+  [D-LITERALEXPR] blocking — decision_an_arrangement_with  (main.l4:729:63-735:135)
       `an arrangement with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_reporting_status_with  (main.l4:730:69-736:112)
+  [D-LITERALEXPR] blocking — decision_a_reporting_status_with  (main.l4:741:69-747:112)
       `a reporting status with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_transfer_at  (main.l4:741:58-746:307)
+  [D-LITERALEXPR] blocking — decision_a_transfer_at  (main.l4:752:58-757:307)
       `a transfer at` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_certified  (main.l4:813:19-115)
+  [D-LITERALEXPR] blocking — decision_certified  (main.l4:824:19-115)
       `certified` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_reviewed  (main.l4:816:18-85)
+  [D-LITERALEXPR] blocking — decision_reviewed  (main.l4:827:18-85)
       `reviewed` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_audited  (main.l4:819:17-83)
+  [D-LITERALEXPR] blocking — decision_audited  (main.l4:830:17-83)
       `audited` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_conforming_notice  (main.l4:852:29-857:167)
+  [D-LITERALEXPR] blocking — decision_a_conforming_notice  (main.l4:863:29-868:167)
       `a conforming notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_overreaching_notice  (main.l4:859:32-864:166)
+  [D-LITERALEXPR] blocking — decision_an_overreaching_notice  (main.l4:870:32-875:166)
       `an overreaching notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_notice_with_no_platform_link  (main.l4:866:40-871:167)
+  [D-LITERALEXPR] blocking — decision_a_notice_with_no_platform_link  (main.l4:877:40-882:167)
       `a notice with no platform link` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_conforming_filing  (main.l4:937:29-940:176)
+  [D-LITERALEXPR] blocking — decision_a_conforming_filing  (main.l4:948:29-951:176)
       `a conforming filing` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_base_case_qualifies  (main.l4:947:5-949:59)
+  [D-LITERALEXPR] blocking — decision_the_base_case_qualifies  (main.l4:958:5-960:59)
       `the base case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_delinquent_issuer_case_qualifies  (main.l4:954:5-956:59)
+  [D-LITERALEXPR] blocking — decision_the_delinquent_issuer_case_qualifies  (main.l4:965:5-967:59)
       `the delinquent-issuer case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_over_limit_investor_case_qualifies  (main.l4:960:5-962:59)
+  [D-LITERALEXPR] blocking — decision_the_over_limit_investor_case_qualifies  (main.l4:971:5-973:59)
       `the over-limit-investor case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_short_availability_case_qualifies  (main.l4:966:5-968:59)
+  [D-LITERALEXPR] blocking — decision_the_short_availability_case_qualifies  (main.l4:977:5-979:59)
       `the short-availability case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_under_assured_financials_case_qualifies  (main.l4:973:5-975:59)
+  [D-LITERALEXPR] blocking — decision_the_under_assured_financials_case_qualifies  (main.l4:984:5-986:59)
       `the under-assured-financials case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-UNDECOMPOSABLE] advisory — decision_investment_limit  (main.l4:310:10-81)

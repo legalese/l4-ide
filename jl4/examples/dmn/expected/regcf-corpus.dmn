@@ -727,16 +727,13 @@
   <decision id="decision_advertising_restriction" name="advertising_restriction" label="advertising restriction">
     <variable id="decision_advertising_restriction_var" name="advertising_restriction" label="advertising restriction" typeRef="Any"/>
     <informationRequirement id="decision_advertising_restriction_ir1">
-      <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
-    </informationRequirement>
-    <informationRequirement id="decision_advertising_restriction_ir2">
       <requiredDecision href="#decision_notice_complies_with_rule_204_b"/>
     </informationRequirement>
-    <informationRequirement id="decision_advertising_restriction_ir3">
+    <informationRequirement id="decision_advertising_restriction_ir2">
       <requiredInput href="#input_notice_2"/>
     </informationRequirement>
     <literalExpression id="decision_advertising_restriction_literal">
-      <text>IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering` WITHIN `days in the resale restricted period`)</text>
+      <text>IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_1_became_an_exchange_act_reporting_company" name="b_1_became_an_Exchange_Act_reporting_company" label="(b)(1) — became an Exchange Act reporting company">
@@ -1811,14 +1808,10 @@
         <di:waypoint x="5870" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_advertising_restriction_ir1_edge" dmnElementRef="decision_advertising_restriction_ir1">
-        <di:waypoint x="3010" y="860"/>
-        <di:waypoint x="1250" y="780"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_advertising_restriction_ir2_edge" dmnElementRef="decision_advertising_restriction_ir2">
         <di:waypoint x="5870" y="860"/>
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_advertising_restriction_ir3_edge" dmnElementRef="decision_advertising_restriction_ir3">
+      <dmndi:DMNEdge id="decision_advertising_restriction_ir2_edge" dmnElementRef="decision_advertising_restriction_ir2">
         <di:waypoint x="6310" y="1020"/>
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>

@@ -31,12 +31,12 @@
     </bpmn:exclusiveGateway>
     <bpmn:endEvent id="End_1" name="Fulfilled" />
     <bpmn:task id="Task_2" name="SHANT advertise the terms of the offering">
-      <bpmn:documentation>PARTY Issuer SHANT advertise the terms of the offering WITHIN `days in the resale restricted period` — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+      <bpmn:documentation>PARTY Issuer SHANT advertise the terms of the offering — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Boundary_2" name="deadline passes, not performed" attachedToRef="Task_2" cancelActivity="true">
-      <bpmn:documentation>the deadline passes (`days in the resale restricted period`) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
+    <bpmn:boundaryEvent id="Boundary_2" name="unreachable: no WITHIN" attachedToRef="Task_2" cancelActivity="true">
+      <bpmn:documentation>the prohibition is respected once its deadline passes with the act not performed, so this is the HENCE arm — but the rule sets no WITHIN, so nothing reaches it: a prohibition with no deadline is discharged by neither the clock nor the act</bpmn:documentation>
       <bpmn:conditionalEventDefinition id="Cond_Boundary_2">
-        <bpmn:condition xsi:type="bpmn:tFormalExpression">`days in the resale restricted period`</bpmn:condition>
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">unreachable: no WITHIN</bpmn:condition>
       </bpmn:conditionalEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Breach">
