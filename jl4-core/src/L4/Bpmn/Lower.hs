@@ -363,8 +363,33 @@ stateGraphToBpmn opts sg =
       , n <- c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse
       ]
 
+  -- Where an edge from ANOTHER state lands when it arrives here.
+  --
+  -- A @\<startEvent\>@ is instance creation, not a re-entry point, and BPMN
+  -- gives it no incoming sequence flow. So an arrival skips it and lands on the
+  -- node it flows to — which for the initial state is the gateway or task
+  -- 'chainFor' already put after it, and which is where the loop belongs
+  -- anyway: the renewal re-tests the guards, it does not re-start the process.
+  --
+  -- This is not a stylistic preference. @HENCE \<this rule\>@ (see
+  -- 'L4.StateGraph.TargetSelf') is the shape that first pointed an edge back at
+  -- the initial state, and drawing it at @Start_0@ produced a file that
+  -- @etc\/check-bpmn-soundness.mjs@ refuses to play ("no start event to put a
+  -- token on") and that jBPM refuses to parse outright: /A start node
+  -- [Start_0, null] may not have an incoming connection!/ Two independent
+  -- engines, one defect.
+  --
+  -- The fallback keeps the start node when the chain has nothing else in it, so
+  -- that an arrival is still drawn rather than silently dropped. An edge the
+  -- reader cannot see is worse than one a checker will complain about; today no
+  -- such chain exists, because a state anything can point back at has an
+  -- obligation or a fan, and either adds a node after the start event.
   entryOf :: StateId -> Maybe Text
-  entryOf sid = chainOf sid >>= \c -> (.nodeId) <$> listToMaybe c.scNodes
+  entryOf sid =
+    chainOf sid >>= \c ->
+      (.nodeId)
+        <$> (listToMaybe (dropWhile ((== StartEvent) . (.nodeKind)) c.scNodes)
+               <|> listToMaybe c.scNodes)
 
   nodeOfKind :: (NodeKind -> Bool) -> StateId -> Maybe Text
   nodeOfKind p sid =

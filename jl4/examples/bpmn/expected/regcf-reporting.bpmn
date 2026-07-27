@@ -65,25 +65,25 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2" />
     <bpmn:sequenceFlow id="Flow_Boundary_1__End_3" sourceRef="Boundary_1" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Task_4__Start_0" sourceRef="Task_4" targetRef="Start_0" />
+    <bpmn:sequenceFlow id="Flow_Task_4__Split_0" sourceRef="Task_4" targetRef="Split_0" />
     <bpmn:sequenceFlow id="Flow_Boundary_4__End_3" sourceRef="Boundary_4" targetRef="End_3" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_ongoing_reporting_obligation">
       <bpmndi:BPMNShape id="Shape_Participant_ongoing_reporting_obligation" bpmnElement="Participant_ongoing_reporting_obligation" isHorizontal="true">
-        <dc:Bounds x="130" y="80" width="1670" height="680" />
+        <dc:Bounds x="130" y="80" width="1670" height="560" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_1_Issuer" bpmnElement="Lane_1_Issuer" isHorizontal="true">
         <dc:Bounds x="160" y="80" width="1640" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
-        <dc:Bounds x="160" y="360" width="1640" height="400" />
+        <dc:Bounds x="160" y="360" width="1640" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
-        <dc:Bounds x="1672" y="402" width="36" height="36" />
+        <dc:Bounds x="232" y="402" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
-        <dc:Bounds x="1665" y="515" width="50" height="50" />
+        <dc:Bounds x="1665" y="395" width="50" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
         <dc:Bounds x="1640" y="100" width="100" height="80" />
@@ -92,7 +92,7 @@
         <dc:Bounds x="1694" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
-        <dc:Bounds x="1672" y="642" width="36" height="36" />
+        <dc:Bounds x="1672" y="522" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
         <dc:Bounds x="1492" y="402" width="36" height="36" />
@@ -104,51 +104,53 @@
         <dc:Bounds x="1694" y="282" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
-        <di:waypoint x="1708" y="420" />
-        <di:waypoint x="1754" y="420" />
-        <di:waypoint x="1754" y="540" />
-        <di:waypoint x="1665" y="540" />
+        <di:waypoint x="268" y="420" />
+        <di:waypoint x="314" y="420" />
+        <di:waypoint x="314" y="480" />
+        <di:waypoint x="1574" y="480" />
+        <di:waypoint x="1574" y="420" />
+        <di:waypoint x="1665" y="420" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_1" bpmnElement="Flow_Split_0__Task_1">
-        <di:waypoint x="1715" y="540" />
-        <di:waypoint x="1764" y="540" />
-        <di:waypoint x="1764" y="140" />
+        <di:waypoint x="1715" y="420" />
+        <di:waypoint x="1754" y="420" />
+        <di:waypoint x="1754" y="140" />
         <di:waypoint x="1640" y="140" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__End_2" bpmnElement="Flow_Split_0__End_2">
-        <di:waypoint x="1715" y="540" />
-        <di:waypoint x="1774" y="540" />
-        <di:waypoint x="1774" y="660" />
-        <di:waypoint x="1672" y="660" />
+        <di:waypoint x="1715" y="420" />
+        <di:waypoint x="1767" y="420" />
+        <di:waypoint x="1767" y="540" />
+        <di:waypoint x="1672" y="540" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_4" bpmnElement="Flow_Split_0__Task_4">
-        <di:waypoint x="1715" y="540" />
-        <di:waypoint x="1784" y="540" />
-        <di:waypoint x="1784" y="260" />
+        <di:waypoint x="1715" y="420" />
+        <di:waypoint x="1780" y="420" />
+        <di:waypoint x="1780" y="260" />
         <di:waypoint x="1640" y="260" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Task_1__End_2" bpmnElement="Flow_Task_1__End_2">
         <di:waypoint x="1740" y="140" />
-        <di:waypoint x="1794" y="140" />
-        <di:waypoint x="1794" y="660" />
-        <di:waypoint x="1672" y="660" />
+        <di:waypoint x="1793" y="140" />
+        <di:waypoint x="1793" y="540" />
+        <di:waypoint x="1672" y="540" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__End_3" bpmnElement="Flow_Boundary_1__End_3">
         <di:waypoint x="1712" y="198" />
-        <di:waypoint x="1574" y="198" />
-        <di:waypoint x="1574" y="420" />
+        <di:waypoint x="1587" y="198" />
+        <di:waypoint x="1587" y="420" />
         <di:waypoint x="1492" y="420" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__Start_0" bpmnElement="Flow_Task_4__Start_0">
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__Split_0" bpmnElement="Flow_Task_4__Split_0">
         <di:waypoint x="1740" y="260" />
-        <di:waypoint x="1804" y="260" />
-        <di:waypoint x="1804" y="420" />
-        <di:waypoint x="1672" y="420" />
+        <di:waypoint x="1806" y="260" />
+        <di:waypoint x="1806" y="420" />
+        <di:waypoint x="1665" y="420" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_3" bpmnElement="Flow_Boundary_4__End_3">
         <di:waypoint x="1712" y="318" />
-        <di:waypoint x="1584" y="318" />
-        <di:waypoint x="1584" y="420" />
+        <di:waypoint x="1600" y="318" />
+        <di:waypoint x="1600" y="420" />
         <di:waypoint x="1492" y="420" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
