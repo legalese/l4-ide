@@ -1645,6 +1645,20 @@ the joint name is declared, which an exporter always does.
 So mangling is a **portability decision about Camunda** (whose engine does forbid whitespace in
 names), not a correctness fix. What _is_ broken today is narrower and worse:
 
+> **Superseded in part, 2026-07-27 — see §13.2.** "Spaces work" is true of KIE, feelin and
+> dmn-eval-js and **false of Camunda, in the silent-wrong-answer direction**: `annual income` is
+> tokenised as `annual` `in` `come` — the membership operator — and answers a **boolean** rather
+> than the number. EXECUTED on Camunda 8.7.6 against a model declaring `annual income` = 100000,
+> `annual` = 5, `come` = [1,2,5]: it answers `true`, identically to `annual in come`, where KIE
+> 8.44 answers `100000` (§13.2). The shipped golden throws on 4 of 5 decisions in Camunda 7
+> (QUOTED) and is rejected outright at `parse()` by Camunda 8 (EXECUTED). Mangling is therefore
+> **not** an optional portability preference — under R7 it is a correctness fix, and §5.2 is the
+> policy. The three defects below stand unchanged; item 4 is added.
+>
+> Also measured: the two engines **bind the FEEL name off different attributes** — KIE off the
+> node's `@name`, Camunda off the `<variable>`'s `@name`. Today's exporter mangles only the
+> latter, which is why the same file fails both, for opposite reasons.
+
 1. **`feelIdentText` passes dots through** — `keep c | c elem " _."` (`IR.hs:260-270`). An L4
    name containing `.` injects a FEEL path expression and silently shadows a genuine projection,
    with no warning. This is the E7 silent-misreading class, in our own code. **Fix this first;
@@ -1654,6 +1668,23 @@ names), not a correctness fix. What _is_ broken today is narrower and worse:
 3. **Keyword-_initial_ names** are the genuine hazard. §10.3.1.4: a name start SHALL NOT be a
    literal terminal symbol; a name _part_ MAY be. Keyword-inner is fine, which retires the worry
    about legal English being full of `in`, `for`, `between`.
+4. **The declaration side is mangled and the node side is not** — `Emit.hs:135` emits
+   `<inputData name="first-time issuer">` verbatim while `Emit.hs:141` emits
+   `<variable name="first_time issuer">` through `feelIdentText`. `feelIdentText`'s own
+   doc-comment claims the declaring and referencing sides "always agree"; the node `@name` is the
+   place that does not go through it. KIE fires `VARIABLE_NAME_MISMATCH` **and then fails to
+   build**. Added 2026-07-27; measured, see §13.2.
+
+> **Status, 2026-07-27 (revised the same day under review).** Items **1 and 4 are FIXED** and both
+> engines are green on the re-blessed golden, at 25 expected values over 5 contexts (§13.7). Items
+> **2 and 3 are still open**: type names still go through the same function, and no reserved-word
+> suffix is applied. §5.2's stage 1 is implemented as far as step 5; step 6 and the whole of stage
+> 2 (`uniquifyIn`) remain Phase 2 work, so distinct L4 names can still collapse onto one FEEL name
+> — and mapping space and `.` to `_` **widens** that collision domain rather than leaving it
+> unchanged. Every such collision is now reported by **`D-FEELNAME` at `Blocking`**, across the
+> whole DRG namespace rather than the `inputData` half of it; measured engine behaviour is in
+> §13.7-1. `@label` additionally keeps the L4 name visible in the file. Detection is not
+> resolution: `uniquifyIn` is still the fix and is still Phase 2.
 
 ### 5.2 The policy
 
@@ -2033,6 +2064,13 @@ nothing.
 
 ### 6.3 Refuse loudly — three cases, not BKMs in general
 
+> **Case 3 narrowed 2026-07-27 by R7 (§13.3).** It read as an instruction to _suppress_ BKM
+> emission under a target engine. Measurement retired that: KIE and Camunda 8 — the two flavors
+> this exporter emits — both execute BKMs in every probed form, so **BKM is built once, for both
+> flavors, ungated**. What survives is a **fidelity note**, not a suppression, and it is keyed to
+> consumers we do not emit for (`@hbtgmbh/dmn-eval-js`, Camunda 7). Read case 3 below with that
+> substitution.
+
 1. **Recursion.** DMN §6.3.9 (Business Knowledge Model metamodel): "a BusinessKnowledgeModel
    element SHALL not require itself, directly or indirectly". KIE
    evaluates recursive BKMs anyway (`fact(5)=120`) but emits a spurious eval-time ERROR and the
@@ -2045,6 +2083,9 @@ nothing.
 2. **Partial application / higher-order.** A BKM is a first-order named function only.
 3. **Non-KIE target engines.** `@hbtgmbh/dmn-eval-js` has no BKM support and fails **silently**:
    an unresolvable callee in a cell logs `resolved to undefined` and the table falls through to
+   the next rule, returning a plausible wrong answer. ~~If the exporter claims a target engine,
+   gate BKM emission on it.~~ **Superseded — name it in the fidelity report; do not gate emission
+   on it.** See the note at the head of this section.
    the next rule, returning a plausible wrong answer. If the exporter claims a target engine,
    gate BKM emission on it. (**Narrowed 2026-07-27 by R7/§13:** KIE and Camunda 8 both execute BKMs
    in every probed form, so this is not a flavor axis. It survives as a refusal keyed to
@@ -2464,6 +2505,13 @@ Each phase is independently shippable and independently useful.
 Phase 1 alone makes the existing exhibit's analysability claim true, which is worth shipping on
 its own.
 
+**Amended 2026-07-27 by R7 — see §13.7 for the added rows.** In summary: Phase 0 grows the uniform
+`feelBase` fix (which is now a correctness fix, not a portability preference), the two committed
+engine harnesses, and the `DmnFlavor` seam; Phase 2 loses its flavor branch, because naming was
+measured not to diverge; Phase 5 gains the one bit that does diverge and is where the goldens
+split. **Phase 0's naming item was a red gate — the shipped golden failed both engines — and it
+landed 2026-07-27; both harnesses are green on both flavors (§11-R7, §13.7).**
+
 ---
 
 ## 11. Open rulings
@@ -2597,15 +2645,105 @@ tenancy to another person` — **2 of the 12 decision tables the entire 51-file 
   reference to it. `itemDefinition` is **scheduled, not gating**. Flavor: the `outputDecision` link is
   structurally flavor-independent but its §2.3 payoff is `kie`-only (§14).
 
-- **R7 — Target engine. ANSWERED 2026-07-27, elsewhere.** Camunda is a target and so is KIE: the
-  exporter emits **two flavors**, `camunda` (default) and `kie`, and the axis is **one bit wide** —
-  may a `decisionService` be _invocable_. Naming is **not** a divergence (one policy is
-  clean-and-correct on all three engines measured, which is §5.2/§5.3's fold), and BKM is not a
-  divergence on the target pair. **The authoritative text is §13, which arrives with PR #160 on branch
-  `feat/dmn-engine-flavors`; this document reserves §13 for it and does not restate it.** On merge,
-  take PR #160's §13 and §11-R7 verbatim; the sentence above is a stub written so that §11 reads
-  consistently in the meantime. What this pass adds is the interaction register in §14 — R3, R4, R5
-  and R6 were each ruled against R7 explicitly, and each says whether it is flavor-sensitive.
+- **R7 — Target engine. ANSWERED 2026-07-27, revised the same day under review, see §13.** Camunda is a target, and so is KIE: the
+  exporter emits **two flavors**, `camunda` (default) and `kie`, and both are driven through a
+  real engine in the test suite. But the flavor axis is **one bit wide, not three** — of the three
+  axes the issue proposed, measurement retired two.
+
+  **Axis 1, naming — NOT a divergence.** Exactly one policy is clean-and-correct on all three
+  engines measured (KIE 8.44.0.Final, Camunda 7.23/7.24, Camunda 8.7.6): §5.2's `feelBase` applied
+  **uniformly** to the node `@name`, the `<variable>` `@name` and every FEEL reference, with
+  `@label` carrying the verbatim L4 name. The appearance of a divergence was two of our own bugs
+  wearing one coat (§5.1-4, §13.2). The alternative that looked engine-specific — backtick-escaping
+  the reference — is a **Camunda-only extension** and is a hard KIE compile error (`syntax error near` the backtick), so
+  it is not a flavor either; it is simply wrong. §5.2 becomes a shared fix, not a knob.
+
+  **Axis 2, BKM — NOT a divergence on the ruled target pair.** KIE and Camunda 8 both execute
+  BKMs in every probed form (literal-invoked, `<invocation>`-boxed, table-bodied, hyphen-named,
+  invoked from a table's `inputExpression` and `outputEntry`). Only **Camunda 7** lacks BKM, and
+  silently — a BKM call evaluates to `null`, and an `<invocation>`-bodied decision is dropped from
+  the model entirely. Camunda 7 is not the target (§13.1). §6.3-3's gating survives as a refusal
+  keyed to `@hbtgmbh/dmn-eval-js` and C7, neither of which is a flavor we emit for.
+
+  **Axis 3, `§`-as-`decisionService` — THE divergence, and narrower and sharper than supposed.**
+  A bare `<decisionService>` is inert-but-safe everywhere. The bit that actually splits is
+  `<knowledgeRequirement><requiredKnowledge href="#a-decisionService"/></knowledgeRequirement>` —
+  the edge §2.3.1 marks **mandatory**, without which the service's name is not in FEEL scope and
+  §2.3's whole `every q in c.purposes satisfies Article 6(q)…` payoff is unspellable. KIE compiles,
+  validates and executes it. **Camunda 8 throws `ClassCastException: DecisionServiceImpl cannot be
+cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, including
+  decisions that have nothing to do with the service. Deleting that one element makes the same file
+  parse and evaluate. So the knob is: **may a `decisionService` be invocable?**
+
+  **Default is `camunda`,** from where artifacts are consumed and from the failure asymmetry.
+  `specs/todo/lexipedia-superset/SPEC.md` K4 commits the BPMN side to Camunda Modeler import and
+  says outright that "Camunda remains _the_ audience, because their authoring flow is Camunda
+  Modeler → paste XML; KIE is a correctness instrument". A DMN file that user cannot open breaks
+  the pairing. And the two flavors fail unequally on the other engine: the camunda flavor on KIE is
+  **degraded but sound** (the service survives as grouping, every decision still validates and
+  evaluates — measured), whereas the kie flavor on Camunda is **catastrophic** (nothing in the file
+  loads). Default to the flavor whose wrong-engine failure mode is "less structure", not "nothing".
+
+  **Honest scope note.** Neither `decisionService` nor BKM is emitted today, so **on today's
+  emitter the two flavors are byte-identical** and `--flavor` changes nothing. It lands now because
+  the seam, the goldens and the two harnesses are what make Phase 5 checkable; §13.6 pins the
+  byte-identity as a test so the day it stops being true is visible rather than silent.
+
+  **Prerequisite — was red, fixed 2026-07-27, now green.** The shipped golden
+  `jl4/examples/dmn/expected/reg-cf.dmn` used to fail in **both** engines — KIE: 2 validator errors
+  and a `KieBuilder` build failure, undeployable; Camunda 8: rejected at `parse()`. §13.2's naming
+  fix was therefore a hard prerequisite for wiring either checker green, and it moved the golden.
+  Both failures were reproduced from the committed harnesses before the fix and again from
+  `git show origin/unstable:…/reg-cf.dmn` afterwards, so the red gate is itself regression-tested
+  rather than merely remembered. Current state, both flavors, from the committed harnesses:
+
+  ```
+  KIE 8.44.0.Final VERDICT: 1 file(s), 5 case(s), 0 error(s), 0 warning(s), 25/25 decision(s) SUCCEEDED, 25/25 value(s) as expected
+  Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 5 case(s), 1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected
+  ```
+
+  This is also the direct answer to why the harness must be committed. `spec:124`'s "KIE validator
+  clean" is **not reproducible**, and that — rather than "it was true and rotted" — is the
+  supportable claim: the run behind it was never committed, so there is no state of the tree in
+  which anyone can re-derive it. An uncommitted measurement is indistinguishable from one that was
+  never taken, which is the entire argument for `etc/kie-dmn-check/` and `etc/camunda-dmn-check/`
+  existing at all.
+
+  **What review changed, recorded so it is not un-changed by accident.** The ruling stands; seven
+  defects around it did not, and all are repaired in place. (1) Both harnesses checked **liveness,
+  not answers** — `5/5 SUCCEEDED` passes a file that answers `true` where a number was meant, which
+  is precisely the Camunda misparse. They now take `--cases` and compare **expected values**, both
+  engines, 25 values over 5 contexts, symmetric in both directions (an unexpected decision and an
+  unmatched expectation are each a failure). (2) The Camunda banner **echoed** its version from a
+  shell variable; it is now read off the jar's implementation version and cross-checked against the
+  pom pin, on both harnesses, and asserted in CI and in `l4-cli-test`. (3) `--flavor` was admitted
+  on `--to=dmn-md`, where **nothing reads it** — the markdown emitter never touches `drgFlavor` and
+  `markdownReport` hard-codes its target — so it is now rejected there, per this file's own rule
+  against silently ignoring a flag the caller typed. (4) The flavor test helper was a second copy of
+  `drgNamed` **without its `tcdErrors` guard**, reopening the hole that guard's docstring exists to
+  describe, directly under the byte-identity tripwire; there is now one helper taking the flavor as
+  a parameter. (5) `feelIdentText`'s widening of the collision domain had **no detector for two of
+  its three classes**; `D-FEELNAME` now covers the whole DRG namespace at `Blocking`. (6) The C7
+  column of §13.2 and (7) the `dmn-js` row of §13.4 were corrected as recorded in those sections.
+
+  Two of the seven were found only by **execution**, and both had been reported green: the harness
+  did not compile (an unbalanced brace, which `run.sh` reported as `SKIP … javac failed` and exit 0
+  — the skip contract hiding a repo defect, now a hard `BROKEN` exit), and `jl4-core` did not build
+  (`-Werror=x-partial` on a `head`). A suite number quoted from a pipeline whose exit code was
+  masked by `tail` is how both survived review.
+
+  **Residual risk, in order.** (1) **The two flavors are still byte-identical**, so the axis is
+  ceremony until Phase 5; the tripwire at `DmnExport.hs` is what makes the day it stops being true
+  visible, and it now sits behind a typecheck guard. (2) **`uniquifyIn` is still not implemented**
+  (§5.2 stage 2), so a FEEL-name collision is _detected_ and not _resolved_ — and the asymmetry
+  runs against the default: KIE's validator says `DUPLICATE_NAME` (while still building and
+  answering), Camunda 8 says nothing at all, and the two engines do not agree on which element
+  wins. On `camunda`, a `Blocking` note is the only line of defence. (3) **The `dmn-engines` job is
+  not a required status check** on the `unstable` ruleset — verified against
+  `gh api repos/legalese/l4-ide/rulesets/18543507`, which lists only TypeScript, Haskell, WASM and
+  Nix — so today its failure does not block a merge; adding the context is a repo-settings change,
+  not a code one. (4) Zeebe **deploy-time** validation, Camunda **Modeler** import, and Camunda 8's
+  behaviour on a **malformed BKM** remain unmeasured (§13.8).
 
 - **R8 — Builtin `MAYBE` / `EITHER`. OPEN. Opened 2026-07-27 by R4 (§4.2.1-6).** They are
   payload-carrying unions and are deliberately **out of R4's scope**: `MAYBE` reaches 11 decisions,
@@ -2637,14 +2775,526 @@ tenancy to another person` — **2 of the 12 decision tables the entire 51-file 
 
 ## 13. Engine flavors — R7's detail
 
-_Reserved. The authoritative text arrives with **PR #160** on branch `feat/dmn-engine-flavors`
-(`7e766d71`), which was written and landed in parallel with R3–R6 and which this document must not
-restate second-hand. On merge, take PR #160's §13 and its §11-R7 bullet verbatim; §11-R7 here is a stub
-kept only so §11 reads consistently._
+_Written 2026-07-27, from execution against three engines. Everything marked **EXECUTED** in
+§13.2, §13.3 and §13.4 was run against a real engine, from the sources listed in §13.9;
+everything marked **QUOTED** was run by another agent in the same session and is reproduced
+without independent re-run; everything marked **UNKNOWN** was not measured and must not be
+designed against._
 
-_The one thing this pass adds to R7 is downstream: R3's ruled fold and R7's naming fix are the **same
-function**, arrived at independently, and §5.3.3 and §14 record that so nobody later reads them as two
-policies that happen to agree._
+_Revised 2026-07-27 under review, and the revisions are corrections rather than additions: the
+Camunda 7 column of §13.2 said "all 5 correct" and did not survive re-measurement (§13.2); the
+`annual in come` probe was promoted from QUOTED to EXECUTED and its claimed value corrected;
+`dmn-js` was removed from the engine table in §13.4; and §13.10 records what review changed. The
+labels in this section are load-bearing — the reason §5.1 shipped a wrong headline for months is
+that a reading of the DMN grammar was recorded as though it were a measurement._
+
+### 13.1 Which Camunda
+
+They are not two versions of one engine, they are unrelated implementations, and the artifact
+that matters differs:
+
+|                | Camunda 7                                    | Camunda 8                                                    |
+| -------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| Maven artifact | `org.camunda.bpm.dmn:camunda-engine-dmn`     | `io.camunda:zeebe-dmn`                                       |
+| DMN engine     | Camunda's own Java engine                    | `org.camunda.bpm.extension.dmn.scala:dmn-engine` (dmn-scala) |
+| FEEL           | `camunda-engine-feel-scala` + `camunda-juel` | `org.camunda.feel:feel-engine`                               |
+| Impl class     | `DefaultDmnEngine`                           | `io.camunda.zeebe.dmn.impl.DmnScalaDecisionEngine`           |
+| BKM            | **absent, and silent**                       | full                                                         |
+| JDK            | 17                                           | 21+ (class file 65)                                          |
+
+**The Camunda target is Camunda 8.** Camunda 7 executes only decision tables and literal
+expressions — it cannot run a BKM at all, which is exactly axis 2 — and it is end-of-life: 7.24.0
+is the final minor and Community received nothing after 2025-10-14. Camunda 8 ran every construct
+this exporter might emit, correctly.
+
+Camunda 7 is still worth **measuring** — it is the reason axis 2 looked like a divergence — but it
+is not a flavor we emit for. Where C7 and C8 differ, C8 wins and C7's behaviour is recorded as
+context.
+
+The two engines' classpaths **must be kept separate**: `feel-engine` 1.19.x-scala-shaded (C7) and
+1.18.3 (C8) collide. QUOTED, and consistent with the two separate `cp.txt`s used here.
+
+### 13.2 Axis 1 — naming. Measured NOT to diverge.
+
+The four candidate policies, each carried through all three engines on the same `reg-cf` model:
+
+| Variant                          | node `@name`                   | `<variable>` `@name`               | FEEL reference        | KIE 8.44                                                    | Camunda 7.23                       | Camunda 8.7.6                 |
+| -------------------------------- | ------------------------------ | ---------------------------------- | --------------------- | ----------------------------------------------------------- | ---------------------------------- | ----------------------------- |
+| **shipped golden**               | verbatim (`first-time issuer`) | half-mangled (`first_time issuer`) | half-mangled          | **2 ERR, BUILD FAILS**                                      | parses, **4 of 5 decisions throw** | **`parse()` rejects the DRG** |
+| **backticked**                   | verbatim                       | verbatim                           | `` `annual income` `` | **6 ERR, BUILD FAILS** (`syntax error near` the backtick)   | all 5 evaluate (QUOTED)            | all 5 evaluate                |
+| **variable-only mangle**         | verbatim                       | `annual_income`                    | `annual_income`       | **6 ERR, BUILD FAILS** (`Unknown variable 'annual_income'`) | all 5 evaluate (QUOTED)            | all 5 evaluate                |
+| **`vE` = `feelBase` everywhere** | `annual_income`                | `annual_income` (+`label`)         | `annual_income`       | **0 ERR, BUILD clean, 5/5 SUCCEEDED**                       | **4 of 5; see below**              | all 5 correct                 |
+
+The KIE and Camunda 8 cells are **EXECUTED**. The Camunda 7 cells are **not what an earlier draft
+of this table said**, and the correction is the substance of the next paragraph.
+
+> **Corrected 2026-07-27 under review.** Three of the C7 cells previously read "all 5 correct".
+> That was wrong, it contradicted §13.2's own last bullet (which says C7 ignores
+> `<defaultOutputEntry>`), and the contradiction was in the document from the day it was written.
+> Re-measured on the shipped `vE` golden, **EXECUTED** on `camunda-engine-dmn` 7.23.0 (probe
+> `C7Gen`, scratchpad):
+>
+> - `is accredited investor` returns `[]` — an **empty result**, not `false` — under a context
+>   where no rule fires and the answer is the `<defaultOutputEntry>`. Reviewer B was right.
+> - Under an `accredited` context, `investor limit` answers **25000** where KIE and Camunda 8 both
+>   answer **100000000**. A wrong _value_, not merely a missing one.
+> - Four `DMN-01006 Unsupported type 'number' for clause` warnings: C7 does not support the
+>   `number` typeRef on a clause at all.
+> - Two decisions come back keyed `null` rather than by name, which is the documented cost of
+>   dropping `output/@name` (below) and is C7-only.
+>
+> Both of the first two are **naming-independent**, so "all 5 correct" cannot have been right on
+> any row of this table, including the two still marked QUOTED. C7 is not a target (§13.1); this
+> is recorded so nobody re-measures on C7 and mistakes any of it for a live constraint. The word
+> in the remaining C7 cells is deliberately "evaluate", not "correct": nothing in this repo pins
+> C7's values, and the harnesses do not run it.
+
+Three things fall out, and together they retire the axis:
+
+1. **`vE` is a universal policy.** There is no naming decision left to flavor. §5.2's `feelBase`,
+   applied uniformly and paired with `@label`, is simply the right answer everywhere.
+2. **The engines bind the FEEL name off different attributes.** KIE resolves an `inputData` by the
+   **node's** `@name`; Camunda resolves it by the **`<variable>`'s** `@name`. That is why
+   variable-only mangling is green on Camunda and fatal on KIE, and why the shipped golden is
+   fatal on both — it does half of each. Making the two attributes equal is what makes the
+   question disappear; it is not a compromise, it is the invariant `feelIdentText`'s doc-comment
+   already claims to hold and does not.
+3. **Backticking is not an alternative.** It is a `feel-scala` extension. Camunda accepts it, KIE
+   rejects it at compile time. Any design that reaches for backticks to preserve verbatim names
+   has silently become Camunda-only.
+
+**The failure mode on Camunda is the bad kind.** `annual income` does not fail to resolve; it is
+_tokenised_ as `annual` `in` `come` — the membership operator — and answers a **boolean** rather
+than the number.
+
+**EXECUTED 2026-07-27** (this claim was marked QUOTED until then, and it is the single claim the
+whole naming ruling rests on, so it was run). A two-decision model declaring `annual income` =
+100000, `annual` = 5 and `come` = [1,2,5], with one decision bodied `annual income` and the other
+`annual in come`:
+
+| Engine                                 | `annual income` | `annual in come` |
+| -------------------------------------- | --------------- | ---------------- |
+| KIE 8.44.0.Final                       | `100000`        | `true`           |
+| Camunda 8.7.6 (`io.camunda:zeebe-dmn`) | **`true`**      | `true`           |
+
+The two expressions are indistinguishable to Camunda. Note the value: **`true`**, not `null` — the
+boolean is whatever the membership test happens to yield, so the earlier "evaluates to `false`" was
+right about the _kind_ and wrong to fix the _value_. This matters operationally, and is why §13.6's
+harness contract compares **expected values** and not merely statuses and nulls: a checker that
+failed on `FAILED`, `SKIPPED` and `null` passes this file. Verified both ways — the committed
+harnesses were run over this exact probe, and Camunda's leg fails on it **only** because of the
+value comparison (`= true <<< EXPECTED 100000`), while reporting `0 error(s), 2/2 decision(s)
+evaluated`.
+
+This is the E7 silent-misreading class again, in the artifact rather than in the encoding —
+precisely what §5.1 was written to prevent, arriving through the one clause §5.1 got wrong.
+
+**Two adjacent findings, both shared fixes rather than flavor bits:**
+
+- **`output/@name` + `output/@typeRef` on single-output tables.** KIE fires `ILLEGAL_USE_OF_NAME`
+  and `ILLEGAL_USE_OF_TYPEREF`, six warnings on the golden; stripping both makes `vE` **0 errors,
+  0 warnings** on KIE, leaves Camunda 8 byte-for-byte correct, and costs Camunda 7 only the
+  result-map _key_ (values unchanged). EXECUTED on all three. Do it once, for both flavors.
+- **`<defaultOutputEntry>`.** Camunda 7 **ignores** it — `is accredited investor` returns an empty
+  result instead of `false` — while KIE and Camunda 8 both honour it. EXECUTED, and **re-executed
+  under review on the shipped `vE` golden**, which is what exposed the contradiction corrected in
+  the table above. A C7-only divergence, and C7 is not a target, so it does not become a knob; it
+  is recorded so that nobody re-measures on C7 and mistakes it for a live constraint. Both target
+  engines are pinned on this path by `reg-cf.cases.json` case A, whose `is_accredited_investor`
+  expectation is exactly the `false` that the default entry produces.
+
+### 13.3 Axis 2 — BKM. Measured NOT to diverge on the target pair.
+
+| Probe                                                                 | KIE 8.44                                        | Camunda 7.23                                     | Camunda 8.7.6 |
+| --------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------ | ------------- |
+| BKM + `formalParameter` + caller `knowledgeRequirement`, literal call | `answer = 120` ✅                               | **`answer = null`, silently**                    | `120` ✅      |
+| BKM invoked from a decision table cell                                | correct ✅                                      | **`null`, silently, and the output key is lost** | `120` ✅      |
+| `<invocation>`-boxed decision                                         | QUOTED ✅                                       | **silently dropped: `PARSE OK: 0 decision(s)`**  | QUOTED ✅     |
+| BKM whose encapsulated logic is a decision table                      | QUOTED ✅                                       | —                                                | QUOTED ✅     |
+| caller `knowledgeRequirement` **removed**                             | validator ERROR **and** BUILD ERROR — loud      | —                                                | UNKNOWN       |
+| BKM `@name` ≠ `variable/@name`                                        | validator ERROR, build clean, **runtime FAILS** | —                                                | UNKNOWN       |
+
+The first two rows and the Camunda columns of them are **EXECUTED**; the rest as marked.
+
+So on `{KIE, Camunda 8}` BKM is uniformly supported and uniformly loud when malformed. **BKM
+emission does not need a flavor gate.** What §6.3-3 actually established is a refusal keyed to
+_consumers we do not emit for_ — `@hbtgmbh/dmn-eval-js`, which has no BKM support and falls through
+to the next rule with a plausible wrong answer, and Camunda 7, which returns `null`. Those stay in
+§6.3-3 as reasons the **fidelity report** must name BKM usage; they are not reasons for a
+`--flavor` bit.
+
+**Consequence for §6.2:** build BKM once, for both flavors, unconditionally. The "gating" clause in
+§6.3-3 is hereby narrowed to a fidelity note, not a suppression.
+
+### 13.4 Axis 3 — `§`-as-`decisionService`. The one real bit.
+
+| Shape                                                                                   | KIE 8.44                                                                                                              | Camunda 7.23                                                                                               | Camunda 8.7.6                                                                                                                       |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `<decisionService>` present, **no** caller edge (grouping only)                         | validator clean, build clean, service **addressable** via `evaluateDecisionService`; enclosed decisions also evaluate | parses; service not addressable (`DMN-01001 Unable to find decision with id`); enclosed decisions evaluate | parses; service not addressable; enclosed decisions evaluate                                                                        |
+| `<knowledgeRequirement><requiredKnowledge href="#svc"/>` on a caller + FEEL `svc(x: x)` | **clean, build clean, `caller SUCCEEDED = 610`**                                                                      | parses; caller silently evaluates to **`null`**                                                            | **`parse()` throws `ClassCastException: DecisionServiceImpl cannot be cast to BusinessKnowledgeModel` — the whole DRG is rejected** |
+| identical file, that one `<knowledgeRequirement>` element deleted                       | —                                                                                                                     | —                                                                                                          | **parses, 3/3 decisions evaluate**                                                                                                  |
+
+All three rows **EXECUTED**, on both a space-bearing and a FEEL-safe-named variant so the crash
+cannot be blamed on naming. Row 3 is the isolation: one element, nothing else changed, parse
+failure → parse success. **Re-executed independently under review 2026-07-27** on a fresh probe
+(`KIE: caller SUCCEEDED = 610`, `SVC double_svc -> {n=300, doubled=600}`, 0 errors; `Camunda:
+PARSE INVALID: DecisionServiceImpl cannot be cast to BusinessKnowledgeModel`; same file minus the
+one element: `PARSE ok … 2/2 evaluated`). This is the sole justification for the flavor axis, so
+it is the one measurement that is not allowed to be inherited.
+
+> **A renderer is not an engine.** An earlier version of this table carried a fourth row —
+> "Camunda Modeler / dmn-js renders the service box" — with ✅ in the two Camunda **engine**
+> columns. `dmn-js` is a moddle-based renderer; a ✅ from it in an engine column is exactly the
+> "valid per the validator, wrong in the engine" conflation this whole section exists to stop, and
+> it was doubly misleading here because the C8 **engine** rejects at `parse()` the very file the
+> renderer draws happily. The row is removed; the renderer/Modeler evidence lives in §13.8 with
+> the rest of what was not executed against an engine.
+
+Read carefully, this says the divergence is **not** "does the engine support decision services". It
+is narrower: **may a `decisionService` be the target of a `knowledgeRequirement`.** Camunda 8's
+model layer casts every `requiredKnowledge` target to `BusinessKnowledgeModel` unconditionally,
+which is a Camunda defect against DMN 1.3 §10.3.2.11 (`tKnowledgeRequirement/requiredKnowledge`
+points at `tInvocable`, and `tDecisionService` is a `tInvocable`) — but it is the defect we have to
+export against.
+
+And it is the worst possible shape of divergence: **whole-file, at parse, before any decision runs**.
+There is no partial credit and no diagnostic pointing at the cause.
+
+### 13.5 The ruling, and the option
+
+**Two flavors. One bit. `camunda` is the default.**
+
+|                                                           | `camunda` (default)                                                               | `kie`                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------- |
+| §5.2 naming (`feelBase` everywhere + `@label`)            | yes                                                                               | yes — **identical**     |
+| `itemDefinition`, `inputValues`/`outputValues` (§3, §4)   | yes                                                                               | yes — **identical**     |
+| BKM + `knowledgeRequirement` → BKM (§6)                   | yes                                                                               | yes — **identical**     |
+| `<decisionService>` per `§` (§2.3)                        | emitted, **structural only**                                                      | emitted                 |
+| `knowledgeRequirement` → `decisionService`                | **never emitted**                                                                 | emitted                 |
+| FEEL invocation of a `§` (`Article 6(q)`)                 | **not available** — route to a BKM, else refuse with the existing `Blocking` note | available (§2.3)        |
+| `output/@name`, `output/@typeRef` on single-output tables | omitted                                                                           | omitted — **identical** |
+
+The camunda flavor pays a real price and the spec should say so rather than imply parity: a `§`
+with N `GIVEN p` decisions that must be applied per list element needs N BKMs with duplicated
+internal wiring, which is exactly the cost §2.3 cites for choosing a service over BKMs in the
+first place. Where that is not affordable the call is refused with a `Blocking` note, not silently
+degraded. **A new fidelity code, `D-FLAVOR-NOSERVICE`,** carries it: `Blocking` when a call site
+needed an invocable `§` and the flavor forbids it, `Advisory` when a `§` was emitted as grouping
+only and nothing tried to invoke it.
+
+**Why a lowering option and not a post-hoc XML rewrite.** Three reasons, in order of force:
+
+1. **The FEEL text differs, not just the element set.** A rewriter can delete
+   `<knowledgeRequirement>`; it cannot re-render `Article 6(q).meets the test` into whatever the
+   camunda flavor routes it to, because that text was already committed to a `<text>` node with no
+   record of what it meant. The difference is a lowering decision that happens to _also_ show up
+   as a missing element.
+2. **The fidelity report is generated from the IR** (`dmnReport :: Drg -> FidelityReport`,
+   `IR.hs:493`). A post-hoc pass would produce an artifact whose accompanying report describes a
+   _different_ artifact — the report would still claim the service is invocable. That is the
+   "valid per the validator, wrong in the engine" failure class this whole issue exists to close,
+   reintroduced one layer up.
+3. **Camunda 8 fails at `parse()`, whole-file.** "Emit the rich form, then strip for Camunda"
+   has no safe intermediate: the intermediate is a file that loads nowhere.
+
+**Type and placement.**
+
+```haskell
+-- L4.Dmn.IR, beside the other emission-shaping types.  (Mirrors DeadlineUnitPolicy,
+-- which lives in L4.Bpmn.IR rather than L4.Bpmn.Lower for the same reason: the
+-- emitter and the fidelity report both need to see it.)
+data DmnFlavor = FlavorCamunda | FlavorKie
+  deriving stock (Eq, Show, Generic)
+
+defaultDmnFlavor :: DmnFlavor
+defaultDmnFlavor = FlavorCamunda
+```
+
+- **Enters at** `DmnLowerOptions` (`Lower.hs:206`) as `dloFlavor :: !DmnFlavor`, with
+  `defaultDmnLowerOptions` setting `FlavorCamunda`. Adding the field is a compile break at exactly
+  two external construction sites, `Cli/Export.hs:281` and `tests/DmnExport.hs:1247`, both of which
+  want to be updated anyway.
+- **Is stored in the `Drg`** as `drgFlavor :: !DmnFlavor` (`IR.hs:410`). This keeps
+  `emitDrg :: Drg -> Text`, `emitMarkdown :: Drg -> Text`, `dmnReport :: Drg -> FidelityReport` and
+  `markdownReport :: Drg -> FidelityReport` at one argument each, preserves the "one IR, two
+  emitters" story `Markdown.hs:4-11` is built on, and lets `dmnReport` tag `FidelityReport.target`
+  as `"DMN 1.3 (XML), camunda flavour"` so the report names the artifact it describes.
+- **Does not reach `renderFeelIn`** under this ruling, because naming turned out not to diverge.
+  Had it diverged, the carrier would have been `TypeOracle` (`Lower.hs:171`), which is already
+  threaded to every `renderFeelIn` call site by `oracleOf`; recorded here so the next person does
+  not re-derive it.
+
+**CLI** (`jl4/app/L4/Cli/Export.hs`), matching the file's three existing conventions — a closed
+enum behind an `eitherReader` that names the accepted spellings, a `Maybe` so
+`checkTargetFlags` can tell "typed" from "defaulted", and a hard error rather than a silent
+ignore when the flag lands on the wrong target:
+
+```haskell
+dmnFlavorReader :: ReadM DmnFlavor           -- beside deadlineUnitReader, Export.hs:130
+dmnFlavorReader = eitherReader \input ->
+  case Text.toLower (Text.pack input) of
+    "camunda" -> Right FlavorCamunda
+    "kie"     -> Right FlavorKie
+    "drools"  -> Right FlavorKie
+    other     -> Left $
+      "Invalid --flavor: " <> Text.unpack other <> " (expected camunda|kie)"
+```
+
+`--flavor` is legal on `--to=dmn` **only**, and `checkTargetFlags` rejects it on both other
+targets.
+
+> **Corrected 2026-07-27 under review.** This paragraph used to admit `--flavor` on `--to=dmn-md`
+> as well, reasoning that "the flavor lives in the `Drg`, which both emitters read". Review checked
+> the markdown side and it reads it **nowhere**: `emitMarkdown` mentions no field of `drgFlavor`,
+> and `markdownReport` hard-codes its target string as `"dmnmd"` instead of naming the flavor the
+> way `dmnReport` does. So `--flavor=kie --to=dmn-md` produced a byte-identical document **and** a
+> byte-identical fidelity report — the exact silent ignore that `checkTargetFlags`' own docstring
+> refuses. Nor would it self-heal at Phase 5: the one divergence is whether a `<decisionService>`
+> may be invocable, and dmnmd is a table format with no DRG at all (it says so already, via
+> `D-MD-NODRG`). Admitting a flag on the strength of a dependency that does not exist is the same
+> error class as a banner reporting a version nothing loaded.
+
+### 13.6 Goldens and test wiring
+
+**Goldens: one pair per flavor, not a base plus a diff** — but not yet, and the "not yet" is the
+interesting part.
+
+Today the two flavors are byte-identical, because neither `decisionService` nor BKM is emitted. So:
+
+- **Now:** the existing four goldens stay at their existing names, and a new test asserts
+  `emitDrg (lower FlavorCamunda m) == emitDrg (lower FlavorKie m)` on the exhibit, with a comment
+  saying this is expected to **fail** at Phase 5 and that the fix is to split the goldens, not to
+  delete the test. A flavor knob with no observable effect is a trap; a test that will announce the
+  day it acquires one is the cheapest defence.
+- **At Phase 5:** the default flavor keeps the unsuffixed names (`reg-cf.dmn`,
+  `reg-cf.fidelity.txt`) and the kie flavor gets `reg-cf.kie.dmn`, `reg-cf.kie.fidelity.txt`. The
+  asymmetry is deliberate: it keeps `jl4/tests-cli/Main.hs:340`, `jl4/examples/dmn/README.md:130`
+  and `git blame` intact, and it makes the default visible in the filesystem.
+- **Never a diff-golden.** `jl4/examples/dmn/README.md:127-137` and `tests-cli/Main.hs:888-894`
+  both assert every golden is reproducible byte-for-byte by one `l4 export` invocation; a diff is
+  not the output of any command. And a diff cannot be fed to an engine, which is the whole point.
+
+**Two harnesses, two directories, two independent skip gates.**
+
+|           | `etc/kie-dmn-check/`                                                                  | `etc/camunda-dmn-check/`                         |
+| --------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Artifacts | `org.kie:kie-dmn-core`, `org.kie:kie-dmn-validation`                                  | `io.camunda:zeebe-dmn`                           |
+| Pinned at | `8.44.0.Final`                                                                        | `8.7.6`                                          |
+| JDK       | 17                                                                                    | 21+                                              |
+| Legs      | Xerces XSD · KIE validator · `KieBuilder` · `evaluateAll` + `evaluateDecisionService` | `parse()` + `isValid()` · `evaluateDecisionById` |
+| Env gate  | `KIE_CHECK_REQUIRED`                                                                  | `CAMUNDA_CHECK_REQUIRED`                         |
+
+Both resolve their classpath into `$TMPDIR` via `mvn dependency:build-classpath` and **never** into
+the repo; nothing downloaded is committed and neither touches `package.json` or the lockfile. Both
+pin their version in a comment that says bumping it invalidates every EXECUTED claim in this file.
+The XSD needs no download: `kie-dmn-validation-8.44.0.Final.jar` ships
+`org/kie/dmn/validation/org/omg/spec/DMN/20191111/DMN13.xsd`.
+
+**What a harness must assert**, because no single leg is sufficient — each row is a measured case
+where the other legs are silent:
+
+| Condition                                    | XSD   | validator | build     | runtime                                                                             |
+| -------------------------------------------- | ----- | --------- | --------- | ----------------------------------------------------------------------------------- |
+| cyclic decision service                      | valid | **clean** | **clean** | every decision `SUCCEEDED` with **`null`**; ERROR only in `DMNResult.getMessages()` |
+| service with no `outputDecision`             | valid | ERROR     | **clean** | throws                                                                              |
+| `variable/@name` mismatch on `inputData`     | valid | ERROR     | clean     | **succeeds, right answer** — the validator over-reports                             |
+| required input absent or under the wrong key | valid | clean     | clean     | `SKIPPED` + `null`                                                                  |
+
+QUOTED from the KIE strand, whose author reports reproducing the first row's trap in their own
+first draft — a harness counting only `FAILED` statuses exits 0 on it. So the assertion set is:
+**fail on any validator ERROR, any build ERROR, any `DMNResult` message at ERROR, any decision
+`SUCCEEDED` whose value is `null`, and any decision `SKIPPED`.**
+
+> **Necessary, and measured to be insufficient — amended 2026-07-27 under review.** Every row above
+> is a case where a decision fails to _run_. None is a case where it runs and answers **wrongly**,
+> and that is the failure this exporter actually ships: §13.2's identity probe has Camunda 8
+> answering `true` — non-null, `SUCCEEDED`, no message at any severity — where the number `100000`
+> was meant. The assertion set above passes that file.
+>
+> So both harnesses now take **`--cases`**: a list of `{name, context, expect}`, where `expect`
+> pins the value of **every** decision. The check is symmetric — a decision with no expectation and
+> an expectation naming no decision are each a failure — so adding a decision cannot silently
+> widen the unchecked surface. `jl4/examples/dmn/reg-cf.cases.json` carries five contexts, 25
+> expected values, and between them they fire all nine `<rule>` elements and both
+> `<defaultOutputEntry>` paths; the single context this used to run left six of the nine
+> unevaluated. The banner gained a term that is not a liveness claim:
+> `25/25 value(s) as expected`.
+>
+> Discriminating power was checked in both directions rather than assumed: perturbing one expected
+> value fails both harnesses (`= 80000 <<< EXPECTED 99999`) while still reporting `25/25 …
+SUCCEEDED`, and removing one expectation fails both with `NO EXPECTATION for this decision`.
+>
+> **What no context on this exhibit can catch**, stated so its absence is not read as evidence:
+> `annual income` and `net worth` are consumed only by `+` and `min`, both commutative, so
+> exchanging those two bindings is invisible here. That is faithful to a statute symmetric in the
+> two (17 CFR 227.100(a)(2)) rather than a gap a further case could close.
+
+**Where it is wired: `l4-cli-test` (`jl4/tests-cli/Main.hs`), not `jl4-test`.** `jl4-test` has
+neither `process` nor `directory` in `build-depends` and is the hermetic leg of `cabal test all`;
+`l4-cli-test` already has both, already spawns `l4`, and already owns the `l4 export` golden
+byte-comparisons at `:884-1075`.
+
+**Skip-loudly contract — the part that must not be got wrong.**
+
+1. **Locally**, an absent toolchain prints `SKIP  <checker>: <reason>` on stderr and exits 0; the
+   hspec leg calls `pendingWith` with the same reason, which hspec renders as `# PENDING: …` and
+   counts separately in the summary. A pending is visibly not a pass.
+2. **In CI it cannot skip.** The `dmn-engines` job sets `KIE_CHECK_REQUIRED=1` and
+   `CAMUNDA_CHECK_REQUIRED=1`, caches `~/.m2` in its own step, and runs **the two scripts
+   directly**, greping their banners. It does not invoke `l4-cli-test`, and the Haskell job does
+   not set `L4_DMN_ENGINE_CHECK` — so the gate is the job, and the hspec leg is the developer
+   entry point (one command, the same harnesses, the same assertions). Neither pretends to be the
+   other. (As written, this item claimed the job set `L4_DMN_ENGINE_CHECK=1` and reached the hspec
+   path; it does not, and the deviation is recorded at §13.7-3.) The default `cabal test all` stays
+   hermetic and network-free; the engine block is gated on `L4_DMN_ENGINE_CHECK=1` so it is a
+   deliberate opt-in, not an accident of what happens to be installed. **This is the answer to
+   "what if a checker is unavailable in CI": in CI, unavailable is a failure. Only a developer
+   laptop is allowed to skip, and only loudly.**
+
+   **An absent toolchain skips; a broken harness does not.** If `javac` fails, both scripts exit 1
+   regardless of `*_CHECK_REQUIRED`, because absent tooling is a fact about the machine while a
+   harness that will not compile is a fact about the repo. Added under review, from a live
+   instance: a `KieDmnCheck.java` with an unbalanced brace reported `SKIP … javac failed` and
+   exited 0, so the skip contract was concealing a repo defect on the very branch that introduced
+   it.
+
+3. **A skip can never be mistaken for a pass by a reader either.** Each harness prints a verdict
+   banner on success (`KIE 8.44.0.Final VERDICT: 1 file(s), 5 case(s), 0 error(s), 0 warning(s),
+25/25 decision(s) SUCCEEDED, 25/25 value(s) as expected`), and the hspec leg asserts the banner
+   is present rather than asserting exit 0. A skip has no banner, so "exit 0 and nothing ran" fails
+   the assertion. **The version substring is part of what is asserted**, in both the hspec leg and
+   the CI grep, because the banner reports the version the harness observed off its classpath —
+   which is the only token in it that is evidence about which engine looked at the file.
+4. **Per-flavor reporting.** The suite runs the camunda golden through the Camunda harness and the
+   kie golden through the KIE harness. If one harness is absent, the test output names that flavor
+   **`UNEXERCISED`** rather than omitting it, so a green run always states which of the two engines
+   actually looked at the artifact.
+
+**If one strand were blocked.** They are separately gated by construction, so the camunda strand
+lands whole while the kie hook is present-but-`UNEXERCISED`, or vice versa. Neither ever reads as
+passing on the other's behalf. (As of this writing **neither is blocked**: both harnesses were run
+against the goldens and probes while writing this section, from a clean Maven repo in the KIE case.)
+
+### 13.7 Sequencing consequences
+
+| Phase    | Added or changed by R7                                                                                                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0** ✅ | `feelBase` uniformly on node `@name`, `variable/@name` and references (§5.2, §13.2). Was a red gate: the shipped golden failed both engines. Drop `output/@name` + `output/@typeRef` on single-output tables. Re-bless goldens. |
+| **0** ✅ | Commit `etc/kie-dmn-check/` and `etc/camunda-dmn-check/`, wire both into `l4-cli-test`, add the CI job. Ordered **with** the naming fix, not after it — the harness is what proves the fix.                                     |
+| **0** ✅ | `DmnFlavor`, `dloFlavor`, `drgFlavor`, `--flavor`, and the byte-identity test of §13.6. No output change.                                                                                                                       |
+| **2**    | Unchanged: §5.2 is now known to be a shared fix, so no flavor branch here.                                                                                                                                                      |
+| **5**    | BKM emission for **both** flavors (§13.3 retires the gate). `decisionService` per `§` for both flavors as grouping; `knowledgeRequirement` → service for `kie` only; `D-FLAVOR-NOSERVICE`. **This is where the goldens split.** |
+
+**Phase 0 landed 2026-07-27, and was revised the same day under review.** Verbatim, from the
+committed harnesses over the re-blessed `jl4/examples/dmn/expected/reg-cf.dmn`, at **both**
+flavors (they are byte-identical today, so the four runs are two distinct artifacts):
+
+```
+KIE 8.44.0.Final VERDICT: 1 file(s), 5 case(s), 0 error(s), 0 warning(s), 25/25 decision(s) SUCCEEDED, 25/25 value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 5 case(s), 1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected
+```
+
+Four deviations from the letter of §13.5/§13.6, all deliberate:
+
+1. **`feelIdentText` implements steps 2–5 of §5.2's stage 1, not all six, and no stage 2.**
+   NFC normalisation, the reserved-word suffix and `uniquifyIn` stay in Phase 2: the first
+   two are independent of R7, and `uniquifyIn` needs a whole-DRG traversal rather than a
+   per-name function. Two L4 names can therefore still collapse onto one FEEL name.
+
+   **Amended under review.** Calling that "pre-existing" was too comfortable. Mapping space _and_
+   `.` to `_` **widens** the collision domain: `first-time issuer` / `first time issuer` and
+   `a.b` / `a_b` were distinct FEEL names before this change and are not now. And the only detector
+   in the lowering, `D-SCOPE`, is computed from `freeTerms` and therefore covered exactly one of
+   the three classes (inputData × inputData), leaving inputData × decision and decision × decision
+   silent. All three are now reported by **`D-FEELNAME` at `Blocking`**, over the whole DRG
+   namespace. Measured on both target engines (base = 100, `net worth` = 7):
+
+   | Collision             | L4 says  | KIE 8.44                                             | Camunda 8.7.6     |
+   | --------------------- | -------- | ---------------------------------------------------- | ----------------- |
+   | inputData × inputData | 10 + 200 | validator 2× `DUPLICATE_NAME`, **build clean**, `20` | silent, `20`      |
+   | inputData × decision  | 108      | validator 2× ERROR, decision `NOT_EVALUATED`, `14`   | silent, **`202`** |
+   | decision × decision   | 203      | validator 2× ERROR, one `NOT_EVALUATED`, `202`       | silent, **`204`** |
+
+   Note what that does **not** say: KIE does not _reject_ any of these. The `DUPLICATE_NAME`
+   errors come from the validator leg, `KieBuilder` is clean, and the model deploys and answers.
+   So neither engine refuses the file, neither returns what L4 said, and the two do not even agree
+   on which element wins — while the **default** flavor is the one that says nothing at all.
+   `Blocking` rather than `Lossy` for that reason: nothing was approximated, an answer was changed.
+   Detecting is not resolving; `uniquifyIn` is still the fix, and it is still Phase 2.
+
+2. **Spelling: `flavor`, not `flavour`** — §13.5 wrote the report target as
+   `"DMN 1.3 (XML), camunda flavour"` once, against the American spelling used by `--flavor`
+   and by every heading in this section. The code says `flavor` throughout.
+3. **The CI job runs the two scripts directly, not `cabal test l4-cli-test` with
+   `L4_DMN_ENGINE_CHECK=1`.** Same check, same file, but the script route needs no GHC, so
+   the gate is a small Java job rather than a second full Haskell build. The hspec leg is
+   still wired and is the developer-facing entry point; `KIE_CHECK_REQUIRED` /
+   `CAMUNDA_CHECK_REQUIRED` do the not-allowed-to-skip work either way. **Consequence, stated
+   because a code comment got it wrong and had to be corrected:** in CI, `dmnEngineCheck` in
+   `jl4/tests-cli/Main.hs` always takes its outer `pendingWith`, because nothing in CI sets
+   `L4_DMN_ENGINE_CHECK`.
+
+4. **`--flavor` is rejected on `--to=dmn-md`, where §13.5 originally admitted it.** Recorded at
+   §13.5; the flag is accepted only where something reads it.
+
+**Not done, and not a deviation but a gap:** the `dmn-engines` job is **not** in the `unstable`
+ruleset's required status checks (`gh api repos/legalese/l4-ide/rulesets/18543507` lists
+TypeScript, Haskell, WASM, Nix). Until its context is added there — a repo-settings change, not a
+code one — a failure of this job, including the deliberate `exit 1` the whole skip contract is
+built around, does not block a merge.
+
+### 13.8 What was not measured
+
+Stated so nobody reads absence as evidence:
+
+- **Zeebe deployment-time validation.** `zeebe-dmn` is the code Camunda 8 uses to _evaluate_; a
+  real deployment additionally runs `DmnResourceTransformer` id/DRG constraints. Everything here
+  covers evaluation semantics, not deploy-time rejection. Would need `zeebe-workflow-engine` or a
+  broker in Docker.
+- **Camunda Modeler desktop import**, which is K4's human check and deliberately not scriptable.
+  dmn-js in headless Chrome is the closest scriptable proxy and passes (QUOTED); treat the desktop
+  app as confirmation only. **A renderer is not an engine**, and this one especially so: dmn-js
+  draws the decision-service file that the Camunda 8 _engine_ rejects at `parse()` (§13.4). A
+  green render says the XML is well-formed against the metamodel and says nothing whatever about
+  whether the model loads or answers. This bullet is where that evidence belongs; it was briefly a
+  ✅ row in §13.4's engine table, which is the conflation this section exists to prevent.
+- **`@camunda/linting`** is BPMN-only — there are no Camunda DMN lint rules on the npm side. So
+  there is no JS-side Camunda check to add alongside `etc/validate-dmn.mjs`; the engine harness is
+  the only Camunda opinion available.
+- **Camunda 8 behaviour on a malformed BKM** (missing `knowledgeRequirement`, `@name` ≠
+  `variable/@name`). KIE is loud on both; C8 is UNKNOWN. Worth a probe before Phase 5 ships BKM,
+  since a silent C8 would change §6.2's invariants from "checked by the engine" to "checked by us".
+
+### 13.9 Review triage — what was rejected, and on what measurement
+
+Two reviews raised 20 findings against the R7 landing. Thirteen were defects and are fixed in
+place (§11-R7's "What review changed"). The rest were **rejected on evidence**, and the evidence is
+recorded here rather than in a commit message, because a rejection nobody can re-derive is worth as
+little as a measurement nobody committed.
+
+| Finding                                                                                                   | Verdict                    | Measurement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "The flavor enters at the _report_, not at lowering; the commit is observationally a post-hoc rewrite."   | **Accurate, not a defect** | True and disclosed. `dloFlavor` has one consumer (`Lower.hs`) and `drgFlavor` one (`dmnReport`'s target), because the emitter has nothing flavor-dependent to emit yet. The seam is still the right shape: a rewriter can delete a `<knowledgeRequirement>` but cannot re-render the FEEL call text that referenced the service, and C8 fails whole-file at `parse()`, so "emit rich, strip later" has no safe intermediate. Kept, with the byte-identity tripwire as the forcing function. |
+| "`Drg` derives `Eq` and now carries `drgFlavor`, so two `Drg`s emitting identical bytes compare unequal." | **Not a defect**           | No test compares `Drg` values; the byte-identity tests compare `emitDrg` output, which is the property that matters. Left as is deliberately.                                                                                                                                                                                                                                                                                                                                               |
+| "`spaced = Text.unwords (Text.words t)` is a no-op."                                                      | **Correct — removed**      | It was: `Text.map keep` maps every whitespace character to `_`, and `squashed` already collapses `_` runs and trims. Verified across NBSP, tabs, leading/trailing and interior runs. Removed rather than left to read as a load-bearing invariant.                                                                                                                                                                                                                                          |
+| "`l4 export --fidelity-report -o /dev/null` dies with a raw GHC backtrace."                               | **Real, out of scope**     | Reproduced. It is the fidelity-report writer refusing `/dev/null.fidelity.txt`, not a flavor concern, and it predates this branch. Left for the export-surfaces strand rather than fixed under an R7 commit.                                                                                                                                                                                                                                                                                |
+| "R7 claims `spec:124`'s KIE-clean run 'was true when written and rotted silently'."                       | **Correct — reworded**     | Unverifiable by construction: the run was never committed, which is the strand's own argument. Now states the supportable claim — it is **not reproducible** — and draws the actual conclusion from it (§11-R7).                                                                                                                                                                                                                                                                            |
+
+Two findings were rejected as **premises rather than defects**, and both are worth keeping visible:
+the brief's "wire both engines the way KIE already is" assumed a committed KIE harness that did not
+exist (there was none; the §13 measurements were ad-hoc), and reviewer B's "the harnesses have real
+discriminating power" was accepted only after being re-checked in the failing direction, not the
+passing one.
+
+### 13.10 Sources
+
+Probe sources and full engine output are in the session scratchpad, not the repo:
+`c7/`, `c724/`, `c8/` (poms, `cp.txt`, Java probes), `kieflavors/` (harness, 13 axis probes, golden
+variants, consolidated runs), `flavorcheck/` (the generic `C7Gen`/`C8Gen` drivers and the
+`vE`/`vF` variants built for §13.2), `probes/`, and `triage/` (the review-round re-runs: the `annual income` identity probe, the three FEEL-name collision modules, the decision-service isolation, and the Camunda 7 re-measurement of the shipped golden). Doc corroboration: Camunda FEEL variable-names page
+("It may not contain whitespaces … the name can be wrapped into single backquotes"), Camunda 7 DMN
+reference (BKM, invocation and decision services absent from the supported list), Camunda 7
+end-of-life notice.
 
 ---
 
