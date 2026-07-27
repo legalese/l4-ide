@@ -964,10 +964,10 @@ rather than assumed benign. R11 and R12 are new in revision 2.
 
 ---
 
-## 9. Two today-bugs found while scoping, to be filed separately
+## 9. Two today-bugs found while scoping — filed as smucclaw/l4-ide#927, both now FIXED
 
-Neither is P2 work; both affect `l4 state-graph` output as it ships. Line numbers re-verified at
-`cfeaea5d`.
+Neither was P2 work; both affected `l4 state-graph` output as it shipped. Line numbers were
+verified at `cfeaea5d` and have since moved.
 
 1. **`SHANT` + explicit `LEST` is labelled `"timeout"`, which is exactly inverted.**
    `StateGraph.hs:446-470`: all four `Just lestExpr` branches build
@@ -984,10 +984,50 @@ Neither is P2 work; both affect `l4 state-graph` output as it ships. Line number
    second consumer would have to reinvent the same patch. Fixing it in `StateGraph` and dropping
    P1's compensation is the right sequence, and it is a natural companion to B1.
 
+   **Resolved.** `L4.StateGraph.lestArmWording` now derives the caption from the modal _and_ the
+   deadline, and the `LEST` edge carries `labelModal` so a consumer holding only that edge can
+   tell the arms apart. `SHANT` + explicit `LEST` reads `violation`; `MAY` + `WITHIN` reads
+   `lapses`. Asserted in `jl4-core/test/StateGraphSpec.hs`, "LEST edge captions", and — for the
+   BPMN side, which the goldens do **not** pin — in `jl4/tests/BpmnExport.hs`, "the LEST caption
+   where BPMN actually consumes it".
+
+   **The no-`WITHIN` row went one step further than the issue asked.** Naming it `timeout`
+   asserts a deadline the rule never set; the first patch changed it to `not performed`, which
+   asserts a transition the runtime never makes. Measured — `PARTY Alice MUST pay LEST (…)` with
+   no `WITHIN`, run to ``(`WAIT UNTIL` 1000)`` — the obligation stays outstanding as a residual
+   and the `LEST` arm is never taken, because `Contract4` skips the timing step and `Contract5`,
+   the only frame that consults `lest` on expiry, never runs. Same for `MAY` and `DO`; `SHANT` is
+   the exception because its trigger is the act. So the caption is `unreachable: no WITHIN`, and
+   `L4.Bpmn.Lower` uses the same word on the boundary event it draws for that arm.
+
+   **But the second half of the prescription above is wrong, and was wrong when written.**
+   Dropping P1's compensation _moves the BPMN goldens_: deleting the `DMustNot` clause of
+   `Lower.triggerName` renames `offering.bpmn`'s two prohibition boundaries from
+   `"after P30D, not performed"` / `"after P365D, not performed"` to bare `"after P30D"` /
+   `"after P365D"`, and the untimed one to `"violation"`. It is not a compensation for a bad
+   label. `raceArms` puts a prohibition's boundary event on the **HENCE** arm while it is
+   _constructed from_ the LEST edge, so that node names an event the state graph gives no caption
+   to at all; a correct LEST caption is still the wrong words for it. The right characterisation
+   is the ordinary one: `StateGraph` owns what an edge _means_, `Lower` owns what a BPMN node is
+   _called_, and the general path of `triggerName` does now take its words from `StateGraph`.
+
+   That split had a hole in it, found by an adversarial pass and fixed here: `boundaryTrigger`'s
+   `fallbackCondition` was **not** guarded the way `triggerName` was, so on a `SHANT` with no
+   `WITHIN` one element carried `name="the act is not performed"` over
+   `<condition>violation</condition>` — the two halves of a single node asserting opposite arms.
+   Both halves now read `unreachable: no WITHIN`, which is true of that node in a way neither
+   previous word was.
+
 2. **`MAY` and `MUST` without `HENCE` produce literally the same edge.** `:435-442` is a `case`
    with two branches and identical bodies. A permission exercised and an obligation discharged
    are one arrow. Arguably correct-by-accident given the defaults table, but it should be one
    branch with a comment, or two branches that differ.
+
+   **Resolved: collapsed to one branch.** Every modal defaults `HENCE` to `FULFILLED`, so there
+   was nothing to distinguish. The seam a reader will come looking for — `SHANT`'s HENCE edge is
+   taken by the deadline _expiring_, so its caption reads backwards — deliberately stays
+   unopened, because that caption is the obligation restated and is the record `Lower` builds its
+   task name and lane from. A comment at the site says so.
 
 ---
 

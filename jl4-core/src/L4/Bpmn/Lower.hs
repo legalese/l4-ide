@@ -228,12 +228,12 @@ stateGraphToBpmn opts sg =
     -- not here. See 'raceArms'.
     --
     -- Note the deadline comes from the obligation's own label (WITHIN lives on
-    -- the HENCE edge), not from the LEST edge, whose label is a bare "timeout"
-    -- or "violation".
+    -- the HENCE edge), not from the LEST edge, whose label is the one-word
+    -- caption L4.StateGraph.lestArmWording derives for that arm.
     (boundary, boundaryFindings) = case (lestOf sid, taskNodes) of
       (Just lestT, host : _) ->
         let bid = "Boundary_" <> tag
-            (trigger, finds) = boundaryTrigger opts bid lestT.transLabel.labelAction deadline
+            (trigger, finds) = boundaryTrigger opts modal bid lestT.transLabel.labelAction deadline
          in ( Just
                 FlowNode
                   { nodeId = bid
@@ -251,14 +251,21 @@ stateGraphToBpmn opts sg =
     -- place HENCE goes. So synthesise the boundary event and draw the lapse
     -- rather than dropping the WITHIN and filing a note about it. Confessing a
     -- loss you could have avoided is not honesty.
+    --
+    -- The word for it comes from 'lestArmWording', not from a literal here:
+    -- this node draws the very arm that function names, and two spellings of
+    -- one vocabulary is the shape smucclaw/l4-ide#927 was about. The guard
+    -- below only fires with a deadline in hand, which is the case in which
+    -- 'lestArmWording' says @lapses@.
     (lapse, lapseFindings) = case (modal, lestOf sid, deadline, taskNodes) of
-      (Just DMay, Nothing, Just _, host : _) ->
+      (Just DMay, Nothing, Just d, host : _) ->
         let lid = "Lapse_" <> tag
-            (trigger, finds) = boundaryTrigger opts lid "lapses" deadline
+            lapseWord = lestArmWording DMay (Just d)
+            (trigger, finds) = boundaryTrigger opts modal lid lapseWord deadline
          in ( Just
                 FlowNode
                   { nodeId = lid
-                  , nodeName = triggerName modal deadline trigger "lapses"
+                  , nodeName = triggerName modal deadline trigger lapseWord
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc =
                       Just
@@ -394,8 +401,23 @@ stateGraphToBpmn opts sg =
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
             ]
-          -- The lapse timer lands wherever HENCE lands: that is the whole
-          -- claim being drawn.
+          -- The lapse timer lands wherever HENCE lands.
+          --
+          -- KNOWN WRONG in one shape, and not fixed here. The evaluator routes
+          -- an unexercised MAY's expiry through @fromMaybe fulfilExpr lest@,
+          -- i.e. to FULFILLED — which is where HENCE goes only when HENCE is
+          -- absent or is FULFILLED. Give a bare MAY a HENCE that points at
+          -- another obligation and the two part company. Measured:
+          --
+          --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
+          --     (`WAIT UNTIL` 100)          ==> FULFILLED
+          --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
+          --
+          -- so in that shape this flow draws the lapse arriving at Bob's
+          -- obligation, which it never does. The root cause is upstream —
+          -- 'L4.StateGraph.extractDeonton' emits no LEST edge for a bare MAY, so
+          -- there is nothing here to follow and this synthesis is guessing. See
+          -- the NOTE at that site; fixing it retires this whole branch.
           lapses =
             [ (src, tgt, Nothing)
             | t <- outOf sid
@@ -927,25 +949,46 @@ restateRule l =
 -- | The boundary event's name — the words a reader sees on the diagram, with no
 -- @\<documentation\>@ open.
 --
--- The fallback is the @LEST@ edge's own label, and the extractor writes that as
--- the bare word @\"timeout\"@ — or @\"violation\"@ where a @SHANT@ defaulted its
--- own @LEST@ — for every modal alike (@L4.StateGraph@, @timeoutLabel@). For an
--- obligation that is merely terse. On a prohibition it is __false__: this
--- boundary is reached when the deadline passes /with the act not performed/,
--- which is compliance, not a missed deadline and not a violation. Getting
--- 'raceArms' right and then labelling the compliance arm \"violation\" would
--- leave the diagram saying the same wrong thing in a smaller font, so a
--- prohibition names its boundary itself and never borrows that word.
+-- The fallback is the @LEST@ edge's own label, which
+-- 'L4.StateGraph.lestArmWording' derives from the modal and the deadline. For
+-- every modal but one that is exactly the right caption, and this function
+-- simply uses it.
+--
+-- __The prohibition clause below is not a correction of that label.__ It is
+-- there because on a @SHANT@ this boundary event is a /different arm/ from the
+-- @LEST@ edge it was built out of: 'raceArms' sends the timer to __HENCE__,
+-- because for a prohibition the deadline expiring with the act not performed is
+-- compliance. So the boundary is named after an event the state graph gives no
+-- caption to — the @LEST@ edge's caption belongs to the task, not to this node.
+-- Borrowing it here would draw the compliance arm labelled \"violation\", which
+-- is the same falsehood in a smaller font.
+--
+-- This was checked rather than argued: deleting the clause leaves
+-- @offering.bpmn@'s two prohibition boundaries reading \"after P30D\" and
+-- \"after P365D\", dropping the \", not performed\" that says which arm they
+-- are, and renames the untimed one to \"violation\". See smucclaw\/l4-ide#927,
+-- which proposed the deletion on the theory that it was compensating for a
+-- modal-blind label; it was not.
+--
 -- The deadline is passed separately from the trigger because a boundary event
 -- has one either way: with no @WITHIN@ at all, 'boundaryTrigger' still emits a
 -- conditional trigger, and naming that one \"deadline passes\" would assert a
--- deadline the rule does not have.
+-- deadline the rule does not have — the same rule 'L4.StateGraph.lestArmWording'
+-- follows on the other arm. With no @WITHIN@ this arm has no trigger at all,
+-- which is what 'L4.StateGraph.noTriggerWording' says; the name and the
+-- condition ('fallbackCondition') must agree on that, because they sit on the
+-- same element and a reader who opens one has already read the other.
 triggerName :: Maybe DeonticModal -> Maybe Text -> BoundaryTrigger -> Text -> Text
 triggerName (Just DMustNot) mDue trigger _ = case trigger of
   TimerAfter iso -> "after " <> iso <> ", not performed"
   WhenCondition _
     | isJust mDue -> "deadline passes, not performed"
-    | otherwise -> "the act is not performed"
+    -- No WITHIN: the compliance arm this node draws is reached by the deadline
+    -- passing, and there is no deadline. Measured — @SHANT smoke LEST …@ with
+    -- no WITHIN, run to @WAIT UNTIL 1000@, leaves the prohibition standing as a
+    -- residual and never reaches HENCE. This used to read "the act is not
+    -- performed", naming an event that never fires.
+    | otherwise -> noTriggerWording
 triggerName _ _ trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
@@ -984,13 +1027,29 @@ raceArms _ task bnd = (task, bnd)
 
 -- | Documentation for the deadline's boundary event, which for a prohibition
 -- marks compliance rather than failure.
+--
+-- The no-@WITHIN@ rows do not describe a deadline, because there is not one.
+-- Three of the four modals reach this node only by the clock running out, so
+-- with no @WITHIN@ the node is drawn (BPMN needs somewhere for the arm to leave
+-- from) but nothing can ever trigger it — see 'L4.StateGraph.noTriggerWording'
+-- for the trace. Saying \"the deadline passes\" there was a straightforward
+-- falsehood; a @\<documentation\>@ string is the one place with room to say why
+-- the node is inert instead.
 boundaryDoc :: Maybe DeonticModal -> Maybe Text -> Text
-boundaryDoc (Just DMustNot) mDue =
-  "the deadline passes"
-    <> maybe "" (" (" <>) (fmap (<> ")") mDue)
-    <> " with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm"
+boundaryDoc (Just DMustNot) (Just d) =
+  "the deadline passes ("
+    <> d
+    <> ") with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm"
+boundaryDoc (Just DMustNot) Nothing =
+  "the prohibition is respected once its deadline passes with the act not \
+  \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
+  \nothing reaches it: a prohibition with no deadline is discharged by neither \
+  \the clock nor the act"
 boundaryDoc _ (Just d) = "LEST: the obligation is not discharged within " <> d
-boundaryDoc _ Nothing = "LEST: the obligation is not discharged"
+boundaryDoc _ Nothing =
+  "LEST: the obligation is not discharged — but the rule sets no WITHIN, and \
+  \for every modal but SHANT this arm is reached only by the deadline passing, \
+  \so nothing reaches it"
 
 --------------------------------------------------------------------------------
 -- Deadlines
@@ -999,21 +1058,29 @@ boundaryDoc _ Nothing = "LEST: the obligation is not discharged"
 -- | Choose the boundary event's trigger, and say what it cost.
 boundaryTrigger ::
   BpmnOptions ->
+  -- | the obligation's modal, which decides /which arm/ this node is: for a
+  -- @SHANT@ 'raceArms' puts it on HENCE, so it must not be given the LEST
+  -- edge's caption. See 'fallbackCondition'.
+  Maybe DeonticModal ->
   Text ->
-  -- | the LEST edge's own label, e.g. @timeout@ or @violation@
+  -- | the LEST edge's own label — 'L4.StateGraph.lestArmWording', e.g.
+  -- @timeout@, @violation@, @lapses@
   Text ->
   -- | the obligation's @WITHIN@ text, if any
   Maybe Text ->
   (BoundaryTrigger, [FidelityNote])
-boundaryTrigger opts elemId lestLabel = \case
+boundaryTrigger opts modal elemId lestLabel = \case
   Nothing ->
-    ( WhenCondition (fallbackCondition lestLabel)
+    ( WhenCondition (fallbackCondition modal lestLabel)
     , [ note
           "P-DEADLINE"
           Blocking
           "This LEST has no deadline, and BPMN has no untriggered boundary \
           \event, so it is drawn as a conditional boundary event rather than a \
-          \timer."
+          \timer. Nothing can fire it: for every modal but SHANT this arm is \
+          \reached only by the deadline passing, and for SHANT this node is the \
+          \compliance arm, which is likewise reached only by the deadline \
+          \passing."
           "the trigger as something an engine could evaluate"
       ]
     )
@@ -1067,8 +1134,22 @@ boundaryTrigger opts elemId lestLabel = \case
       }
   quoted t = "\8216" <> t <> "\8217"
 
-fallbackCondition :: Text -> Text
-fallbackCondition lestLabel
+-- | The @\<condition\>@ on a boundary event that has no deadline to time on.
+--
+-- For every modal but one this is the @LEST@ edge's own caption, because that is
+-- the arm this node draws. A prohibition is the exception, for the same reason
+-- 'triggerName' has one: 'raceArms' puts a @SHANT@'s boundary on the __HENCE__
+-- arm, so the @LEST@ caption belongs to the task, not to this node. It used to
+-- land here anyway, and the result was a single element whose @name@ read \"the
+-- act is not performed\" and whose @condition@ read \"violation\" — the two
+-- halves of one node asserting opposite arms.
+--
+-- The word both halves now use is 'L4.StateGraph.noTriggerWording', which is
+-- also true of this node in a way \"violation\" never was: with no @WITHIN@ the
+-- prohibition's compliance arm has nothing to fire it.
+fallbackCondition :: Maybe DeonticModal -> Text -> Text
+fallbackCondition (Just DMustNot) _ = noTriggerWording
+fallbackCondition _ lestLabel
   | Text.null (Text.strip lestLabel) = "the obligation is not discharged"
   | otherwise = lestLabel
 
