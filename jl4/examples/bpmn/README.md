@@ -428,11 +428,22 @@ differences and are **not** defects:
 
   | declared        | jBPM builds | and says                                 |
   | --------------- | ----------- | ---------------------------------------- |
-  | `Unspecified`   | nothing     | `Unknown gateway direction: Unspecified` |
-  | (attribute absent) | nothing  | `Unknown gateway direction: null`        |
+  | `Unspecified`      | nothing     | `Unknown gateway direction: Unspecified` |
+  | (attribute absent) | nothing     | `Unknown gateway direction: Unspecified` |
+
+  The second row was re-measured on 2026-07-28 and **corrected**: it previously
+  read `Unknown gateway direction: null`, which no run produces. Omitting the
+  attribute is not a third case — the XSD declares `default="Unspecified"`, so
+  the parser materialises that value and jBPM then rejects it by name, giving a
+  message identical to the row above. (A verification pass reported the opposite
+  — that omitting the attribute makes the file compile. It does not; measured on
+  `unsound/mislabelled-gateway-direction.bpmn` with every `gatewayDirection`
+  attribute stripped, jBPM reports `errors=1` and `RESULT: 1 file(s) with
+  findings.`)
 
   So jBPM accepts **only** `Diverging` and `Converging` — it rejects the XSD's
-  own default both by name and by omission. Nothing emitted today is affected:
+  own default both by name and by omission, and by omission it is the same
+  rejection, not a distinct one. Nothing emitted today is affected:
   `grep -ho 'gatewayDirection="[A-Za-z]*"'` over `expected/`, `sound/` and
   `unsound/` returns 15 `Diverging`, 6 `Converging`, 1 `Mixed` and **no**
   `Unspecified`. It is a latent hazard rather than a live one, recorded so that

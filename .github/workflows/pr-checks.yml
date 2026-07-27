@@ -199,9 +199,16 @@ jobs:
       #              All four are jBPM COMPILE rejections, not liveness defects:
       #
       #                handover.bpmn           axis A4: an L4 name inside a
-      #                                        conditionExpression declared as a
-      #                                        formal expression; Drools parses
-      #                                        it as DRL and refuses
+      #                                        <bpmn:condition> on a CONDITIONAL
+      #                                        BOUNDARY EVENT (`grace period`,
+      #                                        line 44) declared as a formal
+      #                                        expression; Drools parses it as
+      #                                        DRL and refuses. NOT a
+      #                                        conditionExpression — this file
+      #                                        has zero of those, as the element
+      #                                        table in bpmn/README.md says; an
+      #                                        earlier version of this comment
+      #                                        named the wrong element
       #                regcf-advertising.bpmn  A4's defect class, on a gateway guard
       #                regcf-resale.bpmn       A4's defect class, on a gateway guard
       #                regcf-reporting.bpmn    `Unknown gateway direction: Mixed` —
