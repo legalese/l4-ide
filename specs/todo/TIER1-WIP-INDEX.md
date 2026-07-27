@@ -29,6 +29,16 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 | L4-VERSIONING                     | ⚠️ premise superseded | —                                | ⏸️ HELD — awaiting scope decision         | —                                                 |
 | PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                                | ⏭️ not implementable                      | —                                                 |
 | LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR                | —                                                 |
+| FIDELITY-SEVERITY-AXIS            | 🟢 OPEN (interchange) | `docs/fidelity-severity-axis`    | ⬜ todo — ruling only, no impl            | —                                                 |
+
+> **FIDELITY-SEVERITY-AXIS** (classified Tier-2: interchange/DX). Answers smucclaw/l4-ide#928:
+> `FidelitySeverity`'s `Blocking` conflates "the target cannot express this" with "we emitted
+> something no engine can run", so it fires on 98.6% of DMN exports and cannot drive a gate. Ruling:
+> add an orthogonal `FidelityEffect = Faithful | Unevaluable | Malformed | Incomplete | Misstated`
+> (no `Ord`), leave severity untouched, and add `--fail-on-effect=broken`. **Start with W3** — three
+> lines at `Dmn/Lower.hs:1681-1692` that raise the existing `D-NONFEELOUTPUT` on the boxed-literal
+> path; it ships alone and is the only work item that moves a number (measured recall ceiling 97.6%
+> against a real FEEL engine). Spec: `specs/todo/FIDELITY-SEVERITY-AXIS-SPEC.md`.
 
 > **LIBRARY-RESOLUTION-SHADOW** (classified Tier-2: DX/infra, low-risk, high-annoyance).
 > `IMPORT` resolution searches ambient/global filesystem locations (XDG data dir, VSCode
