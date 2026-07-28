@@ -11,20 +11,25 @@ import { gatherL4Bundle } from './l4-bundle.js'
  * Drives a turn on the cloud compose agent (legalese-compose-agent) instead of
  * streaming ai-proxy locally. The harness — tool loop, MCP, file tools — runs
  * server-side; this client only:
- *   1. mints a per-turn agent token from the user's session,
+ *   1. mints a per-turn agent credential from the user's session (a WorkOS
+ *      user-scoped API key, issued and expired by WorkOS),
  *   2. uploads the workspace bundle (attachments + active file + L4 import tree),
  *   3. POSTs the turn and maps the agent's (ai-proxy-compatible) SSE back onto
  *      the same {@link ChatServiceEvent}s the local path emits, and
- *   4. revokes the token at end of turn.
+ *   4. deletes the credential at end of turn.
  *
  * Because the agent's SSE is wire-identical to ai-proxy's, the webview renders
  * the conversation exactly as a normal one.
  */
 
+/** Response from `POST /auth/agent-token`. The credential is a WorkOS
+ *  user-scoped API key (`sk_…`), owned by the signed-in user and bound to their
+ *  org; `id` is the WorkOS key id, used to revoke it at end of turn. */
 interface MintResponse {
   token: string
-  jti: string
+  id: string
   expiresAt: number
+  permissions?: string[]
 }
 
 export class CloudAgentClient {
@@ -211,8 +216,9 @@ export class CloudAgentClient {
         finishReason: abortSignal.aborted ? 'aborted' : 'error',
       })
     } finally {
-      // End-of-turn: invalidate the token so it can't be reused.
-      void this.revokeToken(mint.jti, mint.expiresAt)
+      // End-of-turn: delete the key at WorkOS so it can't be reused. Deletion is
+      // immediate and global — there is no denylist to propagate.
+      void this.revokeToken(mint.id)
     }
   }
 
@@ -230,17 +236,17 @@ export class CloudAgentClient {
     return (await res.json()) as MintResponse
   }
 
-  private async revokeToken(jti: string, expiresAt: number): Promise<void> {
+  private async revokeToken(id: string): Promise<void> {
     try {
       const headers = await this.auth.getAuthHeaders()
       await fetch(`${this.authBase()}/auth/agent-token/revoke`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jti, exp: expiresAt }),
+        body: JSON.stringify({ id }),
       })
     } catch (err) {
       this.logger.warn(
-        `cloud-agent: token revoke failed (will expire): ${err instanceof Error ? err.message : String(err)}`
+        `cloud-agent: credential revoke failed (it still expires on its own): ${err instanceof Error ? err.message : String(err)}`
       )
     }
   }
