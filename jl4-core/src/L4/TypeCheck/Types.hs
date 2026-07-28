@@ -937,7 +937,7 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
-resolveTerm' p n = resolveTermFiltered p (const True) n pure
+resolveTerm' p n = resolveTermFiltered False p (const True) n pure
 
 -- | Continuation-passing overload resolution with a candidate pre-filter
 -- (smucclaw\/l4-ide#929).
@@ -968,13 +968,20 @@ resolveTerm' p n = resolveTermFiltered p (const True) n pure
 -- The single-candidate and out-of-scope arms are untouched (in particular, a
 -- single candidate is never filtered: its failures must surface exactly as
 -- today).
+--
+-- The leading 'Bool' says whether an Error-severity diagnostic was already
+-- emitted for this application node BEFORE resolution (e.g. 'FixityConflict'
+-- or 'MixfixMatchErrorCheck' in the App preamble). When set, the ambiguity
+-- fallback is appended unconditionally — see 'forkWithLazyFallback' for why
+-- the one-success skip is unsound in that case.
 resolveTermFiltered
-  :: (TermKind -> Bool)
+  :: Bool
+  -> (TermKind -> Bool)
   -> (Type' Resolved -> Bool)
   -> Name
   -> ((Resolved, Type' Resolved) -> Check r)
   -> Check r
-resolveTermFiltered p viab n kont = do
+resolveTermFiltered preambleErr p viab n kont = do
   options <- lookupRawNameInEnvironment (rawName n)
   -- Lexical scoping: among the viable candidates, prefer those defined in the
   -- nearest enclosing section (see 'selectByProximity'). Only fall through to
@@ -1038,7 +1045,7 @@ resolveTermFiltered p viab n kont = do
           rn <- ambiguousTerm n' xs'
           pure (rn, v)
       in
-        forkWithLazyFallback kept fallback kont
+        forkWithLazyFallback preambleErr kept fallback kont
   where
     -- Group by the declared type (via its annotation-insensitive 'typeKey') so
     -- that same-typed bindings shadow lexically while distinct overloads remain
@@ -1082,11 +1089,26 @@ resolveTermFiltered p viab n kont = do
 -- candidate branches, the fallback's expensive argument re-checking is never
 -- forced on the happy path.
 --
+-- CAVEAT (the @preambleErr@ flag): the skip is byte-invisible ONLY when no
+-- Error-severity diagnostic was emitted for this node before the fork. This
+-- function counts successes on its LOCAL outcomes — @runCheck@ from the
+-- state at the fork — but a diagnostic emitted in the caller's preamble
+-- (e.g. 'FixityConflict' before falling through to flat application
+-- inference, or a partial-mixfix 'MixfixMatchErrorCheck') is prefixed onto
+-- EVERY branch by the enclosing bind, outside this function's view, and
+-- 'softprune'\/'prune' classify successes WITH that prefix. A locally-Plain
+-- outcome is then a failure upstream: with zero upstream successes the old
+-- shape surfaced the LAST outcome, the fallback's curated ambiguity error —
+-- so skipping the fallback would silently swap that error for the
+-- erstwhile-success candidate. Callers must pass @preambleErr = True@
+-- whenever such a diagnostic preceded the fork; the fallback is then
+-- appended unconditionally, restoring the pre-skip behaviour byte-for-byte.
+--
 -- The one-success test must run AFTER the caller's continuation (the
 -- candidate branches can still fail inside 'matchFunTy'), which is why this
 -- takes the continuation explicitly rather than composing with '>>='.
-forkWithLazyFallback :: forall a r. [Check a] -> Check a -> (a -> Check r) -> Check r
-forkWithLazyFallback cands fallback kont =
+forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check r) -> Check r
+forkWithLazyFallback preambleErr cands fallback kont =
   MkCheck $ \ e s ->
     let
       ks = runCheck (choose cands >>= kont) e s
@@ -1095,8 +1117,8 @@ forkWithLazyFallback cands fallback kont =
       isSuccess (With _ _, _) = False
     in
       case filter isSuccess ks of
-        [_] -> ks
-        _   -> ks ++ runCheck (fallback >>= kont) e s
+        [_] | not preambleErr -> ks
+        _                     -> ks ++ runCheck (fallback >>= kont) e s
 
 -- | Whether a 'TermKind' names a value in the ordinary term namespace (as
 -- opposed to a record selector or data constructor, which are reached through

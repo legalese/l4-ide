@@ -1556,8 +1556,14 @@ checkConsider ec ann e branches t = do
 -- | Infer a plain (non-re-associated) application: the pre-existing App
 -- inference logic, factored out of 'inferExpr' so the fixity chain
 -- pre-pass can fall through to it unchanged.
-inferFlatApp :: Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
-inferFlatApp ann n es = do
+--
+-- The 'Bool' says whether the caller already emitted an Error-severity
+-- diagnostic for this node before delegating here (the 'FixityConflict'
+-- fall-through). Together with a partial mixfix match diagnosed below
+-- ('MixfixMatchErrorCheck'), it forces the ambiguity fallback in overload
+-- resolution — see the CAVEAT on 'forkWithLazyFallback'.
+inferFlatApp :: Bool -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferFlatApp preambleErr ann n es = do
       (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
       -- We want good type error messages. Therefore, we pursue the
       -- following strategy:
@@ -1620,7 +1626,11 @@ inferFlatApp ann n es = do
             -- fork re-checks every argument subtree. See 'appCandidateFilter'
             -- and 'resolveTermFiltered' for the byte-identity argument.
             viab <- appCandidateFilter actualArgs
-            resolveTermFiltered (const True) viab actualFuncName \ (rn, pt) -> do
+            -- An Error-severity diagnostic emitted before the overload fork
+            -- (FixityConflict fall-through or partial mixfix match) makes the
+            -- one-success fallback skip unsound; force the fallback then.
+            let preambleDiag = preambleErr || isJust mMixfixError
+            resolveTermFiltered preambleDiag (const True) viab actualFuncName \ (rn, pt) -> do
               t <- instantiate pt
               (res, rt) <- matchFunTy False rn t actualArgs
               let finalAnn = if needsAnnoRebuild
@@ -2249,11 +2259,15 @@ inferExpr' g =
       -- re-associate it into nested binary applications and infer the result;
       -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
       -- fall through to the ordinary application logic (including the route-α
-      -- variadic-construction rescue), which lives in 'inferFlatApp'.
-      mReassociated <- tryReassociateFixityChain ann n es
+      -- variadic-construction rescue), which lives in 'inferFlatApp'. The
+      -- 'Bool' reports whether the pre-pass emitted an Error-severity
+      -- diagnostic ('FixityConflict') on the fall-through route; it must
+      -- reach overload resolution so that the ambiguity fallback is not
+      -- skipped (see 'forkWithLazyFallback').
+      (fixityErrEmitted, mReassociated) <- tryReassociateFixityChain ann n es
       case mReassociated of
         Just reassociated -> inferExpr reassociated
-        Nothing -> inferFlatApp ann n es
+        Nothing -> inferFlatApp fixityErrEmitted ann n es
     AppNamed ann n nes _morder -> do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -3660,11 +3674,19 @@ rebuildMixfixAppAnno origAnn funcName args =
 -- grouping (mixed left\/right, or a non-associative @infix operator chained
 -- with itself) report a 'FixityReassociationClash'; grouping then recovers
 -- left-associatively so that checking can continue past the error.
-tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Maybe (Expr Name))
+--
+-- The extra 'Bool' reports whether this pass emitted an Error-severity
+-- diagnostic AND declined the chain (the 'FixityConflict' route): the caller
+-- falls through to 'inferFlatApp', which must then force the ambiguity
+-- fallback in overload resolution (see 'forkWithLazyFallback'). All other
+-- declining routes emit nothing and return 'False'; the accepting route
+-- returns a reassociated expression, which is re-inferred wholesale, so its
+-- flag is likewise 'False'.
+tryReassociateFixityChain :: Anno -> Name -> [Expr Name] -> Check (Bool, Maybe (Expr Name))
 tryReassociateFixityChain ann headOp es = do
   registry <- asks (.mixfixRegistry)
   case normalizeChain registry headOp es of
-    Nothing -> pure Nothing
+    Nothing -> pure (False, Nothing)
     Just (operands, allOps) -> do
       -- If the pre-existing mixfix matcher already gives this exact flat shape a
       -- meaning, that interpretation predates fixity declarations and keeps
@@ -3682,15 +3704,15 @@ tryReassociateFixityChain ann headOp es = do
           conflicts = [ (op, fs) | (op, ChainOpConflict fs) <- opFixities ]
           declared = [ (op, f) | (op, ChainOpFixity f) <- opFixities ]
       if | any (isDeclaredChainOperator registry) operands ->
-             pure Nothing
+             pure (False, Nothing)
          | Just _ <- existingMatch ->
-             pure Nothing
+             pure (False, Nothing)
          | ((op, fs) : _) <- conflicts -> do
              addError (FixityConflict (rawName op) fs)
-             pure Nothing
+             pure (True, Nothing)
          | length declared /= length allOps ->
              -- at least one operator has no (complete) fixity declaration
-             pure Nothing
+             pure (False, Nothing)
          | otherwise -> do
              let (reassociated, mClash) = shuntChain declared operands
              case mClash of
@@ -3700,7 +3722,7 @@ tryReassociateFixityChain ann headOp es = do
              -- the needsAnnoRebuild path of the App case: the root keeps the
              -- original source range and extension, with the two-hole payload
              -- the generic ToConcreteNodes instance for App expects.
-             pure $ Just $ case reassociated of
+             pure $ (False,) $ Just $ case reassociated of
                App _ rootOp rootArgs -> App (rebuildMixfixAppAnno ann rootOp rootArgs) rootOp rootArgs
                other -> other
   where
