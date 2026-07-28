@@ -26,6 +26,12 @@
 --
 -- Figures are illustrative. The point of the exhibit is the SHAPE, not the
 -- currency of the numbers.
+--
+-- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- `--model-name` takes the <definitions> name from a module's outermost
+-- section, so the model is named once, here, by the file that is the model.
+
+§ `Regulation Crowdfunding`
 
 ASSUME `annual income` IS A NUMBER
 ASSUME `net worth` IS A NUMBER

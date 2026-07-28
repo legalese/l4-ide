@@ -1,0 +1,2152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_sec_regulation_crowdfunding_17_cfr_part_227" name="SEC Regulation Crowdfunding — 17 CFR Part 227" namespace="https://legalese.com/l4/dmn/sec_regulation_crowdfunding_17_cfr_part_227" exporter="jl4">
+  <inputData id="input_issuer" name="issuer">
+    <variable id="input_issuer_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_2" name="issuer">
+    <variable id="input_issuer_2_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_3" name="issuer">
+    <variable id="input_issuer_3_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_4" name="issuer">
+    <variable id="input_issuer_4_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_5" name="issuer">
+    <variable id="input_issuer_5_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_6" name="issuer">
+    <variable id="input_issuer_6_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_7" name="issuer">
+    <variable id="input_issuer_7_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_8" name="issuer">
+    <variable id="input_issuer_8_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_offering" name="offering">
+    <variable id="input_offering_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_offering_2" name="offering">
+    <variable id="input_offering_2_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_investor" name="investor">
+    <variable id="input_investor_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_investor_2" name="investor">
+    <variable id="input_investor_2_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_investor_3" name="investor">
+    <variable id="input_investor_3_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_investor_4" name="investor">
+    <variable id="input_investor_4_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_amount_to_be_sold_in_this_transaction" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
+    <variable id="input_amount_to_be_sold_in_this_transaction_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
+  </inputData>
+  <inputData id="input_investor_5" name="investor">
+    <variable id="input_investor_5_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_amount_to_be_sold_in_this_transaction_2" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
+    <variable id="input_amount_to_be_sold_in_this_transaction_2_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
+  </inputData>
+  <inputData id="input_offering_3" name="offering">
+    <variable id="input_offering_3_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_required" name="required">
+    <variable id="input_required_var" name="required" typeRef="string"/>
+  </inputData>
+  <inputData id="input_supplied" name="supplied">
+    <variable id="input_supplied_var" name="supplied" typeRef="string"/>
+  </inputData>
+  <inputData id="input_offering_4" name="offering">
+    <variable id="input_offering_4_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_filing" name="filing">
+    <variable id="input_filing_var" name="filing" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_offering_5" name="offering">
+    <variable id="input_offering_5_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_arrangement" name="arrangement">
+    <variable id="input_arrangement_var" name="arrangement" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_arrangement_2" name="arrangement">
+    <variable id="input_arrangement_2_var" name="arrangement" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_arrangement_3" name="arrangement">
+    <variable id="input_arrangement_3_var" name="arrangement" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_arrangement_4" name="arrangement">
+    <variable id="input_arrangement_4_var" name="arrangement" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_notice" name="notice">
+    <variable id="input_notice_var" name="notice" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_notice_2" name="notice">
+    <variable id="input_notice_2_var" name="notice" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status" name="status">
+    <variable id="input_status_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_2" name="status">
+    <variable id="input_status_2_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_3" name="status">
+    <variable id="input_status_3_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_4" name="status">
+    <variable id="input_status_4_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_5" name="status">
+    <variable id="input_status_5_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_6" name="status">
+    <variable id="input_status_6_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_status_7" name="status">
+    <variable id="input_status_7_var" name="status" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_annual_cycles" name="annual_cycles" label="annual cycles">
+    <variable id="input_annual_cycles_var" name="annual_cycles" label="annual cycles" typeRef="number"/>
+  </inputData>
+  <inputData id="input_transfer" name="transfer">
+    <variable id="input_transfer_var" name="transfer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_transfer_2" name="transfer">
+    <variable id="input_transfer_2_var" name="transfer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_transfer_3" name="transfer">
+    <variable id="input_transfer_3_var" name="transfer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_transfer_4" name="transfer">
+    <variable id="input_transfer_4_var" name="transfer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_issuer_9" name="issuer">
+    <variable id="input_issuer_9_var" name="issuer" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_offering_6" name="offering">
+    <variable id="input_offering_6_var" name="offering" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_investor_6" name="investor">
+    <variable id="input_investor_6_var" name="investor" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_amount" name="amount">
+    <variable id="input_amount_var" name="amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_arrangement_5" name="arrangement">
+    <variable id="input_arrangement_5_var" name="arrangement" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_filing_2" name="filing">
+    <variable id="input_filing_2_var" name="filing" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_maximum" name="maximum">
+    <variable id="input_maximum_var" name="maximum" typeRef="number"/>
+  </inputData>
+  <inputData id="input_prior_sales" name="prior_sales" label="prior sales">
+    <variable id="input_prior_sales_var" name="prior_sales" label="prior sales" typeRef="number"/>
+  </inputData>
+  <inputData id="input_previously_sold" name="previously_sold" label="previously sold">
+    <variable id="input_previously_sold_var" name="previously_sold" label="previously sold" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_accredited" name="accredited">
+    <variable id="input_accredited_var" name="accredited" typeRef="boolean"/>
+  </inputData>
+  <inputData id="input_income" name="income">
+    <variable id="input_income_var" name="income" typeRef="number"/>
+  </inputData>
+  <inputData id="input_worth" name="worth">
+    <variable id="input_worth_var" name="worth" typeRef="number"/>
+  </inputData>
+  <inputData id="input_already" name="already">
+    <variable id="input_already_var" name="already" typeRef="number"/>
+  </inputData>
+  <inputData id="input_intermediaries" name="intermediaries">
+    <variable id="input_intermediaries_var" name="intermediaries" typeRef="number"/>
+  </inputData>
+  <inputData id="input_days_available" name="days_available" label="days available">
+    <variable id="input_days_available_var" name="days_available" label="days available" typeRef="number"/>
+  </inputData>
+  <inputData id="input_annual_reports" name="annual_reports" label="annual reports">
+    <variable id="input_annual_reports_var" name="annual_reports" label="annual reports" typeRef="number"/>
+  </inputData>
+  <inputData id="input_holders" name="holders">
+    <variable id="input_holders_var" name="holders" typeRef="number"/>
+  </inputData>
+  <inputData id="input_assets" name="assets">
+    <variable id="input_assets_var" name="assets" typeRef="number"/>
+  </inputData>
+  <inputData id="input_days_since_issue" name="days_since_issue" label="days since issue">
+    <variable id="input_days_since_issue_var" name="days_since_issue" label="days since issue" typeRef="number"/>
+  </inputData>
+  <inputData id="input_to_accredited" name="to_accredited" label="to accredited">
+    <variable id="input_to_accredited_var" name="to_accredited" label="to accredited" typeRef="boolean"/>
+  </inputData>
+  <decision id="decision_offering_maximum_in_a_12_month_period" name="offering_maximum_in_a_12_month_period" label="offering maximum in a 12-month period">
+    <variable id="decision_offering_maximum_in_a_12_month_period_var" name="offering_maximum_in_a_12_month_period" label="offering maximum in a 12-month period" typeRef="number"/>
+    <literalExpression id="decision_offering_maximum_in_a_12_month_period_literal">
+      <text>5000000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_income_or_net_worth_cut_point" name="income_or_net_worth_cut_point" label="income or net worth cut point">
+    <variable id="decision_income_or_net_worth_cut_point_var" name="income_or_net_worth_cut_point" label="income or net worth cut point" typeRef="number"/>
+    <literalExpression id="decision_income_or_net_worth_cut_point_literal">
+      <text>124000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_minimum_permitted_investment" name="minimum_permitted_investment" label="minimum permitted investment">
+    <variable id="decision_minimum_permitted_investment_var" name="minimum_permitted_investment" label="minimum permitted investment" typeRef="number"/>
+    <literalExpression id="decision_minimum_permitted_investment_literal">
+      <text>2500</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period" name="maximum_amount_sold_to_any_one_investor_in_a_12_month_period" label="maximum amount sold to any one investor in a 12-month period">
+    <variable id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_var" name="maximum_amount_sold_to_any_one_investor_in_a_12_month_period" label="maximum amount sold to any one investor in a 12-month period" typeRef="number"/>
+    <literalExpression id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_literal">
+      <text>124000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_tier_1_ceiling" name="tier_1_ceiling" label="tier 1 ceiling">
+    <variable id="decision_tier_1_ceiling_var" name="tier_1_ceiling" label="tier 1 ceiling" typeRef="number"/>
+    <literalExpression id="decision_tier_1_ceiling_literal">
+      <text>124000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_tier_2_ceiling" name="tier_2_ceiling" label="tier 2 ceiling">
+    <variable id="decision_tier_2_ceiling_var" name="tier_2_ceiling" label="tier 2 ceiling" typeRef="number"/>
+    <literalExpression id="decision_tier_2_ceiling_literal">
+      <text>618000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_first_time_issuer_review_ceiling" name="first_time_issuer_review_ceiling" label="first-time issuer review ceiling">
+    <variable id="decision_first_time_issuer_review_ceiling_var" name="first_time_issuer_review_ceiling" label="first-time issuer review ceiling" typeRef="number"/>
+    <literalExpression id="decision_first_time_issuer_review_ceiling_literal">
+      <text>1235000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_holders_of_record_threshold" name="holders_of_record_threshold" label="holders of record threshold">
+    <variable id="decision_holders_of_record_threshold_var" name="holders_of_record_threshold" label="holders of record threshold" typeRef="number"/>
+    <literalExpression id="decision_holders_of_record_threshold_literal">
+      <text>300</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_total_assets_threshold" name="total_assets_threshold" label="total assets threshold">
+    <variable id="decision_total_assets_threshold_var" name="total_assets_threshold" label="total assets threshold" typeRef="number"/>
+    <literalExpression id="decision_total_assets_threshold_literal">
+      <text>10000000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_minimum_days_publicly_available_before_any_sale" name="minimum_days_publicly_available_before_any_sale" label="minimum days publicly available before any sale">
+    <variable id="decision_minimum_days_publicly_available_before_any_sale_var" name="minimum_days_publicly_available_before_any_sale" label="minimum days publicly available before any sale" typeRef="number"/>
+    <literalExpression id="decision_minimum_days_publicly_available_before_any_sale_literal">
+      <text>21</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_days_to_file_the_annual_report_after_fiscal_year_end" name="days_to_file_the_annual_report_after_fiscal_year_end" label="days to file the annual report after fiscal year end">
+    <variable id="decision_days_to_file_the_annual_report_after_fiscal_year_end_var" name="days_to_file_the_annual_report_after_fiscal_year_end" label="days to file the annual report after fiscal year end" typeRef="number"/>
+    <literalExpression id="decision_days_to_file_the_annual_report_after_fiscal_year_end_literal">
+      <text>120</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_business_days_to_file_form_c_tr" name="business_days_to_file_Form_C_TR" label="business days to file Form C-TR">
+    <variable id="decision_business_days_to_file_form_c_tr_var" name="business_days_to_file_Form_C_TR" label="business days to file Form C-TR" typeRef="number"/>
+    <literalExpression id="decision_business_days_to_file_form_c_tr_literal">
+      <text>5</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_business_days_to_file_a_progress_update" name="business_days_to_file_a_progress_update" label="business days to file a progress update">
+    <variable id="decision_business_days_to_file_a_progress_update_var" name="business_days_to_file_a_progress_update" label="business days to file a progress update" typeRef="number"/>
+    <literalExpression id="decision_business_days_to_file_a_progress_update_literal">
+      <text>5</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_days_in_the_resale_restricted_period" name="days_in_the_resale_restricted_period" label="days in the resale restricted period">
+    <variable id="decision_days_in_the_resale_restricted_period_var" name="days_in_the_resale_restricted_period" label="days in the resale restricted period" typeRef="number"/>
+    <literalExpression id="decision_days_in_the_resale_restricted_period_literal">
+      <text>365</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_1_not_organized_under_state_or_territorial_law" name="b_1_not_organized_under_State_or_territorial_law" label="(b)(1) — not organized under State or territorial law">
+    <variable id="decision_b_1_not_organized_under_state_or_territorial_law_var" name="b_1_not_organized_under_State_or_territorial_law" label="(b)(1) — not organized under State or territorial law" typeRef="boolean"/>
+    <informationRequirement id="decision_b_1_not_organized_under_state_or_territorial_law_ir1">
+      <requiredInput href="#input_issuer"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_1_not_organized_under_state_or_territorial_law_literal">
+      <text>true and not(issuer.is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_2_an_exchange_act_reporting_company" name="b_2_an_Exchange_Act_reporting_company" label="(b)(2) — an Exchange Act reporting company">
+    <variable id="decision_b_2_an_exchange_act_reporting_company_var" name="b_2_an_Exchange_Act_reporting_company" label="(b)(2) — an Exchange Act reporting company" typeRef="boolean"/>
+    <informationRequirement id="decision_b_2_an_exchange_act_reporting_company_ir1">
+      <requiredInput href="#input_issuer_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_2_an_exchange_act_reporting_company_literal">
+      <text>true and issuer.is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_3_an_investment_company" name="b_3_an_investment_company" label="(b)(3) — an investment company">
+    <variable id="decision_b_3_an_investment_company_var" name="b_3_an_investment_company" label="(b)(3) — an investment company" typeRef="boolean"/>
+    <informationRequirement id="decision_b_3_an_investment_company_ir1">
+      <requiredInput href="#input_issuer_3"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_3_an_investment_company_literal">
+      <text>true and issuer.is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_4_subject_to_a_bad_actor_disqualification" name="b_4_subject_to_a_bad_actor_disqualification" label="(b)(4) — subject to a bad-actor disqualification">
+    <variable id="decision_b_4_subject_to_a_bad_actor_disqualification_var" name="b_4_subject_to_a_bad_actor_disqualification" label="(b)(4) — subject to a bad-actor disqualification" typeRef="boolean"/>
+    <informationRequirement id="decision_b_4_subject_to_a_bad_actor_disqualification_ir1">
+      <requiredInput href="#input_issuer_4"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_4_subject_to_a_bad_actor_disqualification_literal">
+      <text>true and issuer.is_subject_to_a_disqualification_as_specified_in_section_227_503_a</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_5_delinquent_in_ongoing_annual_reports" name="b_5_delinquent_in_ongoing_annual_reports" label="(b)(5) — delinquent in ongoing annual reports">
+    <variable id="decision_b_5_delinquent_in_ongoing_annual_reports_var" name="b_5_delinquent_in_ongoing_annual_reports" label="(b)(5) — delinquent in ongoing annual reports" typeRef="boolean"/>
+    <informationRequirement id="decision_b_5_delinquent_in_ongoing_annual_reports_ir1">
+      <requiredInput href="#input_issuer_5"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_5_delinquent_in_ongoing_annual_reports_literal">
+      <text>true and issuer.has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan" name="b_6_no_specific_business_plan_or_a_blank_check_business_plan" label="(b)(6) — no specific business plan, or a blank-check business plan">
+    <variable id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_var" name="b_6_no_specific_business_plan_or_a_blank_check_business_plan" label="(b)(6) — no specific business plan, or a blank-check business plan" typeRef="boolean"/>
+    <informationRequirement id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_ir1">
+      <requiredInput href="#input_issuer_6"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_literal">
+      <text>true and issuer.has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_issuer_is_excluded_by_rule_100_b" name="issuer_is_excluded_by_Rule_100_b" label="issuer is excluded by Rule 100(b)">
+    <variable id="decision_issuer_is_excluded_by_rule_100_b_var" name="issuer_is_excluded_by_Rule_100_b" label="issuer is excluded by Rule 100(b)" typeRef="boolean"/>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir1">
+      <requiredDecision href="#decision_b_1_not_organized_under_state_or_territorial_law"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir2">
+      <requiredDecision href="#decision_b_2_an_exchange_act_reporting_company"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir3">
+      <requiredDecision href="#decision_b_3_an_investment_company"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir4">
+      <requiredDecision href="#decision_b_4_subject_to_a_bad_actor_disqualification"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir5">
+      <requiredDecision href="#decision_b_5_delinquent_in_ongoing_annual_reports"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir6">
+      <requiredDecision href="#decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_excluded_by_rule_100_b_ir7">
+      <requiredInput href="#input_issuer_7"/>
+    </informationRequirement>
+    <literalExpression id="decision_issuer_is_excluded_by_rule_100_b_literal">
+      <text>... "(b) Applicability. The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:" OR `(b)(1) — not organized under State or territorial law` OF issuer OR `(b)(2) — an Exchange Act reporting company` OF issuer OR `(b)(3) — an investment company` OF issuer OR `(b)(4) — subject to a bad-actor disqualification` OF issuer OR `(b)(5) — delinquent in ongoing annual reports` OF issuer OR `(b)(6) — no specific business plan, or a blank-check business plan` OF issuer</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_issuer_is_eligible" name="issuer_is_eligible" label="issuer is eligible">
+    <variable id="decision_issuer_is_eligible_var" name="issuer_is_eligible" label="issuer is eligible" typeRef="boolean"/>
+    <informationRequirement id="decision_issuer_is_eligible_ir1">
+      <requiredDecision href="#decision_issuer_is_excluded_by_rule_100_b"/>
+    </informationRequirement>
+    <informationRequirement id="decision_issuer_is_eligible_ir2">
+      <requiredInput href="#input_issuer_8"/>
+    </informationRequirement>
+    <literalExpression id="decision_issuer_is_eligible_literal">
+      <text>NOT `issuer is excluded by Rule 100(b)` OF issuer</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_aggregate_offering_amount" name="aggregate_offering_amount" label="aggregate offering amount">
+    <variable id="decision_aggregate_offering_amount_var" name="aggregate_offering_amount" label="aggregate offering amount" typeRef="number"/>
+    <informationRequirement id="decision_aggregate_offering_amount_ir1">
+      <requiredInput href="#input_offering"/>
+    </informationRequirement>
+    <literalExpression id="decision_aggregate_offering_amount_literal">
+      <text>offering.aggregate_amount_sold_in_reliance_on_section_4_a_6_during_the_preceding_12_months + offering.maximum_offering_amount_the_issuer_will_accept</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_offering_is_within_the_offering_limit" name="offering_is_within_the_offering_limit" label="offering is within the offering limit">
+    <variable id="decision_offering_is_within_the_offering_limit_var" name="offering_is_within_the_offering_limit" label="offering is within the offering limit" typeRef="boolean"/>
+    <informationRequirement id="decision_offering_is_within_the_offering_limit_ir1">
+      <requiredDecision href="#decision_aggregate_offering_amount"/>
+    </informationRequirement>
+    <informationRequirement id="decision_offering_is_within_the_offering_limit_ir2">
+      <requiredDecision href="#decision_offering_maximum_in_a_12_month_period"/>
+    </informationRequirement>
+    <informationRequirement id="decision_offering_is_within_the_offering_limit_ir3">
+      <requiredInput href="#input_offering_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_offering_is_within_the_offering_limit_literal">
+      <text>... "(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;" AND (`aggregate offering amount` OF offering) AT MOST `offering maximum in a 12-month period`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_greater_of_annual_income_or_net_worth" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth">
+    <variable id="decision_greater_of_annual_income_or_net_worth_var" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth" typeRef="number"/>
+    <informationRequirement id="decision_greater_of_annual_income_or_net_worth_ir1">
+      <requiredInput href="#input_investor"/>
+    </informationRequirement>
+    <literalExpression id="decision_greater_of_annual_income_or_net_worth_literal">
+      <text>max(investor.annual_income, investor.net_worth)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point">
+    <variable id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_var" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point" typeRef="boolean"/>
+    <informationRequirement id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1">
+      <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
+    </informationRequirement>
+    <informationRequirement id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2">
+      <requiredInput href="#input_investor_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_literal">
+      <text>investor.annual_income &lt; income_or_net_worth_cut_point or investor.net_worth &lt; income_or_net_worth_cut_point</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_investment_limit" name="investment_limit" label="investment limit">
+    <variable id="decision_investment_limit_var" name="investment_limit" label="investment limit" typeRef="number"/>
+    <informationRequirement id="decision_investment_limit_ir1">
+      <requiredDecision href="#decision_either_annual_income_or_net_worth_is_less_than_the_cut_point"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investment_limit_ir2">
+      <requiredDecision href="#decision_greater_of_annual_income_or_net_worth"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investment_limit_ir3">
+      <requiredDecision href="#decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investment_limit_ir4">
+      <requiredDecision href="#decision_minimum_permitted_investment"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investment_limit_ir5">
+      <requiredInput href="#input_investor_3"/>
+    </informationRequirement>
+    <decisionTable id="decision_investment_limit_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="investment limit">
+      <input id="decision_investment_limit_i1" label="`either annual income or net worth is less than the cut point` OF investor">
+        <inputExpression id="decision_investment_limit_i1_expr" typeRef="boolean">
+          <text>`either annual income or net worth is less than the cut point` OF investor</text>
+        </inputExpression>
+      </input>
+      <output id="decision_investment_limit_o1">
+        <defaultOutputEntry id="decision_investment_limit_o1_default">
+          <text>IF ((0.1 TIMES (`greater of annual income or net worth` OF investor)) AT MOST `maximum amount sold to any one investor in a 12-month period`) THEN (0.1 TIMES (`greater of annual income or net worth` OF investor)) ELSE `maximum amount sold to any one investor in a 12-month period`</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_investment_limit_r1">
+        <description>`either annual income or net worth is less than the cut point` OF investor</description>
+        <inputEntry id="decision_investment_limit_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_investment_limit_r1_o1">
+          <text>IF (`minimum permitted investment` AT LEAST (0.05 TIMES (`greater of annual income or net worth` OF investor))) THEN `minimum permitted investment` ELSE (0.05 TIMES (`greater of annual income or net worth` OF investor))</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction" name="aggregate_amount_sold_to_this_investor_including_this_transaction" label="aggregate amount sold to this investor including this transaction">
+    <variable id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_var" name="aggregate_amount_sold_to_this_investor_including_this_transaction" label="aggregate amount sold to this investor including this transaction" typeRef="number"/>
+    <informationRequirement id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1">
+      <requiredInput href="#input_amount_to_be_sold_in_this_transaction"/>
+    </informationRequirement>
+    <informationRequirement id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2">
+      <requiredInput href="#input_investor_4"/>
+    </informationRequirement>
+    <literalExpression id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_literal">
+      <text>investor.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_investor_is_within_the_investment_limit" name="investor_is_within_the_investment_limit" label="investor is within the investment limit">
+    <variable id="decision_investor_is_within_the_investment_limit_var" name="investor_is_within_the_investment_limit" label="investor is within the investment limit" typeRef="boolean"/>
+    <informationRequirement id="decision_investor_is_within_the_investment_limit_ir1">
+      <requiredDecision href="#decision_aggregate_amount_sold_to_this_investor_including_this_transaction"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investor_is_within_the_investment_limit_ir2">
+      <requiredDecision href="#decision_investment_limit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investor_is_within_the_investment_limit_ir3">
+      <requiredInput href="#input_amount_to_be_sold_in_this_transaction_2"/>
+    </informationRequirement>
+    <informationRequirement id="decision_investor_is_within_the_investment_limit_ir4">
+      <requiredInput href="#input_investor_5"/>
+    </informationRequirement>
+    <literalExpression id="decision_investor_is_within_the_investment_limit_literal">
+      <text>... "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:" OR investor's `is an accredited investor as defined in Rule 501` OR (`aggregate amount sold to this investor including this transaction` OF investor, `amount to be sold in this transaction`) AT MOST (`investment limit` OF investor)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_financial_statements_required" name="financial_statements_required" label="financial statements required">
+    <variable id="decision_financial_statements_required_var" name="financial_statements_required" label="financial statements required" typeRef="string"/>
+    <informationRequirement id="decision_financial_statements_required_ir1">
+      <requiredDecision href="#decision_aggregate_offering_amount"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir2">
+      <requiredDecision href="#decision_first_time_issuer_review_ceiling"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir3">
+      <requiredDecision href="#decision_tier_1_ceiling"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir4">
+      <requiredDecision href="#decision_tier_2_ceiling"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statements_required_ir5">
+      <requiredInput href="#input_offering_3"/>
+    </informationRequirement>
+    <decisionTable id="decision_financial_statements_required_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="financial statements required">
+      <input id="decision_financial_statements_required_i1" label="(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`">
+        <inputExpression id="decision_financial_statements_required_i1_expr" typeRef="boolean">
+          <text>(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`</text>
+        </inputExpression>
+      </input>
+      <input id="decision_financial_statements_required_i2" label="(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`">
+        <inputExpression id="decision_financial_statements_required_i2_expr" typeRef="boolean">
+          <text>(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`</text>
+        </inputExpression>
+      </input>
+      <input id="decision_financial_statements_required_i3" label="offering&apos;s `the issuer has previously sold securities in reliance on section 4(a)(6)`">
+        <inputExpression id="decision_financial_statements_required_i3_expr" typeRef="boolean">
+          <text>offering.the_issuer_has_previously_sold_securities_in_reliance_on_section_4_a_6</text>
+        </inputExpression>
+      </input>
+      <input id="decision_financial_statements_required_i4" label="(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`">
+        <inputExpression id="decision_financial_statements_required_i4_expr" typeRef="boolean">
+          <text>(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`</text>
+        </inputExpression>
+      </input>
+      <output id="decision_financial_statements_required_o1"/>
+      <rule id="decision_financial_statements_required_r1">
+        <description>(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`</description>
+        <inputEntry id="decision_financial_statements_required_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r1_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r1_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r1_o1">
+          <text>"financial statements certified by the principal executive officer, with tax return information"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r2">
+        <description>(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`</description>
+        <inputEntry id="decision_financial_statements_required_r2_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r2_i2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r2_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r2_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r2_o1">
+          <text>"financial statements reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r3">
+        <description>NOT offering's `the issuer has previously sold securities in reliance on section 4(a)(6)` AND (`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`</description>
+        <inputEntry id="decision_financial_statements_required_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r3_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r3_i3">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r3_i4">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r3_o1">
+          <text>"financial statements reviewed by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_financial_statements_required_r4">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_financial_statements_required_r4_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r4_i2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r4_i3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_financial_statements_required_r4_i4">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_financial_statements_required_r4_o1">
+          <text>"financial statements audited by an independent public accountant"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_assurance_level" name="assurance_level" label="assurance level">
+    <variable id="decision_assurance_level_var" name="assurance_level" label="assurance level" typeRef="number"/>
+    <informationRequirement id="decision_assurance_level_ir1">
+      <requiredInput href="#input_required"/>
+    </informationRequirement>
+    <decisionTable id="decision_assurance_level_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="assurance level">
+      <input id="decision_assurance_level_i1" label="required">
+        <inputExpression id="decision_assurance_level_i1_expr" typeRef="string">
+          <text>required</text>
+        </inputExpression>
+      </input>
+      <output id="decision_assurance_level_o1"/>
+      <rule id="decision_assurance_level_r1">
+        <description>required EQUALS `financial statements certified by the principal executive officer, with tax return information`</description>
+        <inputEntry id="decision_assurance_level_r1_i1">
+          <text>"financial statements certified by the principal executive officer, with tax return information"</text>
+        </inputEntry>
+        <outputEntry id="decision_assurance_level_r1_o1">
+          <text>1</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_assurance_level_r2">
+        <description>required EQUALS `financial statements reviewed by an independent public accountant`</description>
+        <inputEntry id="decision_assurance_level_r2_i1">
+          <text>"financial statements reviewed by an independent public accountant"</text>
+        </inputEntry>
+        <outputEntry id="decision_assurance_level_r2_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_assurance_level_r3">
+        <description>required EQUALS `financial statements audited by an independent public accountant`</description>
+        <inputEntry id="decision_assurance_level_r3_i1">
+          <text>"financial statements audited by an independent public accountant"</text>
+        </inputEntry>
+        <outputEntry id="decision_assurance_level_r3_o1">
+          <text>3</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_financial_statement_requirement_is_satisfied" name="financial_statement_requirement_is_satisfied" label="financial statement requirement is satisfied">
+    <variable id="decision_financial_statement_requirement_is_satisfied_var" name="financial_statement_requirement_is_satisfied" label="financial statement requirement is satisfied" typeRef="boolean"/>
+    <informationRequirement id="decision_financial_statement_requirement_is_satisfied_ir1">
+      <requiredDecision href="#decision_assurance_level"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statement_requirement_is_satisfied_ir2">
+      <requiredDecision href="#decision_financial_statements_required"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statement_requirement_is_satisfied_ir3">
+      <requiredInput href="#input_offering_4"/>
+    </informationRequirement>
+    <informationRequirement id="decision_financial_statement_requirement_is_satisfied_ir4">
+      <requiredInput href="#input_supplied"/>
+    </informationRequirement>
+    <literalExpression id="decision_financial_statement_requirement_is_satisfied_literal">
+      <text>(`assurance level` OF supplied) AT LEAST (`assurance level` OF (`financial statements required` OF offering))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_disclosure_requirements_are_met" name="disclosure_requirements_are_met" label="disclosure requirements are met">
+    <variable id="decision_disclosure_requirements_are_met_var" name="disclosure_requirements_are_met" label="disclosure requirements are met" typeRef="boolean"/>
+    <informationRequirement id="decision_disclosure_requirements_are_met_ir1">
+      <requiredDecision href="#decision_financial_statement_requirement_is_satisfied"/>
+    </informationRequirement>
+    <informationRequirement id="decision_disclosure_requirements_are_met_ir2">
+      <requiredInput href="#input_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_disclosure_requirements_are_met_ir3">
+      <requiredInput href="#input_offering_5"/>
+    </informationRequirement>
+    <literalExpression id="decision_disclosure_requirements_are_met_literal">
+      <text>... "(1) Offering statement. ... an issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act ... must file with the Commission and provide to investors and the relevant intermediary a Form C: Offering Statement prior to the commencement of the offering of securities. ... Every Form C must include the information required by section 227.201." AND filing's `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` AND filing's `the Form C includes the information required by section 227.201` AND `financial statement requirement is satisfied` OF offering, (filing's `the financial statements supplied`)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_3_conducted_through_a_single_complying_intermediary" name="a_3_conducted_through_a_single_complying_intermediary" label="(a)(3) — conducted through a single complying intermediary">
+    <variable id="decision_a_3_conducted_through_a_single_complying_intermediary_var" name="a_3_conducted_through_a_single_complying_intermediary" label="(a)(3) — conducted through a single complying intermediary" typeRef="boolean"/>
+    <informationRequirement id="decision_a_3_conducted_through_a_single_complying_intermediary_ir1">
+      <requiredInput href="#input_arrangement"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_3_conducted_through_a_single_complying_intermediary_literal">
+      <text>true and (arrangement.the_intermediary_complies_with_section_4A_a_of_the_Securities_Act_and_the_related_requirements_in_this_part and (arrangement.the_transaction_is_conducted_exclusively_through_the_intermediary_s_platform and (true and arrangement.the_number_of_intermediaries_used_for_the_offering = 1)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_21_day_public_availability_period_has_run" name="the_21_day_public_availability_period_has_run" label="the 21-day public availability period has run">
+    <variable id="decision_the_21_day_public_availability_period_has_run_var" name="the_21_day_public_availability_period_has_run" label="the 21-day public availability period has run" typeRef="boolean"/>
+    <informationRequirement id="decision_the_21_day_public_availability_period_has_run_ir1">
+      <requiredDecision href="#decision_minimum_days_publicly_available_before_any_sale"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_21_day_public_availability_period_has_run_ir2">
+      <requiredInput href="#input_arrangement_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_21_day_public_availability_period_has_run_literal">
+      <text>true and arrangement.the_days_the_issuer_information_has_been_publicly_available_on_the_intermediary_s_platform_before_any_sale &gt;= minimum_days_publicly_available_before_any_sale</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_intermediary_has_discharged_its_investor_facing_duties" name="the_intermediary_has_discharged_its_investor_facing_duties" label="the intermediary has discharged its investor-facing duties">
+    <variable id="decision_the_intermediary_has_discharged_its_investor_facing_duties_var" name="the_intermediary_has_discharged_its_investor_facing_duties" label="the intermediary has discharged its investor-facing duties" typeRef="boolean"/>
+    <informationRequirement id="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1">
+      <requiredInput href="#input_arrangement_3"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_intermediary_has_discharged_its_investor_facing_duties_literal">
+      <text>true and (arrangement.the_intermediary_delivered_educational_materials_in_connection_with_establishing_the_investor_s_account and (true and arrangement.the_intermediary_has_a_reasonable_basis_for_believing_that_the_investor_satisfies_the_investment_limitations))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_intermediary_obligations_are_met" name="intermediary_obligations_are_met" label="intermediary obligations are met">
+    <variable id="decision_intermediary_obligations_are_met_var" name="intermediary_obligations_are_met" label="intermediary obligations are met" typeRef="boolean"/>
+    <informationRequirement id="decision_intermediary_obligations_are_met_ir1">
+      <requiredDecision href="#decision_a_3_conducted_through_a_single_complying_intermediary"/>
+    </informationRequirement>
+    <informationRequirement id="decision_intermediary_obligations_are_met_ir2">
+      <requiredDecision href="#decision_the_21_day_public_availability_period_has_run"/>
+    </informationRequirement>
+    <informationRequirement id="decision_intermediary_obligations_are_met_ir3">
+      <requiredDecision href="#decision_the_intermediary_has_discharged_its_investor_facing_duties"/>
+    </informationRequirement>
+    <informationRequirement id="decision_intermediary_obligations_are_met_ir4">
+      <requiredInput href="#input_arrangement_4"/>
+    </informationRequirement>
+    <literalExpression id="decision_intermediary_obligations_are_met_literal">
+      <text>`(a)(3) — conducted through a single complying intermediary` OF arrangement AND `the 21-day public availability period has run` OF arrangement AND `the intermediary has discharged its investor-facing duties` OF arrangement</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_notice_complies_with_rule_204_b" name="notice_complies_with_Rule_204_b" label="notice complies with Rule 204(b)">
+    <variable id="decision_notice_complies_with_rule_204_b_var" name="notice_complies_with_Rule_204_b" label="notice complies with Rule 204(b)" typeRef="boolean"/>
+    <informationRequirement id="decision_notice_complies_with_rule_204_b_ir1">
+      <requiredInput href="#input_notice"/>
+    </informationRequirement>
+    <literalExpression id="decision_notice_complies_with_rule_204_b_literal">
+      <text>true and (notice.directs_investors_to_the_intermediary_s_platform and (true and (true and (true and not(notice.includes_information_beyond_that_permitted_by_paragraph_b)))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_definition_terms_of_the_offering" name="definition_terms_of_the_offering" label="definition — terms of the offering">
+    <variable id="decision_definition_terms_of_the_offering_var" name="definition_terms_of_the_offering" label="definition — terms of the offering" typeRef="boolean"/>
+    <literalExpression id="decision_definition_terms_of_the_offering_literal">
+      <text>true and true</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_advertising_restriction" name="advertising_restriction" label="advertising restriction">
+    <variable id="decision_advertising_restriction_var" name="advertising_restriction" label="advertising restriction" typeRef="Any"/>
+    <informationRequirement id="decision_advertising_restriction_ir1">
+      <requiredDecision href="#decision_notice_complies_with_rule_204_b"/>
+    </informationRequirement>
+    <informationRequirement id="decision_advertising_restriction_ir2">
+      <requiredInput href="#input_notice_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_advertising_restriction_literal">
+      <text>IF (`notice complies with Rule 204(b)` OF notice) THEN FULFILLED ELSE (PARTY Issuer MUST NOT `advertise the terms of the offering`)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_1_became_an_exchange_act_reporting_company" name="b_1_became_an_Exchange_Act_reporting_company" label="(b)(1) — became an Exchange Act reporting company">
+    <variable id="decision_b_1_became_an_exchange_act_reporting_company_var" name="b_1_became_an_Exchange_Act_reporting_company" label="(b)(1) — became an Exchange Act reporting company" typeRef="boolean"/>
+    <informationRequirement id="decision_b_1_became_an_exchange_act_reporting_company_ir1">
+      <requiredInput href="#input_status"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_1_became_an_exchange_act_reporting_company_literal">
+      <text>true and status.the_issuer_is_required_to_file_reports_under_section_13_a_or_section_15_d_of_the_Exchange_Act</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" name="b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" label="(b)(2) — one annual report filed and fewer than 300 holders of record">
+    <variable id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_var" name="b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record" label="(b)(2) — one annual report filed and fewer than 300 holders of record" typeRef="boolean"/>
+    <informationRequirement id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1">
+      <requiredDecision href="#decision_holders_of_record_threshold"/>
+    </informationRequirement>
+    <informationRequirement id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir2">
+      <requiredInput href="#input_status_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_literal">
+      <text>true and (status.annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part &gt;= 1 and status.holders_of_record &lt; holders_of_record_threshold)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" name="b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" label="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000">
+    <variable id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_var" name="b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000" label="(b)(3) — three annual reports filed and total assets not exceeding $10,000,000" typeRef="boolean"/>
+    <informationRequirement id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1">
+      <requiredDecision href="#decision_total_assets_threshold"/>
+    </informationRequirement>
+    <informationRequirement id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir2">
+      <requiredInput href="#input_status_3"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_literal">
+      <text>true and (status.annual_reports_filed_since_the_most_recent_sale_of_securities_pursuant_to_this_part &gt;= 3 and status.total_assets &lt;= total_assets_threshold)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_4_all_securities_repurchased" name="b_4_all_securities_repurchased" label="(b)(4) — all securities repurchased">
+    <variable id="decision_b_4_all_securities_repurchased_var" name="b_4_all_securities_repurchased" label="(b)(4) — all securities repurchased" typeRef="boolean"/>
+    <informationRequirement id="decision_b_4_all_securities_repurchased_ir1">
+      <requiredInput href="#input_status_4"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_4_all_securities_repurchased_literal">
+      <text>true and status.the_issuer_or_another_party_has_repurchased_all_of_the_securities_issued_in_reliance_on_section_4_a_6</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b_5_liquidated_or_dissolved" name="b_5_liquidated_or_dissolved" label="(b)(5) — liquidated or dissolved">
+    <variable id="decision_b_5_liquidated_or_dissolved_var" name="b_5_liquidated_or_dissolved" label="(b)(5) — liquidated or dissolved" typeRef="boolean"/>
+    <informationRequirement id="decision_b_5_liquidated_or_dissolved_ir1">
+      <requiredInput href="#input_status_5"/>
+    </informationRequirement>
+    <literalExpression id="decision_b_5_liquidated_or_dissolved_literal">
+      <text>true and status.the_issuer_has_liquidated_or_dissolved_its_business_in_accordance_with_state_law</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_ongoing_reporting_obligation_may_terminate" name="ongoing_reporting_obligation_may_terminate" label="ongoing reporting obligation may terminate">
+    <variable id="decision_ongoing_reporting_obligation_may_terminate_var" name="ongoing_reporting_obligation_may_terminate" label="ongoing reporting obligation may terminate" typeRef="boolean"/>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir1">
+      <requiredDecision href="#decision_b_1_became_an_exchange_act_reporting_company"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir2">
+      <requiredDecision href="#decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir3">
+      <requiredDecision href="#decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir4">
+      <requiredDecision href="#decision_b_4_all_securities_repurchased"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir5">
+      <requiredDecision href="#decision_b_5_liquidated_or_dissolved"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_may_terminate_ir6">
+      <requiredInput href="#input_status_6"/>
+    </informationRequirement>
+    <literalExpression id="decision_ongoing_reporting_obligation_may_terminate_literal">
+      <text>... "(b) An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:" OR `(b)(1) — became an Exchange Act reporting company` OF status OR `(b)(2) — one annual report filed and fewer than 300 holders of record` OF status OR `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` OF status OR `(b)(4) — all securities repurchased` OF status OR `(b)(5) — liquidated or dissolved` OF status</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_ongoing_reporting_obligation" name="ongoing_reporting_obligation" label="ongoing reporting obligation">
+    <variable id="decision_ongoing_reporting_obligation_var" name="ongoing_reporting_obligation" label="ongoing reporting obligation" typeRef="Any"/>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir1">
+      <requiredDecision href="#decision_business_days_to_file_form_c_tr"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir2">
+      <requiredDecision href="#decision_days_to_file_the_annual_report_after_fiscal_year_end"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir3">
+      <requiredDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir4">
+      <requiredInput href="#input_annual_cycles"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir5">
+      <requiredInput href="#input_status_7"/>
+    </informationRequirement>
+    <literalExpression id="decision_ongoing_reporting_obligation_literal">
+      <text>IF (`ongoing reporting obligation may terminate` OF status) THEN (PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`) ELSE (IF (`annual cycles` AT MOST 0) THEN FULFILLED ELSE (PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_transfer_is_within_the_one_year_restricted_period" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period">
+    <variable id="decision_transfer_is_within_the_one_year_restricted_period_var" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period" typeRef="boolean"/>
+    <informationRequirement id="decision_transfer_is_within_the_one_year_restricted_period_ir1">
+      <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
+    </informationRequirement>
+    <informationRequirement id="decision_transfer_is_within_the_one_year_restricted_period_ir2">
+      <requiredInput href="#input_transfer"/>
+    </informationRequirement>
+    <literalExpression id="decision_transfer_is_within_the_one_year_restricted_period_literal">
+      <text>true and transfer.days_since_the_securities_were_issued &lt; days_in_the_resale_restricted_period</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_transfer_falls_within_an_exception_in_rule_501_a" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)">
+    <variable id="decision_transfer_falls_within_an_exception_in_rule_501_a_var" name="transfer_falls_within_an_exception_in_Rule_501_a" label="transfer falls within an exception in Rule 501(a)" typeRef="boolean"/>
+    <informationRequirement id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
+      <requiredInput href="#input_transfer_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_transfer_falls_within_an_exception_in_rule_501_a_literal">
+      <text>false or (false or (transfer.is_to_the_issuer_of_the_securities or (false or (transfer.is_to_an_accredited_investor or (false or (transfer.is_as_part_of_an_offering_registered_with_the_Commission or (false or transfer.is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))))))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_transfer_is_permitted" name="transfer_is_permitted" label="transfer is permitted">
+    <variable id="decision_transfer_is_permitted_var" name="transfer_is_permitted" label="transfer is permitted" typeRef="boolean"/>
+    <informationRequirement id="decision_transfer_is_permitted_ir1">
+      <requiredDecision href="#decision_transfer_falls_within_an_exception_in_rule_501_a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_transfer_is_permitted_ir2">
+      <requiredDecision href="#decision_transfer_is_within_the_one_year_restricted_period"/>
+    </informationRequirement>
+    <informationRequirement id="decision_transfer_is_permitted_ir3">
+      <requiredInput href="#input_transfer_3"/>
+    </informationRequirement>
+    <literalExpression id="decision_transfer_is_permitted_literal">
+      <text>NOT `transfer is within the one-year restricted period` OF transfer OR `transfer falls within an exception in Rule 501(a)` OF transfer</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_resale_restriction" name="resale_restriction" label="resale restriction">
+    <variable id="decision_resale_restriction_var" name="resale_restriction" label="resale restriction" typeRef="Any"/>
+    <informationRequirement id="decision_resale_restriction_ir1">
+      <requiredDecision href="#decision_days_in_the_resale_restricted_period"/>
+    </informationRequirement>
+    <informationRequirement id="decision_resale_restriction_ir2">
+      <requiredDecision href="#decision_transfer_falls_within_an_exception_in_rule_501_a"/>
+    </informationRequirement>
+    <informationRequirement id="decision_resale_restriction_ir3">
+      <requiredInput href="#input_transfer_4"/>
+    </informationRequirement>
+    <literalExpression id="decision_resale_restriction_literal">
+      <text>IF (`transfer falls within an exception in Rule 501(a)` OF transfer) THEN FULFILLED ELSE (PARTY Purchaser MUST NOT `transfer the securities` WITHIN `days in the resale restricted period`)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption" name="the_transaction_qualifies_for_the_section_4_a_6_exemption" label="the transaction qualifies for the section 4(a)(6) exemption">
+    <variable id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_var" name="the_transaction_qualifies_for_the_section_4_a_6_exemption" label="the transaction qualifies for the section 4(a)(6) exemption" typeRef="boolean"/>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1">
+      <requiredDecision href="#decision_disclosure_requirements_are_met"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir2">
+      <requiredDecision href="#decision_intermediary_obligations_are_met"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir3">
+      <requiredDecision href="#decision_investor_is_within_the_investment_limit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir4">
+      <requiredDecision href="#decision_issuer_is_eligible"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir5">
+      <requiredDecision href="#decision_offering_is_within_the_offering_limit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir6">
+      <requiredInput href="#input_amount"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7">
+      <requiredInput href="#input_arrangement_5"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8">
+      <requiredInput href="#input_filing_2"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9">
+      <requiredInput href="#input_investor_6"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10">
+      <requiredInput href="#input_issuer_9"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11">
+      <requiredInput href="#input_offering_6"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_literal">
+      <text>... "(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:" AND `issuer is eligible` OF issuer AND `offering is within the offering limit` OF offering AND `investor is within the investment limit` OF investor, amount AND `intermediary obligations are met` OF arrangement AND `disclosure requirements are met` OF filing, offering</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_clean_issuer" name="a_clean_issuer" label="a clean issuer">
+    <variable id="decision_a_clean_issuer_var" name="a_clean_issuer" label="a clean issuer" typeRef="Any"/>
+    <literalExpression id="decision_a_clean_issuer_literal">
+      <text>IssuerProfile WITH name IS "Clean Co" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_foreign_issuer" name="a_foreign_issuer" label="a foreign issuer">
+    <variable id="decision_a_foreign_issuer_var" name="a_foreign_issuer" label="a foreign issuer" typeRef="Any"/>
+    <literalExpression id="decision_a_foreign_issuer_literal">
+      <text>IssuerProfile WITH name IS "Ausland GmbH" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS FALSE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_delinquent_issuer" name="a_delinquent_issuer" label="a delinquent issuer">
+    <variable id="decision_a_delinquent_issuer_var" name="a_delinquent_issuer" label="a delinquent issuer" typeRef="Any"/>
+    <literalExpression id="decision_a_delinquent_issuer_literal">
+      <text>IssuerProfile WITH name IS "Late Filer Inc" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_blank_check_issuer" name="a_blank_check_issuer" label="a blank-check issuer">
+    <variable id="decision_a_blank_check_issuer_var" name="a_blank_check_issuer" label="a blank-check issuer" typeRef="Any"/>
+    <literalExpression id="decision_a_blank_check_issuer_literal">
+      <text>IssuerProfile WITH name IS "SPAC-ish LLC" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_an_offering_of" name="an_offering_of" label="an offering of">
+    <variable id="decision_an_offering_of_var" name="an_offering_of" label="an offering of" typeRef="Any"/>
+    <informationRequirement id="decision_an_offering_of_ir1">
+      <requiredInput href="#input_maximum"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_offering_of_ir2">
+      <requiredInput href="#input_previously_sold"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_offering_of_ir3">
+      <requiredInput href="#input_prior_sales"/>
+    </informationRequirement>
+    <literalExpression id="decision_an_offering_of_literal">
+      <text>Offering WITH `target offering amount` IS maximum `maximum offering amount the issuer will accept` IS maximum `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS `prior sales` `the issuer has previously sold securities in reliance on section 4(a)(6)` IS `previously sold`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_an_investor_with" name="an_investor_with" label="an investor with">
+    <variable id="decision_an_investor_with_var" name="an_investor_with" label="an investor with" typeRef="Any"/>
+    <informationRequirement id="decision_an_investor_with_ir1">
+      <requiredInput href="#input_accredited"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_investor_with_ir2">
+      <requiredInput href="#input_already"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_investor_with_ir3">
+      <requiredInput href="#input_income"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_investor_with_ir4">
+      <requiredInput href="#input_worth"/>
+    </informationRequirement>
+    <literalExpression id="decision_an_investor_with_literal">
+      <text>InvestorProfile WITH name IS "Test Investor" `is an accredited investor as defined in Rule 501` IS accredited `annual income` IS income `net worth` IS worth `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS already</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_an_arrangement_with" name="an_arrangement_with" label="an arrangement with">
+    <variable id="decision_an_arrangement_with_var" name="an_arrangement_with" label="an arrangement with" typeRef="Any"/>
+    <informationRequirement id="decision_an_arrangement_with_ir1">
+      <requiredInput href="#input_days_available"/>
+    </informationRequirement>
+    <informationRequirement id="decision_an_arrangement_with_ir2">
+      <requiredInput href="#input_intermediaries"/>
+    </informationRequirement>
+    <literalExpression id="decision_an_arrangement_with_literal">
+      <text>IntermediaryArrangement WITH `the intermediary complies with section 4A(a) of the Securities Act and the related requirements in this part` IS TRUE `the transaction is conducted exclusively through the intermediary's platform` IS TRUE `the number of intermediaries used for the offering` IS intermediaries `the intermediary delivered educational materials in connection with establishing the investor's account` IS TRUE `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations` IS TRUE `the days the issuer information has been publicly available on the intermediary's platform before any sale` IS `days available`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_reporting_status_with" name="a_reporting_status_with" label="a reporting status with">
+    <variable id="decision_a_reporting_status_with_var" name="a_reporting_status_with" label="a reporting status with" typeRef="Any"/>
+    <informationRequirement id="decision_a_reporting_status_with_ir1">
+      <requiredInput href="#input_annual_reports"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_reporting_status_with_ir2">
+      <requiredInput href="#input_assets"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_reporting_status_with_ir3">
+      <requiredInput href="#input_holders"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_reporting_status_with_literal">
+      <text>ReportingStatus WITH `the issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act` IS FALSE `annual reports filed since the most recent sale of securities pursuant to this part` IS `annual reports` `holders of record` IS holders `total assets` IS assets `the issuer or another party has repurchased all of the securities issued in reliance on section 4(a)(6)` IS FALSE `the issuer has liquidated or dissolved its business in accordance with state law` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_transfer_at" name="a_transfer_at" label="a transfer at">
+    <variable id="decision_a_transfer_at_var" name="a_transfer_at" label="a transfer at" typeRef="Any"/>
+    <informationRequirement id="decision_a_transfer_at_ir1">
+      <requiredInput href="#input_days_since_issue"/>
+    </informationRequirement>
+    <informationRequirement id="decision_a_transfer_at_ir2">
+      <requiredInput href="#input_to_accredited"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_transfer_at_literal">
+      <text>Transfer WITH `days since the securities were issued` IS `days since issue` `is to the issuer of the securities` IS FALSE `is to an accredited investor` IS `to accredited` `is as part of an offering registered with the Commission` IS FALSE `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_certified" name="certified">
+    <variable id="decision_certified_var" name="certified" typeRef="string"/>
+    <literalExpression id="decision_certified_literal">
+      <text>"financial statements certified by the principal executive officer, with tax return information"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_reviewed" name="reviewed">
+    <variable id="decision_reviewed_var" name="reviewed" typeRef="string"/>
+    <literalExpression id="decision_reviewed_literal">
+      <text>"financial statements reviewed by an independent public accountant"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_audited" name="audited">
+    <variable id="decision_audited_var" name="audited" typeRef="string"/>
+    <literalExpression id="decision_audited_literal">
+      <text>"financial statements audited by an independent public accountant"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_conforming_notice" name="a_conforming_notice" label="a conforming notice">
+    <variable id="decision_a_conforming_notice_var" name="a_conforming_notice" label="a conforming notice" typeRef="Any"/>
+    <literalExpression id="decision_a_conforming_notice_literal">
+      <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS TRUE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_an_overreaching_notice" name="an_overreaching_notice" label="an overreaching notice">
+    <variable id="decision_an_overreaching_notice_var" name="an_overreaching_notice" label="an overreaching notice" typeRef="Any"/>
+    <literalExpression id="decision_an_overreaching_notice_literal">
+      <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS TRUE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS TRUE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS TRUE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_notice_with_no_platform_link" name="a_notice_with_no_platform_link" label="a notice with no platform link">
+    <variable id="decision_a_notice_with_no_platform_link_var" name="a_notice_with_no_platform_link" label="a notice with no platform link" typeRef="Any"/>
+    <literalExpression id="decision_a_notice_with_no_platform_link_literal">
+      <text>AdvertisingNotice WITH `directs investors to the intermediary's platform` IS FALSE `states that the issuer is conducting an offering pursuant to section 4(a)(6), names the intermediary, and directs the potential investor to its platform` IS FALSE `states the terms of the offering` IS TRUE `states factual information about the legal identity and business location of the issuer` IS TRUE `includes information beyond that permitted by paragraph (b)` IS FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_a_conforming_filing" name="a_conforming_filing" label="a conforming filing">
+    <variable id="decision_a_conforming_filing_var" name="a_conforming_filing" label="a conforming filing" typeRef="Any"/>
+    <informationRequirement id="decision_a_conforming_filing_ir1">
+      <requiredDecision href="#decision_reviewed"/>
+    </informationRequirement>
+    <literalExpression id="decision_a_conforming_filing_literal">
+      <text>FormCFiling WITH `a Form C offering statement was filed with the Commission and provided to investors and the relevant intermediary prior to the commencement of the offering` IS TRUE `the Form C includes the information required by section 227.201` IS TRUE `the financial statements supplied` IS reviewed</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_base_case_qualifies" name="the_base_case_qualifies" label="the base case qualifies">
+    <variable id="decision_the_base_case_qualifies_var" name="the_base_case_qualifies" label="the base case qualifies" typeRef="boolean"/>
+    <informationRequirement id="decision_the_base_case_qualifies_ir1">
+      <requiredDecision href="#decision_a_clean_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_base_case_qualifies_ir2">
+      <requiredDecision href="#decision_a_conforming_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_base_case_qualifies_ir3">
+      <requiredDecision href="#decision_an_arrangement_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_base_case_qualifies_ir4">
+      <requiredDecision href="#decision_an_investor_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_base_case_qualifies_ir5">
+      <requiredDecision href="#decision_an_offering_of"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_base_case_qualifies_ir6">
+      <requiredDecision href="#decision_the_transaction_qualifies_for_the_section_4_a_6_exemption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_base_case_qualifies_literal">
+      <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_delinquent_issuer_case_qualifies" name="the_delinquent_issuer_case_qualifies" label="the delinquent-issuer case qualifies">
+    <variable id="decision_the_delinquent_issuer_case_qualifies_var" name="the_delinquent_issuer_case_qualifies" label="the delinquent-issuer case qualifies" typeRef="boolean"/>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir1">
+      <requiredDecision href="#decision_a_conforming_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir2">
+      <requiredDecision href="#decision_a_delinquent_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir3">
+      <requiredDecision href="#decision_an_arrangement_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir4">
+      <requiredDecision href="#decision_an_investor_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir5">
+      <requiredDecision href="#decision_an_offering_of"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_delinquent_issuer_case_qualifies_ir6">
+      <requiredDecision href="#decision_the_transaction_qualifies_for_the_section_4_a_6_exemption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_delinquent_issuer_case_qualifies_literal">
+      <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a delinquent issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_over_limit_investor_case_qualifies" name="the_over_limit_investor_case_qualifies" label="the over-limit-investor case qualifies">
+    <variable id="decision_the_over_limit_investor_case_qualifies_var" name="the_over_limit_investor_case_qualifies" label="the over-limit-investor case qualifies" typeRef="boolean"/>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir1">
+      <requiredDecision href="#decision_a_clean_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir2">
+      <requiredDecision href="#decision_a_conforming_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir3">
+      <requiredDecision href="#decision_an_arrangement_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir4">
+      <requiredDecision href="#decision_an_investor_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir5">
+      <requiredDecision href="#decision_an_offering_of"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_over_limit_investor_case_qualifies_ir6">
+      <requiredDecision href="#decision_the_transaction_qualifies_for_the_section_4_a_6_exemption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_over_limit_investor_case_qualifies_literal">
+      <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 9000), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_short_availability_case_qualifies" name="the_short_availability_case_qualifies" label="the short-availability case qualifies">
+    <variable id="decision_the_short_availability_case_qualifies_var" name="the_short_availability_case_qualifies" label="the short-availability case qualifies" typeRef="boolean"/>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir1">
+      <requiredDecision href="#decision_a_clean_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir2">
+      <requiredDecision href="#decision_a_conforming_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir3">
+      <requiredDecision href="#decision_an_arrangement_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir4">
+      <requiredDecision href="#decision_an_investor_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir5">
+      <requiredDecision href="#decision_an_offering_of"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_short_availability_case_qualifies_ir6">
+      <requiredDecision href="#decision_the_transaction_qualifies_for_the_section_4_a_6_exemption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_short_availability_case_qualifies_literal">
+      <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 500000, FALSE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 20, 1), `a conforming filing`</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_under_assured_financials_case_qualifies" name="the_under_assured_financials_case_qualifies" label="the under-assured-financials case qualifies">
+    <variable id="decision_the_under_assured_financials_case_qualifies_var" name="the_under_assured_financials_case_qualifies" label="the under-assured-financials case qualifies" typeRef="boolean"/>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir1">
+      <requiredDecision href="#decision_a_clean_issuer"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir2">
+      <requiredDecision href="#decision_a_conforming_filing"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir3">
+      <requiredDecision href="#decision_an_arrangement_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir4">
+      <requiredDecision href="#decision_an_investor_with"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir5">
+      <requiredDecision href="#decision_an_offering_of"/>
+    </informationRequirement>
+    <informationRequirement id="decision_the_under_assured_financials_case_qualifies_ir6">
+      <requiredDecision href="#decision_the_transaction_qualifies_for_the_section_4_a_6_exemption"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_under_assured_financials_case_qualifies_literal">
+      <text>`the transaction qualifies for the section 4(a)(6) exemption` OF `a clean issuer`, (`an offering of` OF 0, 700000, TRUE), (`an investor with` OF FALSE, 60000, 200000, 0), 5000, (`an arrangement with` OF 21, 1), `a conforming filing`</text>
+    </literalExpression>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_sec_regulation_crowdfunding_17_cfr_part_227_diagram" name="SEC Regulation Crowdfunding — 17 CFR Part 227">
+      <dmndi:DMNShape id="input_issuer_shape" dmnElementRef="input_issuer">
+        <dc:Bounds x="60" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_2_shape" dmnElementRef="input_issuer_2">
+        <dc:Bounds x="280" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_3_shape" dmnElementRef="input_issuer_3">
+        <dc:Bounds x="500" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_4_shape" dmnElementRef="input_issuer_4">
+        <dc:Bounds x="720" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_5_shape" dmnElementRef="input_issuer_5">
+        <dc:Bounds x="940" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_6_shape" dmnElementRef="input_issuer_6">
+        <dc:Bounds x="1160" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_7_shape" dmnElementRef="input_issuer_7">
+        <dc:Bounds x="1380" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_8_shape" dmnElementRef="input_issuer_8">
+        <dc:Bounds x="1600" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_shape" dmnElementRef="input_offering">
+        <dc:Bounds x="1820" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_2_shape" dmnElementRef="input_offering_2">
+        <dc:Bounds x="2040" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_shape" dmnElementRef="input_investor">
+        <dc:Bounds x="2260" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_2_shape" dmnElementRef="input_investor_2">
+        <dc:Bounds x="2480" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_3_shape" dmnElementRef="input_investor_3">
+        <dc:Bounds x="2700" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_4_shape" dmnElementRef="input_investor_4">
+        <dc:Bounds x="2920" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction">
+        <dc:Bounds x="3140" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_5_shape" dmnElementRef="input_investor_5">
+        <dc:Bounds x="3360" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_2_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction_2">
+        <dc:Bounds x="3580" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_3_shape" dmnElementRef="input_offering_3">
+        <dc:Bounds x="3800" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_required_shape" dmnElementRef="input_required">
+        <dc:Bounds x="4020" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_supplied_shape" dmnElementRef="input_supplied">
+        <dc:Bounds x="4240" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_4_shape" dmnElementRef="input_offering_4">
+        <dc:Bounds x="4460" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_filing_shape" dmnElementRef="input_filing">
+        <dc:Bounds x="4680" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_5_shape" dmnElementRef="input_offering_5">
+        <dc:Bounds x="4900" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_arrangement_shape" dmnElementRef="input_arrangement">
+        <dc:Bounds x="5120" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_arrangement_2_shape" dmnElementRef="input_arrangement_2">
+        <dc:Bounds x="5340" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_arrangement_3_shape" dmnElementRef="input_arrangement_3">
+        <dc:Bounds x="5560" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_arrangement_4_shape" dmnElementRef="input_arrangement_4">
+        <dc:Bounds x="5780" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_notice_shape" dmnElementRef="input_notice">
+        <dc:Bounds x="6000" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_notice_2_shape" dmnElementRef="input_notice_2">
+        <dc:Bounds x="6220" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_shape" dmnElementRef="input_status">
+        <dc:Bounds x="6440" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_2_shape" dmnElementRef="input_status_2">
+        <dc:Bounds x="6660" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_3_shape" dmnElementRef="input_status_3">
+        <dc:Bounds x="6880" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_4_shape" dmnElementRef="input_status_4">
+        <dc:Bounds x="7100" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_5_shape" dmnElementRef="input_status_5">
+        <dc:Bounds x="7320" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_6_shape" dmnElementRef="input_status_6">
+        <dc:Bounds x="7540" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_status_7_shape" dmnElementRef="input_status_7">
+        <dc:Bounds x="7760" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_annual_cycles_shape" dmnElementRef="input_annual_cycles">
+        <dc:Bounds x="7980" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_transfer_shape" dmnElementRef="input_transfer">
+        <dc:Bounds x="8200" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_transfer_2_shape" dmnElementRef="input_transfer_2">
+        <dc:Bounds x="8420" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_transfer_3_shape" dmnElementRef="input_transfer_3">
+        <dc:Bounds x="8640" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_transfer_4_shape" dmnElementRef="input_transfer_4">
+        <dc:Bounds x="8860" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_issuer_9_shape" dmnElementRef="input_issuer_9">
+        <dc:Bounds x="9080" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_offering_6_shape" dmnElementRef="input_offering_6">
+        <dc:Bounds x="9300" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_investor_6_shape" dmnElementRef="input_investor_6">
+        <dc:Bounds x="9520" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_amount_shape" dmnElementRef="input_amount">
+        <dc:Bounds x="9740" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_arrangement_5_shape" dmnElementRef="input_arrangement_5">
+        <dc:Bounds x="9960" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_filing_2_shape" dmnElementRef="input_filing_2">
+        <dc:Bounds x="10180" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_maximum_shape" dmnElementRef="input_maximum">
+        <dc:Bounds x="10400" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_prior_sales_shape" dmnElementRef="input_prior_sales">
+        <dc:Bounds x="10620" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_previously_sold_shape" dmnElementRef="input_previously_sold">
+        <dc:Bounds x="10840" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_accredited_shape" dmnElementRef="input_accredited">
+        <dc:Bounds x="11060" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_income_shape" dmnElementRef="input_income">
+        <dc:Bounds x="11280" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_worth_shape" dmnElementRef="input_worth">
+        <dc:Bounds x="11500" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_already_shape" dmnElementRef="input_already">
+        <dc:Bounds x="11720" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_intermediaries_shape" dmnElementRef="input_intermediaries">
+        <dc:Bounds x="11940" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_days_available_shape" dmnElementRef="input_days_available">
+        <dc:Bounds x="12160" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_annual_reports_shape" dmnElementRef="input_annual_reports">
+        <dc:Bounds x="12380" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_holders_shape" dmnElementRef="input_holders">
+        <dc:Bounds x="12600" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_assets_shape" dmnElementRef="input_assets">
+        <dc:Bounds x="12820" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_days_since_issue_shape" dmnElementRef="input_days_since_issue">
+        <dc:Bounds x="13040" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_to_accredited_shape" dmnElementRef="input_to_accredited">
+        <dc:Bounds x="13260" y="1020" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_offering_maximum_in_a_12_month_period_shape" dmnElementRef="decision_offering_maximum_in_a_12_month_period">
+        <dc:Bounds x="60" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_income_or_net_worth_cut_point_shape" dmnElementRef="decision_income_or_net_worth_cut_point">
+        <dc:Bounds x="280" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_minimum_permitted_investment_shape" dmnElementRef="decision_minimum_permitted_investment">
+        <dc:Bounds x="500" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_shape" dmnElementRef="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period">
+        <dc:Bounds x="720" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_tier_1_ceiling_shape" dmnElementRef="decision_tier_1_ceiling">
+        <dc:Bounds x="940" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_tier_2_ceiling_shape" dmnElementRef="decision_tier_2_ceiling">
+        <dc:Bounds x="1160" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_first_time_issuer_review_ceiling_shape" dmnElementRef="decision_first_time_issuer_review_ceiling">
+        <dc:Bounds x="1380" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_holders_of_record_threshold_shape" dmnElementRef="decision_holders_of_record_threshold">
+        <dc:Bounds x="1600" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_total_assets_threshold_shape" dmnElementRef="decision_total_assets_threshold">
+        <dc:Bounds x="1820" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_minimum_days_publicly_available_before_any_sale_shape" dmnElementRef="decision_minimum_days_publicly_available_before_any_sale">
+        <dc:Bounds x="2040" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_days_to_file_the_annual_report_after_fiscal_year_end_shape" dmnElementRef="decision_days_to_file_the_annual_report_after_fiscal_year_end">
+        <dc:Bounds x="2260" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_business_days_to_file_form_c_tr_shape" dmnElementRef="decision_business_days_to_file_form_c_tr">
+        <dc:Bounds x="2480" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_business_days_to_file_a_progress_update_shape" dmnElementRef="decision_business_days_to_file_a_progress_update">
+        <dc:Bounds x="2700" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_days_in_the_resale_restricted_period_shape" dmnElementRef="decision_days_in_the_resale_restricted_period">
+        <dc:Bounds x="2920" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_1_not_organized_under_state_or_territorial_law_shape" dmnElementRef="decision_b_1_not_organized_under_state_or_territorial_law">
+        <dc:Bounds x="3140" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_2_an_exchange_act_reporting_company_shape" dmnElementRef="decision_b_2_an_exchange_act_reporting_company">
+        <dc:Bounds x="3360" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_3_an_investment_company_shape" dmnElementRef="decision_b_3_an_investment_company">
+        <dc:Bounds x="3580" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_4_subject_to_a_bad_actor_disqualification_shape" dmnElementRef="decision_b_4_subject_to_a_bad_actor_disqualification">
+        <dc:Bounds x="3800" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_5_delinquent_in_ongoing_annual_reports_shape" dmnElementRef="decision_b_5_delinquent_in_ongoing_annual_reports">
+        <dc:Bounds x="4020" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_shape" dmnElementRef="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan">
+        <dc:Bounds x="4240" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_aggregate_offering_amount_shape" dmnElementRef="decision_aggregate_offering_amount">
+        <dc:Bounds x="4460" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_greater_of_annual_income_or_net_worth_shape" dmnElementRef="decision_greater_of_annual_income_or_net_worth">
+        <dc:Bounds x="4680" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_shape" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction">
+        <dc:Bounds x="4900" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_assurance_level_shape" dmnElementRef="decision_assurance_level">
+        <dc:Bounds x="5120" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_3_conducted_through_a_single_complying_intermediary_shape" dmnElementRef="decision_a_3_conducted_through_a_single_complying_intermediary">
+        <dc:Bounds x="5340" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_intermediary_has_discharged_its_investor_facing_duties_shape" dmnElementRef="decision_the_intermediary_has_discharged_its_investor_facing_duties">
+        <dc:Bounds x="5560" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_notice_complies_with_rule_204_b_shape" dmnElementRef="decision_notice_complies_with_rule_204_b">
+        <dc:Bounds x="5780" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_definition_terms_of_the_offering_shape" dmnElementRef="decision_definition_terms_of_the_offering">
+        <dc:Bounds x="6000" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_1_became_an_exchange_act_reporting_company_shape" dmnElementRef="decision_b_1_became_an_exchange_act_reporting_company">
+        <dc:Bounds x="6220" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_4_all_securities_repurchased_shape" dmnElementRef="decision_b_4_all_securities_repurchased">
+        <dc:Bounds x="6440" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_5_liquidated_or_dissolved_shape" dmnElementRef="decision_b_5_liquidated_or_dissolved">
+        <dc:Bounds x="6660" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_transfer_falls_within_an_exception_in_rule_501_a_shape" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a">
+        <dc:Bounds x="6880" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_clean_issuer_shape" dmnElementRef="decision_a_clean_issuer">
+        <dc:Bounds x="7100" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_foreign_issuer_shape" dmnElementRef="decision_a_foreign_issuer">
+        <dc:Bounds x="7320" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_delinquent_issuer_shape" dmnElementRef="decision_a_delinquent_issuer">
+        <dc:Bounds x="7540" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_blank_check_issuer_shape" dmnElementRef="decision_a_blank_check_issuer">
+        <dc:Bounds x="7760" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_an_offering_of_shape" dmnElementRef="decision_an_offering_of">
+        <dc:Bounds x="7980" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_an_investor_with_shape" dmnElementRef="decision_an_investor_with">
+        <dc:Bounds x="8200" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_an_arrangement_with_shape" dmnElementRef="decision_an_arrangement_with">
+        <dc:Bounds x="8420" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_reporting_status_with_shape" dmnElementRef="decision_a_reporting_status_with">
+        <dc:Bounds x="8640" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_transfer_at_shape" dmnElementRef="decision_a_transfer_at">
+        <dc:Bounds x="8860" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_certified_shape" dmnElementRef="decision_certified">
+        <dc:Bounds x="9080" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_reviewed_shape" dmnElementRef="decision_reviewed">
+        <dc:Bounds x="9300" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_audited_shape" dmnElementRef="decision_audited">
+        <dc:Bounds x="9520" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_conforming_notice_shape" dmnElementRef="decision_a_conforming_notice">
+        <dc:Bounds x="9740" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_an_overreaching_notice_shape" dmnElementRef="decision_an_overreaching_notice">
+        <dc:Bounds x="9960" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_notice_with_no_platform_link_shape" dmnElementRef="decision_a_notice_with_no_platform_link">
+        <dc:Bounds x="10180" y="860" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_issuer_is_excluded_by_rule_100_b_shape" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b">
+        <dc:Bounds x="60" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_offering_is_within_the_offering_limit_shape" dmnElementRef="decision_offering_is_within_the_offering_limit">
+        <dc:Bounds x="280" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_shape" dmnElementRef="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point">
+        <dc:Bounds x="500" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_financial_statements_required_shape" dmnElementRef="decision_financial_statements_required">
+        <dc:Bounds x="720" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_21_day_public_availability_period_has_run_shape" dmnElementRef="decision_the_21_day_public_availability_period_has_run">
+        <dc:Bounds x="940" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_advertising_restriction_shape" dmnElementRef="decision_advertising_restriction">
+        <dc:Bounds x="1160" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_shape" dmnElementRef="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record">
+        <dc:Bounds x="1380" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_shape" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000">
+        <dc:Bounds x="1600" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_transfer_is_within_the_one_year_restricted_period_shape" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period">
+        <dc:Bounds x="1820" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_resale_restriction_shape" dmnElementRef="decision_resale_restriction">
+        <dc:Bounds x="2040" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_a_conforming_filing_shape" dmnElementRef="decision_a_conforming_filing">
+        <dc:Bounds x="2260" y="700" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_issuer_is_eligible_shape" dmnElementRef="decision_issuer_is_eligible">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_investment_limit_shape" dmnElementRef="decision_investment_limit">
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_financial_statement_requirement_is_satisfied_shape" dmnElementRef="decision_financial_statement_requirement_is_satisfied">
+        <dc:Bounds x="500" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_intermediary_obligations_are_met_shape" dmnElementRef="decision_intermediary_obligations_are_met">
+        <dc:Bounds x="720" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_ongoing_reporting_obligation_may_terminate_shape" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate">
+        <dc:Bounds x="940" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_transfer_is_permitted_shape" dmnElementRef="decision_transfer_is_permitted">
+        <dc:Bounds x="1160" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_investor_is_within_the_investment_limit_shape" dmnElementRef="decision_investor_is_within_the_investment_limit">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_disclosure_requirements_are_met_shape" dmnElementRef="decision_disclosure_requirements_are_met">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_ongoing_reporting_obligation_shape" dmnElementRef="decision_ongoing_reporting_obligation">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_shape" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_base_case_qualifies_shape" dmnElementRef="decision_the_base_case_qualifies">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_delinquent_issuer_case_qualifies_shape" dmnElementRef="decision_the_delinquent_issuer_case_qualifies">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_over_limit_investor_case_qualifies_shape" dmnElementRef="decision_the_over_limit_investor_case_qualifies">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_short_availability_case_qualifies_shape" dmnElementRef="decision_the_short_availability_case_qualifies">
+        <dc:Bounds x="720" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_under_assured_financials_case_qualifies_shape" dmnElementRef="decision_the_under_assured_financials_case_qualifies">
+        <dc:Bounds x="940" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_b_1_not_organized_under_state_or_territorial_law_ir1_edge" dmnElementRef="decision_b_1_not_organized_under_state_or_territorial_law_ir1">
+        <di:waypoint x="150" y="1020"/>
+        <di:waypoint x="3230" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_2_an_exchange_act_reporting_company_ir1_edge" dmnElementRef="decision_b_2_an_exchange_act_reporting_company_ir1">
+        <di:waypoint x="370" y="1020"/>
+        <di:waypoint x="3450" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_3_an_investment_company_ir1_edge" dmnElementRef="decision_b_3_an_investment_company_ir1">
+        <di:waypoint x="590" y="1020"/>
+        <di:waypoint x="3670" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_4_subject_to_a_bad_actor_disqualification_ir1_edge" dmnElementRef="decision_b_4_subject_to_a_bad_actor_disqualification_ir1">
+        <di:waypoint x="810" y="1020"/>
+        <di:waypoint x="3890" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_5_delinquent_in_ongoing_annual_reports_ir1_edge" dmnElementRef="decision_b_5_delinquent_in_ongoing_annual_reports_ir1">
+        <di:waypoint x="1030" y="1020"/>
+        <di:waypoint x="4110" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_ir1_edge" dmnElementRef="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_ir1">
+        <di:waypoint x="1250" y="1020"/>
+        <di:waypoint x="4330" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir1_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir1">
+        <di:waypoint x="3230" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir2_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir2">
+        <di:waypoint x="3450" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir3_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir3">
+        <di:waypoint x="3670" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir4_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir4">
+        <di:waypoint x="3890" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir5_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir5">
+        <di:waypoint x="4110" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir6_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir6">
+        <di:waypoint x="4330" y="860"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_excluded_by_rule_100_b_ir7_edge" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b_ir7">
+        <di:waypoint x="1470" y="1020"/>
+        <di:waypoint x="150" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_eligible_ir1_edge" dmnElementRef="decision_issuer_is_eligible_ir1">
+        <di:waypoint x="150" y="700"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_issuer_is_eligible_ir2_edge" dmnElementRef="decision_issuer_is_eligible_ir2">
+        <di:waypoint x="1690" y="1020"/>
+        <di:waypoint x="150" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_aggregate_offering_amount_ir1_edge" dmnElementRef="decision_aggregate_offering_amount_ir1">
+        <di:waypoint x="1910" y="1020"/>
+        <di:waypoint x="4550" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_offering_is_within_the_offering_limit_ir1_edge" dmnElementRef="decision_offering_is_within_the_offering_limit_ir1">
+        <di:waypoint x="4550" y="860"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_offering_is_within_the_offering_limit_ir2_edge" dmnElementRef="decision_offering_is_within_the_offering_limit_ir2">
+        <di:waypoint x="150" y="860"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_offering_is_within_the_offering_limit_ir3_edge" dmnElementRef="decision_offering_is_within_the_offering_limit_ir3">
+        <di:waypoint x="2130" y="1020"/>
+        <di:waypoint x="370" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_greater_of_annual_income_or_net_worth_ir1_edge" dmnElementRef="decision_greater_of_annual_income_or_net_worth_ir1">
+        <di:waypoint x="2350" y="1020"/>
+        <di:waypoint x="4770" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1_edge" dmnElementRef="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1">
+        <di:waypoint x="370" y="860"/>
+        <di:waypoint x="590" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2_edge" dmnElementRef="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2">
+        <di:waypoint x="2570" y="1020"/>
+        <di:waypoint x="590" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investment_limit_ir1_edge" dmnElementRef="decision_investment_limit_ir1">
+        <di:waypoint x="590" y="700"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investment_limit_ir2_edge" dmnElementRef="decision_investment_limit_ir2">
+        <di:waypoint x="4770" y="860"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investment_limit_ir3_edge" dmnElementRef="decision_investment_limit_ir3">
+        <di:waypoint x="810" y="860"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investment_limit_ir4_edge" dmnElementRef="decision_investment_limit_ir4">
+        <di:waypoint x="590" y="860"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investment_limit_ir5_edge" dmnElementRef="decision_investment_limit_ir5">
+        <di:waypoint x="2790" y="1020"/>
+        <di:waypoint x="370" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1_edge" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1">
+        <di:waypoint x="3230" y="1020"/>
+        <di:waypoint x="4990" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2_edge" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2">
+        <di:waypoint x="3010" y="1020"/>
+        <di:waypoint x="4990" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir1_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir1">
+        <di:waypoint x="4990" y="860"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir2_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir2">
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir3_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir3">
+        <di:waypoint x="3670" y="1020"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir4_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir4">
+        <di:waypoint x="3450" y="1020"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir1_edge" dmnElementRef="decision_financial_statements_required_ir1">
+        <di:waypoint x="4550" y="860"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir2_edge" dmnElementRef="decision_financial_statements_required_ir2">
+        <di:waypoint x="1470" y="860"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir3_edge" dmnElementRef="decision_financial_statements_required_ir3">
+        <di:waypoint x="1030" y="860"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir4_edge" dmnElementRef="decision_financial_statements_required_ir4">
+        <di:waypoint x="1250" y="860"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statements_required_ir5_edge" dmnElementRef="decision_financial_statements_required_ir5">
+        <di:waypoint x="3890" y="1020"/>
+        <di:waypoint x="810" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_assurance_level_ir1_edge" dmnElementRef="decision_assurance_level_ir1">
+        <di:waypoint x="4110" y="1020"/>
+        <di:waypoint x="5210" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir1_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir1">
+        <di:waypoint x="5210" y="860"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir2_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir2">
+        <di:waypoint x="810" y="700"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir3_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir3">
+        <di:waypoint x="4550" y="1020"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir4_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir4">
+        <di:waypoint x="4330" y="1020"/>
+        <di:waypoint x="590" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir1_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir1">
+        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir2_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir2">
+        <di:waypoint x="4770" y="1020"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir3_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir3">
+        <di:waypoint x="4990" y="1020"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_3_conducted_through_a_single_complying_intermediary_ir1_edge" dmnElementRef="decision_a_3_conducted_through_a_single_complying_intermediary_ir1">
+        <di:waypoint x="5210" y="1020"/>
+        <di:waypoint x="5430" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_21_day_public_availability_period_has_run_ir1_edge" dmnElementRef="decision_the_21_day_public_availability_period_has_run_ir1">
+        <di:waypoint x="2130" y="860"/>
+        <di:waypoint x="1030" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_21_day_public_availability_period_has_run_ir2_edge" dmnElementRef="decision_the_21_day_public_availability_period_has_run_ir2">
+        <di:waypoint x="5430" y="1020"/>
+        <di:waypoint x="1030" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1_edge" dmnElementRef="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1">
+        <di:waypoint x="5650" y="1020"/>
+        <di:waypoint x="5650" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir1_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir1">
+        <di:waypoint x="5430" y="860"/>
+        <di:waypoint x="810" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir2_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir2">
+        <di:waypoint x="1030" y="700"/>
+        <di:waypoint x="810" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir3_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir3">
+        <di:waypoint x="5650" y="860"/>
+        <di:waypoint x="810" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir4_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir4">
+        <di:waypoint x="5870" y="1020"/>
+        <di:waypoint x="810" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_notice_complies_with_rule_204_b_ir1_edge" dmnElementRef="decision_notice_complies_with_rule_204_b_ir1">
+        <di:waypoint x="6090" y="1020"/>
+        <di:waypoint x="5870" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_advertising_restriction_ir1_edge" dmnElementRef="decision_advertising_restriction_ir1">
+        <di:waypoint x="5870" y="860"/>
+        <di:waypoint x="1250" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_advertising_restriction_ir2_edge" dmnElementRef="decision_advertising_restriction_ir2">
+        <di:waypoint x="6310" y="1020"/>
+        <di:waypoint x="1250" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_1_became_an_exchange_act_reporting_company_ir1_edge" dmnElementRef="decision_b_1_became_an_exchange_act_reporting_company_ir1">
+        <di:waypoint x="6530" y="1020"/>
+        <di:waypoint x="6310" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1_edge" dmnElementRef="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1">
+        <di:waypoint x="1690" y="860"/>
+        <di:waypoint x="1470" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir2_edge" dmnElementRef="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir2">
+        <di:waypoint x="6750" y="1020"/>
+        <di:waypoint x="1470" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1_edge" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1">
+        <di:waypoint x="1910" y="860"/>
+        <di:waypoint x="1690" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir2_edge" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir2">
+        <di:waypoint x="6970" y="1020"/>
+        <di:waypoint x="1690" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_4_all_securities_repurchased_ir1_edge" dmnElementRef="decision_b_4_all_securities_repurchased_ir1">
+        <di:waypoint x="7190" y="1020"/>
+        <di:waypoint x="6530" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_b_5_liquidated_or_dissolved_ir1_edge" dmnElementRef="decision_b_5_liquidated_or_dissolved_ir1">
+        <di:waypoint x="7410" y="1020"/>
+        <di:waypoint x="6750" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir1_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir1">
+        <di:waypoint x="6310" y="860"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir2_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir2">
+        <di:waypoint x="1470" y="700"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir3_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir3">
+        <di:waypoint x="1690" y="700"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir4">
+        <di:waypoint x="6530" y="860"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir5">
+        <di:waypoint x="6750" y="860"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir6_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir6">
+        <di:waypoint x="7630" y="1020"/>
+        <di:waypoint x="1030" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir1_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir1">
+        <di:waypoint x="2570" y="860"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir2_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir2">
+        <di:waypoint x="2350" y="860"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir3_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir3">
+        <di:waypoint x="1030" y="540"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
+        <di:waypoint x="8070" y="1020"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
+        <di:waypoint x="7850" y="1020"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir1_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir1">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="1910" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir2_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir2">
+        <di:waypoint x="8290" y="1020"/>
+        <di:waypoint x="1910" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1_edge" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
+        <di:waypoint x="8510" y="1020"/>
+        <di:waypoint x="6970" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir1_edge" dmnElementRef="decision_transfer_is_permitted_ir1">
+        <di:waypoint x="6970" y="860"/>
+        <di:waypoint x="1250" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir2_edge" dmnElementRef="decision_transfer_is_permitted_ir2">
+        <di:waypoint x="1910" y="700"/>
+        <di:waypoint x="1250" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_transfer_is_permitted_ir3_edge" dmnElementRef="decision_transfer_is_permitted_ir3">
+        <di:waypoint x="8730" y="1020"/>
+        <di:waypoint x="1250" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_resale_restriction_ir1_edge" dmnElementRef="decision_resale_restriction_ir1">
+        <di:waypoint x="3010" y="860"/>
+        <di:waypoint x="2130" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_resale_restriction_ir2_edge" dmnElementRef="decision_resale_restriction_ir2">
+        <di:waypoint x="6970" y="860"/>
+        <di:waypoint x="2130" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_resale_restriction_ir3_edge" dmnElementRef="decision_resale_restriction_ir3">
+        <di:waypoint x="8950" y="1020"/>
+        <di:waypoint x="2130" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir2_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir2">
+        <di:waypoint x="810" y="540"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir3_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir3">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir4_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir4">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir5_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir5">
+        <di:waypoint x="370" y="700"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir6_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir6">
+        <di:waypoint x="9830" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7">
+        <di:waypoint x="10050" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8">
+        <di:waypoint x="10270" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9">
+        <di:waypoint x="9610" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10">
+        <di:waypoint x="9170" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11">
+        <di:waypoint x="9390" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_offering_of_ir1_edge" dmnElementRef="decision_an_offering_of_ir1">
+        <di:waypoint x="10490" y="1020"/>
+        <di:waypoint x="8070" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_offering_of_ir2_edge" dmnElementRef="decision_an_offering_of_ir2">
+        <di:waypoint x="10930" y="1020"/>
+        <di:waypoint x="8070" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_offering_of_ir3_edge" dmnElementRef="decision_an_offering_of_ir3">
+        <di:waypoint x="10710" y="1020"/>
+        <di:waypoint x="8070" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_investor_with_ir1_edge" dmnElementRef="decision_an_investor_with_ir1">
+        <di:waypoint x="11150" y="1020"/>
+        <di:waypoint x="8290" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_investor_with_ir2_edge" dmnElementRef="decision_an_investor_with_ir2">
+        <di:waypoint x="11810" y="1020"/>
+        <di:waypoint x="8290" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_investor_with_ir3_edge" dmnElementRef="decision_an_investor_with_ir3">
+        <di:waypoint x="11370" y="1020"/>
+        <di:waypoint x="8290" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_investor_with_ir4_edge" dmnElementRef="decision_an_investor_with_ir4">
+        <di:waypoint x="11590" y="1020"/>
+        <di:waypoint x="8290" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_arrangement_with_ir1_edge" dmnElementRef="decision_an_arrangement_with_ir1">
+        <di:waypoint x="12250" y="1020"/>
+        <di:waypoint x="8510" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_an_arrangement_with_ir2_edge" dmnElementRef="decision_an_arrangement_with_ir2">
+        <di:waypoint x="12030" y="1020"/>
+        <di:waypoint x="8510" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_reporting_status_with_ir1_edge" dmnElementRef="decision_a_reporting_status_with_ir1">
+        <di:waypoint x="12470" y="1020"/>
+        <di:waypoint x="8730" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_reporting_status_with_ir2_edge" dmnElementRef="decision_a_reporting_status_with_ir2">
+        <di:waypoint x="12910" y="1020"/>
+        <di:waypoint x="8730" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_reporting_status_with_ir3_edge" dmnElementRef="decision_a_reporting_status_with_ir3">
+        <di:waypoint x="12690" y="1020"/>
+        <di:waypoint x="8730" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_transfer_at_ir1_edge" dmnElementRef="decision_a_transfer_at_ir1">
+        <di:waypoint x="13130" y="1020"/>
+        <di:waypoint x="8950" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_transfer_at_ir2_edge" dmnElementRef="decision_a_transfer_at_ir2">
+        <di:waypoint x="13350" y="1020"/>
+        <di:waypoint x="8950" y="940"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_a_conforming_filing_ir1_edge" dmnElementRef="decision_a_conforming_filing_ir1">
+        <di:waypoint x="9390" y="860"/>
+        <di:waypoint x="2350" y="780"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir1_edge" dmnElementRef="decision_the_base_case_qualifies_ir1">
+        <di:waypoint x="7190" y="860"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir2_edge" dmnElementRef="decision_the_base_case_qualifies_ir2">
+        <di:waypoint x="2350" y="700"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir3_edge" dmnElementRef="decision_the_base_case_qualifies_ir3">
+        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir4_edge" dmnElementRef="decision_the_base_case_qualifies_ir4">
+        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir5_edge" dmnElementRef="decision_the_base_case_qualifies_ir5">
+        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir6_edge" dmnElementRef="decision_the_base_case_qualifies_ir6">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir1_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir1">
+        <di:waypoint x="2350" y="700"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir2_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir2">
+        <di:waypoint x="7630" y="860"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir3_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir3">
+        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir4_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir4">
+        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir5_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir5">
+        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir6_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir6">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir1_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir1">
+        <di:waypoint x="7190" y="860"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir2_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir2">
+        <di:waypoint x="2350" y="700"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir3_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir3">
+        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir4_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir4">
+        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir5_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir5">
+        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir6_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir6">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir1_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir1">
+        <di:waypoint x="7190" y="860"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir2_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir2">
+        <di:waypoint x="2350" y="700"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir3_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir3">
+        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir4_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir4">
+        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir5_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir5">
+        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir6_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir6">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir1_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir1">
+        <di:waypoint x="7190" y="860"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir2_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir2">
+        <di:waypoint x="2350" y="700"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir3_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir3">
+        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir4_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir4">
+        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir5_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir5">
+        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir6_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir6">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

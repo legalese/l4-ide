@@ -27,13 +27,14 @@ import qualified Base.Text as Text
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVFS)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule)
+import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
+import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (Severity (..))
 
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeBaseName)
 import Test.Hspec
 import Test.Hspec.Golden
 
@@ -1094,6 +1095,10 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       let shared = [n | n <- drg.drgNotes, n.code == "D-SCOPE"]
       map (.severity) shared `shouldBe` [Lossy]
       map (.message) shared `shouldSatisfy` all (Text.isInfixOf "both named `n`")
+      -- The count is computed, not spelled. It read "two" unconditionally
+      -- until 2026-07-27, which understated the Reg CF corpus's eight-way
+      -- collision on `issuer` as a two-way one.
+      map (.message) shared `shouldSatisfy` all (Text.isInfixOf "two different terms")
 
     it "element ids derive from L4 names, so they survive a rebuild" $ do
       let drg = drgOf decisionChain
@@ -1310,67 +1315,75 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       emitMarkdown drg `shouldSatisfy` Text.isInfixOf "200000"
       emitDrg drg `shouldSatisfy` Text.isInfixOf "&gt;= 200000"
 
-  describe "golden" $ do
-    it "the Reg CF exhibit, as DMN 1.3 XML" $ goldenDmn examplesRoot
-    it "the Reg CF exhibit's fidelity report" $ goldenFidelity examplesRoot
-    it "the Reg CF exhibit, as dmnmd markdown" $ goldenMarkdown examplesRoot
-    it "the Reg CF exhibit's markdown fidelity report" $ goldenMarkdownFidelity examplesRoot
+  describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
+    it (label <> ", as DMN 1.3 XML") $
+      goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
+    it (label <> "'s fidelity report") $
+      goldenOf examplesRoot srcPath (stem <> ".fidelity.txt")
+        (renderReport . dmnReport)
+    it (label <> ", as dmnmd markdown") $
+      goldenOf examplesRoot srcPath (stem <> ".dmn.md") emitMarkdown
+    it (label <> "'s markdown fidelity report") $
+      goldenOf examplesRoot srcPath (stem <> ".md.fidelity.txt")
+        (renderReport . markdownReport)
 
 ------------------------------------------------------------------------
 -- golden
 ------------------------------------------------------------------------
 
--- | A realistic multi-decision module, in the shape of the regulation the
--- Lexipedia page describes: a boolean eligibility test, a computed measure, and
--- an investor limit that returns a NUMBER. Goldens live beside the source, the
--- way the OpenFisca ones do.
-goldenDmn :: FilePath -> IO (Golden Text)
-goldenDmn examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  let output = emitDrg (drgNamed "Regulation Crowdfunding" src)
-  pure
-    Golden
-      { output
-      , encodePretty = Text.unpack
-      , writeToFile = Text.writeFile
-      , readFromFile = Text.readFile
-      , goldenFile = examplesRoot </> "dmn" </> "expected" </> "reg-cf.dmn"
-      , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> "reg-cf.dmn.actual")
-      , failFirstTime = True
-      }
-
--- | The other half of the deliverable, and the more interesting one: every place
--- the emitted model left the fragment DMN can analyse, named and located.
-goldenFidelity :: FilePath -> IO (Golden Text)
-goldenFidelity examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  let output = renderReport (dmnReport (drgNamed "Regulation Crowdfunding" src))
-  pure
-    Golden
-      { output
-      , encodePretty = Text.unpack
-      , writeToFile = Text.writeFile
-      , readFromFile = Text.readFile
-      , goldenFile = examplesRoot </> "dmn" </> "expected" </> "reg-cf.fidelity.txt"
-      , actualFile = Just (examplesRoot </> "dmn" </> "expected" </> "reg-cf.fidelity.actual")
-      , failFirstTime = True
-      }
-
--- | The markdown emitter's two goldens. Kept separate from the XML pair on
--- purpose: the whole demonstration is that ONE IR produces TWO artifacts with
--- TWO different loss lists.
-goldenMarkdown :: FilePath -> IO (Golden Text)
-goldenMarkdown examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  pure (mkGolden examplesRoot "reg-cf.dmn.md" (emitMarkdown (drgNamed "Regulation Crowdfunding" src)))
-
-goldenMarkdownFidelity :: FilePath -> IO (Golden Text)
-goldenMarkdownFidelity examplesRoot = do
-  src <- Text.readFile (examplesRoot </> "dmn" </> "reg-cf.l4")
-  pure
-    ( mkGolden examplesRoot "reg-cf.md.fidelity.txt"
-        (renderReport (markdownReport (drgNamed "Regulation Crowdfunding" src)))
+-- | @(source, golden stem, spec label)@.
+--
+-- There is deliberately no model-name column. The model's name comes from the
+-- module's own outermost @§@ heading, else from the file's base name — the
+-- same precedence @l4 export --to=dmn@ applies — so these goldens are what a
+-- bare CLI invocation writes, with no flag and no string retyped here. It used
+-- to be a hand-typed column, and the result was that the Reg CF corpus's model
+-- had three names at once: @SEC Regulation Crowdfunding — 17 CFR Part 227@ in
+-- the corpus, @Regulation Crowdfunding (17 CFR Part 227)@ in this table, and
+-- @regcf@ from the CLI.
+--
+-- Two subjects, and the difference between them is the whole point:
+--
+-- * @dmn\/reg-cf.l4@ is the SHAPE exhibit — five decisions chosen so the
+--   goldens show every outcome the exporter has, written module-level-scalar
+--   (@ASSUME@) style because that is the program model DMN itself has. Its
+--   figures are illustrative and its own header says so.
+-- * @legal\/regcf\/regcf.l4@ is the REAL 992-line corpus, 73 decisions, written
+--   in the house @GIVEN@ + record style. It is here to be honest about what
+--   that costs: a DMN decision is a 0-ary variable, so every cross-decision
+--   call @f x@ leaves the FEEL fragment, and every @GIVEN@ binder becomes a
+--   global @inputData@ — nine of which are called @issuer@. The XML is
+--   well-formed and a real engine will load it; almost none of it will
+--   evaluate. That is a fact about the DMN program model, and it belongs in a
+--   golden rather than in a paragraph nobody can regression-test.
+goldenSubjects :: [(FilePath, FilePath, String)]
+goldenSubjects =
+  [ ( "dmn" </> "reg-cf.l4"
+    , "reg-cf"
+    , "the Reg CF shape exhibit"
     )
+  , ( "legal" </> "regcf" </> "regcf.l4"
+    , "regcf-corpus"
+    , "the Reg CF corpus"
+    )
+  ]
+
+-- | One golden: read the source, lower it the way the CLI would, render it
+-- with @render@, and compare against @expected\/\<name\>@. Goldens all live
+-- under @examples\/dmn\/expected@ even when the source does not, so
+-- @etc\/validate-dmn.mjs@ with no arguments still finds every emitted model.
+goldenOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text)
+goldenOf examplesRoot srcPath name render = do
+  src <- Text.readFile (examplesRoot </> srcPath)
+  pure (mkGolden examplesRoot name (render (drgAsCli srcPath src)))
+
+-- | Lower exactly as @l4 export --to=dmn FILE@ does with no @--model-name@:
+-- the module's outermost @§@ heading if it has one, else the file's base name.
+-- Keeping this in step with 'L4.Cli.Export.exportDmn' is what makes every DMN
+-- golden reproducible from the command line.
+drgAsCli :: FilePath -> Text -> Drg
+drgAsCli srcPath src =
+  drgWith (\m -> fromMaybe (Text.pack (takeBaseName srcPath)) (moduleTitle m)) src
 
 mkGolden :: FilePath -> FilePath -> Text -> Golden Text
 mkGolden examplesRoot name output =
@@ -1412,14 +1425,15 @@ drgNamed = drgFlavored defaultDmnFlavor
 -- claimed to pin DATE behaviour was pinning the exporter's treatment of a failed
 -- overload resolution. Warnings and infos are left alone; only errors are fatal.
 --
--- __There is exactly one of these, taking the flavor as a parameter.__ The
--- flavor helper was briefly a second copy without the @tcdErrors@ guard, which
--- put the hole above straight back — and put it precisely under the
--- byte-identity tripwire, where a fixture that stopped typechecking would
--- degrade /both/ sides equally, keep the equality true, and let the one test
--- whose job is to announce Phase 5 go green on garbage.
-drgFlavored :: DmnFlavor -> Text -> Text -> Drg
-drgFlavored flavor name src = case checkWithImports emptyVFS src of
+-- __There is exactly one of these__, taking the flavor and the model-naming
+-- function as parameters; everything else in this file is a partial
+-- application of it. The flavor helper was briefly a second copy without the
+-- @tcdErrors@ guard, which put the hole above straight back — and put it
+-- precisely under the byte-identity tripwire, where a fixture that stopped
+-- typechecking would degrade /both/ sides equally, keep the equality true, and
+-- let the one test whose job is to announce Phase 5 go green on garbage.
+drgFlavoredWith :: DmnFlavor -> (Module Resolved -> Text) -> Text -> Drg
+drgFlavoredWith flavor mkName src = case checkWithImports emptyVFS src of
   Left errs -> error ("source failed to parse: " <> show errs)
   Right tc
     | errs@(_ : _) <- filter ((== SError) . TC.severity) tc.tcdErrors ->
@@ -1430,11 +1444,20 @@ drgFlavored flavor name src = case checkWithImports emptyVFS src of
     | otherwise ->
         lowerModule
           MkDmnLowerOptions
-            { dloModelName    = name
+            { dloModelName    = mkName tc.tcdModule
             , dloSubstitution = tc.tcdSubstitution
             , dloFlavor       = flavor
             }
           tc.tcdModule
+
+-- | As 'drgFlavoredWith', with a fixed model name.
+drgFlavored :: DmnFlavor -> Text -> Text -> Drg
+drgFlavored flavor name = drgFlavoredWith flavor (const name)
+
+-- | As 'drgNamed', at the default flavor, with the model name computed from the
+-- checked module.
+drgWith :: (Module Resolved -> Text) -> Text -> Drg
+drgWith = drgFlavoredWith defaultDmnFlavor
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of

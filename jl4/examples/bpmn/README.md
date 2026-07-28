@@ -14,6 +14,52 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
+| `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
+
+## The Reg CF goldens are cut from the corpus itself
+
+The three `regcf-*` golden pairs are exported from
+`jl4/examples/legal/regcf/regcf.l4` — the real 992-line formalisation of 17 CFR
+Part 227 — not from a fixture beside it:
+
+```
+$ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn \
+     --rule "ongoing reporting obligation" --fidelity-report
+```
+
+Until 2026-07-27 that command failed with "No regulative rules found in module",
+because `L4.StateGraph.findRegulativeExpr` descended through `Where` and `LetIn`
+but not `IfThenElse`, and all three of the corpus's duties are `IF`-headed — the
+CFR writes its guard outside the duty ("**unless** such securities are
+transferred: …"). A hand-written `regcf.l4` lived here as the workaround, with the
+guard hoisted into `PROVIDED` and the reporting spine rewritten as a `ROR`.
+
+**That file is deleted.** It was a second source, and it had drifted from the
+corpus on its first commit: it re-declared three deadline constants, renamed four
+predicates, dropped the statutory chapeau, invented two `LEST` breach clauses the
+CFR does not contain, and — because a `ROR` arm needs an obligation to hang a
+`PROVIDED` on — silently dropped the annual cycle's base case, so the shipped
+diagram asserted a duty the corpus discharges. Citation is not a drift control;
+projection is.
+
+Three things the extractor learned in the process, all visible in the goldens:
+
+- **`IF`/`ELSE` over regulative arms is a guarded `OneOf` junction.**
+  `guardedIfBranches` peels the chain, conjoining each arm's condition with the
+  negation of every condition above it, so the branch set stays exhaustive and
+  mutually exclusive by construction. `regcf-reporting.bpmn` has **three** arms,
+  including the one that imposes no duty at all.
+- **A `HENCE` back into the rule being extracted is a loop.** It is an `App` with
+  arguments, which used to fall through to "unknown target" and produce a dead-end
+  state named `next`; `P-CYCLE` could not fire because there was no cycle in the
+  graph to detect. `TargetSelf` now edges back to the initial state, and `P-CYCLE`
+  fires.
+- **A junction's branch edges carry their guards.** `Lower.hs`'s `branches` passed
+  `Nothing`, so an exclusive gateway drew a free choice and the condition landed on
+  the flow *out of the task* — the diagram read "pick an arm, do the work, then test
+  what decided it". The guards are now `conditionExpression`s on the branch flows,
+  and the new `P-BRANCHGUARD` note records what BPMN still cannot say about them:
+  that they exhaust the cases and cannot overlap.
 
 Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 
@@ -63,6 +109,12 @@ directory:
 l4 export --to=bpmn offering.l4 -o /tmp/offering.bpmn --fidelity-report
 diff /tmp/offering.bpmn          expected/offering.bpmn
 diff /tmp/offering.fidelity.txt  expected/offering.fidelity.txt
+
+# the Reg CF trio, from the corpus in examples/legal/ rather than from here
+l4 export ../legal/regcf/regcf.l4 --to bpmn --rule "ongoing reporting obligation" \
+   -o /tmp/regcf-reporting.bpmn --fidelity-report
+diff /tmp/regcf-reporting.bpmn         expected/regcf-reporting.bpmn
+diff /tmp/regcf-reporting.fidelity.txt expected/regcf-reporting.fidelity.txt
 ```
 
 Without `-o` the XML goes to stdout and the report to stderr, so a redirected
@@ -88,8 +140,9 @@ Each fixture produces two goldens under `expected/`:
   per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
   writing more Haskell; codes `P-…` are this exporter's own doing — an
   approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
-  (`P-NOJOIN`), or a shape the `StateGraph` types permit that BPMN has no honest
-  drawing for at all (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
+  (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), or a
+  shape the `StateGraph` types permit that BPMN has no honest drawing for at all
+  (`P-MULTI-HENCE`, `P-JUNCTION-OBLIGATION`, `P-CYCLE`).
   (DMN uses `D-…`, so a combined report never confuses the two.)
 
 ## Checking the XML is really importable
@@ -99,14 +152,12 @@ BPMN with. Nothing is added to `package.json`:
 
 ```sh
 npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs \
-  jl4/examples/bpmn/expected/offering.bpmn \
-  jl4/examples/bpmn/expected/handover.bpmn \
-  jl4/examples/bpmn/expected/consultation.bpmn
+  jl4/examples/bpmn/expected/*.bpmn
 ```
 
 It reports parse errors, moddle warnings, unresolved references, boundary events
 without a trigger, and any flow node or sequence flow missing its diagram
-interchange. All three fixtures parse with zero warnings.
+interchange. All six goldens parse with zero warnings.
 
 **It is not evidence that the diagram is right, and must never be cited as
 such.** It checks well-formedness, and well-formedness is exactly what a wrong
@@ -131,7 +182,18 @@ It translates the process to a workflow net — places are sequence flows, plus
 one "this activity is running" place per activity carrying a boundary event —
 and explores every reachable marking. Four properties, in van der Aalst's
 vocabulary: **S1** option to complete, **S2** no deadlock, **S3** no dead flow
-node, **S4** safe. All three fixtures pass all four.
+node, **S4** safe. All six goldens pass all four — and a fifth, structural check
+now rides alongside them; see `unsound/mislabelled-gateway-direction.bpmn`.
+
+**S3 is about wiring, not about triggers, and the difference matters.** A node
+is dead to this checker only when no run can reach it. A conditional boundary
+event whose condition nothing will ever satisfy is *reachable* — an engine may
+fire a conditional boundary non-deterministically — so S3 passes and should.
+`regcf-advertising.bpmn`'s `Boundary_2`, named "unreachable: no WITHIN", is
+exactly that shape: the prohibition sets no deadline, so nothing discharges it,
+and the token game has nothing to say. It is the **fidelity report** that records
+the loss, as `P-DEADLINE` on that node. Do not read a SOUND verdict as "every
+node can actually fire".
 
 Two things it deliberately does not do. It does not use `bpmn-moddle`, so a
 disagreement with `validate-bpmn.mjs` about what the graph even is shows up
@@ -157,19 +219,48 @@ correctly and why K4 holds.
 
 Not every consumer derives them. **`bpmnlint`, Camunda's own linter, reads the
 back-references only**, and without them reports every node in every fixture —
-including the sound ones — as `no-disconnected`, `no-implicit-start` and
-`no-implicit-end`: 65 findings across three good files. Adding the
-back-references drops that to 3, all of them `label-required` on the unnamed
-start event.
+including the sound ones — as disconnected. Measured 2026-07-28 with
+`bpmnlint` **11.12.1** and `bpmnlint:recommended` over the **six** files in
+`expected/`:
 
-So this is a fidelity note about the emitted XML rather than a defect in it, and
-the fix is small if it is ever wanted. Recorded here for the same reason the DMN
-flavor axis is recorded: a construct one conforming tool accepts and another
-rejects is a property of the interchange, not of either tool.
+| | without back-refs (the tree as it stands) | with back-refs injected |
+| --- | --- | --- |
+| `no-disconnected`      | 55  | 0 |
+| `no-implicit-end`      | 45  | 0 |
+| `no-implicit-start`    | 35  | 0 |
+| `label-required`       | 13  | 13 |
+| `fake-join`            | 0   | 7 (warnings) |
+| `no-gateway-join-fork` | 0   | 1 |
+| **total**              | **148** | **21** (14 errors, 7 warnings) |
 
-(`bpmnlint` finds nothing else on the fixtures, and — once the noise is removed
-— nothing at all on either deadlocking diagram. A linter is not an engine
-either.)
+**No golden in the tree carries back-references** — `grep -c '<bpmn:incoming>'`
+returns 0 for all six in `expected/` and for `sound/joined-beside-breach.bpmn`.
+So the right-hand column is a *prediction*, measured by injecting the
+back-references into scratch copies, not a state this repo has ever shipped.
+
+The residue is not what an earlier version of this paragraph claimed. It said
+"65 findings across three good files", dropping to "3, all of them
+`label-required` on the unnamed start event" — wrong on the file count (three,
+now six), wrong on both totals, and wrong on the character of what survives:
+the 13 `label-required` are on start events **and** unnamed sequence flows, and
+adding the back-references *introduces* 7 `fake-join` warnings and a
+`no-gateway-join-fork` that the disconnected reading had masked. Supplying them
+would not be a pure improvement.
+
+So this is a fidelity note about the emitted XML rather than a defect in it.
+The emitter change is small if it is ever wanted, but the table above is the
+reason to decide it on purpose rather than reflexively: it trades 135 findings
+away and 8 findings in.
+
+Recorded here for the same reason the DMN flavor axis is recorded: a construct
+one conforming tool accepts and another rejects is a property of the
+interchange, not of either tool.
+
+(And a linter is not an engine. With back-references supplied, `bpmnlint`
+reports exactly one `label-required` on each of the two deadlocking diagrams in
+`unsound/` — and **nothing whatever about the deadlock**, which
+`check-bpmn-soundness.mjs` catches with a witness trace and jBPM confirms
+independently.)
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 
@@ -205,36 +296,77 @@ same join our token game names, that is evidence our hand-written semantics are
 right.
 
 How much exporter output it actually exercises is worth measuring rather than
-assuming, and the answer is: not much. Across the three goldens there is exactly
-**one** `exclusiveGateway` (in `handover.bpmn`) and **zero**
-`conditionExpression`s and **zero** `default` flows anywhere — so branching has
-never been exercised on exporter output at all, and the single fixture that has a
-real branch is the one jBPM rejects. Most of what the engine confirms, it
-confirms on files written by hand for this purpose.
+assuming, and the answer is: **less than before**, because the goldens grew
+faster than the engine's reach. Re-measured over the six committed files in
+`expected/`:
+
+| golden                   | `exclusiveGateway` | `parallelGateway` | `conditionExpression` | `default` flow | jBPM |
+| ------------------------ | ------------------ | ----------------- | --------------------- | -------------- | ---- |
+| `consultation.bpmn`      | 0                  | 2                 | 0                     | 0              | runs |
+| `handover.bpmn`          | 1                  | 1                 | 0                     | 0              | **rejects** |
+| `offering.bpmn`          | 0                  | 1                 | 0                     | 0              | runs |
+| `regcf-advertising.bpmn` | 1                  | 0                 | 2                     | 0              | **rejects** |
+| `regcf-reporting.bpmn`   | 1                  | 0                 | 3                     | 0              | **rejects** |
+| `regcf-resale.bpmn`      | 1                  | 0                 | 2                     | 0              | **rejects** |
+| **total**                | **4**              | **4**             | **7**                 | **0**          | 2 of 6 run |
+
+An earlier version of this paragraph said "across the three goldens there is
+exactly one `exclusiveGateway` … and zero `conditionExpression`s", which was true
+of a directory that has since doubled. There are now four exclusive gateways and
+seven guarded flows — the three Reg CF files brought both — and still **zero**
+`default` flows anywhere.
+
+The conclusion survives the correction and in fact sharpens: **every** golden
+that has a real branch is one jBPM rejects. `handover.bpmn` is rejected for axis
+A4, and all three Reg CF files are rejected too — two of them for A4's defect
+class (an L4 name inside a `conditionExpression` declared as a formal
+expression), and `regcf-reporting.bpmn` for its mixed gateway. So branching has
+still never been executed on exporter output. Most of what the engine confirms,
+it confirms on files written by hand for this purpose.
 
 ### It agrees, everywhere it can run
 
-| fixture                                       | `validate-bpmn.mjs` | `check-bpmn-soundness.mjs` | jBPM execution                       |
-| --------------------------------------------- | ------------------- | -------------------------- | ------------------------------------ |
-| `consultation.bpmn`                           | OK, 0 warnings      | SOUND                      | COMPLETED                            |
-| `offering.bpmn`                               | OK, 0 warnings      | SOUND                      | ABORTED via error end event `Breach` |
-| `handover.bpmn`                               | OK, 0 warnings      | SOUND                      | **rejected, see A4**                 |
-| `sound/joined-beside-breach.bpmn`             | OK, 0 warnings      | SOUND                      | COMPLETED                            |
-| `unsound/historical-handover-edge-counted-join.bpmn` | OK, 0 warnings | UNSOUND (S2)           | **rejected, see A4**                 |
-| `unsound/deadlock-boundary-in-rand.bpmn`      | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`** |
-| `unsound/deadlock-ror-in-rand.bpmn`           | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`** |
-| `unsound/unsafe-xor-join-after-rand.bpmn`     | OK, 0 warnings      | UNSOUND (S4)               | **DUPLICATION, `Fulfilled` fired 2x** |
+All twelve fixtures in this tree, measured together — `bpmn-moddle@10`,
+`check-bpmn-soundness.mjs`, and `etc/check-bpmn-kie.sh` (jbpm-bpmn2
+7.74.1.Final, JDK 17.0.20). An earlier version of this table listed eight and
+concluded "agreement on all six files jBPM can compile", which silently omitted
+the three Reg CF goldens whose rejections were disclosed only in
+`../legal/regcf/PROJECTIONS.md`. They are rows here now.
 
-Agreement on all six files jBPM can compile, in both directions — with the
+| fixture                                              | `validate-bpmn.mjs` | `check-bpmn-soundness.mjs` | jBPM                                  |
+| ---------------------------------------------------- | ------------------- | -------------------------- | ------------------------------------- |
+| `consultation.bpmn`                                  | OK, 0 warnings      | SOUND                      | COMPLETED                             |
+| `offering.bpmn`                                      | OK, 0 warnings      | SOUND                      | ABORTED via error end event `Breach`  |
+| `handover.bpmn`                                      | OK, 0 warnings      | SOUND                      | **rejected at compile, see A4**       |
+| `regcf-advertising.bpmn`                             | OK, 0 warnings      | SOUND                      | **rejected at compile**, A4's defect class: `` `notice complies with Rule 204(b)` OF notice `` in a `conditionExpression` |
+| `regcf-reporting.bpmn`                               | OK, 0 warnings      | SOUND                      | **rejected at compile**: `Unknown gateway direction: Mixed` |
+| `regcf-resale.bpmn`                                  | OK, 0 warnings      | SOUND                      | **rejected at compile**, A4's defect class |
+| `sound/joined-beside-breach.bpmn`                    | OK, 0 warnings      | SOUND                      | COMPLETED                             |
+| `unsound/historical-handover-edge-counted-join.bpmn` | OK, 0 warnings      | UNSOUND (S2)               | **rejected at compile, see A4**       |
+| `unsound/deadlock-boundary-in-rand.bpmn`             | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`**  |
+| `unsound/deadlock-ror-in-rand.bpmn`                  | OK, 0 warnings      | UNSOUND (S2)               | **DEADLOCK, token parked at `Join`**  |
+| `unsound/mislabelled-gateway-direction.bpmn`         | OK, 0 warnings      | UNSOUND (**STRUCTURE**; S1–S4 all pass) | **rejected at compile**: >1 incoming on a node it built as a `Split` |
+| `unsound/unsafe-xor-join-after-rand.bpmn`            | OK, 0 warnings      | UNSOUND (S4)               | **DUPLICATION, `Fulfilled` fired 2x** |
+
+**jBPM compiles 6 of the 12 and rejects the other 6.** On the six it can run,
+its verdict agrees with `check-bpmn-soundness.mjs` in both directions — with the
 `unsafe-xor-join` row carrying a caveat, because DUPLICATION is our firing-count
 heuristic layered on top of jBPM rather than jBPM's own verdict (which is
 COMPLETED). See `unsound/README.md`.
 
-**The load-bearing detail: jBPM's _compile_ phase caught none of the defects.**
-Once the missing guard below was supplied it passed all three compilable
-fixtures at zero errors, and only execution found anything. A KIE gate that
+The `mislabelled-gateway-direction` row is **not** agreement, and is marked so
+it is not read as such: jBPM rejects that file because it cannot build a node
+with multiple incoming and multiple outgoing flows at all, while the checker
+plays exactly that shape happily and objects only to the *attribute*. Two
+measurements, two questions, one coincident verdict.
+
+**The load-bearing detail: jBPM's _compile_ phase caught none of the join
+defects.** Once the missing guard below was supplied it passed every compilable
+fixture at zero errors, and only execution found anything. A KIE gate that
 merely compiled would have been parse-level agreement — nearly free, and worth
-nearly nothing. That is why this harness runs the process.
+nearly nothing. That is why this harness runs the process. (Compile-time
+rejection does catch the *structural* defect in
+`mislabelled-gateway-direction.bpmn`, which is the one kind it can see.)
 
 **And the sharpest limit, stated plainly: the one fixture that is _real_ pre-fix
 exporter output is one jBPM cannot read.** `historical-handover-edge-counted-join.bpmn`
@@ -265,7 +397,7 @@ differences and are **not** defects:
 - **A0 `isExecutable="false"` → `true`.** Deliberate in the exporter (see
   `L4/Bpmn/Emit.hs`) so Camunda will not apply executable-process validation to
   a picture. Flipped in memory only; flipping it in the exporter would rewrite
-  three goldens.
+  all six goldens.
 - **A1 abstract `<bpmn:task>` → `<bpmn:userTask>`.** jBPM needs an
   implementation binding; Camunda and `bpmn-moddle` accept the abstract form.
 - **A2 end event with more than one incoming flow.** Spec-legal implicit merge,
@@ -280,6 +412,53 @@ differences and are **not** defects:
   that **exporter output never reaches**, since every emitted gateway sets it —
   so in practice this only ever fires on a hand-written file.
 
+  **jBPM implements only two of BPMN's four directions**, and it picks the node
+  type from this attribute. Measured on one fixture, three runs, nothing changed
+  but the attribute (`unsound/mislabelled-gateway-direction.bpmn`, jbpm-bpmn2
+  7.74.1.Final, JDK 17.0.20):
+
+  | declared     | jBPM builds | and says                                                                            |
+  | ------------ | ----------- | ----------------------------------------------------------------------------------- |
+  | `Diverging`  | a `Split`   | `This type of node [Split_0, one of] cannot have more than one incoming connection!` |
+  | `Converging` | a `Join`    | `This type of node [Split_0, one of] cannot have more than one outgoing connection!` |
+  | `Mixed`      | nothing     | `Unknown gateway direction: Mixed`                                                   |
+
+  And the fourth value, measured separately by putting the literal string on
+  `consultation.bpmn`'s `Split_0` — a gateway jBPM otherwise runs to COMPLETED:
+
+  | declared        | jBPM builds | and says                                 |
+  | --------------- | ----------- | ---------------------------------------- |
+  | `Unspecified`      | nothing     | `Unknown gateway direction: Unspecified` |
+  | (attribute absent) | nothing     | `Unknown gateway direction: Unspecified` |
+
+  The second row was re-measured on 2026-07-28 and **corrected**: it previously
+  read `Unknown gateway direction: null`, which no run produces. Omitting the
+  attribute is not a third case — the XSD declares `default="Unspecified"`, so
+  the parser materialises that value and jBPM then rejects it by name, giving a
+  message identical to the row above. (A verification pass reported the opposite
+  — that omitting the attribute makes the file compile. It does not; measured on
+  `unsound/mislabelled-gateway-direction.bpmn` with every `gatewayDirection`
+  attribute stripped, jBPM reports `errors=1` and `RESULT: 1 file(s) with
+  findings.`)
+
+  So jBPM accepts **only** `Diverging` and `Converging` — it rejects the XSD's
+  own default both by name and by omission, and by omission it is the same
+  rejection, not a distinct one. Nothing emitted today is affected:
+  `grep -ho 'gatewayDirection="[A-Za-z]*"'` over `expected/`, `sound/` and
+  `unsound/` returns 15 `Diverging`, 6 `Converging`, 1 `Mixed` and **no**
+  `Unspecified`. It is a latent hazard rather than a live one, recorded so that
+  the first gateway with one incoming and one outgoing flow — which
+  `gatewayFlowFor` would correctly call `Unspecified` — is a known cost and not
+  a surprise.
+
+  The `Mixed` case **is** reached by exporter output: `expected/regcf-reporting.bpmn`'s
+  renewal loop makes its gateway genuinely mixed, so the file now says `Mixed`
+  and jBPM will not read it. Unlike A0–A2, the harness cannot adapt around it —
+  the shape, not the spelling, is what jBPM has no node for. Before this was
+  measured the same rejection was attributed to mixedness on the strength of the
+  `Diverging` message, which is about incoming arity; the difference is recorded
+  in `../legal/regcf/PROJECTIONS.md` §3 and `unsound/README.md`.
+
 A5 is neither, and used to be filed with the gaps below by mistake:
 
 - **A5 timer event definition with no `timeDuration`/`timeCycle`/`timeDate`.**
@@ -291,27 +470,39 @@ A5 is neither, and used to be filed with the gaps below by mistake:
 
 The remaining two are **real gaps in the emitted XML**, not tool disagreements:
 
-- **A3 — a diverging `exclusiveGateway` with no guard at all.**
-  `grep -c conditionExpression` over every fixture returns 0, and none sets
-  `default` either. `ROR` ("one of") emits a bare XOR split, so **no** engine can
-  decide the branch — this is not something Camunda accepts and jBPM rejects, it
-  is something nothing can execute. This is precisely the **F4 seam**: those
-  guards are what a referenced DMN decision would supply. The harness injects a
-  deterministic stand-in purely so execution can proceed — **which means the
-  single path jBPM explores is chosen by our own adaptation**, not by the file:
-  every multi-way exclusive gateway takes its first outgoing flow in document
-  order. Do not read the explored interleaving as representative.
-- **A4 — `handover.bpmn`'s conditional boundary event is L4 source text labelled
-  as a formal expression.** The body is
+- **A3 — a diverging `exclusiveGateway` with no guard at all.** **Narrowed, not
+  gone.** The claim here used to be that `grep -c conditionExpression` over every
+  fixture returns 0. That was true when `handover.bpmn` held the only exclusive
+  gateway in the tree; it is now false, because the three Reg CF goldens carry
+  **7** `conditionExpression`s between them (see the table above), lowered from
+  the corpus's `IF`/`ELSE` chains. What is still true is that **no** fixture sets
+  a `default` flow, and that a bare `ROR` ("one of") emits an XOR split with no
+  guard at all — so on `handover.bpmn` A3 still fires, and **no** engine can
+  decide that branch. This is precisely the **F4 seam**: those guards are what a
+  referenced DMN decision would supply. The harness injects a deterministic
+  stand-in purely so execution can proceed — **which means the single path jBPM
+  explores is chosen by our own adaptation**, not by the file: every multi-way
+  exclusive gateway takes its first outgoing flow in document order. Do not read
+  the explored interleaving as representative. (Where a guard *is* emitted, it
+  runs into A4 instead: the text is L4, not DRL.)
+- **A4 — L4 source text labelled as a formal expression.** The original witness
+  is `handover.bpmn`'s conditional boundary event, whose body is
   `<bpmn:condition xsi:type="bpmn:tFormalExpression">` `` `grace period` ``
   `</bpmn:condition>` — a backticked L4 name, with no `language` attribute and no
   `expressionLanguage` on `<definitions>`. So the file asserts this is a formal
   expression in the default language while it is in fact an identifier. Camunda
   Modeler renders it happily; Drools takes the claim at face value, tries to
-  parse it as DRL, and rejects the whole file with an ANTLR error. **This is the
-  one fixture no engine can run**, and it is a fidelity defect rather than a
-  flavor axis: the honest emission would set `language` to something naming L4,
-  or drop the `tFormalExpression` type.
+  parse it as DRL, and rejects the whole file with an ANTLR error.
+
+  **The same defect now appears in a second place**, and the earlier "this is the
+  one fixture no engine can run" no longer holds: the `conditionExpression`s on
+  the Reg CF gateways are L4 too, so `regcf-advertising.bpmn` and
+  `regcf-resale.bpmn` are rejected the same way (`Unable to Analyse Expression`
+  `` `notice complies with Rule 204(b)` OF notice ``). Counting from the table
+  above, jBPM rejects 6 of the 12 fixtures: four for this, one for A6's mixed
+  gateway, one for the deliberate structural fixture. It is a fidelity defect
+  rather than a flavor axis: the honest emission would set `language` to
+  something naming L4, or drop the `tFormalExpression` type.
 
 Also seen and deliberately ignored: non-fatal XSD chatter on stderr about
 `bpmn:tFormalExpression` for `timeDuration`, which does not stop compilation.

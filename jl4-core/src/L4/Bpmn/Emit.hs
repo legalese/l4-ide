@@ -155,8 +155,10 @@ gatewayTag = \case
 
 flowDirection :: GatewayFlow -> Text
 flowDirection = \case
+  Unspecified -> "Unspecified"
   Diverging -> "Diverging"
   Converging -> "Converging"
+  Mixed -> "Mixed"
 
 triggerLines :: Int -> Text -> BoundaryTrigger -> [Text]
 triggerLines depth nid = \case

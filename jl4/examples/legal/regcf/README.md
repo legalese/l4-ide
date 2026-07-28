@@ -348,6 +348,274 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    the investor limit on 2020-06-01?". That is Track C1 (`temporal-rule-version`), and it is
    the demonstration SPEC §8/M5 is built around.
 
+## 6. Projections: what comes out of this corpus, and what does not
+
+The mirrored page is prose plus **one** hand-drawn BPMN diagram pasted from Camunda
+Modeler, with nothing connecting the prose to the XML — which is why the investor
+threshold appears twice on it and is stale in both. Everything in this section is cut
+from `regcf.l4` by a program. None of it was drawn.
+
+**[`PROJECTIONS.md`](PROJECTIONS.md) is the full account**: every artifact, the exact
+command that regenerates it, its fidelity notes, and — the part that matters — what each
+projection *cannot* say. What follows is the summary.
+
+| Target     | Artifact                                                                      | Status                                                       |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **does not evaluate** — see below           |
+| **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
+
+Every DMN and BPMN golden reproduces byte for byte from a bare CLI invocation — no
+`--model-name`, no flag but `--rule`. The `<definitions>` name comes from this file's own
+outermost `§` heading.
+
+### 6.1 DMN: 73 decisions, 3 tables, and a model no engine can bind
+
+`l4 export --to=dmn` on this file succeeds and the XML parses under `dmn-moddle`
+with **zero warnings**. It is also, as a program, nearly inert:
+
+- **73 `<decision>`** elements — every top-level `DECIDE`/`MEANS` including the nine
+  record fixtures and the five test scenarios — of which **3** are decision tables
+  and **70** are boxed literal expressions (`D-LITERALEXPR`, blocking, ×69).
+- **61 `<inputData>`** elements under **27 distinct names**. Nine are called `issuer`,
+  seven `status`, six `offering`, six `investor`. `assignIds` disambiguates the XML
+  `id` but the `name` is the L4 binder, so a FEEL expression cannot tell them apart
+  (`D-SCOPE`, lossy, ×9 — and the note now counts the collision, rather than saying
+  "two" for a nine-way one). Every one has `typeRef="Any"`: there is no
+  `<itemDefinition>` for a record, so `issuer.<field>` binds to nothing.
+- **84 blocking, 9 lossy, 9 advisory** notes in total. Nine of the blocking notes are
+  `D-FEELNAME`: the FEEL name that 9 `issuer` binders — and 7 `status`, 6 `offering`,
+  6 `investor` — all mangle down to is one name in a flat namespace, so no FEEL
+  reference can pick one of them.
+
+The cause is one sentence: **a DMN decision is a 0-ary variable**, so every
+cross-decision call `f x` — which is every reference in this corpus, because the
+house style threads a record through `GIVEN` — leaves the FEEL fragment and is
+emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter is
+right to refuse to invent a rendering; the report says so at each site.
+
+The `dmnmd` markdown leg makes the same point in one glance: 992 lines of law become
+**two tables**, plus 235 lines of loss report.
+
+An earlier revision of this section reported two further defects that the fidelity
+report did not catch — a section heading spliced into FEEL as a path step (22
+decisions), and the same heading prefixing every enum value in the one clean table.
+Both are **fixed**: `.` separates scopes in L4 and traverses a value in FEEL, so
+section qualification is now dropped on the way out
+(`L4.Syntax.unqualifiedNameToText`). See `PROJECTIONS.md` §1.
+
+`jl4/examples/dmn/reg-cf.l4` is kept as a **separate, deliberately different**
+exhibit: 101 lines of `ASSUME`-style scalars chosen so the goldens show every
+outcome the exporter has. Its figures are illustrative and it says so. It is not
+this corpus and must not be read as it.
+
+### 6.2 BPMN: three rules, three processes, cut from this file
+
+```
+$ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn --rule "ongoing reporting obligation"
+```
+
+All three regulative rules here are `IF`-headed — `advertising restriction` (:494),
+`ongoing reporting obligation` (:567), `resale restriction` (:622) — because the CFR
+writes the guard outside the duty ("**unless** such securities are transferred: …").
+`L4.StateGraph` reads that shape directly: an `IF`/`ELSE` chain over regulative arms
+becomes a `OneOf` junction whose branch edges carry the condition that selects them.
+
+Until 2026-07-27 it did not, and this section recorded a workaround —
+`jl4/examples/bpmn/regcf.l4`, a hand-written second source — together with the
+sentence "there is at present no BPMN of this corpus that is single-sourced from it."
+**That file is deleted and that sentence no longer holds.** It had re-declared three
+deadline constants, renamed four predicates, dropped the statutory chapeau, invented
+two `LEST` breach clauses the CFR does not contain, and silently dropped the annual
+cycle's base case — so the shipped diagram asserted a duty this corpus discharges.
+None of those five is expressible now.
+
+Three things worth looking at in the goldens:
+
+1. **The base case is drawn.** `Split_0 → End_2` carries
+   `NOT (…may terminate…) AND ``annual cycles`` AT MOST 0` — the arm that imposes no
+   duty at all.
+2. **The renewal loop is drawn**, and `P-CYCLE` fires on it. `HENCE` back into the
+   rule itself is an `App` *with arguments*; it used to fall through to "unknown
+   target" and produce a state literally named `next` with no successor.
+3. **Single-sourcing costs the timer.** Every deadline here is a *name*
+   (`business days to file Form C-TR`), because this file binds each period once and
+   every consumer reads the binding. `P-DEADLINE` fires on every boundary event: no
+   ISO 8601 duration could be read, so it is a conditional event carrying the text.
+   Inlining `5` and `120` would draw real timers by reintroducing exactly the
+   duplication this corpus exists to remove.
+
+`F1` remains the most important note in the set, and it applies to the mirrored page's
+own hand-drawn diagram just as much: *"A prohibition is not an activity at all and BPMN
+has no negative shape for one, so read literally this diagram instructs the reader to
+perform the very act the rule forbids."*
+
+## 7. Deployment: `regcf-wizard.l4`, the façade
+
+`regcf.l4` carries **no `@export` annotations**, so nothing in it is deployable. `regcf-wizard.l4`
+is the deployable surface: it `IMPORT`s the corpus, routes flat plain-English inputs into the
+corpus's own record types, calls the corpus's own predicates, and presents the result as flat
+records a form can render. It re-implements no law. The corpus is untouched.
+
+Five `@export`s, each a question a reader of the mirrored page actually has:
+
+| Export                   | Route                            | Answers                                             |
+| ------------------------ | -------------------------------- | --------------------------------------------------- |
+| `raise check` (default)  | `/regcf/raise-check`             | groups 1, 2, 4 — eligibility, limit, financials      |
+| `investment limit check` | `/regcf/investment-limit-check`  | group 3 — the investor's own limit (§3.1)            |
+| `resale check`           | `/regcf/resale-check`            | group 8 — may these securities be transferred yet    |
+| `reporting exit check`   | `/regcf/reporting-exit-check`    | group 7 — when the annual reporting duty may end     |
+| `can this company raise` | `/regcf/can-this-company-raise`  | the same question as a `BOOLEAN`, for `/ladder`      |
+
+### 7.1 Why a façade, and not `@export` on the corpus
+
+Three reasons, each measured rather than assumed.
+
+1. **Field names.** `jl4-service` sanitises schema property names — every non-alphanumeric
+   becomes `-`, runs collapse — and then **truncates to 60 characters**
+   (`jl4-service/src/Shared.hs`). **23 of the corpus's 41 record fields exceed that**, because
+   they are the CFR's own sentences; the longest is 291 characters. Deployed and read back off
+   the live MCP endpoint:
+
+   ```
+   60  is-subject-to-a-disqualification-as-specified-in-section-227
+   59  the-Form-C-includes-the-information-required-by-section-227
+   ```
+
+   Both citations lose their paragraph number at the same cut: `227.503(a)` and `227.201` both
+   arrive as `section-227`. A form built off the corpus records would be labelled in amputated
+   CFR-ese. Every one of the façade's 49 fields sanitises to **43 characters or fewer**, so
+   nothing is truncated and nothing collides.
+
+2. **Six declared corpus fields are inputs no rule reads** — `target offering amount`, `name` on
+   `IssuerProfile` and `InvestorProfile`, and the three "states …" booleans on
+   `AdvertisingNotice` (Rule 204(b) makes them permissions, not requirements). A schema-driven
+   form off the corpus records would ask six questions that cannot change any answer.
+
+3. **The corpus's top-level `DECIDE` takes six records** and the regulative rules return
+   `DEONTIC`, which `jl4-service` will only evaluate against a hand-built event trace. Neither
+   shape is a citizen form.
+
+### 7.2 No figure is typed twice — including in the prose
+
+Every threshold, deadline and percentage that appears in a façade description or answer string is
+**spliced from the corpus constant**, so an amendment to `regcf.l4` rewrites the façade's
+sentences without anyone editing them. Live output, with the figures the corpus supplied:
+
+```
+"Rule 100(a)(2)(i) governs, because at least one of your annual income ($60,000) and your net
+ worth ($200,000) is below $124,000. Your limit is 5% of the greater of the two ($200,000), or
+ $2,500, whichever is the larger — which comes to $10,000."
+```
+
+That is §3.1's investor, answered by machine. Typing "5%" or "$124,000" into that sentence would
+have reproduced, inside our own artifact, exactly the duplication §3.3 convicts the mirrored page
+of.
+
+**The same investor, accredited, gets no number at all** — and that is a fix, not an omission.
+`your 12 month limit` and `you can still invest` are `MAYBE NUMBER`, serialising to JSON `null`
+when Rule 100(a)(2)'s carve-out applies:
+
+```json
+{ "you have no limit": true, "your 12 month limit": null, "you can still invest": null }
+```
+
+They were plain `NUMBER`s until 2026-07-27, computed with the carve-out ignored, so an accredited
+investor was told `"your 12 month limit": 10000` — a cap that does not exist in law, and which
+`regcf.l4:806` contradicts outright by asserting that the very same investor is within the limit
+at $5,000,000. The prose field said the right thing and the numbers did not. A citizen asking "may
+I invest $50,000?" would have compared against 10000 and concluded no; an LLM reading the
+structured fields would have reported the same. A wrong number in a field a form renders as its
+headline is worse than no number, and `null` is how JSON says "no number".
+
+**The corpus has one single-sourcing gap, and it is the two percentages.** `regcf.l4` binds every
+dollar figure once, as a named constant with an `@ref`. It does **not** do that for `0.05` and
+`0.10`: both are inlined in a `WHERE` local inside `investment limit`. Rather than re-type them,
+the façade recovers them from the corpus by probing `investment limit` at a point where neither
+the floor nor the cap binds, and dividing out (`limb (i) percentage`). Two `#ASSERT`s, stated in
+corpus constants only, pin the conditions that make the derivation valid. The proper fix is to
+bind the two rates in `regcf.l4` the way every other figure is bound; that is a corpus edit, and
+this file does not make it.
+
+### 7.3 What the local deploy proved, and what it did not
+
+Verified against a live `jl4-service` (5 functions, deploy job `applied`): the function list, the
+parameter schema, evaluation on all five exports, `?trace=full` (a reasoning tree of `exampleCode`/`explanation` pairs bottoming out in corpus predicates; 30–76 KB depending on the export), batch
+evaluation, `query-plan`, `ladder`, MCP discovery + `tools/list` + `tools/call` on both the
+scoped and org-wide endpoints, WebMCP discovery and `embed.js`, OpenAPI, and file browsing.
+Field names round-trip in **both** forms — `"organized in the United States"` and
+`"organized-in-the-United-States"` are both accepted, on REST, batch and MCP alike.
+
+Three things the deploy showed that reading the types would not have:
+
+1. **`/state-graphs` returns `{"graphs":[]}`** on every export — but no longer for the reason
+   §6.2 used to give. `findRegulativeExpr` reads `IfThenElse` now, and
+   `l4 state-graph regcf.l4` yields **3** graphs. `l4 state-graph regcf-wizard.l4` still yields
+   **0**, because `extractStateGraphs` walks the deployed module's own section tree and does not
+   follow `IMPORT`. A façade still cannot work around it — a wrapper that calls the imported rule
+   is an `App`, not a `Regulative` — but the remaining defect is import traversal, not shape
+   blindness.
+
+2. **A properly single-sourced façade has a two-leaf ladder, and an empty query plan.** The
+   `/ladder` route returns exactly what `can this company raise` says:
+
+   ```
+   funDecl.body  $type = And
+     args[0]     $type = UBoolVar   name.label = `issuer is eligible` OF (`issuer profile from` OF plan)
+     args[1]     $type = UBoolVar   name.label = `offering is within the offering limit` OF (`offering from` OF plan)
+   ```
+
+   The six Rule 100(b) limbs are inside `issuer is eligible`, which is an `App` over a record, so
+   the ladder cannot see through it. Correspondingly `query-plan` returns `"asks": []` and
+   `"inputs": []`: it can name no citizen question, only the two derived predicates. **This is a
+   structural tension, not an oversight.** Any decision body that delegates to the corpus is one
+   opaque leaf; getting an interesting ladder means restating the statutory connectives in the
+   façade, which is the duplication the whole exercise exists to avoid. The six-limb picture
+   already exists, cut from the corpus itself, at `figures/regcf-rule-100b.svg`.
+
+3. **The `atomId`s do not line up, and the disagreement is internal to one response.** In a
+   single `/query-plan` payload the ids under `impact[…].support[].atomId` and the ids in its own
+   embedded `ladder` field have an **empty intersection** (measured: two ids each, none shared).
+   The embedded ladder does agree with the standalone `/ladder` endpoint, so the split is between
+   the query planner's atoms and the ladder's nodes. This is the `KNOWN GAP` pinned in
+   `jl4-service/README.md`; it reproduces here exactly.
+
+### 7.4 Defects found in `jl4-service` while deploying
+
+**Fixed** (each reproduced live before and after):
+
+- **An enum return value did not validate against its own declared schema.** `returnSchema`
+  declares `"enum": ["financial statements reviewed by an independent public accountant", …]`,
+  and evaluation returned `` "`financial statements reviewed by an independent public accountant`" ``
+  — the L4 backticks inside the JSON string. `Backend.Jl4` rendered a constructor with
+  `prettyLayout`, which emits L4 *source* and so backtick-quotes an identifier containing spaces,
+  while `L4.FunctionSchema` built the declared enum from the plain name. They now use the same
+  spelling by construction.
+- **`NOTHING` serialised as the string `"NOTHING"` and `JUST x` was not unwrapped**, which made
+  `MAYBE` unusable for the one job it is for. `NOTHING` is now JSON `null`, matching
+  `L4.Evaluate.ValueLazyJSON`.
+- **`@desc` was emitted with a leading space** into every JSON Schema `description`, deployed
+  function schema and hover. The lexer keeps the annotation line verbatim for exact printing;
+  `L4.Syntax.getDesc` now trims for readers.
+- **`POST /deployments` with a new `id` but identical bundle bytes silently ignored the id.**
+  Content-hash deduplication returned the *existing* deployment (200, `"id":"regcf"`) and never
+  created the requested one (`GET` → 404) — documented as "skips recompilation", it actually
+  skipped deployment creation. The shortcut is now keyed on the id as well as the hash.
+
+**Reported, not fixed** — outside this corpus:
+
+- **Org-wide MCP tool names are not namespaced.** `jl4-service/README.md` documents
+  `{"name":"my-rules/compute_qualifies"}`; the server actually emits the bare sanitised function
+  name and puts the deployment in the description. Calling `regcf/raise-check` on `/.mcp` returns
+  `-32602 Unknown tool`. (The naming is deliberate — `buildToolNames` disambiguates with a
+  `-<depPrefix>` suffix only on collision — so this is a documentation defect, not a hazard.)
+- **`GET /webmcp.js` 404s.** The README says it is a 301 to `/.webmcp/embed.js`; the string does
+  not appear anywhere in `jl4-service/src`. `/.well-known/{mcp,mcp/manifest,webmcp}` and
+  `/.webmcp/embed.js` all return 200.
+- **`evaluation/batch` with `outcomes` returned no result at all**:
+  `{"cases":[],"summary":{"casesRead":1,"casesIgnored":1,"casesProcessed":0}}`. Reproduced; not
+  diagnosed.
+
 ## Attribution
 
 The mirrored page is © its authors under **CC BY-SA 4.0** (Center for Civic Innovation,

@@ -8,8 +8,10 @@
 //   jl4/examples/bpmn/expected/*.bpmn   MUST be reported SOUND   (exit 0)
 //   jl4/examples/bpmn/sound/*.bpmn      MUST be reported SOUND   (exit 0)
 //   jl4/examples/bpmn/unsound/*.bpmn    MUST be reported UNSOUND (exit 1), AND
-//                                       must fail the SPECIFIC property it was
-//                                       written to exercise, per EXERCISES below
+//                                       must produce the SPECIFIC complaint it
+//                                       was written to provoke — a token-game
+//                                       `FAIL  Sn …` or a `STRUCTURE  …`
+//                                       well-formedness line, per EXERCISES below
 //
 // `expected/` is exporter output. `sound/` is hand-written, and exists because
 // a gate is not only wrong when it misses a defect — it is also wrong when it
@@ -53,13 +55,22 @@ const piles = [
   { dir: join(repo, "jl4/examples/bpmn/unsound"), verdict: "UNSOUND", code: 1 },
 ];
 
-// Which property each unsound fixture exists to make fail. Every .bpmn in the
-// unsound pile must appear here; see the header for why.
+// The line each unsound fixture must produce. Every .bpmn in the unsound pile
+// must appear here; see the header for why.
+//
+// Stored as the literal output line, marker and all, because there are two
+// kinds of defect and they must not be confusable: `FAIL  Sn …` is a token-game
+// property the diagram violates, `STRUCTURE  …` is a well-formedness rule it
+// breaks while playing perfectly well. A bare property name would have made a
+// STRUCTURE fixture look like it was exercising a token-game property.
 const EXERCISES = {
-  "deadlock-boundary-in-rand.bpmn": "S2 no deadlock",
-  "deadlock-ror-in-rand.bpmn": "S2 no deadlock",
-  "unsafe-xor-join-after-rand.bpmn": "S4 safe (1-bounded)",
-  "historical-handover-edge-counted-join.bpmn": "S2 no deadlock",
+  "deadlock-boundary-in-rand.bpmn": "FAIL  S2 no deadlock",
+  "deadlock-ror-in-rand.bpmn": "FAIL  S2 no deadlock",
+  "unsafe-xor-join-after-rand.bpmn": "FAIL  S4 safe (1-bounded)",
+  "historical-handover-edge-counted-join.bpmn": "FAIL  S2 no deadlock",
+  "mislabelled-gateway-direction.bpmn":
+    'STRUCTURE  exclusiveGateway Split_0 declares gatewayDirection="Diverging" ' +
+    "but has 2 incoming and 2 outgoing sequence flow(s)",
 };
 
 let failures = 0;
@@ -109,12 +120,12 @@ for (const { dir, verdict, code } of piles) {
         problems.push(
           `not listed in EXERCISES — declare which property this fixture exists to fail`,
         );
-      else if (!out.includes(`FAIL  ${want}`))
+      else if (!out.includes(want))
         problems.push(
-          `${want} did not fail — that is what this fixture is for`,
+          `${want} did not fire — that is what this fixture is for`,
         );
     }
-    if (verdict === "SOUND" && /FAIL/.test(out))
+    if (verdict === "SOUND" && /FAIL|STRUCTURE/.test(out))
       problems.push("a property failed on a fixture expected to be sound");
 
     if (problems.length) {

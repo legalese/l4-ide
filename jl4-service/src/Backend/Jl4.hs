@@ -1120,15 +1120,27 @@ valueToFnLiteral ei = \case
     pure $ FnLitString $ prettyLayout name
   Eval.ValConstructor resolved [] ->
     -- Special case boolean constructors (preserve original casing for others)
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
      in case Text.toUpper name of
           "TRUE" -> pure $ FnLitBool True
           "FALSE" -> pure $ FnLitBool False
+          -- NOTHING is the absence of a value, and JSON spells that null.
+          -- Emitting the string "NOTHING" made an optional field's empty case
+          -- indistinguishable from a genuine string answer, and made
+          -- `MAYBE NUMBER` unusable for exactly the job it is for: saying that
+          -- a limit does not apply without naming a number that could be
+          -- mistaken for one.
+          "NOTHING" -> pure FnUnknown
           -- Other nullary constructors become strings (original casing preserved)
           _ -> pure $ FnLitString name
+  -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
+  -- in an object would make every optional field a tagged union the client has
+  -- to unwrap. This matches 'L4.Evaluate.ValueLazyJSON', which the LSP uses.
+  Eval.ValConstructor resolved [v]
+    | Text.toUpper (constructorText resolved) == "JUST" -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do
     lits <- traverse (nfToFnLiteral ei) vals
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
         fieldNames = lookupFieldNames ei resolved
     pure $ case fieldNames of
       Just names | length names == length lits ->
@@ -1143,6 +1155,23 @@ valueToFnLiteral ei = \case
           ]
   Eval.ValAssumed var ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+
+-- | A constructor's name, as a JSON payload should carry it.
+--
+-- NOT 'prettyLayout': that renders a 'Name' as L4 /source/, so an identifier
+-- with spaces in it comes back backtick-quoted — and this value is compared by
+-- clients against the @enum@ the service itself declared in its
+-- @returnSchema@, which is built by 'L4.FunctionSchema.resolvedNameText' and
+-- carries no backticks. So the service was handing out a schema and then
+-- returning values that fail it: declared
+-- @\"financial statements reviewed by an independent public accountant\"@,
+-- returned
+-- @\"\`financial statements reviewed by an independent public accountant\`\"@.
+--
+-- 'getActual' rather than 'getOriginal', matching 'L4.FunctionSchema', so that
+-- the two agree by construction rather than by coincidence.
+constructorText :: Resolved -> Text
+constructorText = rawNameToText . rawName . getActual
 
 -- | Look up field names for a constructor from the EntityInfo.
 -- Returns 'Just' field names if the constructor has named fields, 'Nothing' otherwise.

@@ -81,6 +81,7 @@ module L4.Dmn.Lower
   , TableCtx (..)
   , defaultTableCtx
   , lowerModule
+  , moduleTitle
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
     -- * Reusable pieces
@@ -520,8 +521,34 @@ isConstructorKind r = case getActual r of
     Just (TypeInfo _ (Just Constructor)) -> True
     _                                    -> False
 
+-- | The name of a binding, as DMN should spell it.
+--
+-- L4 gives a constructor or a stored record selector declared inside a @§@ a
+-- section-qualified /spelling/ as well as its bare one (see
+-- @specs\/todo\/SECTION-RANKING-SPEC.md@ and @addQualifiedAliases@ in
+-- "L4.TypeCheck"). 'rawNameToText' renders that qualification by joining the
+-- section path with @.@ — which is right for L4, where @.@ separates scopes,
+-- and wrong for FEEL, where @.@ is path traversal into a value.
+--
+-- Flattening the qualified spelling into FEEL therefore produced text that
+-- /parses/ as a path and cannot resolve: the corpus at
+-- @jl4\/examples\/legal\/regcf\/regcf.l4@ emitted, among 22 such decisions,
+--
+-- > investor._3. Investor investment limits _ Rule 100_a__2_.annual income
+--
+-- — four path steps, of which two are a section heading with its punctuation
+-- mangled by 'feelIdentText'. Because that renders as structured FEEL it never
+-- reached the verbatim fallback, so no @D-NONFEELINPUT@ fired and the model
+-- was silently unevaluable rather than loudly so. The same flattening put a
+-- section heading in front of every enum value in the one clean decision table
+-- the corpus produced.
+--
+-- FEEL has no notion of L4 sections, so the qualification cannot be carried,
+-- and dropping it is the only honest rendering. Where dropping it makes two
+-- bindings collide, @D-SCOPE@ already says so — that note is the reason this
+-- is a documented loss rather than a silent one.
 nameOf :: Resolved -> Text
-nameOf = rawNameToText . rawName . getOriginal
+nameOf = unqualifiedNameToText . getOriginal
 
 ------------------------------------------------------------------------
 -- Columns
@@ -1607,12 +1634,18 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- emitted model has two inputData elements a FEEL expression cannot tell
   -- apart. Note that the same term used by two decisions is NOT this, and does
   -- not warn.
+  -- The counts are computed, not spelled. They used to read "two ... two"
+  -- unconditionally under a guard of @length us > 1@, which understated the
+  -- Reg CF corpus's eight-way collision on `issuer` as a two-way one.
   sharedInputNotes =
     [ dmnNote "D-SCOPE" Lossy ("input_" <> sanitiseId nm) Nothing
-        ("two different terms are both named `" <> nm <> "` (in "
+        (englishCount (length us) <> " different terms are "
+           <> (if length us == 2 then "both" else "all")
+           <> " named `" <> nm <> "` (in "
            <> Text.intercalate ", " users
-           <> "); DMN's inputData is global, so the emitted model has two elements a FEEL \
-              \expression cannot tell apart")
+           <> "); DMN's inputData is global, so the emitted model has "
+           <> englishCount (length us)
+           <> " elements a FEEL expression cannot tell apart")
         "L4's lexical scoping of GIVEN parameters"
     | (nm, us) <- Map.toAscList sharedNames
     , length us > 1
@@ -1799,6 +1832,19 @@ assignIds prefix names = reverse (snd (foldl' step (Map.empty, []) names))
         this = if n == 0 then base else base <> "_" <> tshow (n + 1)
     in (Map.insert base (n + 1) seen, this : acc)
 
+-- | Small counts spelled as words, as a fidelity note's prose wants them.
+englishCount :: Int -> Text
+englishCount n = case n of
+  2 -> "two"
+  3 -> "three"
+  4 -> "four"
+  5 -> "five"
+  6 -> "six"
+  7 -> "seven"
+  8 -> "eight"
+  9 -> "nine"
+  _ -> tshow n
+
 -- | An XML @ID@-safe, deterministic slug.
 sanitiseId :: Text -> Text
 sanitiseId t
@@ -1817,6 +1863,23 @@ sanitiseId t
 ------------------------------------------------------------------------
 
 -- | Every top-level declaration, descending through nested @SECTION@s.
+-- | The module's own title: the name of its outermost @§@ heading, if it has
+-- one.
+--
+-- This exists so that the @\<definitions\>@ name has a single source. It was
+-- previously supplied by the caller in every case, which meant the Reg CF
+-- corpus's model was called three different things at once — its own heading
+-- (@SEC Regulation Crowdfunding — 17 CFR Part 227@), a string hand-typed in
+-- the golden test, and the file's base name from the CLI. A title duplicated
+-- across three files and stale in at least two of them is the exact defect
+-- this exhibit exists to criticise.
+moduleTitle :: Module Resolved -> Maybe Text
+moduleTitle (MkModule _ _ (MkSection _ mName _ decls)) =
+  listToMaybe
+    ( [nameOf n | Just n <- [mName]]
+        <> [nameOf n | Section _ (MkSection _ (Just n) _ _) <- decls]
+    )
+
 topDecls :: Module Resolved -> [TopDecl Resolved]
 topDecls (MkModule _ _ sec) = section sec
  where

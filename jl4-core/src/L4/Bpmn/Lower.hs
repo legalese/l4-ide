@@ -147,6 +147,7 @@ stateGraphToBpmn opts sg =
       , scLapse = lapse
       , scFindings =
           taskFindings
+            <> branchGuardFindings
             <> boundaryFindings
             <> lapseFindings
             <> undrawnDeadlineFindings
@@ -168,11 +169,14 @@ stateGraphToBpmn opts sg =
       | s.stateType == InitialState
       ]
 
+    -- 'Unspecified' is a placeholder, not a decision: no edge exists yet, and
+    -- @gatewayDirection@ is a claim about edges. 'withGatewayDirections'
+    -- overwrites every one of these once the flows are known.
     gatewayNodes =
       [ FlowNode
         { nodeId = "Split_" <> tag
         , nodeName = fanName s.stateFan
-        , nodeKind = Gateway (fanGateway s.stateFan) Diverging
+        , nodeKind = Gateway (fanGateway s.stateFan) Unspecified
         , nodeDoc = Just (fanDoc s.stateFan)
         , nodeLane = Nothing
         }
@@ -306,6 +310,35 @@ stateGraphToBpmn opts sg =
       (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
       _ -> []
 
+    -- The @IF@ that chose between arms. This is the branch-edge counterpart of
+    -- @F4@: @F4@ accounts for a @PROVIDED@ on one obligation, this accounts
+    -- for the condition on a gateway's outgoing flow. Both end as opaque text
+    -- in a @conditionExpression@ and both are reported, because a guard that
+    -- an engine cannot evaluate is exactly the loss a reader needs to be told
+    -- about — and until the extractor could see an @IF@-headed rule at all,
+    -- there was no shape here to report on.
+    branchGuardFindings =
+      [ MkFidelityNote
+        { code = "P-BRANCHGUARD"
+        , severity = Lossy
+        , element = gw.nodeId
+        , range = Nothing
+        , message =
+            "The gateway's arms are selected by \8216"
+              <> Text.intercalate "\8217, \8216" guards
+              <> "\8217, written into each outgoing flow as an opaque \
+                 \conditionExpression: BPMN has no way to say that these \
+                 \exhaust the cases and cannot overlap, which is what the L4 \
+                 \IF/ELSE chain they came from does say."
+        , lost =
+            "exhaustiveness and mutual exclusion as properties of the \
+            \gateway — and whatever decision structure backed each condition, \
+            \for which DMN, not BPMN, is the right home"
+        }
+      | gw <- take 1 gatewayNodes
+      , guards@(_ : _) <- [mapMaybe (.transLabel.labelGuard) (defaultsOf sid)]
+      ]
+
     danglingFindings =
       [ MkFidelityNote
         { code = "P-DANGLING"
@@ -340,8 +373,33 @@ stateGraphToBpmn opts sg =
       , n <- c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse
       ]
 
+  -- Where an edge from ANOTHER state lands when it arrives here.
+  --
+  -- A @\<startEvent\>@ is instance creation, not a re-entry point, and BPMN
+  -- gives it no incoming sequence flow. So an arrival skips it and lands on the
+  -- node it flows to — which for the initial state is the gateway or task
+  -- 'chainFor' already put after it, and which is where the loop belongs
+  -- anyway: the renewal re-tests the guards, it does not re-start the process.
+  --
+  -- This is not a stylistic preference. @HENCE \<this rule\>@ (see
+  -- 'L4.StateGraph.TargetSelf') is the shape that first pointed an edge back at
+  -- the initial state, and drawing it at @Start_0@ produced a file that
+  -- @etc\/check-bpmn-soundness.mjs@ refuses to play ("no start event to put a
+  -- token on") and that jBPM refuses to parse outright: /A start node
+  -- [Start_0, null] may not have an incoming connection!/ Two independent
+  -- engines, one defect.
+  --
+  -- The fallback keeps the start node when the chain has nothing else in it, so
+  -- that an arrival is still drawn rather than silently dropped. An edge the
+  -- reader cannot see is worse than one a checker will complain about; today no
+  -- such chain exists, because a state anything can point back at has an
+  -- obligation or a fan, and either adds a node after the start event.
   entryOf :: StateId -> Maybe Text
-  entryOf sid = chainOf sid >>= \c -> (.nodeId) <$> listToMaybe c.scNodes
+  entryOf sid =
+    chainOf sid >>= \c ->
+      (.nodeId)
+        <$> (listToMaybe (dropWhile ((== StartEvent) . (.nodeKind)) c.scNodes)
+               <|> listToMaybe c.scNodes)
 
   nodeOfKind :: (NodeKind -> Bool) -> StateId -> Maybe Text
   nodeOfKind p sid =
@@ -395,8 +453,15 @@ stateGraphToBpmn opts sg =
             , Just src <- [lestSrc]
             , Just tgt <- [entryOf t.transTo]
             ]
+          -- A branch edge out of a junction carries a guard when the junction
+          -- came from an @IF@ rather than from @RAND@ \/ @ROR@, and that guard
+          -- is the whole reason the gateway is readable: without it the
+          -- diagram says "pick an arm", then does the work, and only then
+          -- tests the condition that decided which arm applied. Dropping it
+          -- (which is what this did until 2026-07-27) turns a fact-driven
+          -- exclusive gateway into a free choice.
           branches =
-            [ (src, tgt, Nothing)
+            [ (src, tgt, t.transLabel.labelGuard)
             | t <- defaultsOf sid
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
@@ -458,7 +523,13 @@ stateGraphToBpmn opts sg =
 
   allFlows = numberFlows joinedEdges
 
-  (allNodes, joinedEdges, joinFindings) =
+  -- Last, because @gatewayDirection@ is the one attribute that describes the
+  -- rest of the file rather than its own node: it cannot be settled until every
+  -- edge — including the ones 'addJoin' redirects — is final.
+  allNodes :: [FlowNode]
+  allNodes = withGatewayDirections allFlows rawNodes
+
+  (rawNodes, joinedEdges, joinFindings) =
     foldl' addJoin (baseNodes, chainFlows <> transitionFlows, []) allOfJunctions
 
   allOfJunctions :: [StateId]
@@ -531,7 +602,7 @@ stateGraphToBpmn opts sg =
                     FlowNode
                       { nodeId = jid
                       , nodeName = ""
-                      , nodeKind = Gateway ParallelGateway Converging
+                      , nodeKind = Gateway ParallelGateway Unspecified
                       , nodeDoc =
                           Just
                             "every branch of the RAND must complete; each \
@@ -870,6 +941,57 @@ isErrorEnd :: FlowNode -> Bool
 isErrorEnd n = case n.nodeKind of
   EndEvent isError -> isError
   _ -> False
+
+-- | Restate every gateway's @gatewayDirection@ as what its edges actually say.
+--
+-- @gatewayDirection@ is not a caption on a shape: BPMN 2.0 §10.5.1 Table 10.100
+-- makes it a constraint the rest of the file has to satisfy, and a file whose
+-- gateway declares a direction its own sequence flows contradict is malformed
+-- even though no schema validator will say so — the attribute is a plain
+-- enumeration in the XSD, so @bpmn-moddle@ and Xerces both wave it through.
+--
+-- The pass that creates a gateway cannot know the answer, because it runs
+-- before any edge exists, and 'addJoin' moves edges afterwards. Guessing there
+-- is what shipped @regcf-reporting.bpmn@ with @Diverging@ on a gateway holding
+-- two incoming flows: the @HENCE \<this rule\>@ renewal loop hands the fan-out
+-- gateway a second arrival, and a guess made one pass earlier had no way to
+-- learn about it.
+--
+-- So the only place this can be decided correctly is here, once 'allFlows' is
+-- final. It is total: every gateway is rewritten, so no earlier guess survives.
+withGatewayDirections :: [SequenceFlow] -> [FlowNode] -> [FlowNode]
+withGatewayDirections flows = map redirect
+ where
+  incoming = tally (.flowTo)
+  outgoing = tally (.flowFrom)
+
+  tally :: (SequenceFlow -> Text) -> Map Text Int
+  tally f = Map.fromListWith (+) [(f fl, 1) | fl <- flows]
+
+  arity m nid = Map.findWithDefault 0 nid m
+
+  redirect n = case n.nodeKind of
+    Gateway kind _ ->
+      n
+        { nodeKind =
+            Gateway kind (gatewayFlowFor (arity incoming n.nodeId) (arity outgoing n.nodeId))
+        }
+    _ -> n
+
+-- | The direction BPMN 2.0 §10.5.1 Table 10.100 permits for a gateway with this
+-- many incoming and outgoing sequence flows.
+--
+-- @Diverging@ requires multiple outgoing and forbids multiple incoming;
+-- @Converging@ is its mirror; a gateway with multiple of both is @Mixed@ (which
+-- §10.5.2 permits, whatever any one engine makes of it); and a gateway with
+-- multiple of neither can only be @Unspecified@, the XSD default, since the
+-- other three all /require/ a multiplicity it does not have.
+gatewayFlowFor :: Int -> Int -> GatewayFlow
+gatewayFlowFor ins outs = case (ins > 1, outs > 1) of
+  (True, True) -> Mixed
+  (True, False) -> Converging
+  (False, True) -> Diverging
+  (False, False) -> Unspecified
 
 -- | A sequence flow before it has an id: source node, target node, and the
 -- condition (if any) from a @PROVIDED@ guard. Ids are assigned last, after the

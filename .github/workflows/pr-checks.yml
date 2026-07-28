@@ -140,6 +140,14 @@ jobs:
       - name: Self-test (the gate must still be able to fail, and to pass)
         run: node etc/check-bpmn-soundness.selftest.mjs
 
+      # Same argument, one level up. The jBPM baseline comparator below is the
+      # only thing standing between "expected/ has four known findings" and
+      # "expected/ has any number of findings and nobody notices", so it gets
+      # the same treatment: mutate a real transcript eight ways and assert it
+      # objects, then two ways and assert it does NOT.
+      - name: Self-test the jBPM baseline comparator
+        run: node etc/check-bpmn-kie-baseline.selftest.mjs
+
       # The gate itself, over the emitted goldens.
       - name: Soundness-check the emitted BPMN
         run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
@@ -153,9 +161,16 @@ jobs:
       # agreement that a diagram deadlocks is evidence our own token semantics
       # are right rather than merely self-consistent.
       #
-      # JDK 17: the harness accepts 11+, but Drools/jBPM 8.x is not happy on the
+      # JDK 17: the harness accepts 11+, but the pinned stack is not happy on the
       # newest JDKs, and an unpinned `java` has already once produced a stale
       # JDK 14 that failed in a way which read as a diagram defect.
+      #
+      # That stack is jbpm-bpmn2 / jbpm-flow-builder / drools-compiler, ALL at
+      # 7.74.1.Final (etc/kie/pom.xml). It is NOT the 8.44.0.Final used by the
+      # DMN harnesses below: 8.44.0.Final is real for kie-dmn and does not exist
+      # for org.jbpm:jbpm-bpmn2. Different product lines; do not harmonise them.
+      # The harness prints the version it observed off its own classpath, so the
+      # banner in the log is the authority, not this comment.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -179,16 +194,46 @@ jobs:
       #
       #   sound/     MUST be clean. Measured exit 0 today. A finding here is a
       #              regression and fails the build.
-      #   expected/  is real exporter output and reports ONE known finding today
-      #              (offering.bpmn, which the harness itself annotates "a
-      #              modelled terminal state, not a liveness defect" — and then
-      #              counts anyway). Measured exit 1. There is no baseline
-      #              mechanism in the harness, so exit 1 is tolerated HERE and
-      #              only here, while 2/3/4 still fail.
+      #   expected/  is real exporter output, and the harness reports
+      #              `RESULT: 4 file(s) with findings.` today — measured exit 1.
+      #              All four are jBPM COMPILE rejections, not liveness defects:
       #
-      # Tolerating 1 loses the new-finding signal on expected/ until a baseline
-      # exists. That is a real gap, recorded rather than papered over; it does
-      # NOT weaken the toolchain gate, which is the reason this job exists.
+      #                handover.bpmn           axis A4: an L4 name inside a
+      #                                        <bpmn:condition> on a CONDITIONAL
+      #                                        BOUNDARY EVENT (`grace period`,
+      #                                        line 44) declared as a formal
+      #                                        expression; Drools parses it as
+      #                                        DRL and refuses. NOT a
+      #                                        conditionExpression — this file
+      #                                        has zero of those, as the element
+      #                                        table in bpmn/README.md says; an
+      #                                        earlier version of this comment
+      #                                        named the wrong element
+      #                regcf-advertising.bpmn  A4's defect class, on a gateway guard
+      #                regcf-resale.bpmn       A4's defect class, on a gateway guard
+      #                regcf-reporting.bpmn    `Unknown gateway direction: Mixed` —
+      #                                        the renewal loop makes that gateway
+      #                                        genuinely mixed (2 in, 3 out), which
+      #                                        BPMN 2.0 §10.5.2 permits and jBPM
+      #                                        does not implement
+      #
+      #              offering.bpmn is NOT among them: it logs an ABORTED-via-
+      #              error-end, which the harness annotates "a modelled terminal
+      #              state, not a liveness defect" and does not count. An earlier
+      #              version of this comment said expected/ reported ONE finding
+      #              and named offering.bpmn — wrong on both halves.
+      #
+      #              Exit 1 is therefore EXPECTED on expected/ and cannot itself
+      #              be the gate. What gates it is etc/bpmn-kie-baseline.txt,
+      #              compared below.
+      #
+      # The list above is a summary for a human reader. It is NOT the assertion —
+      # etc/bpmn-kie-baseline.txt is, and it is machine-compared every run. Until
+      # 2026-07-28 there was no such file, exit 1 was tolerated unconditionally,
+      # and a fifth rejected golden (or a regression turning a clean golden into
+      # a rejected one) would have landed green. The comparator closes both that
+      # and the coverage half: a file the baseline names but the run never
+      # reached now fails, so a narrowed glob can no longer pass by doing less.
       - name: Second opinion — does an independent engine agree? (jBPM/KIE)
         run: |
           export L4_KIE_CACHE="$HOME/.cache/l4-engines"
@@ -199,17 +244,23 @@ jobs:
 
           echo "::group::expected/ — real exporter output"
           set +e
-          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn
-          rc=$?
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn | tee kie-expected.log
+          rc=${PIPESTATUS[0]}
           set -e
           echo "::endgroup::"
 
+          # 0 and 1 are both verdicts, and which one it is carries no information
+          # the baseline does not carry better: the comparator reads the
+          # transcript. 2/3/4 mean no verdict was reached, so there is nothing to
+          # compare and the baseline must not be consulted — a SKIPPED run whose
+          # empty transcript "matched" would be the original bug wearing a hat.
           case "$rc" in
-            0) ;;
-            1) echo "::notice::jBPM reported findings on expected/ (exit 1). Known and tolerated until the harness grows a baseline." ;;
+            0 | 1) ;;
             *) echo "::error::jBPM check exited $rc — 2=usage, 3=SKIPPED (nothing was checked), 4=BROKEN (toolchain present, harness failed)."
                exit "$rc" ;;
           esac
+
+          node etc/check-bpmn-kie-baseline.mjs kie-expected.log
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)

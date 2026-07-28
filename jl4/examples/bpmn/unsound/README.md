@@ -1,30 +1,60 @@
 # Deliberately unsound BPMN
 
-Four diagrams that are **wrong in a way no parser can see**, kept so that
+Five diagrams that are **wrong in a way no parser can see**, kept so that
 `etc/check-bpmn-soundness.mjs` can be shown to fail. They are the negative half
 of `etc/check-bpmn-soundness.selftest.mjs`; the positive halves are
 `../expected/` (exporter goldens) and `../sound/` (hand-written diagrams that
 must NOT be flagged).
 
-Each one exists to make **one named property** fail, and the self-test asserts
-that specific property rather than accepting any failure — a typo'd id would
-make almost any file unsound and would otherwise look like proof. The mapping
-lives in `EXERCISES` in the self-test, which refuses to pass on a fixture that
-is not listed there **and** on an `EXERCISES` entry whose fixture has gone
-missing, so the properties cannot silently drift out of coverage in either
-direction.
+Each one exists to provoke **one named complaint**, and the self-test asserts
+that specific line rather than accepting any failure — a typo'd id would make
+almost any file unsound and would otherwise look like proof. The mapping lives
+in `EXERCISES` in the self-test, which refuses to pass on a fixture that is not
+listed there **and** on an `EXERCISES` entry whose fixture has gone missing, so
+coverage cannot silently drift in either direction.
 
-| file                                            | property it exercises   | the defect                                   | provenance                     |
-| ----------------------------------------------- | ----------------------- | -------------------------------------------- | ------------------------------ |
-| `historical-handover-edge-counted-join.bpmn`    | **S2** no deadlock      | join starves behind lapse timers             | **real pre-fix exporter output** |
-| `deadlock-boundary-in-rand.bpmn`                | **S2** no deadlock      | join starves behind an interrupting boundary | hand-written                   |
-| `deadlock-ror-in-rand.bpmn`                     | **S2** no deadlock      | join starves behind an `ROR`                 | hand-written                   |
-| `unsafe-xor-join-after-rand.bpmn`               | **S4** safe (1-bounded) | XOR gateway used to merge a `RAND`           | hand-written                   |
+Two kinds of complaint live here, and the `EXERCISES` entries carry the marker
+so they cannot be confused: `FAIL Sn` is a **token-game** property the diagram
+violates, `STRUCTURE` is a **well-formedness** rule it breaks while playing
+perfectly well.
 
-**Today's exporter cannot emit any of these shapes** — declining to is exactly
-the fix that `addJoin` in `jl4-core/src/L4/Bpmn/Lower.hs` implements. Three of
-the four are hand-written and must never be treated as goldens. The first is
-different, and is the reason to believe the rest.
+| file                                            | complaint it provokes         | the defect                                   | provenance                     |
+| ----------------------------------------------- | ----------------------------- | -------------------------------------------- | ------------------------------ |
+| `historical-handover-edge-counted-join.bpmn`    | **S2** no deadlock            | join starves behind lapse timers             | **real pre-fix exporter output** |
+| `deadlock-boundary-in-rand.bpmn`                | **S2** no deadlock            | join starves behind an interrupting boundary | hand-written                   |
+| `deadlock-ror-in-rand.bpmn`                     | **S2** no deadlock            | join starves behind an `ROR`                 | hand-written                   |
+| `unsafe-xor-join-after-rand.bpmn`               | **S4** safe (1-bounded)       | XOR gateway used to merge a `RAND`           | hand-written                   |
+| `mislabelled-gateway-direction.bpmn`            | **STRUCTURE** gatewayDirection | gateway declares `Diverging` with 2 incoming | **shape of real exporter output** |
+
+**Today's exporter cannot emit any of these shapes** — for the four join
+defects, declining to is exactly the fix that `addJoin` in
+`jl4-core/src/L4/Bpmn/Lower.hs` implements; for the fifth it is
+`withGatewayDirections`, which computes the attribute from the edges instead of
+guessing it a pass too early. Three of the five are hand-written and must never
+be treated as goldens. The first is byte-for-byte real, and is the reason to
+believe the rest; the fifth is a hand-written minimum of a contradiction that
+really did ship in `../expected/regcf-reporting.bpmn`.
+
+## `mislabelled-gateway-direction.bpmn` — the one that plays perfectly
+
+Every token-game property **passes** on this file. `S1`, `S2`, `S3` and `S4` are
+all green, the process completes, and nothing is stranded. What is wrong is that
+the file contradicts itself: `Split_0` declares `gatewayDirection="Diverging"`
+while carrying two incoming sequence flows, and BPMN 2.0 §10.5.1 Table 10.100
+says `Diverging` MUST NOT have multiple incoming — with multiple of both, the
+direction is `Mixed`.
+
+The attribute is a plain enumeration in the XSD, so this is schema-valid and
+`bpmn-moddle` reports **0 warnings**. That combination — behaviourally sound,
+structurally a lie, invisible to the parser — is exactly why the check had to go
+somewhere that already knows each node's real in/out arity, and why it is
+reported as `STRUCTURE` rather than as one of S1–S4.
+
+It shipped. `../expected/regcf-reporting.bpmn` carried this contradiction
+because the exporter chose the direction in a pass that ran before any edge
+existed, and the `HENCE <this rule>` renewal loop then handed that gateway a
+second arrival. Both scripts were green over it, which is the whole argument for
+the fixture.
 
 ## `historical-handover-edge-counted-join.bpmn` — the measurement, not the argument
 
@@ -69,7 +99,32 @@ pre-fix exporter: only `handover.l4` had a `RAND` whose branches carried lapse
 timers, which is the shape the edge-counting predicate got wrong. A regression
 suite of those two goldens would have shown nothing at all.
 
-## The three hand-written ones
+### What jBPM makes of the three directions
+
+Worth recording, because it is the reason the corrected golden is *still*
+rejected and the reason the correction is still right. The same fixture, run
+three times with only `gatewayDirection` changed (`etc/check-bpmn-kie.sh`,
+jbpm-bpmn2 7.74.1.Final, JDK 17.0.20):
+
+| declared      | jBPM says                                                                        |
+| ------------- | -------------------------------------------------------------------------------- |
+| `Diverging`   | `This type of node [Split_0, one of] cannot have more than one incoming connection!` |
+| `Converging`  | `This type of node [Split_0, one of] cannot have more than one outgoing connection!` |
+| `Mixed`       | `Unknown gateway direction: Mixed`                                                |
+
+So jBPM really does model a gateway as **either** a split **or** a join, and it
+picks which from this attribute: declare `Diverging` and you get a `Split` whose
+invariant is at most one incoming, declare `Converging` and you get a `Join`
+whose invariant is at most one outgoing. `Mixed` is not a value it implements at
+all — which BPMN 2.0 §10.5.2 permits and jBPM simply does not.
+
+Two things follow. The message quoted from a `Diverging` run is about **incoming
+arity**, not about mixedness, and citing it as "jBPM refuses mixed gateways"
+reads the wrong constraint off it. And no value of this attribute makes jBPM
+accept a gateway with multiple of both: the shape is what it will not have, and
+saying so accurately is all the attribute can do.
+
+## The three hand-written join defects
 
 The two deadlock fixtures are reconstructions of the same class of defect, built
 to the description `addJoin` gives of the code it replaced:
@@ -104,7 +159,7 @@ state?" verdict says COMPLETED and sees nothing wrong.
 ## What each checker says about them
 
 Run from the repo root. This is the evidence for adding a soundness check at
-all: the check the repo already had passes **all four** files at zero warnings.
+all: the check the repo already had passes **all five** files at zero warnings.
 
 ```sh
 npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/unsound/*.bpmn
@@ -112,14 +167,20 @@ node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/unsound/*.bpmn
 etc/check-bpmn-kie.sh jl4/examples/bpmn/unsound/*.bpmn
 ```
 
-| Checker                                               | `historical-handover`   | `boundary-in-rand`      | `ror-in-rand`           | `unsafe-xor-join`     |
-| ----------------------------------------------------- | ----------------------- | ----------------------- | ----------------------- | --------------------- |
-| `etc/validate-bpmn.mjs` (bpmn-moddle, a parser)        | **OK, 0 warnings**      | **OK, 0 warnings**      | **OK, 0 warnings**      | **OK, 0 warnings**    |
-| `bpmnlint` (Camunda's linter)                          | not run                 | **0 findings**\*        | **0 findings**\*        | not run               |
-| `pm4py` + Woflan (Petri-net soundness)                 | not run                 | **reports SOUND**       | reports unsound         | not run               |
-| `etc/check-bpmn-soundness.mjs`                         | UNSOUND, S1+S2+S3 fail  | UNSOUND, S1+S2+S3 fail  | UNSOUND, S1+S2+S3 fail  | UNSOUND, **S4** fails |
-| jBPM 7.74.1 **compile** (`check-bpmn-kie.sh` phase 1)  | **rejected** (axis A4)  | passes, 0 errors\*\*    | passes, 0 errors\*\*    | passes, 0 errors      |
-| jBPM 7.74.1 **execute** (phase 2)                      | never reached           | **DEADLOCK**, token parked at `Join` | **DEADLOCK**, token parked at `Join` | **DUPLICATION**, `Fulfilled` fired 2x |
+| Checker                                               | `historical-handover`   | `boundary-in-rand`      | `ror-in-rand`           | `unsafe-xor-join`     | `mislabelled-gateway-direction` |
+| ----------------------------------------------------- | ----------------------- | ----------------------- | ----------------------- | --------------------- | ------------------------------- |
+| `etc/validate-bpmn.mjs` (bpmn-moddle, a parser)        | **OK, 0 warnings**      | **OK, 0 warnings**      | **OK, 0 warnings**      | **OK, 0 warnings**    | **OK, 0 warnings**              |
+| `bpmnlint` (Camunda's linter)                          | not run                 | **0 findings**\*        | **0 findings**\*        | not run               | not run                         |
+| `pm4py` + Woflan (Petri-net soundness)                 | not run                 | **reports SOUND**       | reports unsound         | not run               | not run                         |
+| `etc/check-bpmn-soundness.mjs`                         | UNSOUND, S1+S2+S3 fail  | UNSOUND, S1+S2+S3 fail  | UNSOUND, S1+S2+S3 fail  | UNSOUND, **S4** fails | UNSOUND, **STRUCTURE**; S1–S4 all pass |
+| jBPM 7.74.1 **compile** (`check-bpmn-kie.sh` phase 1)  | **rejected** (axis A4)  | passes, 0 errors\*\*    | passes, 0 errors\*\*    | passes, 0 errors      | **rejected**, >1 incoming on a `Split` |
+| jBPM 7.74.1 **execute** (phase 2)                      | never reached           | **DEADLOCK**, token parked at `Join` | **DEADLOCK**, token parked at `Join` | **DUPLICATION**, `Fulfilled` fired 2x | never reached          |
+
+The last column is the one where jBPM and the soundness checker agree on the
+verdict for **different reasons**, and it is not corroboration. jBPM rejects the
+file because it cannot build a node with two incoming flows and two outgoing
+ones at all; the checker plays that very shape happily and objects only to the
+*attribute*. Read as one measurement each, not as two opinions on one question.
 
 \*\* only after the harness supplies a `conditionExpression` for the unguarded
 `ROR` — axis A3, a real gap in the emitted XML. Without it jBPM rejects the file

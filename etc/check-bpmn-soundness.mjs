@@ -27,6 +27,15 @@
 // S1/S2 are the properties the historical bug violated. S3 catches a branch
 // wired so it can never be entered. S4 catches a fork whose tokens pile up.
 //
+// Alongside those, and reported as `STRUCTURE`, are the well-formedness rules
+// that make the token game meaningful in the first place: a dangling
+// sourceRef/targetRef, a start event with an incoming flow, an end event with an
+// outgoing one, a node nothing can start — and a gateway whose declared
+// `gatewayDirection` contradicts its own edges, which is schema-valid, invisible
+// to bpmn-moddle, and shipped once. See `buildNet`. A STRUCTURE finding makes
+// the file UNSOUND, because a file that lies about its own shape is not one any
+// verdict should be read off.
+//
 // PROPER COMPLETION IS DELIBERATELY NOT AN ERROR HERE. A classic WF-net demands
 // exactly one token in one sink; BPMN instead completes when every token has
 // been consumed, and consuming several at several end events is legal. The
@@ -236,6 +245,10 @@ function readBpmn(xml) {
       AND_GATEWAYS.has(name)
     ) {
       const node = { id: a.id, kind: name, name: a.name ?? "" };
+      // Kept only for gateways, and only so `buildNet` can hold the file to its
+      // own claim. Nothing in the token game reads it.
+      if (XOR_GATEWAYS.has(name) || AND_GATEWAYS.has(name))
+        node.gatewayDirection = a.gatewayDirection;
       current.nodes.set(a.id, node);
       if (name === "endEvent" && !isLeaf) openEnd = node;
     }
@@ -283,6 +296,53 @@ function buildNet(proc) {
   }
   const incoming = (id) => inc.get(id) ?? [];
   const outgoing = (id) => out.get(id) ?? [];
+
+  // gatewayDirection is a CLAIM ABOUT THE EDGES, not a caption on a shape.
+  // BPMN 2.0 §10.5.1 Table 10.100:
+  //
+  //   Unspecified  no constraint (and the XSD default, so an absent attribute
+  //                is this and is always fine)
+  //   Converging   MUST have multiple incoming, MUST NOT have multiple outgoing
+  //   Diverging    MUST have multiple outgoing, MUST NOT have multiple incoming
+  //   Mixed        multiple incoming AND multiple outgoing
+  //
+  // Nothing else in this repo looks: the XSD types the attribute as a plain
+  // enumeration, so a gateway declaring the opposite of what its own sequence
+  // flows say is schema-valid, and both bpmn-moddle and Xerces pass it at zero
+  // warnings. It is checked here because this is the script that already knows
+  // every node's real in/out arity.
+  //
+  // The defect this exists for shipped: regcf-reporting.bpmn declared
+  // `Diverging` on a gateway with TWO incoming flows, because the exporter
+  // chose the direction in a pass that ran before any edge existed and the
+  // `HENCE <this rule>` renewal loop then added a second arrival. Both scripts
+  // were green over it.
+  for (const node of proc.nodes.values()) {
+    if (!XOR_GATEWAYS.has(node.kind) && !AND_GATEWAYS.has(node.kind)) continue;
+    const dir = node.gatewayDirection;
+    if (dir === undefined || dir === "Unspecified") continue;
+    const ni = incoming(node.id).length;
+    const no = outgoing(node.id).length;
+    const said = `${node.kind} ${node.id} declares gatewayDirection="${dir}" but has ${ni} incoming and ${no} outgoing sequence flow(s)`;
+    if (!["Converging", "Diverging", "Mixed"].includes(dir))
+      problems.push(
+        `${node.kind} ${node.id} declares gatewayDirection="${dir}", which is not one of Unspecified/Converging/Diverging/Mixed`,
+      );
+    else if (dir === "Diverging" && ni > 1)
+      problems.push(
+        `${said} — Diverging must not have multiple incoming; this is Mixed`,
+      );
+    else if (dir === "Converging" && no > 1)
+      problems.push(
+        `${said} — Converging must not have multiple outgoing; this is Mixed`,
+      );
+    else if (dir === "Diverging" && no <= 1)
+      problems.push(`${said} — Diverging requires multiple outgoing`);
+    else if (dir === "Converging" && ni <= 1)
+      problems.push(`${said} — Converging requires multiple incoming`);
+    else if (dir === "Mixed" && !(ni > 1 && no > 1))
+      problems.push(`${said} — Mixed requires multiple of both`);
+  }
 
   const attached = new Map(); // activity id -> [boundary]
   for (const b of proc.boundaries) {

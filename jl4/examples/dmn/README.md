@@ -3,17 +3,30 @@
 The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-superset
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
-| File                              | What it is                                                             |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `reg-cf.l4`                       | the source: five decisions, one of each shape the exporter can produce |
-| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                |
-| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                    |
-| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                      |
-| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list        |
-| `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each  |
+There are **two** subjects, and the difference between them is the deliverable.
 
-Both goldens are produced by `jl4/tests/DmnExport.hs`; regenerate them by deleting the
-file and re-running `cabal test jl4:jl4-test`.
+| File                              | What it is                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `reg-cf.l4`                       | the **shape** exhibit: five decisions, one of each shape the exporter can produce           |
+| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                                     |
+| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                                         |
+| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                                           |
+| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list                             |
+| `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each                       |
+| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 992-line corpus at `../legal/regcf/regcf.l4` |
+
+Both sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
+deleting a golden and re-running `cabal test jl4:jl4-test` twice.
+
+`reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program
+model DMN itself has, and its **figures are illustrative** — its own header says so, and
+it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
+and it is here to be honest about what the real thing costs: **73 decisions, 3 tables,
+70 boxed literal expressions, 61 `inputData` under 27 names, 84 blocking notes.** The
+diagnosis is one sentence — a DMN decision is a 0-ary variable, so the house
+`GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
+and it is written up at `../legal/regcf/PROJECTIONS.md` §1, which also records what
+the projection *cannot* say. Read that before citing either file.
 
 `reg-cf.cases.json` is hand-written, not generated, and its keys are **FEEL** names
 (`annual_income`, not `annual income`). That is not a quirk of the harness — it is the
@@ -134,6 +147,17 @@ Two committed harnesses take `expected/reg-cf.dmn` to the two engines that matte
 report what the **engine** says, which is a different question from what a schema or a
 metamodel parser says:
 
+> **They run the toy, not the corpus.** Both commands below, and both `dmn-engines` CI
+> steps, name `expected/reg-cf.dmn` literally. **`expected/regcf-corpus.dmn` has never
+> been through KIE or Camunda at all** — the only tool that opens it is
+> `etc/validate-dmn.mjs` (dmn-moddle, a metamodel parser). So `25/25 value(s) as
+> expected` is a statement about the five-decision shape exhibit and says nothing
+> whatever about the 73-decision corpus projection, whose 84 blocking notes predict
+> that most of it would not evaluate. Do not read the engine banners as covering it.
+> Running the corpus through an engine needs a `regcf-corpus.cases.json` that does not
+> exist yet, and would first need the `f(x)` problem in `../legal/regcf/PROJECTIONS.md`
+> §1 solved; until then this is a gap, recorded rather than papered over.
+
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
 etc/camunda-dmn-check/run.sh jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json
@@ -210,14 +234,27 @@ Track **S0** is wired: both goldens in this directory are reproducible byte-for-
 through `l4 export`, from a repo checkout with `jl4/` as the working directory.
 
 ```sh
-l4 export --to=dmn    reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn
-l4 export --to=dmn-md reg-cf.l4 --model-name "Regulation Crowdfunding" | diff - expected/reg-cf.dmn.md
+l4 export --to=dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
+l4 export --to=dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
+
+# the corpus, likewise with no flags
+l4 export --to=dmn    ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
+l4 export --to=dmn-md ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
 ```
 
-`--model-name` matters: `lowerModule` takes the `<definitions>` name as a parameter
-rather than reading it off the module's URI, precisely so the emitted bytes do not
-depend on where the file lives. Without it the name defaults to the file's base name
-(`reg-cf`), and the `id`/`namespace` attributes change with it.
+No `--model-name` is needed, and that is the point. `lowerModule` takes the
+`<definitions>` name as a parameter rather than reading it off the module's URI, so
+the emitted bytes do not depend on where the file lives; the CLI supplies it from the
+module's own outermost `§` heading, falling back to the file's base name. Both files
+here carry such a heading, so each names its own model exactly once, in the file that
+*is* the model.
+
+The flag still exists and still overrides. It used to be *required* for the corpus
+golden, whose title was consequently hand-typed in `jl4/tests/DmnExport.hs` — so one
+model had three names at once (`SEC Regulation Crowdfunding — 17 CFR Part 227` in the
+corpus, `Regulation Crowdfunding (17 CFR Part 227)` in the test, `regcf` from a bare
+CLI run). A title duplicated across three files and stale in two of them is exactly
+the defect this exhibit exists to criticise.
 
 Add `--fidelity-report` for the loss list — written to `<output>.fidelity.txt` when
 `-o` is given, and to stderr otherwise, so that a redirected document stays a document.
