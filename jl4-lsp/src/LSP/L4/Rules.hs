@@ -347,7 +347,41 @@ data ImportOutcome = ImportOutcome
   { importUri  :: !(Maybe NormalizedUri)
   , vfsTried   :: ![NormalizedUri]
   , pathsTried :: ![FilePath]
+  , embedTried :: !EmbedStatus
+    -- ^ What happened at the embedded tier. Kept SEPARATE from 'pathsTried'
+    -- because the embed has no path, and the not-found diagnostic listed only
+    -- paths — so the one tier that can silently be empty was the one tier the
+    -- error could not mention. See 'renderEmbedStatus'.
   }
+
+-- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
+data EmbedStatus
+  = EmbedSkipped
+    -- ^ @JL4_LIBRARY_PATH@ is set, so the embed was deliberately not consulted.
+  | EmbedEmpty
+    -- ^ Consulted, and this binary carries NO embedded libraries at all.
+    --
+    -- __Unreachable in a binary built from this tree__, because the @fail@ in
+    -- "L4.API.EmbeddedLibraries" now stops such a binary from being produced.
+    -- Kept anyway: it costs three lines, it explains the failure for the many
+    -- already-installed binaries that predate that @fail@, and if the guard is
+    -- ever weakened this is the message that says what went wrong.
+  | EmbedMissing !Int
+    -- ^ Consulted, carries @n@ modules, and this one is not among them.
+  deriving stock (Eq, Show)
+
+-- | One entry for the not-found diagnostic's list of tried locations.
+renderEmbedStatus :: EmbedStatus -> Text
+renderEmbedStatus = \ case
+  EmbedSkipped   -> "the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)"
+  EmbedMissing n -> "the stdlib embedded in this binary (" <> Text.pack (show n) <> " modules, not among them)"
+  EmbedEmpty     -> Text.unlines
+    [ "the stdlib embedded in this binary -- WHICH IS EMPTY."
+    , "  That is a BUILD DEFECT, not a problem with your file: this binary carries no"
+    , "  standard libraries at all, so no IMPORT of one can ever succeed. If it came"
+    , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
+    , "  precedes every section (`cabal check` reports it if not) and rebuild."
+    ]
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -413,7 +447,9 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
     Just vfsUri -> do
       logWith recorder Info $ LogImportResolution $
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
-      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = [] }
+      -- Resolved above the library tiers entirely, so the embed was never reached.
+      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = []
+                         , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
       res <- liftIO $ resolveLibrary rootDirectory mImportingNfp modName
@@ -435,8 +471,14 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
           "Candidate order for " <> Text.pack modName <> ": " <> Text.intercalate "; " statuses
         warnOnLibraryShadow res
 
-      let outcome mUri = ImportOutcome
-            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths }
+      let embedStatus
+            | res.hasExplicitPath = EmbedSkipped
+            | n == 0              = EmbedEmpty
+            | otherwise           = EmbedMissing n
+            where n = Map.size EmbeddedLibraries.embeddedLibraries
+          outcome mUri = ImportOutcome
+            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths
+            , embedTried = embedStatus }
 
       case res.winner of
         Just (ix, FileCandidate _ fp) -> do
@@ -598,7 +640,13 @@ jl4Rules evalConfig rootDirectory recorder = do
           Just u ->
             pure ([], range, u)
           Nothing ->
-            let allPaths = map ((.getUri) . fromNormalizedUri) outcome.vfsTried <> map Text.pack outcome.pathsTried
+            -- nub: the CLI sets the project root to the importing file's own
+            -- directory, so the root and importer-relative tiers coincide and
+            -- the list used to repeat every path twice.
+            let allPaths = List.nub
+                  ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
+                 <> map Text.pack outcome.pathsTried )
+                 <> [renderEmbedStatus outcome.embedTried]
                 diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri

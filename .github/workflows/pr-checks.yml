@@ -342,6 +342,38 @@ jobs:
           cabal configure --enable-tests --disable-documentation
           cabal build all --dry-run
 
+      # Guards the defect where `data-files` in jl4-core.cabal was silently
+      # disabled by a `flag` stanza inserted above it. Cabal ignores
+      # package-level fields that appear after the first section, warns ONCE,
+      # and then caches the parse -- so the warning vanished and nobody saw it
+      # for months. The consequence was invisible in CI and fatal downstream:
+      # the sdist shipped no .l4 files, so every `cabal install` produced an
+      # `l4` with an EMPTY embedded stdlib, answering "Module not found:
+      # prelude" for every IMPORT.
+      #
+      # Nothing else here can catch it. `cabal build`/`cabal test` build
+      # jl4-core INPLACE, where the TH splice's cwd fallback finds libraries/
+      # anyway, and the test step additionally sets JL4_LIBRARY_PATH, which
+      # disables the embedded tier outright. The isolation needed is along the
+      # BUILD axis; the sdist shows it cheaply, without building anything.
+      - name: The sdist must carry the standard library
+        run: |
+          ( cd jl4-core && cabal check ) 2>&1 | tee /tmp/cabal-check.txt || true
+          if grep -q 'parser-warning' /tmp/cabal-check.txt; then
+            echo "::error::cabal check reported a parser warning for jl4-core. A package-level"
+            echo "::error::field is probably being ignored because a section was inserted above it."
+            exit 1
+          fi
+          cabal sdist jl4-core --list-only > /tmp/sdist.txt
+          if ! grep -q 'libraries/prelude\.l4' /tmp/sdist.txt; then
+            echo "::error::jl4-core's sdist contains no libraries/prelude.l4, so cabal install"
+            echo "::error::would produce an l4 binary with an empty embedded stdlib."
+            echo "::error::Check that data-files in jl4-core.cabal precedes every section."
+            sed -n '1,40p' /tmp/sdist.txt
+            exit 1
+          fi
+          echo "sdist carries $(grep -c '\.l4$' /tmp/sdist.txt) .l4 files"
+
       - name: Install dependencies
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
