@@ -1614,13 +1614,19 @@ inferFlatApp ann n es = do
       -- Note that if there are no arguments, then matchFunTy does not
       -- actually insist on the type t being a function.
       let directApp = do
-            (rn, pt) <- resolveTerm actualFuncName
-            t <- instantiate pt
-            (res, rt) <- matchFunTy False rn t actualArgs
-            let finalAnn = if needsAnnoRebuild
-                           then rebuildMixfixAppAnno ann actualFuncName actualArgs
-                           else ann
-            pure (App finalAnn rn res, rt)
+            -- Definite-incompatibility overload pre-filter (#929): drop
+            -- candidates whose parameter types provably cannot match the
+            -- arguments' possible result-type heads, BEFORE the per-candidate
+            -- fork re-checks every argument subtree. See 'appCandidateFilter'
+            -- and 'resolveTermFiltered' for the byte-identity argument.
+            viab <- appCandidateFilter actualArgs
+            resolveTermFiltered (const True) viab actualFuncName \ (rn, pt) -> do
+              t <- instantiate pt
+              (res, rt) <- matchFunTy False rn t actualArgs
+              let finalAnn = if needsAnnoRebuild
+                             then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                             else ann
+              pure (App finalAnn rn res, rt)
 
           variadicRescue = do
             (rn, pt) <- resolveTerm actualFuncName
@@ -1647,6 +1653,400 @@ inferFlatApp ann n es = do
       case actualArgs of
         _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
         _         -> directApp
+
+-- ----------------------------------------------------------------------------
+-- Definite-incompatibility overload pre-filter (smucclaw/l4-ide#929)
+-- ----------------------------------------------------------------------------
+--
+-- Overload resolution forks the checker per candidate BEFORE looking at the
+-- arguments ('resolveTermFiltered'), and every branch — including the
+-- 'ambiguousTerm' fallback — re-checks every argument subtree from scratch
+-- ('matchFunTy'). With k same-name candidates the work per application node
+-- is (k+1) times the work of its operands, i.e. exponential in the nesting
+-- depth of overloaded-operator chains: measured base 3 for AND\/OR under
+-- @IMPORT prelude@ (the boolean builtin + the prelude SET overload + the
+-- fallback), which makes a flat 27-operand disjunction effectively
+-- uncheckable.
+--
+-- The pre-filter removes candidates that DEFINITELY cannot apply, using a
+-- conservative approximation of each argument's possible result-type heads
+-- that never recurses into the argument's own subexpressions. "Definitely"
+-- means: after peeling 'Forall' binders (mirroring 'instantiate') and
+-- expanding type synonyms (mirroring 'tryExpandTypeSynonym'), the candidate
+-- parameter's head constructor is rigid, every possible head of the argument
+-- is rigid, and they differ — exactly the situation in which
+-- 'checkExpr'\/'expect'\/'unify' must fail with a 'TypeMismatch'
+-- ('unifyBase' compares rigid heads by 'Unique', and rigid heads cannot
+-- change under a growing substitution). Arity mismatches and rigid
+-- non-function candidates likewise cannot succeed ('matchFunTy' adds
+-- 'IncorrectArgsNumberApp'\/'IllegalApp' unconditionally). EVERY uncertainty
+-- — inference variables, 'Forall'-bound variables, mixfix-rewritable call
+-- shapes, missing entity info, empty candidate sets, fuel exhaustion —
+-- degrades to "viable"\/"unknown", never to a prune.
+--
+-- All probes are pure reads of the environment and a pre-fork substitution
+-- snapshot: no 'applySubst' (whose path compression writes the
+-- substitution), no minting, no error emission. Soundness of the snapshot:
+-- the substitution only ever GROWS during checking and rigid heads are
+-- invariant under it, so a definite mismatch computed pre-fork remains a
+-- mismatch inside every candidate branch; anything unbound at the snapshot
+-- is treated as unknown.
+
+-- | Build the candidate-viability predicate for an application with the
+-- given arguments. 'const True' for nullary applications: with no arguments
+-- there is nothing to be incompatible with ('matchFunTy' never fails on an
+-- empty argument list).
+appCandidateFilter :: [Expr Name] -> Check (Type' Resolved -> Bool)
+appCandidateFilter [] = pure (const True)
+appCandidateFilter args = do
+  env <- ask
+  subst <- use #substitution
+  pure (candidateViableForArgs env subst args)
+
+-- | A conservative approximation of the possible result-type heads of an
+-- argument expression.
+data ArgHeads
+  = AHUnknown
+    -- ^ no usable bound; never prune based on this argument
+  | AHRigid (Set Unique)
+    -- ^ nonempty by construction: in every branch of the argument's own
+    -- inference that can still succeed, the argument's type (after synonym
+    -- expansion) is headed by one of these rigid constructors
+
+-- | How one candidate parameter type can constrain matching.
+data ParamHead
+  = PRigid Unique
+    -- ^ rigid head after synonym expansion; can rule out rigid argument heads
+  | PFlex
+    -- ^ anything else: never prunes
+
+-- | The applicability shape of one candidate's declared (pre-'instantiate')
+-- type.
+data CandShape
+  = CandFun [ParamHead]
+    -- ^ a function; per-parameter constraints
+  | CandShapeUnknown
+    -- ^ could apply in ways we cannot bound: keep
+  | CandNeverApplies
+    -- ^ a rigid non-function: 'matchFunTy' must fail ('IllegalApp')
+
+-- | The head contribution of ONE candidate binding of a name the argument
+-- approximation looks up.
+data HeadContrib
+  = ContribNone
+    -- ^ this binding can never produce a value in this position (its branch
+    -- always fails), so it contributes no head
+  | ContribUnknown
+    -- ^ this binding's result head cannot be bounded
+  | ContribHead Unique
+    -- ^ this binding's result head is this rigid constructor
+
+candidateViableForArgs :: CheckEnv -> Substitution -> [Expr Name] -> Type' Resolved -> Bool
+candidateViableForArgs env subst args = viableCand
+  where
+    nargs = length args
+    -- Computed lazily once per application node and shared across all
+    -- candidate tests (never forced when resolution does not fork).
+    argHs = map (approxArgHeads env subst) args
+
+    viableCand :: Type' Resolved -> Bool
+    viableCand candTy =
+      case candShape env subst candTy of
+        CandShapeUnknown -> True
+        CandNeverApplies -> False
+        CandFun ps
+          | length ps /= nargs -> False
+          | otherwise          -> and (zipWith compatible ps argHs)
+
+    compatible :: ParamHead -> ArgHeads -> Bool
+    compatible PFlex      _            = True
+    compatible (PRigid _) AHUnknown    = True
+    compatible (PRigid u) (AHRigid us) = u `Set.member` us
+
+-- | Peel one leading 'Forall', mirroring what 'instantiate' does to a
+-- candidate's type before 'matchFunTy' sees it. The binders become
+-- wildcards: any head equal to one of them is unknowable.
+peelForall :: Type' Resolved -> (Set Unique, Type' Resolved)
+peelForall (Forall _ ns body) = (Set.fromList (getUnique <$> ns), body)
+peelForall t                  = (Set.empty, t)
+
+-- | Pure mirror of 'tryExpandTypeSynonym': expand a type-synonym
+-- application using only the environment's entity info. Quarantined cyclic
+-- synonyms are installed bodyless and therefore do not expand — same as in
+-- the real checker.
+pureExpandSynonym :: CheckEnv -> Resolved -> [Type' Resolved] -> Maybe (Type' Resolved)
+pureExpandSynonym env r targs =
+  case Map.lookup (getUnique r) env.entityInfo of
+    Just (_n, KnownType _kind params (Just body)) ->
+      Just (substituteType (Map.fromList (zipWith (\ pn t' -> (getUnique pn, t')) params targs)) body)
+    _ -> Nothing
+
+-- | Is this 'Unique' a rigid type-constructor head: a datatype\/builtin
+-- ('KnownType' with no expansion — including quarantined cyclic synonyms,
+-- which 'tryExpandTypeSynonym' also refuses to expand) or an in-scope rigid
+-- type variable? Anything unknown is NOT rigid (conservative).
+isRigidTyCon :: CheckEnv -> Unique -> Bool
+isRigidTyCon env u =
+  case Map.lookup u env.entityInfo of
+    Just (_n, KnownType _ _ Nothing) -> True
+    Just (_n, KnownTypeVariable)     -> True
+    _                                -> False
+
+-- | The rigid head of a type, if it provably has one, chasing the
+-- substitution snapshot and expanding synonyms; 'Nothing' otherwise.
+rigidHeadOf :: CheckEnv -> Substitution -> Set Unique -> Type' Resolved -> Maybe Unique
+rigidHeadOf env subst wilds = goT synonymExpansionFuel
+  where
+    goT :: Int -> Type' Resolved -> Maybe Unique
+    goT fuel t
+      | fuel <= 0 = Nothing
+      | otherwise =
+          case t of
+            InfVar _ _ i -> goT fuel =<< Map.lookup i subst
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> Nothing
+              | Just t' <- pureExpandSynonym env r ts -> goT (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> Just (getUnique r)
+              | otherwise -> Nothing
+            _ -> Nothing  -- Fun / nested Forall / Type
+
+-- | Classify a candidate's declared type for the viability test.
+candShape :: CheckEnv -> Substitution -> Type' Resolved -> CandShape
+candShape env subst t0 =
+  let
+    (wilds, body) = peelForall t0
+
+    goC :: Int -> Type' Resolved -> CandShape
+    goC fuel t
+      | fuel <= 0 = CandShapeUnknown
+      | otherwise =
+          case t of
+            Fun _ onts _ ->
+              CandFun (goP synonymExpansionFuel . optionallyNamedTypeType <$> onts)
+            InfVar _ _ i ->
+              maybe CandShapeUnknown (goC fuel) (Map.lookup i subst)
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> CandShapeUnknown
+              | Just t' <- pureExpandSynonym env r ts -> goC (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> CandNeverApplies
+              | otherwise -> CandShapeUnknown
+            Forall {} -> CandShapeUnknown  -- nested quantifier: be conservative
+            Type {}   -> CandShapeUnknown
+
+    goP :: Int -> Type' Resolved -> ParamHead
+    goP fuel t
+      | fuel <= 0 = PFlex
+      | otherwise =
+          case t of
+            InfVar _ _ i -> maybe PFlex (goP fuel) (Map.lookup i subst)
+            TyApp _ r ts
+              | getUnique r `Set.member` wilds -> PFlex
+              | Just t' <- pureExpandSynonym env r ts -> goP (fuel - 1) t'
+              | isRigidTyCon env (getUnique r) -> PRigid (getUnique r)
+              | otherwise -> PFlex
+            _ -> PFlex  -- Fun / Forall / Type parameters never prune
+  in
+    goC synonymExpansionFuel body
+
+-- | Approximate the possible result-type heads of an argument expression
+-- WITHOUT recursing into its subexpressions (one level of environment
+-- lookups at most, so the cost per application node is bounded).
+approxArgHeads :: CheckEnv -> Substitution -> Expr Name -> ArgHeads
+approxArgHeads env subst = goE
+  where
+    goE :: Expr Name -> ArgHeads
+    goE = \ case
+      -- Direct string operands of AND\/OR have already been converted to
+      -- 'Inert' by 'setInertContext' before desugaring; 'Inert' infers
+      -- BOOLEAN ('inferExpr'').
+      Inert {}              -> rigid1 booleanRef
+      Lit _ (NumericLit {}) -> rigid1 numberRef
+      Lit _ (StringLit {})  -> rigid1 stringRef
+      List {}               -> rigid1 listRef
+      Percent {}            -> rigid1 numberRef
+      Var _ n               -> finalize (headsOfName valueHead (rawName n))
+      App _ f []
+        | mixfixSuspicious (rawName f) -> AHUnknown
+        | otherwise                    -> finalize (headsOfName valueHead (rawName f))
+      App _ f fargs         -> appHeads (rawName f) fargs
+      Proj _ base l         -> projHeads base l
+      -- Surface binary\/unary operators desugar to applications of builtin
+      -- names ('desugarBinOpToFunction'); approximate them as exactly that
+      -- application. Regulative RAnd\/ROr do not desugar this way and fall
+      -- through to unknown.
+      And _ e1 e2           -> binop andName [e1, e2]
+      Or _ e1 e2            -> binop orName [e1, e2]
+      Implies _ e1 e2       -> binop impliesName [e1, e2]
+      Equals _ e1 e2        -> binop equalsName [e1, e2]
+      Leq _ e1 e2           -> binop leqName [e1, e2]
+      Geq _ e1 e2           -> binop geqName [e1, e2]
+      Lt _ e1 e2            -> binop ltName [e1, e2]
+      Gt _ e1 e2            -> binop gtName [e1, e2]
+      Not _ e1              -> binop notName [e1]
+      Plus _ e1 e2          -> binop plusName [e1, e2]
+      Minus _ e1 e2         -> binop minusName [e1, e2]
+      Times _ e1 e2         -> binop timesName [e1, e2]
+      DividedBy _ e1 e2     -> binop divideName [e1, e2]
+      Modulo _ e1 e2        -> binop moduloName [e1, e2]
+      Cons _ e1 e2          -> binop consName [e1, e2]
+      _                     -> AHUnknown
+
+    rigid1 :: Resolved -> ArgHeads
+    rigid1 r = AHRigid (Set.singleton (getUnique r))
+
+    binop :: Name -> [Expr Name] -> ArgHeads
+    binop nm = appHeads (rawName nm)
+
+    -- An application argument: union of the result heads of the head name's
+    -- candidates — unless the mixfix\/postfix\/fixity machinery could
+    -- restructure the call site to resolve a DIFFERENT name, in which case
+    -- we know nothing.
+    appHeads :: RawName -> [Expr Name] -> ArgHeads
+    appHeads frn fargs
+      | mixfixSuspicious frn = AHUnknown
+      | any (maybe False mixfixSuspicious . bareArgName) fargs = AHUnknown
+      | binaryLeftSpineSuspicious = AHUnknown
+      | otherwise = finalize (headsOfName (appliedHead (length fargs)) frn)
+      where
+        -- 'tryMatchMixfixCall''s binary flattening ('flattenBinaryMixfixApp')
+        -- engages on the FIRST keyword of the left spine of a binary
+        -- application, which can sit arbitrarily deep in nested binary apps.
+        binaryLeftSpineSuspicious = case fargs of
+          [l, _r] -> maybe False mixfixSuspicious (leftSpineName l)
+          _       -> False
+
+    -- A bare-name argument (a 'Var' or nullary 'App'): the shape the mixfix
+    -- machinery inspects via 'getExprName' \/ @markerName@.
+    bareArgName :: Expr Name -> Maybe RawName
+    bareArgName = \ case
+      Var _ n1    -> Just (rawName n1)
+      App _ n1 [] -> Just (rawName n1)
+      _           -> Nothing
+
+    -- Head names along the left spine of left-nested binary applications,
+    -- innermost first — mirrors @flattenLeft@ + 'findFirstKeyword'.
+    leftSpineName :: Expr Name -> Maybe RawName
+    leftSpineName = \ case
+      App _ g [x, _y] -> leftSpineName x <|> Just (rawName g)
+      _               -> Nothing
+
+    -- Could this raw name cause 'tryMatchMixfixCall',
+    -- 'reinterpretPostfixAppIfNeeded' or 'tryReassociateFixityChain' to
+    -- restructure a call site? All of those trigger only on names that are
+    -- registered mixfix keywords or first keywords (a binary infix
+    -- operator's keyword is the operator name itself, so declared-fixity
+    -- chain operators are covered too).
+    mixfixSuspicious :: RawName -> Bool
+    mixfixSuspicious rn =
+      isRegisteredKeyword rn env.mixfixRegistry
+        || not (null (lookupByFirstKeyword rn env.mixfixRegistry))
+
+    -- Union the head contributions of every in-scope 'KnownTerm' candidate
+    -- of a name. 'resolveTerm'' selects a SUBSET of these (locals priority,
+    -- section proximity), so the union over all of them is a sound
+    -- over-approximation regardless of which subset survives. 'Nothing'
+    -- means unknown.
+    headsOfName :: (Type' Resolved -> HeadContrib) -> RawName -> Maybe (Set Unique)
+    headsOfName contrib rn =
+      go Set.empty
+        [ contrib t
+        | u <- Map.findWithDefault [] rn env.environment
+        , Just (_o, KnownTerm t _tk) <- [Map.lookup u env.entityInfo]
+        ]
+      where
+        go acc []       = Just acc
+        go acc (c : cs) = case c of
+          ContribUnknown -> Nothing
+          ContribNone    -> go acc cs
+          ContribHead u  -> go (Set.insert u acc) cs
+
+    -- An empty head set means no binding of the name can succeed here; the
+    -- argument fails identically under every candidate, so pruning would be
+    -- sound but pointless — treat as unknown to keep today's error path
+    -- byte-for-byte.
+    finalize :: Maybe (Set Unique) -> ArgHeads
+    finalize Nothing = AHUnknown
+    finalize (Just s)
+      | Set.null s = AHUnknown
+      | otherwise  = AHRigid s
+
+    -- The head this binding exposes as a BARE occurrence (after
+    -- 'instantiate' peels its quantifier).
+    valueHead :: Type' Resolved -> HeadContrib
+    valueHead t =
+      let (wilds, body) = peelForall t
+      in case rigidHeadOf env subst wilds body of
+           Just u  -> ContribHead u
+           Nothing -> ContribUnknown
+
+    -- The head this binding exposes when APPLIED to @n@ arguments. Arity is
+    -- deliberately ignored: the variadic-construction rescue can collect
+    -- mismatched argument counts for constructors, so any 'Fun' result head
+    -- must be included. A rigid non-function can never be applied
+    -- ('IllegalApp' is unconditional), so it contributes nothing.
+    appliedHead :: Int -> Type' Resolved -> HeadContrib
+    appliedHead _n t0 =
+      let
+        (wilds, body) = peelForall t0
+
+        goA :: Int -> Type' Resolved -> HeadContrib
+        goA fuel t
+          | fuel <= 0 = ContribUnknown
+          | otherwise =
+              case t of
+                Fun _ _onts rt ->
+                  case rigidHeadOf env subst wilds rt of
+                    Just u  -> ContribHead u
+                    Nothing -> ContribUnknown
+                InfVar _ _ i ->
+                  maybe ContribUnknown (goA fuel) (Map.lookup i subst)
+                TyApp _ r ts
+                  | getUnique r `Set.member` wilds -> ContribUnknown
+                  | Just t' <- pureExpandSynonym env r ts -> goA (fuel - 1) t'
+                  | isRigidTyCon env (getUnique r) -> ContribNone
+                  | otherwise -> ContribUnknown
+                Forall {} -> ContribUnknown
+                Type {}   -> ContribUnknown
+      in
+        goA synonymExpansionFuel body
+
+    -- Record projection @base's l@ resolves EITHER as a qualified name
+    -- (section dereference, when the base chain is a name path resolving to
+    -- a term) OR as an application of the label's selector to the base
+    -- ('inferExpr'' 'Proj' case). Union the possible heads of both routes;
+    -- a route that cannot fire contributes nothing.
+    projHeads :: Expr Name -> Name -> ArgHeads
+    projHeads base l =
+      let
+        selM  = headsOfName (appliedHead 1) (rawName l)
+        qualM = case projChainRawName base l of
+          Nothing  -> Just Set.empty
+          Just qrn -> headsOfName valueHead qrn
+      in
+        finalize (Set.union <$> selM <*> qualM)
+
+    -- Mirrors @extractProjNameChain@ in 'inferExpr'': the qualified raw
+    -- name a Proj chain would resolve as, if it is a pure name chain of at
+    -- least two components.
+    projChainRawName :: Expr Name -> Name -> Maybe RawName
+    projChainRawName base l = do
+      comps <- goChain base
+      case comps ++ nameComponents (rawName l) of
+        allComps@(_ : _ : _) ->
+          Just (QualifiedName (NE.fromList (init allComps)) (last allComps))
+        _ -> Nothing
+      where
+        goChain :: Expr Name -> Maybe [Text]
+        goChain = \ case
+          Var _ n1         -> Just (nameComponents (rawName n1))
+          Proj _ inner fn  -> (\pre -> pre ++ nameComponents (rawName fn)) <$> goChain inner
+          _                -> Nothing
+
+        nameComponents :: RawName -> [Text]
+        nameComponents = \ case
+          NormalName t          -> [t]
+          PreDef t              -> [t]
+          QualifiedName qs fin  -> NE.toList qs ++ [fin]
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
