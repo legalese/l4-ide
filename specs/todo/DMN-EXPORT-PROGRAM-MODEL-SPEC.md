@@ -12,6 +12,13 @@ and does so from a single analysis: **un-lambda-lifting**.
 Everything asserted here as "verified" was executed, validated or read out of a normative
 document during the research pass; everything else is marked. §11 lists what is still open.
 
+> **On what the DMN ecosystem does and does not analyse**, see
+> [A Gap Analysis of Gap Analysis](../../doc/concepts/language-design/dmn-analysis-prior-art.md)
+> — the canonical copy. One result is directly binding on this spec: **DMN 1.0's completeness
+> indicator was removed by OMG in 1.1**, so a completeness claim cannot be emitted into conformant
+> DMN 1.1+ XML at all. Whatever the exporter knows about a table's completeness has to travel in
+> the fidelity report.
+
 ---
 
 ## 0. Ruling status, and whether smucclaw/l4-ide#923 is unblocked

@@ -766,8 +766,15 @@ getting excited about.
   Decision Requirements Graph in all but name, seventeen years early.
 - **Calvanese, Dumas, Laurson, Maggi, Montali & Teinemaa (2016, 2018)** gave DMN its
   modern semantics: read each rule as a **hyper-rectangle** in the input space and
-  sweep for gaps and overlaps geometrically. This is not a whiteboard result — it is
-  the algorithm running inside Drools and Trisotech today.
+  sweep for gaps and overlaps geometrically — `O(|R|·log^N|R|)`, and the first method
+  that handles _overlapping numeric intervals_ without splitting the table, which
+  earlier algorithms needed and which costs exponentially in the numeric columns.
+  ~~This is not a whiteboard result — it is the algorithm running inside Drools and
+  Trisotech today.~~ **Retracted 2026-07-27: unsupported.** Drools and Trisotech do
+  both ship gap/overlap analysis, but nothing found attributes _this_ algorithm to
+  either. The only published implementation of it is a University of Tartu fork of
+  `dmn-js`, last pushed 2016, whose demo host no longer resolves. See
+  [A Gap Analysis of Gap Analysis](dmn-analysis-prior-art.md).
 - **Vandevelde, Callewaert & Vennekens (2022)** discharge whole-graph consistency to an
   SMT solver (IDP-Z3) and find rules that are dead **only in context** — unfireable not
   because of anything in their own table, but because of what the tables upstream can
