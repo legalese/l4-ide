@@ -1,0 +1,22 @@
+IMPORT prelude
+
+§ `AND on two SETs is a type error — the overload was removed`
+
+-- Until 2026-07-28 the prelude overloaded __AND__/__OR__ on SET operands
+-- to mean UNION. A second candidate for these magic names made the
+-- typechecker re-check argument subtrees per candidate, i.e. exponential
+-- (base 3) in the DEPTH of AND/OR chains — a real 27-operand statutory
+-- disjunction extrapolated to ~a year of checking (smucclaw/l4-ide#929).
+-- The overloads were removed (SET-OPERATORS-SPEC §16); term-level set
+-- union is spelled UNION explicitly.
+--
+-- This test pins the removal: AND on two SETs must fail against the sole
+-- remaining candidate, the predefined boolean __AND__. If this file ever
+-- typechecks again, the overloads have been reintroduced — that is only
+-- legitimate if typechecker memoisation has delivered a big-O win first
+-- (the §16 un-un-overloading contingency).
+
+`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+`new jerseyans` MEANS setFromList (LIST "carol")
+
+#EVAL `new yorkers` AND `new jerseyans`

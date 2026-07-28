@@ -2,28 +2,29 @@ IMPORT prelude
 
 § `Set operators — Phase 2: the overloads, and the two ANDs side by side`
 
--- The acceptance test of SET-OPERATORS-SPEC.md §5: the same token AND,
--- disambiguated by type. Term-level AND on SETs is the lattice join (union);
--- sentence-level AND on BOOLEANs stays conjunction. The type-directed
--- dispatch is in the spirit of Partee & Rooth (1983); the union reading is
--- L4's chosen resolution, not a claim any authority holds that "and"
--- denotes union (SET-OPERATORS-SPEC §9.3, §10.6).
+-- The acceptance test of SET-OPERATORS-SPEC.md §5, as amended by §16:
+-- term-level set union is spelled UNION explicitly; sentence-level AND on
+-- BOOLEANs stays conjunction. The AND/OR-on-sets overloads were REMOVED
+-- 2026-07-28 — a second __AND__/__OR__ candidate made typechecking
+-- exponential (base 3) in AND/OR chain depth (smucclaw/l4-ide#929), so
+-- the type-directed dispatch of the same token now stops at the boolean
+-- reading, and the union reading is written in its own word.
 
-§§ `Term-level AND: union`
+§§ `Term-level union: spelled UNION`
 
 `new yorkers`   MEANS setFromList (LIST "alice", "bob")
 `new jerseyans` MEANS setFromList (LIST "carol")
 
--- "residents of New York and New Jersey may apply": either state qualifies.
-`eligible` MEANS `new yorkers` AND `new jerseyans`
+-- "residents of New York and New Jersey may apply": either state
+-- qualifies. The drafter resolves the source text's "and" to UNION
+-- explicitly; AND on two SETs is a type error (see
+-- not-ok/tc/set-and-unoverloaded.l4).
+`eligible` MEANS `new yorkers` UNION `new jerseyans`
 
 #EVAL setSize `eligible`
 #EVAL "carol" `is in` `eligible`
 
--- OR on sets is the same operation — the collapse the lint will surface.
-#EVAL setSize (`new yorkers` OR `new jerseyans`)
-
-§§ `Sentence-level AND: still conjunction`
+§§ `Sentence-level AND: conjunction, as always`
 
 `is cruel`   MEANS TRUE
 `is unusual` MEANS FALSE
