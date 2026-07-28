@@ -11,7 +11,7 @@ The second one looks paradoxical only because one word is doing two jobs. In the
 
 Courts see this ambiguity constantly. The Singapore Court of Appeal has read the same word _and_ as union in one case (_Nam Hong Construction_ [2016] SGCA 42) and as conjunction in another (_Sit Kwong Lam_ [2018] SGCA 14) — same court, same Chief Justice, opposite results, and correctly so both times. The word underdetermines the meaning; the context decides. As the U.S. Supreme Court put it: "Really, it all depends" (_Pulsifer v. United States_, 601 U.S. 124, 140 (2024)).
 
-L4's answer: give the two jobs two **types**, and let the type checker pick the right operation. This tutorial shows how.
+L4's answer: give the two jobs two **types**, and two **spellings**. Sentence-level conjunction keeps the word `AND`; term-level union is written `UNION`. The type checker enforces the split: `AND` between two sets is a compile-time error, so the drafter is forced to say which reading the source text's _and_ meant. This tutorial shows how.
 
 ## Sets in one minute
 
@@ -55,21 +55,21 @@ One catch: `SET OF` needs at least two elements. With a single argument, `SET OF
 Here is the whole point of the feature in four lines:
 
 ```l4
--- term-level AND: Set AND Set → union. Three people are eligible.
-`eligible` MEANS `new yorkers` AND `new jerseyans`
+-- term-level union: spelled UNION. Three people are eligible.
+`eligible` MEANS `new yorkers` UNION `new jerseyans`
 #EVAL setSize `eligible`                   -- 3
 
 -- sentence-level AND: BOOLEAN AND BOOLEAN → conjunction.
 `violates 8th amendment` MEANS `is cruel` AND `is unusual`
 ```
 
-Same token. Different types. Different operations. **Both correct.** You can transcribe the statute's _and_ verbatim — without first deciding what it means — and the type system routes it to conjunction or union as the operands dictate.
+Same word in the statute; two different operations in the formalization — and the types police the boundary. If you transcribe the statute's _and_ verbatim between two sets, L4 rejects it with a type error: the only `AND` is boolean conjunction, and a set is not a boolean. The error is the feature — it is the exact point where a human once had to choose between the conjunctive and the union reading, surfaced at the exact token where the choice was made. Writing `UNION` records the choice in the source.
 
-(`OR` on sets is _also_ union — "residents of NY and NJ" and "residents of NY or NJ" describe the same eligible population. That the two connectives coincide on sets is not a bug; it is the ambiguity the drafter left behind, made visible.)
+(The same goes for `OR` between two sets — "residents of NY and NJ" and "residents of NY or NJ" describe the same eligible population, and both are written `UNION`. An earlier design overloaded `AND`/`OR` on sets to mean union so verbatim transcription would typecheck; those overloads were **removed on 2026-07-28** because a second candidate for `AND`/`OR` made typechecking exponential in the depth of `AND`/`OR` chains — a real 27-operand statutory disjunction became uncheckable ([smucclaw/l4-ide#929](https://github.com/smucclaw/l4-ide/issues/929)). See the design record for the reversal and the conditions for reinstatement.)
 
 ## Union, intersection, difference
 
-The explicit vocabulary, when you want to leave no doubt:
+The rest of the vocabulary:
 
 ```l4
 #EVAL setSize (`new yorkers` UNION `new jerseyans`)       -- 3
@@ -139,5 +139,5 @@ Seen from engineering, the redundancy canon is a **Boolean-minimization presumpt
 ## Where next
 
 - Reference: [Sets library](../../reference/libraries/sets.md)
-- The full design record, with the case law verified against primary sources: [SET-OPERATORS-SPEC](https://github.com/legalese/l4-ide/blob/docs/set-operators-spec/specs/todo/SET-OPERATORS-SPEC.md)
+- The full design record, with the case law verified against primary sources: [SET-OPERATORS-SPEC](../../../specs/todo/SET-OPERATORS-SPEC.md)
 - Coming next: the ambiguity lint that surfaces the otiosity argument in the IDE

@@ -9,12 +9,14 @@ IMPORT prelude
 -- contents list); use setFromList or SET OF LIST for singletons
 `new jerseyans` MEANS setFromList (LIST "carol")
 
--- term-level AND on sets is union: three people are eligible
-`eligible` MEANS `new yorkers` AND `new jerseyans`
+-- term-level union is spelled UNION: three people are eligible.
+-- (AND on two sets is a type error — the AND/OR set overloads were
+-- removed 2026-07-28 for typechecker performance, smucclaw/l4-ide#929.)
+`eligible` MEANS `new yorkers` UNION `new jerseyans`
 #EVAL setSize `eligible`                                   -- 3
 #EVAL "carol" `is in` `eligible`                           -- TRUE
 
--- sentence-level AND on booleans is still conjunction
+-- sentence-level AND on booleans is conjunction, as always
 #EVAL TRUE AND FALSE                                       -- FALSE
 
 §§ `The canonical vocabulary`
