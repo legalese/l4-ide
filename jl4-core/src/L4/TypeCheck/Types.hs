@@ -937,7 +937,51 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
     Section _ (MkSection _ mr maka decls') -> toResolved mr <> toResolved maka <> foldMap relevantResolveds decls'
 
 resolveTerm' :: (TermKind -> Bool) -> Name -> Check (Resolved, Type' Resolved)
-resolveTerm' p n = do
+resolveTerm' p n = resolveTermFiltered False p (const True) n pure
+
+-- | Continuation-passing overload resolution with a candidate pre-filter
+-- (smucclaw\/l4-ide#929).
+--
+-- This is 'resolveTerm'' with two extra capabilities, both byte-neutral on
+-- every program whose resolution behaviour they do not speed up:
+--
+--  1. A /viability/ predicate over each candidate's (fully substituted)
+--     declared type. In the multi-candidate arm, candidates the predicate
+--     rejects are dropped from the type-directed 'choose' fork. Callers must
+--     only reject candidates that are DEFINITELY incompatible with the call
+--     site (see 'appCandidateFilter' in "L4.TypeCheck"): sibling branches of
+--     '<|>' start from the same entry state ('Alternative' above), so
+--     removing a branch that can only fail cannot perturb any surviving
+--     branch's minted uniques, bindings, or error chain. The 'ambiguousTerm'
+--     fallback is still built from the UNFILTERED candidate list, so
+--     ambiguity diagnostics enumerate every candidate exactly as before.
+--
+--  2. The rest of the caller's computation is passed in as a continuation
+--     so that the fork can decide, per candidate and AFTER the continuation
+--     has run, whether the fallback branch is reachable at all — see
+--     'forkWithLazyFallback'. Passing @pure@ recovers the original
+--     behaviour exactly: @(m1 '<|>' m2) '>>=' f@ distributes to
+--     @(m1 '>>=' f) '<|>' (m2 '>>=' f)@ in this monad (bind concatenates
+--     per-branch outcome lists in order), so threading the continuation
+--     through the fork is observationally identical to sequencing after it.
+--
+-- The single-candidate and out-of-scope arms are untouched (in particular, a
+-- single candidate is never filtered: its failures must surface exactly as
+-- today).
+--
+-- The leading 'Bool' says whether an Error-severity diagnostic was already
+-- emitted for this application node BEFORE resolution (e.g. 'FixityConflict'
+-- or 'MixfixMatchErrorCheck' in the App preamble). When set, the ambiguity
+-- fallback is appended unconditionally — see 'forkWithLazyFallback' for why
+-- the one-success skip is unsound in that case.
+resolveTermFiltered
+  :: Bool
+  -> (TermKind -> Bool)
+  -> (Type' Resolved -> Bool)
+  -> Name
+  -> ((Resolved, Type' Resolved) -> Check r)
+  -> Check r
+resolveTermFiltered preambleErr p viab n kont = do
   options <- lookupRawNameInEnvironment (rawName n)
   -- Lexical scoping: among the viable candidates, prefer those defined in the
   -- nearest enclosing section (see 'selectByProximity'). Only fall through to
@@ -989,14 +1033,19 @@ resolveTerm' p n = do
       v <- fresh (rawName n)
       n' <- setAnnResolvedType v Nothing n
       rn <- outOfScope n' v
-      pure (rn, v)
-    [x] -> x
-    xs -> choose xs <|> do
-      v <- fresh (rawName n)
-      n' <- setAnnResolvedType v Nothing n
-      xs' <- sequenceA xs
-      rn <- ambiguousTerm n' xs'
-      pure (rn, v)
+      kont (rn, v)
+    [(_t, x)] -> x >>= kont
+    xs ->
+      let
+        kept = [ x | (t', x) <- xs, viab t' ]
+        fallback = do
+          v <- fresh (rawName n)
+          n' <- setAnnResolvedType v Nothing n
+          xs' <- sequenceA (snd <$> xs)
+          rn <- ambiguousTerm n' xs'
+          pure (rn, v)
+      in
+        forkWithLazyFallback preambleErr kept fallback kont
   where
     -- Group by the declared type (via its annotation-insensitive 'typeKey') so
     -- that same-typed bindings shadow lexically while distinct overloads remain
@@ -1004,14 +1053,72 @@ resolveTerm' p n = do
     -- first so that inference variables introduced during signature scanning are
     -- resolved to concrete types before we compare them. The 'Bool' records
     -- whether this is a value binding (as opposed to a selector\/constructor),
-    -- which governs forward-reference shadowing (see above).
-    proc :: (Unique, Name, CheckEntity) -> Check (Maybe (TypeKey, Bool, Unique, Check (Resolved, Type' Resolved)))
+    -- which governs forward-reference shadowing (see above). The fully
+    -- substituted type is returned alongside each candidate's action so that
+    -- the viability pre-filter can inspect it without re-running 'applySubst'.
+    proc :: (Unique, Name, CheckEntity) -> Check (Maybe (TypeKey, Bool, Unique, (Type' Resolved, Check (Resolved, Type' Resolved))))
     proc (u, o, KnownTerm t tk) | p tk = do
       t' <- applySubst t
-      pure $ Just . (typeKey t', isValueBinding tk, u,) $ do
+      pure $ Just . (typeKey t', isValueBinding tk, u,) . (t',) $ do
         n' <-  setAnnResolvedType t (Just tk) n
         pure (Ref n' u o, t)
     proc _                             = pure Nothing
+
+-- | Fork over the (pre-filtered) overload candidates, appending the
+-- 'ambiguousTerm' fallback branch only when it is observable.
+--
+-- Today's shape @('choose' xs '<|>' fallback) '>>=' kont@ runs the fallback
+-- branch unconditionally, and the fallback re-checks every argument of the
+-- application against fresh inference variables ('matchFunTy''s 'InfVar'
+-- case), which — combined with the per-candidate argument re-checking — is
+-- what makes overloaded-operator chains exponential (#929). But the fallback
+-- branch's outcomes are only ever /surfaced/ when the candidates produce
+-- zero successes ('prune'\/'softprune' surface the LAST failure candidate,
+-- which is fallback-derived) or two or more successes ('prune' surfaces the
+-- curated ambiguity error, again fallback-derived, and 'softprune' passes
+-- the whole list upward). With EXACTLY ONE success, every consumer discards
+-- the failure candidates: 'softprune'\/'prune' keep only the success, and
+-- 'orElse'\/'orElseKeepAll' pass through a candidate set whose failures are
+-- likewise never surfaced downstream (a failure's error chain is permanent,
+-- so no continuation can promote it to a success, and fallback-derived
+-- outcomes always sit after candidate-derived ones, so a candidate failure
+-- is never the surfaced last element). The fallback branch always fails (it
+-- 'addError's before doing anything else), so it can never change the
+-- success count. Skipping it in the one-success case is therefore
+-- byte-invisible — and, because the decision is made after running only the
+-- candidate branches, the fallback's expensive argument re-checking is never
+-- forced on the happy path.
+--
+-- CAVEAT (the @preambleErr@ flag): the skip is byte-invisible ONLY when no
+-- Error-severity diagnostic was emitted for this node before the fork. This
+-- function counts successes on its LOCAL outcomes — @runCheck@ from the
+-- state at the fork — but a diagnostic emitted in the caller's preamble
+-- (e.g. 'FixityConflict' before falling through to flat application
+-- inference, or a partial-mixfix 'MixfixMatchErrorCheck') is prefixed onto
+-- EVERY branch by the enclosing bind, outside this function's view, and
+-- 'softprune'\/'prune' classify successes WITH that prefix. A locally-Plain
+-- outcome is then a failure upstream: with zero upstream successes the old
+-- shape surfaced the LAST outcome, the fallback's curated ambiguity error —
+-- so skipping the fallback would silently swap that error for the
+-- erstwhile-success candidate. Callers must pass @preambleErr = True@
+-- whenever such a diagnostic preceded the fork; the fallback is then
+-- appended unconditionally, restoring the pre-skip behaviour byte-for-byte.
+--
+-- The one-success test must run AFTER the caller's continuation (the
+-- candidate branches can still fail inside 'matchFunTy'), which is why this
+-- takes the continuation explicitly rather than composing with '>>='.
+forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check r) -> Check r
+forkWithLazyFallback preambleErr cands fallback kont =
+  MkCheck $ \ e s ->
+    let
+      ks = runCheck (choose cands >>= kont) e s
+
+      isSuccess (Plain _, _)  = True
+      isSuccess (With _ _, _) = False
+    in
+      case filter isSuccess ks of
+        [_] | not preambleErr -> ks
+        _                     -> ks ++ runCheck (fallback >>= kont) e s
 
 -- | Whether a 'TermKind' names a value in the ordinary term namespace (as
 -- opposed to a record selector or data constructor, which are reached through
