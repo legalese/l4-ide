@@ -47,6 +47,7 @@ import { AiProxyClient } from './ai/ai-proxy-client.js'
 import { registerChatParticipant } from './chat-participant.js'
 import { ConversationStore } from './ai/conversation-store.js'
 import { ChatService } from './ai/chat-service.js'
+import { CloudAgentClient } from './ai/cloud-agent-client.js'
 import { ToolDispatcher } from './ai/tool-dispatcher.js'
 import { registerAiChatHandlers } from './ai/register.js'
 import { recordDirectiveResults } from './ai/tools/l4-evaluate.js'
@@ -699,6 +700,7 @@ export async function activate(context: ExtensionContext) {
     dispatcher,
     mcp: aiMcpClient,
     vsMcp: vsMcpTools,
+    cloudAgent: new CloudAgentClient(auth, client, aiLogger),
     extensionVersion,
   })
 

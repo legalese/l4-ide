@@ -253,6 +253,18 @@
             ],
             "default": "always",
             "description": "Legalese AI permission: post short status updates into the chat."
+          },
+          "legaleseAgent.url": {
+            "scope": "machine-overridable",
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Override the cloud compose agent base URL (the crimson-outlined cloud submit). Defaults to `https://agent.legalese.cloud`, or `http://127.0.0.1:8080` when `legaleseAi.localMode` is on."
+          },
+          "legaleseAgent.authBaseUrl": {
+            "scope": "machine-overridable",
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Override the base URL used to mint/revoke per-turn agent tokens. Defaults to `https://legalese.cloud`."
           }
         }
       }

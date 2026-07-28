@@ -759,6 +759,14 @@ export interface AiChatStartParams {
    *  passthrough (no local IDE context, tools, or summize title). */
   deploymentId?: string
   apiBaseUrl?: string
+  /** Route this turn to the cloud compose agent (legalese-compose-agent)
+   *  instead of streaming ai-proxy locally. Set by the webview's
+   *  crimson-outlined "cloud" submit. The extension mints a per-turn agent
+   *  token, uploads the workspace bundle (attachments + active file + L4
+   *  import tree), POSTs the turn to the agent, maps its SSE back onto the
+   *  same AiChat* events, and revokes the token at end of turn. Requires
+   *  Legalese Cloud sign-in (the agent token is minted from the session). */
+  cloudAgent?: boolean
 }
 
 export interface AiChatAttachment {

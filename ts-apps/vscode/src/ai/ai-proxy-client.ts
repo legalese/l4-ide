@@ -593,7 +593,7 @@ function extractErrorCode(body: string): string | undefined {
  * frames (our `metadata` / `tool_activity`) and the OpenAI-compat
  * `chat.completion.chunk` data-only frames.
  */
-async function* parseSse(
+export async function* parseSse(
   body: ReadableStream<Uint8Array>,
   logger?: AiLogger,
   cursor?: SseCursor

@@ -8,6 +8,7 @@ import type {
 import type { AuthManager } from '../auth.js'
 import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
 import { AiProxyClient, AiProxyError } from './ai-proxy-client.js'
+import type { CloudAgentClient } from './cloud-agent-client.js'
 import type { ConversationStore } from './conversation-store.js'
 import type { AiLogger } from './logger.js'
 import {
@@ -159,6 +160,9 @@ export interface ChatServiceOptions {
    *  per server in the sidebar settings). Advertised alongside the
    *  built-ins and l4-rules tools; executed via vscode.lm.invokeTool. */
   vsMcp: VsCodeMcpTools
+  /** Drives turns flagged `cloudAgent` against the cloud compose agent
+   *  instead of streaming ai-proxy locally. */
+  cloudAgent: CloudAgentClient
   /** Extension version string (e.g. "1.4.0"). Injected into the
    *  first-turn `<session-context>` system message and stamped on
    *  locally-persisted conversations so support can correlate
@@ -262,8 +266,25 @@ export class ChatService {
    * `turnId` remains the stable abort key for the entire pipeline.
    */
   async start(params: AiChatStartParams): Promise<void> {
-    const isNewConversation = !params.conversationId
     const { turnId } = params
+
+    // Cloud compose agent: the whole harness (tool loop, MCP, file tools)
+    // runs server-side. We register an abort controller under the same
+    // turnId so the webview's Stop works identically, then hand off to the
+    // CloudAgentClient, which streams back the same ChatServiceEvents.
+    if (params.cloudAgent) {
+      const ac = new AbortController()
+      this.active.set(turnId, ac)
+      try {
+        await this.opts.cloudAgent.run(params, (e) => this.emit(e), ac.signal)
+      } finally {
+        this.active.delete(turnId)
+        this.injections.delete(turnId)
+      }
+      return
+    }
+
+    const isNewConversation = !params.conversationId
 
     // Re-resolve the deployment binding for a follow-up turn. The
     // webview only sends `apiBaseUrl`/`deploymentId` on the FIRST turn

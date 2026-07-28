@@ -183,6 +183,21 @@
     store.abort()
   }
 
+  /** Submit to the cloud compose agent instead of streaming ai-proxy
+   *  locally. Same input handling as {@link submit}; the turn runs on the
+   *  server and renders identically. Disabled while a pendingQuestion is
+   *  open (answers always go to the local turn that asked). */
+  function submitCloud(): void {
+    const trimmed = text.trim()
+    if (!trimmed || disabled || store.pendingQuestion) return
+    store.sendCloud(trimmed, stagedMentions)
+    stagedMentions = []
+    text = ''
+    store.setDraft('')
+    mentionState = null
+    void tick().then(() => autoresize())
+  }
+
   // Attachment picker state. `attachBusy` guards against double-clicks
   // while the native dialog is open; `attachNote` surfaces soft warnings
   // ("this PDF might eat a lot of context") and rejection reasons from
@@ -477,6 +492,39 @@
           </svg>
         </button>
       {:else}
+        <!-- Cloud agent submit: runs the turn on the server
+             (legalese-compose-agent) instead of streaming ai-proxy
+             locally. Crimson-OUTLINED to read as "same family, different
+             destination" next to the solid Send. Hidden while answering a
+             meta__ask_user question (that always resumes the local turn). -->
+        {#if !store.pendingQuestion}
+          <button
+            class="submit-btn cloud"
+            onclick={submitCloud}
+            disabled={disabled || !text.trim()}
+            title="Send to cloud agent"
+            aria-label="Send to cloud agent"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M4.6 12.2a2.4 2.4 0 0 1-.3-4.8 3.1 3.1 0 0 1 6-1 2.5 2.5 0 0 1 .5 5"
+                stroke="currentColor"
+                stroke-width="1.3"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8 14.5V7M5.8 9.2L8 7l2.2 2.2"
+                stroke="currentColor"
+                stroke-width="1.6"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        {/if}
         <button
           class="submit-btn"
           onclick={submit}
@@ -736,5 +784,21 @@
   .submit-btn.stop:hover {
     background: #7f1a3f;
     color: rgba(255, 255, 255, 0.75);
+  }
+  /* Cloud agent submit: crimson OUTLINED rather than solid, so it sits
+     beside the solid Send as a sibling action with a different destination.
+     Fills in on hover for the same press affordance. */
+  .submit-btn.cloud {
+    background: transparent;
+    color: #c8376a;
+    border: 1px solid #c8376a;
+    margin-right: 6px;
+  }
+  .submit-btn.cloud:hover:not(:disabled) {
+    background: #c8376a;
+    color: #fff;
+  }
+  .submit-btn.cloud:disabled {
+    opacity: 0.4;
   }
 </style>

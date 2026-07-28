@@ -625,7 +625,11 @@ export function createAiChatStore(
   async function send(
     text: string,
     mentions: AiChatStartParams['mentions'] = [],
-    opts: { fileChips?: Array<{ name: string; path: string }> } = {}
+    opts: {
+      fileChips?: Array<{ name: string; path: string }>
+      /** Route this turn to the cloud compose agent instead of ai-proxy. */
+      cloud?: boolean
+    } = {}
   ): Promise<void> {
     const m = getMessenger()
     if (!m || !text.trim()) return
@@ -818,6 +822,10 @@ export function createAiChatStore(
               apiBaseUrl: deploymentBinding.apiBaseUrl,
             }
           : {}),
+        // Cloud compose agent: the extension mints a per-turn token,
+        // uploads the workspace bundle, and streams the agent instead of
+        // ai-proxy. Rendering is identical (same AiChat* events).
+        ...(opts.cloud ? { cloudAgent: true } : {}),
       })
       // Attaching the active file is one-shot: once this turn's
       // <editor-context> is in flight, flip the toggle off so the
@@ -851,6 +859,20 @@ export function createAiChatStore(
     // for *this* conversation. Cards on other conversations keep their
     // pending state — the user may flip back to answer them.
     if (currentId) clearPendingQuestionFor(currentId)
+  }
+
+  /** Submit a turn to the cloud compose agent (legalese-compose-agent)
+   *  instead of streaming ai-proxy locally. Identical to {@link send}
+   *  except it sets the `cloudAgent` flag, which the extension acts on by
+   *  minting a per-turn token, uploading the workspace bundle, and mapping
+   *  the agent's SSE back onto the same AiChat* events. The conversation
+   *  renders identically. Behind the crimson-outlined cloud submit. */
+  async function sendCloud(
+    text: string,
+    mentions: AiChatStartParams['mentions'] = [],
+    opts: { fileChips?: Array<{ name: string; path: string }> } = {}
+  ): Promise<void> {
+    return send(text, mentions, { ...opts, cloud: true })
   }
 
   /** Drop any trailing assistant turns whose only outcome was an
@@ -2032,6 +2054,7 @@ export function createAiChatStore(
     newConversation,
     startDeploymentChat,
     send,
+    sendCloud,
     continueTurn,
     abort,
     usageSubscribe,
@@ -2134,6 +2157,14 @@ export type AiChatStore = {
     intendedUse?: string
   ) => void
   send: (
+    text: string,
+    mentions?: AiChatStartParams['mentions'],
+    opts?: {
+      fileChips?: Array<{ name: string; path: string }>
+      cloud?: boolean
+    }
+  ) => Promise<void>
+  sendCloud: (
     text: string,
     mentions?: AiChatStartParams['mentions'],
     opts?: { fileChips?: Array<{ name: string; path: string }> }
