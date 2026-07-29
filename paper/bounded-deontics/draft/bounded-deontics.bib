@@ -696,3 +696,52 @@
   srctag  = {Shannon 1938},
   status  = {standard}   % from Shannon's 1937 MIT master's thesis; the logic/circuits unification
 }
+
+% ---- van der Meyden: the transition-system home of free-choice permission ----
+% Same Ron van der Meyden (UNSW) as the SAFE smart-contract book below: one author
+% spans the classical transition-system reading of permission and the recent
+% executable-contract line closest to our SAFE facet.
+
+@article{vandermeyden1996,
+  author  = {Ron van der Meyden},
+  title   = {{The Dynamic Logic of Permission}},
+  journal = {Journal of Logic and Computation},
+  volume  = {6},
+  number  = {3},
+  pages   = {465--479},
+  year    = {1996},
+  doi     = {10.1093/logcom/6.3.465},
+  srctag  = {van der Meyden 1996},
+  status  = {verified}   % dblp + OUP: JLC 6(3):465-479. Process semantics: EXECUTIONS
+                         % (state-sequences), not states, are permitted; free-choice
+                         % permission vs permission-as-lack-of-prohibition; DLP is
+                         % EXPTIME-complete. NB: NOT goal-indexed -- do not conflate
+                         % with the Anderson/Meyer diamond-not-V reading.
+}
+
+@article{vandermeyden2005,
+  author  = {Ron van der Meyden},
+  title   = {{Reduction from {DLP} to {PDL}}},
+  journal = {Journal of Logic and Computation},
+  volume  = {15},
+  number  = {5},
+  pages   = {767--782},
+  year    = {2005},
+  doi     = {10.1093/logcom/exi044},
+  srctag  = {van der Meyden 2005},
+  status  = {verified}   % follow-up embedding DLP into propositional dynamic logic;
+                         % page range to confirm against OUP before camera-ready
+}
+
+@book{vandermeyden2025safe,
+  author    = {Ron van der Meyden and Michael J. Maher},
+  title     = {{Simple Agreement for Future Equity (SAFE): Smart Contracts for Venture Finance}},
+  series    = {Blockchain Technologies},
+  publisher = {Springer Nature Singapore},
+  year      = {2025},
+  isbn      = {9789819639199},
+  doi       = {10.1007/978-981-96-3920-5},
+  srctag    = {van der Meyden \& Maher 2025},
+  status    = {verified}   % Springer + Waterstones/Blackwell's: hardcover 2 Oct 2025;
+                           % legal-contract -> smart-contract case study of the YC SAFE
+}
