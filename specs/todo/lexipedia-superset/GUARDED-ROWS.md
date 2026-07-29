@@ -70,6 +70,15 @@ the enabling mechanism.
 
 ## 3. The IR
 
+> **Drift note (2026-07-29): the record below is the design, not the tree.** The shipped
+> `jl4-core/src/L4/Viz/GuardedRows.hs:48-56` has **three** fields, not four — there is no
+> `grScrutinee` (CONSIDER's subject is consumed into equality guards by `considerRows`), and
+> `grDisjoint` is a conservative **`Bool`**, not the `Disjointness`/`DisjointnessWitness` ADT
+> (`grep -rn DisjointnessWitness --include='*.hs'` is empty). The witness ADT remains a good
+> idea nothing implements; `INLINE-DMNMD-SPEC.md` names an inline table's declared hit policy
+> as the thing that would finally give it a consumer. Caught 2026-07-29 when that spec copied
+> this section as if it were code.
+
 One normalised form, deliberately carrying _rows_ rather than a boolean tree, because the DMN
 consumer needs the rows and the ladder consumer can derive its tree from them.
 
