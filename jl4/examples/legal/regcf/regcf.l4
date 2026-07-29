@@ -118,7 +118,7 @@ GIVETH A DATE
 GIVEN amendment IS A DATE
 GIVETH A BOOLEAN
 `the rules in force include` amendment MEANS
-    DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL amendment
+    `RULES EFFECTIVE DATE` AT LEAST amendment
 
 -- Ruling R2 (CORPUS-TRACK §8): below commencement there is no Reg CF to
 -- answer for, so a rule date before 2016-05-16 is a curated refusal, not an
@@ -136,13 +136,10 @@ ASSUME `no Regulation Crowdfunding figure exists before commencement on 2016-05-
 @ref 17 CFR 227.100(a)(1) — offering maximum — https://www.ecfr.gov/current/title-17/section-227.100
 GIVETH A NUMBER
 `offering maximum in a 12-month period` MEANS
-    IF   `the rules in force include` `the 2021 amendments`
-    THEN 5000000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 1070000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 1000000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2021 amendments`           THEN 5000000
+           IF ^                            `the 2017 inflation adjustment` THEN 1070000
+           IF ^                            `Reg CF commenced`              THEN 1000000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $100,000 as adopted; $107,000 from 2017-04-12 (82 FR 17545 instr. 5.b-c);
 -- $124,000 from 2022-09-20 (87 FR 57394 at 57398, instr. 2). Note: the 2022
@@ -151,77 +148,59 @@ GIVETH A NUMBER
 @ref 17 CFR 227.100(a)(2)(i)-(ii) — income/net-worth cut point — https://www.federalregister.gov/d/2022-19867
 GIVETH A NUMBER
 `income or net worth cut point` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 124000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 107000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 100000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 124000
+           IF ^                            `the 2017 inflation adjustment` THEN 107000
+           IF ^                            `Reg CF commenced`              THEN 100000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $2,000 as adopted; $2,200 from 2017-04-12; $2,500 from 2022-09-20.
 @ref 17 CFR 227.100(a)(2)(i) — investment floor
 GIVETH A NUMBER
 `minimum permitted investment` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 2500
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 2200
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 2000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 2500
+           IF ^                            `the 2017 inflation adjustment` THEN 2200
+           IF ^                            `Reg CF commenced`              THEN 2000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $100,000 as adopted; $107,000 from 2017-04-12; $124,000 from 2022-09-20
 -- (87 FR 57398 instr. 2.b, "removing the two references to $107,000").
 @ref 17 CFR 227.100(a)(2)(ii) — per-investor cap
 GIVETH A NUMBER
 `maximum amount sold to any one investor in a 12-month period` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 124000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 107000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 100000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 124000
+           IF ^                            `the 2017 inflation adjustment` THEN 107000
+           IF ^                            `Reg CF commenced`              THEN 100000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $100,000 as adopted; $107,000 from 2017-04-12 (82 FR 17545 instr. 6.a);
 -- $124,000 from 2022-09-20 (87 FR 57398 instr. 3.a).
 @ref 17 CFR 227.201(t)(1) — tier 1 ceiling
 GIVETH A NUMBER
 `tier 1 ceiling` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 124000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 107000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 100000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 124000
+           IF ^                            `the 2017 inflation adjustment` THEN 107000
+           IF ^                            `Reg CF commenced`              THEN 100000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $500,000 as adopted; $535,000 from 2017-04-12 (82 FR 17545 instr. 6.b);
 -- $618,000 from 2022-09-20 (87 FR 57398 instr. 3.b).
 @ref 17 CFR 227.201(t)(2) — tier 2 ceiling
 GIVETH A NUMBER
 `tier 2 ceiling` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 618000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 535000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 500000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 618000
+           IF ^                            `the 2017 inflation adjustment` THEN 535000
+           IF ^                            `Reg CF commenced`              THEN 500000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- $1,000,000 as adopted; $1,070,000 from 2017-04-12; $1,235,000 from
 -- 2022-09-20 (87 FR 57398 instr. 3.c).
 @ref 17 CFR 227.201(t)(3) — first-time-issuer review ceiling
 GIVETH A NUMBER
 `first-time issuer review ceiling` MEANS
-    IF   `the rules in force include` `the 2022 inflation adjustment`
-    THEN 1235000
-    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
-         THEN 1070000
-         ELSE IF   `the rules in force include` `Reg CF commenced`
-              THEN 1000000
-              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 1235000
+           IF ^                            `the 2017 inflation adjustment` THEN 1070000
+           IF ^                            `Reg CF commenced`              THEN 1000000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- Unchanged since adoption, 80 FR 71537 (Nov. 16, 2015), effective 2016-05-16.
 @ref 17 CFR 227.202(b)(2) — holders-of-record threshold, 300, effective 2016-05-16
@@ -401,11 +380,9 @@ DECLARE InvestorProfile HAS
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
 `the applicable measure of annual income or net worth` investor MEANS
-    IF   `the rules in force include` `the 2021 amendments`
-    THEN `greater of annual income or net worth` investor
-    ELSE IF   `the rules in force include` `Reg CF commenced`
-         THEN `lesser of annual income or net worth` investor
-         ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    BRANCH IF `the rules in force include` `the 2021 amendments` THEN `greater of annual income or net worth` investor
+           IF ^                            `Reg CF commenced`    THEN `lesser of annual income or net worth` investor
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
@@ -500,8 +477,8 @@ ASSUME `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled her
 @ref 85 FR 27116 (Rule 201(z)); 86 FR 3496 instr. 5 (Rule 201(bb))
 GIVETH A BOOLEAN
 `the rule date is inside the COVID-19 temporary rules window` MEANS
-        DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 4 5 2020)
-    AND DATE_SERIAL `RULES EFFECTIVE DATE` AT MOST  DATE_SERIAL (Date 28 8 2022)
+        `RULES EFFECTIVE DATE` AT LEAST Date 4 5 2020
+    AND `RULES EFFECTIVE DATE` AT MOST  Date 28 8 2022
 
 -- The three tiers of Rule 201(t), plus the first-time-issuer relief inside tier
 -- 3. That relief is BOUNDED: it runs out at the (t)(3) ceiling, above which
@@ -510,15 +487,11 @@ GIVETH A BOOLEAN
 GIVEN offering IS AN Offering
 GIVETH A FinancialStatementRequirement
 `financial statements required` offering MEANS
-    IF   `the COVID-19 temporary relief could change this answer`
-    THEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
-    ELSE IF   `aggregate` AT MOST `tier 1 ceiling`
-         THEN `financial statements certified by the principal executive officer, with tax return information`
-         ELSE IF   `aggregate` AT MOST `tier 2 ceiling`
-              THEN `financial statements reviewed by an independent public accountant`
-              ELSE IF   `first-time issuer relief applies`
-                   THEN `financial statements reviewed by an independent public accountant`
-                   ELSE `financial statements audited by an independent public accountant`
+    BRANCH IF `the COVID-19 temporary relief could change this answer` THEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+           IF `aggregate` AT MOST `tier 1 ceiling`                     THEN `financial statements certified by the principal executive officer, with tax return information`
+           IF `aggregate` AT MOST `tier 2 ceiling`                     THEN `financial statements reviewed by an independent public accountant`
+           IF `first-time issuer relief applies`                       THEN `financial statements reviewed by an independent public accountant`
+           OTHERWISE `financial statements audited by an independent public accountant`
     WHERE
         `aggregate` MEANS `aggregate offering amount` offering
         `first-time issuer relief applies` MEANS
@@ -1167,13 +1140,13 @@ GIVETH A BOOLEAN
 `W offering` MEANS `an offering of` 0 3000000 FALSE
 
 `W within the limit in 2016` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 9 2016)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) (`offering is within the offering limit` `W offering`)
 
 `W within the limit in 2021 January` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 1 2021)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 1 2021) (`offering is within the offering limit` `W offering`)
 
 `W within the limit in 2021 June` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`offering is within the offering limit` `W offering`)
 
 #ASSERT NOT `W within the limit in 2016`
 #ASSERT NOT `W within the limit in 2021 January`
@@ -1181,10 +1154,10 @@ GIVETH A BOOLEAN
 
 -- The 2017-04-12 boundary itself, one day either side.
 `the cut point the day before the 2017 adjustment` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 11 4 2017)) `income or net worth cut point`
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 11 4 2017) `income or net worth cut point`
 
 `the cut point on the day of the 2017 adjustment` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 12 4 2017)) `income or net worth cut point`
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 12 4 2017) `income or net worth cut point`
 
 #ASSERT `the cut point the day before the 2017 adjustment` EQUALS 100000
 #ASSERT `the cut point on the day of the 2017 adjustment`  EQUALS 107000
@@ -1198,10 +1171,10 @@ GIVETH A BOOLEAN
 `I-3 investor` MEANS `an investor with` FALSE 110000 115000 0
 
 `I-3 limit under the 2022 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-3 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2022) (`investment limit` `I-3 investor`)
 
 `I-3 limit under the 2023 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`investment limit` `I-3 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`investment limit` `I-3 investor`)
 
 #ASSERT `I-3 limit under the 2022 rules` EQUALS 11500
 #ASSERT `I-3 limit under the 2023 rules` EQUALS 5750
@@ -1213,7 +1186,7 @@ GIVETH A BOOLEAN
 `I-4 investor` MEANS `an investor with` FALSE 1240000 1240000 0
 
 `I-4 limit under the 2022 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-4 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2022) (`investment limit` `I-4 investor`)
 
 #ASSERT `I-4 limit under the 2022 rules` EQUALS 107000
 
@@ -1221,7 +1194,7 @@ GIVETH A BOOLEAN
 -- worth) promised this row: under the pre-2021 "lesser of" rule the same
 -- investor was limited to 5% of $60,000 = $3,000, not 5% of $200,000.
 `the percentage case under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investment limit` (`an investor with` FALSE 60000 200000 0))
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`investment limit` (`an investor with` FALSE 60000 200000 0))
 
 #ASSERT `the percentage case under the 2019 rules` EQUALS 3000
 
@@ -1232,10 +1205,10 @@ GIVETH A BOOLEAN
 `A investor` MEANS `an investor with` TRUE 1000000 1000000 200000
 
 `A is within the limit under the 2021 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`investor is within the investment limit` `A investor` 1)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`investor is within the investment limit` `A investor` 1)
 
 `A is within the limit under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investor is within the investment limit` `A investor` 1)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`investor is within the investment limit` `A investor` 1)
 
 #ASSERT     `A is within the limit under the 2021 rules`
 #ASSERT NOT `A is within the limit under the 2019 rules`
@@ -1245,10 +1218,10 @@ GIVETH A BOOLEAN
 `F offering` MEANS `an offering of` 0 550000 TRUE
 
 `F requirement under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`financial statements required` `F offering`)
 
 `F requirement under the 2023 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`financial statements required` `F offering`)
 
 #ASSERT `F requirement under the 2019 rules` EQUALS `audited`
 #ASSERT `F requirement under the 2023 rules` EQUALS `reviewed`
@@ -1259,10 +1232,10 @@ GIVETH A BOOLEAN
 -- a $550,000 offering is above the $250,000 relief band, so the ordinary
 -- tiers answer too. (A question INSIDE the band refuses; see README §5.)
 `a small offering inside the COVID window` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` (`an offering of` 0 100000 FALSE))
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`financial statements required` (`an offering of` 0 100000 FALSE))
 
 `a large offering inside the COVID window` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`financial statements required` `F offering`)
 
 #ASSERT `a small offering inside the COVID window` EQUALS `certified`
 #ASSERT `a large offering inside the COVID window` EQUALS `audited`

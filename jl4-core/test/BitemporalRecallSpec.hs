@@ -111,7 +111,7 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
 
     it "RECORD inside EVAL UNDER VALID TIME stamps the asserted valid-from" $ do
       [res] <- runDirectives
-        "#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2023)) (RECORD `dated` IS 7)\n"
+        "#EVAL `EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2023) (RECORD `dated` IS 7)\n"
       case provsFor ["dated"] (anonLedger res.ledger) of
         [pv] -> do
           pv.txTime `shouldBe` fixedNow
@@ -120,7 +120,7 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
 
     it "tx-IMMUNITY: RECORD inside EVAL AS OF SYSTEM TIME still stamps the root clock" $ do
       [res] <- runDirectives
-        "#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (RECORD `immune` IS 2)\n"
+        "#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (RECORD `immune` IS 2)\n"
       case provsFor ["immune"] (anonLedger res.ledger) of
         [pv] -> do
           -- the audit invariant: AS OF scopes reads, never writes
@@ -130,7 +130,7 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
 
     it "nested clauses: vt from the valid-time clause, tx still the root clock" $ do
       [res] <- runDirectives
-        "#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 5 5 2021)) (RECORD `both` IS 3))\n"
+        "#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 5 5 2021) (RECORD `both` IS 3))\n"
       case provsFor ["both"] (anonLedger res.ledger) of
         [pv] -> do
           pv.txTime `shouldBe` fixedNow
@@ -141,7 +141,7 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
       -- The valid-time clause wraps only the VALUE of the outer RECORD; by the
       -- time the outer write itself fires, the override has been restored.
       [res] <- runDirectives
-        "#EVAL RECORD `outer` IS (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2023)) (RECORD `inner` IS 7))\n"
+        "#EVAL RECORD `outer` IS (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2023) (RECORD `inner` IS 7))\n"
       case (provsFor ["inner"] (anonLedger res.ledger), provsFor ["outer"] (anonLedger res.ledger)) of
         ([inner], [outer]) -> do
           inner.vtFrom `shouldBe` Just (d 2023 1 1)
@@ -164,9 +164,9 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
           , "  WITHIN 100"
           , "  HENCE RECORD `x` IS 7"
           , "        HENCE RECORD `rbBare` IS (RECALL `x`)"
-          , "              HENCE RECORD `rbCovered` IS (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 6 2026)) (RECALL `x`))"
-          , "                    HENCE RECORD `rbEarly` IS (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 6 2022)) (RECALL `x`))"
-          , "                          HENCE RECORD `rbAsOfPast` IS (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (RECALL `x`))"
+          , "              HENCE RECORD `rbCovered` IS (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2026) (RECALL `x`))"
+          , "                    HENCE RECORD `rbEarly` IS (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2022) (RECALL `x`))"
+          , "                          HENCE RECORD `rbAsOfPast` IS (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (RECALL `x`))"
           , "                                HENCE COMMIT `done` IS FULFILLED"
           , ""
           , "#TRACE scenario AT 0 WITH"
@@ -210,7 +210,7 @@ spec = describe "bitemporal stamping + context-sensitive RECALL (#914 §2A/§2B)
           , "  MUST act"
           , "  WITHIN 100"
           , "  HENCE RECORD `x` IS 7"
-          , "        HENCE RECORD `rbScoped` IS (`EVAL UNDER VALID TIME` (DATE_SERIAL (DATE_FROM_DMY 1 6 2022)) `shared read`)"
+          , "        HENCE RECORD `rbScoped` IS (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2022) `shared read`)"
           , "              HENCE RECORD `rbBareShared` IS `shared read`"
           , "                    HENCE COMMIT `done` IS FULFILLED"
           , ""

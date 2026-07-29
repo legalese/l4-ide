@@ -587,7 +587,7 @@ GIVEN `rule date` IS A DATE @desc Apply the rules as they stood on this date —
       facts IS AN InvestorFacts @desc Your income, your net worth, and what you have already invested under Regulation Crowdfunding
 GIVETH A NUMBER
 `investment limit under the rules effective on` `rule date` facts MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL `rule date`)
+    `EVAL UNDER RULES EFFECTIVE AT` `rule date`
         (`investment limit` (`investor profile from` facts))
 
 @export Check whether securities bought through SEC Regulation Crowdfunding may be transferred yet, and if not, how much longer the restriction runs.

@@ -149,501 +149,501 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_the_2022_inflation_adjustment  (main.l4:116:39-53)
       `the 2022 inflation adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_rules_in_force_include  (main.l4:121:5-70)
+  [D-LITERALEXPR] blocking — decision_the_rules_in_force_include  (main.l4:121:5-46)
       `the rules in force include` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_holders_of_record_threshold  (main.l4:229:37-40)
+  [D-LITERALEXPR] blocking — decision_holders_of_record_threshold  (main.l4:208:37-40)
       `holders of record threshold` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_total_assets_threshold  (main.l4:234:32-40)
+  [D-LITERALEXPR] blocking — decision_total_assets_threshold  (main.l4:213:32-40)
       `total assets threshold` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_minimum_days_publicly_available_before_any_sale  (main.l4:240:57-59)
+  [D-LITERALEXPR] blocking — decision_minimum_days_publicly_available_before_any_sale  (main.l4:219:57-59)
       `minimum days publicly available before any sale` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_days_to_file_the_annual_report_after_fiscal_year_end  (main.l4:244:62-65)
+  [D-LITERALEXPR] blocking — decision_days_to_file_the_annual_report_after_fiscal_year_end  (main.l4:223:62-65)
       `days to file the annual report after fiscal year end` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_business_days_to_file_form_c_tr  (main.l4:248:41-42)
+  [D-LITERALEXPR] blocking — decision_business_days_to_file_form_c_tr  (main.l4:227:41-42)
       `business days to file Form C-TR` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_business_days_to_file_a_progress_update  (main.l4:252:49-50)
+  [D-LITERALEXPR] blocking — decision_business_days_to_file_a_progress_update  (main.l4:231:49-50)
       `business days to file a progress update` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_days_in_the_resale_restricted_period  (main.l4:259:46-49)
+  [D-LITERALEXPR] blocking — decision_days_in_the_resale_restricted_period  (main.l4:238:46-49)
       `days in the resale restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_1_not_organized_under_state_or_territorial_law  (main.l4:281:9-282:141)
+  [D-LITERALEXPR] blocking — decision_b_1_not_organized_under_state_or_territorial_law  (main.l4:260:9-261:141)
       `(b)(1) — not organized under State or territorial law` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_2_an_exchange_act_reporting_company  (main.l4:288:9-289:125)
+  [D-LITERALEXPR] blocking — decision_b_2_an_exchange_act_reporting_company  (main.l4:267:9-268:125)
       `(b)(2) — an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_3_an_investment_company  (main.l4:295:9-296:134)
+  [D-LITERALEXPR] blocking — decision_b_3_an_investment_company  (main.l4:274:9-275:134)
       `(b)(3) — an investment company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_4_subject_to_a_bad_actor_disqualification  (main.l4:302:9-303:87)
+  [D-LITERALEXPR] blocking — decision_b_4_subject_to_a_bad_actor_disqualification  (main.l4:281:9-282:87)
       `(b)(4) — subject to a bad-actor disqualification` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_5_delinquent_in_ongoing_annual_reports  (main.l4:311:9-312:204)
+  [D-LITERALEXPR] blocking — decision_b_5_delinquent_in_ongoing_annual_reports  (main.l4:290:9-291:204)
       `(b)(5) — delinquent in ongoing annual reports` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan  (main.l4:318:9-319:172)
+  [D-LITERALEXPR] blocking — decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan  (main.l4:297:9-298:172)
       `(b)(6) — no specific business plan, or a blank-check business plan` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_issuer_is_excluded_by_rule_100_b  (main.l4:325:9-331:84)
+  [D-LITERALEXPR] blocking — decision_issuer_is_excluded_by_rule_100_b  (main.l4:304:9-310:84)
       `issuer is excluded by Rule 100(b)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_issuer_is_eligible  (main.l4:337:5-51)
+  [D-LITERALEXPR] blocking — decision_issuer_is_eligible  (main.l4:316:5-51)
       `issuer is eligible` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_aggregate_offering_amount  (main.l4:357:9-358:69)
+  [D-LITERALEXPR] blocking — decision_aggregate_offering_amount  (main.l4:336:9-337:69)
       `aggregate offering amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_offering_is_within_the_offering_limit  (main.l4:368:9-369:93)
+  [D-LITERALEXPR] blocking — decision_offering_is_within_the_offering_limit  (main.l4:347:9-348:93)
       `offering is within the offering limit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_either_annual_income_or_net_worth_is_less_than_the_cut_point  (main.l4:432:8-433:76)
+  [D-LITERALEXPR] blocking — decision_either_annual_income_or_net_worth_is_less_than_the_cut_point  (main.l4:409:8-410:76)
       `either annual income or net worth is less than the cut point` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_aggregate_amount_sold_to_this_investor_including_this_transaction  (main.l4:455:9-456:49)
+  [D-LITERALEXPR] blocking — decision_aggregate_amount_sold_to_this_investor_including_this_transaction  (main.l4:432:9-433:49)
       `aggregate amount sold to this investor including this transaction` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_accredited_investor_carve_out_applies_to  (main.l4:467:9-468:70)
+  [D-LITERALEXPR] blocking — decision_the_accredited_investor_carve_out_applies_to  (main.l4:444:9-445:70)
       `the accredited-investor carve-out applies to` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_investor_is_within_the_investment_limit  (main.l4:475:9-478:44)
+  [D-LITERALEXPR] blocking — decision_investor_is_within_the_investment_limit  (main.l4:452:9-455:44)
       `investor is within the investment limit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window  (main.l4:503:9-504:81)
+  [D-LITERALEXPR] blocking — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window  (main.l4:480:9-481:55)
       `the rule date is inside the COVID-19 temporary rules window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_financial_statement_requirement_is_satisfied  (main.l4:550:9-551:74)
+  [D-LITERALEXPR] blocking — decision_financial_statement_requirement_is_satisfied  (main.l4:523:9-524:74)
       `financial statement requirement is satisfied` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_disclosure_requirements_are_met  (main.l4:567:9-570:111)
+  [D-LITERALEXPR] blocking — decision_disclosure_requirements_are_met  (main.l4:540:9-543:111)
       `disclosure requirements are met` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_3_conducted_through_a_single_complying_intermediary  (main.l4:587:9-591:88)
+  [D-LITERALEXPR] blocking — decision_a_3_conducted_through_a_single_complying_intermediary  (main.l4:560:9-564:88)
       `(a)(3) — conducted through a single complying intermediary` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_21_day_public_availability_period_has_run  (main.l4:597:9-599:67)
+  [D-LITERALEXPR] blocking — decision_the_21_day_public_availability_period_has_run  (main.l4:570:9-572:67)
       `the 21-day public availability period has run` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_intermediary_has_discharged_its_investor_facing_duties  (main.l4:605:9-608:137)
+  [D-LITERALEXPR] blocking — decision_the_intermediary_has_discharged_its_investor_facing_duties  (main.l4:578:9-581:137)
       `the intermediary has discharged its investor-facing duties` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_intermediary_obligations_are_met  (main.l4:614:9-616:81)
+  [D-LITERALEXPR] blocking — decision_intermediary_obligations_are_met  (main.l4:587:9-589:81)
       `intermediary obligations are met` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_notice_complies_with_rule_204_b  (main.l4:636:9-641:87)
+  [D-LITERALEXPR] blocking — decision_notice_complies_with_rule_204_b  (main.l4:609:9-614:87)
       `notice complies with Rule 204(b)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_definition_terms_of_the_offering  (main.l4:646:9-647:13)
+  [D-LITERALEXPR] blocking — decision_definition_terms_of_the_offering  (main.l4:619:9-620:13)
       `definition — terms of the offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_advertising_restriction  (main.l4:667:5-669:66)
+  [D-LITERALEXPR] blocking — decision_advertising_restriction  (main.l4:640:5-642:66)
       `advertising restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:686:9-687:115)
+  [D-LITERALEXPR] blocking — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:659:9-660:115)
       `(b)(1) — became an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:693:9-695:77)
+  [D-LITERALEXPR] blocking — decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record  (main.l4:666:9-668:77)
       `(b)(2) — one annual report filed and fewer than 300 holders of record` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:701:9-703:65)
+  [D-LITERALEXPR] blocking — decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000  (main.l4:674:9-676:65)
       `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_4_all_securities_repurchased  (main.l4:709:9-710:123)
+  [D-LITERALEXPR] blocking — decision_b_4_all_securities_repurchased  (main.l4:682:9-683:123)
       `(b)(4) — all securities repurchased` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_b_5_liquidated_or_dissolved  (main.l4:716:9-717:100)
+  [D-LITERALEXPR] blocking — decision_b_5_liquidated_or_dissolved  (main.l4:689:9-690:100)
       `(b)(5) — liquidated or dissolved` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation_may_terminate  (main.l4:723:9-728:50)
+  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation_may_terminate  (main.l4:696:9-701:50)
       `ongoing reporting obligation may terminate` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation  (main.l4:740:5-745:84)
+  [D-LITERALEXPR] blocking — decision_ongoing_reporting_obligation  (main.l4:713:5-718:84)
       `ongoing reporting obligation` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:767:9-768:108)
+  [D-LITERALEXPR] blocking — decision_transfer_is_within_the_one_year_restricted_period  (main.l4:740:9-741:108)
       `transfer is within the one-year restricted period` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:774:9-782:313)
+  [D-LITERALEXPR] blocking — decision_transfer_falls_within_an_exception_in_rule_501_a  (main.l4:747:9-755:313)
       `transfer falls within an exception in Rule 501(a)` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_transfer_is_permitted  (main.l4:788:8-789:68)
+  [D-LITERALEXPR] blocking — decision_transfer_is_permitted  (main.l4:761:8-762:68)
       `transfer is permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_resale_restriction  (main.l4:795:5-797:103)
+  [D-LITERALEXPR] blocking — decision_resale_restriction  (main.l4:768:5-770:103)
       `resale restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:816:9-821:58)
+  [D-LITERALEXPR] blocking — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:789:9-794:58)
       `the transaction qualifies for the section 4(a)(6) exemption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_clean_issuer  (main.l4:827:24-834:168)
+  [D-LITERALEXPR] blocking — decision_a_clean_issuer  (main.l4:800:24-807:168)
       `a clean issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_foreign_issuer  (main.l4:836:26-843:168)
+  [D-LITERALEXPR] blocking — decision_a_foreign_issuer  (main.l4:809:26-816:168)
       `a foreign issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_delinquent_issuer  (main.l4:847:29-854:168)
+  [D-LITERALEXPR] blocking — decision_a_delinquent_issuer  (main.l4:820:29-827:168)
       `a delinquent issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_blank_check_issuer  (main.l4:856:30-863:167)
+  [D-LITERALEXPR] blocking — decision_a_blank_check_issuer  (main.l4:829:30-836:167)
       `a blank-check issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_offering_of  (main.l4:869:66-873:111)
+  [D-LITERALEXPR] blocking — decision_an_offering_of  (main.l4:842:66-846:111)
       `an offering of` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_investor_with  (main.l4:880:66-885:147)
+  [D-LITERALEXPR] blocking — decision_an_investor_with  (main.l4:853:66-858:147)
       `an investor with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_arrangement_with  (main.l4:890:63-896:135)
+  [D-LITERALEXPR] blocking — decision_an_arrangement_with  (main.l4:863:63-869:135)
       `an arrangement with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_reporting_status_with  (main.l4:902:69-908:112)
+  [D-LITERALEXPR] blocking — decision_a_reporting_status_with  (main.l4:875:69-881:112)
       `a reporting status with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_transfer_at  (main.l4:913:58-918:307)
+  [D-LITERALEXPR] blocking — decision_a_transfer_at  (main.l4:886:58-891:307)
       `a transfer at` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_certified  (main.l4:985:19-115)
+  [D-LITERALEXPR] blocking — decision_certified  (main.l4:958:19-115)
       `certified` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_reviewed  (main.l4:988:18-85)
+  [D-LITERALEXPR] blocking — decision_reviewed  (main.l4:961:18-85)
       `reviewed` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_audited  (main.l4:991:17-83)
+  [D-LITERALEXPR] blocking — decision_audited  (main.l4:964:17-83)
       `audited` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_conforming_notice  (main.l4:1024:29-1029:167)
+  [D-LITERALEXPR] blocking — decision_a_conforming_notice  (main.l4:997:29-1002:167)
       `a conforming notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_overreaching_notice  (main.l4:1031:32-1036:166)
+  [D-LITERALEXPR] blocking — decision_an_overreaching_notice  (main.l4:1004:32-1009:166)
       `an overreaching notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_notice_with_no_platform_link  (main.l4:1038:40-1043:167)
+  [D-LITERALEXPR] blocking — decision_a_notice_with_no_platform_link  (main.l4:1011:40-1016:167)
       `a notice with no platform link` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_conforming_filing  (main.l4:1109:29-1112:176)
+  [D-LITERALEXPR] blocking — decision_a_conforming_filing  (main.l4:1082:29-1085:176)
       `a conforming filing` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_base_case_qualifies  (main.l4:1119:5-1121:59)
+  [D-LITERALEXPR] blocking — decision_the_base_case_qualifies  (main.l4:1092:5-1094:59)
       `the base case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_delinquent_issuer_case_qualifies  (main.l4:1126:5-1128:59)
+  [D-LITERALEXPR] blocking — decision_the_delinquent_issuer_case_qualifies  (main.l4:1099:5-1101:59)
       `the delinquent-issuer case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_over_limit_investor_case_qualifies  (main.l4:1132:5-1134:59)
+  [D-LITERALEXPR] blocking — decision_the_over_limit_investor_case_qualifies  (main.l4:1105:5-1107:59)
       `the over-limit-investor case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_short_availability_case_qualifies  (main.l4:1138:5-1140:59)
+  [D-LITERALEXPR] blocking — decision_the_short_availability_case_qualifies  (main.l4:1111:5-1113:59)
       `the short-availability case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_under_assured_financials_case_qualifies  (main.l4:1145:5-1147:59)
+  [D-LITERALEXPR] blocking — decision_the_under_assured_financials_case_qualifies  (main.l4:1118:5-1120:59)
       `the under-assured-financials case qualifies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_offering  (main.l4:1167:20-52)
+  [D-LITERALEXPR] blocking — decision_w_offering  (main.l4:1140:20-52)
       `W offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2016  (main.l4:1170:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2016  (main.l4:1143:5-107)
       `W within the limit in 2016` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1173:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1146:5-107)
       `W within the limit in 2021 January` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1176:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1149:5-107)
       `W within the limit in 2021 June` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1184:5-99)
+  [D-LITERALEXPR] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1157:5-85)
       `the cut point the day before the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1187:5-99)
+  [D-LITERALEXPR] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1160:5-85)
       `the cut point on the day of the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_3_investor  (main.l4:1198:22-62)
+  [D-LITERALEXPR] blocking — decision_i_3_investor  (main.l4:1171:22-62)
       `I-3 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1201:5-102)
+  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1174:5-88)
       `I-3 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1204:5-102)
+  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1177:5-88)
       `I-3 limit under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_4_investor  (main.l4:1213:22-64)
+  [D-LITERALEXPR] blocking — decision_i_4_investor  (main.l4:1186:22-64)
       `I-4 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1216:5-102)
+  [D-LITERALEXPR] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1189:5-88)
       `I-4 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1224:5-129)
+  [D-LITERALEXPR] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1197:5-115)
       `the percentage case under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_investor  (main.l4:1232:20-66)
+  [D-LITERALEXPR] blocking — decision_a_investor  (main.l4:1205:20-66)
       `A investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1235:5-125)
+  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1208:5-111)
       `A is within the limit under the 2021 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1238:5-125)
+  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1211:5-111)
       `A is within the limit under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_f_offering  (main.l4:1245:20-50)
+  [D-LITERALEXPR] blocking — decision_f_offering  (main.l4:1218:20-50)
       `F offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1248:5-113)
+  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1221:5-99)
       `F requirement under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1251:5-113)
+  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1224:5-99)
       `F requirement under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1262:5-134)
+  [D-LITERALEXPR] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1235:5-120)
       `a small offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1265:5-113)
+  [D-LITERALEXPR] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1238:5-99)
       `a large offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:139:10-60)
+  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:139:15-65)
       the guard ``the rules in force include` OF `the 2021 amendments`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:141:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:140:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:143:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:141:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:139:10-60)
+  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:139:15-65)
       the input expression ``the rules in force include` OF `the 2021 amendments`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:141:15-75)
+  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:140:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:143:20-67)
+  [D-NONFEELINPUT] blocking — decision_offering_maximum_in_a_12_month_period  (main.l4:141:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:139:10-60)
+  [D-ORDERDEPENDENT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:139:15-65)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:145:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:142:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:154:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:151:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:156:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:152:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:158:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_income_or_net_worth_cut_point  (main.l4:153:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:154:10-70)
+  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:151:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:156:15-75)
+  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:152:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:158:20-67)
+  [D-NONFEELINPUT] blocking — decision_income_or_net_worth_cut_point  (main.l4:153:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_income_or_net_worth_cut_point  (main.l4:154:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_income_or_net_worth_cut_point  (main.l4:151:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_income_or_net_worth_cut_point  (main.l4:160:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_income_or_net_worth_cut_point  (main.l4:154:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:166:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:160:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:168:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:161:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:170:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_minimum_permitted_investment  (main.l4:162:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:166:10-70)
+  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:160:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:168:15-75)
+  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:161:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:170:20-67)
+  [D-NONFEELINPUT] blocking — decision_minimum_permitted_investment  (main.l4:162:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_minimum_permitted_investment  (main.l4:166:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_minimum_permitted_investment  (main.l4:160:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_minimum_permitted_investment  (main.l4:172:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_minimum_permitted_investment  (main.l4:163:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:179:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:170:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:181:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:171:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:183:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:172:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:179:10-70)
+  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:170:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:181:15-75)
+  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:171:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:183:20-67)
+  [D-NONFEELINPUT] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:172:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:179:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:170:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:185:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period  (main.l4:173:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:192:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:180:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:194:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:181:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:196:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_1_ceiling  (main.l4:182:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:192:10-70)
+  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:180:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:194:15-75)
+  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:181:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:196:20-67)
+  [D-NONFEELINPUT] blocking — decision_tier_1_ceiling  (main.l4:182:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_tier_1_ceiling  (main.l4:192:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_tier_1_ceiling  (main.l4:180:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_tier_1_ceiling  (main.l4:198:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_tier_1_ceiling  (main.l4:183:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:205:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:190:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:207:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:191:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:209:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_tier_2_ceiling  (main.l4:192:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:205:10-70)
+  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:190:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:207:15-75)
+  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:191:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:209:20-67)
+  [D-NONFEELINPUT] blocking — decision_tier_2_ceiling  (main.l4:192:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_tier_2_ceiling  (main.l4:205:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_tier_2_ceiling  (main.l4:190:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_tier_2_ceiling  (main.l4:211:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_tier_2_ceiling  (main.l4:193:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:218:10-70)
+  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:200:15-75)
       the guard ``the rules in force include` OF `the 2022 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:220:15-75)
+  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:201:15-75)
       the guard ``the rules in force include` OF `the 2017 inflation adjustment`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:222:20-67)
+  [D-UNDECOMPOSABLE] advisory — decision_first_time_issuer_review_ceiling  (main.l4:202:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:218:10-70)
+  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:200:15-75)
       the input expression ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:220:15-75)
+  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:201:15-75)
       the input expression ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:222:20-67)
+  [D-NONFEELINPUT] blocking — decision_first_time_issuer_review_ceiling  (main.l4:202:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_first_time_issuer_review_ceiling  (main.l4:218:10-70)
+  [D-ORDERDEPENDENT] advisory — decision_first_time_issuer_review_ceiling  (main.l4:200:15-75)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_first_time_issuer_review_ceiling  (main.l4:224:20-96)
+  [D-COMPUTEDOUTPUT] advisory — decision_first_time_issuer_review_ceiling  (main.l4:203:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:404:10-60)
+  [D-UNDECOMPOSABLE] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:383:15-65)
       the guard ``the rules in force include` OF `the 2021 amendments`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:406:15-62)
+  [D-UNDECOMPOSABLE] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:384:15-62)
       the guard ``the rules in force include` OF `Reg CF commenced`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:404:10-60)
+  [D-NONFEELINPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:383:15-65)
       the input expression ``the rules in force include` OF `the 2021 amendments`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:406:15-62)
+  [D-NONFEELINPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:384:15-62)
       the input expression ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:404:10-60)
+  [D-ORDERDEPENDENT] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:383:15-65)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-NONFEELOUTPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:405:10-58)
+  [D-NONFEELOUTPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:383:71-119)
       the output entry ``greater of annual income or net worth` OF investor` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
       lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
-  [D-NONFEELOUTPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:407:15-62)
+  [D-NONFEELOUTPUT] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:384:71-118)
       the output entry ``lesser of annual income or net worth` OF investor` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
       lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
-  [D-COMPUTEDOUTPUT] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:408:15-91)
+  [D-COMPUTEDOUTPUT] advisory — decision_the_applicable_measure_of_annual_income_or_net_worth  (main.l4:385:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-UNDECOMPOSABLE] advisory — decision_investment_limit  (main.l4:439:10-81)
+  [D-UNDECOMPOSABLE] advisory — decision_investment_limit  (main.l4:416:10-81)
       the guard ``either annual income or net worth is less than the cut point` OF investor` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_investment_limit  (main.l4:439:10-81)
+  [D-NONFEELINPUT] blocking — decision_investment_limit  (main.l4:416:10-81)
       the input expression ``either annual income or net worth is less than the cut point` OF investor` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:440:10-442:44)
+  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:417:10-419:44)
       the output entry `IF (`minimum permitted investment` AT LEAST (0.05 TIMES (`the applicable measure of annual income or net worth` OF investor))) THEN `minimum permitted investment` ELSE (0.05 TIMES (`the applicable measure of annual income or net worth` OF investor))` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
       lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
-  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:443:10-445:77)
+  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:420:10-422:77)
       the output entry `IF ((0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) AT MOST `maximum amount sold to any one investor in a 12-month period`) THEN (0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) ELSE `maximum amount sold to any one investor in a 12-month period`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
       lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
-  [D-INLINEDLOCAL] advisory — decision_investment_limit  (main.l4:439:10-81)
+  [D-INLINEDLOCAL] advisory — decision_investment_limit  (main.l4:416:10-81)
       the WHERE/LET local(s) `five percent of the measure`, `ten percent of the measure` were inlined into the cells that used them; DMN has no lexically scoped intermediate value
       lost: the name the drafter gave the intermediate quantity
-  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:529:17-530:16)
+  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:502:17-503:16)
       the guard `(`aggregate offering amount` OF offering) GREATER THAN `tier 1 ceiling`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:515:15-51)
+  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:491:15-51)
       the guard `(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:517:20-56)
+  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:492:15-51)
       the guard `(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:526:17-71)
+  [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:499:17-71)
       the guard `(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:529:17-530:16)
+  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:502:17-503:16)
       the input expression `(`aggregate offering amount` OF offering) GREATER THAN `tier 1 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:523:27-63)
+  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:496:27-63)
       the input expression ``aggregate offering amount` OF offering` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:515:15-51)
+  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:491:15-51)
       the input expression `(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:517:20-56)
+  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:492:15-51)
       the input expression `(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:526:17-71)
+  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:499:17-71)
       the input expression `(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
       lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-ORDERDEPENDENT] advisory — decision_financial_statements_required  (main.l4:528:17-530:43)
+  [D-ORDERDEPENDENT] advisory — decision_financial_statements_required  (main.l4:501:17-503:43)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it
-  [D-COMPUTEDOUTPUT] advisory — decision_financial_statements_required  (main.l4:514:10-85)
+  [D-COMPUTEDOUTPUT] advisory — decision_financial_statements_required  (main.l4:490:77-152)
       the output entry `the_COVID_19_temporary_rules_Rule_201_z_and_bb_are_not_modelled_here` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
-  [D-INLINEDLOCAL] advisory — decision_financial_statements_required  (main.l4:528:17-530:43)
+  [D-INLINEDLOCAL] advisory — decision_financial_statements_required  (main.l4:501:17-503:43)
       the WHERE/LET local(s) `aggregate`, `first-time issuer relief applies`, `the COVID-19 temporary relief could change this answer` were inlined into the cells that used them; DMN has no lexically scoped intermediate value
       lost: the name the drafter gave the intermediate quantity

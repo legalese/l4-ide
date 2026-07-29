@@ -29,23 +29,23 @@ GIVETH A NUMBER
 `GST payable on` amount MEANS amount TIMES `GST rate` DIVIDED BY 100
 
 -- expected: 7 — same predicate, OLD rule-version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
 
 -- expected: 9 — same predicate, NEW rule-version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) `GST rate`
 
 -- expected: 7 — flips BACK under the old version (WHNFWhen cache
 -- revalidation across context switches, not staleness)
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
 
 -- expected: 9 — ambient: axis unset, fallback = localized today 2025-01-31
 #EVAL `GST rate`
 
 -- expected: 70 — composes through a dependent rule (old version)
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`GST payable on` 1000)
 
 -- expected: 90 — dependent rule under the new version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) (`GST payable on` 1000)
 
 -- expected: 7 — VALUE AT's per-day UnderRulesEffectiveAt stamp is load-bearing
 #EVAL `VALUE AT` (Date 1 6 2023) (GIVEN d YIELD `GST rate`)

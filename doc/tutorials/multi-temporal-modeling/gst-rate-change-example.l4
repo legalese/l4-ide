@@ -33,16 +33,16 @@ GIVETH A NUMBER
 
 -- expected: 7 -- old law, regardless of when this is run or what the
 -- facts say
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
 
 -- expected: 9 -- new law
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) `GST rate`
 
 -- expected: 70 -- composes through a dependent rule, old version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`GST payable on` 1000)
 
 -- expected: 90 -- dependent rule, new version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) (`GST payable on` 1000)
 
 § `Step 3 -- the default: law-time tracks fact-time`
 
@@ -52,10 +52,10 @@ GIVETH A NUMBER
 -- (apply the law that was in force when the facts occurred).
 --
 -- expected: 7
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) `GST rate`
+#EVAL `EVAL UNDER VALID TIME` (Date 1 6 2019) `GST rate`
 
 -- expected: 9 -- facts pinned to 2024 instead: new regime
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+#EVAL `EVAL UNDER VALID TIME` (Date 1 7 2024) `GST rate`
 
 § `Step 4 -- an explicit rule-version pin overrides fact-time`
 
@@ -66,7 +66,7 @@ GIVETH A NUMBER
 -- audit of what an old ruling would look like restated in code.
 --
 -- expected: 7
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) (`EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) `GST rate`)
+#EVAL `EVAL UNDER VALID TIME` (Date 1 7 2024) (`EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) `GST rate`)
 
 § `Step 5 -- TODAY is independent of valid time and rule-effective time`
 
@@ -76,7 +76,7 @@ GIVETH A NUMBER
 -- whenever you evaluated a rule about a past fact.
 --
 -- Same result with or without a valid-time override: TODAY doesn't care.
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) (DATE_SERIAL TODAY)
+#EVAL `EVAL UNDER VALID TIME` (Date 1 6 2019) (DATE_SERIAL TODAY)
 #EVAL DATE_SERIAL TODAY
 
 § `Step 6 -- auditing a past evaluation clock with system time`
@@ -95,7 +95,7 @@ GIVETH A NUMBER
 --
 -- expected: 7 -- no rule-version or valid-time pinned, so the fallback
 -- resolves via the (overridden) system clock: 2020-06-01 is pre-cutover
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (Date 1 6 2020)) `GST rate`
+#EVAL `EVAL AS OF SYSTEM TIME` (Date 1 6 2020) `GST rate`
 
 § `Step 7 -- scanning a range of dates`
 

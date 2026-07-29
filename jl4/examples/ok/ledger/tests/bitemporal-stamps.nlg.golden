@@ -1,3 +1,3 @@
 record a is 1
-`EVAL UNDER VALID TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and record b is 2
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and record c is 3
+`EVAL UNDER VALID TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and record b is 2
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and record c is 3

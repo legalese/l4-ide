@@ -5,11 +5,11 @@ bitemporal-stamps.l4:15:1-22:
   1
   Ledger:
     RECORD `a` IS 1   [source=RECORD, at=2025-01-31T15:45:30Z]
-bitemporal-stamps.l4:18:1-87:
+bitemporal-stamps.l4:18:1-73:
   2
   Ledger:
     RECORD `b` IS 2   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2020-01-01]
-bitemporal-stamps.l4:21:1-88:
+bitemporal-stamps.l4:21:1-74:
   3
   Ledger:
     RECORD `c` IS 3   [source=RECORD, at=2025-01-31T15:45:30Z]
