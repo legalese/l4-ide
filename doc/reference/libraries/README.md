@@ -177,13 +177,16 @@ Date arithmetic library. ISO 8601 conventions.
 
 **Constructors:**
 
-| Function              | Type                              | Description                    |
-| --------------------- | --------------------------------- | ------------------------------ |
-| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                     |
-| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch) |
-| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                  |
-| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                   |
-| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week             |
+| Function              | Type                              | Description                               |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| `YMD year month day`  | `NUMBER → NUMBER → NUMBER → DATE` | From y/m/d — **recommended** for new code |
+| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                                |
+| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch)            |
+| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                             |
+| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                              |
+| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week                        |
+
+`YMD y m d` builds through `Date d m y` but is deliberately stricter: it bounds-checks by component round-trip, so `YMD 2026 28 7` (a transposition) and `YMD 2023 2 29` (no such leap day) refuse loudly where `Date` rolls silently — a transposed `Date 7 28 2026` is not rejected, it overflows month 28 into 2028-04-07. Prefer `YMD` in new code: ISO 8601 order is harder to transpose, and a transposition that happens anyway is caught instead of computed.
 
 **Queries:**
 

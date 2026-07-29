@@ -1,0 +1,47 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+ymd-constructor.l4:19:1-20:
+  DATE OF 28, 7, 2026
+ymd-constructor.l4:22:1-42:
+  TRUE
+ymd-constructor.l4:25:1-54:
+  TRUE
+ymd-constructor.l4:31:1-34:
+  740189
+ymd-constructor.l4:34:1-41:
+  DATE OF 28, 7, 2026
+ymd-constructor.l4:37:1-62:
+  TRUE
+ymd-constructor.l4:46:1-20:
+  DATE OF 28, 7, 2026
+ymd-constructor.l4:51:1-21:
+  DATE OF 7, 4, 2028
+ymd-constructor.l4:54:1-42:
+  FALSE
+ymd-constructor.l4:57:1-35:
+  740808
+ymd-constructor.l4:64:1-20:
+  `YMD refused an out-of-range month or day`
+ymd-constructor.l4:70:1-21:
+  DATE OF 31, 12, 2026
+ymd-constructor.l4:73:1-20:
+  DATE OF 29, 2, 2024
+ymd-constructor.l4:76:1-20:
+  `YMD refused an out-of-range month or day`
+ymd-constructor.l4:81:1-21:
+  DATE OF 1, 3, 2023
+ymd-constructor.l4:84:1-20:
+  `YMD refused an out-of-range month or day`
+ymd-constructor.l4:87:1-20:
+  `YMD refused an out-of-range month or day`
+ymd-constructor.l4:93:1-34:
+  I could not continue evaluating, because I needed to know the value of
+    `YMD refused an out-of-range month or day`
+  but it is an assumed term.
+ymd-constructor.l4:106:1-64:
+  7
+ymd-constructor.l4:109:1-64:
+  9
+ymd-constructor.l4:112:1-17:
+  9
