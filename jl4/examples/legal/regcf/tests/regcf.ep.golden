@@ -1,6 +1,12 @@
 IMPORT prelude
+IMPORT daydate
 
 § `SEC Regulation Crowdfunding — 17 CFR Part 227`
+
+-- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE` read
+-- resolves to the localized current day, and localization needs a timezone.
+-- The SEC's clock: Reg CF effective dates are Washington, D.C. dates.
+TIMEZONE IS "America/New_York"
 
 -- ===========================================================================
 -- REGULATION CROWDFUNDING (17 CFR Part 227), as in force on 2026-07-23.
@@ -32,9 +38,17 @@ IMPORT prelude
 -- divergence is itemised in README.md.
 --
 -- THRESHOLDS AND THEIR CLOCKS. Every dollar figure is bound ONCE, as a named
--- constant in the section below, with an `@ref` carrying the rule paragraph and
--- the effective date of the figure now in force. Two amending events matter:
+-- constant in the section below, with one arm per amendment regime, newest
+-- first, so every constant answers under `EVAL UNDER RULES EFFECTIVE AT` for
+-- any rule date back to commencement. Four dates matter:
 --
+--   2016-05-16  Commencement. Release 33-9974, 80 FR 71388 (Nov. 16, 2015),
+--               Part 227 text at 71537, instr. 4: "Effective May 16, 2016,
+--               part 227 is revised to read as follows". Rule dates below
+--               this are a curated refusal, not an answer (CORPUS-TRACK R2).
+--   2017-04-12  Release 33-10332, "Inflation Adjustments ... Titles I and III
+--               of the JOBS Act", 82 FR 17545 (Apr. 12, 2017), instrs. 5-6.
+--               Moved every Reg CF dollar figure then in existence.
 --   2021-03-15  Release 33-10884, "Facilitating Capital Formation and Expanding
 --               Investment Opportunities by Improving Access to Capital in
 --               Private Markets", 86 FR 3496 (Jan. 14, 2021). Raised the
@@ -46,6 +60,11 @@ IMPORT prelude
 --               remaining Reg CF dollar figure. The offering limit was
 --               deliberately NOT adjusted: the Commission considered $5,000,000
 --               to "more than account for inflation" (87 FR at 57397).
+--
+-- The COVID-19 temporary rules (Rule 201(z)/(bb), 2020-05-04 through
+-- 2022-08-28) are deliberately NOT modelled; inside that window and the
+-- affected band, `financial statements required` refuses rather than
+-- guesses. See the note at that function, and README §5.
 --
 -- MODELLING NOTE. Constitutive material (eligibility, limits, tiers) is encoded
 -- as `DECIDE`/`MEANS` predicates carrying the verbatim rule text inline as
@@ -70,45 +89,139 @@ DECLARE Action IS ONE OF
     `transmit funds to the issuer`
     `transfer the securities`
 
-§§ `Thresholds — every dollar figure, bound once`
+§§ `Thresholds — every dollar figure, bound once, dated per regime`
 
--- Raised from $1,070,000 to $5,000,000 by Release 33-10884, 86 FR 3496,
--- effective 2021-03-15. Left unadjusted by the 2022 inflation release.
-@ref 17 CFR 227.100(a)(1) — offering maximum, $5,000,000, effective 2021-03-15 — https://www.ecfr.gov/current/title-17/section-227.100
-GIVETH A NUMBER
-`offering maximum in a 12-month period` MEANS 5000000
+-- THE RULE-VERSION AXIS. Each amended figure below carries one arm per
+-- regime, newest first, selected on `RULES EFFECTIVE DATE` — so the whole
+-- module answers under `EVAL UNDER RULES EFFECTIVE AT` for any rule date
+-- back to commencement. Temporal closure (CORPUS-TRACK.md §2.4 trap 5):
+-- every constant in the transitive read set of every dateable function is
+-- dated over the same window; dating a proper subset would answer
+-- confidently and wrongly inside the window.
 
--- $107,000 -> $124,000 by Release 33-11098, 87 FR 57394, effective 2022-09-20.
--- The SAME amendatory instruction moved this figure and the Rule 201(t)(1) tier
--- ceiling below, on the same day.
-@ref 17 CFR 227.100(a)(2)(i)-(ii) — income/net-worth cut point, $124,000, effective 2022-09-20 — https://www.federalregister.gov/d/2022-19867
-GIVETH A NUMBER
-`income or net worth cut point` MEANS 124000
+@ref 80 FR 71388 (Rel. 33-9974), Part 227 text at 71537, instr. 4 — commencement
+GIVETH A DATE
+`Reg CF commenced` MEANS Date 16 5 2016
 
--- $2,200 -> $2,500 by Release 33-11098, effective 2022-09-20.
-@ref 17 CFR 227.100(a)(2)(i) — investment floor, $2,500, effective 2022-09-20
-GIVETH A NUMBER
-`minimum permitted investment` MEANS 2500
+@ref 82 FR 17545 (Rel. 33-10332), instrs. 5-6 — inflation adjustment eff. 2017-04-12
+GIVETH A DATE
+`the 2017 inflation adjustment` MEANS Date 12 4 2017
 
--- $107,000 -> $124,000 by Release 33-11098, effective 2022-09-20.
-@ref 17 CFR 227.100(a)(2)(ii) — per-investor cap, $124,000, effective 2022-09-20
-GIVETH A NUMBER
-`maximum amount sold to any one investor in a 12-month period` MEANS 124000
+@ref 86 FR 3496 (Rel. 33-10884), instr. 3 — the 2020 amendments, eff. 2021-03-15
+GIVETH A DATE
+`the 2021 amendments` MEANS Date 15 3 2021
 
--- $107,000 -> $124,000 by Release 33-11098, effective 2022-09-20.
-@ref 17 CFR 227.201(t)(1) — tier 1 ceiling, $124,000, effective 2022-09-20
-GIVETH A NUMBER
-`tier 1 ceiling` MEANS 124000
+@ref 87 FR 57394 (Rel. 33-11098), instrs. 2-3 — inflation adjustment eff. 2022-09-20
+GIVETH A DATE
+`the 2022 inflation adjustment` MEANS Date 20 9 2022
 
--- $535,000 -> $618,000 by Release 33-11098, effective 2022-09-20.
-@ref 17 CFR 227.201(t)(2) — tier 2 ceiling, $618,000, effective 2022-09-20
-GIVETH A NUMBER
-`tier 2 ceiling` MEANS 618000
+GIVEN amendment IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` amendment MEANS
+    DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL amendment
 
--- $1,070,000 -> $1,235,000 by Release 33-11098, effective 2022-09-20.
-@ref 17 CFR 227.201(t)(3) — first-time-issuer review ceiling, $1,235,000, effective 2022-09-20
+-- Ruling R2 (CORPUS-TRACK §8): below commencement there is no Reg CF to
+-- answer for, so a rule date before 2016-05-16 is a curated refusal, not an
+-- answer. ASSUME makes this a deliberate bottom: an arm that reaches it
+-- stops evaluation with "... is an assumed term", naming this binding.
+-- Phase 2's generated "not in force on <day>" arm is the designed
+-- replacement (TEMPORAL-RULE-VERSION-DESIGN.md item 3); delete this when it
+-- lands. This is not the deprecated module-parameter ASSUME style
+-- (CORPUS-TRACK §1.3): no input is ever routed through it.
+ASSUME `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` IS A NUMBER
+
+-- $1,000,000 as adopted (80 FR 71537); $1,070,000 from 2017-04-12
+-- (82 FR 17545 instr. 5.a); $5,000,000 from 2021-03-15 (86 FR 3496 instr. 3).
+-- Left deliberately unadjusted by the 2022 inflation release (87 FR at 57397).
+@ref 17 CFR 227.100(a)(1) — offering maximum — https://www.ecfr.gov/current/title-17/section-227.100
 GIVETH A NUMBER
-`first-time issuer review ceiling` MEANS 1235000
+`offering maximum in a 12-month period` MEANS
+    IF   `the rules in force include` `the 2021 amendments`
+    THEN 5000000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 1070000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 1000000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $100,000 as adopted; $107,000 from 2017-04-12 (82 FR 17545 instr. 5.b-c);
+-- $124,000 from 2022-09-20 (87 FR 57394 at 57398, instr. 2). Note: the 2022
+-- release moved this figure by instr. 2.a and the Rule 201(t)(1) tier ceiling
+-- below by the SEPARATE instr. 3.a, on the same day (defect D3, fixed).
+@ref 17 CFR 227.100(a)(2)(i)-(ii) — income/net-worth cut point — https://www.federalregister.gov/d/2022-19867
+GIVETH A NUMBER
+`income or net worth cut point` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 124000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 107000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 100000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $2,000 as adopted; $2,200 from 2017-04-12; $2,500 from 2022-09-20.
+@ref 17 CFR 227.100(a)(2)(i) — investment floor
+GIVETH A NUMBER
+`minimum permitted investment` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 2500
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 2200
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 2000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $100,000 as adopted; $107,000 from 2017-04-12; $124,000 from 2022-09-20
+-- (87 FR 57398 instr. 2.b, "removing the two references to $107,000").
+@ref 17 CFR 227.100(a)(2)(ii) — per-investor cap
+GIVETH A NUMBER
+`maximum amount sold to any one investor in a 12-month period` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 124000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 107000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 100000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $100,000 as adopted; $107,000 from 2017-04-12 (82 FR 17545 instr. 6.a);
+-- $124,000 from 2022-09-20 (87 FR 57398 instr. 3.a).
+@ref 17 CFR 227.201(t)(1) — tier 1 ceiling
+GIVETH A NUMBER
+`tier 1 ceiling` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 124000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 107000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 100000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $500,000 as adopted; $535,000 from 2017-04-12 (82 FR 17545 instr. 6.b);
+-- $618,000 from 2022-09-20 (87 FR 57398 instr. 3.b).
+@ref 17 CFR 227.201(t)(2) — tier 2 ceiling
+GIVETH A NUMBER
+`tier 2 ceiling` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 618000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 535000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 500000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
+-- $1,000,000 as adopted; $1,070,000 from 2017-04-12; $1,235,000 from
+-- 2022-09-20 (87 FR 57398 instr. 3.c).
+@ref 17 CFR 227.201(t)(3) — first-time-issuer review ceiling
+GIVETH A NUMBER
+`first-time issuer review ceiling` MEANS
+    IF   `the rules in force include` `the 2022 inflation adjustment`
+    THEN 1235000
+    ELSE IF   `the rules in force include` `the 2017 inflation adjustment`
+         THEN 1070000
+         ELSE IF   `the rules in force include` `Reg CF commenced`
+              THEN 1000000
+              ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- Unchanged since adoption, 80 FR 71537 (Nov. 16, 2015), effective 2016-05-16.
 @ref 17 CFR 227.202(b)(2) — holders-of-record threshold, 300, effective 2016-05-16
@@ -284,11 +397,27 @@ DECLARE InvestorProfile HAS
 -- the 'lesser of' standard at that time due to concerns about investors incurring
 -- unaffordable losses". So the operative word here is a discretionary regulatory
 -- gloss on an ambiguous statute, held for five years and then reversed.
-@ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15
+@ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15; "lesser of" from commencement until then
+GIVEN investor IS AN InvestorProfile
+GIVETH A NUMBER
+`the applicable measure of annual income or net worth` investor MEANS
+    IF   `the rules in force include` `the 2021 amendments`
+    THEN `greater of annual income or net worth` investor
+    ELSE IF   `the rules in force include` `Reg CF commenced`
+         THEN `lesser of annual income or net worth` investor
+         ELSE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
 `greater of annual income or net worth` investor MEANS
     IF   investor's `annual income` AT LEAST investor's `net worth`
+    THEN investor's `annual income`
+    ELSE investor's `net worth`
+
+GIVEN investor IS AN InvestorProfile
+GIVETH A NUMBER
+`lesser of annual income or net worth` investor MEANS
+    IF   investor's `annual income` AT MOST investor's `net worth`
     THEN investor's `annual income`
     ELSE investor's `net worth`
 
@@ -308,15 +437,15 @@ GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
 `investment limit` investor MEANS
     IF   `either annual income or net worth is less than the cut point` investor
-    THEN IF   `minimum permitted investment` AT LEAST `five percent of the greater`
+    THEN IF   `minimum permitted investment` AT LEAST `five percent of the measure`
          THEN `minimum permitted investment`
-         ELSE `five percent of the greater`
-    ELSE IF   `ten percent of the greater` AT MOST `maximum amount sold to any one investor in a 12-month period`
-         THEN `ten percent of the greater`
+         ELSE `five percent of the measure`
+    ELSE IF   `ten percent of the measure` AT MOST `maximum amount sold to any one investor in a 12-month period`
+         THEN `ten percent of the measure`
          ELSE `maximum amount sold to any one investor in a 12-month period`
     WHERE
-        `five percent of the greater` MEANS 0.05 TIMES `greater of annual income or net worth` investor
-        `ten percent of the greater`  MEANS 0.10 TIMES `greater of annual income or net worth` investor
+        `five percent of the measure` MEANS 0.05 TIMES `the applicable measure of annual income or net worth` investor
+        `ten percent of the measure`  MEANS 0.10 TIMES `the applicable measure of annual income or net worth` investor
 
 @ref 17 CFR 227.100(a)(2) — aggregation across all issuers
 GIVEN investor IS AN InvestorProfile
@@ -328,15 +457,23 @@ GIVETH A NUMBER
 
 -- The accredited-investor carve-out. The limit bites only "Where the purchaser
 -- is not an accredited investor"; an accredited purchaser is subject to no Reg
--- CF investment limit at all. Added 2021-03-15 by Release 33-10884; before that
--- date the limit applied to EVERY investor.
+-- CF investment limit at all. Added 2021-03-15 by Release 33-10884 (86 FR 3496
+-- instr. 3); before that date the limit applied to EVERY investor, so the
+-- carve-out limb is itself dated.
 @ref 17 CFR 227.100(a)(2) — accredited-investor carve-out, effective 2021-03-15
+GIVEN investor IS AN InvestorProfile
+GIVETH A BOOLEAN
+`the accredited-investor carve-out applies to` investor MEANS
+        `the rules in force include` `the 2021 amendments`
+    AND investor's `is an accredited investor as defined in Rule 501`
+
+@ref 17 CFR 227.100(a)(2)
 GIVEN investor IS AN InvestorProfile
       `amount to be sold in this transaction` IS A NUMBER
 GIVETH A BOOLEAN
 `investor is within the investment limit` investor `amount to be sold in this transaction` MEANS
         "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:"
-    ..  investor's `is an accredited investor as defined in Rule 501`
+    ..  `the accredited-investor carve-out applies to` investor
     ..      `aggregate amount sold to this investor including this transaction` investor `amount to be sold in this transaction`
         AT MOST `investment limit` investor
 
@@ -348,25 +485,49 @@ DECLARE FinancialStatementRequirement IS ONE OF
     `financial statements reviewed by an independent public accountant`
     `financial statements audited by an independent public accountant`
 
+-- THE COVID-19 TEMPORARY RULES ARE NOT MODELLED — a curated refusal.
+-- Rule 201(z) (85 FR 27116, eff. 2020-05-04), extended as Rule 201(bb)
+-- (86 FR 3496 instr. 5) through 2022-08-28, let an ELIGIBLE issuer offering
+-- more than the tier 1 ceiling and not more than $250,000 substitute
+-- CEO-certified statements for reviewed ones. Eligibility turns on facts
+-- this corpus does not model (organization age, prior delinquency), so for
+-- a rule date inside that window AND an aggregate inside that band, the
+-- honest answer is a refusal, not a guess. Outside the band the ordinary
+-- tiers were unaffected and the answer stands. CORPUS-TRACK §2.4.1;
+-- decided 2026-07-29: refuse, not encode. See README §5.
+ASSUME `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` IS A FinancialStatementRequirement
+
+@ref 85 FR 27116 (Rule 201(z)); 86 FR 3496 instr. 5 (Rule 201(bb))
+GIVETH A BOOLEAN
+`the rule date is inside the COVID-19 temporary rules window` MEANS
+        DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 4 5 2020)
+    AND DATE_SERIAL `RULES EFFECTIVE DATE` AT MOST  DATE_SERIAL (Date 28 8 2022)
+
 -- The three tiers of Rule 201(t), plus the first-time-issuer relief inside tier
--- 3. That relief is BOUNDED: it runs out at $1,235,000, above which even a
--- first-time issuer must provide audited statements.
+-- 3. That relief is BOUNDED: it runs out at the (t)(3) ceiling, above which
+-- even a first-time issuer must provide audited statements.
 @ref 17 CFR 227.201(t)(1)-(3)
 GIVEN offering IS AN Offering
 GIVETH A FinancialStatementRequirement
 `financial statements required` offering MEANS
-    IF   `aggregate` AT MOST `tier 1 ceiling`
-    THEN `financial statements certified by the principal executive officer, with tax return information`
-    ELSE IF   `aggregate` AT MOST `tier 2 ceiling`
-         THEN `financial statements reviewed by an independent public accountant`
-         ELSE IF   `first-time issuer relief applies`
+    IF   `the COVID-19 temporary relief could change this answer`
+    THEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+    ELSE IF   `aggregate` AT MOST `tier 1 ceiling`
+         THEN `financial statements certified by the principal executive officer, with tax return information`
+         ELSE IF   `aggregate` AT MOST `tier 2 ceiling`
               THEN `financial statements reviewed by an independent public accountant`
-              ELSE `financial statements audited by an independent public accountant`
+              ELSE IF   `first-time issuer relief applies`
+                   THEN `financial statements reviewed by an independent public accountant`
+                   ELSE `financial statements audited by an independent public accountant`
     WHERE
         `aggregate` MEANS `aggregate offering amount` offering
         `first-time issuer relief applies` MEANS
                 NOT offering's `the issuer has previously sold securities in reliance on section 4(a)(6)`
             AND `aggregate` AT MOST `first-time issuer review ceiling`
+        `the COVID-19 temporary relief could change this answer` MEANS
+                `the rule date is inside the COVID-19 temporary rules window`
+            AND `aggregate` GREATER THAN `tier 1 ceiling`
+            AND `aggregate` AT MOST 250000
 
 -- Rule 201(t)(1) and (t)(2) each let an issuer discharge the tier by supplying
 -- a HIGHER-quality statement than the tier demands ("If financial statements of
@@ -990,3 +1151,118 @@ GIVETH A BOOLEAN
 #ASSERT NOT `the over-limit-investor case qualifies`
 #ASSERT NOT `the short-availability case qualifies`
 #ASSERT NOT `the under-assured-financials case qualifies`
+
+§§ `The rule-version axis — the same question under four regimes`
+
+-- Every assertion in this group pins its rule date explicitly (CORPUS-TRACK
+-- §4.3): an unpinned read rides the ambient clock, which in CI is the
+-- harness's fixed 2025-01-31 and on a developer's machine is the real today.
+-- The 55 assertions above are deliberately left unpinned — they state the
+-- CURRENT law, and the harness clock sits in the current regime (ruling R3,
+-- resolved: pin none of the existing assertions, document the dependency).
+
+-- W: may a clean issuer raise $3,000,000? Three regimes, three answers —
+-- and the 2021-January row is the standing guard against re-dropping the
+-- 2017-04-12 boundary (CORPUS-TRACK §5.1).
+`W offering` MEANS `an offering of` 0 3000000 FALSE
+
+`W within the limit in 2016` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 9 2016)) (`offering is within the offering limit` `W offering`)
+
+`W within the limit in 2021 January` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 1 2021)) (`offering is within the offering limit` `W offering`)
+
+`W within the limit in 2021 June` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`offering is within the offering limit` `W offering`)
+
+#ASSERT NOT `W within the limit in 2016`
+#ASSERT NOT `W within the limit in 2021 January`
+#ASSERT     `W within the limit in 2021 June`
+
+-- The 2017-04-12 boundary itself, one day either side.
+`the cut point the day before the 2017 adjustment` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 11 4 2017)) `income or net worth cut point`
+
+`the cut point on the day of the 2017 adjustment` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 12 4 2017)) `income or net worth cut point`
+
+#ASSERT `the cut point the day before the 2017 adjustment` EQUALS 100000
+#ASSERT `the cut point on the day of the 2017 adjustment`  EQUALS 107000
+
+-- I-3. The 2022 inflation adjustment HALVES this investor's capacity by
+-- moving them across the (i)/(ii) limb boundary: under the 2022 rules both
+-- figures clear the $107,000 cut point, so limb (ii) gives 10% of $115,000;
+-- under the 2023 rules income $110,000 sits below the new $124,000 cut
+-- point, so limb (i) gives max($2,500, 5% of $115,000). Both answers are
+-- correct for their date (CORPUS-TRACK §5.2).
+`I-3 investor` MEANS `an investor with` FALSE 110000 115000 0
+
+`I-3 limit under the 2022 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-3 investor`)
+
+`I-3 limit under the 2023 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`investment limit` `I-3 investor`)
+
+#ASSERT `I-3 limit under the 2022 rules` EQUALS 11500
+#ASSERT `I-3 limit under the 2023 rules` EQUALS 5750
+
+-- I-4. THE CLOSURE REGRESSION (CORPUS-TRACK §2.4 trap 5). This investor is
+-- above the limb-(ii) cap, so the answer IS the cap — which also moved on
+-- 2022-09-20, in the same release, by the same instruction. Under a
+-- partially dated module this returns 124000 and is wrong.
+`I-4 investor` MEANS `an investor with` FALSE 1240000 1240000 0
+
+`I-4 limit under the 2022 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-4 investor`)
+
+#ASSERT `I-4 limit under the 2022 rules` EQUALS 107000
+
+-- The SHAPE change. Group 3's percentage case ($60,000 income, $200,000 net
+-- worth) promised this row: under the pre-2021 "lesser of" rule the same
+-- investor was limited to 5% of $60,000 = $3,000, not 5% of $200,000.
+`the percentage case under the 2019 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investment limit` (`an investor with` FALSE 60000 200000 0))
+
+#ASSERT `the percentage case under the 2019 rules` EQUALS 3000
+
+-- The accredited carve-out did not exist before 2021-03-15: an accredited
+-- investor with $200,000 already sold was over the limit like anyone else.
+-- (Under the 2019 rules, limb (ii): 10% of the lesser of $1M/$1M = $100,000,
+-- within the $107,000 cap; aggregate $200,001 exceeds it.)
+`A investor` MEANS `an investor with` TRUE 1000000 1000000 200000
+
+`A is within the limit under the 2021 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`investor is within the investment limit` `A investor` 1)
+
+`A is within the limit under the 2019 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investor is within the investment limit` `A investor` 1)
+
+#ASSERT     `A is within the limit under the 2021 rules`
+#ASSERT NOT `A is within the limit under the 2019 rules`
+
+-- Financial statements under the 2019 ceilings ($107,000 / $535,000): a
+-- $550,000 repeat offering needed AUDITED statements then, reviewed today.
+`F offering` MEANS `an offering of` 0 550000 TRUE
+
+`F requirement under the 2019 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`financial statements required` `F offering`)
+
+`F requirement under the 2023 rules` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`financial statements required` `F offering`)
+
+#ASSERT `F requirement under the 2019 rules` EQUALS `audited`
+#ASSERT `F requirement under the 2023 rules` EQUALS `reviewed`
+
+-- The COVID-19 window refusal is BANDED, not blanket: inside the window a
+-- question the temporary rules could not touch still answers. $100,000 is
+-- at most the then-tier-1 ceiling of $107,000, so certified suffices; and
+-- a $550,000 offering is above the $250,000 relief band, so the ordinary
+-- tiers answer too. (A question INSIDE the band refuses; see README §5.)
+`a small offering inside the COVID window` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` (`an offering of` 0 100000 FALSE))
+
+`a large offering inside the COVID window` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` `F offering`)
+
+#ASSERT `a small offering inside the COVID window` EQUALS `certified`
+#ASSERT `a large offering inside the COVID window` EQUALS `audited`

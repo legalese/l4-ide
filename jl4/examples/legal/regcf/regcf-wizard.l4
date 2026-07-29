@@ -1,6 +1,12 @@
 IMPORT prelude
 IMPORT regcf
 
+-- TIMEZONE is per-document, not inherited through IMPORT: the corpus's dated
+-- thresholds read `RULES EFFECTIVE DATE`, and an unpinned read (every export
+-- except the law-time one) falls back to the localized current day, which
+-- needs a timezone in THIS document. Same zone as the corpus.
+TIMEZONE IS "America/New_York"
+
 § `Regulation Crowdfunding — founder and investor façade`
 
 -- ===========================================================================
@@ -533,9 +539,11 @@ GIVETH A LIST OF STRING
 
 § `The exported entry points`
 
--- Five exports. Four are the four questions a reader of the mirrored page
+-- Six exports. Four are the four questions a reader of the mirrored page
 -- actually has; the fifth returns a BOOLEAN, which is what jl4-service's
--- /ladder and /query-plan routes require.
+-- /ladder and /query-plan routes require; the sixth is the law-time
+-- control — the same investment-limit computation under the rules in force
+-- on a chosen date.
 
 @export default Check whether a company can raise money under SEC Regulation Crowdfunding, how much it may raise now, what financial statements it must provide, and what it will owe afterwards.
 GIVEN plan IS A RaisePlan @desc Your company, and what you want to raise
@@ -566,6 +574,21 @@ DECIDE `investment limit check` IS
         `which limb applies`     IS `which limb for` facts
         `how this is worked out` IS `how the limit is worked out for` facts
         `caveats`                IS `investment caveats`
+
+-- The law-time control (CORPUS-TRACK §2.4; ruling R8, piece 3). Safe only
+-- because the corpus is now temporally closed back to commencement
+-- (2016-05-16): every constant and both shape changes in `investment
+-- limit`'s read set carry dated arms, and a rule date below commencement is
+-- a curated refusal, not an answer. Note the limit this returns is the Rule
+-- 100(a)(2) formula; from 2021-03-15 accredited investors are outside it
+-- altogether (the carve-out is itself dated, in the corpus).
+@export Work out what an investor's 12-month Regulation Crowdfunding investment limit was, or will be, under the rules in force on a chosen date — for checking a past investment against the rules that actually applied to it.
+GIVEN `rule date` IS A DATE @desc Apply the rules as they stood on this date — for example, the date the investment was actually made
+      facts IS AN InvestorFacts @desc Your income, your net worth, and what you have already invested under Regulation Crowdfunding
+GIVETH A NUMBER
+`investment limit under the rules effective on` `rule date` facts MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL `rule date`)
+        (`investment limit` (`investor profile from` facts))
 
 @export Check whether securities bought through SEC Regulation Crowdfunding may be transferred yet, and if not, how much longer the restriction runs.
 GIVEN holding IS A ResaleFacts @desc When the securities were issued, and who they would go to
@@ -710,6 +733,13 @@ DECIDE `can this company raise` IS
 
 -- README §3.1, through the façade: $10,000, not $3,000.
 #ASSERT (`limit for` `the README 3.1 investor`) EQUALS 10000
+
+-- The law-time export makes the §3.1 comparison executable: the same
+-- investor, under the rules the mirrored page still describes (in force
+-- until 2021-03-15), really was limited to $3,000 — and the export says so
+-- under a pinned rule date, rather than leaving it as prose.
+#ASSERT (`investment limit under the rules effective on` (DATE_FROM_DMY 1 6 2023) `the README 3.1 investor`) EQUALS 10000
+#ASSERT (`investment limit under the rules effective on` (DATE_FROM_DMY 1 6 2019) `the README 3.1 investor`) EQUALS 3000
 
 -- The per-investor cap still bites at the top.
 #ASSERT (`limit for` `a wealthy investor`) EQUALS 124000
