@@ -1966,17 +1966,20 @@ expect3 = \ case
 expectNumber :: WHNF -> Machine Rational
 expectNumber = \ case
   ValNumber f -> pure f
+  ValAssumed r -> stuckOnAssumed r
   v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
 
 expectString :: WHNF -> Machine Text
 expectString = \ case
   ValString f -> pure f
+  ValAssumed r -> stuckOnAssumed r
   v -> internalException $ RuntimeTypeError $ "expected a STRING but got: " <> prettyLayout v
 
 expectDateValue :: WHNF -> Machine Time.Day
 expectDateValue = \ case
   ValDate d -> pure d
   ValNumber serial -> pure (Time.utctDay (serialToUTCTime serial))
+  ValAssumed r -> stuckOnAssumed r
   v -> internalException $ RuntimeTypeError $ "expected a DATE but got: " <> prettyLayout v
 
 expectInteger :: BinOp -> Rational -> Machine Integer
