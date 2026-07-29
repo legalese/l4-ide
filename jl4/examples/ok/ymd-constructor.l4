@@ -98,15 +98,15 @@ TIMEZONE IS "Etc/UTC"
 -- GST rose from 7% to 9% for rules effective on/after 2024-01-01, expressed
 -- with YMD throughout.
 `GST rate` MEANS
-  IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (YMD 2024 1 1))
+  IF `RULES EFFECTIVE DATE` AT LEAST YMD 2024 1 1
   THEN 9
   ELSE 7
 
 -- expected: 7 — old rule-version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (YMD 2023 6 1)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) `GST rate`
 
 -- expected: 9 — new rule-version
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (YMD 2024 7 1)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2024 7 1) `GST rate`
 
 -- expected: 9 — axis unset, fallback = localized today 2025-01-31
 #EVAL `GST rate`

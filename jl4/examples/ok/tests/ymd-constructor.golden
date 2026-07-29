@@ -39,9 +39,9 @@ ymd-constructor.l4:93:1-34:
   I could not continue evaluating, because I needed to know the value of
     `YMD refused an out-of-range month or day`
   but it is an assumed term.
-ymd-constructor.l4:106:1-78:
+ymd-constructor.l4:106:1-64:
   7
-ymd-constructor.l4:109:1-78:
+ymd-constructor.l4:109:1-64:
   9
 ymd-constructor.l4:112:1-17:
   9
