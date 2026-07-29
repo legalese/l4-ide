@@ -48,6 +48,12 @@ one axis at a time.
   ELSE 7
 ```
 
+The examples in this tutorial use `Date day month year` throughout. New code
+should prefer `YMD year month day`, the ISO 8601-ordered constructor from
+`daydate`: `YMD 2024 1 1` is the same date as `Date 1 1 2024`, delegating to
+the same machinery, but its big-endian argument order is much harder to
+transpose. See [the daydate reference](../../reference/libraries/daydate.md).
+
 `RULES EFFECTIVE DATE` is a nullary `DATE` builtin — it doesn't read an
 argument, it reads the **rule-effective-time axis** out of the ambient
 evaluation context. With nothing pinned, it falls all the way back to

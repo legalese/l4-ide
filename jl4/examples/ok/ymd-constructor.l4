@@ -1,0 +1,84 @@
+-- YMD: the ISO 8601-ordered date constructor.
+--
+-- `YMD y m d` is the recommended constructor for new code. It delegates to
+-- `Date d m y`, so the two agree by construction; the only difference is
+-- argument order, which YMD makes big-endian to match how ISO 8601 writes a
+-- date. `Date d m y` is unchanged and stays supported for existing corpora.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+
+§ `YMD agrees with Date`
+
+-- expected: DATE OF 28, 7, 2026 — big-endian arguments, little-endian display
+#EVAL YMD 2026 7 28
+
+-- expected: TRUE — same date, two argument orders
+#EVAL YMD 2026 7 28 EQUALS Date 28 7 2026
+
+-- expected: TRUE — the AKA resolves to the same constructor
+#EVAL `Year month day` 2026 7 28 EQUALS YMD 2026 7 28
+
+
+§ `DATE_SERIAL round-trip`
+
+-- expected: 740189 — days since 1st January 0000
+#EVAL DATE_SERIAL (YMD 2026 7 28)
+
+-- expected: DATE OF 28, 7, 2026 — serial round-trips back to the same date
+#EVAL Date (DATE_SERIAL (YMD 2026 7 28))
+
+-- expected: TRUE
+#EVAL Date (DATE_SERIAL (YMD 2026 7 28)) EQUALS YMD 2026 7 28
+
+
+§ `The transposition footgun YMD exists to avoid`
+
+-- Transposing month and day is the mistake little-endian `Date d m y` invites,
+-- and the failure is SILENT: month 28 is not rejected, it rolls forward.
+--
+-- expected: DATE OF 28, 7, 2026 — what the author meant
+#EVAL YMD 2026 7 28
+
+-- expected: DATE OF 7, 4, 2028 — `Date 7 28 2026` read as day 7, month 28,
+-- year 2026; month 28 overflows 2026 by 16 months into April 2028. No error,
+-- no warning, just a date two years off.
+#EVAL Date 7 28 2026
+
+-- expected: FALSE — the transposed form is a different date entirely
+#EVAL Date 7 28 2026 EQUALS YMD 2026 7 28
+
+-- expected: 740808 — 619 days adrift of the intended 740189
+#EVAL DATE_SERIAL (Date 7 28 2026)
+
+-- YMD inherits exactly this overflow behaviour, because it delegates: the
+-- point is not that YMD validates, it is that YMD is harder to transpose.
+-- expected: DATE OF 7, 4, 2028 — YMD 2026 28 7 overflows identically
+#EVAL YMD 2026 28 7
+
+-- expected: TRUE — identical by construction
+#EVAL YMD 2026 28 7 EQUALS Date 7 28 2026
+
+
+§ `YMD under a rule-version axis`
+
+-- GST rose from 7% to 9% for rules effective on/after 2024-01-01, expressed
+-- with YMD throughout.
+`GST rate` MEANS
+  IF (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL (YMD 2024 1 1))
+  THEN 9
+  ELSE 7
+
+-- expected: 7 — old rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (YMD 2023 6 1)) `GST rate`
+
+-- expected: 9 — new rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (YMD 2024 7 1)) `GST rate`
+
+-- expected: 9 — axis unset, fallback = localized today 2025-01-31
+#EVAL `GST rate`

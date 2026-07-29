@@ -177,13 +177,16 @@ Date arithmetic library. ISO 8601 conventions.
 
 **Constructors:**
 
-| Function              | Type                              | Description                    |
-| --------------------- | --------------------------------- | ------------------------------ |
-| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                     |
-| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch) |
-| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                  |
-| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                   |
-| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week             |
+| Function              | Type                              | Description                               |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| `YMD year month day`  | `NUMBER → NUMBER → NUMBER → DATE` | From y/m/d — **recommended** for new code |
+| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                                |
+| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch)            |
+| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                             |
+| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                              |
+| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week                        |
+
+`YMD y m d` delegates to `Date d m y`; the two are identical apart from argument order. Prefer `YMD` in new code because ISO 8601 order is harder to transpose — a transposed `Date 7 28 2026` is not rejected, it silently overflows month 28 into 2028-04-07.
 
 **Queries:**
 

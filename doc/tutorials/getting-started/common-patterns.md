@@ -375,8 +375,14 @@ GIVETH A BOOLEAN
 ```l4
 IMPORT daydate
 
--- Create a date
-expiryDate MEANS Date 2025 12 31
+-- Create a date. YMD takes year, month, day (ISO 8601 order) and is the
+-- recommended constructor for new code.
+expiryDate MEANS YMD 2025 12 31
+
+-- `Date` takes day, month, year — so `Date 2025 12 31` is NOT 2025-12-31.
+-- Day 2025 of month 12 of year 31 silently overflows to 0037-06-16, with no
+-- error. That is exactly the transposition footgun `YMD` exists to avoid;
+-- written correctly in day-month-year order it is `Date 31 12 2025`.
 
 -- Compare dates
 GIVEN d1 IS A Date

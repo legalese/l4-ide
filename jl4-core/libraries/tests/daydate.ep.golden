@@ -80,6 +80,26 @@ GIVEN dt IS A DATETIME
 GIVETH A DATE
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
+-- YMD year month day  -> the same date as Date day month year, written in
+-- ISO 8601 argument order. This is the recommended constructor for new code:
+-- big-endian year-month-day reads the way ISO 8601 writes it, which makes a
+-- day/month transposition harder to WRITE. `Date d m y` is unchanged and
+-- remains supported for existing corpora.
+--
+-- YMD delegates to `Date`, so validity and overflow behaviour are identical
+-- by construction. That cuts both ways, and the limit is worth stating
+-- plainly: YMD does not detect a transposition, it only makes one less
+-- tempting. A transposed `YMD 2026 28 7` evaluates to 2028-04-07 — month 28
+-- silently rolls forward 16 months — exactly as `Date 7 28 2026` does. No
+-- error, no warning. The gain is at authoring time, not at evaluation time;
+-- neither constructor validates its arguments.
+GIVEN year  IS A NUMBER
+      month IS A NUMBER
+      day   IS A NUMBER
+GIVETH A DATE
+`YMD` AKA `Year month day` MEANS
+    Date day month year
+
 
 
 §§ `Datestamp Constructors`

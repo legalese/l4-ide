@@ -396,7 +396,13 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
 
-Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `YMD 2025 1 15`. This is the recommended constructor for new code, because ISO 8601 order is harder to transpose.
+
+The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
+
+Neither constructor validates its arguments — `YMD` just delegates to `Date`. A transposed `YMD 2025 15 1` rolls month 15 forward into `2026-03-01` with no error. YMD makes a transposition harder to write, not detectable.
+
+Also: `Time hour minute second`, `DateTime date time`.
 
 ### Operators
 

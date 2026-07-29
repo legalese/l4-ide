@@ -430,6 +430,8 @@ calendar handles leap years; a magic `365` does not.
 > - **ADD** N months to the _earlier_ date (`DATE_MONTH earlier PLUS N`) and compare, or
 > - go back a whole year via `DATE_YEAR … MINUS 1` (which can never produce `month ≤ 0`, so the clamp never fires).
 >
+> **`YMD year month day` inherits this unchanged.** It delegates to `Date`, so `YMD 2025 (3 MINUS 6) 1` clamps to January 2025 too. Prefer `YMD` in new code for its ISO 8601 argument order, but do not expect it to validate anything.
+>
 > (Same footgun is catalogued in [gotchas.md](gotchas.md) under "The `daydate` month-subtraction footgun".)
 
 "≤ 6 months before proceedings" done safely by **adding** to the earlier date (`ground-2ZC.l4` / `ground-2ZD.l4`):
