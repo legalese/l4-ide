@@ -2000,22 +2000,33 @@ the rule (quotas, apportionment, counting):
 #EVAL carol `is in` `eligible population`      -- TRUE
 ```
 
-**Style 3 — distributed predicates.** The fully distributed boolean form; maximally
-ladder-friendly as-is, and the shape §17.6's normaliser would produce mechanically from Style 1:
+**Style 3 — distributed predicates, infix + dittos.** The fully distributed boolean form;
+maximally ladder-friendly as-is, and the shape §17.6's normaliser would produce mechanically
+from Style 1. The predicate is defined **infix** (subject-first, on the prelude's `p UNION q`
+model), and the repeated `p `resides in``prefix is elided with **caret dittos** — each`^`
+copies the token from the line above at the same column, so the second disjunct reads as pure
+delta, spreadsheet-style, and the enumeration's list-nature shows in the source layout:
 
 ```l4
+GIVEN p IS A Person
+      s IS A STRING
+GIVETH A BOOLEAN
+p `resides in` s MEANS p's `state of residence` EQUALS s
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
 `may apply` p MEANS
-       `resides in` p "NY"
-    OR `resides in` p "NJ"
+       p `resides in` "NY"
+    OR ^ ^            "NJ"
 ```
 
 **Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
 prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —
-``any (`resides in` p) …`` is a type error; the lambda is required:
+there is no partial application, so the fold takes an explicit lambda:
 
 ```l4
 `may apply` p MEANS
-    any (GIVEN s YIELD `resides in` p s) (LIST "NY", "NJ")
+    any (GIVEN s YIELD p `resides in` s) (LIST "NY", "NJ")
 ```
 
 **Style 5 — inert: the statute's very token rides as scaffolding.** An inert string in `OR`
