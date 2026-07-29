@@ -263,61 +263,61 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_w_offering  (main.l4:1140:20-52)
       `W offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2016  (main.l4:1143:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2016  (main.l4:1143:5-107)
       `W within the limit in 2016` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1146:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_january  (main.l4:1146:5-107)
       `W within the limit in 2021 January` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1149:5-121)
+  [D-LITERALEXPR] blocking — decision_w_within_the_limit_in_2021_june  (main.l4:1149:5-107)
       `W within the limit in 2021 June` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1157:5-99)
+  [D-LITERALEXPR] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment  (main.l4:1157:5-85)
       `the cut point the day before the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1160:5-99)
+  [D-LITERALEXPR] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment  (main.l4:1160:5-85)
       `the cut point on the day of the 2017 adjustment` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_i_3_investor  (main.l4:1171:22-62)
       `I-3 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1174:5-102)
+  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2022_rules  (main.l4:1174:5-88)
       `I-3 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1177:5-102)
+  [D-LITERALEXPR] blocking — decision_i_3_limit_under_the_2023_rules  (main.l4:1177:5-88)
       `I-3 limit under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_i_4_investor  (main.l4:1186:22-64)
       `I-4 investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1189:5-102)
+  [D-LITERALEXPR] blocking — decision_i_4_limit_under_the_2022_rules  (main.l4:1189:5-88)
       `I-4 limit under the 2022 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1197:5-129)
+  [D-LITERALEXPR] blocking — decision_the_percentage_case_under_the_2019_rules  (main.l4:1197:5-115)
       `the percentage case under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_a_investor  (main.l4:1205:20-66)
       `A investor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1208:5-125)
+  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2021_rules  (main.l4:1208:5-111)
       `A is within the limit under the 2021 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1211:5-125)
+  [D-LITERALEXPR] blocking — decision_a_is_within_the_limit_under_the_2019_rules  (main.l4:1211:5-111)
       `A is within the limit under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_f_offering  (main.l4:1218:20-50)
       `F offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1221:5-113)
+  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2019_rules  (main.l4:1221:5-99)
       `F requirement under the 2019 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1224:5-113)
+  [D-LITERALEXPR] blocking — decision_f_requirement_under_the_2023_rules  (main.l4:1224:5-99)
       `F requirement under the 2023 rules` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1235:5-134)
+  [D-LITERALEXPR] blocking — decision_a_small_offering_inside_the_covid_window  (main.l4:1235:5-120)
       `a small offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1238:5-113)
+  [D-LITERALEXPR] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1238:5-99)
       `a large offering inside the COVID window` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-UNDECOMPOSABLE] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:139:15-65)

@@ -29,7 +29,7 @@ untouched.
 
 The consequence is good news and awkward news at once. The good news: **M5 is not blocked
 on language work.** The rule-version axis shipped (PR #89, merged `6b2c7f55`) and
-`EVAL UNDER RULES EFFECTIVE AT` is a first-class `∀a. NUMBER → a → a` over a _runtime_
+`EVAL UNDER RULES EFFECTIVE AT` is a first-class `∀a. DATE → a → a` (since 2026-07-29; previously a `NUMBER` serial) over a _runtime_
 serial, so a corpus author can pin a rule date today. The awkward news: C0 left a set of
 gaps SPEC.md's C1 line does not name at all — no `@export`, no composed contract, three
 dead `Action`s, two dutyless `Actor`s — and two of those are hard preconditions for C2 and
@@ -645,7 +645,7 @@ than hide it.
   `--rules-effective-at` flag and no jl4-service parameter.
 
 **The workaround is in-language, cheap, and should become the C1/C2/S3 convention.**
-Because the builtin is `∀a. NUMBER → a → a` and its argument is forced through the ordinary
+Because the builtin is `∀a. DATE → a → a` (a serial `NUMBER` still evaluates, but no longer typechecks) and its argument is forced through the ordinary
 frame protocol (`Machine.hs:1092-1099`, `serial <- expectNumber val`; the previous draft
 cited `:1074`, which is a different frame), the rule date may be any runtime-computed value
 — including one supplied by `@export`ed JSON invocation:
@@ -1404,7 +1404,7 @@ assertions (§4.1); `Machine.hs:1074` → `:1092-1099`; `ResolveAnnotation.hs` i
 `TemporalContext.hs` `applyEvalClauses` at `:85-105`, not `:83`.
 
 **What survived refutation, and is therefore load-bearing.** The first lens verified against
-source that: `EVAL UNDER RULES EFFECTIVE AT` is built, typed `∀a. NUMBER → a → a`
+source that: `EVAL UNDER RULES EFFECTIVE AT` is built, typed `∀a. DATE → a → a` (2026-07-29; previously `NUMBER`)
 (`Environment.hs:78`, `:321-324`), evaluated (`Machine.hs:1092-1099`) and CI-covered by a
 blessed golden that includes the flip _back_ to the old regime; `RULES EFFECTIVE DATE` and
 its three-step fallback chain are real (`Machine.hs:3742-3774`); the durational prohibition

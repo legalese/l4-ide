@@ -1140,13 +1140,13 @@ GIVETH A BOOLEAN
 `W offering` MEANS `an offering of` 0 3000000 FALSE
 
 `W within the limit in 2016` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 9 2016)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) (`offering is within the offering limit` `W offering`)
 
 `W within the limit in 2021 January` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 1 2021)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 1 2021) (`offering is within the offering limit` `W offering`)
 
 `W within the limit in 2021 June` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`offering is within the offering limit` `W offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`offering is within the offering limit` `W offering`)
 
 #ASSERT NOT `W within the limit in 2016`
 #ASSERT NOT `W within the limit in 2021 January`
@@ -1154,10 +1154,10 @@ GIVETH A BOOLEAN
 
 -- The 2017-04-12 boundary itself, one day either side.
 `the cut point the day before the 2017 adjustment` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 11 4 2017)) `income or net worth cut point`
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 11 4 2017) `income or net worth cut point`
 
 `the cut point on the day of the 2017 adjustment` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 12 4 2017)) `income or net worth cut point`
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 12 4 2017) `income or net worth cut point`
 
 #ASSERT `the cut point the day before the 2017 adjustment` EQUALS 100000
 #ASSERT `the cut point on the day of the 2017 adjustment`  EQUALS 107000
@@ -1171,10 +1171,10 @@ GIVETH A BOOLEAN
 `I-3 investor` MEANS `an investor with` FALSE 110000 115000 0
 
 `I-3 limit under the 2022 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-3 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2022) (`investment limit` `I-3 investor`)
 
 `I-3 limit under the 2023 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`investment limit` `I-3 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`investment limit` `I-3 investor`)
 
 #ASSERT `I-3 limit under the 2022 rules` EQUALS 11500
 #ASSERT `I-3 limit under the 2023 rules` EQUALS 5750
@@ -1186,7 +1186,7 @@ GIVETH A BOOLEAN
 `I-4 investor` MEANS `an investor with` FALSE 1240000 1240000 0
 
 `I-4 limit under the 2022 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2022)) (`investment limit` `I-4 investor`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2022) (`investment limit` `I-4 investor`)
 
 #ASSERT `I-4 limit under the 2022 rules` EQUALS 107000
 
@@ -1194,7 +1194,7 @@ GIVETH A BOOLEAN
 -- worth) promised this row: under the pre-2021 "lesser of" rule the same
 -- investor was limited to 5% of $60,000 = $3,000, not 5% of $200,000.
 `the percentage case under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investment limit` (`an investor with` FALSE 60000 200000 0))
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`investment limit` (`an investor with` FALSE 60000 200000 0))
 
 #ASSERT `the percentage case under the 2019 rules` EQUALS 3000
 
@@ -1205,10 +1205,10 @@ GIVETH A BOOLEAN
 `A investor` MEANS `an investor with` TRUE 1000000 1000000 200000
 
 `A is within the limit under the 2021 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`investor is within the investment limit` `A investor` 1)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`investor is within the investment limit` `A investor` 1)
 
 `A is within the limit under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`investor is within the investment limit` `A investor` 1)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`investor is within the investment limit` `A investor` 1)
 
 #ASSERT     `A is within the limit under the 2021 rules`
 #ASSERT NOT `A is within the limit under the 2019 rules`
@@ -1218,10 +1218,10 @@ GIVETH A BOOLEAN
 `F offering` MEANS `an offering of` 0 550000 TRUE
 
 `F requirement under the 2019 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) (`financial statements required` `F offering`)
 
 `F requirement under the 2023 rules` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`financial statements required` `F offering`)
 
 #ASSERT `F requirement under the 2019 rules` EQUALS `audited`
 #ASSERT `F requirement under the 2023 rules` EQUALS `reviewed`
@@ -1232,10 +1232,10 @@ GIVETH A BOOLEAN
 -- a $550,000 offering is above the $250,000 relief band, so the ordinary
 -- tiers answer too. (A question INSIDE the band refuses; see README §5.)
 `a small offering inside the COVID window` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` (`an offering of` 0 100000 FALSE))
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`financial statements required` (`an offering of` 0 100000 FALSE))
 
 `a large offering inside the COVID window` MEANS
-    `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2021)) (`financial statements required` `F offering`)
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) (`financial statements required` `F offering`)
 
 #ASSERT `a small offering inside the COVID window` EQUALS `certified`
 #ASSERT `a large offering inside the COVID window` EQUALS `audited`

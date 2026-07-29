@@ -26,7 +26,7 @@ GIVETH A BOOLEAN
 
 -- expected: JUST OF (DATE OF 1, 1, 2020) — steps 5,4,3,2 Jan are FALSE, the
 -- snapshot is forced on the first step under the override (= 1 Jan 2020)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`WHEN LAST` (DATE_FROM_DMY 5 1 2020) `is today`)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (`WHEN LAST` (DATE_FROM_DMY 5 1 2020) `is today`)
 
 -- expected: DATE OF 31, 1, 2025 (pre-fix: leaked DATE OF 1, 1, 2020)
 #EVAL `today snapshot`
@@ -60,7 +60,7 @@ GIVETH A BOOLEAN
 `on or before shared B` d MEANS DATE_SERIAL d <= `shared today B`
 
 -- expected: JUST OF (DATE OF 15, 6, 2020)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 15 6 2020)) (`WHEN LAST` (DATE_FROM_DMY 15 6 2020) `on or before shared B`)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 15 6 2020) (`WHEN LAST` (DATE_FROM_DMY 15 6 2020) `on or before shared B`)
 
 -- expected: 739646 (pre-fix: leaked 737955, the override-scope serial)
 #EVAL `shared today B`
@@ -83,4 +83,4 @@ GIVETH A BOOLEAN
 -- expected: JUST OF (DATE OF 15, 6, 2020) — under the override the shared
 -- binding re-forces to serial(2020-06-15), so the iterator stops after 6
 -- steps (pre-fix: JUST OF (DATE OF 31, 1, 2025))
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 15 6 2020)) (`WHEN NEXT` (DATE_FROM_DMY 10 6 2020) `equals shared C`)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 15 6 2020) (`WHEN NEXT` (DATE_FROM_DMY 10 6 2020) `equals shared C`)

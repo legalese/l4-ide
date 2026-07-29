@@ -2072,7 +2072,7 @@
       <requiredDecision href="#decision_w_offering"/>
     </informationRequirement>
     <literalExpression id="decision_w_within_the_limit_in_2016_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 9, 2016)), (`offering is within the offering limit` OF `W offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 9, 2016), (`offering is within the offering limit` OF `W offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_w_within_the_limit_in_2021_january" name="W_within_the_limit_in_2021_January" label="W within the limit in 2021 January">
@@ -2084,7 +2084,7 @@
       <requiredDecision href="#decision_w_offering"/>
     </informationRequirement>
     <literalExpression id="decision_w_within_the_limit_in_2021_january_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 1, 2021)), (`offering is within the offering limit` OF `W offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 1, 2021), (`offering is within the offering limit` OF `W offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_w_within_the_limit_in_2021_june" name="W_within_the_limit_in_2021_June" label="W within the limit in 2021 June">
@@ -2096,7 +2096,7 @@
       <requiredDecision href="#decision_w_offering"/>
     </informationRequirement>
     <literalExpression id="decision_w_within_the_limit_in_2021_june_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`offering is within the offering limit` OF `W offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`offering is within the offering limit` OF `W offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_cut_point_the_day_before_the_2017_adjustment" name="the_cut_point_the_day_before_the_2017_adjustment" label="the cut point the day before the 2017 adjustment">
@@ -2105,7 +2105,7 @@
       <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
     </informationRequirement>
     <literalExpression id="decision_the_cut_point_the_day_before_the_2017_adjustment_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 11, 4, 2017)), `income or net worth cut point`</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 11, 4, 2017), `income or net worth cut point`</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_cut_point_on_the_day_of_the_2017_adjustment" name="the_cut_point_on_the_day_of_the_2017_adjustment" label="the cut point on the day of the 2017 adjustment">
@@ -2114,7 +2114,7 @@
       <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
     </informationRequirement>
     <literalExpression id="decision_the_cut_point_on_the_day_of_the_2017_adjustment_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 12, 4, 2017)), `income or net worth cut point`</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 12, 4, 2017), `income or net worth cut point`</text>
     </literalExpression>
   </decision>
   <decision id="decision_i_3_investor" name="I_3_investor" label="I-3 investor">
@@ -2135,7 +2135,7 @@
       <requiredDecision href="#decision_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_i_3_limit_under_the_2022_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2022)), (`investment limit` OF `I-3 investor`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-3 investor`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_i_3_limit_under_the_2023_rules" name="I_3_limit_under_the_2023_rules" label="I-3 limit under the 2023 rules">
@@ -2147,7 +2147,7 @@
       <requiredDecision href="#decision_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_i_3_limit_under_the_2023_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2023)), (`investment limit` OF `I-3 investor`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`investment limit` OF `I-3 investor`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_i_4_investor" name="I_4_investor" label="I-4 investor">
@@ -2168,7 +2168,7 @@
       <requiredDecision href="#decision_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_i_4_limit_under_the_2022_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2022)), (`investment limit` OF `I-4 investor`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-4 investor`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_percentage_case_under_the_2019_rules" name="the_percentage_case_under_the_2019_rules" label="the percentage case under the 2019 rules">
@@ -2180,7 +2180,7 @@
       <requiredDecision href="#decision_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_the_percentage_case_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`investment limit` OF (`an investor with` OF FALSE, 60000, 200000, 0))</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investment limit` OF (`an investor with` OF FALSE, 60000, 200000, 0))</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_investor" name="A_investor" label="A investor">
@@ -2201,7 +2201,7 @@
       <requiredDecision href="#decision_investor_is_within_the_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_a_is_within_the_limit_under_the_2021_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`investor is within the investment limit` OF `A investor`, 1)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`investor is within the investment limit` OF `A investor`, 1)</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_is_within_the_limit_under_the_2019_rules" name="A_is_within_the_limit_under_the_2019_rules" label="A is within the limit under the 2019 rules">
@@ -2213,7 +2213,7 @@
       <requiredDecision href="#decision_investor_is_within_the_investment_limit"/>
     </informationRequirement>
     <literalExpression id="decision_a_is_within_the_limit_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`investor is within the investment limit` OF `A investor`, 1)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investor is within the investment limit` OF `A investor`, 1)</text>
     </literalExpression>
   </decision>
   <decision id="decision_f_offering" name="F_offering" label="F offering">
@@ -2234,7 +2234,7 @@
       <requiredDecision href="#decision_financial_statements_required"/>
     </informationRequirement>
     <literalExpression id="decision_f_requirement_under_the_2019_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`financial statements required` OF `F offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`financial statements required` OF `F offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_f_requirement_under_the_2023_rules" name="F_requirement_under_the_2023_rules" label="F requirement under the 2023 rules">
@@ -2246,7 +2246,7 @@
       <requiredDecision href="#decision_financial_statements_required"/>
     </informationRequirement>
     <literalExpression id="decision_f_requirement_under_the_2023_rules_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2023)), (`financial statements required` OF `F offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`financial statements required` OF `F offering`)</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_small_offering_inside_the_covid_window" name="a_small_offering_inside_the_COVID_window" label="a small offering inside the COVID window">
@@ -2258,7 +2258,7 @@
       <requiredDecision href="#decision_financial_statements_required"/>
     </informationRequirement>
     <literalExpression id="decision_a_small_offering_inside_the_covid_window_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`financial statements required` OF (`an offering of` OF 0, 100000, FALSE))</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF (`an offering of` OF 0, 100000, FALSE))</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_large_offering_inside_the_covid_window" name="a_large_offering_inside_the_COVID_window" label="a large offering inside the COVID window">
@@ -2270,7 +2270,7 @@
       <requiredDecision href="#decision_financial_statements_required"/>
     </informationRequirement>
     <literalExpression id="decision_a_large_offering_inside_the_covid_window_literal">
-      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`financial statements required` OF `F offering`)</text>
+      <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF `F offering`)</text>
     </literalExpression>
   </decision>
   <dmndi:DMNDI>

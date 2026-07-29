@@ -321,59 +321,59 @@ fidelity report — dmnmd
       `W offering` is a formula (`an offering of` OF 0, 3000000, FALSE), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_w_within_the_limit_in_2016
-      `W within the limit in 2016` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 9, 2016)), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `W within the limit in 2016` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 9, 2016), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_w_within_the_limit_in_2021_january
-      `W within the limit in 2021 January` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 1, 2021)), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `W within the limit in 2021 January` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 1, 2021), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_w_within_the_limit_in_2021_june
-      `W within the limit in 2021 June` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `W within the limit in 2021 June` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`offering is within the offering limit` OF `W offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_cut_point_the_day_before_the_2017_adjustment
-      `the cut point the day before the 2017 adjustment` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 11, 4, 2017)), `income or net worth cut point`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the cut point the day before the 2017 adjustment` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 11, 4, 2017), `income or net worth cut point`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_cut_point_on_the_day_of_the_2017_adjustment
-      `the cut point on the day of the 2017 adjustment` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 12, 4, 2017)), `income or net worth cut point`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the cut point on the day of the 2017 adjustment` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 12, 4, 2017), `income or net worth cut point`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_i_3_investor
       `I-3 investor` is a formula (`an investor with` OF FALSE, 110000, 115000, 0), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_i_3_limit_under_the_2022_rules
-      `I-3 limit under the 2022 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2022)), (`investment limit` OF `I-3 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `I-3 limit under the 2022 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-3 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_i_3_limit_under_the_2023_rules
-      `I-3 limit under the 2023 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2023)), (`investment limit` OF `I-3 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `I-3 limit under the 2023 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`investment limit` OF `I-3 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_i_4_investor
       `I-4 investor` is a formula (`an investor with` OF FALSE, 1240000, 1240000, 0), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_i_4_limit_under_the_2022_rules
-      `I-4 limit under the 2022 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2022)), (`investment limit` OF `I-4 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `I-4 limit under the 2022 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2022), (`investment limit` OF `I-4 investor`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_percentage_case_under_the_2019_rules
-      `the percentage case under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`investment limit` OF (`an investor with` OF FALSE, 60000, 200000, 0))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the percentage case under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investment limit` OF (`an investor with` OF FALSE, 60000, 200000, 0))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_a_investor
       `A investor` is a formula (`an investor with` OF TRUE, 1000000, 1000000, 200000), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_a_is_within_the_limit_under_the_2021_rules
-      `A is within the limit under the 2021 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`investor is within the investment limit` OF `A investor`, 1)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `A is within the limit under the 2021 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`investor is within the investment limit` OF `A investor`, 1)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_a_is_within_the_limit_under_the_2019_rules
-      `A is within the limit under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`investor is within the investment limit` OF `A investor`, 1)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `A is within the limit under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`investor is within the investment limit` OF `A investor`, 1)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_f_offering
       `F offering` is a formula (`an offering of` OF 0, 550000, TRUE), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_f_requirement_under_the_2019_rules
-      `F requirement under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2019)), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `F requirement under the 2019 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2019), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_f_requirement_under_the_2023_rules
-      `F requirement under the 2023 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2023)), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `F requirement under the 2023 rules` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2023), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_a_small_offering_inside_the_covid_window
-      `a small offering inside the COVID window` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`financial statements required` OF (`an offering of` OF 0, 100000, FALSE))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `a small offering inside the COVID window` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF (`an offering of` OF 0, 100000, FALSE))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_a_large_offering_inside_the_covid_window
-      `a large offering inside the COVID window` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (DATE_SERIAL OF (Date OF 1, 6, 2021)), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `a large offering inside the COVID window` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown

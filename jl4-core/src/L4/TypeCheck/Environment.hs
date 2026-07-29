@@ -306,29 +306,30 @@ valueAtBuiltin =
   forall' [aDef] $
     fun_ [date, fun_ [date] (app aRef [])] (app aRef [])
 
--- EVAL under alternate system time (serial-based). Type: NUMBER -> a -> a
+-- EVAL under alternate system time. Type: DATE -> a -> a (midnight convention;
+-- the runtime also tolerates a serial NUMBER via expectDateValue)
 evalAsOfSystemTimeBuiltin :: Type' Resolved
 evalAsOfSystemTimeBuiltin =
   forall' [aDef] $
-    fun_ [number, app aRef []] (app aRef [])
+    fun_ [date, app aRef []] (app aRef [])
 
--- EVAL under valid time (serial-based). Type: NUMBER -> a -> a
+-- EVAL under valid time. Type: DATE -> a -> a
 evalUnderValidTimeBuiltin :: Type' Resolved
 evalUnderValidTimeBuiltin =
   forall' [aDef] $
-    fun_ [number, app aRef []] (app aRef [])
+    fun_ [date, app aRef []] (app aRef [])
 
--- EVAL under rules effective date. Type: DATE SERIAL -> a -> a
+-- EVAL under rules effective date. Type: DATE -> a -> a
 evalUnderRulesEffectiveAtBuiltin :: Type' Resolved
 evalUnderRulesEffectiveAtBuiltin =
   forall' [aDef] $
-    fun_ [number, app aRef []] (app aRef [])
+    fun_ [date, app aRef []] (app aRef [])
 
--- EVAL under rules encoded date. Type: DATE SERIAL -> a -> a
+-- EVAL under rules encoded date. Type: DATE -> a -> a (midnight convention)
 evalUnderRulesEncodedAtBuiltin :: Type' Resolved
 evalUnderRulesEncodedAtBuiltin =
   forall' [aDef] $
-    fun_ [number, app aRef []] (app aRef [])
+    fun_ [date, app aRef []] (app aRef [])
 
 -- Basic Arithmetic
 
