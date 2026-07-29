@@ -90,7 +90,7 @@ This would eliminate the ambiguity where `DATE` serves dual roles and `Date` dif
 
 #### What `YMD` did and did not change
 
-`YMD year month day` has since landed in `daydate.l4` as the **recommended constructor for new code**. It is **additive and non-breaking**: it delegates to `Date day month year` and renames nothing.
+`YMD year month day` has since landed in `daydate.l4` as the **recommended constructor for new code**. It is **additive and non-breaking** — it renames nothing, and builds through `Date day month year` — but it is deliberately STRICTER: `YMD` bounds-checks its arguments by component round-trip and refuses out-of-range input (a loud `ASSUME` bottom), where `Date` rolls or clamps silently. Strict literals via `YMD`; lenient arithmetic via `Date`.
 
 So `YMD` does **not** discharge the rename proposed above — it addresses a different problem (argument _order_, not constructor _naming_). The `makeDate`/`newDate` question is **still open**, and `Date` remains the little-endian constructor it always was. If you are writing new code, use `YMD`; be prepared to update `Date`/`DATE` call sites if the rename ever lands.
 

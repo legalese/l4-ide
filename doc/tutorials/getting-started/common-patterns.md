@@ -381,7 +381,8 @@ expiryDate MEANS YMD 2025 12 31
 
 -- `Date` takes day, month, year — so `Date 2025 12 31` is NOT 2025-12-31.
 -- Day 2025 of month 12 of year 31 silently overflows to 0037-06-16, with no
--- error. That is exactly the transposition footgun `YMD` exists to avoid;
+-- error. That is exactly the transposition footgun `YMD` avoids twice over
+-- (harder to write, and refused if written anyway);
 -- written correctly in day-month-year order it is `Date 31 12 2025`.
 
 -- Compare dates

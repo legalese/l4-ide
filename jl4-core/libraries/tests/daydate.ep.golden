@@ -80,25 +80,41 @@ GIVEN dt IS A DATETIME
 GIVETH A DATE
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
--- YMD year month day  -> the same date as Date day month year, written in
--- ISO 8601 argument order. This is the recommended constructor for new code:
--- big-endian year-month-day reads the way ISO 8601 writes it, which makes a
--- day/month transposition harder to WRITE. `Date d m y` is unchanged and
--- remains supported for existing corpora.
+-- YMD year month day  -> the date, in ISO 8601 argument order, with the
+-- arguments BOUNDS-CHECKED. This is the recommended constructor for new
+-- code, on two grounds:
 --
--- YMD delegates to `Date`, so validity and overflow behaviour are identical
--- by construction. That cuts both ways, and the limit is worth stating
--- plainly: YMD does not detect a transposition, it only makes one less
--- tempting. A transposed `YMD 2026 28 7` evaluates to 2028-04-07 — month 28
--- silently rolls forward 16 months — exactly as `Date 7 28 2026` does. No
--- error, no warning. The gain is at authoring time, not at evaluation time;
--- neither constructor validates its arguments.
+--   * big-endian year-month-day reads the way ISO 8601 writes it, so a
+--     day/month transposition is harder to WRITE;
+--   * unlike `Date d m y`, YMD REFUSES out-of-range components instead of
+--     rolling them: `YMD 2026 28 7` (a transposition) and `YMD 2023 2 29`
+--     (no such leap day) stop evaluation loudly, where `Date` rolls forward
+--     silently.
+--
+-- The check is a component round-trip: build the candidate with `Date`,
+-- then require its year, month and day to equal the arguments. Any rolled
+-- component fails the comparison, so leap years are handled by the same
+-- arithmetic that builds the date and no calendar logic is duplicated.
+--
+-- The pair is deliberate: YMD is the STRICT constructor for literals;
+-- `Date d m y` is unchanged as the LENIENT, rolling constructor, which date
+-- arithmetic relies on (`Date 1 (month PLUS 6) year` is idiomatic). The
+-- refusal is a deliberate ASSUME bottom: evaluation that reaches it stops
+-- with "... is an assumed term", naming the binding below.
+ASSUME `YMD refused an out-of-range month or day` IS A DATE
+
 GIVEN year  IS A NUMBER
       month IS A NUMBER
       day   IS A NUMBER
 GIVETH A DATE
 `YMD` AKA `Year month day` MEANS
-    Date day month year
+    IF      DATE_YEAR  candidate EQUALS year
+        AND DATE_MONTH candidate EQUALS month
+        AND DATE_DAY   candidate EQUALS day
+    THEN candidate
+    ELSE `YMD refused an out-of-range month or day`
+    WHERE
+        candidate MEANS Date day month year
 
 
 
