@@ -110,15 +110,15 @@ and how do they tackle state-space explosion?" Feeds `draft/section-permission-a
   - **NOT goal-indexed.** ⚠️ Correction to an earlier chat claim: do NOT describe it
     as "the edge that keeps the goal reachable" — that goal-reachability dual is the
     Anderson/Meyer `◇(A∧¬V)` reading (our reconstruction), not van der Meyden's result.
-    His is the transition-system home of *free-choice* permission, a different refinement.
+    His is the transition-system home of _free-choice_ permission, a different refinement.
   - **DLP is EXPTIME-complete**; contribution is a complete axiomatisation, not a
     scalable checker. This IS the strand-1 answer to "how do they handle explosion":
     they don't enumerate a model — the cost lives in the decision procedure.
   - Follow-up: **"Reduction from DLP to PDL," JLC 15(5):767–782, 2005**
     (DOI 10.1093/logcom/exi044) — page range to reconfirm against OUP before camera-ready.
 - **Identity confirmed:** same Ron van der Meyden (UNSW) authored the DLP papers and,
-  with **Michael J. Maher**, the **SAFE** book — *Simple Agreement for Future Equity
-  (SAFE): Smart Contracts for Venture Finance*, Springer Nature Singapore, Blockchain
+  with **Michael J. Maher**, the **SAFE** book — _Simple Agreement for Future Equity
+  (SAFE): Smart Contracts for Venture Finance_, Springer Nature Singapore, Blockchain
   Technologies series, 2025 (ISBN 9789819639199, DOI 10.1007/978-981-96-3920-5,
   hardcover 2 Oct 2025). One author spans the classical semantics of permission and its
   contemporary executable use — a one-citation spine linking the deontics paper's
