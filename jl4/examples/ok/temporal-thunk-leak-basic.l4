@@ -24,7 +24,7 @@ TIMEZONE IS "Etc/UTC"
 `today snapshot` MEANS TODAY
 
 -- expected: DATE OF 1, 1, 2020 (forced under the override; correct)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot`
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `today snapshot`
 
 -- expected: DATE OF 31, 1, 2025 (ambient; pre-fix leaked DATE OF 1, 1, 2020)
 #EVAL `today snapshot`
@@ -39,7 +39,7 @@ TIMEZONE IS "Etc/UTC"
 #EVAL `today snapshot 2`
 
 -- expected: DATE OF 1, 1, 2020 (pre-fix leaked the ambient DATE OF 31, 1, 2025)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot 2`
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `today snapshot 2`
 
 ----------------------------------------------------------------------------
 -- Case 3: nested overrides (2020 wrapping 2010; forced innermost first)
@@ -48,10 +48,10 @@ TIMEZONE IS "Etc/UTC"
 `today snapshot 3` MEANS TODAY
 
 -- expected: DATE OF 1, 1, 2010 (innermost override wins)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2010)) `today snapshot 3`)
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2010) `today snapshot 3`)
 
 -- expected: DATE OF 1, 1, 2020 (pre-fix leaked DATE OF 1, 1, 2010 one level up)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `today snapshot 3`
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `today snapshot 3`
 
 -- expected: DATE OF 31, 1, 2025 (pre-fix leaked DATE OF 1, 1, 2010 to ambient)
 #EVAL `today snapshot 3`
@@ -64,7 +64,7 @@ TIMEZONE IS "Etc/UTC"
 `day after today` MEANS DATE_FROM_SERIAL (DATE_SERIAL TODAY PLUS 1)
 
 -- expected: DATE OF 2, 1, 2020 (day after overridden today)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `day after today`
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `day after today`
 
 -- expected: DATE OF 1, 2, 2025 (pre-fix leaked DATE OF 2, 1, 2020)
 #EVAL `day after today`
@@ -77,7 +77,7 @@ TIMEZONE IS "Etc/UTC"
 `now snapshot` MEANS NOW
 
 -- expected: 2020-01-01T00:00:00+0000 (midnight UTC of the override serial)
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `now snapshot`
+#EVAL `EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `now snapshot`
 
 -- expected: 2025-01-31T15:45:30+0000 (pre-fix leaked the 2020 instant)
 #EVAL `now snapshot`

@@ -1074,35 +1074,34 @@ backward val = withPoppedFrame $ \ case
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
   -- Evaluate thunk under overridden system time (serial number)
   Just (EvalAsOfSystemTime1 thunkRef _env) -> do
-    serial <- expectNumber val
+    day <- expectDateValue val
     -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [AsOfSystemTime (serialToUTCTime serial)] originalCtx
+    let newCtx = applyEvalClauses [AsOfSystemTime (Time.UTCTime day 0)] originalCtx
     putTemporalContext newCtx
     pushFrame (EvalAsOfSystemTime2 originalCtx)
     continueRef thunkRef
   Just (EvalUnderValidTime1 thunkRef _env) -> do
-    serial <- expectNumber val
+    day <- expectDateValue val
     -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [UnderValidTime (Time.utctDay (serialToUTCTime serial))] originalCtx
+    let newCtx = applyEvalClauses [UnderValidTime day] originalCtx
     putTemporalContext newCtx
     pushFrame (EvalUnderValidTime2 originalCtx)
     continueRef thunkRef
   Just (EvalUnderRulesEffectiveAt1 thunkRef _env) -> do
-    serial <- expectNumber val
+    day <- expectDateValue val
     -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
-    let retroDay = Time.utctDay (serialToUTCTime serial)
-        newCtx = applyEvalClauses [UnderRulesEffectiveAt retroDay] originalCtx
+    let newCtx = applyEvalClauses [UnderRulesEffectiveAt day] originalCtx
     putTemporalContext newCtx
     pushFrame (EvalUnderRulesEffectiveAt2 originalCtx)
     continueRef thunkRef
   Just (EvalUnderRulesEncodedAt1 thunkRef _env) -> do
-    serial <- expectNumber val
+    day <- expectDateValue val
     -- frame plumbing (save/override), not a context observation (see T6)
     originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [UnderRulesEncodedAt (serialToUTCTime serial)] originalCtx
+    let newCtx = applyEvalClauses [UnderRulesEncodedAt (Time.UTCTime day 0)] originalCtx
     putTemporalContext newCtx
     pushFrame (EvalUnderRulesEncodedAt2 originalCtx)
     continueRef thunkRef

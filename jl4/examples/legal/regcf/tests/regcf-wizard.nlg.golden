@@ -6,6 +6,8 @@
 not `can this company raise` with `a delinquent plan`
 not `can this company raise` with `an over-limit plan`
 `limit for` with `the README 3.1 investor` is equal to 10000
+`investment limit under the rules effective on` with `DATE_FROM_DMY` with 1, 6 and 2023 and `the README 3.1 investor` is equal to 10000
+`investment limit under the rules effective on` with `DATE_FROM_DMY` with 1, 6 and 2019 and `the README 3.1 investor` is equal to 3000
 `limit for` with `a wealthy investor` is equal to 124000
 `headroom left` with `an over-limit plan` is equal to 1000000
 `headroom left` with `a clean plan` is equal to 5000000

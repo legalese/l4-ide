@@ -49,7 +49,7 @@ These word operators have **no precedence**: parenthesize compounds, e.g. `A UNI
 
 **Caution — sets are not arithmetic.** Union is idempotent (`A PLUS A` is `A`) and has no inverse: `(A PLUS B) MINUS B` is **not** `A` in general.
 
-**Why `AND`/`OR` on sets no longer resolve to union:** the overloads existed (the two-ANDs design of the spec's §D4) but a second candidate for `__AND__`/`__OR__` made typechecking **exponential — base 3 in the depth of `AND`/`OR` chains**: a flat 15-operand boolean conjunction took 71.75s, 16+ operands never finished, and a real 27-operand statutory disjunction extrapolated to about a year ([smucclaw/l4-ide#929](https://github.com/smucclaw/l4-ide/issues/929)). Term-level union is now written `UNION` explicitly; the overloads may return only if typechecker memoisation removes the blow-up (SET-OPERATORS-SPEC §16).
+**Why `AND`/`OR` on sets no longer resolve to union:** the overloads existed (the two-ANDs design of the spec's §D4) but a second candidate for `__AND__`/`__OR__` made typechecking **exponential — base 3 in the depth of `AND`/`OR` chains**: a flat 15-operand boolean conjunction took 71.75s, 16+ operands never finished, and a real 27-operand statutory disjunction extrapolated to about a year ([smucclaw/l4-ide#929](https://github.com/smucclaw/l4-ide/issues/929)). Term-level union is now written `UNION` explicitly. A typechecker fix (an overload pre-filter, [legalese/l4-ide#169](https://github.com/legalese/l4-ide/pull/169)) has since removed the blow-up for such chains, so reinstating the overloads is now a semantic question, not a performance one — see SET-OPERATORS-SPEC §16.3 for the recorded ruling and its conditions.
 
 ### Equality: use `set equals`, not `EQUALS`
 

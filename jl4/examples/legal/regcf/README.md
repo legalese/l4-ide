@@ -74,24 +74,48 @@ communications), and the Rule 205 (compensation disclosure) regime.
 | **5 business days** | to file a Form C-U progress update | 17 CFR 227.203(a)(3)(i) | 2016-05-16 | — |
 | **1 year** | resale restricted period | 17 CFR 227.501(a) | 2016-05-16 | — |
 
-### The two amending events
+### The four dates, and the rule-version axis
 
-1. **Release 33-10884**, *Facilitating Capital Formation and Expanding Investment
-   Opportunities by Improving Access to Capital in Private Markets*,
-   [86 FR 3496](https://www.federalregister.gov/d/2020-24749) (Jan. 14, 2021), **effective
-   2021-03-15**. Raised the offering limit to $5,000,000 **and changed the shape of the
-   investor limit** (see §3.1).
+**As of 2026-07-29 the corpus encodes the full amendment history, not just the current
+values.** Every figure above that has ever moved carries one arm per regime in `regcf.l4`,
+selected on `RULES EFFECTIVE DATE`, so any question in this corpus can be asked under the
+rules in force on any date back to commencement via `EVAL UNDER RULES EFFECTIVE AT`. The
+regime table (verified instruction-by-instruction against the Federal Register full text —
+see CORPUS-TRACK §2.4.1):
 
-2. **Release 33-11098**, *Inflation Adjustments Under Titles I and III of the JOBS Act*,
-   [87 FR 57394](https://www.federalregister.gov/d/2022-19867) (Sept. 20, 2022), **effective
-   2022-09-20**. Moved every remaining Reg CF dollar figure. The **$5,000,000 offering limit
-   was deliberately left alone**: the Commission said the March 2021 increase already "more
+| In force                    | Offering limit | Limb test      | Cut point | Floor  | Cap      | Tier 1   | Tier 2   | First-time ceiling | Accredited carve-out |
+| --------------------------- | -------------- | -------------- | --------- | ------ | -------- | -------- | -------- | ------------------ | -------------------- |
+| **2016-05-16 – 2017-04-11** | $1,000,000     | **lesser** of  | $100,000  | $2,000 | $100,000 | $100,000 | $500,000 | $1,000,000         | none                 |
+| **2017-04-12 – 2021-03-14** | $1,070,000     | **lesser** of  | $107,000  | $2,200 | $107,000 | $107,000 | $535,000 | $1,070,000         | none                 |
+| **2021-03-15 – 2022-09-19** | $5,000,000     | **greater** of | $107,000  | $2,200 | $107,000 | $107,000 | $535,000 | $1,070,000         | **added**            |
+| **2022-09-20 – present**    | $5,000,000     | **greater** of | $124,000  | $2,500 | $124,000 | $124,000 | $618,000 | $1,235,000         | yes                  |
+
+The four boundary dates:
+
+1. **2016-05-16 — commencement.** Release 33-9974, 80 FR 71388 (Nov. 16, 2015), Part 227
+   text at 71537. A rule date below this is a **curated refusal** in the corpus, not an
+   answer (CORPUS-TRACK ruling R2).
+
+2. **2017-04-12** — Release 33-10332,
+   [82 FR 17545](https://www.federalregister.gov/d/2017-06797) (Apr. 12, 2017), instrs. 5–6.
+   Moved every Reg CF dollar figure then in existence.
+
+3. **2021-03-15** — **Release 33-10884**, *Facilitating Capital Formation and Expanding
+   Investment Opportunities by Improving Access to Capital in Private Markets*,
+   [86 FR 3496](https://www.federalregister.gov/d/2020-24749) (Jan. 14, 2021). Raised the
+   offering limit to $5,000,000 **and changed the shape of the investor limit** — "lesser
+   of" → "greater of", plus the accredited-investor carve-out (see §3.1).
+
+4. **2022-09-20** — **Release 33-11098**, *Inflation Adjustments Under Titles I and III of
+   the JOBS Act*, [87 FR 57394](https://www.federalregister.gov/d/2022-19867) (Sept. 20,
+   2022). Moved every remaining Reg CF dollar figure. The **$5,000,000 offering limit was
+   deliberately left alone**: the Commission said the March 2021 increase already "more
    than account[s] for inflation", and noted it "expect[s] that the Commission will use $5
    million as the baseline" next time (87 FR at 57397 & n.18).
 
-The prior adjustment was Release 33-10332, [82 FR 17545](https://www.federalregister.gov/d/2017-06797)
-(Apr. 12, 2017). The statutory adjustment cycle is roughly five-yearly, so **the next one is
-due around 2027** — and will move six of the eleven dollar figures above.
+The statutory adjustment cycle is roughly five-yearly, so **the next release is due around
+2027** — at which point the corpus gains one arm per moved figure, and the assertions in
+the rule-version group keep the old answers pinned to their old dates.
 
 Primary text used: eCFR Title 17 Part 227 at the 2026-07-23 issue date, retrieved via
 `https://www.ecfr.gov/api/versioner/v1/full/2026-07-23/title-17.xml?part=227`. The pre-2021
@@ -153,8 +177,11 @@ Both were superseded on **2022-09-20**. Current: **$124,000** and **$2,500**.
 ### 3.3 The page is internally inconsistent about the *same* threshold
 
 $107,000 appears in their group 3 (investor limits) while **$124,000** appears in their
-group 4 (financial-statement tier 1). These are the *same underlying figure*, moved by the
-*same amendatory instruction*, on the *same day*:
+group 4 (financial-statement tier 1). These are **three distinct legal parameters** — the
+cut point (§ 227.100(a)(2)), the per-investor cap (§ 227.100(a)(2)(ii)), and the tier-1
+ceiling (§ 227.201(t)(1)) — which have moved in lockstep through every release so far, by
+the *same release* on the *same day* but by **separate amendatory instructions** (2.a for
+§ 227.100(a)(2), 3.a for § 227.201):
 
 > a. In paragraph (a)(2)(i), removing reference to "$2,200" and adding in its place "$2,500";
 > and removing "$107,000" and adding in its place "$124,000" […]
@@ -162,8 +189,11 @@ group 4 (financial-statement tier 1). These are the *same underlying figure*, mo
 > adding in its place "$124,000" — 87 FR 57394, 57398
 
 Half the page was updated and half was not. This is the failure mode SPEC §1.3(3) predicts
-when one number is typed in more than one place. In `regcf.l4` the figure is bound once, as
-`income or net worth cut point`, and read by both consumers.
+when a figure is transcribed with nothing linking it to its rule, its instruction, or its
+date. In `regcf.l4` the three parameters are three bindings, each carrying its own `@ref`
+to its own paragraph and its own dated arms — their agreement at $124,000 today is a
+coincidence of the rounding table, not a structural identity, and a future release could
+move one without the others exactly as the 2021 release moved § 227.100(a)(1) alone.
 
 ### 3.4 The first-time-issuer audit relief is **bounded**, and the page drops the bound
 
@@ -343,10 +373,32 @@ Honest list. Nothing below is hidden behind a `TRUE`.
    effect, but the rule never states an ordering, and the "if available" trigger — which
    turns on what the issuer happens to possess — is not modelled at all.
 
-9. **No temporal axis yet.** Every figure here is the 2026-07-23 value. The corpus records
-   each figure's effective date in an `@ref` and in §2 above, but cannot yet answer "what was
-   the investor limit on 2020-06-01?". That is Track C1 (`temporal-rule-version`), and it is
-   the demonstration SPEC §8/M5 is built around.
+9. **The rule-version axis is encoded (2026-07-29), with four named residuals.** The
+   corpus now answers "what was the investor limit on 2020-06-01?" — every amended figure
+   and both shape changes carry dated arms back to commencement, closed per CORPUS-TRACK
+   §2.4 trap 5, with a floor refusal below 2016-05-16 (ruling R2). What remains, named
+   rather than hidden:
+
+   - **The COVID-19 temporary rules (Rule 201(z)/(bb)) are refused, not modelled.** For a
+     rule date in 2020-05-04 – 2022-08-28 AND an aggregate in the affected band (above the
+     then-tier-1 ceiling, at most $250,000), `financial statements required` stops with a
+     deliberate `ASSUME` bottom rather than guessing: relief eligibility turns on facts
+     (organization age, prior delinquency) the corpus does not model. Outside that band,
+     in-window questions answer normally, and two assertions pin that.
+   - **Per-arm citation has no in-language home** (CORPUS-TRACK §2.4 trap 4): each dated
+     arm's authority is a `--` comment, because number-returning bodies cannot carry inert
+     prose. Phase 2's `@label` is the designed fix.
+   - **Nothing lints the dated arms** for exhaustiveness, overlap, or citation (ruling R6).
+     The arms are hand-checked against the Federal Register instructions and pinned by the
+     rule-version assertion group; that is discipline, not enforcement.
+   - **The 55 pre-existing assertions are deliberately unpinned** (ruling R3, resolved: pin
+     none). They state the *current* law; in CI they evaluate under the harness's fixed
+     clock (2025-01-31), which sits in the current regime. After the next inflation release
+     (~2027), they must either be pinned to the pre-release regime or re-verified against
+     the new figures — the rule-version group's own assertions are all pinned and immune.
+
+   The demonstration SPEC §8/M5 is built around this axis; the encoding-time clock
+   (`l4 diff-eval`, Phase 3) remains absent.
 
 ## 6. Projections: what comes out of this corpus, and what does not
 

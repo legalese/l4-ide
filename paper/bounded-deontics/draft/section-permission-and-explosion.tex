@@ -1,0 +1,79 @@
+% =====================================================================
+% SECTION DRAFT: "The permission dual, and the cost of checking it"
+% Related-work paragraph on how the prior art meets state-space explosion,
+% for the bounded-deontics paper. Slots into the background material near
+% Section~\ref{sec:nec}/\ref{sec:tooling}, or as a subsection of the
+% composition/tooling discussion. \src{Author Year} placeholders match the
+% draft convention; bib entries (van der Meyden 1996/2005/2025) merged into
+% ../bounded-deontics/draft/bounded-deontics.bib.
+%
+% ACCURACY NOTE: van der Meyden's DLP classifies EXECUTIONS (state-sequences),
+% not states, as permitted, and distinguishes free-choice permission from
+% permission-as-lack-of-prohibition. It is NOT goal-indexed. Do not conflate it
+% with the Anderson/Meyer <a>not-V reading, and do not describe it as
+% "the edge that keeps the goal reachable" -- that is our reconstruction, not
+% his result.
+% =====================================================================
+
+\subsection{The permission dual, and the cost of checking it}
+\label{sec:explosion}
+
+If a \textsc{must} is the dominator of a goal---an act on \emph{every} accepting
+run (Section~\ref{sec:nec})---then its dual is immediate and old. A \textsc{may}
+is the existential companion: an act that lies on \emph{some} accepting run, an
+edge whose taking does not foreclose the goal. Read the necessity/possibility
+pair over a transition system and this is just $\Box/\Diamond$: the
+Anderson--Kanger reduction already gives $O(A)=\Box(\lnot A\to V)$ with dual
+$P(A)=\Diamond(A\land\lnot V)$ \src{Anderson 1958}, and Meyer's dynamic-logic
+recasting makes the edge explicit, $F\alpha=[\alpha]V$ and
+$P\alpha=\langle\alpha\rangle\lnot V$ \src{Meyer 1988}. The permission-as-goal-non-precluding reading we use is that
+diamond, specialised to a goal automaton; we claim no novelty for it.
+
+The sharpest transition-system treatment of permission is van der Meyden's
+\emph{dynamic logic of permission} \src{van der Meyden 1996}, and it is worth
+stating precisely, because it is both closer and more careful than the slogan.
+Van der Meyden classifies not states but \emph{executions}---sequences of
+states---as permitted or not, so that a permission constrains the intermediate
+course of an action and not merely its result; and he separates
+\emph{free-choice} permission from permission-as-lack-of-prohibition, the former
+being exactly what standard modal logics cannot capture. His reading is
+therefore trajectory-indexed rather than goal-indexed: it is the home of
+free-choice permission, not of our goal-reachability dual, and the two should not
+be run together. (The same Ron van der Meyden later reduces \textsc{dlp} to
+\textsc{pdl} \src{van der Meyden 2005}, and, three decades on, is the co-author of
+the executable-SAFE case study \src{van der Meyden \& Maher 2025} nearest our own
+smart-contract work---one author spanning the classical semantics of permission
+and its contemporary executable use.)
+
+That precision comes at a price, and the price is the point. Van der Meyden's
+\textsc{dlp} is \textsc{exptime}-complete, and his contribution is a complete
+axiomatisation, not a checker that scales: the classical deontic tradition, from
+Anderson through Meyer to van der Meyden, meets state-space explosion by
+\emph{not enumerating a model at all}---it works at the level of proof theory and
+Kripke semantics, where the exponential lives in the decision procedure rather
+than in a graph one builds. Where the normative content \emph{is} model-checked,
+in the normative multi-agent tradition---deontic interpreted systems and their
+\textsc{mcmas}-style verifiers \src{Lomuscio \& Sergot 2003}---explosion is met
+with the generic apparatus of symbolic model checking: \textsc{obdd} state
+representation, partial-order reduction, bounded model checking. Nothing there is
+specific to the deontic operators; the mitigation is the standard temporal-logic
+toolbox pointed at a normative property.
+
+The dominator reading buys something neither of those does, and it buys it by
+borrowing. A dominator is a \emph{structural} property of the transition
+graph, computable in near-linear time \src{Lengauer \& Tarjan 1979}; the
+exponential never lived in the dominator computation but in \emph{building} the
+graph, the product of the parties' state spaces. The one tradition that both
+frames obligation as a necessary passage and has a native way to dodge that
+product is AI planning, where our dominator is the \emph{landmark}---a fact true
+on every plan \src{Hoffmann, Porteous \& Sebastia 2004}. Planning does not
+compute landmarks on the true reachable graph; it extracts sound-but-incomplete
+landmarks from the delete-relaxed problem in polynomial time
+\src{Helmert \& Domshlak 2009}, and rides their count as a search heuristic
+\src{Richter \& Westphal 2010}. The permission dual inherits the mirror
+machinery: proving that an edge \emph{does} preclude the goal is dead-end
+detection, itself relaxation- and abstraction-based. Reading \textsc{must} as
+domination thus imports, as a side effect, planning's relaxation-based answer to
+explosion---an answer the $\Box/\Diamond$ tradition could not reach because it
+never made the landmark move. That import, not the duality, is what
+Section~\ref{sec:tooling} turns into a checker.
