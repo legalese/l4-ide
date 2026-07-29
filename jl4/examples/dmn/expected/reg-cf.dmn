@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_regulation_crowdfunding" name="Regulation Crowdfunding" namespace="https://legalese.com/l4/dmn/regulation_crowdfunding" exporter="jl4">
+  <itemDefinition id="itemdef_investor_class" name="Investor_Class" label="Investor Class">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"accredited","retail","institutional"</text>
+    </allowedValues>
+  </itemDefinition>
   <inputData id="input_class" name="class">
-    <variable id="input_class_var" name="class" typeRef="string"/>
+    <variable id="input_class_var" name="class" typeRef="Investor_Class"/>
   </inputData>
   <inputData id="input_annual_income" name="annual_income" label="annual income">
     <variable id="input_annual_income_var" name="annual_income" label="annual income" typeRef="number"/>
@@ -22,9 +28,12 @@
     </informationRequirement>
     <decisionTable id="decision_is_accredited_investor_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="is accredited investor">
       <input id="decision_is_accredited_investor_i1" label="class">
-        <inputExpression id="decision_is_accredited_investor_i1_expr" typeRef="string">
+        <inputExpression id="decision_is_accredited_investor_i1_expr" typeRef="Investor_Class">
           <text>class</text>
         </inputExpression>
+        <inputValues>
+          <text>"accredited","retail","institutional"</text>
+        </inputValues>
       </input>
       <output id="decision_is_accredited_investor_o1">
         <defaultOutputEntry id="decision_is_accredited_investor_o1_default">

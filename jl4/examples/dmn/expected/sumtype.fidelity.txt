@@ -1,0 +1,40 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-ITEMDEF] lossy — itemdef_claim_c3
+      `Claim`'s component `supporting notes` is typed `LIST OF STRING`, and a collection needs an itemDefinition of its OWN -- isCollection is an attribute of tItemDefinition, not of a typeRef -- which this phase does not mint, so it is emitted as typeRef="Any"
+      lost: the component's declared type; nothing downstream can tell what it holds
+  [D-MAYBE-NULL] lossy — itemdef_claim_c2
+      `Claim`'s component `assessed grade` is declared `MAYBE OF Grade`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the emitted typeRef is the payload type's own. FEEL has one `null` and it means both "there is no value" and "the value could not be computed", so NOTHING and an undefined result can no longer be told apart in the artifact. No allowedValues or inputValues is emitted AT THIS ELEMENT, because DMN 7.3.3 makes allowedValues the COMPLETE range of values a type represents and `null` is not a legal S-FEEL endpoint -- and because that range is read through the typeRef, this element points at `Grade_optional`, a domain-free alias of `Grade`, rather than at `Grade` itself. Pointing at `Grade` would re-assert its complete range one hop on, and that range has no absent case in it, so an enforcing engine would reject the very NOTHING this type exists to allow
+      lost: the distinction between an absent value and an undefined one, and -- at THIS element only -- engine-side validation of the values that ARE present: `Grade`'s domain is deliberately not asserted here, so a value outside it is no longer rejected at this site
+  [D-MAYBE-NULL] lossy — input_q
+      the input `q` is declared `MAYBE OF Grade`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the emitted typeRef is the payload type's own. FEEL has one `null` and it means both "there is no value" and "the value could not be computed", so NOTHING and an undefined result can no longer be told apart in the artifact. No allowedValues or inputValues is emitted AT THIS ELEMENT, because DMN 7.3.3 makes allowedValues the COMPLETE range of values a type represents and `null` is not a legal S-FEEL endpoint -- and because that range is read through the typeRef, this element points at `Grade_optional`, a domain-free alias of `Grade`, rather than at `Grade` itself. Pointing at `Grade` would re-assert its complete range one hop on, and that range has no absent case in it, so an enforcing engine would reject the very NOTHING this type exists to allow
+      lost: the distinction between an absent value and an undefined one, and -- at THIS element only -- engine-side validation of the values that ARE present: `Grade`'s domain is deliberately not asserted here, so a value outside it is no longer rejected at this site
+  [D-LITERALEXPR] blocking — decision_doubled_amount  (main.l4:98:53-60)
+      `doubled amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-SUMTYPE] lossy — decision_doubled_amount
+      `doubled amount` threads `Claim`, whose field `the disposal` is typed `Disposal`, a payload-carrying sum type; the itemComponent is emitted as typeRef="Disposal", which resolves to an itemDefinition over `string` listing every constructor as a bare tag -- FEEL has no tagged value, so a constructor that carries a payload and the same constructor without one are a single FEEL string
+      lost: the tag/payload distinction: every `Disposal` constructor is spelled as a bare string, and the payload one of them carries has no image in the component at all
+  [D-SUMTYPE] lossy — decision_is_a_sale  (main.l4:106:12-13)
+      `is a sale` CONSIDERs `Disposal`, a payload-carrying sum type, over its nullary constructors only; no cell is emitted for `lease`, and no FEEL value can stand for one
+      lost: the refused constructors' share of the domain -- the itemDefinition's allowedValues lists them, so a gap analyser reports the missing rows, which is the loss made visible
+  [D-SUMTYPE] blocking — decision_stated_term  (main.l4:115:3-29)
+      `stated term` is a reader of `Disposal`, a payload-carrying sum type FEEL has no way to represent (it projects the payload field `term in years`), so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_claim_amount  (main.l4:122:3-15)
+      `claim amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-SUMTYPE] lossy — decision_claim_amount
+      `claim amount` threads `Claim`, whose field `the disposal` is typed `Disposal`, a payload-carrying sum type; the itemComponent is emitted as typeRef="Disposal", which resolves to an itemDefinition over `string` listing every constructor as a bare tag -- FEEL has no tagged value, so a constructor that carries a payload and the same constructor without one are a single FEEL string
+      lost: the tag/payload distinction: every `Disposal` constructor is spelled as a bare string, and the payload one of them carries has no image in the component at all
+  [D-SUMTYPE] blocking — decision_capped_at_ten  (main.l4:129:3-43)
+      `capped at ten` is a decision that constructs or matches L4's builtin open sums (it mentions `JUST`), and FEEL has no way to spell a tagged value, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-MAYBE-NULL] lossy — decision_capped_at_ten  (main.l4:129:3-43)
+      `capped at ten` is declared `MAYBE OF NUMBER`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the emitted typeRef is the payload type's own. FEEL has one `null` and it means both "there is no value" and "the value could not be computed", so NOTHING and an undefined result can no longer be told apart in the artifact
+      lost: the distinction between an absent value and an undefined one
+  [D-SUMTYPE] blocking — decision_grade_is_settled  (main.l4:136:3-138:26)
+      `grade is settled` is a decision that constructs or matches L4's builtin open sums (it mentions `JUST`), and FEEL has no way to spell a tagged value, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-SUMTYPE] blocking — decision_deep  (main.l4:144:3-7)
+      `deep` is typed `MAYBE OF MAYBE OF NUMBER` at its own boundary: FEEL's `null` does not nest and FEEL has no EITHER, so the type has no faithful image, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review

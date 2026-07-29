@@ -670,8 +670,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       map (.icExpr.feText) t.dtInputs `shouldBe` ["c"]
       map (.drInputs) t.dtRules
         `shouldBe` [[TestEq (VStr "red")], [TestEq (VStr "green")]]
-      -- an enum has no FEEL type, but every cell in the column is a string
-      map (.icType) t.dtInputs `shouldBe` [DmnString]
+      -- An enum has no FEEL type of its own, so it becomes a NAMED type over
+      -- `string` -- the itemDefinition's base -- and the column carries the
+      -- domain that used to be nowhere (§3.1, §4.2).
+      map (.icType) t.dtInputs `shouldBe` [DmnNamed "Colour" DmnString]
+      map (.icValues) t.dtInputs `shouldBe` [Just ["red", "green", "blue"]]
 
   describe "columns, cells, and what is NOT in them" $ do
     it "overlapping thresholds decompose to one column of unary tests under F" $ do
@@ -714,7 +717,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       let t = tableOf "complement" constructorOutput
       map (.drOutput.feText) t.dtRules `shouldBe` ["\"green\"", "\"red\""]
       fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "\"blue\""
-      t.dtOutput.ocType `shouldBe` DmnString
+      t.dtOutput.ocType `shouldBe` DmnNamed "Colour" DmnString
+      -- ...and an ENUM-typed output is the one case §3.2 says the domain is
+      -- knowable, so it ships as <outputValues>. A boolean output does not:
+      -- there the domain IS the typeRef.
+      t.dtOutput.ocValues `shouldBe` Just ["red", "green", "blue"]
       -- and a quoted constant is not a "computed output"
       map (.code) t.dtNotes `shouldNotContain` ["D-COMPUTEDOUTPUT"]
 
@@ -913,19 +920,42 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Blocking)]
       emitDrg drg `shouldSatisfy` Text.isInfixOf "<literalExpression"
 
-    it "an elided CONSIDER arm with no OTHERWISE refuses to become a table" $ do
-      -- DMN answers null where the rule answers FALSE, so there must be no table
+    -- __Both of these shapes are now refused EARLIER, and by a different code.__
+    -- Their `WHEN other description` arm binds the payload of a
+    -- payload-carrying `IS ONE OF`, which is R4-a's third reading form, and
+    -- §4.2.1-8 requires `D-SUMTYPE` to be decided BEFORE `normaliseGuarded` so
+    -- that a FEEL type-system limit is not reported as a table-shape problem.
+    -- What used to be reported here -- `RowsElided`, "a DMN table would answer
+    -- null where the rule answers FALSE" -- was the correct diagnosis of the
+    -- second-nearest cause.
+    --
+    -- Two consequences worth stating plainly rather than leaving in a diff.
+    -- (i) `RowsElided` is now UNREACHABLE for a multi-constructor payload
+    -- union, which is the only shape that could produce it: `considerRows`
+    -- elides an arm only when the arm binds AND still contributes a
+    -- disjointness key, and a `PatVar` catch-all supplies no key (measured: it
+    -- gives "is not a guarded chain" instead). (ii) `elidedArmWithOtherwise`
+    -- used to emit a table that was CORRECT -- one rule for `education`, the
+    -- rest to the default -- and R4-a refuses it anyway. That is the ruling as
+    -- written, and it is the one place the corpus-derived claim "R4-a refuses
+    -- only what is already refused" does not extend to a synthetic shape.
+    it "a payload-binding CONSIDER arm is refused as D-SUMTYPE, not misdiagnosed" $ do
       let drg = drgOf elidedArmNoOtherwise
       case (decisionNamed "charitable" drg).dcnLogic of
         LogicLiteral _ -> pure ()
         LogicTable _   -> expectationFailure "emitted a table that answers null where the rule answers FALSE"
-      [n.code | n <- drg.drgNotes] `shouldBe` ["D-LITERALEXPR"]
-      [n.message | n <- drg.drgNotes] `shouldSatisfy` all (Text.isInfixOf "answer null")
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-SUMTYPE", Blocking)]
+      [n.message | n <- drg.drgNotes]
+        `shouldSatisfy` all (Text.isInfixOf "binds `other`'s payload")
+      -- and NOT the shape diagnosis it used to get
+      [n.message | n <- drg.drgNotes] `shouldSatisfy` all (not . Text.isInfixOf "answer null")
 
-    it "...but with an OTHERWISE the default output plugs the hole" $ do
-      let t = tableOf "charitable" elidedArmWithOtherwise
-      map (.drInputs) t.dtRules `shouldBe` [[TestEq (VStr "education")]]
-      fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "false"
+    it "...and adding an OTHERWISE does not rescue it, because the arm still binds" $ do
+      let drg = drgOf elidedArmWithOtherwise
+      case (decisionNamed "charitable" drg).dcnLogic of
+        LogicLiteral _ -> pure ()
+        LogicTable _   -> expectationFailure "expected a boxed literal expression (R4-a form 3)"
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-SUMTYPE", Blocking)]
 
     it "U is claimed only when the CELLS witness it, not merely because the guards are exclusive" $ do
       let t = tableOf "tier" disjointButUnwitnessable
@@ -1094,11 +1124,17 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       map (.idId) (drgInputData drg) `shouldBe` ["input_n", "input_n_2"]
       let shared = [n | n <- drg.drgNotes, n.code == "D-SCOPE"]
       map (.severity) shared `shouldBe` [Lossy]
-      map (.message) shared `shouldSatisfy` all (Text.isInfixOf "both named `n`")
       -- The count is computed, not spelled. It read "two" unconditionally
       -- until 2026-07-27, which understated the Reg CF corpus's eight-way
       -- collision on `issuer` as a two-way one.
       map (.message) shared `shouldSatisfy` all (Text.isInfixOf "two different terms")
+      -- After §5.2 stage 2 the message may NOT say the elements cannot be told
+      -- apart -- they are renamed apart, and every reference reaches the one it
+      -- means. What survives is the scope loss, and the note names both the L4
+      -- spelling and the FEEL names the reader will see (§5.3.6).
+      map (.message) shared `shouldSatisfy` all (Text.isInfixOf "fold to the FEEL name `n`")
+      map (.message) shared `shouldSatisfy` all (Text.isInfixOf "`n`, `n_2`")
+      map (.message) shared `shouldNotSatisfy` any (Text.isInfixOf "cannot tell apart")
 
     it "element ids derive from L4 names, so they survive a rebuild" $ do
       let drg = drgOf decisionChain
@@ -1140,6 +1176,70 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       feelIdentText "" `shouldBe` "_"
       feelIdentText "---" `shouldBe` "_"
       feelIdentText "2nd tranche" `shouldBe` "_2nd_tranche"
+
+    it "suffixes a folded name that IS a FEEL reserved word (§5.2 stage 1 step 6)" $ do
+      feelIdentText "in" `shouldBe` "in_"
+      feelIdentText "date" `shouldBe` "date_"
+      -- The test is against the WHOLE folded name, never a part: §10.3.1.4
+      -- forbids a keyword name START and explicitly permits a keyword name
+      -- part, and after folding `annual income` is one name, not two.
+      feelIdentText "annual income" `shouldBe` "annual_income"
+      feelIdentText "in come" `shouldBe` "in_come"
+      -- CASE-SENSITIVE, and this pins the choice rather than inheriting it:
+      -- FEEL's literal terminal symbols are lower case, so `IF` is not one of
+      -- them and renaming it would rename a name no engine objects to.
+      feelIdentText "IF" `shouldBe` "IF"
+      -- The suffix is applied LAST, after the leading-digit repair, and is not
+      -- re-collapsed.
+      feelIdentText "not" `shouldBe` "not_"
+      feelIdentText "not!" `shouldBe` "not_"
+
+    it "gives type names their own function, with the same map and the same dot policy" $ do
+      -- §5.1-2 and §5.3.6. A `.` in a typeRef QName is DMN's IMPORT PREFIX
+      -- separator and this exporter emits no imports, so a dot passed through
+      -- would name an import that does not exist.
+      feelTypeNameText "Investor Class" `shouldBe` "Investor_Class"
+      feelTypeNameText "a.b" `shouldBe` "a_b"
+      feelTypeNameText "list" `shouldBe` "list_"
+
+    it "suffixes a type name that collides with a FEEL BUILT-IN type spelling" $ do
+      -- The two namespaces diverge here, and only here. FEEL's built-in type
+      -- names are not keywords -- a VARIABLE called `number` is fine -- but a
+      -- typeRef is resolved against them, so an itemDefinition called `number`
+      -- does not shadow the numeric type, it ALIASES onto it: a string enum and
+      -- every genuine NUMBER-typed element would share one typeRef, with
+      -- nothing in the artifact to say they differ, and therefore nothing a
+      -- fidelity note could key off. Renaming is the only repair that leaves
+      -- the artifact readable.
+      feelTypeNameText "number" `shouldBe` "number_"
+      feelTypeNameText "string" `shouldBe` "string_"
+      feelTypeNameText "boolean" `shouldBe` "boolean_"
+      feelTypeNameText "Any" `shouldBe` "Any_"
+      feelTypeNameText "dateTime" `shouldBe` "dateTime_"
+      feelTypeNameText "days and time duration" `shouldBe` "days_and_time_duration"
+      feelTypeNameText "daysAndTimeDuration" `shouldBe` "daysAndTimeDuration_"
+      feelTypeNameText "yearsAndMonthsDuration" `shouldBe` "yearsAndMonthsDuration_"
+      -- Case-sensitive, as in the variable namespace: `Any` is DMN's spelling,
+      -- `any` is not, and renaming the latter would rename a name no engine
+      -- objects to.
+      feelTypeNameText "any" `shouldBe` "any"
+      -- ...and the VARIABLE namespace is unmoved: a decision or inputData named
+      -- `number` needs no suffix, because nothing resolves a variable name
+      -- against the type names.
+      feelIdentText "number" `shouldBe` "number"
+      feelIdentText "Any" `shouldBe` "Any"
+      -- ...but the type set is a SUPERSET, so nothing reserved for a variable
+      -- silently became legal for a type when the two functions diverged.
+      [w | w <- toList reservedFeelWords, w `notElem` toList reservedFeelTypeNames]
+        `shouldBe` []
+
+    it "uniquifyIn takes the least FREE suffix, over a stable source order" $ do
+      -- §5.2 stage 2. First claimant keeps the base; the nth gets base_<n>.
+      uniquifyIn ["a", "a", "b", "a"] `shouldBe` ["a", "a_2", "b", "a_3"]
+      -- "least free" rather than "least unused count": a source name that
+      -- already spells the suffix must not be handed out twice.
+      uniquifyIn ["a", "a_2", "a"] `shouldBe` ["a", "a_2", "a_3"]
+      uniquifyIn [] `shouldBe` []
 
     it "gives a node and its variable the SAME @name (the engines read different ones)" $ do
       -- KIE resolves an inputData by the NODE's @name; Camunda by the
@@ -1190,40 +1290,318 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- a multi-output table will.
       (tableOf "investor limit" spacedNames).dtOutput.ocName `shouldBe` "investor_limit"
 
-    -- D-FEELNAME. `feelIdentText` is §5.2 stage 1 only: it is deliberately
-    -- non-injective, and stage 2 (`uniquifyIn`, which has to rename references
-    -- as well as declarations) is Phase 2. Until then a collision has to be
-    -- LOUD, because it is measured to be a silently wrong answer on the DEFAULT
-    -- flavor -- Camunda 8 loads the file and reads the wrong element, while KIE
-    -- at least rejects it with DUPLICATE_NAME. Detecting is not resolving; this
-    -- is the detection, and it must not regress to silence.
-    describe "two elements, one FEEL name (D-FEELNAME)" $ do
+    -- §5.2 stage 2 landed, so a collision is now RESOLVED rather than merely
+    -- detected: `uniquifyIn` suffixes every claimant after the first, in both
+    -- the declaration and every reference to it, and D-RENAME reports the
+    -- rename at Lossy. D-FEELNAME keeps its code and its predicate -- §7's
+    -- header forbids deleting the tree's only detector of a duplicate
+    -- `inputData/@name` until something else reports it -- and therefore now
+    -- fires ZERO times. That zero is pinned below, so the day it fires again is
+    -- visible rather than inferred.
+    describe "two elements, one FEEL name (uniquifyIn, D-RENAME)" $ do
       let feelNameNotes src =
             [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-FEELNAME"]
+          renameNotes src =
+            [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-RENAME"]
 
-      it "reports inputData x inputData (Camunda reads one value twice)" $ do
-        let notes = feelNameNotes collidingInputs
-        map (.severity) notes `shouldBe` [Blocking]
-        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`first_time_issuer`")
-        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "inputData `first-time issuer`")
+      it "renames inputData x inputData apart, in the declaration AND the references" $ do
+        -- Before stage 2, Camunda 8 loaded this file and read one supplied
+        -- value twice while KIE rejected it with DUPLICATE_NAME. Now there are
+        -- two distinct FEEL names and the sum reads both.
+        let drg = drgOf collidingInputs
+        map (.idFeelName) (drgInputData drg)
+          `shouldBe` ["first_time_issuer", "first_time_issuer_2"]
+        emitDrg drg `shouldSatisfy`
+          Text.isInfixOf "first_time_issuer + first_time_issuer_2"
+        feelNameNotes collidingInputs `shouldBe` []
+        let notes = renameNotes collidingInputs
+        map (.severity) notes `shouldBe` [Lossy]
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`first_time_issuer_2`")
+        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "`first time issuer`")
 
-      it "reports inputData x decision -- which had NO note at all before" $ do
-        -- Measured: L4 says 7 + 101; Camunda 8 answers 202, because the
-        -- reference to the INPUT resolves to the DECISION.
-        let notes = feelNameNotes collidingInputAndDecision
-        map (.severity) notes `shouldBe` [Blocking]
-        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "inputData `net worth`")
-        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "decision `net_worth`")
+      it "renames inputData x decision apart -- one flat namespace, both kinds" $ do
+        -- Measured before the fix: L4 says 7 + 101; Camunda 8 answered 202,
+        -- because the reference to the INPUT resolved to the DECISION.
+        let drg = drgOf collidingInputAndDecision
+        -- free terms in first-use order: `base` is read by the decision that
+        -- collides, so it is collected first.
+        map (.idFeelName) (drgInputData drg) `shouldBe` ["base", "net_worth"]
+        map (.dcnFeelName) (drgDecisions drg) `shouldBe` ["net_worth_2", "total"]
+        feelNameNotes collidingInputAndDecision `shouldBe` []
+        map (.severity) (renameNotes collidingInputAndDecision) `shouldBe` [Lossy]
 
-      it "reports decision x decision -- likewise previously silent" $ do
-        -- Measured: L4 says 101 + 102; Camunda 8 answers 204.
-        let notes = feelNameNotes collidingDecisions
-        map (.severity) notes `shouldBe` [Blocking]
-        map (.message) notes `shouldSatisfy` all (Text.isInfixOf "decision `net worth`")
+      it "renames decision x decision apart" $ do
+        let drg = drgOf collidingDecisions
+        map (.dcnFeelName) (drgDecisions drg)
+          `shouldBe` ["net_worth", "net_worth_2", "total"]
+        emitDrg drg `shouldSatisfy` Text.isInfixOf "net_worth + net_worth_2"
+        feelNameNotes collidingDecisions `shouldBe` []
+        map (.severity) (renameNotes collidingDecisions) `shouldBe` [Lossy]
 
       it "says nothing when the names are distinct after mangling" $ do
         feelNameNotes spacedNames `shouldBe` []
         feelNameNotes considerConstructors `shouldBe` []
+        renameNotes spacedNames `shouldBe` []
+        renameNotes considerConstructors `shouldBe` []
+
+    -- §5.3.4's witness, and the reason stage 2's scope list covers projection
+    -- paths and not only the DRG: this is the ONE executed corpus collision,
+    -- and before stage 2 it emitted `p.foo_bar + p.foo_bar` -- valid FEEL,
+    -- computing a wrong number, with no note of any kind. The file's own
+    -- comment says the bridge must reject it; the OpenFisca backend does, and
+    -- this exporter now renames it apart and says so.
+    it "renames two fields of one record apart, and reports it (§5.3.4)" $ do
+      src <- Text.readFile (examplesRoot </> "openfisca" </> "not-ok" </> "name-collision.l4")
+      let drg = drgNamed "name-collision" src
+          xml = emitDrg drg
+          notes = dmnReport drg
+      xml `shouldSatisfy` Text.isInfixOf "p.foo_bar + p.foo_bar_2"
+      xml `shouldNotSatisfy` Text.isInfixOf "p.foo_bar + p.foo_bar<"
+      [n.severity | n <- notes.notes, n.code == "D-RENAME"] `shouldBe` [Lossy]
+      [n.code | n <- notes.notes] `shouldNotContain` ["D-FEELNAME"]
+
+  -- Phase 3 (§4): the TYPE-level half of the export. What each assertion pins
+  -- is either a normative XSD/spec requirement or a ruling with a measurement
+  -- behind it, never a preference.
+  describe "the data model: itemDefinitions, domains, and the sums FEEL has not got" $ do
+    it "puts every itemDefinition BEFORE every drgElement (§4.3)" $ do
+      -- tDefinitions is an xsd:sequence, so this is normative, not cosmetic --
+      -- and the obvious validator does NOT catch it: libxml2 and dmn-moddle
+      -- both accept the misordering that Xerces rejects with
+      -- cvc-complex-type.2.4.a.
+      --
+      -- This assertion is over the EMITTER. That the schema gate itself can go
+      -- red is a separate claim, and it needs a file the emitter cannot
+      -- produce: see the matched pair in jl4/tests-cli/fixtures/dmn-xsd-order/
+      -- and the "XSD sequence-order gate" describe in jl4/tests-cli/Main.hs.
+      -- Measured there: Camunda 8.7.6 rejects the misordered file at parse,
+      -- while Drools/KIE 8.44 builds and evaluates it correctly and only its
+      -- schema legs object.
+      let xml = emitDrg (drgOf considerConstructors)
+      Text.breakOn "<itemDefinition" xml `shouldSatisfy` (not . Text.null . snd)
+      Text.length (fst (Text.breakOn "<itemDefinition" xml))
+        `shouldSatisfy` (< Text.length (fst (Text.breakOn "<inputData" xml)))
+
+    it "mints NO itemDefinition for a scalar (§4.3)" $ do
+      -- An alias over `number` adds no information and degrades for any
+      -- consumer that does not resolve typeRefs.
+      let drg = drgOf overlappingThresholds
+      drg.drgItemDefs `shouldBe` []
+      emitDrg drg `shouldNotSatisfy` Text.isInfixOf "<itemDefinition"
+
+    it "gives an IS ONE OF a string base and its COMPLETE domain, in declaration order" $ do
+      -- §7.3.3: allowedValues "specifies the complete range of values that this
+      -- ItemDefinition represents". Order is the L4's, because that is the only
+      -- ordering the source ever states (and §3.2 makes it the priority order
+      -- for the hit policies a later phase may use).
+      let drg = drgOf considerConstructors
+      map (.idfName) drg.drgItemDefs `shouldBe` ["Colour"]
+      map (.idfBase) drg.drgItemDefs `shouldBe` [Just DmnString]
+      map (.idfValues) drg.drgItemDefs `shouldBe` [Just ["red", "green", "blue"]]
+      map (.idfComponents) drg.drgItemDefs `shouldBe` [[]]
+      emitDrg drg `shouldSatisfy`
+        Text.isInfixOf "<text>\"red\",\"green\",\"blue\"</text>"
+
+    it "spells a constructor with nameOf, NOT the FEEL fold (§5.3.6)" $ do
+      -- A constructor name becomes a FEEL string LITERAL -- the tag value --
+      -- never an identifier, so the name fold must not touch it. This is also
+      -- what keeps the domain and the cells identical strings.
+      let drg = drgOf considerConstructors
+          t   = tableOf "score" considerConstructors
+      map (.idfValues) drg.drgItemDefs `shouldBe` [Just ["red", "green", "blue"]]
+      map (.drInputs) t.dtRules
+        `shouldBe` [[TestEq (VStr "red")], [TestEq (VStr "green")]]
+
+    describe "sumtype.l4, the data-model exhibit" $ do
+      let sumtypeDrg = do
+            src <- Text.readFile (examplesRoot </> "dmn" </> "sumtype.l4")
+            pure (drgAsCli "sumtype.l4" src)
+
+      it "maps a record to an itemDefinition with one component per STORED field" $ do
+        drg <- sumtypeDrg
+        let claim = itemDefNamed "Claim" drg
+        claim.idfBase `shouldBe` Nothing
+        claim.idfValues `shouldBe` Nothing
+        -- `doubled amount` is absent because L4.Desugar turned it into a
+        -- top-level DECIDE before type checking, not because we dropped it.
+        map (.icmLabel) claim.idfComponents
+          `shouldBe` [ "amount", "assessed grade", "supporting notes", "the disposal" ]
+        -- nesting -> nesting: a component whose type is another declared type
+        -- points at that itemDefinition by name.
+        [c.icmType | c <- claim.idfComponents, c.icmLabel == "the disposal"]
+          `shouldBe` [DmnNamed "Disposal" DmnString]
+
+      it "gives a component the SAME name a projection path uses (§5.2 scope 2)" $ do
+        drg <- sumtypeDrg
+        let claim = itemDefNamed "Claim" drg
+        map (.icmName) claim.idfComponents
+          `shouldSatisfy` elem "supporting_notes"
+        emitDrg drg `shouldSatisfy` Text.isInfixOf "c.amount"
+
+      it "points a MAYBE over a DOMAIN-carrying type at a domain-free alias (R8-a, R8-b)" $ do
+        drg <- sumtypeDrg
+        let xml   = emitDrg drg
+            notes = [n | n <- drgNotesAll drg, n.code == "D-MAYBE-NULL"]
+            qNotes = [n.message | n <- notes, Text.isInfixOf "`q`" n.message]
+        map (.severity) notes `shouldSatisfy` all (== Lossy)
+        notes `shouldSatisfy` (not . null)
+        -- R8-b suppresses the domain AT the element, because `null` is not a
+        -- legal S-FEEL endpoint and a list that omitted it would not be the
+        -- COMPLETE range §7.3.3 requires. But §7.3.3 reads the range off
+        -- whatever the typeRef RESOLVES to, so R8-a's plain lowering --
+        -- typeRef="Grade" -- re-asserted that range one hop on, and nothing
+        -- this exporter emits lowers to null. An enforcing engine would then
+        -- reject the absent case that is the whole content of the MAYBE: an
+        -- ANSWER CHANGE, not a reporting gap, which is why the repair is in
+        -- the artifact. `q` points at the alias.
+        xml `shouldSatisfy` Text.isInfixOf "name=\"q\" typeRef=\"Grade_optional\""
+        xml `shouldNotSatisfy` Text.isInfixOf "name=\"q\" typeRef=\"Grade\""
+        -- The alias is a `string` with NO allowedValues, and it does not spell
+        -- nullability -- tItemDefinition cannot -- it only keeps R8-b's
+        -- suppression from being undone by the hop.
+        xml `shouldSatisfy` Text.isInfixOf
+          "<itemDefinition id=\"itemdef_grade_optional\" name=\"Grade_optional\" label=\"Grade\">\n\
+          \    <typeRef>string</typeRef>\n\
+          \  </itemDefinition>"
+        -- Minted at most ONCE per module, however many sites point at it:
+        -- `Claim`'s `assessed grade` is the second.
+        length (Text.breakOnAll "name=\"Grade_optional\"" xml) `shouldBe` 1
+        xml `shouldSatisfy` Text.isInfixOf
+          "name=\"assessed_grade\" label=\"assessed grade\">\n      <typeRef>Grade_optional</typeRef>"
+        -- ...and gated on being pointed at: `Disposal` has a domain too and is
+        -- never reached through a MAYBE, so it gets no alias.
+        xml `shouldNotSatisfy` Text.isInfixOf "Disposal_optional"
+        -- The note names the alias and the type it drops the range of, and
+        -- reports what the alias COSTS: at this element an engine no longer
+        -- validates the values that ARE present.
+        qNotes `shouldSatisfy` all (Text.isInfixOf "`Grade_optional`, a domain-free alias of `Grade`")
+        -- The note went wrong twice before, in opposite directions, and this
+        -- pins the second one -- the live hazard. It said the suppression "does
+        -- not reach through the typeRef", i.e. that a consumer resolving `q`
+        -- still finds Grade's complete range. That WAS true of the artifact
+        -- that shipped, and is what the alias exists to make false; a note
+        -- saying it again would describe an export we no longer emit. (The
+        -- first error was the reverse claim that the domain was dropped
+        -- outright, which is now true AT THE ALIAS -- so it is deliberately not
+        -- pinned here, or a future editor writing the accurate sentence would
+        -- trip a test asserting the inaccurate one.)
+        qNotes `shouldNotSatisfy` any (Text.isInfixOf "does not reach through the typeRef")
+        map (.lost) [n | n <- notes, Text.isInfixOf "`q`" n.message]
+          `shouldSatisfy` all (Text.isInfixOf "engine-side validation of the values that ARE present")
+        -- The BASE definition is untouched: the alias drops the range, it does
+        -- not remove it from the file.
+        xml `shouldSatisfy` Text.isInfixOf "<text>\"high\",\"low\"</text>"
+
+      it "leaves a MAYBE over a type with NO domain on R8-a's plain lowering" $ do
+        -- The carve-out is scoped to what defeats R8-b. A builtin asserts no
+        -- range, so the typeRef hop has nothing to re-assert and an alias would
+        -- be the pure ceremony §4.3 refuses.
+        drg <- sumtypeDrg
+        let xml = emitDrg drg
+        xml `shouldSatisfy` Text.isInfixOf
+          "name=\"capped_at_ten\" label=\"capped at ten\" typeRef=\"number\""
+        xml `shouldNotSatisfy` Text.isInfixOf "number_optional"
+        [ n.message | n <- drgNotesAll drg, n.code == "D-MAYBE-NULL"
+          , Text.isInfixOf "`capped at ten`" n.message ]
+          `shouldSatisfy` all (not . Text.isInfixOf "domain-free alias")
+
+      it "names a THREADED sum component's REAL typeRef, not a hardcoded Any" $ do
+        -- The component is emitted `typeRef="Disposal"`, and `Disposal`'s
+        -- itemDefinition is a `string` enum listing all three constructors --
+        -- so the loss is the tag/payload distinction, not the declared type.
+        -- The note used to say typeRef="Any" while the emitter wrote the minted
+        -- name: a claim about the artifact that the artifact refuted.
+        drg <- sumtypeDrg
+        let threaded =
+              [ n | n <- drgNotesAll drg, n.code == "D-SUMTYPE"
+              , Text.isInfixOf "threads `Claim`" n.message ]
+        threaded `shouldSatisfy` (not . null)
+        map (.message) threaded `shouldSatisfy` all (Text.isInfixOf "typeRef=\"Disposal\"")
+        map (.message) threaded `shouldNotSatisfy` any (Text.isInfixOf "typeRef=\"Any\"")
+        map (.lost) threaded `shouldSatisfy` all (Text.isInfixOf "tag/payload distinction")
+        emitDrg drg `shouldSatisfy`
+          Text.isInfixOf "name=\"the_disposal\" label=\"the disposal\">\n      <typeRef>Disposal</typeRef>"
+
+      it "suffixes an itemDefinition name that collides with a FEEL built-in type" $ do
+        -- `DECLARE `number`` and a NUMBER-typed element must not end up sharing
+        -- one typeRef: a typeRef resolves against FEEL's built-in type names,
+        -- so `name="number"` aliases rather than shadows, and no fidelity note
+        -- could report it because nothing in the artifact distinguishes them.
+        drg <- sumtypeDrg
+        let xml = emitDrg drg
+        map (.idfName) drg.drgItemDefs `shouldSatisfy` elem "number_"
+        map (.idfName) drg.drgItemDefs `shouldNotSatisfy` elem "number"
+        xml `shouldSatisfy` Text.isInfixOf "name=\"k\" typeRef=\"number_\""
+        -- ...while a genuine NUMBER keeps the built-in spelling.
+        xml `shouldSatisfy` Text.isInfixOf "name=\"n\" typeRef=\"number\""
+        -- The L4 spelling survives verbatim on @label, so the rename is visible
+        -- rather than lossy.
+        xml `shouldSatisfy`
+          Text.isInfixOf "<itemDefinition id=\"itemdef_number\" name=\"number_\" label=\"number\">"
+
+      it "never spells NOTHING as a FEEL value (R8-f, and the defect it fixes)" $ do
+        drg <- sumtypeDrg
+        let xml = emitDrg drg
+        -- The shipped defect: `isConstantRef` accepted the BUILTIN NOTHING,
+        -- because the typechecker stamps it `Constructor` exactly as it stamps
+        -- a user one, so it lowered to the S-FEEL string constant "NOTHING" --
+        -- silently wrong, and worse than a loud failure because the paired JUST
+        -- arm WAS reported.
+        xml `shouldNotSatisfy` Text.isInfixOf "\"NOTHING\""
+        -- Nor as a bare FEEL identifier, which is what excluding it from
+        -- `isConstantRef` alone would have produced: the decision is refused
+        -- outright, and every occurrence of the token is inside text this
+        -- backend has declared to be L4 source rather than FEEL.
+        case (decisionNamed "capped at ten" drg).dcnLogic of
+          LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
+          LogicTable _   -> expectationFailure "expected a boxed literal expression"
+
+      it "refuses the builtin open sums at the value level, before D-LITERALEXPR (R8-d)" $ do
+        drg <- sumtypeDrg
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_capped_at_ten"]
+          `shouldBe` [("D-SUMTYPE", Blocking), ("D-MAYBE-NULL", Lossy)]
+
+      it "refuses a NESTED MAYBE, because null does not nest (R8-c)" $ do
+        drg <- sumtypeDrg
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_deep"]
+          `shouldBe` [("D-SUMTYPE", Blocking)]
+        [n.message | n <- drgNotesAll drg, n.element == "decision_deep"]
+          `shouldSatisfy` all (Text.isInfixOf "does not nest")
+
+      it "keeps the nullary-only CONSIDER's table and reports the DOMAIN, not a refusal" $ do
+        -- §10's Phase 3 obligation. The table is exact -- measured in KIE 8.44,
+        -- §4.2.1-2 -- and what is lost is that the payload constructor has no
+        -- cell, which the itemDefinition's allowedValues makes visible to a gap
+        -- analyser as a gap rather than as silence.
+        drg <- sumtypeDrg
+        case (decisionNamed "is a sale" drg).dcnLogic of
+          LogicTable t -> do
+            t.dtHitPolicy `shouldBe` HitUnique
+            map (.icValues) t.dtInputs `shouldBe` [Just ["sell", "lease", "assign"]]
+          LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_is_a_sale"]
+          `shouldBe` [("D-SUMTYPE", Lossy)]
+        [n.message | n <- drgNotesAll drg, n.element == "decision_is_a_sale"]
+          `shouldSatisfy` all (Text.isInfixOf "no cell is emitted for `lease`")
+
+      it "refuses a payload PROJECTION and only Lossy-reports a record that threads one" $ do
+        drg <- sumtypeDrg
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_stated_term"]
+          `shouldBe` [("D-SUMTYPE", Blocking)]
+        -- Threading is NOT reading: R4-a keeps this one, and only says the
+        -- component's type could not be carried.
+        -- (it is also a plain projection rather than a chain, so it carries the
+        -- ordinary D-LITERALEXPR as well; the point here is the SEVERITY of the
+        -- sum-type note, which is Lossy and not Blocking)
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_claim_amount"]
+          `shouldBe` [("D-LITERALEXPR", Blocking), ("D-SUMTYPE", Lossy)]
+
+      it "reports a LIST OF component, which needs an itemDefinition of its own" $ do
+        drg <- sumtypeDrg
+        [n.message | n <- drgNotesAll drg, n.code == "D-ITEMDEF"]
+          `shouldSatisfy` any (Text.isInfixOf "supporting notes")
+        [n.severity | n <- drgNotesAll drg, n.code == "D-ITEMDEF"]
+          `shouldSatisfy` all (== Lossy)
 
   describe "engine flavors (R7)" $ do
     it "defaults to camunda" $ do
@@ -1315,6 +1693,17 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       emitMarkdown drg `shouldSatisfy` Text.isInfixOf "200000"
       emitDrg drg `shouldSatisfy` Text.isInfixOf "&gt;= 200000"
 
+  -- The corpus assertion §5.2 stage 2 owes: on the real Reg CF corpus, whose
+  -- nine collision groups (`issuer` x 9, `investor` x 9, ...) are what made
+  -- D-FEELNAME worth building, the code must now fire ZERO times, because every
+  -- one of those groups is renamed apart instead. The golden fidelity report
+  -- shows the same thing; this says it as an invariant rather than as a diff.
+  it "fires D-FEELNAME zero times on the Reg CF corpus, by construction" $ do
+    src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+    let notes = (dmnReport (drgAsCli "regcf.l4" src)).notes
+    [n | n <- notes, n.code == "D-FEELNAME"] `shouldBe` []
+    [n | n <- notes, n.code == "D-RENAME"] `shouldSatisfy` (not . null)
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -1366,6 +1755,10 @@ goldenSubjects =
   , ( "legal" </> "regcf" </> "regcf.l4"
     , "regcf-corpus"
     , "the Reg CF corpus"
+    )
+  , ( "dmn" </> "sumtype.l4"
+    , "sumtype"
+    , "the data-model exhibit"
     )
   ]
 
@@ -1459,6 +1852,11 @@ drgFlavored flavor name = drgFlavoredWith flavor (const name)
 -- checked module.
 drgWith :: (Module Resolved -> Text) -> Text -> Drg
 drgWith = drgFlavoredWith defaultDmnFlavor
+
+itemDefNamed :: Text -> Drg -> ItemDefinition
+itemDefNamed nm drg = case [i | i <- drg.drgItemDefs, i.idfName == nm] of
+  (i : _) -> i
+  []      -> error ("no itemDefinition named " <> show nm)
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of

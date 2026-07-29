@@ -1,58 +1,142 @@
 fidelity report — DMN 1.3 (XML), camunda flavor
   [D-SCOPE] lossy — input_amount_to_be_sold_in_this_transaction
-      two different terms are both named `amount_to_be_sold_in_this_transaction` (in aggregate amount sold to this investor including this transaction, investor is within the investment limit); DMN's inputData is global, so the emitted model has two elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      two different terms fold to the FEEL name `amount_to_be_sold_in_this_transaction` (L4: `amount to be sold in this transaction`; used in aggregate amount sold to this investor including this transaction, investor is within the investment limit); they are emitted as the distinct globals `amount_to_be_sold_in_this_transaction`, `amount_to_be_sold_in_this_transaction_2`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_arrangement
-      five different terms are all named `arrangement` (in (a)(3) — conducted through a single complying intermediary, the 21-day public availability period has run, the intermediary has discharged its investor-facing duties, intermediary obligations are met, the transaction qualifies for the section 4(a)(6) exemption); DMN's inputData is global, so the emitted model has five elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      five different terms fold to the FEEL name `arrangement` (L4: `arrangement`; used in (a)(3) — conducted through a single complying intermediary, the 21-day public availability period has run, the intermediary has discharged its investor-facing duties, intermediary obligations are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `arrangement`, `arrangement_2`, `arrangement_3`, `arrangement_4`, `arrangement_5`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_filing
-      two different terms are both named `filing` (in disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); DMN's inputData is global, so the emitted model has two elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      two different terms fold to the FEEL name `filing` (L4: `filing`; used in disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `filing`, `filing_2`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_investor
-      nine different terms are all named `investor` (in the applicable measure of annual income or net worth, greater of annual income or net worth, lesser of annual income or net worth, either annual income or net worth is less than the cut point, investment limit, aggregate amount sold to this investor including this transaction, the accredited-investor carve-out applies to, investor is within the investment limit, the transaction qualifies for the section 4(a)(6) exemption); DMN's inputData is global, so the emitted model has nine elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      nine different terms fold to the FEEL name `investor` (L4: `investor`; used in the applicable measure of annual income or net worth, greater of annual income or net worth, lesser of annual income or net worth, either annual income or net worth is less than the cut point, investment limit, aggregate amount sold to this investor including this transaction, the accredited-investor carve-out applies to, investor is within the investment limit, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `investor`, `investor_2`, `investor_3`, `investor_4`, `investor_5`, `investor_6`, `investor_7`, `investor_8`, `investor_9`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_issuer
-      nine different terms are all named `issuer` (in (b)(1) — not organized under State or territorial law, (b)(2) — an Exchange Act reporting company, (b)(3) — an investment company, (b)(4) — subject to a bad-actor disqualification, (b)(5) — delinquent in ongoing annual reports, (b)(6) — no specific business plan, or a blank-check business plan, issuer is excluded by Rule 100(b), issuer is eligible, the transaction qualifies for the section 4(a)(6) exemption); DMN's inputData is global, so the emitted model has nine elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      nine different terms fold to the FEEL name `issuer` (L4: `issuer`; used in (b)(1) — not organized under State or territorial law, (b)(2) — an Exchange Act reporting company, (b)(3) — an investment company, (b)(4) — subject to a bad-actor disqualification, (b)(5) — delinquent in ongoing annual reports, (b)(6) — no specific business plan, or a blank-check business plan, issuer is excluded by Rule 100(b), issuer is eligible, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `issuer`, `issuer_2`, `issuer_3`, `issuer_4`, `issuer_5`, `issuer_6`, `issuer_7`, `issuer_8`, `issuer_9`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_notice
-      two different terms are both named `notice` (in notice complies with Rule 204(b), advertising restriction); DMN's inputData is global, so the emitted model has two elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      two different terms fold to the FEEL name `notice` (L4: `notice`; used in notice complies with Rule 204(b), advertising restriction); they are emitted as the distinct globals `notice`, `notice_2`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_offering
-      six different terms are all named `offering` (in aggregate offering amount, offering is within the offering limit, financial statements required, financial statement requirement is satisfied, disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); DMN's inputData is global, so the emitted model has six elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      six different terms fold to the FEEL name `offering` (L4: `offering`; used in aggregate offering amount, offering is within the offering limit, financial statements required, financial statement requirement is satisfied, disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `offering`, `offering_2`, `offering_3`, `offering_4`, `offering_5`, `offering_6`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_status
-      seven different terms are all named `status` (in (b)(1) — became an Exchange Act reporting company, (b)(2) — one annual report filed and fewer than 300 holders of record, (b)(3) — three annual reports filed and total assets not exceeding $10,000,000, (b)(4) — all securities repurchased, (b)(5) — liquidated or dissolved, ongoing reporting obligation may terminate, ongoing reporting obligation); DMN's inputData is global, so the emitted model has seven elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
+      seven different terms fold to the FEEL name `status` (L4: `status`; used in (b)(1) — became an Exchange Act reporting company, (b)(2) — one annual report filed and fewer than 300 holders of record, (b)(3) — three annual reports filed and total assets not exceeding $10,000,000, (b)(4) — all securities repurchased, (b)(5) — liquidated or dissolved, ongoing reporting obligation may terminate, ongoing reporting obligation); they are emitted as the distinct globals `status`, `status_2`, `status_3`, `status_4`, `status_5`, `status_6`, `status_7`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_transfer
-      four different terms are all named `transfer` (in transfer is within the one-year restricted period, transfer falls within an exception in Rule 501(a), transfer is permitted, resale restriction); DMN's inputData is global, so the emitted model has four elements a FEEL expression cannot tell apart
-      lost: L4's lexical scoping of GIVEN parameters
-  [D-FEELNAME] blocking — input_amount_to_be_sold_in_this_transaction
-      `amount_to_be_sold_in_this_transaction` is the FEEL name of 2 elements this module keeps apart (inputData `amount to be sold in this transaction`, inputData `amount to be sold in this transaction`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_arrangement
-      `arrangement` is the FEEL name of 5 elements this module keeps apart (inputData `arrangement`, inputData `arrangement`, inputData `arrangement`, inputData `arrangement`, inputData `arrangement`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_filing
-      `filing` is the FEEL name of 2 elements this module keeps apart (inputData `filing`, inputData `filing`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_investor
-      `investor` is the FEEL name of 9 elements this module keeps apart (inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`, inputData `investor`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_issuer
-      `issuer` is the FEEL name of 9 elements this module keeps apart (inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`, inputData `issuer`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_notice
-      `notice` is the FEEL name of 2 elements this module keeps apart (inputData `notice`, inputData `notice`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_offering
-      `offering` is the FEEL name of 6 elements this module keeps apart (inputData `offering`, inputData `offering`, inputData `offering`, inputData `offering`, inputData `offering`, inputData `offering`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_status
-      `status` is the FEEL name of 7 elements this module keeps apart (inputData `status`, inputData `status`, inputData `status`, inputData `status`, inputData `status`, inputData `status`, inputData `status`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
-  [D-FEELNAME] blocking — input_transfer
-      `transfer` is the FEEL name of 4 elements this module keeps apart (inputData `transfer`, inputData `transfer`, inputData `transfer`, inputData `transfer`); DMN's variable namespace is flat, so no FEEL reference can pick one of them. Neither engine refuses the file: KIE's validator says DUPLICATE_NAME but still builds and answers, and Camunda 8 says nothing at all. Both answer with whichever element they resolved first, and they do not agree on which that is
-      lost: the distinction between them; every reference to either now reaches one of them
+      four different terms fold to the FEEL name `transfer` (L4: `transfer`; used in transfer is within the one-year restricted period, transfer falls within an exception in Rule 501(a), transfer is permitted, resale restriction); they are emitted as the distinct globals `transfer`, `transfer_2`, `transfer_3`, `transfer_4`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
+  [D-RENAME] lossy — input_issuer_2
+      `issuer` is emitted as the FEEL name `issuer_2`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_3
+      `issuer` is emitted as the FEEL name `issuer_3`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_4
+      `issuer` is emitted as the FEEL name `issuer_4`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_5
+      `issuer` is emitted as the FEEL name `issuer_5`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_6
+      `issuer` is emitted as the FEEL name `issuer_6`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_7
+      `issuer` is emitted as the FEEL name `issuer_7`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_8
+      `issuer` is emitted as the FEEL name `issuer_8`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_offering_2
+      `offering` is emitted as the FEEL name `offering_2`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_2
+      `investor` is emitted as the FEEL name `investor_2`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_3
+      `investor` is emitted as the FEEL name `investor_3`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_4
+      `investor` is emitted as the FEEL name `investor_4`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_5
+      `investor` is emitted as the FEEL name `investor_5`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_6
+      `investor` is emitted as the FEEL name `investor_6`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_7
+      `investor` is emitted as the FEEL name `investor_7`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_8
+      `investor` is emitted as the FEEL name `investor_8`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_amount_to_be_sold_in_this_transaction_2
+      `amount to be sold in this transaction` is emitted as the FEEL name `amount_to_be_sold_in_this_transaction_2`, not `amount_to_be_sold_in_this_transaction`: two elements of the DRG's flat variable namespace in this module fold to `amount_to_be_sold_in_this_transaction` (`amount to be sold in this transaction`, `amount to be sold in this transaction`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_offering_3
+      `offering` is emitted as the FEEL name `offering_3`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_offering_4
+      `offering` is emitted as the FEEL name `offering_4`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_offering_5
+      `offering` is emitted as the FEEL name `offering_5`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_arrangement_2
+      `arrangement` is emitted as the FEEL name `arrangement_2`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_arrangement_3
+      `arrangement` is emitted as the FEEL name `arrangement_3`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_arrangement_4
+      `arrangement` is emitted as the FEEL name `arrangement_4`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_notice_2
+      `notice` is emitted as the FEEL name `notice_2`, not `notice`: two elements of the DRG's flat variable namespace in this module fold to `notice` (`notice`, `notice`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_2
+      `status` is emitted as the FEEL name `status_2`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_3
+      `status` is emitted as the FEEL name `status_3`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_4
+      `status` is emitted as the FEEL name `status_4`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_5
+      `status` is emitted as the FEEL name `status_5`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_6
+      `status` is emitted as the FEEL name `status_6`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_status_7
+      `status` is emitted as the FEEL name `status_7`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_transfer_2
+      `transfer` is emitted as the FEEL name `transfer_2`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_transfer_3
+      `transfer` is emitted as the FEEL name `transfer_3`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_transfer_4
+      `transfer` is emitted as the FEEL name `transfer_4`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_issuer_9
+      `issuer` is emitted as the FEEL name `issuer_9`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_offering_6
+      `offering` is emitted as the FEEL name `offering_6`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_investor_9
+      `investor` is emitted as the FEEL name `investor_9`, not `investor`: nine elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_arrangement_5
+      `arrangement` is emitted as the FEEL name `arrangement_5`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-RENAME] lossy — input_filing_2
+      `filing` is emitted as the FEEL name `filing_2`, not `filing`: two elements of the DRG's flat variable namespace in this module fold to `filing` (`filing`, `filing`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-LITERALEXPR] blocking — decision_reg_cf_commenced  (main.l4:104:26-40)
       `Reg CF commenced` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review

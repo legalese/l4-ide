@@ -11,7 +11,8 @@
 module Main where
 
 import Control.Monad (unless, when)
-import Data.List (isInfixOf)
+import Data.List (findIndex, isInfixOf, sort)
+import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
@@ -233,22 +234,53 @@ runL4EmbeddedOnlyIn mCwd bin args = do
 -- about the machine; an absent /harness/ is a fact about the repo, and would
 -- mean this test has silently stopped testing anything.
 dmnEngineCheck :: String -> FilePath -> String -> (String -> Expectation) -> Expectation
-dmnEngineCheck label script requiredVar assertBanner = do
+dmnEngineCheck label script requiredVar =
+  dmnEngineCheckOn label script requiredVar HarnessMustPass
+    dmnGolden [dmnGolden, "--cases", dmnEngineCases]
+
+-- | Which way round the harness's own exit code is being asserted.
+--
+-- 'HarnessMustFail' exists for the negative fixtures: a file that the gate is
+-- supposed to REJECT. Without it the suite could only ever show the gate
+-- staying green, which is not evidence that it is connected to anything —
+-- see 'dmnXsdOrderNegative' and DMN-EXPORT-PROGRAM-MODEL-SPEC.md §9.
+data HarnessOutcome = HarnessMustPass | HarnessMustFail
+  deriving (Eq, Show)
+
+-- | The general form: run one committed engine harness over one file and
+-- assert its VERDICT banner, under the same opt-in/skip contract as
+-- 'dmnEngineCheck'.
+--
+-- The banner is still the liveness signal in BOTH directions. A harness that
+-- died before running also exits non-zero, so \"exited 1\" on its own would let
+-- a broken harness masquerade as a caught defect — exactly the confusion the
+-- banner was introduced to prevent, only mirrored.
+dmnEngineCheckOn
+  :: String -> FilePath -> String -> HarnessOutcome
+  -> FilePath -> [String] -> (String -> Expectation) -> Expectation
+dmnEngineCheckOn label script requiredVar outcome subject args assertBanner = do
   enabled <- lookupEnv "L4_DMN_ENGINE_CHECK"
   case enabled of
     Just "1" -> do
       haveScript <- doesFileExist script
       unless haveScript $
         expectationFailure (label ++ " harness missing from the repo: " ++ script)
-      Output code sout serr <-
-        runL4In Nothing Nothing script [dmnGolden, "--cases", dmnEngineCases]
+      Output code sout serr <- runL4In Nothing Nothing script args
       let banner = "VERDICT:"
       if banner `isInfixOf` sout
         then do
-          unless (code == ExitSuccess) $
-            expectationFailure
-              (label ++ " reported a problem in " ++ dmnGolden
-                 ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+          case outcome of
+            HarnessMustPass ->
+              unless (code == ExitSuccess) $
+                expectationFailure
+                  (label ++ " reported a problem in " ++ subject
+                     ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+            HarnessMustFail ->
+              when (code == ExitSuccess) $
+                expectationFailure
+                  (label ++ " ACCEPTED " ++ subject
+                     ++ ", which is committed precisely because it must be rejected."
+                     ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
           assertBanner sout
         else
           -- No banner: the harness skipped, or died before running.
@@ -308,6 +340,14 @@ expectGolden bin args goldenPath = do
 -- which a CP1252 Windows runner cannot decode through 'readFile'.
 readUtf8 :: FilePath -> IO String
 readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
+
+-- | Index of the first line containing a needle.
+--
+-- An ABSENT needle yields 'maxBound' rather than a negative sentinel, so it
+-- sorts LAST: a fixture that lost its @\<itemDefinition\>@ altogether then
+-- fails the \"before\" assertion instead of vacuously satisfying it.
+firstLineWith :: String -> String -> Int
+firstLineWith needle = fromMaybe maxBound . findIndex (needle `isInfixOf`) . lines
 
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
@@ -435,6 +475,24 @@ kieCheckScript     = ".." </> "etc" </> "kie-dmn-check" </> "run.sh"
 camundaCheckScript = ".." </> "etc" </> "camunda-dmn-check" </> "run.sh"
 dmnEngineCases     = "examples/dmn/reg-cf.cases.json"
 
+-- The XSD SEQUENCE-ORDER pair (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §4.3, §9).
+--
+-- Two hand-written DMN 1.3 files holding the same lines and differing only in
+-- where the @\<itemDefinition\>@ block sits. @tDefinitions@ is a sequence, so
+-- the one that puts it after @\<inputData\>@ is schema-INVALID; the other is
+-- the positive control that says so is the only difference.
+--
+-- __Why a hand-written file and not a mutated golden.__ The emitter cannot
+-- produce the negative case — that is the property under test — so there is
+-- nothing to generate it from. These are fixtures, never regenerated.
+dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases :: FilePath
+dmnXsdOrderPositive = dmnXsdOrderDir </> "M1-itemdef-before-inputdata.dmn"
+dmnXsdOrderNegative = dmnXsdOrderDir </> "M1-itemdef-after-inputdata.dmn"
+dmnXsdOrderCases    = dmnXsdOrderDir </> "M1-itemdef.cases.json"
+
+dmnXsdOrderDir :: FilePath
+dmnXsdOrderDir = fixtureDir </> "dmn-xsd-order"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -475,7 +533,8 @@ main = do
        , shadowExtraEntry, shadowImporterEntry
        , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
-       , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases ] \fp -> do
+       , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
+       , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1269,6 +1328,61 @@ spec bin = do
         out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
+
+  -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
+  -- this file asserts that a gate stays green, which on its own says nothing
+  -- about whether the gate is connected: an emitter that put
+  -- <itemDefinition> after <inputData> passed every check in the tree —
+  -- xmllint, dmn-moddle, the goldens — until these two files existed.
+  describe "the XSD sequence-order gate (DMN 1.3 tDefinitions is a sequence)" $ do
+    it "the committed pair differs ONLY in where the itemDefinition block sits" $ do
+      pos <- readUtf8 dmnXsdOrderPositive
+      neg <- readUtf8 dmnXsdOrderNegative
+      -- Same lines, permuted. Without this the two files could drift apart and
+      -- a red negative would no longer isolate placement as the cause.
+      sort (lines pos) `shouldBe` sort (lines neg)
+      pos `shouldNotBe` neg
+      -- The needles carry the @ id=@ so they match the ELEMENTS and not the
+      -- files' own header comment, which names both tags in prose. (It did
+      -- match the comment at first, and the negative assertion duly failed on
+      -- line 5.)
+      firstLineWith "<itemDefinition id=" pos
+        `shouldSatisfy` (< firstLineWith "<inputData id=" pos)
+      firstLineWith "<itemDefinition id=" neg
+        `shouldSatisfy` (> firstLineWith "<inputData id=" neg)
+
+    it "Drools/KIE ACCEPTS those lines with the itemDefinition first" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmnXsdOrderPositive [dmnXsdOrderPositive, "--cases", dmnXsdOrderCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
+
+    it "Drools/KIE REJECTS the misordered file, naming the schema rule" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmnXsdOrderNegative [dmnXsdOrderNegative, "--cases", dmnXsdOrderCases] \out -> do
+          out `shouldSatisfy` ("XSD    INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("cvc-complex-type.2.4.a" `isInfixOf`)
+          -- MEASURED, and the reason the fixture earns its keep: KIE 8.44
+          -- BUILDS the misordered file and answers both cases correctly. Only
+          -- the schema legs object. So "a misordered emitter fails in the
+          -- engine" is NOT true of Drools — the schema check is the only thing
+          -- between a misordered emitter and a shipped artifact, which is
+          -- precisely why it has to be the gate.
+          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
+
+    it "Camunda 8 ACCEPTS those lines with the itemDefinition first" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmnXsdOrderPositive [dmnXsdOrderPositive, "--cases", dmnXsdOrderCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
+
+    it "Camunda 8 REJECTS the misordered file outright, at parse" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmnXsdOrderNegative [dmnXsdOrderNegative, "--cases", dmnXsdOrderCases] \out -> do
+          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

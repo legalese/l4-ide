@@ -44,12 +44,20 @@ module L4.Dmn.IR
   , FeelFragment (..)
   , DmnType (..)
   , dmnTypeAttr
+  , dmnTypeBase
+    -- * The data model
+  , ItemDefinition (..)
+  , ItemComponent (..)
     -- * FEEL surface syntax
   , renderUnaryTest
   , renderFeelValue
   , renderNumber
   , quoteFeelString
   , feelIdentText
+  , feelTypeNameText
+  , reservedFeelWords
+  , reservedFeelTypeNames
+  , uniquifyIn
   , oneLine
     -- * Engine flavors
   , DmnFlavor (..)
@@ -69,12 +77,14 @@ module L4.Dmn.IR
     -- $fidelity
   , FidelityLoss (..)
   , renderFidelityLoss
+  , fidelityLossCode
   , drgNotesAll
   , dmnReport
   ) where
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
 
@@ -87,17 +97,94 @@ import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, empt
 -- | The FEEL built-in types we target. DMN 1.3 spells these unprefixed in a
 -- @typeRef@ (the @feel:@ prefix was a DMN 1.1 artifact). 'DmnAny' is the honest
 -- answer when L4's inferred type is an inference variable or something FEEL has
--- no analogue for (a record, a list of records, an algebraic data type).
+-- no analogue for (a list, an open sum, a type declared in another module).
+--
+-- 'DmnNamed' is a reference to an 'ItemDefinition' this module minted (§4.1,
+-- §4.2): a record or an @IS ONE OF@ declared in the module being lowered. It
+-- carries __both__ the minted FEEL type name and the builtin the definition is
+-- /based on/ — @DmnString@ for an enum (whose values serialise as strings),
+-- @DmnAny@ for a record (whose definition is a context, and has no base
+-- @typeRef@ at all).
+--
+-- The base is on the constructor rather than only on the 'ItemDefinition'
+-- because a consumer that has no notion of named types still has to say
+-- something: "L4.Dmn.Markdown" maps a @typeRef@ into dmnmd's four-type grammar,
+-- and without the base an enum column — which was @string@ before item
+-- definitions existed and is @string@-backed after — would start reporting a
+-- type collapse it does not have.
 data DmnType = DmnNumber | DmnString | DmnBoolean | DmnDate | DmnAny
+             | DmnNamed !Text !DmnType
   deriving stock (Eq, Show, Generic)
 
 dmnTypeAttr :: DmnType -> Text
 dmnTypeAttr = \case
-  DmnNumber  -> "number"
-  DmnString  -> "string"
-  DmnBoolean -> "boolean"
-  DmnDate    -> "date"
-  DmnAny     -> "Any"
+  DmnNumber    -> "number"
+  DmnString    -> "string"
+  DmnBoolean   -> "boolean"
+  DmnDate      -> "date"
+  DmnAny       -> "Any"
+  DmnNamed t _ -> t
+
+-- | The FEEL builtin a type stands on, for consumers that cannot carry a named
+-- type. The identity on every builtin.
+dmnTypeBase :: DmnType -> DmnType
+dmnTypeBase = \case
+  DmnNamed _ base -> base
+  t               -> t
+
+------------------------------------------------------------------------
+-- The data model
+------------------------------------------------------------------------
+
+-- | One field of a record's @itemDefinition@ (DMN §7.3.3: a @tItemDefinition@
+-- whose components are themselves @tItemDefinition@s).
+--
+-- Two names, for the reason 'Decision' has two: 'icmName' is the resolved FEEL
+-- name — the same string "L4.Dmn.Lower" emits as the path step of a projection,
+-- taken from the same @uniquifyIn@ scope (§5.2 scope 2), so a component and the
+-- @r.f@ that reads it cannot disagree — and 'icmLabel' is the verbatim L4 field
+-- name.
+data ItemComponent = MkItemComponent
+  { icmId    :: !Text
+  , icmName  :: !Text
+  , icmLabel :: !Text
+  , icmType  :: !DmnType
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | A @\<itemDefinition\>@: the type-level half of the export (§4.1, §4.2).
+--
+-- Three shapes, and DMN spells them all with the same element:
+--
+--   * a __record__ — @idfBase = Nothing@, @idfValues = Nothing@, one
+--     'ItemComponent' per /stored/ field. FEEL contexts are records, so this is
+--     the tightest correspondence in the exercise.
+--   * an __@IS ONE OF@__ — @idfBase = Just DmnString@ (its values serialise as
+--     strings, since FEEL has no sum types) and @idfValues@ listing every
+--     constructor in declaration order, which is what §7.3.3 calls "the
+--     complete range of values that this ItemDefinition represents".
+--   * a __domain-free alias__ of one of those — @idfBase = Just DmnString@ and
+--     @idfValues = Nothing@ — which is what a @MAYBE τ@ site points at when τ
+--     has a domain (§11-R8-a's carve-out). It spells no nullability, because
+--     @tItemDefinition@ cannot; it exists so that R8-b's suppression of the
+--     range /at the element/ is not undone by the @typeRef@ hop, since §7.3.3
+--     reads the range off whatever the @typeRef@ resolves to. "L4.Dmn.Lower"
+--     mints one per domain-carrying type at most, and only where an element
+--     actually points at it.
+--
+-- __Scalars get none__ (§4.3): an alias over @number@ adds no information and
+-- degrades for any consumer that does not resolve @typeRef@s. A @MAYBE NUMBER@
+-- gets no optional alias either, and for the same reason — a builtin asserts no
+-- range, so there is none to keep the hop from re-asserting.
+data ItemDefinition = MkItemDefinition
+  { idfId         :: !Text
+  , idfName       :: !Text            -- ^ 'feelTypeNameText' + 'uniquifyIn'
+  , idfLabel      :: !Text            -- ^ the verbatim L4 type name
+  , idfBase       :: !(Maybe DmnType) -- ^ the @\<typeRef\>@ CHILD element, if any
+  , idfValues     :: !(Maybe [Text])  -- ^ @\<allowedValues\>@, in declaration order
+  , idfComponents :: ![ItemComponent]
+  }
+  deriving stock (Eq, Show, Generic)
 
 -- | A /constant/ FEEL value: the only thing this exporter will ever put on the
 -- endpoint of a 'UnaryTest'.
@@ -278,17 +365,105 @@ renderNumber r
 -- injects a FEEL path expression that silently shadows a genuine record
 -- projection.
 --
--- This is stage 1 of §5.2's policy, minus three parts that belong to Phase 2
--- and are deliberately __not__ done here: NFC normalisation, the reserved-word
--- suffix, and @uniquifyIn@ (which is what makes the mapping injective within a
--- scope, and which needs a whole-DRG traversal rather than a per-name
--- function). Until then two L4 names can still collapse onto one FEEL name. The
+-- This is the whole of stage 1 of §5.2's policy __except step 1 (NFC
+-- normalisation)__, which is deferred with its reason recorded in §5.3.3: under
+-- fold, NFC is defence-in-depth rather than load-bearing, @jl4-core.cabal@ has
+-- no normalisation dependency, and the library must survive the @arch(wasm32)@
+-- branch. Step 6, the reserved-word suffix, is applied here ('reservedFeelWords').
+--
+-- Stage 1 is deliberately __non-injective__: two distinct L4 names can still
+-- fold onto one FEEL name. What makes the composite injective within a scope is
+-- stage 2, 'uniquifyIn', which needs a whole-DRG traversal rather than a
+-- per-name function and therefore lives at the call site in "L4.Dmn.Lower". The
 -- emitter pairs every mangled @\@name@ with a verbatim @\@label@ so a reader can
--- always see which L4 name a node came from, and 'L4.Dmn.Lower' raises a
--- @D-FEELNAME@ note, at 'Blocking', when a collision actually happens — because
--- on Camunda 8 a collision is a silently wrong answer rather than a rejection.
+-- always see which L4 name a node came from.
 feelIdentText :: Text -> Text
-feelIdentText t
+feelIdentText = suffixReserved . foldFeelName
+
+-- | An L4 __type__ name as a FEEL type name — the name an @itemDefinition@
+-- carries and a @typeRef@ refers to (§5.1-2, §5.3.6).
+--
+-- It is 'feelIdentText'\'s character map plus the same reserved-word suffix, and
+-- it is a __separate function__ because it names a separate thing and lives in a
+-- separate 'uniquifyIn' scope: DMN keeps the itemDefinition-name namespace apart
+-- from the variable namespace, so a type and a variable may share a name without
+-- either being renamed.
+--
+-- __Dot policy (ruled, §5.3.6).__ A @.@ in a type name folds to @_@, identically
+-- to 'feelIdentText'. DMN reserves @.@ in a @typeRef@ QName for the /import
+-- prefix/, and this exporter emits no @\<import\>@ — so a dot passed through
+-- would manufacture a reference to an import that does not exist.
+--
+-- __The two functions have already diverged__, and this is where: a type name
+-- is checked against 'reservedFeelTypeNames', which is 'reservedFeelWords' plus
+-- FEEL's __built-in type spellings__. A variable may be called @number@; a
+-- @typeRef@ may not, because @typeRef=\"number\"@ already means FEEL's numeric
+-- type. See 'reservedFeelTypeNames' for the collision this prevents.
+feelTypeNameText :: Text -> Text
+feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
+
+-- | §5.2 stage 1 step 6. FEEL's literal terminal symbols, as DMN 1.3 grammar
+-- rules 28-30 and §10.3.1.4 spell them: __lower case__.
+--
+-- Matching is therefore case-sensitive, and that is the ruling rather than an
+-- accident: §10.3.1.4 forbids a name /start/ that is a literal terminal symbol,
+-- and @IF@ is not one — FEEL's keyword is @if@. Folding case would rename names
+-- no engine objects to. (A name /part/ may be a keyword in any case, which is
+-- why the test is against the whole folded name and not against a part: after
+-- folding, @annual income@ is @annual_income@, not @in@.)
+reservedFeelWords :: Set Text
+reservedFeelWords = Set.fromList
+  [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
+  , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
+  , "date", "time", "duration", "list", "context"
+  ]
+
+-- | 'reservedFeelWords' __plus FEEL's built-in type spellings__, which is the
+-- set a /type/ name is checked against ('feelTypeNameText').
+--
+-- The two sets differ because the two namespaces differ. FEEL's built-in types
+-- are not keywords — nothing stops a /variable/ called @number@ — but a
+-- @typeRef@ is resolved against the built-in type names first, so an
+-- @itemDefinition name=\"number\"@ does not shadow the built-in: it __aliases__
+-- onto it. Both an L4 @DECLARE \`number\` IS ONE OF alpha\/beta@ and a genuine
+-- @NUMBER@-typed element then emit @typeRef=\"number\"@, and a reader who
+-- resolves the numeric element's type lands on a @string@ enum. Nothing in the
+-- artifact says the two are different types, so nothing in the fidelity report
+-- could report it either — which is why the repair is a rename rather than a
+-- note. @number@ becomes @number_@ and the two stay distinct.
+--
+-- The spellings are DMN 1.3 §10.3.1.2's, i.e. the ones that are legal in a
+-- @typeRef@ attribute, so the two-word types appear in their camel-case form
+-- (@dateTime@, @daysAndTimeDuration@, @yearsAndMonthsDuration@) and not as the
+-- prose forms — @date and time@ folds to @date_and_time@, which no engine
+-- resolves. @Any@ is capitalised, and matching stays case-sensitive, so a type
+-- called @any@ is left alone.
+reservedFeelTypeNames :: Set Text
+reservedFeelTypeNames = reservedFeelWords <> Set.fromList
+  [ "number", "string", "boolean", "Any"
+  , "dateTime", "daysAndTimeDuration", "yearsAndMonthsDuration"
+  ]
+
+-- | Append a single @_@ to a folded name that is a reserved word. The result is
+-- deliberately __not__ re-run through the run-collapser: collapsing would undo
+-- the suffix on a name that already ends in @_@, which after folding cannot
+-- happen anyway (step 4 strips trailing @_@), and re-running would make the
+-- function's fixed point depend on the order of two steps that must not be
+-- reordered.
+suffixReserved :: Text -> Text
+suffixReserved = suffixReservedIn reservedFeelWords
+
+-- | 'suffixReserved', against a namespace's own reserved set.
+suffixReservedIn :: Set Text -> Text -> Text
+suffixReservedIn reserved t
+  | Set.member t reserved = t <> "_"
+  | otherwise             = t
+
+-- | §5.2 stage 1 steps 2-5: the character map, the run collapse, the empty and
+-- leading-digit repairs. Shared by 'feelIdentText' and 'feelTypeNameText' so the
+-- two cannot drift apart on the part R3 ruled.
+foldFeelName :: Text -> Text
+foldFeelName t
   | Text.null squashed           = "_"
   | isDigit (Text.head squashed) = "_" <> squashed
   | otherwise                    = squashed
@@ -306,6 +481,37 @@ feelIdentText t
   keep c
     | isAscii c && isAlphaNum c = c
     | otherwise                 = '_'
+
+-- | §5.2 stage 2. Make a list of folded names injective, in place, over a stable
+-- source-order traversal: the first claimant keeps the base, and the @n@th gets
+-- @base_\<n\>@ for the least free @n \>= 2@.
+--
+-- \"Least __free__\" rather than \"least unused count\" is what keeps the result
+-- injective when a suffixed name collides with a name the source already spells:
+-- @[\"a\", \"a_2\", \"a\"]@ gives @[\"a\", \"a_2\", \"a_3\"]@, not a second
+-- @a_2@.
+--
+-- __A port, not a design__: 'L4.Dmn.Lower.assignIds' has been exactly this
+-- stepper for XML ids since before §5.2 was written, and is now expressed in
+-- terms of it so the two cannot drift.
+--
+-- The caller supplies the scope. §5.2 names four, and they are separate
+-- namespaces in DMN: the DRG variable namespace (all @inputData@ and all
+-- @decision@ variables together), each itemDefinition's @itemComponent@ list
+-- (and, until itemDefinitions exist, the record-field projection paths
+-- "L4.Dmn.Lower" emits), @decisionService@ names, and BKM @formalParameter@
+-- names.
+uniquifyIn :: [Text] -> [Text]
+uniquifyIn names = reverse (snd (foldl' step (Set.empty, []) names))
+ where
+  step (used, acc) nm =
+    let this = if Set.member nm used then firstFree (2 :: Int) else nm
+        firstFree n
+          | Set.member cand used = firstFree (n + 1)
+          | otherwise            = cand
+         where
+          cand = nm <> "_" <> Text.pack (show n)
+    in (Set.insert this used, this : acc)
 
 ------------------------------------------------------------------------
 -- Decision tables
@@ -341,11 +547,21 @@ hitPolicyAttr = \case
 --
 -- That "once for the whole table" is why an effectful guard bails out entirely
 -- rather than becoming a column: see 'EffectfulGuard'.
+--
+-- @icValues@ is @\<inputValues\>@ — the column's /expected/ values, which DMN
+-- §8.2.4 makes the thing completeness is assessed against: "a decision table
+-- will be considered complete if its rules cover all combinations of expected
+-- input values for all input expressions". It is a __different scope__ from the
+-- itemDefinition's @allowedValues@ (the type's domain), and §8.2.4's own
+-- "regardless of how the expected input values are modeled" is what makes
+-- carrying both belt-and-braces rather than redundant. Emitted only when the
+-- column's L4 type has a known finite domain, i.e. an @IS ONE OF@.
 data InputColumn = MkInputColumn
-  { icId    :: !Text
-  , icLabel :: !Text     -- ^ the L4 source text of the column's subject
-  , icExpr  :: !FeelExpr
-  , icType  :: !DmnType
+  { icId     :: !Text
+  , icLabel  :: !Text     -- ^ the L4 source text of the column's subject
+  , icExpr   :: !FeelExpr
+  , icType   :: !DmnType
+  , icValues :: !(Maybe [Text])
   }
   deriving stock (Eq, Show, Generic)
 
@@ -365,10 +581,19 @@ data InputColumn = MkInputColumn
 -- @ocDefault@ is the @\<defaultOutputEntry\>@, which DMN supports precisely for
 -- the single-hit order-free policies. It is where @OTHERWISE@ goes under 'HitUnique';
 -- under 'HitFirst' @OTHERWISE@ becomes a final all-@-@ rule instead.
+--
+-- @ocValues@ is @\<outputValues\>@, and it is emitted for an __enum-typed__
+-- output only. Not for a boolean: §8.2.4 assesses completeness "regardless of
+-- how the expected input values are modeled", so restating @true,false@ adds no
+-- information, while §8.2.7 ("output entries SHOULD be … a subset of the output
+-- values") would then be violated by every computed boolean output entry. An
+-- enum is the case where the domain is genuinely unrecoverable from
+-- @typeRef="string"@, which is §3.1's complaint.
 data OutputColumn = MkOutputColumn
   { ocId      :: !Text
   , ocName    :: !Text
   , ocType    :: !DmnType
+  , ocValues  :: !(Maybe [Text])
   , ocDefault :: !(Maybe FeelExpr)
   }
   deriving stock (Eq, Show, Generic)
@@ -478,9 +703,19 @@ data DecisionLogic
   | LogicLiteral !FeelExpr
   deriving stock (Eq, Show, Generic)
 
+-- | A @\<decision\>@.
+--
+-- __Two names, and the split is load-bearing.__ 'dcnName' is the verbatim L4
+-- name and becomes @\@label@; 'dcnFeelName' is the resolved FEEL name — folded
+-- ('feelIdentText') and then made unique within the DRG's variable namespace
+-- ('uniquifyIn') — and becomes both the element's @\@name@ and its
+-- @\<variable\>@'s (§5.3.5's invariant, which is now true by construction rather
+-- than by an emitter remembering to re-fold). Resolution is a property of the
+-- whole graph, so it cannot be recomputed from the string at emission time.
 data Decision = MkDecision
   { dcnId           :: !Text
   , dcnName         :: !Text
+  , dcnFeelName     :: !Text
   , dcnType         :: !DmnType
   , dcnLogic        :: !DecisionLogic
   , dcnRequirements :: ![Requirement]  -- ^ sorted by target id, for determinism
@@ -489,10 +724,15 @@ data Decision = MkDecision
 
 -- | A free term: a @GIVEN@ parameter, an @ASSUME@d term, or any other name the
 -- module does not itself decide.
+--
+-- 'idName' and 'idFeelName' split for the same reason 'dcnName' and
+-- 'dcnFeelName' do, and share one 'uniquifyIn' scope with them: DMN's variable
+-- namespace is flat and holds both kinds of node at once.
 data InputData = MkInputData
-  { idId   :: !Text
-  , idName :: !Text
-  , idType :: !DmnType
+  { idId       :: !Text
+  , idName     :: !Text
+  , idFeelName :: !Text
+  , idType     :: !DmnType
   }
   deriving stock (Eq, Show, Generic)
 
@@ -511,6 +751,16 @@ data Drg = MkDrg
     -- 'L4.Dmn.Markdown.emitMarkdown', 'dmnReport' and
     -- 'L4.Dmn.Markdown.markdownReport' all stay one-argument functions over one
     -- IR, and so that the fidelity report can name the artifact it describes.
+  , drgItemDefs  :: ![ItemDefinition]
+    -- ^ one per module-local record and @IS ONE OF@, in source order, referenced
+    -- or not. Reachability-gating would make the artifact depend on which
+    -- decisions happened to survive lowering — a moving target — and an
+    -- unreferenced itemDefinition is inert. They are the __first children__ of
+    -- @\<definitions\>@ (§4.3).
+    --
+    -- The __domain-free aliases__ follow them, and those /are/ gated on being
+    -- pointed at: an alias exists only to be some @MAYBE@ site's @typeRef@, so
+    -- unlike a base definition one with no referrer says nothing.
   , drgNodes     :: ![DrgNode]
   , drgNotes     :: ![FidelityNote]  -- ^ module-level notes; per-table ones live on the table
   }
@@ -563,7 +813,26 @@ data FidelityLoss
   | UninlinableLocal
     -- ^ a @WHERE@ \/ @LET@ local could not be inlined (it takes parameters, or its
     -- body performs I\/O), so the chain cannot be flattened into a closed table.
+  | SumTypeRead !Text
+    -- ^ the decision /reads/ a sum type FEEL cannot represent (§4.2.1's R4-a,
+    -- and R8-c\/d\/e for the builtin @MAYBE@ \/ @EITHER@). The 'Text' is the
+    -- clause naming what it read. Reported as @D-SUMTYPE@ rather than
+    -- @D-LITERALEXPR@ — see 'fidelityLossCode' — and decided /before/
+    -- normalisation, so a payload-binding @CONSIDER@ is not misdiagnosed as
+    -- "is not a guarded chain" (§4.2.1-8).
   deriving stock (Eq, Show, Generic)
+
+-- | Which fidelity code reports this loss.
+--
+-- Every loss ends in the same place — a boxed literal expression — but not
+-- every loss is the same /diagnosis/, and §4.2.1-8 makes the distinction
+-- normative: a decision refused because FEEL has no sum type must not be told
+-- it "is not a guarded chain", which describes a table-shape problem it does
+-- not have.
+fidelityLossCode :: FidelityLoss -> Text
+fidelityLossCode = \case
+  SumTypeRead _ -> "D-SUMTYPE"
+  _             -> "D-LITERALEXPR"
 
 renderFidelityLoss :: FidelityLoss -> Text
 renderFidelityLoss = \case
@@ -576,6 +845,7 @@ renderFidelityLoss = \case
     \a DMN table would answer null where the rule answers FALSE"
   UninlinableLocal ->
     "a WHERE/LET local could not be inlined (parameterised, or effectful)"
+  SumTypeRead what -> what
 
 -- | Every note in a 'Drg': the module-level ones, then each table\'s own, in
 -- decision order.

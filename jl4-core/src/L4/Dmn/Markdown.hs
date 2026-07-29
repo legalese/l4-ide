@@ -195,8 +195,15 @@ wholeNumber = \case
   _ -> Nothing
 
 -- | @DMNType@ is @String | Number | Boolean | List@. Everything else collapses.
+--
+-- A __named__ type maps to its base, not to its name: dmnmd's pipe grammar has
+-- no notion of an @itemDefinition@, so an enum — whose values serialise as
+-- strings on both sides — is @String@ here exactly as it was before item
+-- definitions existed, and a record is @String@ for the same reason @Any@ was.
+-- Reading the base rather than the constructor is what keeps 'collapses' from
+-- reporting a loss the carrier does not incur (§8 is Phase 6).
 mdType :: DmnType -> Text
-mdType = \case
+mdType ty = case dmnTypeBase ty of
   DmnNumber  -> "Number"
   DmnBoolean -> "Boolean"
   _          -> "String"
@@ -309,7 +316,9 @@ markdownReport drg =
          , expressible t
          ]
 
-  collapses ty = ty /= DmnNumber && ty /= DmnBoolean && ty /= DmnString
+  collapses ty = base /= DmnNumber && base /= DmnBoolean && base /= DmnString
+   where
+    base = dmnTypeBase ty
 
   note c sev el msg lostWhat =
     MkFidelityNote

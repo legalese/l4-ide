@@ -1,0 +1,25 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_sum_types_and_the_data_model
+      dmnmd is a table format, not a graph: the 8 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NOLITERAL] blocking — decision_doubled_amount
+      `doubled amount` is a formula (self.amount * 2), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NODEFAULT] lossy — decision_is_a_sale
+      dmnmd has no <defaultOutputEntry>, so `is a sale`'s OTHERWISE became a final catch-all row — which overlaps every other rule, so the hit policy had to go from U down to F
+      lost: the order-free reading of a Unique table
+  [D-MD-NOLITERAL] blocking — decision_stated_term
+      `stated term` is a formula (disposal.term_in_years), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_claim_amount
+      `claim amount` is a formula (c.amount), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_capped_at_ten
+      `capped at ten` is a formula (IF (n AT MOST 10) THEN (JUST OF n) ELSE NOTHING), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_grade_is_settled
+      `grade is settled` is a formula (CONSIDER q WHEN JUST g THEN TRUE, WHEN NOTHING THEN FALSE), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_deep
+      `deep` is a formula (true), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
