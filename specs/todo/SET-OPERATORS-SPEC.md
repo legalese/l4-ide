@@ -1901,11 +1901,24 @@ lines). Shipped docs (`doc/reference/libraries/sets.md` + `sets-example.l4`,
 
 ### 16.3 The un-un-overloading contingency
 
-The overloads may be **reconsidered** ("un-un-overloading") only if the memoisation work
+The overloads may be **reconsidered** ("un-un-overloading") only if the typechecker work
 delivers a genuine big-O improvement — polynomial checking of N-operand `AND`/`OR` chains in
 the presence of a second candidate, demonstrated on the charities corpus, not a constant-factor
 win. Until then, isomorphic transcription of a set-flavoured `and` costs one explicit word, and
 buys back the ability to typecheck statutes at all.
+
+> **CONDITION MET 2026-07-29 — the perf ground has shifted; the ruling has not.** The
+> typechecker fix landed as [legalese/l4-ide#169](https://github.com/legalese/l4-ide/pull/169)
+> — a definite-incompatibility overload **pre-filter** plus a lazy ambiguity fallback, not the
+> memoisation this section anticipated. Measured on the charities corpus: part-3 (the 27-operand
+> disjunction) 0.72 s, part-7 1.4 s, flat chains flat through N=512, with a second candidate in
+> scope. So the demonstration this section demanded exists, with two residual caveats: operands
+> headed by registered mixfix names conservatively decline the pre-filter (they keep today's
+> fork cost), and balanced trees whose _every_ operand is itself an overloaded connective still
+> fork polynomially. **Un-un-overloading is therefore now a live option, and the question
+> reduces to the semantic argument** (§9.3, §9.5, §10.6: `AND` = `OR` = union erases a
+> distinction no authority endorses, and the type error surfaces a real drafting choice). This
+> section records that the perf precondition is satisfied; it does not reinstate the overloads.
 
 ### 16.4 What review changed
 
