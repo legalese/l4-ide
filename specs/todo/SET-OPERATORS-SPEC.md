@@ -1929,3 +1929,156 @@ as the record of the design that shipped and was measured, not as current behavi
 file also moved from branch `docs/set-operators-spec` onto `unstable` in the same change, so the
 reversal and its owning document land together; the copy on `docs/set-operators-spec` predates
 §16 and is superseded.
+
+## 17. Coordination as list formation — the factored-form analysis (2026-07-29)
+
+**Status: analysis and recommended style, recorded after discussion with Meng 2026-07-29. The
+"enumeration recognition" normaliser of §17.6 is PROPOSED, NOT BUILT.** Every L4 example in this
+section was typechecked and evaluated against the post-§16 tree (prelude without the `AND`/`OR`
+set overloads) before being written down; the anti-pattern was separately confirmed to be a type
+error.
+
+### 17.1 The linguistic claim
+
+"Residents of NY and NJ may apply" is conjunction reduction — the factored surface of "residents
+of NY and residents of NJ." Three facts about the construction are load-bearing:
+
+1. **The factored/distributed flip.** As a membership predicate, x ∈ (NY ∪ NJ) ⟺ x ∈ NY **∨**
+   x ∈ NJ: the distributed form of a nominal _and_ is a logical _or_. The prelude states this
+   law in a comment at its `is in`/`UNION` definitions ("x `is in` (p UNION q) exactly when
+   x `is in` p OR x `is in` q").
+2. **Nominal _and_ is ambiguous between ∪ and ∩.** "Residents of NY and NJ may apply" is union;
+   "citizens of France and Germany" (dual nationals) is intersection. Distribution
+   disambiguates. The removed overload did not merely collapse `AND` with `OR` (§16): it
+   silently always chose ∪, deciding an interpretive question without recording it.
+3. **The terminal connective is agreement morphology, not an operator.** The same extension
+   surfaces with _and_, _or_, or nothing, selected by the grammatical environment rather than
+   by the set operation: "residents of NY, NJ, **and** CT may apply" (affirmative); "is she a
+   resident of NY, NJ, **or** CT?" (interrogative); "no resident of NY, NJ, **or** CT may
+   apply" (negative polarity); "residents of NY, NJ, CT" (telegraphic asyndeton). A morpheme
+   selected by mood and polarity is agreement — the audible close-bracket of an enumeration.
+   The construction is `x elem [a, …, z]`: the list is the semantic object, the comma is the
+   true separator, and the pre-final connective closes the list. (_O'Connor v. Oakhurst Dairy_,
+   851 F.3d 69 (1st Cir. 2017), is the exhibit for the list boundary being where the real
+   ambiguity lives; Maine's legislative fix was re-punctuation — semicolons — not re-wording.)
+
+Statutory sub-paragraph enumerations institutionalize this: "(a) …; (b) …; … (y); **or**
+(z) …" places the connective exactly once, penultimately, and drafting convention reads it as
+distributing over every limb.
+
+### 17.2 The same error, computationally
+
+§16.1's detonation was this category error made mechanical. Article 6(1) of the Charities
+(Jersey) Law is a flat 27-limb enumeration; transcribing its terminal connective as a _binary
+operator_ binarized a list into a depth-27 leaning chain, and the measured blow-up was
+exponential **in that artificial depth** — the balanced 32-operand tree checked in 0.39 s while
+flat 16-operand chains timed out (§16.1). The pathology was never "27 operands"; it was
+list-shaped law forced through operator-shaped syntax. The ladder visualizer's IR, by contrast,
+already models `And`/`Or` as **n-ary**.
+
+### 17.3 Recommended style — the NY/NJ example, five ways
+
+All verified green. `alice` resides in NY, `carol` in NJ, `dave` in CT.
+
+**Style 1 — enumerated values + membership (the default recommendation).** When the statute
+enumerates _attribute values_ (states), the enumeration is the object and membership is the
+logic. This is also the form DMN can render natively (§17.5):
+
+```l4
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`may apply` p MEANS
+    p's `state of residence` `is in` (SET OF "NY", "NJ")
+```
+
+**Style 2 — sets of people, explicit `UNION`.** When populations are themselves the objects of
+the rule (quotas, apportionment, counting):
+
+```l4
+`eligible population` MEANS `new yorkers` UNION `new jerseyans`
+#EVAL setSize `eligible population`            -- 2
+#EVAL carol `is in` `eligible population`      -- TRUE
+```
+
+**Style 3 — distributed predicates.** The fully distributed boolean form; maximally
+ladder-friendly as-is, and the shape §17.6's normaliser would produce mechanically from Style 1:
+
+```l4
+`may apply` p MEANS
+       `resides in` p "NY"
+    OR `resides in` p "NJ"
+```
+
+**Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
+prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —
+``any (`resides in` p) …`` is a type error; the lambda is required:
+
+```l4
+`may apply` p MEANS
+    any (GIVEN s YIELD `resides in` p s) (LIST "NY", "NJ")
+```
+
+**Style 5 — inert: the statute's very token rides as scaffolding.** An inert string in `OR`
+context evaluates to `FALSE`, the identity — so the source's word "and" stays visible in the
+code (and in the ladder, as an `InertE` leaf) while the operative connective is the honest `OR`:
+
+```l4
+GIVEN `is a resident of New York`   IS A BOOLEAN
+      `is a resident of New Jersey` IS A BOOLEAN
+DECIDE `may apply per s 1` IF
+        "residents of"
+    ..  `is a resident of New York`
+    ..  "and"
+    ..  `is a resident of New Jersey`
+```
+
+This dissolves the isomorphism tension of §16: token fidelity via scaffolding, semantic honesty
+via lifted structure — without any set overload.
+
+**Anti-pattern (pinned):** `` `new yorkers` AND `new jerseyans` `` — type error since §16, by
+design; the error is the point where the drafter must choose ∪ vs ∩ and record it.
+
+### 17.4 Per-consumer preferences
+
+| setting                  | prefers                    | why                                                                 |
+| ------------------------ | -------------------------- | ------------------------------------------------------------------- |
+| token isomorphism        | factored                   | transcribe the source's "and" — served by Style 5, not by overloads |
+| interpretive isomorphism | `UNION` / `is in` explicit | records the ∪-vs-∩ ruling where it was made                         |
+| inert style              | indifferent (dissolves it) | the token rides inert; the logic distributes                        |
+| DMN export               | distributed membership     | unary-test alternation is native; set values stay `Any`             |
+| ladder diagrams          | distributed / n-ary        | branches render; a factored set expression is an opaque `App` leaf  |
+
+### 17.5 The DMN connection: rows are boxes, tables are unions of boxes
+
+FEEL's unary-test alternation `"NY","NJ"` is itself a factored comma-notation — DMN
+independently evolved §17.1's conclusion (enumeration kept, morpheme dropped). Formally: a
+decision-table **row**, read across columns, is a conjunction of per-column disjunctions — CNF
+restricted to **univariate clauses**, i.e. an axis-aligned **box** (a Cartesian product of one
+admissible set per column). The **table** is a union of boxes (DNF over box-shaped rows), and a
+**FIRST**-hit table is a decision list — ordered DNF whose "no earlier row fired" negations are
+carried by vertical position alone. Three connectives, zero connective tokens: conjunction by
+column-juxtaposition, inner disjunction by comma, outer disjunction by row-stacking.
+
+The univariate restriction is load-bearing in both directions: it is why decision-table
+completeness/overlap analysis is tractable (two boxes intersect iff every column's cell-sets
+intersect — column-wise, no SAT), and why non-box logic (`x = a ∨ y = b`) forces combinatorial
+row-splitting. That is exactly the seam the GuardedRows normaliser sits on: L4 guards are
+general boolean structure; a table is emittable only when they normalise to boxes.
+
+### 17.6 PROPOSED, NOT BUILT: enumeration recognition
+
+A canonical n-ary list-membership shape — recognising `x is in (SET OF …)`, `any p (LIST …)`,
+and `Or`-of-membership chains as one construct — rendered per consumer in its native
+compression: the ladder as a **menu box** (one group, list rows, any-suffices layout); DMN as
+the unary-test alternation; NLG as the syndetic list whose terminal token is _regenerated from
+the grammatical context_ (mood/polarity, §17.1.3) rather than stored. One Haskell pass, every
+consumer, on the GuardedRows precedent. Nothing is implemented as of 2026-07-29.
+
+### 17.7 Consequence for §16.3's contingency
+
+Un-un-overloading is deflated a step further than §16.3's CONDITION MET note left it: every
+consumer either prefers the distributed form or is indifferent, the only argument for the
+factored set form is token isomorphism, and Style 5 serves token isomorphism _better_ than the
+overloads did — without the `AND`/`OR` collapse, without the silent ∪ choice. Restoring the
+overloads would sanctify the agreement morpheme as an operator: encoding the one token in the
+sentence that carries no meaning.
