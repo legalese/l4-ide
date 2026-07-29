@@ -43,12 +43,12 @@ table, which is exactly what the page can already do. The thing a page cannot do
 So **M5 depends on C2**, and SPEC.md §5's M5 row has been corrected from `C1, C3, S2, S3`
 to `C1, C2, C3, S2, S3`. See §6.3 and finding **F5** in §9.
 
-| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-29                                                                                                                                                                                                                      |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **C0** | Mirror their eight groups | **Built.** 992 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete                                                                                                                             |
-| **C1** | Four superset moves       | **One of four remains.** Formula, deadlines and the resale deontic all landed inside C0. Rule-version axis: 0 occurrences                                                                                                                              |
-| **C2** | Citizen wizard            | **C2a built** — `regcf-wizard.l4` landed in PR #162 (`65681a0a`): 749 lines, 5 `@export`, 55 `@desc`, four goldens, in CI. No rule-date question yet (gated on C1; §3.3 last row) and `TYPICALLY` still 0; C2b/C2c not started. **M5 depends on this** |
-| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                                                                                                                                 |
+| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-29                                                                                                                                                                                                                                                   |
+| ------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C0** | Mirror their eight groups | **Built.** 992 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete                                                                                                                                                          |
+| **C1** | Four superset moves       | **Complete (2026-07-29).** Formula, deadlines and the resale deontic landed inside C0; the rule-version axis landed on `mengwong/regcf-rule-version` — seven dated constants, both dated shapes, R2 floor refusal, banded COVID refusal, pinned by the rule-version assertion group |
+| **C2** | Citizen wizard            | **C2a built** — `regcf-wizard.l4` landed in PR #162 (`65681a0a`): 749 lines, 5 `@export`, 55 `@desc`, four goldens, in CI. No rule-date question yet (gated on C1; §3.3 last row) and `TYPICALLY` still 0; C2b/C2c not started. **M5 depends on this**                              |
+| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                                                                                                                                                              |
 
 Provenance: `jl4/examples/legal/regcf/regcf.l4` (992 lines; cut in `4c6a385d`,
 `6ddbc68c`, `10e74b95`, then grown by PR #162's projection triage) and
@@ -349,6 +349,17 @@ recorded in PROCESS-TRACK.md, but it is not this move's argument.
 
 ### 2.4 Thresholds on the rule-version axis — **the whole remaining C1**
 
+> **Status (2026-07-29): BUILT**, on branch `mengwong/regcf-rule-version`, exactly to this
+> section's prescription — §6.2 steps 1, 1b, 2 and 2b in one change, because trap 5 makes
+> them one unit. All seven moved constants carry four-regime dated arms; the lesser→greater
+> shape and the accredited carve-out are dated; the R2 floor is a deliberate `ASSUME`
+> bottom (an arm that reaches it stops with "…is an assumed term", naming the refusal —
+> not the deprecated module-parameter ASSUME style, no input routes through it); the
+> 201(z)/(bb) COVID window is a **banded refusal** in `financial statements required`
+> (decided 2026-07-29 — see §2.4.1). Every claim below this note describes the tree
+> **before** that change and is kept as the build spec it was; the paragraph-opening grep
+> now counts the dated arms rather than 0.
+
 `grep -c "RULES EFFECTIVE\|EVAL UNDER" regcf.l4` → **0**. The `§§ Thresholds` block
 (**73-121**) binds **nine** constants, **eight** of them dollar figures, all flat: **79**
 `MEANS 5000000`, **86** `MEANS 124000`, **91** `MEANS 2500`, **96** `MEANS 124000`, **101**
@@ -429,6 +440,14 @@ because it sits _inside_ the answerable window. This is recorded as a known limi
 `regcf/README.md §5` rather than papered over. Whoever encodes the tier ceilings must decide
 whether to encode 201(z)/(bb) or to refuse rule dates in `2020-05-04 … 2022-08-28` for
 `financial statements required` specifically.
+
+> **Decided 2026-07-29: refuse, and refuse in the band, not blanket.** The relief could
+> only ever change the answer for an aggregate **above the then-tier-1 ceiling and at most
+> $250,000**; outside that band the ordinary tiers were unaffected, so in-window questions
+> outside the band still answer (and two assertions pin that). Inside the band the
+> eligibility conditions turn on facts the corpus does not model (organization age, prior
+> delinquency), so the arm stops on a typed `ASSUME` bottom naming Rule 201(z)/(bb) rather
+> than guessing. Documented in `regcf/README.md §5`.
 
 #### 2.4.2 The shape a C1 author writes
 
@@ -551,6 +570,53 @@ investment` (91) need dated bodies; the formula at 306-319 is untouched". False.
    (and, for the tier ceilings, until the 201(z)/(bb) window in §2.4.1 is either encoded or
    explicitly refused).
 
+#### 2.4.4 Prior art: OpenFisca's ten years on one time axis (researched 2026-07-29)
+
+OpenFisca is the closest production system to this track — ~4,000 dated parameter files in
+the French corpus alone — and it was surveyed before the axis landed here (source readings
+against `openfisca/openfisca-core@master`; doc pages
+[legislation_parameters](https://openfisca.org/doc/coding-the-legislation/legislation_parameters.html),
+[40_legislation_evolutions](https://openfisca.org/doc/coding-the-legislation/40_legislation_evolutions.html),
+[reforms](https://openfisca.org/doc/coding-the-legislation/reforms.html)). Five findings,
+each with a consequence for us:
+
+1. **It versions law on exactly one time axis — and it is fact-time.** `Simulation._run_formula`
+   passes one `period` to both formula dispatch and parameter lookup
+   (`simulations/simulation.py:335-351`); there is no as-of-law argument anywhere in core.
+   The only escape is a `Reform`, which is not a date but a whole second copy of the
+   tax-benefit system (`reforms/reform.py:9`). **L4's `EVAL UNDER RULES EFFECTIVE AT` is
+   precisely the thing OpenFisca lacks**: law-time as a value rather than an object
+   identity, making "2019 facts under 2021 rules" an ordinary query instead of a fork.
+2. **Dated values are half-open intervals scanned newest-first** — `values:` keyed by ISO
+   date, sorted reverse-chronologically, first entry ≤ instant wins
+   (`parameters/parameter.py:77-80, 213-217`). Structurally identical to our
+   newest-first `IF … AT LEAST` chains, which is reassuring: two systems converged on the
+   same shape.
+3. **Out-of-range behaviour is split, and half of it is dangerous.** A parameter read
+   before its first value **fails loud** (`ParameterNotFoundError`); a formula evaluated
+   outside its dated window **fails silent**, substituting the type default — zero
+   (`simulations/simulation.py:159-161`). A silent zero for "no rule in force" is how a
+   wrong number reaches a filing. **This is R2's floor-refusal design vindicated by
+   counterexample**: our pre-commencement bottom is loud on both constants and shapes.
+4. **Per-value legal citation exists only as hand-rolled, unvalidated metadata.** The
+   French minimum-wage file carries a date-keyed `reference` map to Legifrance URLs, an
+   `official_journal_date` map (effective date → publication date), and a
+   `last_value_still_valid_on` freshness stamp — none of which the engine reads or checks
+   (`parameters/config.py:25`). The community reinvented **per-arm citation** (our trap 4)
+   and **transaction-time** (our latent `tcRuleEncodingTime`) in the only place available
+   to them. Consequence for Phase 2: `@label` should be a _required, checked_ field of a
+   dated arm, not optional metadata — an uncited amendment should fail the lint (R6) —
+   and the rule-version axis should connect to the bitemporal ledger rather than remain a
+   separate feature, because OpenFisca's users demonstrably needed the third axis and had
+   nowhere to put it.
+5. **Period-start resolution erases mid-year boundaries.** `parameters(period)` resolves a
+   year-period to the law as of 1 January (`tax_benefit_system.py:465-466`), so a
+   threshold moving on 16 May is invisible to an annual computation. Every Reg CF boundary
+   is mid-year. Our rule date is day-resolved, so we do not inherit the bug — but the
+   general hazard (a fact-_period_ straddling a rule-version boundary) is real here too:
+   Rule 100(a)(2)'s 12-month aggregation window can straddle a release, which is exactly
+   the K-b scenario §4.3 marks "the corpus cannot answer today". Name it, do not paper it.
+
 **Language support: SPECIFIED but not built** — and the C1 spec should name the cost rather
 than hide it.
 
@@ -596,7 +662,7 @@ boolean top level means all seven that have ever moved (79, 86, 91, 96, 101, 106
 | investor limit as a **formula**         | **Done** — `regcf.l4:306-319`                                            | built                                                            |
 | obligation tail with **real deadlines** | **Mostly done** — 491-497, 563-573, 619-625. Residue = §1.5 + one `LEST` | built                                                            |
 | resale as a **12-month deontic**        | **Done** — `regcf.l4:619-625`                                            | built                                                            |
-| thresholds on the **rule-version axis** | **Absent — the whole remaining C1**                                      | **built**; Phase 2 ergonomics and the "not in force" arm are not |
+| thresholds on the **rule-version axis** | **Done 2026-07-29** — see the §2.4 status note                           | **built**; Phase 2 ergonomics and the "not in force" arm are not |
 
 **Nothing in C1 is blocked on language work.** `EVAL UNDER RULES EFFECTIVE AT` and
 `RULES EFFECTIVE DATE` are shipped, typed, evaluated and covered by a blessed CI golden
@@ -1151,21 +1217,21 @@ its 2016/2017 rows are the guard against re-dropping the 2017-04-12 boundary.
 
 ### 6.2 Order of work
 
-| Step   | Work                                                                                                                                                 | Depends on   | Doable now?                                                                         |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------- |
-| **0**  | **C0-f** — the D3 prose fixes in `regcf.l4:81-83` and README §3.3                                                                                    | —            | **yes**; smallest, and it is the accuracy claim                                     |
-| 1      | **C1-T** — `investment limit` **closed**: cut point + floor + **cap** + the lesser→greater shape + 2016-05-16 floor arm; `TIMEZONE`; I-3 **and I-4** | —            | **yes**                                                                             |
-| **1b** | **C1-T1b** — `investor is within the investment limit` closed: the accredited carve-out at **337-341**, which did not exist before 2021-03-15        | 1            | **yes**; needed before the top-level is dateable                                    |
-| 2      | **C1-T2** — `offering maximum` closed (three arms incl. 2017-04-12)                                                                                  | 1            | **yes**                                                                             |
-| **2b** | **C1-T3** — the three tier ceilings closed, or a documented refusal for the 201(z)/(bb) COVID window                                                 | 1            | **yes**; **prerequisite for the rule date as a wizard question** (trap 5, last row) |
-| 3      | **C0-a/b** — D1 and D2 fixes                                                                                                                         | —            | **yes**, independent                                                                |
-| 4      | **C0-c/d** — Form C and intermediary duties                                                                                                          | —            | **yes**                                                                             |
-| 5      | **C0-e** — the composed `RAND` contract                                                                                                              | 3, 4         | **yes** — and it unblocks **P0**                                                    |
-| 6      | **C3** — `regcf-scenarios.l4`, party-grouped, rule-date-pinned, K-a/b/c only                                                                         | 1, 5         | **yes**; the _gate_ needs (a) or (b) — see **R5**                                   |
-| 7      | **C2a** — `regcf-wizard.l4` façade, `@desc`, two exports, `TYPICALLY`, the rule-date question                                                        | 1, 1b, 2, 2b | **yes**                                                                             |
-| 8      | **C2b** — frontend answer layer + progressive disclosure + **the applied-rule-date disclosure** (R8)                                                 | 7            | **yes** — backend finished                                                          |
-| 9      | **C2c** — deploy to `dev.jl4.legalese.com`                                                                                                           | 7            | one-line nix change                                                                 |
-| —      | Phase 2 `@effective` ergonomics; `l4 diff-eval`                                                                                                      | —            | **not built.** C1 does not wait for either                                          |
+| Step   | Work                                                                                                                                                 | Depends on   | Doable now?                                                       |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------- |
+| **0**  | **C0-f** — the D3 prose fixes in `regcf.l4:81-83` and README §3.3                                                                                    | —            | **DONE 2026-07-29** (with steps 1-2b)                             |
+| 1      | **C1-T** — `investment limit` **closed**: cut point + floor + **cap** + the lesser→greater shape + 2016-05-16 floor arm; `TIMEZONE`; I-3 **and I-4** | —            | **DONE 2026-07-29** — §2.4 status note                            |
+| **1b** | **C1-T1b** — `investor is within the investment limit` closed: the accredited carve-out at **337-341**, which did not exist before 2021-03-15        | 1            | **DONE 2026-07-29**                                               |
+| 2      | **C1-T2** — `offering maximum` closed (three arms incl. 2017-04-12)                                                                                  | 1            | **DONE 2026-07-29**                                               |
+| **2b** | **C1-T3** — the three tier ceilings closed, **and** the documented banded refusal for the 201(z)/(bb) COVID window (§2.4.1 decision note)            | 1            | **DONE 2026-07-29** — unblocks the rule date as a wizard question |
+| 3      | **C0-a/b** — D1 and D2 fixes                                                                                                                         | —            | **yes**, independent                                              |
+| 4      | **C0-c/d** — Form C and intermediary duties                                                                                                          | —            | **yes**                                                           |
+| 5      | **C0-e** — the composed `RAND` contract                                                                                                              | 3, 4         | **yes** — and it unblocks **P0**                                  |
+| 6      | **C3** — `regcf-scenarios.l4`, party-grouped, rule-date-pinned, K-a/b/c only                                                                         | 1, 5         | **yes**; the _gate_ needs (a) or (b) — see **R5**                 |
+| 7      | **C2a** — `regcf-wizard.l4` façade, `@desc`, two exports, `TYPICALLY`, the rule-date question                                                        | 1, 1b, 2, 2b | **yes**                                                           |
+| 8      | **C2b** — frontend answer layer + progressive disclosure + **the applied-rule-date disclosure** (R8)                                                 | 7            | **yes** — backend finished                                        |
+| 9      | **C2c** — deploy to `dev.jl4.legalese.com`                                                                                                           | 7            | one-line nix change                                               |
+| —      | Phase 2 `@effective` ergonomics; `l4 diff-eval`                                                                                                      | —            | **not built.** C1 does not wait for either                        |
 
 **M5 = steps 1, 1b, 2, 2b, 6, 7, 8, 9.** Steps 1-2b are the arithmetic; 7-9 are the argument. A
 run that stops after step 1 has a correct golden file and no exhibit.
@@ -1246,13 +1312,14 @@ changed the shape of the fourth; the reasoning is kept so the decision is audita
   **not** catch the two failure modes that actually bit — a constant left undated _inside_
   the window (trap 5) and an omitted boundary _inside_ the window (2017-04-12). Those need
   closure discipline and primary-source verification respectively, not a floor.
-- **R3 — Do C0's 55 existing assertions get pinned?** Once a threshold reads
-  `RULES EFFECTIVE DATE`, an unpinned assertion resolves against the ambient clock. In CI
-  that is the harness's fixed `2025-01-31` (`jl4/tests/Main.hs:64-66`), which happens to sit
-  in the current regime, so the goldens stay green **by luck**. A developer running `l4 run`
-  by hand gets the real today, and after the next inflation release (README §2 puts it
-  around 2027) "today" stops meaning what the assertions assume. Options: pin all 55; pin
-  none and document the harness dependency; pin only those that touch a dated constant.
+- **R3 — Do C0's 55 existing assertions get pinned? — RESOLVED 2026-07-29: pin none,
+  document the dependency.** The 55 assertions state the _current_ law and stay unpinned;
+  the dependency on the harness clock (`jl4/tests/Main.hs:64-66`, fixed `2025-01-31`, which
+  sits in the current regime) is documented at the head of the rule-version assertion group
+  in `regcf.l4` and in README §5. Every assertion in the rule-version group itself is
+  pinned and immune. After the next inflation release (~2027) the 55 must either be pinned
+  to the pre-release regime or re-verified against the new figures — that chore is now
+  written where the next editor will trip over it, instead of latent.
 - **R4 — Party attribution for scenarios.** L4 has no `SCENARIO` or `OWNER` construct; `§§`
   headings and comments are the only grouping. Is a section-name convention enough to carry
   the negotiation story, or does C3 want a real construct? A construct is a language change
