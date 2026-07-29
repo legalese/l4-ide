@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-bitemporal-recall.l4:19:1-503:
+bitemporal-recall.l4:19:1-433:
   LIST 7, 9, 7, 9, 0, 9
   Ledger:
     RECORD `rate` IS 7   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2023-01-01]

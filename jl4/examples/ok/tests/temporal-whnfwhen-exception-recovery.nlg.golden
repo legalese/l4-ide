@@ -1,7 +1,7 @@
 `x`
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and `x`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `x`
 `x`
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and `y`
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and `y`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `y`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `y`
 `r`
 `r`

@@ -1,4 +1,4 @@
-the difference between `serial snapshot 1` and `EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and `serial snapshot 1`
-the difference between `EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and `serial snapshot 2` and `serial snapshot 2`
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and the difference between `EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2010 and `serial snapshot 3` and `serial snapshot 3`
-`EVAL AS OF SYSTEM TIME` with `DATE_SERIAL` with `DATE_FROM_DMY` with 1, 1 and 2020 and the difference between `serial snapshot 4` and `serial snapshot 4`
+the difference between `serial snapshot 1` and `EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `serial snapshot 1`
+the difference between `EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and `serial snapshot 2` and `serial snapshot 2`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and the difference between `EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2010 and `serial snapshot 3` and `serial snapshot 3`
+`EVAL AS OF SYSTEM TIME` with `DATE_FROM_DMY` with 1, 1 and 2020 and the difference between `serial snapshot 4` and `serial snapshot 4`

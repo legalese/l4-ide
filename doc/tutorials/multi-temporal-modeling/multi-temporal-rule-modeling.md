@@ -67,24 +67,25 @@ axis you evaluate it under. Nothing about its _definition_ changes.
 ## Step 2: Pin the rule-version explicitly
 
 ```l4
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) `GST rate`
 -- => 7
 
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) `GST rate`
 -- => 9
 ```
 
 `EVAL UNDER RULES EFFECTIVE AT <date> <expr>` evaluates `<expr>` with the
 rule-effective-time axis pinned to `<date>`, then restores the previous
-context. It's an ordinary function, `DATE SERIAL -> a -> a`, so it
-composes: it works exactly the same way through a dependent rule like
-`GST payable on`:
+context. It's an ordinary function, `DATE -> a -> a` (since 2026-07-29;
+it previously took a `DATE_SERIAL` number, and the runtime still
+tolerates one), so it composes: it works exactly the same way through a
+dependent rule like `GST payable on`:
 
 ```l4
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2023)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2023) (`GST payable on` 1000)
 -- => 70
 
-#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 7 2024)) (`GST payable on` 1000)
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (Date 1 7 2024) (`GST payable on` 1000)
 -- => 90
 ```
 
@@ -99,7 +100,7 @@ What if you _don't_ pin a rule-version, but you do pin the facts to a
 particular date?
 
 ```l4
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) `GST rate`
+#EVAL `EVAL UNDER VALID TIME` (Date 1 6 2019) `GST rate`
 -- => 7
 ```
 
@@ -115,7 +116,7 @@ in force when someone later asks about it. Pin the facts to the new
 regime instead, and the new rate follows automatically:
 
 ```l4
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024)) `GST rate`
+#EVAL `EVAL UNDER VALID TIME` (Date 1 7 2024) `GST rate`
 -- => 9
 ```
 
@@ -129,8 +130,8 @@ said, restated in today's code, about a fact from the new regime?" Nest
 the two overrides and the explicit, inner pin wins:
 
 ```l4
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 7 2024))
-      (`EVAL UNDER RULES EFFECTIVE AT` (DATE_SERIAL (Date 1 6 2019)) `GST rate`)
+#EVAL `EVAL UNDER VALID TIME` (Date 1 7 2024)
+      (`EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2019) `GST rate`)
 -- => 7
 ```
 
@@ -147,7 +148,7 @@ nature — an explicit statement always wins.
 independent of both valid time and rule-effective time:
 
 ```l4
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 6 2019)) (DATE_SERIAL TODAY)
+#EVAL `EVAL UNDER VALID TIME` (Date 1 6 2019) (DATE_SERIAL TODAY)
 #EVAL DATE_SERIAL TODAY
 -- both give the same answer
 ```
@@ -178,7 +179,7 @@ the valid-time axis is pinned — and "today" is computed the same way
 through to `RULES EFFECTIVE DATE` as well:
 
 ```l4
-#EVAL `EVAL AS OF SYSTEM TIME` (DATE_SERIAL (Date 1 6 2020)) `GST rate`
+#EVAL `EVAL AS OF SYSTEM TIME` (Date 1 6 2020) `GST rate`
 -- => 7
 ```
 
@@ -242,7 +243,7 @@ rule-version pin → valid-time pin → today (via system time)**.
 
 ```l4
 -- ❌ Wrong assumption: TODAY shifts to match
-#EVAL `EVAL UNDER VALID TIME` (DATE_SERIAL (Date 1 1 2000)) (DATE_SERIAL TODAY)
+#EVAL `EVAL UNDER VALID TIME` (Date 1 1 2000) (DATE_SERIAL TODAY)
 -- Actually returns the REAL today — TODAY never reads valid time.
 ```
 
@@ -273,9 +274,9 @@ rule-version pin → valid-time pin → today (via system time)**.
   by default: absent an explicit pin, the law that applies tracks the
   facts' valid time, falling back further to today.
 - `EVAL UNDER RULES EFFECTIVE AT`, `EVAL UNDER VALID TIME`, and
-  `EVAL AS OF SYSTEM TIME` are ordinary composable overrides (`DATE SERIAL
--> a -> a`), and an explicit inner pin always wins over an outer or
-  ambient default.
+  `EVAL AS OF SYSTEM TIME` are ordinary composable overrides
+  (`DATE -> a -> a` since 2026-07-29), and an explicit inner pin always
+  wins over an outer or ambient default.
 - `TODAY` is pinned to system time only — it's the one thing an
   unpinned-fallback system-time override can still reach, but an
   explicit rule-version/valid-time pin cannot touch it at all.

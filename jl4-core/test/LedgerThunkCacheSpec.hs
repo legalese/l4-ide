@@ -87,7 +87,7 @@ doubleWriteSrc = Text.unlines
   , ""
   , "`stamped write` MEANS (RECORD `x` IS 100) PLUS DATE_SERIAL TODAY"
   , ""
-  , "#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `stamped write`) MINUS `stamped write`"
+  , "#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `stamped write`) MINUS `stamped write`"
   ]
 
 -- | A shared top-level binding whose force RECALLs a cell, used first under
@@ -104,7 +104,7 @@ recallCoherenceSrc = Text.unlines
   , "  WHEN JUST v THEN v"
   , "  WHEN NOTHING THEN DATE_SERIAL TODAY"
   , ""
-  , "#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or today`), (RECORD `x` IS 7), `recall or today`"
+  , "#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `recall or today`), (RECORD `x` IS 7), `recall or today`"
   ]
 
 -- | CONTROL (contract #914 §4): the same shape but with NO clause anywhere —

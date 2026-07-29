@@ -61,3 +61,18 @@ not `the delinquent-issuer case qualifies`
 not `the over-limit-investor case qualifies`
 not `the short-availability case qualifies`
 not `the under-assured-financials case qualifies`
+not `W within the limit in 2016`
+not `W within the limit in 2021 January`
+`W within the limit in 2021 June`
+`the cut point the day before the 2017 adjustment` is equal to 100000
+`the cut point on the day of the 2017 adjustment` is equal to 107000
+`I-3 limit under the 2022 rules` is equal to 11500
+`I-3 limit under the 2023 rules` is equal to 5750
+`I-4 limit under the 2022 rules` is equal to 107000
+`the percentage case under the 2019 rules` is equal to 3000
+`A is within the limit under the 2021 rules`
+not `A is within the limit under the 2019 rules`
+`F requirement under the 2019 rules` is equal to `audited`
+`F requirement under the 2023 rules` is equal to `reviewed`
+`a small offering inside the COVID window` is equal to `certified`
+`a large offering inside the COVID window` is equal to `audited`

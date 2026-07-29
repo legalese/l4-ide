@@ -1,11 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-temporal-rule-version-validtime.l4:24:1-71:
+temporal-rule-version-validtime.l4:24:1-57:
   7
-temporal-rule-version-validtime.l4:28:1-71:
+temporal-rule-version-validtime.l4:28:1-57:
   9
-temporal-rule-version-validtime.l4:33:1-135:
+temporal-rule-version-validtime.l4:33:1-107:
   7
 temporal-rule-version-validtime.l4:36:1-17:
   9

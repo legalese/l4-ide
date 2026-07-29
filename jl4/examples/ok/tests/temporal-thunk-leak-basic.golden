@@ -1,25 +1,25 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-temporal-thunk-leak-basic.l4:27:1-87:
+temporal-thunk-leak-basic.l4:27:1-73:
   DATE OF 1, 1, 2020
 temporal-thunk-leak-basic.l4:30:1-23:
   DATE OF 31, 1, 2025
 temporal-thunk-leak-basic.l4:39:1-25:
   DATE OF 31, 1, 2025
-temporal-thunk-leak-basic.l4:42:1-89:
+temporal-thunk-leak-basic.l4:42:1-75:
   DATE OF 1, 1, 2020
-temporal-thunk-leak-basic.l4:51:1-155:
+temporal-thunk-leak-basic.l4:51:1-127:
   DATE OF 1, 1, 2010
-temporal-thunk-leak-basic.l4:54:1-89:
+temporal-thunk-leak-basic.l4:54:1-75:
   DATE OF 1, 1, 2020
 temporal-thunk-leak-basic.l4:57:1-25:
   DATE OF 31, 1, 2025
-temporal-thunk-leak-basic.l4:67:1-88:
+temporal-thunk-leak-basic.l4:67:1-74:
   DATE OF 2, 1, 2020
 temporal-thunk-leak-basic.l4:70:1-24:
   DATE OF 1, 2, 2025
-temporal-thunk-leak-basic.l4:80:1-85:
+temporal-thunk-leak-basic.l4:80:1-71:
   2020-01-01T00:00:00+0000
 temporal-thunk-leak-basic.l4:83:1-21:
   2025-01-31T15:45:30+0000

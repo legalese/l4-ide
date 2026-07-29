@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-bitemporal-shared-thunk.l4:20:1-392:
+bitemporal-shared-thunk.l4:20:1-322:
   LIST 7, 9, 7, 9, 0, 9
   Ledger:
     RECORD `rate` IS 7   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2023-01-01]

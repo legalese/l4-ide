@@ -29,7 +29,7 @@ TIMEZONE IS "Etc/UTC"
 -- exactly ONE `RECORD `x`` ledger row.
 -- (un-poisoned: -1857 — override value minus a re-forced ambient value —
 -- and TWO ledger rows)
-#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `stamped write`) MINUS `stamped write`
+#EVAL (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `stamped write`) MINUS `stamped write`
 
 ----------------------------------------------------------------------------
 -- Read side: a shared RECALL thunk snapshots PER TEMPORAL SCOPE (#914 §2B)
@@ -45,7 +45,7 @@ TIMEZONE IS "Etc/UTC"
 -- the bare third use is a DIFFERENT temporal scope, so the shared thunk
 -- re-forces against the current ledger and reads the meanwhile-written 7.
 -- (pre-#914 this snapshotted per directive: LIST 737789, 7, 737789)
-#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_SERIAL (DATE_FROM_DMY 1 1 2020)) `recall or today`), (RECORD `x` IS 7), `recall or today`
+#EVAL LIST (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) `recall or today`), (RECORD `x` IS 7), `recall or today`
 
 ----------------------------------------------------------------------------
 -- Control (contract #914 §4): clause-free — same scope, snapshot re-served

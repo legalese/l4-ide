@@ -307,7 +307,8 @@ reuse.
    Unobservable today (no reader) ⇒ goldens silent; re-bless
    `temporal-acceptance` if trace output shifts.
 3. **`RETROACTIVE TO` sugar**: register `evalRetroactiveTo`
-   (`NUMBER -> a -> a`) beside the four EVAL builtins
+   (`DATE -> a -> a`; the four EVAL builtins moved from `NUMBER` serials
+   to `DATE` arguments 2026-07-29) beside the four EVAL builtins
    (`TypeCheck/Environment.hs:76-79` block + type + info + tables); its
    interception arm (`Machine.hs:781-804` pattern) pushes the
    `AsOfSystemTime` and `UnderRulesEffectiveAt` frames nested — no new
