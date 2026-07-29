@@ -95,3 +95,37 @@ C3 strengthens (Yan & He collapse the two orderings; Silk lacks the Holmes/predi
 half and party-indexing); C4 delta (ordinal+party-indexed vs Pearl's cardinal single-
 agent) confirmed; C1 must concede the landmark insight outright and claim only the
 deontic re-reading. Build the `.bib` from the verified entries above.
+
+## van der Meyden — permission dual + the SAFE-author identity (2026-07-29)
+
+Pulled to answer "do the prior-art papers frame MAY as the dual to the dominator,
+and how do they tackle state-space explosion?" Feeds `draft/section-permission-and-explosion.tex`.
+
+- **van der Meyden, "The Dynamic Logic of Permission," J. Logic and Computation
+  6(3):465–479, 1996** (DOI 10.1093/logcom/6.3.465). Verified via dblp + OUP.
+  - Classifies **executions (state-sequences), not states**, as permitted →
+    trajectory-indexed, constrains intermediate course, not just the result.
+  - Separates **free-choice permission** from **permission-as-lack-of-prohibition**;
+    the former is what standard modal logics can't capture — his stated motivation.
+  - **NOT goal-indexed.** ⚠️ Correction to an earlier chat claim: do NOT describe it
+    as "the edge that keeps the goal reachable" — that goal-reachability dual is the
+    Anderson/Meyer `◇(A∧¬V)` reading (our reconstruction), not van der Meyden's result.
+    His is the transition-system home of *free-choice* permission, a different refinement.
+  - **DLP is EXPTIME-complete**; contribution is a complete axiomatisation, not a
+    scalable checker. This IS the strand-1 answer to "how do they handle explosion":
+    they don't enumerate a model — the cost lives in the decision procedure.
+  - Follow-up: **"Reduction from DLP to PDL," JLC 15(5):767–782, 2005**
+    (DOI 10.1093/logcom/exi044) — page range to reconfirm against OUP before camera-ready.
+- **Identity confirmed:** same Ron van der Meyden (UNSW) authored the DLP papers and,
+  with **Michael J. Maher**, the **SAFE** book — *Simple Agreement for Future Equity
+  (SAFE): Smart Contracts for Venture Finance*, Springer Nature Singapore, Blockchain
+  Technologies series, 2025 (ISBN 9789819639199, DOI 10.1007/978-981-96-3920-5,
+  hardcover 2 Oct 2025). One author spans the classical semantics of permission and its
+  contemporary executable use — a one-citation spine linking the deontics paper's
+  permission dual to the SAFE facet. (Cross-ref memory [[yc-safe-executable]].)
+- Three-strata explosion story recorded in the draft: (1) classical deontic logic
+  (Anderson→Meyer→van der Meyden) doesn't enumerate; (2) normative-MAS model checkers
+  (MCMAS/deontic interpreted systems) use generic OBDD/POR/BMC; (3) planning landmarks
+  = dominators dodge the product via delete-relaxation (Hoffmann–Porteous–Sebastia 2004;
+  Helmert–Domshlak 2009; Richter–Westphal 2010). Lomuscio & Sergot 2003 srctag still
+  needs a bib entry + primary-source check before camera-ready.
