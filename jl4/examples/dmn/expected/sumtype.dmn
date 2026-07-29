@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_sum_types_and_the_data_model" name="Sum types and the data model" namespace="https://legalese.com/l4/dmn/sum_types_and_the_data_model" exporter="jl4">
+  <itemDefinition id="itemdef_grade" name="Grade">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"high","low"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_disposal" name="Disposal">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"sell","lease","assign"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_claim" name="Claim">
+    <itemComponent id="itemdef_claim_c1" name="amount">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_claim_c2" name="assessed_grade" label="assessed grade">
+      <typeRef>Grade_optional</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_claim_c3" name="supporting_notes" label="supporting notes">
+      <typeRef>Any</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_claim_c4" name="the_disposal" label="the disposal">
+      <typeRef>Disposal</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_number" name="number_" label="number">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"alpha","beta"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_grade_optional" name="Grade_optional" label="Grade">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <inputData id="input_self" name="self" label="_self">
+    <variable id="input_self_var" name="self" label="_self" typeRef="Claim"/>
+  </inputData>
+  <inputData id="input_d" name="d">
+    <variable id="input_d_var" name="d" typeRef="Disposal"/>
+  </inputData>
+  <inputData id="input_disposal" name="disposal">
+    <variable id="input_disposal_var" name="disposal" typeRef="Disposal"/>
+  </inputData>
+  <inputData id="input_c" name="c">
+    <variable id="input_c_var" name="c" typeRef="Claim"/>
+  </inputData>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <inputData id="input_q" name="q">
+    <variable id="input_q_var" name="q" typeRef="Grade_optional"/>
+  </inputData>
+  <inputData id="input_g" name="g">
+    <variable id="input_g_var" name="g" typeRef="Grade"/>
+  </inputData>
+  <inputData id="input_k" name="k">
+    <variable id="input_k_var" name="k" typeRef="number_"/>
+  </inputData>
+  <decision id="decision_doubled_amount" name="doubled_amount" label="doubled amount">
+    <variable id="decision_doubled_amount_var" name="doubled_amount" label="doubled amount" typeRef="number"/>
+    <informationRequirement id="decision_doubled_amount_ir1">
+      <requiredInput href="#input_self"/>
+    </informationRequirement>
+    <literalExpression id="decision_doubled_amount_literal">
+      <text>self.amount * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_is_a_sale" name="is_a_sale" label="is a sale">
+    <variable id="decision_is_a_sale_var" name="is_a_sale" label="is a sale" typeRef="boolean"/>
+    <informationRequirement id="decision_is_a_sale_ir1">
+      <requiredInput href="#input_d"/>
+    </informationRequirement>
+    <decisionTable id="decision_is_a_sale_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="is a sale">
+      <input id="decision_is_a_sale_i1" label="d">
+        <inputExpression id="decision_is_a_sale_i1_expr" typeRef="Disposal">
+          <text>d</text>
+        </inputExpression>
+        <inputValues>
+          <text>"sell","lease","assign"</text>
+        </inputValues>
+      </input>
+      <output id="decision_is_a_sale_o1">
+        <defaultOutputEntry id="decision_is_a_sale_o1_default">
+          <text>false</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_is_a_sale_r1">
+        <description>d EQUALS sell</description>
+        <inputEntry id="decision_is_a_sale_r1_i1">
+          <text>"sell"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_a_sale_r1_o1">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_is_a_sale_r2">
+        <description>d EQUALS assign</description>
+        <inputEntry id="decision_is_a_sale_r2_i1">
+          <text>"assign"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_a_sale_r2_o1">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_stated_term" name="stated_term" label="stated term">
+    <variable id="decision_stated_term_var" name="stated_term" label="stated term" typeRef="number"/>
+    <informationRequirement id="decision_stated_term_ir1">
+      <requiredInput href="#input_disposal"/>
+    </informationRequirement>
+    <literalExpression id="decision_stated_term_literal">
+      <text>disposal.term_in_years</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_claim_amount" name="claim_amount" label="claim amount">
+    <variable id="decision_claim_amount_var" name="claim_amount" label="claim amount" typeRef="number"/>
+    <informationRequirement id="decision_claim_amount_ir1">
+      <requiredInput href="#input_c"/>
+    </informationRequirement>
+    <literalExpression id="decision_claim_amount_literal">
+      <text>c.amount</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_capped_at_ten" name="capped_at_ten" label="capped at ten">
+    <variable id="decision_capped_at_ten_var" name="capped_at_ten" label="capped at ten" typeRef="number"/>
+    <informationRequirement id="decision_capped_at_ten_ir1">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_capped_at_ten_literal">
+      <text>IF (n AT MOST 10) THEN (JUST OF n) ELSE NOTHING</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_grade_is_settled" name="grade_is_settled" label="grade is settled">
+    <variable id="decision_grade_is_settled_var" name="grade_is_settled" label="grade is settled" typeRef="boolean"/>
+    <informationRequirement id="decision_grade_is_settled_ir1">
+      <requiredInput href="#input_q"/>
+    </informationRequirement>
+    <literalExpression id="decision_grade_is_settled_literal">
+      <text>CONSIDER q WHEN JUST g THEN TRUE, WHEN NOTHING THEN FALSE</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_deep" name="deep">
+    <variable id="decision_deep_var" name="deep" typeRef="boolean"/>
+    <literalExpression id="decision_deep_literal">
+      <text>true</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_grade_for" name="grade_for" label="grade for">
+    <variable id="decision_grade_for_var" name="grade_for" label="grade for" typeRef="number"/>
+    <informationRequirement id="decision_grade_for_ir1">
+      <requiredInput href="#input_g"/>
+    </informationRequirement>
+    <decisionTable id="decision_grade_for_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="grade for">
+      <input id="decision_grade_for_i1" label="g">
+        <inputExpression id="decision_grade_for_i1_expr" typeRef="Grade">
+          <text>g</text>
+        </inputExpression>
+        <inputValues>
+          <text>"high","low"</text>
+        </inputValues>
+      </input>
+      <output id="decision_grade_for_o1"/>
+      <rule id="decision_grade_for_r1">
+        <description>g EQUALS high</description>
+        <inputEntry id="decision_grade_for_r1_i1">
+          <text>"high"</text>
+        </inputEntry>
+        <outputEntry id="decision_grade_for_r1_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_grade_for_r2">
+        <description>g EQUALS low</description>
+        <inputEntry id="decision_grade_for_r2_i1">
+          <text>"low"</text>
+        </inputEntry>
+        <outputEntry id="decision_grade_for_r2_o1">
+          <text>1</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_is_alpha" name="is_alpha" label="is alpha">
+    <variable id="decision_is_alpha_var" name="is_alpha" label="is alpha" typeRef="boolean"/>
+    <informationRequirement id="decision_is_alpha_ir1">
+      <requiredInput href="#input_k"/>
+    </informationRequirement>
+    <decisionTable id="decision_is_alpha_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="is alpha">
+      <input id="decision_is_alpha_i1" label="k">
+        <inputExpression id="decision_is_alpha_i1_expr" typeRef="number_">
+          <text>k</text>
+        </inputExpression>
+        <inputValues>
+          <text>"alpha","beta"</text>
+        </inputValues>
+      </input>
+      <output id="decision_is_alpha_o1"/>
+      <rule id="decision_is_alpha_r1">
+        <description>k EQUALS alpha</description>
+        <inputEntry id="decision_is_alpha_r1_i1">
+          <text>"alpha"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_alpha_r1_o1">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_is_alpha_r2">
+        <description>k EQUALS beta</description>
+        <inputEntry id="decision_is_alpha_r2_i1">
+          <text>"beta"</text>
+        </inputEntry>
+        <outputEntry id="decision_is_alpha_r2_o1">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_sum_types_and_the_data_model_diagram" name="Sum types and the data model">
+      <dmndi:DMNShape id="input_self_shape" dmnElementRef="input_self">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_d_shape" dmnElementRef="input_d">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_disposal_shape" dmnElementRef="input_disposal">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_n_shape" dmnElementRef="input_n">
+        <dc:Bounds x="940" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_q_shape" dmnElementRef="input_q">
+        <dc:Bounds x="1160" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_g_shape" dmnElementRef="input_g">
+        <dc:Bounds x="1380" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_k_shape" dmnElementRef="input_k">
+        <dc:Bounds x="1600" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_doubled_amount_shape" dmnElementRef="decision_doubled_amount">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_is_a_sale_shape" dmnElementRef="decision_is_a_sale">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_stated_term_shape" dmnElementRef="decision_stated_term">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_claim_amount_shape" dmnElementRef="decision_claim_amount">
+        <dc:Bounds x="720" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_capped_at_ten_shape" dmnElementRef="decision_capped_at_ten">
+        <dc:Bounds x="940" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_grade_is_settled_shape" dmnElementRef="decision_grade_is_settled">
+        <dc:Bounds x="1160" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_deep_shape" dmnElementRef="decision_deep">
+        <dc:Bounds x="1380" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_grade_for_shape" dmnElementRef="decision_grade_for">
+        <dc:Bounds x="1600" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_is_alpha_shape" dmnElementRef="decision_is_alpha">
+        <dc:Bounds x="1820" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_doubled_amount_ir1_edge" dmnElementRef="decision_doubled_amount_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_is_a_sale_ir1_edge" dmnElementRef="decision_is_a_sale_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_stated_term_ir1_edge" dmnElementRef="decision_stated_term_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_claim_amount_ir1_edge" dmnElementRef="decision_claim_amount_ir1">
+        <di:waypoint x="810" y="220"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_at_ten_ir1_edge" dmnElementRef="decision_capped_at_ten_ir1">
+        <di:waypoint x="1030" y="220"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_grade_is_settled_ir1_edge" dmnElementRef="decision_grade_is_settled_ir1">
+        <di:waypoint x="1250" y="220"/>
+        <di:waypoint x="1250" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_grade_for_ir1_edge" dmnElementRef="decision_grade_for_ir1">
+        <di:waypoint x="1470" y="220"/>
+        <di:waypoint x="1690" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_is_alpha_ir1_edge" dmnElementRef="decision_is_alpha_ir1">
+        <di:waypoint x="1690" y="220"/>
+        <di:waypoint x="1910" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

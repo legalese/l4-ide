@@ -196,8 +196,43 @@ The same two harnesses are wired into `l4-cli-test` behind `L4_DMN_ENGINE_CHECK=
 cd jl4 && L4_DMN_ENGINE_CHECK=1 cabal test l4-cli-test
 ```
 
-Absent the variable those two examples are reported `PENDING … UNEXERCISED`, never as
+Absent the variable those examples are reported `PENDING … UNEXERCISED`, never as
 passes, so a green run always says which engine actually looked at the artifact.
+
+### The negative control: does the schema gate go red?
+
+Everything above asserts that a gate stays **green**, which on its own is not evidence the
+gate is connected to anything. `jl4/tests-cli/fixtures/dmn-xsd-order/` holds a matched pair
+of hand-written DMN 1.3 files that answers the other question:
+
+| file                              |                                                              |
+| --------------------------------- | ------------------------------------------------------------ |
+| `M1-itemdef-before-inputdata.dmn` | `itemDefinition` first — DMN 1.3 valid (the positive control) |
+| `M1-itemdef-after-inputdata.dmn`  | `itemDefinition` last — DMN 1.3 **invalid**                   |
+
+They contain **the same lines**, differing only in where the `<itemDefinition>` block sits,
+and the suite asserts that (`sort . lines` equality) so a red negative always isolates
+placement as the cause. They are fixtures, never regenerated: the emitter cannot produce
+the negative case, which is the property under test.
+
+What the four checkers say about the misordered file — **measured 2026-07-29**, and worth
+reading before trusting any one of them:
+
+| checker                                | on `M1-itemdef-after-inputdata.dmn`                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Xerces, via `etc/kie-dmn-check` leg 1   | `XSD INVALID`, `cvc-complex-type.2.4.a`; KIE validator adds `FAILED_XML_VALIDATION`; exit 1     |
+| Drools/KIE 8.44 `KieBuilder` + runtime  | **clean** — it builds, loads and answers both cases correctly                                    |
+| Camunda 8.7.6                           | `PARSE INVALID`, `0 parsed, 1 error(s)` — rejected outright                                      |
+| `etc/validate-dmn.mjs` (dmn-moddle)     | `OK` — misses it entirely, exactly as its own header warns                                       |
+
+So on Drools the **schema check is the only thing** standing between a misordered emitter
+and a shipped artifact; "the engine would have caught it" is true of Camunda and false of
+Drools. That asymmetry is the whole argument for keeping the Xerces leg first.
+
+```sh
+etc/kie-dmn-check/run.sh jl4/tests-cli/fixtures/dmn-xsd-order/M1-itemdef-after-inputdata.dmn \
+  --cases jl4/tests-cli/fixtures/dmn-xsd-order/M1-itemdef.cases.json   # expected: exit 1
+```
 
 **Why this exists.** Until 2026-07-27 this exhibit was checked by `dmn-moddle` and by an
 ad-hoc KIE run that was never committed — and the committed golden was, at that point,

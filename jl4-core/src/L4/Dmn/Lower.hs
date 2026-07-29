@@ -87,12 +87,19 @@ module L4.Dmn.Lower
     -- * Reusable pieces
   , renderFeel
   , renderFeelIn
+  , NameEnv (..)
+  , emptyNameEnv
   , sanitiseId
   , selectShape
   , selectIdiom
   , selectIdiomIn
   , TypeOracle (..)
   , noTypeOracle
+  , TypeEnv (..)
+  , emptyTypeEnv
+  , TypeFlags (..)
+  , noTypeFlags
+  , classifyType
   , peelLocals
   , flattenGuarded
   ) where
@@ -119,9 +126,45 @@ import L4.Dmn.IR
 -- Contexts
 ------------------------------------------------------------------------
 
+-- | The resolved FEEL names of everything a reference can name (§5.2 stage 2).
+--
+-- Stage 1 ('feelIdentText') is a per-name fold and is deliberately
+-- non-injective; stage 2 ('uniquifyIn') makes it injective /within a scope/ and
+-- is therefore a property of the whole module, not of a string. So a reference
+-- cannot be rendered by folding the name it mentions — it has to look the name
+-- up. That is what this environment is for, and it is what makes a rename reach
+-- __references__ and not only declarations.
+--
+-- Two scopes, because DMN has two namespaces here (§5.2 scopes 1 and 2):
+--
+--   * 'neVars' — the DRG's flat variable namespace: every @inputData@ variable
+--     and every @decision@ variable together, since they share one evaluation
+--     scope.
+--   * 'neFields' — record-field projection paths, keyed by the selector's own
+--     'Unique'. A selector is unique to its declaring type, so one flat map
+--     covers every record at once, and the map is per-declaration internally:
+--     two records may each have a field that folds to @foo_bar@ without either
+--     being renamed.
+data NameEnv = MkNameEnv
+  { neVars   :: !(Map Unique Text)
+  , neFields :: !(Map Unique Text)
+  }
+
+-- | Knows no names, so every reference falls back to the stage-1 fold. Right for
+-- 'renderFeel', which holds an expression and nothing else; wrong inside a
+-- module, where 'lowerModule' always supplies the resolved environment.
+emptyNameEnv :: NameEnv
+emptyNameEnv = MkNameEnv { neVars = Map.empty, neFields = Map.empty }
+
 -- | What a single table needs to know beyond its rows.
 data TableCtx = MkTableCtx
   { tcName         :: !Text        -- ^ the decision's name; also the table's
+  , tcFeelName     :: !Text
+    -- ^ the decision's __resolved__ FEEL name (§5.2 stage 2). The output
+    -- clause's @ocName@ is this, not a re-fold of 'tcName': the markdown carrier
+    -- keys its column off it, and a name that disagreed with the decision's
+    -- @\<variable\>@ would name a variable that does not exist.
+  , tcNames        :: !NameEnv     -- ^ resolved FEEL names for every reference
   , tcIdPrefix     :: !Text        -- ^ every id in the table derives from this
   , tcOutputType   :: !DmnType     -- ^ from @GIVETH@, when the source declared one
   , tcConstructors :: !(Set Unique)
@@ -132,11 +175,15 @@ data TableCtx = MkTableCtx
     -- ^ nullary decisions whose body is a literal, i.e. named thresholds. Used
     -- only to decide whether a lifted @max@\/@min@ deserves a
     -- @D-LIFTEDTHRESHOLD@ note; it never changes the lowering.
-  , tcEnums        :: !(Set Unique)
-    -- ^ type constructors declared as @IS ONE OF@ over nullary constructors.
-    -- FEEL has no sum types, so we serialise their values as strings; saying
-    -- @typeRef="string"@ rather than @"Any"@ is what lets a DMN tool do
-    -- anything at all with the column.
+  , tcTypes        :: !TypeEnv
+    -- ^ what the module's own @DECLARE@s say: which types have an
+    -- @itemDefinition@ and what it is called, which have a finite domain, and
+    -- which are payload-carrying unions. One environment answers the @typeRef@
+    -- question and the @inputValues@ question at once, which is why they are
+    -- not two lookups (§3, §4.2).
+  , tcOutputValues :: !(Maybe [Text])
+    -- ^ the @GIVETH@ type's domain, when it has one. Becomes
+    -- @\<outputValues\>@; see 'OutputColumn'.
   , tcSubst        :: !TC.Substitution
   , tcUri          :: !NormalizedUri
   }
@@ -147,11 +194,14 @@ data TableCtx = MkTableCtx
 defaultTableCtx :: TableCtx
 defaultTableCtx = MkTableCtx
   { tcName         = "decision"
+  , tcFeelName     = "decision"
+  , tcNames        = emptyNameEnv
   , tcIdPrefix     = "decision"
   , tcOutputType   = DmnAny
   , tcConstructors = Set.empty
   , tcConstants    = Set.empty
-  , tcEnums        = Set.empty
+  , tcTypes        = emptyTypeEnv
+  , tcOutputValues = Nothing
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
   }
@@ -170,7 +220,7 @@ defaultTableCtx = MkTableCtx
 -- Deliberately NOT threaded into 'flattenGuarded': its @childOf@ guard is
 -- structural, not type-directed. See 'selectShape'.
 data TypeOracle = MkTypeOracle
-  { toEnums :: !(Set Unique)
+  { toTypes :: !TypeEnv
   , toSubst :: !TC.Substitution
   , toUri   :: !NormalizedUri
   }
@@ -192,14 +242,14 @@ data TypeOracle = MkTypeOracle
 -- 'renderFeel', which has an expression and nothing else.
 noTypeOracle :: TypeOracle
 noTypeOracle = MkTypeOracle
-  { toEnums = Set.empty
+  { toTypes = emptyTypeEnv
   , toSubst = Map.empty
   , toUri   = toNormalizedUri (Uri "")
   }
 
 oracleOf :: TableCtx -> TypeOracle
 oracleOf ctx = MkTypeOracle
-  { toEnums = ctx.tcEnums
+  { toTypes = ctx.tcTypes
   , toSubst = ctx.tcSubst
   , toUri   = ctx.tcUri
   }
@@ -286,7 +336,7 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
     -- NB the empty constructor set is this call site's existing behaviour (a
     -- rule output has never quoted constructors, unlike `defaultOut` below);
     -- only the oracle is new here.
-    , drOutput      = renderFeelIn Set.empty (oracleOf ctx) body
+    , drOutput      = renderFeelIn ctx.tcNames Set.empty (oracleOf ctx) body
     , drDescription = Just (oneLine (prettyLayout guardE))
     }
 
@@ -298,14 +348,14 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
       [ MkDmnRule
           { drId          = ctx.tcIdPrefix <> "_r" <> tshow (length rowRules + 1)
           , drInputs      = map (const TestAny) columnKeys
-          , drOutput      = renderFeelIn ctx.tcConstructors (oracleOf ctx) b0
+          , drOutput      = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) b0
           , drDescription = Just "OTHERWISE"
           }
       ]
     _ -> []
 
   allRules   = rowRules <> catchAll
-  defaultOut = renderFeelIn ctx.tcConstructors (oracleOf ctx) <$> rows.grOtherwise
+  defaultOut = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) <$> rows.grOtherwise
 
   -- A column's declared type is whatever L4 inferred for its subject; when that
   -- is opaque to FEEL (an enum, a record, an inference variable) but every cell
@@ -318,8 +368,12 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
 
   outColumn = MkOutputColumn
     { ocId      = ctx.tcIdPrefix <> "_o1"
-    , ocName    = feelIdentText ctx.tcName
+    , ocName    = ctx.tcFeelName
     , ocType    = resolveOutputType ctx (map (.drOutput) allRules <> maybeToList defaultOut)
+      -- Only when the DECLARED type is what won: a type recovered from the
+      -- cells says what this table happens to mention, which is exactly the
+      -- domain we must not assert (§3.2).
+    , ocValues  = if ctx.tcOutputType /= DmnAny then ctx.tcOutputValues else Nothing
     , ocDefault = if policy == HitUnique then defaultOut else Nothing
     }
 
@@ -494,10 +548,39 @@ constantRefIn :: Set Unique -> Resolved -> Maybe FeelValue
 constantRefIn ctors r
   | u == TC.trueUnique    = Just (VBool True)
   | u == TC.falseUnique   = Just (VBool False)
+  | isBuiltinSumCon r     = Nothing
   | isConstantRef ctors r = Just (VStr (nameOf r))
   | otherwise             = Nothing
  where
   u = getUnique r
+
+-- | A constructor of one of L4\'s __builtin open sums__: @NOTHING@, @JUST@,
+-- @LEFT@, @RIGHT@.
+--
+-- The typechecker stamps these with the @Constructor@ 'TermKind'
+-- ("L4.TypeCheck.Environment"), exactly as it stamps a user-declared one, so
+-- 'isConstructorKind' accepted them and 'constantRefIn' turned @NOTHING@ into
+-- the S-FEEL __string constant__ @\"NOTHING\"@. Measured on the Charities and
+-- Reg CF corpora: six decisions of the shape @IF p THEN JUST c ELSE NOTHING@
+-- shipped with a @Blocking@ note on the @JUST@ arm and a silently wrong
+-- @\"NOTHING\"@ on the other — strictly worse than a loud failure, because a
+-- reader who checks the report sees one arm reported and concludes the other is
+-- fine (R8-f).
+--
+-- __Excluding them from 'constantRefIn' is not sufficient on its own__, and the
+-- second half is in 'renderFeelIn': without it a bare @NOTHING@ would fall
+-- through to 'feelIdentIn' and render as a bare FEEL /identifier/ tagged
+-- 'SFeel' — an unresolvable name carrying this module\'s strongest
+-- executability claim, which is worse still. So a reference to one of these
+-- renders __verbatim__, which is honest, and the decision that mentions it is
+-- routed to a boxed literal expression with @D-SUMTYPE@ before any cell is
+-- asked for (R8-d).
+isBuiltinSumCon :: Resolved -> Bool
+isBuiltinSumCon r = Set.member (getUnique r) builtinSumCons
+
+builtinSumCons :: Set Unique
+builtinSumCons =
+  Set.fromList [TC.nothingUnique, TC.justUnique, TC.leftUnique, TC.rightUnique]
 
 -- | Is this nullary reference a data constructor?
 --
@@ -569,13 +652,20 @@ orderedColumns rows = go Set.empty [c | row <- rows, c <- row]
     | Set.member c.cellKey seen = go seen cs
     | otherwise                 = c : go (Set.insert c.cellKey seen) cs
 
+-- | The column, and — from the same walk of the subject's type — its domain
+-- (§3.1). One classification answers both, which is what keeps a column's
+-- @typeRef@ and its @\<inputValues\>@ from being derived by two rules that can
+-- disagree.
 mkColumn :: TableCtx -> Int -> Cell -> InputColumn
 mkColumn ctx i c = MkInputColumn
-  { icId    = ctx.tcIdPrefix <> "_i" <> tshow i
-  , icLabel = oneLine (prettyLayout c.cellSubject)
-  , icExpr  = renderFeelIn ctx.tcConstructors (oracleOf ctx) c.cellSubject
-  , icType  = annType ctx c.cellSubject
+  { icId     = ctx.tcIdPrefix <> "_i" <> tshow i
+  , icLabel  = oneLine (prettyLayout c.cellSubject)
+  , icExpr   = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) c.cellSubject
+  , icType   = ty
+  , icValues = dom
   }
+ where
+  (ty, dom, _) = oracleClassify (oracleOf ctx) c.cellSubject
 
 -- | When L4's own type is opaque to FEEL, fall back to what the cells say.
 typeFromCells :: [UnaryTest] -> DmnType
@@ -733,7 +823,7 @@ rulesPairwiseDisjoint rules =
 -- If any sub-expression is 'L4Verbatim' the whole node is re-rendered with
 -- 'prettyLayout' rather than spliced, so the text never mixes the two languages.
 renderFeel :: Expr Resolved -> FeelExpr
-renderFeel = renderFeelIn Set.empty noTypeOracle
+renderFeel = renderFeelIn emptyNameEnv Set.empty noTypeOracle
 
 -- | 'renderFeel', told which nullary references are data constructors, and given
 -- a 'TypeOracle'.
@@ -749,16 +839,25 @@ renderFeel = renderFeelIn Set.empty noTypeOracle
 -- ('selectIdiomIn'), and whether a bare @\<@ \/ @\<=@ \/ @\>@ \/ @\>=@ is FEEL
 -- at all (see 'ordering' below). Both fall out of DMN 1.3 Table 54, so both ask
 -- the same predicate family and cannot drift apart.
-renderFeelIn :: Set Unique -> TypeOracle -> Expr Resolved -> FeelExpr
-renderFeelIn ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt) frag
+renderFeelIn :: NameEnv -> Set Unique -> TypeOracle -> Expr Resolved -> FeelExpr
+renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr (oneLine txt) frag
  where
   -- (precedence, text, fragment)
   go :: Expr Resolved -> (Int, Text, FeelFragment)
   go e = case e of
     Lit _ (NumericLit _ r) -> (atomPrec, renderNumber r, SFeel)
     Lit _ (StringLit _ s)  -> (atomPrec, quoteFeelString s, SFeel)
-    App _ r []             -> (atomPrec, nullaryText r, SFeel)
-    Proj _ x n             -> unary e SFeel (\t -> t <> "." <> feelIdent n) x
+    -- A builtin sum constructor is NOT a FEEL name and NOT a FEEL string; see
+    -- 'isBuiltinSumCon'. Verbatim is the only honest rendering, and it makes the
+    -- whole enclosing expression verbatim too, which is what stops `NOTHING`
+    -- from being spliced into an otherwise FEEL-looking cell.
+    App _ r [] | isBuiltinSumCon r -> verbatim e
+               | otherwise         -> (atomPrec, nullaryText r, SFeel)
+    -- A projection path is FEEL's `qualified name`, and its steps live in the
+    -- FIELD namespace (§5.2 scope 2), not the DRG's variable namespace. That is
+    -- where the one executed corpus collision lands (§5.3.4): two distinct
+    -- fields folding to one path step is valid FEEL computing a wrong number.
+    Proj _ x n             -> unary e SFeel (\t -> t <> "." <> feelFieldIn names n) x
     Plus      _ a b -> binary e 6 SFeel "+"  a b
     Minus     _ a b -> binary e 6 SFeel "-"  a b
     Times     _ a b -> binary e 7 SFeel "*"  a b
@@ -927,13 +1026,27 @@ renderFeelIn ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr (oneLi
 
   nullaryText r = case constantRefIn ctors r of
     Just v  -> renderFeelValue v
-    Nothing -> feelIdent r
+    Nothing -> feelIdentIn names r
 
--- | An L4 name as the FEEL name that refers to it. The declaring side (an
--- @inputData@\'s or a @decision@\'s @\<variable\>@) uses the same
--- 'feelIdentText', so the two always agree.
-feelIdent :: Resolved -> Text
-feelIdent = feelIdentText . nameOf
+-- | An L4 name as the FEEL name that refers to it.
+--
+-- The declaring side (an @inputData@\'s or a @decision@\'s @\<variable\>@)
+-- carries its resolved name on the IR, and this is the same map, so the two
+-- always agree — including after a collision rename, which is the case a
+-- per-name fold cannot get right (§5.2 stage 2).
+--
+-- The fallback is the bare fold, for a reference the environment does not know:
+-- 'renderFeel' standing alone, and a reference to something outside the DRG's
+-- namespace. It is stage 1's answer, which is what the exporter emitted for
+-- everything before stage 2 landed.
+feelIdentIn :: NameEnv -> Resolved -> Text
+feelIdentIn env r =
+  Map.findWithDefault (feelIdentText (nameOf r)) (getUnique r) env.neVars
+
+-- | A record field, as the FEEL path step that reads it. Its own namespace.
+feelFieldIn :: NameEnv -> Resolved -> Text
+feelFieldIn env r =
+  Map.findWithDefault (feelIdentText (nameOf r)) (getUnique r) env.neFields
 
 ------------------------------------------------------------------------
 -- The select idiom: max / min wearing a conditional's clothes
@@ -1073,14 +1186,15 @@ isBooleanOperand oracle e = builtinOperandType oracle e == DmnBoolean
 -- | The operand\'s type as a FEEL /builtin/, with the enum collapse deliberately
 -- switched off.
 --
--- 'annType' maps an @IS ONE OF@ to 'DmnString', which is right for a typeRef —
--- an enum\'s values serialise as strings — but wrong as a licence to ORDER them.
--- @max("red", "green")@ compares constructor SPELLINGS, and the L4 declaration
--- order those constructors were written in is the only ordering the source ever
--- suggested. Passing the empty constructor set makes 'dmnTypeOf' fall through to
--- 'builtinType', so an enum answers 'DmnAny' here and fails both gates.
+-- 'oracleClassify' maps an @IS ONE OF@ to a named itemDefinition over @string@, which
+-- is right for a typeRef — an enum\'s values serialise as strings — but wrong as
+-- a licence to ORDER them. @max("red", "green")@ compares constructor
+-- SPELLINGS, and the L4 declaration order those constructors were written in is
+-- the only ordering the source ever suggested. Passing the empty environment
+-- makes 'classifyType' fall through to 'builtinType', so an enum answers
+-- 'DmnAny' here and fails both gates.
 builtinOperandType :: TypeOracle -> Expr Resolved -> DmnType
-builtinOperandType o = annTypeOf Set.empty o.toSubst o.toUri
+builtinOperandType o = annTypeOf emptyTypeEnv o.toSubst o.toUri
 
 isSelectIdiomIn :: TypeOracle -> Expr Resolved -> Bool
 isSelectIdiomIn oracle = isJust . selectIdiomIn oracle
@@ -1262,28 +1376,228 @@ flattenGuarded rs0
 -- Types
 ------------------------------------------------------------------------
 
-annType :: TableCtx -> Expr Resolved -> DmnType
-annType = oracleType . oracleOf
+-- | What the module's own @DECLARE@s say about a type.
+--
+-- Phase 3 replaced a bare @Set Unique@ of "enums" with this, because the old
+-- set answered one question ("does this collapse to @string@?") and lost two
+-- others in the same step: /which/ itemDefinition the type is, and what its
+-- domain is. §3 and §4.2 want both, and one walk of the type now produces both.
+data TypeEnv = MkTypeEnv
+  { teNamed   :: !(Map Unique Text)
+    -- ^ type 'Unique' -> the minted @itemDefinition@'s FEEL name. Module-local
+    -- declarations only: 'topDecls' does not descend into imports, so a type
+    -- declared elsewhere has no definition to point at and stays @Any@.
+  , teDomains :: !(Map Unique [Text])
+    -- ^ type 'Unique' -> its constructor names, in __declaration order__ and in
+    -- the __'nameOf' spelling__. Not 'feelIdentText': a constructor name becomes
+    -- a FEEL /string literal/ (the tag value), never an identifier, so the name
+    -- fold must not touch it (§5.3.6) — and this is precisely the string the
+    -- cells already carry, so a domain and a cell cannot disagree.
+  , tePayload :: !(Set Unique)
+    -- ^ types that are payload-carrying @IS ONE OF@s: more than one
+    -- constructor, at least one of which declares fields. R4-a's subject.
+  , teOptional :: !(Map Unique Text)
+    -- ^ type 'Unique' -> the FEEL name of its __domain-free alias__, for the
+    -- types that have a domain at all (R8-a's carve-out, §11-R8-a).
+    --
+    -- A @MAYBE τ@ site points here instead of at 'teNamed' when τ is one of
+    -- them, because pointing at τ's own definition would defeat R8-b one
+    -- @typeRef@ hop away: R8-b suppresses @allowedValues@ /at the element/,
+    -- §7.3.3 makes @allowedValues@ the __complete__ range of the definition
+    -- reached through the @typeRef@, and nothing this exporter emits lowers to
+    -- @null@ — so an enforcing engine would reject the absent case that is the
+    -- whole content of the @MAYBE@. That is an answer change, not a reporting
+    -- gap, which is why it is repaired in the artifact rather than in prose.
+    --
+    -- Empty for a τ with no domain: a record, a builtin and a @LIST OF@ assert
+    -- no range to begin with, so R8-a's plain lowering is already correct for
+    -- them and an alias would be the pure ceremony §4.3 refuses.
+  , teUri     :: !NormalizedUri
+    -- ^ the module being lowered, so "declared in another module" is decidable.
+  }
+
+emptyTypeEnv :: TypeEnv
+emptyTypeEnv = MkTypeEnv
+  { teNamed    = Map.empty
+  , teDomains  = Map.empty
+  , tePayload  = Set.empty
+  , teOptional = Map.empty
+  , teUri      = toNormalizedUri (Uri "")
+  }
+
+-- | What a classification found on the way that the @typeRef@ alone cannot say.
+--
+-- These are the R8 flags plus the two @D-ITEMDEF@ reasons. They exist because
+-- the answer "this element is typed @number@" is true and incomplete when the
+-- L4 said @MAYBE NUMBER@: the loss is real, it is not visible in the artifact,
+-- and the only place it can be reported from is the walk that erased it.
+data TypeFlags = MkTypeFlags
+  { tfMaybe         :: !Bool  -- ^ a @MAYBE τ@ was lowered to τ's own typeRef (R8-a)
+  , tfOptionalAlias :: !(Maybe (Text, Text))
+    -- ^ ...and τ had a finite domain, so the element points at a __domain-free
+    -- alias__ instead: @Just (the alias's name, τ's own name)@.
+    --
+    -- This is R8-a's carve-out, and it exists because the plain lowering was
+    -- __defeated one @typeRef@ hop away__. R8-b suppresses @allowedValues@ \/
+    -- @inputValues@ /at the element/; §7.3.3 then makes the @allowedValues@ of
+    -- whatever the @typeRef@ resolves to the __complete__ range of the element
+    -- — so pointing a @MAYBE@ site at τ's own definition re-asserts, one hop
+    -- on, exactly the range R8-b just refused to write, and it is a range with
+    -- no absent case in it. Nothing this exporter emits lowers to @null@, so
+    -- under an enforcing engine the absent case that is the whole content of
+    -- the @MAYBE@ is rejected: an answer change.
+    --
+    -- Nothing but a 'DmnNamed' with a domain can reach this field, because
+    -- 'classifyType' returns a domain only from the branch that mints a name.
+    -- A record, a builtin and a @LIST OF@ keep R8-a's plain lowering and leave
+    -- this 'Nothing' — they assert no range, so there is nothing to defeat.
+  , tfNestedMaybe   :: !Bool  -- ^ @MAYBE (MAYBE τ)@: refused, because @null@ does not nest (R8-c)
+  , tfEither        :: !Bool  -- ^ @EITHER a b@: refused (R8-e)
+  , tfList          :: !Bool  -- ^ @LIST OF τ@: @isCollection@ needs an itemDefinition of its own
+  , tfForeign       :: !Bool  -- ^ a type declared in another module, so no itemDefinition exists
+  }
+  deriving stock (Eq, Show, Generic)
+
+noTypeFlags :: TypeFlags
+noTypeFlags = MkTypeFlags
+  { tfMaybe = False, tfOptionalAlias = Nothing, tfNestedMaybe = False, tfEither = False
+  , tfList = False, tfForeign = False
+  }
 
 oracleType :: TypeOracle -> Expr Resolved -> DmnType
-oracleType o = annTypeOf o.toEnums o.toSubst o.toUri
+oracleType o e = let (t, _, _) = oracleClassify o e in t
 
--- | Kept separate from 'annType' on purpose: 'TableCtx' has strict fields, so a
+-- | The classifier, asked about an expression's inferred type.
+oracleClassify :: TypeOracle -> Expr Resolved -> (DmnType, Maybe [Text], TypeFlags)
+oracleClassify o e = case annTypeSource o e of
+  Just ty -> classifyType o.toTypes ty
+  Nothing -> (DmnAny, Nothing, noTypeFlags)
+
+-- | An expression's inferred type, with the final substitution applied.
+annTypeSource :: TypeOracle -> Expr Resolved -> Maybe (Type' Resolved)
+annTypeSource o e = case (getAnno e).extra.resolvedInfo of
+  Just (TypeInfo ty _) -> Just (TC.applyFinalSubstitution o.toSubst o.toUri ty)
+  _                    -> Nothing
+
+-- | Kept separate from 'oracleClassify' on purpose: 'TableCtx' has strict fields, so a
 -- caller computing @tcOutputType@ from an expression's annotation cannot go
 -- through the context it is in the middle of building.
-annTypeOf :: Set Unique -> TC.Substitution -> NormalizedUri -> Expr Resolved -> DmnType
-annTypeOf enums subst uri e = case (getAnno e).extra.resolvedInfo of
-  Just (TypeInfo ty _) -> dmnTypeOf enums (TC.applyFinalSubstitution subst uri ty)
-  _                    -> DmnAny
+annTypeOf :: TypeEnv -> TC.Substitution -> NormalizedUri -> Expr Resolved -> DmnType
+annTypeOf env subst uri =
+  oracleType MkTypeOracle { toTypes = env, toSubst = subst, toUri = uri }
 
 -- | FEEL's type system is numbers, strings, booleans, dates, lists and contexts
--- -- no algebraic data types. An @IS ONE OF@ over nullary constructors is the one
--- L4 type with a faithful FEEL image, because its values serialise as strings.
-dmnTypeOf :: Set Unique -> Type' Resolved -> DmnType
-dmnTypeOf enums = \case
-  TyApp _ n [] | Set.member (getUnique n) enums -> DmnString
-               | otherwise                      -> builtinType (getUnique n)
-  _            -> DmnAny
+-- — no algebraic data types. What it /does/ have is the __context__, which is a
+-- record, and DMN's @itemDefinition@ is how you name one. So a module-local
+-- @DECLARE@ maps across (§4.1, §4.2) and everything else is honestly @Any@.
+--
+-- Returns the @typeRef@, the type's __domain__ if it has a finite one, and the
+-- 'TypeFlags' the walk found. One walk rather than three, because §3's column
+-- domains and §4.2's @allowedValues@ are the same question asked at two scopes,
+-- and answering them separately is how they drift.
+--
+-- The rules, in the order they are tested:
+--
+--   * @NUMBER@ \/ @STRING@ \/ @BOOLEAN@ \/ @DATE@ — a builtin @typeRef@, and
+--     __no itemDefinition__ (§4.3: an alias over @number@ adds no information
+--     and degrades for a consumer that does not resolve typeRefs).
+--   * a module-local __record__ — @DmnNamed@, no domain.
+--   * a module-local __@IS ONE OF@__ — @DmnNamed@ over @string@, domain =
+--     __every__ constructor, including payload-carrying ones. Listing them all
+--     is what makes the missing constructor visible to a gap analyser as a gap
+--     (§4.2.1-9); listing only the nullary ones would assert a domain the type
+--     does not have.
+--   * @MAYBE τ@ — __τ's own typeRef__, and __no domain at this element__ (R8-a,
+--     R8-b): @tItemDefinition@ has no nullability flag, so the @MAYBE@ is
+--     recorded in the fidelity report rather than spelled in the artifact; and
+--     §7.3.3 makes @allowedValues@ the /complete/ range, which a list that
+--     cannot include @null@ would not be.
+--   * @MAYBE τ@ __where τ carries a domain__ — a __domain-free alias__ of τ
+--     ('teOptional'), because there the plain lowering is not merely lossy but
+--     wrong: §7.3.3 reads the range off whatever the @typeRef@ resolves to, so
+--     pointing at τ's own definition re-asserts one hop on the complete range
+--     R8-b just suppressed, and that range has no absent case. The alias is
+--     __not__ a way to spell nullability — @tItemDefinition@ still cannot — it
+--     is what keeps R8-b's suppression from being undone by the hop.
+--     'tfOptionalAlias' records both names so @D-MAYBE-NULL@ can report what
+--     the alias costs: no engine-side validation of the values that /are/
+--     present at this site.
+--   * @MAYBE (MAYBE τ)@ — @Any@ and refused (R8-c). @null@ does not nest, so
+--     @JUST NOTHING@ and @NOTHING@ would become one FEEL value and FEEL @=@
+--     would answer @true@ where L4 answers @false@. That is an answer change.
+--   * @EITHER a b@ — @Any@ and refused (R8-e).
+--   * @LIST OF τ@ — @Any@. @isCollection@ is an attribute of
+--     @tItemDefinition@, so a list needs a definition of its own; @D-ITEMDEF@.
+--   * a type declared in __another module__ — @Any@, because 'topDecls' is
+--     module-local and there is nothing to point a @typeRef@ at; @D-ITEMDEF@.
+classifyType :: TypeEnv -> Type' Resolved -> (DmnType, Maybe [Text], TypeFlags)
+classifyType env = go False
+ where
+  go inMaybe = \case
+    TyApp _ n args -> case args of
+      [inner] | getUnique n == TC.maybeUnique ->
+        if inMaybe
+          then (DmnAny, Nothing, noTypeFlags { tfMaybe = True, tfNestedMaybe = True })
+          else
+            -- R8-a, and R8-a's carve-out. τ's own typeRef is the answer unless
+            -- τ carries a domain, in which case pointing at it would re-assert
+            -- through the hop the complete range R8-b just suppressed. Those
+            -- sites get the domain-free alias instead; everything else is
+            -- unchanged.
+            let (t, dom, f) = go True inner
+                aliased = do
+                  _ <- dom
+                  u <- typeHeadUnique inner
+                  a <- Map.lookup u env.teOptional
+                  pure (a, dmnTypeAttr t)
+            in case aliased of
+                 Just (a, base) ->
+                   ( DmnNamed a (dmnTypeBase t)
+                   , Nothing
+                   , f { tfMaybe = True, tfOptionalAlias = Just (a, base) }
+                   )
+                 Nothing -> (t, Nothing, f { tfMaybe = True })
+      [] -> named (getUnique n)
+      _ : _
+        | getUnique n == TC.eitherUnique -> (DmnAny, Nothing, noTypeFlags { tfEither = True })
+        | getUnique n == TC.listUnique   -> (DmnAny, Nothing, noTypeFlags { tfList = True })
+        | otherwise                      -> (DmnAny, Nothing, noTypeFlags)
+    _ -> (DmnAny, Nothing, noTypeFlags)
+
+  named u
+    | Just nm <- Map.lookup u env.teNamed =
+        ( DmnNamed nm (if Map.member u env.teDomains then DmnString else DmnAny)
+        , Map.lookup u env.teDomains
+        , noTypeFlags
+        )
+    | builtinType u /= DmnAny = (builtinType u, Nothing, noTypeFlags)
+    | otherwise               = (DmnAny, Nothing, noTypeFlags { tfForeign = foreign_ u })
+
+  -- An inference variable's Unique belongs to no module and must not be
+  -- reported as an unresolvable import; only a name the checker actually
+  -- resolved somewhere else is.
+  foreign_ u = u.moduleUri /= env.teUri && env.teUri /= toNormalizedUri (Uri "")
+
+-- | One module-local @DECLARE@ that earns an @itemDefinition@ (§4.1, §4.2).
+--
+-- Not exported: it is the shape of an analysis "L4.Dmn.Lower" runs once over
+-- the module's declarations, and every consumer downstream sees the
+-- 'ItemDefinition' it produces instead.
+data ItemDecl = MkItemDecl
+  { itdUnique   :: !Unique
+  , itdName     :: !Text                            -- ^ the verbatim L4 type name
+  , itdCtors    :: ![Text]                          -- ^ @IS ONE OF@: constructors in declaration order
+  , itdFields   :: ![(Resolved, Type' Resolved)]    -- ^ record: STORED fields in declaration order
+  , itdComputed :: ![Text]                          -- ^ record: computed fields, which are skipped
+  , itdPayload  :: !Bool                            -- ^ a multi-constructor union with a payload arm
+  }
+
+-- | The head type constructor of a type, seen through a @MAYBE@.
+typeHeadUnique :: Type' Resolved -> Maybe Unique
+typeHeadUnique = \case
+  TyApp _ n [inner] | getUnique n == TC.maybeUnique -> typeHeadUnique inner
+  TyApp _ n []                                      -> Just (getUnique n)
+  _                                                 -> Nothing
 
 builtinType :: Unique -> DmnType
 builtinType u
@@ -1359,6 +1673,67 @@ nonFeelOutput el rng fe =
     "execution: an engine fails to compile the entry -- loudly when the rule fires, but \
     \SILENTLY (a null result, reported as success) when it is the defaultOutputEntry"
 
+-- | @D-MAYBE-NULL@ (R8-a, R8-b): a @MAYBE τ@ was lowered to τ's own @typeRef@.
+--
+-- __Explicit and mandatory, not silent__, because of what the encoding costs.
+-- The type-level half of R8 is sound: §2.4's refusal is about L4's /error/
+-- channel, and @NOTHING@ is a value of a total function, not a raise — §2.4.1
+-- says so itself when it accepts @TO NUMBER@ \/ @TO DATE@ as "genuinely total"
+-- precisely /because/ they return a @MAYBE@. What the encoding does lose is a
+-- distinction the target cannot make: FEEL has one @null@, and it spells both
+-- "the rule says there is none" and "the engine could not compute it". L4 keeps
+-- those apart; the artifact cannot, and no reader or analyser can recover which
+-- was meant. That is a fidelity loss rather than a soundness one — hence
+-- 'Lossy' — and it is exactly what a fidelity report is for.
+--
+-- The second sentence fires only when τ is a __named__ type with a finite
+-- domain, and it reports an alias rather than a loss of domain. R8-b suppresses
+-- @allowedValues@ \/ @inputValues@ /at this element/, and the reason stands:
+-- §7.3.3 makes @allowedValues@ the __complete__ range of values the type
+-- represents, DMN 1.3's grammar rules 13-17 make an S-FEEL endpoint a @simple
+-- value@, and @null@ (rule 34, a /literal/) is not one — so a list written here
+-- would exclude a value the type admits. The suppression would not survive the
+-- @typeRef@ hop, though, because §7.3.3 reads the range off the definition the
+-- @typeRef@ resolves to: pointing at τ's own would re-assert the very range
+-- just suppressed. So the element points at a __domain-free alias__ of τ
+-- instead (R8-a's carve-out).
+--
+-- __What that costs, and what it does not.__ It does not spell nullability;
+-- @tItemDefinition@ has no flag for it and the alias invents none, which is why
+-- the note fires here at all. What it forfeits is the /other/ half of the
+-- domain's job: at this site an engine no longer validates the values that
+-- __are__ present, so a string outside τ's constructors passes where at a
+-- non-@MAYBE@ site it would be rejected. That is a checking loss on the present
+-- case, deliberately taken to keep the absent case admissible — and naming both
+-- the alias and τ is what lets a reader see the trade in the artifact.
+maybeNullNote :: Text -> Maybe SrcRange -> Text -> Text -> Maybe (Text, Text) -> FidelityNote
+maybeNullNote el rng what tyText optionalAlias =
+  dmnNote "D-MAYBE-NULL" Lossy el rng
+    ( what <> " is declared `" <> tyText
+        <> "`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the \
+           \emitted typeRef is the payload type's own. FEEL has one `null` and it means both \
+           \\"there is no value\" and \"the value could not be computed\", so NOTHING and an \
+           \undefined result can no longer be told apart in the artifact"
+        <> case optionalAlias of
+             Just (alias, base) ->
+               ". No allowedValues or inputValues is emitted AT THIS ELEMENT, because DMN 7.3.3 \
+               \makes allowedValues the COMPLETE range of values a type represents and `null` is \
+               \not a legal S-FEEL endpoint -- and because that range is read through the typeRef, \
+               \this element points at `" <> alias <> "`, a domain-free alias of `" <> base
+               <> "`, rather than at `" <> base <> "` itself. Pointing at `" <> base
+               <> "` would re-assert its complete range one hop on, and that range has no absent \
+                  \case in it, so an enforcing engine would reject the very NOTHING this type \
+                  \exists to allow"
+             Nothing -> ""
+    )
+    ("the distinction between an absent value and an undefined one"
+       <> case optionalAlias of
+            Just (_, base) ->
+              ", and -- at THIS element only -- engine-side validation of the values that ARE \
+              \present: `" <> base <> "`'s domain is deliberately not asserted here, so a value \
+              \outside it is no longer rejected at this site"
+            Nothing -> "")
+
 tableNotes
   :: TableCtx
   -> [[Cell]]
@@ -1373,9 +1748,23 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   dedupeNotes $
     fallbackNotes <> nonFeelInputNotes <> sfeelNotes <> policyNotes
       <> nonFeelOutputNotes <> outputNotes
-      <> inlineNotes <> capNotes <> thresholdNotes
+      <> inlineNotes <> capNotes <> thresholdNotes <> columnMaybeNotes
  where
   here = ctx.tcIdPrefix
+
+  -- R8-a's column site. The output clause has no site of its own: this emitter
+  -- deliberately emits no @typeRef@ on a @\<output\>@ (measured: KIE says
+  -- ILLEGAL_USE_OF_TYPEREF), so a MAYBE-typed decision is reported once, at its
+  -- own @\<variable\>@, in "lowerModule".
+  columnMaybeNotes =
+    [ maybeNullNote here (bestRange c.cellSubject)
+        ("the column `" <> oneLine (prettyLayout c.cellSubject) <> "`")
+        (oneLine (prettyLayout sty)) fl.tfOptionalAlias
+    | c <- columnCells
+    , Just sty <- [annTypeSource (oracleOf ctx) c.cellSubject]
+    , let (_, _, fl) = classifyType ctx.tcTypes sty
+    , fl.tfMaybe
+    ]
 
   fallbackNotes =
     [ dmnNote "D-UNDECOMPOSABLE" Advisory here (bestRange c.cellSubject)
@@ -1452,7 +1841,7 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
               \decision-table analysis defines an output entry as a constant")
         "gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it"
     | body <- outputBodies
-    , let fe = renderFeelIn ctx.tcConstructors (oracleOf ctx) body
+    , let fe = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) body
       -- MUTUALLY EXCLUSIVE with D-NONFEELOUTPUT. An L4Verbatim entry satisfies
       -- `not . isConstantText` too, and used to be reported by this Advisory
       -- note alone -- a note about ANALYSABILITY standing in for a failure of
@@ -1467,7 +1856,7 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   nonFeelOutputNotes =
     [ nonFeelOutput here (bestRange body) fe
     | body <- outputBodies
-    , let fe = renderFeelIn ctx.tcConstructors (oracleOf ctx) body
+    , let fe = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) body
     , fe.feFragment == L4Verbatim
     ]
 
@@ -1541,11 +1930,19 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgName      = opts.dloModelName
     , drgNamespace = "https://legalese.com/l4/dmn/" <> modelId
     , drgFlavor    = opts.dloFlavor
-    , drgNodes     = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
-    , drgNotes     = sharedInputNotes <> feelNameCollisionNotes <> concatMap snd lowered
+    , drgItemDefs  = itemDefs
+    , drgNodes     = nodes
+    , drgNotes     = sharedInputNotes <> renameNotes <> feelNameCollisionNotes
+                       <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
+                       <> concatMap snd lowered
     }
  where
   modelId = sanitiseId opts.dloModelName
+
+  -- Named rather than inlined into 'drgNodes' because the itemDefinition list
+  -- reads the emitted types back off it, to decide which domain-free aliases
+  -- are pointed at. Nothing flows the other way, so there is no knot.
+  nodes = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
 
   decls   = topDecls modul
   decides = [d | Decide _ d <- decls]
@@ -1553,14 +1950,6 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   constructors = Set.fromList
     [ getUnique n | Declare _ (MkDeclare _ _ _ td) <- decls, n <- constructorNames td ]
-
-  -- An enum ALL of whose constructors are nullary. One with fields is a tagged
-  -- union, which FEEL cannot represent as a string, so it stays Any.
-  enums = Set.fromList
-    [ getUnique n
-    | Declare _ (MkDeclare _ _ (MkAppForm _ n _ _) (EnumDecl _ cds)) <- decls
-    , all (\(MkConDecl _ _ fs) -> null fs) cds
-    ]
 
   constructorNames = \case
     EnumDecl _ cds    -> [n | MkConDecl _ n _ <- cds]
@@ -1576,6 +1965,284 @@ lowerModule opts modul@(MkModule _ uri _) =
     EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
     RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ <- fs]
     SynonymDecl _ _   -> []
+
+  -- §5.2 SCOPE 2: the record-field namespace. One 'uniquifyIn' PER DECLARED
+  -- TYPE, in field source order, because that is the namespace DMN has -- an
+  -- itemDefinition's itemComponent list, and until itemDefinitions exist
+  -- (Phase 3) the projection paths this module emits. Two different records may
+  -- each own a field that folds to `foo_bar` without either being renamed; two
+  -- fields of ONE record may not, and that case is the corpus's one executed
+  -- collision, which used to emit `p.foo_bar + p.foo_bar` -- valid FEEL,
+  -- computing a wrong number, with no note (§5.3.4).
+  fieldScopes :: [(Text, [(Resolved, Text, Text)])]
+  fieldScopes =
+    [ (nameOf tn, zip3 ns (map (feelIdentText . nameOf) ns) (uniquifyIn foldedNs))
+    | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) td) <- decls
+    , let ns     = selectorNames td
+    , let foldedNs = map (feelIdentText . nameOf) ns
+    , not (null ns)
+    ]
+
+  fieldNames :: Map Unique Text
+  fieldNames = Map.fromList
+    [ (getUnique n, resolved) | (_, fs) <- fieldScopes, (n, _, resolved) <- fs ]
+
+  ------------------------------------------------------------------------
+  -- The data model (§4, Phase 3)
+  ------------------------------------------------------------------------
+
+  -- Every module-local DECLARE that has an itemDefinition, in source order.
+  --
+  -- __Referenced or not.__ Reachability-gating would make the artifact depend
+  -- on which decisions happened to survive lowering -- a moving target that
+  -- would change the type-level output of the export every time a body did --
+  -- and an unreferenced itemDefinition is inert.
+  itemDecls :: [ItemDecl]
+  itemDecls =
+    [ MkItemDecl
+        { itdUnique   = getUnique tn
+        , itdName     = nameOf tn
+        -- Constructor spellings come from 'nameOf', NOT 'feelIdentText': a
+        -- constructor name becomes a FEEL string LITERAL (the tag value), never
+        -- an identifier, so the name fold must not touch it (§5.3.6). It is
+        -- also the exact string the cells already carry, so the domain and the
+        -- cells cannot disagree.
+        , itdCtors    = ctors
+        -- STORED fields only. The 5th field of 'MkTypedName' is `Just expr` for
+        -- a COMPUTED field (a `MEANS` clause), which is derived rather than
+        -- supplied; emitting it as an itemComponent would misstate the model's
+        -- input contract, so it is skipped and reported D-ITEMDEF.
+        --
+        -- __The filter is unexercised on this tree, and the reason is worth
+        -- knowing rather than discovering.__ "L4.Desugar" rewrites a computed
+        -- field into a synthetic top-level @DECIDE@ __before type checking__,
+        -- so the @Declare@ this module sees never carries one: on
+        -- @jl4\/examples\/dmn\/sumtype.l4@, whose @Claim@ declares
+        -- @`doubled amount` IS A NUMBER MEANS …@, the emitted itemDefinition
+        -- has the other components and the field is a @\<decision\>@ of its own
+        -- reading a @_self@ @inputData@ typed @Claim@. So the information is
+        -- relocated, not dropped, and the D-ITEMDEF arm below has zero
+        -- exercise. It is kept for the same reason @D-FEELNAME@ is (§7): the
+        -- day the desugaring stops running before this pass, an input contract
+        -- that silently gained a derived field is not a failure anyone would
+        -- see.
+        , itdFields   = [(fn, fty) | MkTypedName _ fn fty _ Nothing <- flds]
+        , itdComputed = [nameOf fn | MkTypedName _ fn _ _ (Just _) <- flds]
+        , itdPayload  = payload
+        }
+    | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) td) <- decls
+    , Just (ctors, flds, payload) <- [itemShapeOf td]
+    ]
+
+  -- @Just (constructor names, stored+computed fields, is a payload union)@, or
+  -- 'Nothing' for a declaration that gets no itemDefinition.
+  itemShapeOf = \case
+    RecordDecl _ _ rfs -> Just ([], rfs, False)
+    -- §4.2.1-7 leaves the SINGLE payload constructor unruled, and there are
+    -- zero in the corpora, so the choice is free and stating it stops a guess:
+    -- it is a record, and the itemDefinition is named after the TYPE, which is
+    -- what §4.1 already does for `DECLARE T HAS`.
+    EnumDecl _ [MkConDecl _ _ cfs] | not (null cfs) -> Just ([], cfs, False)
+    EnumDecl _ cds ->
+      Just
+        ( [nameOf cn | MkConDecl _ cn _ <- cds]
+        , []
+        , length cds > 1 && any (\(MkConDecl _ _ cfs) -> not (null cfs)) cds
+        )
+    SynonymDecl _ _ -> Nothing
+
+  itemDefIds   = assignIds "itemdef_" (map (.itdName) itemDecls)
+
+  -- The types that assert a range, and therefore the ones a @MAYBE@ site needs
+  -- a domain-free alias of (R8-a's carve-out).
+  domainDecls = [d | d <- itemDecls, not (null d.itdCtors)]
+
+  -- ONE 'uniquifyIn' scope (§5.2, A3), and it is the itemDefinition-name
+  -- namespace only: DMN keeps that apart from the DRG's variable namespace, so
+  -- a type and a variable may share a name without either being renamed.
+  --
+  -- __The aliases are minted in the same scope as the base names__, and after
+  -- them, so a hand-written @DECLARE Grade_optional@ keeps its own name and the
+  -- alias takes the suffix rather than the other way round. That is why this is
+  -- one 'uniquifyIn' over a concatenation and not two: two scopes could hand
+  -- the same string to a type and to an alias, and the alias would then silently
+  -- acquire the domain it exists to drop.
+  (itemDefNames, optionalNames) =
+    splitAt (length itemDecls) $ uniquifyIn $
+      map (feelTypeNameText . (.itdName)) itemDecls
+        <> [feelTypeNameText d.itdName <> "_optional" | d <- domainDecls]
+
+  optionalNameOf :: Map Unique Text
+  optionalNameOf = Map.fromList (zip (map (.itdUnique) domainDecls) optionalNames)
+
+  typeEnv :: TypeEnv
+  typeEnv = MkTypeEnv
+    { teNamed    = Map.fromList (zip (map (.itdUnique) itemDecls) itemDefNames)
+    , teDomains  = Map.fromList
+        [(d.itdUnique, d.itdCtors) | d <- itemDecls, not (null d.itdCtors)]
+    , tePayload  = Set.fromList [d.itdUnique | d <- itemDecls, d.itdPayload]
+    , teOptional = optionalNameOf
+    , teUri      = uri
+    }
+
+  -- The base definitions, then the aliases any element actually points at.
+  --
+  -- __Alias minting is reachability-gated and the base definitions are not__,
+  -- and the asymmetry is the point. A base definition is minted per @DECLARE@
+  -- because an unreferenced one is inert and gating it would make the type
+  -- half of the artifact move whenever a decision body did. An alias is not
+  -- inert in the same way: it exists only to be the target of a @MAYBE@ site,
+  -- so one with no referrer is noise in an artifact whose whole claim is that
+  -- every line in it means something. The gate is the emitted 'DmnType's, not
+  -- the L4, so what is minted and what is pointed at cannot disagree.
+  itemDefs :: [ItemDefinition]
+  itemDefs = baseItemDefs <> aliasItemDefs
+
+  aliasItemDefs :: [ItemDefinition]
+  aliasItemDefs =
+    [ MkItemDefinition
+        { idfId         = iid <> "_optional"
+        , idfName       = anm
+        -- The L4 type name, verbatim, exactly as the base definition carries
+        -- it: the alias IS `Grade`, minus the range. A reader who wants to
+        -- know which values it holds reads the label and finds the base.
+        , idfLabel      = d.itdName
+        , idfBase       = Just DmnString
+        -- The whole content of the alias. R8-b's suppression is what this
+        -- Nothing spells, and it is spelled HERE so that the typeRef hop
+        -- cannot undo it.
+        , idfValues     = Nothing
+        , idfComponents = []
+        }
+    | (d, iid) <- zip itemDecls itemDefIds
+    , Just anm <- [Map.lookup d.itdUnique optionalNameOf]
+    , Set.member anm referencedTypeNames
+    ]
+
+  -- Every minted type name some element's typeRef actually resolves to.
+  referencedTypeNames :: Set Text
+  referencedTypeNames = Set.fromList
+    [ nm
+    | DmnNamed nm _ <-
+        concatMap nodeTypeRefs nodes
+          <> [c.icmType | b <- baseItemDefs, c <- b.idfComponents]
+    ]
+
+  nodeTypeRefs :: DrgNode -> [DmnType]
+  nodeTypeRefs = \case
+    NodeInputData i -> [i.idType]
+    NodeDecision  d -> d.dcnType : case d.dcnLogic of
+      LogicTable t   -> map (.icType) t.dtInputs
+      LogicLiteral _ -> []
+
+  baseItemDefs :: [ItemDefinition]
+  baseItemDefs =
+    [ MkItemDefinition
+        { idfId         = iid
+        , idfName       = fnm
+        , idfLabel      = d.itdName
+        -- An enum's values serialise as strings, so its definition is a string
+        -- with a domain; a record's definition IS the component list and has no
+        -- base typeRef at all.
+        , idfBase       = if null d.itdCtors then Nothing else Just DmnString
+        , idfValues     = if null d.itdCtors then Nothing else Just d.itdCtors
+        , idfComponents = zipWith (itemComponent iid) [1 :: Int ..] d.itdFields
+        }
+    | (d, iid, fnm) <- zip3 itemDecls itemDefIds itemDefNames
+    ]
+
+  -- The component's name comes from the SAME map a projection path reads
+  -- ('fieldNames', §5.2 scope 2), so `r.f` and the component it names are one
+  -- string by construction rather than by two functions agreeing.
+  itemComponent iid i (fn, fty) = MkItemComponent
+    { icmId    = iid <> "_c" <> tshow i
+    , icmName  = Map.findWithDefault (feelIdentText (nameOf fn)) (getUnique fn) fieldNames
+    , icmLabel = nameOf fn
+    , icmType  = let (t, _, _) = classifyType typeEnv fty in t
+    }
+
+  -- D-ITEMDEF: one code, three reasons, so the report stays readable.
+  itemDefNotes =
+    [ dmnNote "D-ITEMDEF" Lossy iid Nothing
+        ("`" <> d.itdName <> "`'s field `" <> f
+           <> "` is COMPUTED (it is declared with a MEANS clause), so it is not part of the \
+              \model's input contract and no <itemComponent> was emitted for it; DMN has no \
+              \notion of a derived component")
+        "the derived field: a reader of the itemDefinition cannot see that the type has it"
+    | (d, iid) <- zip itemDecls itemDefIds
+    , f <- d.itdComputed
+    ]
+      <> [ dmnNote "D-ITEMDEF" Lossy (iid <> "_c" <> tshow i) Nothing
+             ("`" <> d.itdName <> "`'s component `" <> nameOf fn <> "` is typed `"
+                <> oneLine (prettyLayout fty) <> "`, " <> reason
+                <> ", so it is emitted as typeRef=\"Any\"")
+             "the component's declared type; nothing downstream can tell what it holds"
+         | (d, iid) <- zip itemDecls itemDefIds
+         , (i, (fn, fty)) <- zip [1 :: Int ..] d.itdFields
+         , let (_, _, fl) = classifyType typeEnv fty
+         , Just reason <- [itemDefReason fl]
+         ]
+
+  -- @Nothing@ when the component's type needed no explanation.
+  itemDefReason fl
+    | fl.tfList =
+        Just "and a collection needs an itemDefinition of its OWN -- isCollection is an \
+             \attribute of tItemDefinition, not of a typeRef -- which this phase does not mint"
+    | fl.tfForeign =
+        Just "and it is declared in ANOTHER MODULE: this exporter lowers one module at a time, \
+             \so there is no itemDefinition in this file to point a typeRef at"
+    | otherwise = Nothing
+
+  -- R8-a at the itemComponent site.
+  componentMaybeNotes =
+    [ maybeNullNote (iid <> "_c" <> tshow i) Nothing
+        ("`" <> d.itdName <> "`'s component `" <> nameOf fn <> "`")
+        (oneLine (prettyLayout fty)) fl.tfOptionalAlias
+    | (d, iid) <- zip itemDecls itemDefIds
+    , (i, (fn, fty)) <- zip [1 :: Int ..] d.itdFields
+    , let (_, _, fl) = classifyType typeEnv fty
+    , fl.tfMaybe
+    ]
+
+  -- Which module-local records THREAD a payload-carrying sum type: R4-a's
+  -- second `Lossy` arm, reported at the decision that passes the record around.
+  --
+  -- The third component is the typeRef the itemComponent is ACTUALLY emitted
+  -- with, taken from the same 'classifyType' call 'itemComponent' uses rather
+  -- than from a constant in the message. It used to be spelled "Any" in the
+  -- note's prose while the artifact emitted the minted name, which is the kind
+  -- of claim only the artifact can settle -- so the note now reads it off the
+  -- same computation the emitter does.
+  sumFieldRecords :: Map Unique [(Text, Text, Text)]
+  sumFieldRecords = Map.fromList
+    [ (d.itdUnique, threaded)
+    | d <- itemDecls
+    , let threaded =
+            [ ( nameOf fn
+              , Map.findWithDefault "" hu itemDeclNames
+              , let (t, _, _) = classifyType typeEnv fty in dmnTypeAttr t
+              )
+            | (fn, fty) <- d.itdFields
+            , Just hu <- [typeHeadUnique fty]
+            , Set.member hu typeEnv.tePayload
+            ]
+    , not (null threaded)
+    ]
+
+  itemDeclNames = Map.fromList [(d.itdUnique, d.itdName) | d <- itemDecls]
+
+  -- The constructors and selectors of a payload-carrying union, each mapped to
+  -- the L4 name of the type that owns it. R4-a's first three reading forms are
+  -- membership tests against this.
+  payloadOwner :: Map Unique Text
+  payloadOwner = Map.fromList
+    [ (u, nameOf tn)
+    | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) (EnumDecl _ cds)) <- decls
+    , length cds > 1
+    , MkConDecl _ cn cfs <- cds
+    , not (null cfs)
+    , u <- getUnique cn : [getUnique fn | MkTypedName _ fn _ _ _ <- cfs]
+    ]
 
   decideIds      = assignIds "decision_" (map decideName decides)
 
@@ -1608,24 +2275,60 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   inputNodes =
     [ MkInputData
-        { idId   = iid
-        , idName = nm
-        , idType = Map.findWithDefault DmnAny u freeTermTypes
+        { idId       = iid
+        , idName     = nm
+        , idFeelName = feel
+        , idType     = Map.findWithDefault DmnAny u freeTermTypes
         }
-    | ((u, nm), iid) <- zip freeTerms inputIds
+    | ((u, nm), iid, feel) <- zip3 freeTerms inputIds inputFeelNames
     ]
+
+  -- §5.2 SCOPE 1: the DRG's FEEL variable namespace -- every inputData variable
+  -- and every decision variable TOGETHER, since they share one evaluation scope
+  -- ("the 'variables' of standard DMN correspond to constants"). The traversal
+  -- order is inputData then decision, which is the order 'drgNodes' is
+  -- assembled in above, so the resolution is a function of source order alone.
+  --
+  -- Two further scopes §5.2 names have no emitter yet and therefore no entry
+  -- here: `decisionService` names (§2.3) and BKM `formalParameter` names (§6.2),
+  -- both Phase 5. Each is its own 'uniquifyIn' scope -- neither shares this one
+  -- -- so extending this is adding a scope, not widening it.
+  varFolded = map (feelIdentText . snd) freeTerms <> map (feelIdentText . decideName) decides
+  varResolved = uniquifyIn varFolded
+  (inputFeelNames, decideFeelNames) = splitAt (length freeTerms) varResolved
+
+  nameEnv = MkNameEnv
+    { neVars   = Map.fromList
+        ( zip (map fst freeTerms) inputFeelNames
+            <> zip (map (getUnique . decideResolved) decides) decideFeelNames
+        )
+    , neFields = fieldNames
+    }
 
   -- A GIVEN's declared type is the best evidence about a free term; an ASSUME's
   -- is the other source. Anything else stays Any.
-  freeTermTypes = Map.fromList
-    ( [ (getUnique n, dmnTypeOf enums ty)
+  freeTermSrc :: Map Unique (Type' Resolved)
+  freeTermSrc = Map.fromList
+    ( [ (getUnique n, ty)
       | MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _ <- decides
       , MkOptionallyTypedName _ n (Just ty) _ <- gs
       ]
-        <> [ (getUnique n, dmnTypeOf enums ty)
+        <> [ (getUnique n, ty)
            | MkAssume _ _ (MkAppForm _ n _ _) (Just ty) _ <- assumes
            ]
     )
+
+  freeTermTypes = Map.map (\ty -> let (t, _, _) = classifyType typeEnv ty in t) freeTermSrc
+
+  -- R8-a at the inputData site.
+  inputMaybeNotes =
+    [ maybeNullNote iid Nothing ("the input `" <> nm <> "`")
+        (oneLine (prettyLayout ty)) fl.tfOptionalAlias
+    | ((u, nm), iid) <- zip freeTerms inputIds
+    , Just ty <- [Map.lookup u freeTermSrc]
+    , let (_, _, fl) = classifyType typeEnv ty
+    , fl.tfMaybe
+    ]
 
   -- TWO DIFFERENT free terms that spell the same FEEL name. L4 scopes a GIVEN
   -- to its own decision, so `n` in one rule and `n` in another are unrelated;
@@ -1637,23 +2340,90 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- The counts are computed, not spelled. They used to read "two ... two"
   -- unconditionally under a guard of @length us > 1@, which understated the
   -- Reg CF corpus's eight-way collision on `issuer` as a two-way one.
+  --
+  -- __The message changed when @uniquifyIn@ landed, and it had to.__ It used to
+  -- end "...so the emitted model has eight elements a FEEL expression cannot
+  -- tell apart". After §5.2 stage 2 that sentence is FALSE: the elements are
+  -- renamed apart, and every reference reaches the one it means. The loss that
+  -- SURVIVES is the one this note was always about and never said plainly --
+  -- L4 scoped N parameters locally, one per decision, and DMN has N globals, so
+  -- a caller must now supply eight values where the L4 has one name used eight
+  -- times. The note also names both the L4 spellings and the resolved FEEL
+  -- names, per §5.3.6: under the fold the folded name is precisely what a
+  -- reader cannot invert.
+  --
+  -- The PREDICATE is unchanged, deliberately. §7's header warns that it is the
+  -- tree's only detector of duplicate `inputData/@name` (TP=185/FP=0/FN=0), and
+  -- the type-conflict repurpose it proposes is Phase 4 work that must ADD a
+  -- code rather than take this one over.
   sharedInputNotes =
     [ dmnNote "D-SCOPE" Lossy ("input_" <> sanitiseId nm) Nothing
-        (englishCount (length us) <> " different terms are "
-           <> (if length us == 2 then "both" else "all")
-           <> " named `" <> nm <> "` (in "
-           <> Text.intercalate ", " users
-           <> "); DMN's inputData is global, so the emitted model has "
-           <> englishCount (length us)
-           <> " elements a FEEL expression cannot tell apart")
-        "L4's lexical scoping of GIVEN parameters"
+        (englishCount (length us) <> " different terms fold to the FEEL name `"
+           <> nm <> "` (L4: " <> Text.intercalate ", " (map tick l4spellings)
+           <> "; used in " <> Text.intercalate ", " users
+           <> "); they are emitted as the distinct globals "
+           <> Text.intercalate ", " (map tick feelSpellings)
+           <> ", because DMN's inputData is global and has no scope at all")
+        "L4's lexical scoping of GIVEN parameters: a caller must now supply one value per \
+        \element where the L4 has one locally-scoped name"
     | (nm, us) <- Map.toAscList sharedNames
     , length us > 1
     , let users = nubOrd [decideName d | d <- decides, any ((`elem` us) . fst) (decideFreeTerms d)]
+    , let l4spellings = nubOrd [tnm | (u, tnm) <- freeTerms, u `elem` us]
+    , let feelSpellings =
+            [ feel | (feel, (u, _)) <- zip inputFeelNames freeTerms, u `elem` us ]
     ]
 
   sharedNames = Map.fromListWith (flip (<>))
     [ (feelIdentText tnm, [u]) | (u, tnm) <- freeTerms ]
+
+  tick t = "`" <> t <> "`"
+
+  -- D-RENAME, §5.2 stage 2's own note: the COLLISION arm only.
+  --
+  -- One note per element whose FEEL name had to be suffixed, naming the L4 name,
+  -- the resolved FEEL name and the other claimants on the base. `Lossy` rather
+  -- than `Blocking` is exactly what §5.3.4-3 makes conditional on stage 2: the
+  -- names are now made distinct and `@label` preserves the source, so nothing is
+  -- silently wrong -- what is lost is the resemblance between the FEEL text and
+  -- the L4 name.
+  --
+  -- __The benign-mangle arm (`Advisory`) is deliberately NOT built here.__ §7's
+  -- header defers the two-severities-on-one-code shape to a re-ruling against
+  -- FIDELITY-SEVERITY-AXIS-SPEC.md §5, and the arm would emit ~169 Advisory
+  -- notes on one corpus module while `@label` already carries the source name.
+  renameNotes =
+    [ dmnNote "D-RENAME" Lossy eid Nothing
+        ("`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
+           <> "`, not `" <> foldedName <> "`: " <> englishCount (length claimants)
+           <> " " <> kindPlural <> " in this module fold to `" <> foldedName
+           <> "` (" <> Text.intercalate ", " (map tick claimants)
+           <> "), and the first claimant in source order keeps the base name")
+        "the resemblance between the emitted FEEL name and the L4 name it came from; \
+        \the L4 name survives in @label"
+    | (eid, kindPlural, l4name, foldedName, resolved, claimants) <- renameCandidates
+    , resolved /= foldedName
+    ]
+
+  renameCandidates =
+    [ (iid, "elements of the DRG's flat variable namespace", nm, feelIdentText nm, feel
+      , [ other | (other, ofolded) <- varClaimants, ofolded == feelIdentText nm ])
+    | ((_, nm), iid, feel) <- zip3 freeTerms inputIds inputFeelNames
+    ]
+      <> [ (did, "elements of the DRG's flat variable namespace", nm, feelIdentText nm, feel
+           , [ other | (other, ofolded) <- varClaimants, ofolded == feelIdentText nm ])
+         | (d, did, feel) <- zip3 decides decideIds decideFeelNames
+         , let nm = decideName d
+         ]
+      <> [ ("itemdef_" <> sanitiseId tyName, "fields of one declared type", nameOf n, fldFolded, resolved
+           , [ nameOf other | (other, _, _) <- fs ])
+         | (tyName, fs) <- fieldScopes
+         , (n, fldFolded, resolved) <- fs
+         ]
+
+  varClaimants =
+    [ (nm, feelIdentText nm) | (_, nm) <- freeTerms ]
+      <> [ (nm, feelIdentText nm) | d <- decides, let nm = decideName d ]
 
   -- TWO DIFFERENT DRG ELEMENTS THAT SPELL THE SAME FEEL NAME -- the whole
   -- namespace, not just the inputData half of it.
@@ -1688,15 +2458,20 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- schema-valid, dmn-moddle-clean, and reports every decision as evaluated).
   --
   -- The fix that makes the collision go away rather than merely loud is §5.2's
-  -- stage-2 @uniquifyIn@, which has to rename REFERENCES too and therefore
-  -- needs a whole-DRG map from 'Unique' to FEEL name rather than the per-name
-  -- 'feelIdentText'. That is Phase 2. Detecting is not resolving, and this note
-  -- is the detection.
+  -- stage-2 @uniquifyIn@, and it has now landed: the names below are the
+  -- RESOLVED ones, so this predicate fires __zero times by construction__ and
+  -- D-RENAME reports the rename instead.
+  --
+  -- The code and its predicate are kept anyway, and §7's header says why: it
+  -- must not be deleted until something else reports a duplicate
+  -- `inputData/@name`, which DMN 1.3 §7.3.4 makes a violation of a normative
+  -- SHALL. A test pins the count at zero, so the day it fires again is visible
+  -- rather than inferred.
   declaredFeelNames :: [(Text, (Text, Text, Text))]
   declaredFeelNames =
-    [ (feelIdentText n.idName, ("inputData", n.idName, n.idId)) | n <- inputNodes ]
-      <> [ (feelIdentText (decideName d), ("decision", decideName d, did))
-         | (d, did) <- zip decides decideIds
+    [ (n.idFeelName, ("inputData", n.idName, n.idId)) | n <- inputNodes ]
+      <> [ (feel, ("decision", decideName d, did))
+         | (d, did, feel) <- zip3 decides decideIds decideFeelNames
          ]
 
   feelNameCollisionNotes =
@@ -1714,11 +2489,11 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   feelNameGroups = Map.fromListWith (flip (<>)) [(f, [x]) | (f, x) <- declaredFeelNames]
 
-  lowered = zipWith lowerOne decides decideIds
+  lowered = zipWith3 lowerOne decides decideIds decideFeelNames
 
-  lowerOne d did = (decision, notes)
+  lowerOne d did feelName = (decision, notes)
    where
-    MkDecide _ (MkTypeSig _ _ mGiveth) _ rawBody = d
+    MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) _ rawBody = d
     -- The typechecker desugars every binary operator into a function
     -- application; 'carameliseExpr' undoes that, which is what makes a
     -- comparison recognisable as a comparison. The ladder does the same.
@@ -1729,29 +2504,180 @@ lowerModule opts modul@(MkModule _ uri _) =
     peeled = peelLocals caramelised
     (body, inlined) = either (const (caramelised, [])) id peeled
 
-    declaredType = case mGiveth of
-      Just (MkGivethSig _ ty) -> dmnTypeOf enums ty
-      Nothing                 -> annTypeOf enums opts.dloSubstitution uri body
+    -- The oracle, built WITHOUT going through 'tctx'. 'TableCtx' has strict
+    -- fields, so asking `oracleOf tctx` while computing `tcOutputType` would
+    -- force the record that is being built.
+    oracle0 = MkTypeOracle
+      { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+
+    givethSrc = case mGiveth of
+      Just (MkGivethSig _ ty) -> Just ty
+      Nothing                 -> annTypeSource oracle0 body
+
+    (declaredType, declaredDomain, declaredFlags) =
+      maybe (DmnAny, Nothing, noTypeFlags) (classifyType typeEnv) givethSrc
+
+    -- Every type the decision states at its own boundary: the GIVEN parameters
+    -- that carry a declared type, and the GIVETH.
+    boundaryTypes =
+      [ty | MkOptionallyTypedName _ _ (Just ty) _ <- givens] <> maybeToList givethSrc
 
     tctx = MkTableCtx
       { tcName         = decideName d
+      , tcFeelName     = feelName
+      , tcNames        = nameEnv
       , tcIdPrefix     = did
       , tcOutputType   = declaredType
       , tcConstructors = constructors
       , tcConstants    = namedConstants
-      , tcEnums        = enums
+      , tcTypes        = typeEnv
+      , tcOutputValues = declaredDomain
       , tcSubst        = opts.dloSubstitution
       , tcUri          = uri
       }
 
-    (logic, notes) = case peeled of
+    subExprs = toListOf (cosmosOf (gplate @(Expr Resolved))) body
+
+    -- R4-a's three reading forms, plus R8-c/d/e. Each is a SENTENCE COMPLETING
+    -- "`<decision>` is ...", so 'literalFallback' can render them all one way.
+    --
+    -- __Decided before 'normaliseGuarded' and before the select-idiom branch__
+    -- (§4.2.1-8): a payload-binding CONSIDER fails inside "L4.Viz.GuardedRows"
+    -- for a reason of its own, and would otherwise be reported "is not a guarded
+    -- chain" -- a table-shape diagnosis for a FEEL type-system limit.
+    sumTypeReasons :: [Text]
+    sumTypeReasons =
+      [ "a reader of `" <> owner
+          <> "`, a payload-carrying sum type FEEL has no way to represent (it projects the \
+             \payload field `" <> nameOf n <> "`)"
+      | Proj _ _ n <- subExprs
+      , Just owner <- [Map.lookup (getUnique n) payloadOwner]
+      ]
+        <> [ "a constructor of `" <> owner
+               <> "`, a payload-carrying sum type FEEL has no way to represent (it applies `"
+               <> nameOf r <> "` to arguments)"
+           | (r, applied) <- appHeads
+           , applied
+           , Just owner <- [Map.lookup (getUnique r) payloadOwner]
+           ]
+        <> [ "a reader of `" <> owner
+               <> "`, a payload-carrying sum type FEEL has no way to represent (a CONSIDER arm \
+                  \binds `" <> nameOf cn <> "`'s payload)"
+           | Consider _ _ brs <- subExprs
+           , MkBranch _ (When _ (PatApp _ cn ps)) _ <- brs
+           , not (null ps)
+           , Just owner <- [Map.lookup (getUnique cn) payloadOwner]
+           ]
+        -- R8-d: value emission for the BUILTIN open sums is refused in this
+        -- change. A `CONSIDER`-on-`MAYBE` table would need `null` as an INPUT
+        -- CELL, and DMN 1.3's grammar rule 34 makes `null` a literal while rule
+        -- 33's `simple literal` is numeric | string | boolean | date-time only,
+        -- so it is not a legal S-FEEL endpoint at all. Leaving S-FEEL on the
+        -- cell side would forfeit §3.1's whole thesis on precisely the tables
+        -- the encoding was supposed to buy.
+        <> [ "a decision that constructs or matches L4's builtin open sums (it mentions `"
+               <> nameOf r <> "`), and FEEL has no way to spell a tagged value"
+           | r <- toList d
+           , isBuiltinSumCon r
+           ]
+        <> [ "a CONSIDER over `" <> oneLine (prettyLayout sty)
+               <> "`, whose arms would need `null` as an input cell -- which S-FEEL's endpoint \
+                  \grammar does not admit"
+           | Consider _ scrut _ <- subExprs
+           , Just sty <- [annTypeSource oracle0 scrut]
+           , let (_, _, fl) = classifyType typeEnv sty
+           , fl.tfMaybe || fl.tfEither
+           ]
+        -- R8-c and R8-e at the boundary. Nested MAYBE is refused because `null`
+        -- does not nest: `JUST NOTHING` and `NOTHING` would become one FEEL
+        -- value, and FEEL `=` would answer true where L4 answers false. That is
+        -- an ANSWER CHANGE, which is §2.4's own severity line.
+        <> [ "typed `" <> oneLine (prettyLayout bty)
+               <> "` at its own boundary: FEEL's `null` does not nest and FEEL has no EITHER, so \
+                  \the type has no faithful image"
+           | bty <- boundaryTypes
+           , let (_, _, fl) = classifyType typeEnv bty
+           , fl.tfNestedMaybe || fl.tfEither
+           ]
+
+    appHeads =
+      [(r, not (null as)) | App _ r as <- subExprs]
+        <> [(r, not (null as)) | AppNamed _ r as _ <- subExprs]
+
+    -- R4-a's `Lossy` arms. Emitted only when the decision is NOT refused, so a
+    -- reader is not told two different things about one decision.
+    sumTypeLossyNotes
+      | not (null sumTypeReasons) = []
+      | otherwise = nullaryOnlyNotes <> threadedRecordNotes
+
+    nullaryOnlyNotes =
+      [ dmnNote "D-SUMTYPE" Lossy did (bestRange scrut)
+          ("`" <> decideName d <> "` CONSIDERs `"
+             <> Map.findWithDefault "" tu itemDeclNames
+             <> "`, a payload-carrying sum type, over its nullary constructors only; no cell is \
+                \emitted for " <> Text.intercalate ", " (map tick missing)
+             <> ", and no FEEL value can stand for one")
+          "the refused constructors' share of the domain -- the itemDefinition's allowedValues \
+          \lists them, so a gap analyser reports the missing rows, which is the loss made visible"
+      | Consider _ scrut brs <- subExprs
+      , Just sty <- [annTypeSource oracle0 scrut]
+      , Just tu <- [typeHeadUnique sty]
+      , Set.member tu typeEnv.tePayload
+      , let mentioned = Set.fromList [nameOf cn | MkBranch _ (When _ (PatApp _ cn _)) _ <- brs]
+      , let missing =
+              [c | c <- Map.findWithDefault [] tu typeEnv.teDomains, not (Set.member c mentioned)]
+      , not (null missing)
+      ]
+
+    -- What survives is the type NAME, not the type: the component points at an
+    -- itemDefinition over `string` whose allowedValues list every constructor as
+    -- a bare tag. So the note names the typeRef it really emitted -- a reader
+    -- can check that against the artifact -- and reports the loss that is
+    -- actually there, which is the tag/payload distinction rather than the
+    -- component's declared type.
+    threadedRecordNotes =
+      [ dmnNote "D-SUMTYPE" Lossy did Nothing
+          ("`" <> decideName d <> "` threads `" <> Map.findWithDefault "" hu itemDeclNames
+             <> "`, whose field `" <> fld <> "` is typed `" <> sumNm
+             <> "`, a payload-carrying sum type; the itemComponent is emitted as typeRef=\""
+             <> tref <> "\", which resolves to an itemDefinition over `string` listing every \
+                \constructor as a bare tag -- FEEL has no tagged value, so a constructor that \
+                \carries a payload and the same constructor without one are a single FEEL string")
+          ("the tag/payload distinction: every `" <> sumNm
+             <> "` constructor is spelled as a bare string, and the payload one of them carries \
+                \has no image in the component at all")
+      | bty <- boundaryTypes
+      , Just hu <- [typeHeadUnique bty]
+      , Just threaded <- [Map.lookup hu sumFieldRecords]
+      , (fld, sumNm, tref) <- threaded
+      ]
+
+    -- R8-a at the decision's <variable>. This is also where a MAYBE-typed
+    -- OUTPUT is reported: 'outputXml' emits no typeRef on an <output> at all
+    -- (measured -- KIE says ILLEGAL_USE_OF_TYPEREF), so the decision's variable
+    -- is the only place the type is written down.
+    decisionMaybeNotes =
+      [ maybeNullNote did (bestRange body) ("`" <> decideName d <> "`")
+          (oneLine (prettyLayout sty)) declaredFlags.tfOptionalAlias
+      | declaredFlags.tfMaybe
+      , Just sty <- [givethSrc]
+      ]
+
+    (logic, tableNotes') = case sumTypeReasons of
+      -- §4.2.1-8's diagnosis order, made structural.
+      reason : _ -> literalFallback (SumTypeRead reason)
+      [] -> plainLowering
+
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
+
+    plainLowering = case peeled of
       Left loss -> literalFallback loss
       -- A whole body that IS the select idiom is a formula, not a one-case
       -- table. DMN's own answer for a formula is a boxed literal expression, so
       -- this is not a loss and gets no D-LITERALEXPR note -- only the threshold
       -- note, if a threshold went inside the expression.
       Right _ | isSelectIdiomIn (oracleOf tctx) body ->
-        let rendered = renderFeelIn constructors (oracleOf tctx) body
+        let rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
         in
         ( LogicLiteral rendered
         , [ dmnNote "D-LIFTEDTHRESHOLD" Advisory did (bestRange sub)
@@ -1782,20 +2708,26 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
     -- would describe a different rule set than the module does.
+    --
+    -- The loss chooses its own CODE ('fidelityLossCode'): a decision refused
+    -- because FEEL has no sum type is @D-SUMTYPE@, everything else is
+    -- @D-LITERALEXPR@. One shape, two diagnoses, which is §4.2.1-8's
+    -- requirement expressed where it cannot be forgotten.
     literalFallback loss =
       ( LogicLiteral rendered
-      , [ dmnNote "D-LITERALEXPR" Blocking did (bestRange body)
+      , [ dmnNote (fidelityLossCode loss) Blocking did (bestRange body)
             ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
                <> ", so it is emitted as a boxed literal expression rather than a decision table")
             "every decision-table analysis: gap, overlap, consistency and manual review"
         ]
       )
      where
-      rendered = renderFeelIn constructors (oracleOf tctx) body
+      rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
 
     decision = MkDecision
       { dcnId           = did
       , dcnName         = decideName d
+      , dcnFeelName     = feelName
       , dcnType         = case logic of
           LogicTable t -> t.dtOutput.ocType
           LogicLiteral _ -> declaredType
@@ -1823,14 +2755,15 @@ lowerModule opts modul@(MkModule _ uri _) =
 
 -- | Deterministic element ids: derived from the L4 name, with a positional
 -- suffix only where two names sanitise to the same id.
+--
+-- This __is__ §5.2 stage 2, and always was — first claimant keeps the base, the
+-- nth gets @base_\<n\>@ — applied to XML ids rather than to FEEL names. It is
+-- now expressed in terms of 'uniquifyIn' so the id namespace and the FEEL
+-- namespace cannot drift apart on the stepper they share. (The one behavioural
+-- difference is a repair: 'uniquifyIn' takes the least FREE suffix, so a
+-- source name that already spells @foo_2@ can no longer be handed out twice.)
 assignIds :: Text -> [Text] -> [Text]
-assignIds prefix names = reverse (snd (foldl' step (Map.empty, []) names))
- where
-  step (seen, acc) nm =
-    let base = prefix <> sanitiseId nm
-        n    = Map.findWithDefault (0 :: Int) base seen
-        this = if n == 0 then base else base <> "_" <> tshow (n + 1)
-    in (Map.insert base (n + 1) seen, this : acc)
+assignIds prefix names = uniquifyIn (map ((prefix <>) . sanitiseId) names)
 
 -- | Small counts spelled as words, as a fidelity note's prose wants them.
 englishCount :: Int -> Text

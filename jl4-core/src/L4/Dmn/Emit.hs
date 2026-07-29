@@ -9,11 +9,30 @@
 -- Two things the reader should be able to check by eye:
 --
 -- [Child order is XSD order] DMN's complex types are @xsd:sequence@s, so the
---   order of child elements is /normative/, not cosmetic. @tDecision@ wants
+--   order of child elements is /normative/, not cosmetic. @tDefinitions@ wants
+--   every @itemDefinition@ before any @drgElement@; @tItemDefinition@ wants
+--   @typeRef?@ then @allowedValues?@ then @itemComponent*@; @tDecision@ wants
 --   @variable@ before @informationRequirement@ before the expression;
---   @tDecisionTable@ wants @input*@ then @output+@ then @rule*@; @tOutputClause@
+--   @tDecisionTable@ wants @input*@ then @output+@ then @rule*@; @tInputClause@
+--   wants @inputExpression@ then @inputValues?@; @tOutputClause@
 --   wants @outputValues?@ then @defaultOutputEntry?@. Getting this wrong
 --   produces a file that opens in some tools and is rejected by others.
+--
+--   __The obvious validator does not catch it.__ libxml2 (and therefore
+--   @xmllint@, and therefore @etc\/validate-dmn.mjs@, whose own header says it
+--   "does NOT check XSD sequence order") silently accepts an @itemDefinition@
+--   placed after an @inputData@; Xerces rejects it with
+--   @cvc-complex-type.2.4.a@. The gate is @etc\/kie-dmn-check\/run.sh@, which
+--   validates against the DMN 1.3 schema shipped inside the KIE jar (§4.3, §9).
+--
+--   __What the engines then do, measured rather than assumed__ (2026-07-29, on
+--   the matched pair in @jl4\/tests-cli\/fixtures\/dmn-xsd-order\/@, which holds
+--   the same lines in the two orders): Camunda 8.7.6 rejects the misordered file
+--   outright, at @parse@. Drools\/KIE 8.44 does /not/ — its schema and validator
+--   legs object, but @KieBuilder@ is clean and the runtime answers both cases
+--   correctly. So the schema check is the only thing between a misordered
+--   emitter and a shipped artifact, which is exactly why it has to be the gate;
+--   "it would fail in the engine" is not something to rely on.
 --
 -- [Nothing here is time- or run-dependent] No timestamps, no GUIDs, no
 --   traversal counters: every id comes from an L4 name plus a positional index,
@@ -127,7 +146,43 @@ definitionsXml drg =
     , ("namespace", drg.drgNamespace)
     , ("exporter", "jl4")
     ]
-    (map nodeXml drg.drgNodes <> [dmndiXml drg])
+    -- §4.3: itemDefinitions are the FIRST children of <definitions>, before
+    -- every inputData and every decision. tDefinitions is an xsd:sequence.
+    ( map itemDefinitionXml drg.drgItemDefs
+        <> map nodeXml drg.drgNodes
+        <> [dmndiXml drg]
+    )
+
+-- | A @\<itemDefinition\>@ (§4.1, §4.2).
+--
+-- @\<typeRef\>@ is a __child element__ here, not the attribute it is on a
+-- @\<variable\>@ or an @\<inputExpression\>@ — @tItemDefinition@ declares it as
+-- @xsd:sequence@ member, and the two spellings are not interchangeable.
+--
+-- Note what is __not__ emitted: no @isCollection@ (a @LIST OF@ field would need
+-- an itemDefinition of its own, which is out of this phase's scope and reported
+-- @D-ITEMDEF@), and no @typeLanguage@ (the default is FEEL, which is what we
+-- mean).
+itemDefinitionXml :: ItemDefinition -> Xml
+itemDefinitionXml d =
+  Elem "itemDefinition" (namedAttrs d.idfId d.idfName d.idfLabel) $
+    [Elem "typeRef" [] [Chars (dmnTypeAttr b)] | b <- maybeToList d.idfBase]
+      <> [valuesXml "allowedValues" vs | vs <- maybeToList d.idfValues]
+      <> map componentXml d.idfComponents
+
+componentXml :: ItemComponent -> Xml
+componentXml c =
+  Elem "itemComponent" (namedAttrs c.icmId c.icmName c.icmLabel)
+    [Elem "typeRef" [] [Chars (dmnTypeAttr c.icmType)]]
+
+-- | @allowedValues@ \/ @inputValues@ \/ @outputValues@: all three are
+-- @tUnaryTests@, whose content is one @\<text\>@ holding a comma-separated list
+-- of unary tests. Every value this exporter puts in one is a constructor name,
+-- and 'quoteFeelString' is what spells it — the same function the /cells/ go
+-- through, so a domain and a cell cannot disagree about what a value looks like.
+valuesXml :: Text -> [Text] -> Xml
+valuesXml name vs =
+  Elem name [] [Elem "text" [] [Chars (Text.intercalate "," (map quoteFeelString vs))]]
 
 -- | @id@, a FEEL-safe @name@, and — only when mangling changed something — the
 -- verbatim L4 name as @label@.
@@ -144,26 +199,33 @@ definitionsXml drg =
 -- type this emitter names. It is what makes the mangling cost nothing in
 -- readability: the L4 name is still in the file, just not in the place FEEL
 -- reads.
-namedAttrs :: Text -> Text -> [(Text, Text)]
-namedAttrs eid nm =
+-- __The FEEL name is taken, not recomputed.__ This function used to call
+-- @feelIdentText@ on the L4 name at emission time. That was correct only while
+-- the mapping was a pure per-name fold; after §5.2 stage 2 (@uniquifyIn@) the
+-- FEEL name is a property of the whole DRG — which of two colliding names got
+-- the @_2@ depends on source order, not on the string — so it is resolved once
+-- in "L4.Dmn.Lower" and carried on the IR. Recomputing it here would silently
+-- undo every collision rename.
+namedAttrs :: Text -> Text -> Text -> [(Text, Text)]
+namedAttrs eid feel nm =
   [("id", eid), ("name", feel)] <> [("label", nm) | feel /= nm]
- where
-  feel = feelIdentText nm
 
 nodeXml :: DrgNode -> Xml
 nodeXml = \case
   NodeInputData i ->
-    Elem "inputData" (namedAttrs i.idId i.idName)
+    Elem "inputData" (namedAttrs i.idId i.idFeelName i.idName)
       [ Elem "variable"
-          (namedAttrs (i.idId <> "_var") i.idName <> [("typeRef", dmnTypeAttr i.idType)])
+          (namedAttrs (i.idId <> "_var") i.idFeelName i.idName
+             <> [("typeRef", dmnTypeAttr i.idType)])
           []
       ]
   NodeDecision d ->
-    Elem "decision" (namedAttrs d.dcnId d.dcnName) $
+    Elem "decision" (namedAttrs d.dcnId d.dcnFeelName d.dcnName) $
       -- tDecision is an xsd:sequence: variable, then informationRequirement*,
       -- then the expression.
       [ Elem "variable"
-          (namedAttrs (d.dcnId <> "_var") d.dcnName <> [("typeRef", dmnTypeAttr d.dcnType)])
+          (namedAttrs (d.dcnId <> "_var") d.dcnFeelName d.dcnName
+             <> [("typeRef", dmnTypeAttr d.dcnType)])
           []
       ]
         <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
@@ -196,13 +258,19 @@ decisionTableXml t =
     ]
     (map inputXml t.dtInputs <> [outputXml t.dtOutput] <> map ruleXml t.dtRules)
 
+-- | One input clause. @tInputClause@ is @inputExpression@ then @inputValues?@.
+--
+-- The @\<inputValues\>@ is the whole of §3.1: DMN §8.2.4 assesses completeness
+-- against the column's expected values, so a column that ships none hands an
+-- analyser an unbounded domain and cannot be checked at all.
 inputXml :: InputColumn -> Xml
 inputXml c =
-  Elem "input" [("id", c.icId), ("label", c.icLabel)]
+  Elem "input" [("id", c.icId), ("label", c.icLabel)] $
     [ Elem "inputExpression"
         [("id", c.icId <> "_expr"), ("typeRef", dmnTypeAttr c.icType)]
         [Elem "text" [] [Chars c.icExpr.feText]]
     ]
+      <> [valuesXml "inputValues" vs | vs <- maybeToList c.icValues]
 
 -- | The single output clause.
 --
@@ -225,13 +293,20 @@ inputXml c =
 outputXml :: OutputColumn -> Xml
 outputXml o =
   Elem "output" [("id", o.ocId)] $
-    -- tOutputClause: outputValues? then defaultOutputEntry?. We never emit
-    -- outputValues, because we only know the values a table happens to mention,
-    -- not the domain -- and asserting a domain we have not checked is exactly the
-    -- kind of thing this exporter refuses to do.
-    [ Elem "defaultOutputEntry" [("id", o.ocId <> "_default")] [Elem "text" [] [Chars d.feText]]
-    | d <- maybeToList o.ocDefault
-    ]
+    -- tOutputClause: outputValues? then defaultOutputEntry?, in that order.
+    --
+    -- outputValues is emitted for an ENUM-typed output only, and the narrowing
+    -- is deliberate (§3.2). This used to say "we never emit outputValues,
+    -- because we only know the values a table happens to mention, not the
+    -- domain" -- true for a computed output, and false for one whose L4 type is
+    -- an `IS ONE OF`, where the domain is the declaration. Not for a boolean
+    -- either: there the domain IS the typeRef, so restating it would add no
+    -- information while making every computed boolean entry violate §8.2.7.
+    [valuesXml "outputValues" vs | vs <- maybeToList o.ocValues]
+      <> [ Elem "defaultOutputEntry" [("id", o.ocId <> "_default")]
+             [Elem "text" [] [Chars d.feText]]
+         | d <- maybeToList o.ocDefault
+         ]
 
 ruleXml :: DmnRule -> Xml
 ruleXml r =
