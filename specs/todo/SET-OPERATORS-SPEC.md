@@ -2020,6 +2020,27 @@ GIVETH A BOOLEAN
     OR ^ ^            "NJ"
 ```
 
+Extended past two elements, the composition completes (verified, NY/NJ/PA/DE): the asyndetic
+`..` carries every non-terminal disjunct and the word `OR` appears **exactly once, before the
+last element** — the same distribution English grammar imposes on the syndetic list
+("NY, NJ, PA, **or** DE"). `..` is the comma; the terminal `OR` is the agreement morpheme of
+§17.1.3, uttered where the grammar compels it; the dittos chain through the `..` lines:
+
+```l4
+`may apply` p MEANS
+       p `resides in` "NY"
+    .. ^ ^            "NJ"
+    .. ^ ^            "PA"
+    OR ^ ^            "DE"
+```
+
+One row per enumerated value, connective tokens only where natural language would put them,
+list-nature visible in the layout. **This composition — infix mixfix + `..` asyndeton + caret
+dittos + layout bracketing — is the stylistic form the language features were designed to
+compose into (Meng, 2026-07-29, recording original design intent).** It is the closest L4 comes
+to transcribing an enumeration as the list it is (§17.1) while remaining an honest boolean
+disjunction for every consumer in §17.4.
+
 **Style 4 — `any`-fold over the enumeration.** The list-shaped form for _predicate_ limbs; the
 prelude's `any`/`all` carry `@nlg` templates already. NOTE: L4 functions are **not curried** —
 there is no partial application, so the fold takes an explicit lambda:
