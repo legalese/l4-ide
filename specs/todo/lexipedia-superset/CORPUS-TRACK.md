@@ -43,15 +43,16 @@ table, which is exactly what the page can already do. The thing a page cannot do
 So **M5 depends on C2**, and SPEC.md §5's M5 row has been corrected from `C1, C3, S2, S3`
 to `C1, C2, C3, S2, S3`. See §6.3 and finding **F5** in §9.
 
-| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-27                                                                                                     |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **C0** | Mirror their eight groups | **Built.** 981 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete            |
-| **C1** | Four superset moves       | **One of four remains.** Formula, deadlines and the resale deontic all landed inside C0. Rule-version axis: 0 occurrences             |
-| **C2** | Citizen wizard            | **Not started, and blocked on `@export`.** `regcf.schema.golden` reads `No @export annotations found in file`. **M5 depends on this** |
-| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                |
+| ID     | SPEC.md's line            | Reality on `unstable`, 2026-07-29                                                                                                                                                                                                                      |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **C0** | Mirror their eight groups | **Built.** 992 lines, 55 `#ASSERT` + 7 `#TRACE` + 1 `#EVAL`, all green, four goldens, in CI. Five of eight groups complete                                                                                                                             |
+| **C1** | Four superset moves       | **One of four remains.** Formula, deadlines and the resale deontic all landed inside C0. Rule-version axis: 0 occurrences                                                                                                                              |
+| **C2** | Citizen wizard            | **C2a built** — `regcf-wizard.l4` landed in PR #162 (`65681a0a`): 749 lines, 5 `@export`, 55 `@desc`, four goldens, in CI. No rule-date question yet (gated on C1; §3.3 last row) and `TYPICALLY` still 0; C2b/C2c not started. **M5 depends on this** |
+| **C3** | Scenario tests            | **Not started.** 55 boundary assertions exist; none is a party's scenario, and nothing gates a failure                                                                                                                                                 |
 
-Provenance: `jl4/examples/legal/regcf/regcf.l4` (981 lines), three commits — `4c6a385d`,
-`6ddbc68c`, `10e74b95`. CI coverage via the `legal/**/*.l4` glob at
+Provenance: `jl4/examples/legal/regcf/regcf.l4` (992 lines; cut in `4c6a385d`,
+`6ddbc68c`, `10e74b95`, then grown by PR #162's projection triage) and
+`regcf-wizard.l4` (749 lines, PR #162 `65681a0a`). CI coverage via the `legal/**/*.l4` glob at
 `jl4/tests/Main.hs:73`, joined into the "ok files" suite at `Main.hs:95`; four goldens
 attach per file at `Main.hs:121-129`.
 
@@ -609,6 +610,19 @@ temporal closure (trap 5).
 ---
 
 ## 3. C2 — the citizen wizard
+
+> **Status correction (2026-07-29).** When this section was written (2026-07-27), C2 was not
+> started. **C2a has since shipped** — PR #162 (`65681a0a`) landed `regcf-wizard.l4`:
+> 749 lines, 55 `@desc`, and **five** exports rather than §3.2's prescribed two. The two
+> prescribed roles are both covered — `@export default` returning the assessment record, plus
+> a boolean entry point for `/query-plan` — and three further audience-specific entry points
+> (investor 12-month limit, resale restriction, reporting termination) ride along. Four
+> goldens (`tests/regcf-wizard.{golden,ep.golden,nlg.golden,schema.golden}`) are in CI.
+> Still open, exactly as §3.3's table says: `TYPICALLY` priors (0 occurrences) and **the
+> rule-date question**, which stays gated on C1 temporal closure; C2b (frontend answer
+> layer) and C2c (deploy) are untouched. The §0 table said "Not started, and blocked on
+> `@export`" — true when written, stale once #162 merged without updating this document;
+> both sites corrected 2026-07-29.
 
 ### 3.1 The façade pattern, reused verbatim
 
