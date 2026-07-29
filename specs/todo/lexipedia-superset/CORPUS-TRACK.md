@@ -464,23 +464,31 @@ TIMEZONE IS "America/New_York"     -- REQUIRED; see trap 1 below
 @ref 17 CFR 227.100(a)(1) — offering maximum
 GIVETH A NUMBER
 `offering maximum in a 12-month period` MEANS
-  IF   DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 15 3 2021)
-  THEN 5000000
-  ELSE IF   DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 12 4 2017)
-       THEN 1070000
-       ELSE 1000000
+    BRANCH IF `the rules in force include` `the 2021 amendments`           THEN 5000000
+           IF ^                            `the 2017 inflation adjustment` THEN 1070000
+           IF ^                            `Reg CF commenced`              THEN 1000000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
 -- Rule 100(a)(2) cut point. $100,000 as adopted; $107,000 from 2017-04-12
 -- (82 FR 17545 instr. 5.b/5.c); $124,000 from 2022-09-20 (87 FR 57398 instr. 2).
 @ref 17 CFR 227.100(a)(2)(i)-(ii) — income/net-worth cut point
 GIVETH A NUMBER
 `income or net worth cut point` MEANS
-  IF   DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 20 9 2022)
-  THEN 124000
-  ELSE IF   DATE_SERIAL `RULES EFFECTIVE DATE` AT LEAST DATE_SERIAL (Date 12 4 2017)
-       THEN 107000
-       ELSE 100000
+    BRANCH IF `the rules in force include` `the 2022 inflation adjustment` THEN 124000
+           IF ^                            `the 2017 inflation adjustment` THEN 107000
+           IF ^                            `Reg CF commenced`              THEN 100000
+           OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 ```
+
+_(Amended 2026-07-29: an earlier revision of this sketch — and the first implementation cut
+from it — wrote these as nested `IF … ELSE IF` staircases. A cascade of `ELSE IF` is a
+`BRANCH` that was not written as one: the shipped form above is flat first-match, one line
+per regime, `^` dittos carrying the repeated guard head, `OTHERWISE` as the R2 floor
+refusal, with named amendment dates (`` `the 2021 amendments` `` MEANS `Date 15 3 2021`
+etc.) and a shared `` `the rules in force include` `` helper rather than inline
+`DATE_SERIAL` comparisons. Each dated constant now reads as its §2.4.1 regime-table row —
+and normalises to a multi-row GuardedRows table, which the DMN exporter can carry as an
+actual decision table.)_
 
 #### 2.4.3 What it demonstrates — restated as evaluability
 

@@ -15,7 +15,7 @@ fidelity report — dmnmd
       `the 2022 inflation adjustment` is a formula (Date OF 20, 9, 2022), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_rules_in_force_include
-      `the rules in force include` is a formula ((DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL OF amendment)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the rules in force include` is a formula (RULES_EFFECTIVE_DATE >= amendment), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NONIDENTCOLUMN] blocking — decision_offering_maximum_in_a_12_month_period
       ``the rules in force include` OF `the 2021 amendments`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
@@ -168,7 +168,7 @@ fidelity report — dmnmd
       `investor is within the investment limit` is a formula (... "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:" OR `the accredited-investor carve-out applies to` OF investor OR (`aggregate amount sold to this investor including this transaction` OF investor, `amount to be sold in this transaction`) AT MOST (`investment limit` OF investor)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window
-      `the rule date is inside the COVID-19 temporary rules window` is a formula ((DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL OF (Date OF 4, 5, 2020)) AND (DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT MOST (DATE_SERIAL OF (Date OF 28, 8, 2022))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the rule date is inside the COVID-19 temporary rules window` is a formula (`RULES EFFECTIVE DATE` AT LEAST (Date OF 4, 5, 2020) AND `RULES EFFECTIVE DATE` AT MOST (Date OF 28, 8, 2022)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NONIDENTCOLUMN] blocking — decision_financial_statements_required
       `(`aggregate offering amount` OF offering) GREATER THAN `tier 1 ceiling`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted

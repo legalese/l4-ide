@@ -231,7 +231,7 @@
       <requiredInput href="#input_amendment"/>
     </informationRequirement>
     <literalExpression id="decision_the_rules_in_force_include_literal">
-      <text>(DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL OF amendment)</text>
+      <text>RULES_EFFECTIVE_DATE &gt;= amendment</text>
     </literalExpression>
   </decision>
   <decision id="decision_offering_maximum_in_a_12_month_period" name="offering_maximum_in_a_12_month_period" label="offering maximum in a 12-month period">
@@ -1258,7 +1258,7 @@
   <decision id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window" name="the_rule_date_is_inside_the_COVID_19_temporary_rules_window" label="the rule date is inside the COVID-19 temporary rules window">
     <variable id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_var" name="the_rule_date_is_inside_the_COVID_19_temporary_rules_window" label="the rule date is inside the COVID-19 temporary rules window" typeRef="boolean"/>
     <literalExpression id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_literal">
-      <text>(DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL OF (Date OF 4, 5, 2020)) AND (DATE_SERIAL OF `RULES EFFECTIVE DATE`) AT MOST (DATE_SERIAL OF (Date OF 28, 8, 2022))</text>
+      <text>`RULES EFFECTIVE DATE` AT LEAST (Date OF 4, 5, 2020) AND `RULES EFFECTIVE DATE` AT MOST (Date OF 28, 8, 2022)</text>
     </literalExpression>
   </decision>
   <decision id="decision_financial_statements_required" name="financial_statements_required" label="financial statements required">
