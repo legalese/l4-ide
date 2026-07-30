@@ -259,12 +259,20 @@ for; §4.6 makes it a test rather than a hope.
 **Two seams Track E genuinely does depend on**, neither of which appears in SPEC.md's Track E
 row (now amended):
 
-- **Seam S6 — pan/zoom.** Open, and total (§0). The R1 layout spike measured p99 width 2882px,
-  max 4372px (E1-IDE-INTEGRATION.md:202-208). In a wiki column that is not optional.
-- **Seam S8 — baked palettes.** `ladder-svg/src/svg.ts:20,29` define `SCREEN`/`INK` as
-  constants and `svg.ts:52` emits `fill="#ffffff"` inline. A widget pasted into a host page
-  whose colours we do not control reads as a foreign white rectangle. Ladder Step 2's theming
-  half is still open (E1-IDE-INTEGRATION.md:102). Whether it gates E1 or trails it is **R8**.
+- **Seam S6 — pan/zoom.** ✅ **CLOSED in ladder Step 4** (`<hash>`). It was open and total
+  (§0), and the R1 layout spike measured p99 width 2882px, max 4372px
+  (E1-IDE-INTEGRATION.md:214-220), which in a wiki column is not optional. It is now
+  hand-rolled `viewBox` pan/zoom/fit in `ladder-svg` — pure arithmetic in `src/viewport.ts`,
+  listeners in `controller.ts`, **no dependency**, and a plain wheel deliberately left to the
+  page **unless the ladder has focus**, exactly as §3.3 words it (and note that a click
+  focuses the host, since the controller makes it `tabindex="0"`).
+- **Seam S8 — baked palettes.** ⚠️ **HALF-CLOSED in ladder Step 4** (`<hash>`). The palette is
+  a **parameter** now, not a bake: all 26 colours the emit names are fields of an exported
+  `Palette`, `sceneToSvg` takes one, `LadderController.setTheme` re-themes a live diagram
+  without remounting it, and `DARK_PALETTE` is the proof — so a widget pasted into
+  a host page whose colours we do not control no longer has to read as a foreign white
+  rectangle. What remains with ladder Step 2 is the CSS-custom-property emit and
+  `theme="auto"` (E1-IDE-INTEGRATION.md:102). **R8 is answered** — it does not gate E1.
 
 And one that is half-open in an interesting direction: **seam S4**'s model half already
 shipped — `ladder-model.ts:184` returns `Map<NodeId, ElicitationMark>` — while the render half
@@ -325,18 +333,36 @@ implementable, and there is one render path.
                  └──────────────────────────────────────┘
 ```
 
-Proposed surface, deliberately small:
+The surface, deliberately small. **AS BUILT in ladder Step 4** (`<hash>`) — this block was
+"proposed" until then; the three additions since, and why, are noted inline.
 
 ```ts
 export interface LadderControllerOpts {
   /** Metrics for layout. Default `canvasMetrics()`; a headless test injects `measure`. */
   readonly metrics?: TextMetrics;
-  readonly theme?: Theme;
-  /** Off ⇒ no listeners attached at all: a static picture (see `interactive` in §4.2). */
+  /** `"screen"` | `"ink"` | a full `Palette` (seam S8's contract, landed in Step 4). */
+  readonly theme?: Theme | Palette;
+  /** Off ⇒ no listeners attached at all: a static picture (see `interactive` in §4.2).
+   *  It also turns `panZoom` off by default, so that §4.2's stated contract — "no listeners,
+   *  **no pan/zoom**, no cursor change" — is what `{ interactive: false }` actually produces.
+   *  CLARIFIED in Step 4: the two used to default independently, which meant a static embed
+   *  silently got the pan/zoom sizing (`height:100%`, a definite-height requirement on the
+   *  host) with no gesture and no observer. `{ interactive: false, panZoom: true }` remains
+   *  reachable and means a fitted-but-static picture. */
   readonly interactive?: boolean;
   readonly animate?: boolean; // FLIP; default true
-  readonly panZoom?: boolean; // default true
+  readonly panZoom?: boolean; // defaults to whatever `interactive` is
+  readonly zoomLimits?: ZoomLimits; // multiples of the FIT scale; default {min:.5,max:8}
   readonly onAct?: (act: ClickAct) => void;
+  /**
+   * ADDED in Step 4. Called once the new `<svg>` is in the host and sized, BEFORE the FLIP
+   * invert. The one hook a host needs to decorate individual nodes it cannot express as a
+   * `ViewSpec` — `standalone/playground.ts` marks its hydratable refs `lad-ref` and its
+   * hydrated headings `lad-hydrated` this way, and without the hook that behaviour would
+   * have had to move into the controller, which does not know what a "ref" is. Do not
+   * mutate geometry here: the FLIP baseline is already captured.
+   */
+  readonly onRender?: (svg: SVGSVGElement, scene: Scene) => void;
 }
 
 export declare class LadderController {
@@ -349,15 +375,41 @@ export declare class LadderController {
   /** Escape hatch for a caller that already has a Scene (a worker, a cache, a golden test).
    *  Bypasses metrics entirely; still FLIPs, still wires clicks. */
   renderScene(scene: Scene): void;
-  /** Swap the source tree (a live re-fetch). Invalidates the FLIP baseline. */
-  setFunDecl(fn: FunDecl): void;
+  /**
+   * Swap the source tree (a live re-fetch). Invalidates the FLIP baseline and refits.
+   *
+   * `keepBaseline` ADDED in Step 4: `standalone/playground.ts` rebuilds its display tree on
+   * EVERY render (hydration splices a referenced DECIDE in place), so it calls this every
+   * frame — and there the FLIP is exactly the affordance that shows what happened. A caller
+   * that is genuinely changing subject passes nothing and gets a clean refit.
+   */
+  setFunDecl(fn: FunDecl, keepBaseline?: boolean): void;
+  /**
+   * ADDED in Step 4. Re-theme in place (seam S8). A host's theme can flip while the diagram
+   * is on screen — a dark-mode toggle here, a `--vscode-*` change under Step 5 — and a
+   * `theme` that is only readable at construction is not a parameter, it is a bake with an
+   * extra step: remounting to recolour throws away the user's pan/zoom and the FLIP
+   * baseline. Re-emits the last Scene with no animation and no refit, so nothing moves but
+   * the colours. A no-op before the first draw.
+   */
+  setTheme(theme: Theme | Palette): void;
   fit(): void; // viewBox := scene bounds, centred
-  zoom(factor: number, at?: Pt): void;
+  zoom(factor: number, at?: Pt): void; // `at` in VIEWPORT px; default = the centre
   pan(dx: number, dy: number): void;
   toSvgString(): string; // the last emitted string, verbatim
-  destroy(): void; // remove listeners, cancel rAF, clear host
+  /** Remove listeners, disconnect the observer, cancel the rAFs, clear the host — and
+   *  PUT THE HOST BACK: the constructor writes `overflow`, `position` and (when it was
+   *  absent) `tabindex` onto the caller's element, and a host that outlives its
+   *  controller — Track E swapping renderers — must not keep a stray tab stop. */
+  destroy(): void;
 }
 ```
+
+> **As built, one structural note.** The controller's PURE halves were split out rather than
+> kept inline: `src/viewport.ts` (the viewBox arithmetic, seam S6) and `src/flip.ts` (the FLIP
+> index + delta) are DOM-free and carry 21 of the step's tests between them. §3.1's "every
+> browser-facing behaviour, and no framework" is unchanged by that — what is left in
+> `controller.ts` is exactly the browser-facing part, which is the point.
 
 `ClickAct` is `ladder-core/src/types.ts:241` unchanged — the controller reads the
 `data-value` / `data-fold` attributes `svg.ts:151,158-160` already emits and reports them; it
@@ -406,22 +458,40 @@ Everything except FLIP and pan/zoom is then testable under `tsx --test` with an 
 
 ### 3.5 Landing checklist
 
-- `ts-shared/l4-ladder-visualizer/package.json` **does not declare `@repo/ladder-core`**, yet
-  `src/lib/model/ladder-model.ts:22` imports it. It resolves only through npm-workspace
-  hoisting. `turbo.json` derives `build`/`check`'s `dependsOn: ["^build"]` from declared deps,
-  so ladder-core's `dist/` is not ordered before this package — masked today only because CI
-  runs a full `npm run build` first. Step 4 must add **both** `@repo/ladder-core` and
-  `@repo/ladder-svg` there.
-- **No tsconfig change is needed for DOM types** (§2): ladder-svg sets no `lib`, target
-  ES2020, so `lib.es2020.full.d.ts` supplies `HTMLElement`/`SVGSVGElement`/`PointerEvent`
-  already. Assert this rather than rediscover it — but if a future commit adds an explicit
+- ✅ **DONE in Step 4** (`<hash>`). `ts-shared/l4-ladder-visualizer/package.json` did not
+  declare `@repo/ladder-core`, yet `src/lib/model/ladder-model.ts:22` imported it; it resolved
+  only through npm-workspace hoisting, and `turbo.json` derives `build`/`check`'s
+  `dependsOn: ["^build"]` from declared deps, so ladder-core's `dist/` was not ordered before
+  this package. **Both** `@repo/ladder-core` and `@repo/ladder-svg` are now declared, and the
+  `package-lock.json` diff is exactly those two lines. The ordering fix is observable: the
+  root `check` went from 22 tasks to 23.
+- ✅ **CONFIRMED in Step 4.** **No tsconfig change is needed for DOM types** (§2): ladder-svg
+  sets no `lib`, target ES2020, so `lib.es2020.full.d.ts` supplies
+  `HTMLElement`/`SVGSVGElement`/`PointerEvent`/`WheelEvent`/`ResizeObserver` already.
+  `controller.ts` compiles under the unmodified config. If a future commit adds an explicit
   `lib`, `controller.ts` is what breaks first.
-- Neither ladder package has a `lint` script or an eslint config, so `turbo lint` silently skips
-  them. Adding the controller is a good moment to stop that being true, or to write down that
-  it is deliberate.
-- The repo has a known `package.json`/`package-lock.json` drift on `unstable`; any new
-  dependency blocks the merge queue. The controller adds none, which is one more reason not to
-  reach for a pan/zoom library.
+- ⏭️ **DELIBERATELY NOT TAKEN in Step 4** (`<hash>`), and recorded here rather than left
+  ambiguous: neither `@repo/ladder-core` nor `@repo/ladder-svg` has a `lint` script or an
+  eslint config, so `turbo lint` silently skips both. Adding eslint to two packages is a
+  config change with its own churn and its own failure modes, unrelated to Step 4's risk. It
+  stays open. **Note the asymmetry, because it bit:** `l4-ladder-visualizer` — the OTHER
+  package Step 4 touches — does have `"lint": "eslint --max-warnings=0 ."`, and `npm run lint`
+  is one of the five commands `.github/workflows/pr-checks.yml` runs. Step 4's first pass
+  never ran it and it failed: `partial-eval-sidebar.svelte`'s `<script lang="ts"
+generics="C = unknown">` is the repo's FIRST use of the `generics=` attribute, and
+  `no-undef` reported `'C' is not defined`. The cause is a config gap, not a code defect —
+  typescript-eslint's compatibility layer disables `no-undef` for `.ts`/`.tsx`/`.mts`/`.cts`
+  and not for `.svelte`, which is TS-parsed here but outside that glob. Turned off for
+  `.svelte` in `l4-ladder-visualizer/eslint.config.js` with the diagnosis written next to it.
+  Scoped to that package on purpose: fixing it in `@repo/eslint-config/svelte` — the right
+  home — makes two pre-existing `eslint-disable-next-line no-undef` directives in
+  `ts-apps/webview` redundant and fails that package for the unused directives, and Step 4
+  does not touch `ts-apps/`. **Follow-up:** hoist the rule into the shared config and delete
+  those two directives together.
+- ✅ **HELD in Step 4.** The repo has a known `package.json`/`package-lock.json` drift history
+  on `unstable`; any new third-party dependency blocks the merge queue. The controller adds
+  **none** — pan/zoom is ~120 lines of hand-rolled arithmetic — which is one more reason not to
+  reach for a pan/zoom library. The only lockfile change is the two workspace deps above.
 
 ---
 
@@ -459,21 +529,21 @@ All are observed (`observedAttributes`) and reflected to same-named properties. 
 attributes are ignored, never fatal. **All configuration is on the element**; nothing is read
 off the script tag (§1.2).
 
-| Attribute     | Values                                                       | Default         | Notes                                                                                      |
-| ------------- | ------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------ |
-| `src`         | URL                                                          | —               | **static mode**: fetch a `FunDecl` JSON (§5.1)                                             |
-| `endpoint`    | origin or base URL of a `jl4-service`                        | —               | **live mode** (§5.2); see **R10** before pointing it anywhere public                       |
-| `deployment`  | deployment id                                                | —               | live mode; required with `endpoint`                                                        |
-| `decision`    | function name, as it appears in L4 (spaces allowed)          | —               | live mode; URL-encoded into the path                                                       |
-| `theme`       | `screen` \| `ink` \| `auto`                                  | `screen`        | `screen`/`ink` are `ladder-core`'s `Theme` (`types.ts:160`); `auto` needs seam S8 → **R8** |
-| `connective`  | `on-wire` \| `above-wire` \| `below-wire` \| `straddle-wire` | `straddle-wire` | `types.ts:177`                                                                             |
-| `scale`       | `Scale` (`types.ts:158`)                                     | `full`          |                                                                                            |
-| `interactive` | boolean attribute                                            | present ⇒ on    | absent ⇒ a picture: no listeners, no pan/zoom, no cursor change                            |
-| `values`      | `atomId=T,atomId=F` — see the escaping rule below            | —               | initial valuation, resolved through `nodesByAtomId` (`viz-adapter.ts:64-69`)               |
-| `fold`        | comma-separated `NodeId`s — **pinned payloads only**         | —               | initial `foldSet`; see the stability note below                                            |
-| `max-height`  | CSS length                                                   | none            | viewport for pan/zoom; without it the element is its natural height                        |
-| `sentences`   | boolean attribute                                            | absent          | render `expandSentences` (`sentences.ts:97`) beneath the diagram                           |
-| `caption`     | text                                                         | —               | a **convenience** for the JS path; the real caption is a light-DOM child (§5.3)            |
+| Attribute     | Values                                                       | Default         | Notes                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src`         | URL                                                          | —               | **static mode**: fetch a `FunDecl` JSON (§5.1)                                                                                                                                                                                                                                             |
+| `endpoint`    | origin or base URL of a `jl4-service`                        | —               | **live mode** (§5.2); see **R10** before pointing it anywhere public                                                                                                                                                                                                                       |
+| `deployment`  | deployment id                                                | —               | live mode; required with `endpoint`                                                                                                                                                                                                                                                        |
+| `decision`    | function name, as it appears in L4 (spaces allowed)          | —               | live mode; URL-encoded into the path                                                                                                                                                                                                                                                       |
+| `theme`       | `screen` \| `ink` \| `auto`                                  | `screen`        | `screen`/`ink` are `ladder-core`'s `Theme` (`types.ts:160`), and since ladder Step 4 the controller also accepts a whole `Palette` — which is how a host reaches a third look without a new string. `auto` is still unimplemented and still waits on Step 2's CSS half → **R8** (answered) |
+| `connective`  | `on-wire` \| `above-wire` \| `below-wire` \| `straddle-wire` | `straddle-wire` | `types.ts:177`                                                                                                                                                                                                                                                                             |
+| `scale`       | `Scale` (`types.ts:158`)                                     | `full`          |                                                                                                                                                                                                                                                                                            |
+| `interactive` | boolean attribute                                            | present ⇒ on    | absent ⇒ a picture: no listeners, no pan/zoom, no cursor change                                                                                                                                                                                                                            |
+| `values`      | `atomId=T,atomId=F` — see the escaping rule below            | —               | initial valuation, resolved through `nodesByAtomId` (`viz-adapter.ts:64-69`)                                                                                                                                                                                                               |
+| `fold`        | comma-separated `NodeId`s — **pinned payloads only**         | —               | initial `foldSet`; see the stability note below                                                                                                                                                                                                                                            |
+| `max-height`  | CSS length                                                   | none            | viewport for pan/zoom; without it the element is its natural height                                                                                                                                                                                                                        |
+| `sentences`   | boolean attribute                                            | absent          | render `expandSentences` (`sentences.ts:97`) beneath the diagram                                                                                                                                                                                                                           |
+| `caption`     | text                                                         | —               | a **convenience** for the JS path; the real caption is a light-DOM child (§5.3)                                                                                                                                                                                                            |
 
 **The `values` microformat has an escaping rule, and it is not optional.** Keys are
 `atomId`s; an `atomId` is an arbitrary L4-derived string and may contain `,` or `=`. So:
@@ -982,11 +1052,18 @@ Criteria 8 and 9 do **not** gate M2 or M3 (§1.3). They gate the distribution cl
   half of seam S4, which does not exist (`ViewSpec` has no `marks`; `ClickAct` has two verbs).
   If they gate, E1 waits on ladder 6a. Leaning: they gate E2/live (where the ask ranking is on
   the wire for free) and not E1a/static.
-- **R8 — does seam S8 theming gate E1** (§2). Palettes are baked inline (`svg.ts:20,29,52`). A
-  white rectangle in a dark host page is bad; a _wrong_ diagram is worse, and theming is not
-  correctness. But `theme="auto"` (§4.2) is unimplementable without it. Leaning: E1 ships with
-  `screen`/`ink` only and `auto` lands with S8. Watch the exhibit-churn risk
-  E1-IDE-INTEGRATION.md:102 flags — default output should stay byte-identical.
+- **R8 — ANSWERED 2026-07-30 (ladder Step 4, `<hash>`). It does not gate E1, because the half
+  that mattered landed.** The palette is no longer baked: it is a **parameter**. `Palette` is
+  exported from `@repo/ladder-svg` with all 26 colours the emit names (the seven that were
+  already a `Palette` plus the nineteen that were inline literals), `sceneToSvg(scene, theme
+| palette)` takes one, and `DARK_PALETTE` ships as the second implementation. So a host that
+  already knows its own theme — which a wiki embed does — passes a `Palette` and gets a legible
+  diagram **today**, without `auto`; and `LadderController.setTheme` lets it change its mind
+  later without remounting, which is what a host-side dark-mode toggle actually needs. What is still missing is the CSS-custom-property emit (a
+  host restyling without a re-render) and `theme="auto"` itself (§4.2); both stay with ladder
+  Step 2, and `auto` still waits on them. The exhibit-churn risk E1-IDE-INTEGRATION.md:102
+  flags is **discharged**: default output is byte-identical, guarded by a source scan in
+  `ladder-svg/test/palette.test.ts` that fails if any colour is ever re-baked into `svg.ts`.
 - **R9 — leaf-label wrapping.** The ladder R1 spike found 17 of the 22 widest diagrams have
   exactly ONE leaf, max 4372px, because non-boolean constructs collapse to a source-text ribbon
   (E1-IDE-INTEGRATION.md:220-238). GuardedRows (D0, merged) removes the _typical_ case; the tail
