@@ -1,0 +1,57 @@
+{
+  "note": [
+    "Zone-boundary probe: can the per-spouse predicate of 'if either spouse",
+    "earns < $100,000 or is a Qualifying Candidate, the children are eligible'",
+    "be a DECISION TABLE rather than an opaque satisfies-clause?  One cases",
+    "file serves three models that must agree on every answer:",
+    "  spouse-inline.dmn         control - predicate inline in the quantifier",
+    "  spouse-context-table.dmn  Placement B - table bound in a boxed context",
+    "  spouse-bkm-table.dmn      Placement A - table in a BKM's encapsulatedLogic",
+    "Case E pins the boundary: income exactly 100000 is NOT '< 100000'."
+  ],
+  "cases": [
+    {
+      "name": "A. first spouse under the income threshold",
+      "context": {
+        "spouses": [
+          { "income": 50000, "qualifying_candidate": false },
+          { "income": 150000, "qualifying_candidate": false }
+        ]
+      },
+      "expect": { "children_eligible": true }
+    },
+    {
+      "name": "B. both high earners but one is a Qualifying Candidate",
+      "context": {
+        "spouses": [
+          { "income": 150000, "qualifying_candidate": false },
+          { "income": 120000, "qualifying_candidate": true }
+        ]
+      },
+      "expect": { "children_eligible": true }
+    },
+    {
+      "name": "C. sole high earner, not a Qualifying Candidate",
+      "context": {
+        "spouses": [
+          { "income": 150000, "qualifying_candidate": false }
+        ]
+      },
+      "expect": { "children_eligible": false }
+    },
+    {
+      "name": "D. empty household: existential over [] is false",
+      "context": { "spouses": [] },
+      "expect": { "children_eligible": false }
+    },
+    {
+      "name": "E. boundary: exactly 100000 does not satisfy '< 100000'",
+      "context": {
+        "spouses": [
+          { "income": 100000, "qualifying_candidate": false }
+        ]
+      },
+      "expect": { "children_eligible": false }
+    }
+  ]
+}
