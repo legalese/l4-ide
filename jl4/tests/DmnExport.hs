@@ -34,6 +34,7 @@ import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (Severity (..))
 
+import Data.Time.Calendar (fromGregorian)
 import System.FilePath ((</>), takeBaseName)
 import Test.Hspec
 import Test.Hspec.Golden
@@ -1704,6 +1705,260 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     [n | n <- notes, n.code == "D-FEELNAME"] `shouldBe` []
     [n | n <- notes, n.code == "D-RENAME"] `shouldSatisfy` (not . null)
 
+  ----------------------------------------------------------------------
+  -- Law time (spec §15): binding, interval tables, the D-RULEDATE family
+  ----------------------------------------------------------------------
+  describe "law time" $ do
+    let gstDrg = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "gst-rate.l4")
+          pure (drgAsCli "gst-rate.l4" src)
+        corpusDrg = do
+          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          pure (drgAsCli "regcf.l4" src)
+        notOkDrg n = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> n)
+          pure (drgAsCli n src)
+
+    -- D1. Before this, `RULES_EFFECTIVE_DATE` occurred in the shipped corpus
+    -- golden exactly once and was bound by NOTHING -- a free FEEL name no
+    -- engine can resolve, with no note anywhere saying so.
+    it "binds the rule date as one date-typed inputData (D1)" $ do
+      drg <- gstDrg
+      let ins = [i | NodeInputData i <- drg.drgNodes, i.idFeelName == "RULES_EFFECTIVE_DATE"]
+      map (.idType) ins `shouldBe` [DmnDate]
+      map (.idName) ins `shouldBe` ["RULES EFFECTIVE DATE"]
+      map (.idId) ins `shouldBe` ["input_rules_effective_date"]
+
+    -- Edges are computed at IR level over `freeRefs`, never by scanning the
+    -- emitted FEEL: the corpus's COVID-window decision reads law time twice and
+    -- its emitted text used to contain no `RULES_EFFECTIVE_DATE` token at all.
+    it "gives every decision that mentions the rule date a requiredInput edge (D1)" $ do
+      drg <- gstDrg
+      let mentions d = case d.dcnLogic of
+            LogicLiteral e -> Text.isInfixOf "RULES_EFFECTIVE_DATE" e.feText
+            LogicTable t ->
+              any (Text.isInfixOf "RULES_EFFECTIVE_DATE" . (.feText) . (.icExpr)) t.dtInputs
+      [ d.dcnName
+        | d <- drgDecisions drg
+        , mentions d
+        , RequiredInput "input_rules_effective_date" `notElem` d.dcnRequirements
+        ] `shouldBe` []
+
+    -- §15.5's invariant, asserted over EVERY golden subject rather than left to
+    -- the goldens: no emitted model may reference law time without either the
+    -- bound input plus its Advisory, or the Blocking finding.
+    it "never references law time without a binding or a Blocking note (§15.5)" $
+      forM_ goldenSubjects \(srcPath, stem, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let drg   = drgAsCli srcPath src
+            xml   = emitDrg drg
+            notes = (dmnReport drg).notes
+            bound = not (null [i | NodeInputData i <- drg.drgNodes
+                                 , i.idFeelName == "RULES_EFFECTIVE_DATE"])
+            ruleDate = [n | n <- notes, n.code == "D-RULEDATE"]
+            unbound  = [n | n <- notes, n.code == "D-RULEDATE-UNBOUND"]
+        when (Text.isInfixOf "RULES_EFFECTIVE_DATE" xml) $
+          unless ((bound && length ruleDate == 1) || not (null unbound)) $
+            expectationFailure
+              (stem <> " references law time with neither a bound input + one \
+                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Blocking")
+
+    -- D2, the PREDICATE idiom. The cells are asserted VERBATIM because the
+    -- closed-low/open-high convention is the whole content of the lowering.
+    it "lowers the predicate idiom to a UNIQUE date-interval table (D2)" $ do
+      drg <- gstDrg
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitUnique
+          map (.icType) t.dtInputs `shouldBe` [DmnDate]
+          map (.feText) (map (.icExpr) t.dtInputs) `shouldBe` ["RULES_EFFECTIVE_DATE"]
+          map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+            [ ">= date(\"2024-01-01\")"
+            , "[date(\"2023-01-01\")..date(\"2024-01-01\"))"
+            , "[date(\"1994-04-01\")..date(\"2023-01-01\"))"
+            , "< date(\"1994-04-01\")"
+            ]
+          -- R9: the OTHERWISE is a floor ROW, so §3.3.1's SHALL forbids a
+          -- defaultOutputEntry on what is now a complete table.
+          t.dtOutput.ocDefault `shouldBe` Nothing
+          t.dtAnnotations `shouldBe` ["regime"]
+          map (length . (.drAnnotations)) t.dtRules `shouldBe` [1, 1, 1, 1]
+
+    -- The inline idiom's right-hand side may be a NAMED regime constant or a
+    -- bare `Date d m y`, and the exhibit writes one of each: the inline form is
+    -- the predicate form with the helper elided, so it must fold the same way
+    -- and reach the same one-hop resolver. An earlier version called the bare
+    -- literal fold here, which refused every inline chain written against a
+    -- named constant while the refusal MESSAGE said such constants are folded.
+    it "lowers the inline idiom the same way, named constant or literal (D2)" $ do
+      drg <- gstDrg
+      case (decisionNamed "tourist refund minimum spend" drg).dcnLogic of
+        LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitUnique
+          map (.icType) t.dtInputs `shouldBe` [DmnDate]
+          map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+            [ ">= date(\"2024-01-01\")"
+            , "[date(\"1994-04-01\")..date(\"2024-01-01\"))"
+            , "< date(\"1994-04-01\")"
+            ]
+          t.dtOutput.ocDefault `shouldBe` Nothing
+          -- ...and the constant the arm NAMED reaches the annotation column,
+          -- while the arm written as a literal has nothing but its day.
+          concat (take 1 (map (.drAnnotations) t.dtRules))
+            `shouldSatisfy` any (Text.isInfixOf "the 2024 rate change")
+          concat (take 1 (drop 1 (map (.drAnnotations) t.dtRules)))
+            `shouldBe` ["from 1994-04-01"]
+
+    -- The refusals. Both must ALSO still ship the sound fallback, so the
+    -- artifact is not silently missing a decision.
+    it "refuses a mis-ordered dated BRANCH, loudly (R10)" $ do
+      drg <- notOkDrg "dated-chain-misordered.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "1994-04-01")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "2023-01-01")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not strictly earlier")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+    -- §15.4's leniency ruling, end to end: `Date 32 1 2024` ROLLS in L4, and
+    -- the exporter refuses to fold it rather than putting a day nobody wrote
+    -- into an interval endpoint.
+    it "refuses an unfoldable (rolling) arm date, naming it (§15.4)" $ do
+      drg <- notOkDrg "dated-chain-rolling-date.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not a foldable date constant")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "the rolled change")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+    it "refuses duplicate dates by the same predicate (R10)" $ do
+      drg <- notOkDrg "dated-chain-duplicate-date.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not strictly earlier")
+
+    -- The ALL-OR-NOTHING arm, which nothing else reaches. This is NOT the same
+    -- code path as the corpus's `financial statements required` below: that
+    -- chain matches ZERO rows and is therefore `NotDated` (existing path,
+    -- existing findings, no note), whereas a chain that matches SOME rows and
+    -- not others is a Blocking refusal -- because mixing a law-time arm with an
+    -- ordinary one is exactly how a temporal bug hides.
+    it "refuses a chain that mixes rule-date arms with an ordinary one (R10)" $ do
+      drg <- notOkDrg "dated-chain-mixed.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "no single date axis")
+      -- The ordinal is an index into the CHAIN's rows, so it names the same arm
+      -- here as it would in an ordering refusal on the same file.
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "arm 2 of the chain")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "transitional relief")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+    -- `rowsToDmnWith'` refuses a deontic body BEFORE it builds anything, and
+    -- the dated path does not go through `rowsToDmnWith'`. Without the matching
+    -- refusal in `datedChain`, a law-time-guarded obligation -- the shape
+    -- temporal rule-versioning most invites -- would become a UNIQUE table of
+    -- verbatim L4 obligations, and the reader would be told "the output entry
+    -- is L4 source, not FEEL" instead of "DMN cannot hold an obligation".
+    it "keeps a law-time-guarded OBLIGATION off the dated path (R10)" $ do
+      drg <- notOkDrg "dated-chain-regulative.l4"
+      let notes = (dmnReport drg).notes
+      [n | n <- notes, n.code == "D-DATEDCHAIN"] `shouldBe` []
+      case (decisionNamed "filing duty" drg).dcnLogic of
+        LogicTable _ ->
+          expectationFailure "a deontic body was tabulated; RegulativeBody stopped applying"
+        LogicLiteral _ ->
+          [n.message | n <- notes, n.code == "D-LITERALEXPR"]
+            `shouldSatisfy` any (Text.isInfixOf "deontic (regulative) body")
+
+    -- The nested-chain test counts the OTHERWISE as an arm body. Without that,
+    -- `flattenGuarded`'s `expandOtherwise` never runs on a dated chain and the
+    -- whole inner chain collapses into ONE floor-row output entry -- silently,
+    -- because `datedTable` passes no capped bodies so no D-FLATTENCAP can fire.
+    -- Two rules and UNIQUE would be the WRONG artifact here; three and FIRST is
+    -- what the source says.
+    it "declines a chain whose OTHERWISE is itself a chain (R10)" $ do
+      drg <- notOkDrg "dated-chain-nested-otherwise.l4"
+      [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"] `shouldBe` []
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          length t.dtRules `shouldSatisfy` (> 2)
+        LogicLiteral _ -> expectationFailure "expected the ordinary flattened table"
+
+    -- The corpus's named witnesses that reference law time and are NOT dated
+    -- chains. §15.8 says they must not move. NB this decision matches zero
+    -- rule-date arms, so it is `NotDated` rather than a refusal -- the mixed
+    -- (partial-match) arm is covered by the not-ok fixture above.
+    it "leaves a chain with no rule-date guard on the ordinary path (§15.8)" $ do
+      drg <- corpusDrg
+      case (decisionNamed "financial statements required" drg).dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "expected the ordinary table"
+
+    it "fires D-RULEDATE-UNBOUND on every EVAL UNDER RULES EFFECTIVE AT decision" $ do
+      drg <- corpusDrg
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+      ns `shouldSatisfy` (not . null)
+      map (.severity) ns `shouldSatisfy` all (== Blocking)
+
+    -- ...and the note's CLAIM is scoped to what was emitted. "No DMN engine can
+    -- evaluate this decision" is true of a boxed literal and false of a
+    -- decision that still ships a table (the rebinding can sit inside an arm
+    -- body). Asserted as an invariant over every subject rather than as a fact
+    -- about today's corpus, which is what the earlier version did.
+    it "scopes D-RULEDATE-UNBOUND's claim to what was emitted (§15.5)" $
+      forM_ goldenSubjects \(srcPath, stem, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let drg  = drgAsCli srcPath src
+            ns   = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+            lits = [d.dcnId | d <- drgDecisions drg, LogicLiteral _ <- [d.dcnLogic]]
+        forM_ ns \n ->
+          unless (if n.element `elem` lits
+                    then Text.isInfixOf "no DMN engine can evaluate this decision" n.lost
+                    else Text.isInfixOf "a sub-expression of" n.message) $
+            expectationFailure
+              (stem <> ": D-RULEDATE-UNBOUND on " <> Text.unpack n.element
+                 <> " claims more than the emitted logic supports")
+
+    it "carries the @ref citation into the annotation column (§15.9)" $ do
+      drg <- corpusDrg
+      case (decisionNamed "offering maximum in a 12-month period" drg).dcnLogic of
+        LogicTable t ->
+          concatMap (.drAnnotations) t.dtRules `shouldSatisfy`
+            any (Text.isInfixOf "86 FR 3496")
+        LogicLiteral _ -> expectationFailure "expected the dated table"
+
+    ----------------------------------------------------------------------
+    -- units under the above
+    ----------------------------------------------------------------------
+    it "renders a FEEL date literal and a half-open date interval" $ do
+      renderFeelValue (VDate (fromGregorian 2024 1 1)) `shouldBe` "date(\"2024-01-01\")"
+      renderUnaryTest
+        (TestRange True (VDate (fromGregorian 1994 4 1)) (VDate (fromGregorian 2024 1 1)) False)
+        `shouldBe` "[date(\"1994-04-01\")..date(\"2024-01-01\"))"
+
+    -- dmnmd has no date datatype at all, so a date cell must be REFUSED rather
+    -- than emitted and then misread by dmnmd's numeric parser.
+    it "gives dmnmd no form for a date cell" $ do
+      drg <- gstDrg
+      let md = emitMarkdown drg
+      md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      [ n.code
+        | n <- (markdownReport drg).notes
+        , n.code == "D-MD-CELLSYNTAX"
+        ] `shouldSatisfy` (not . null)
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -1731,13 +1986,22 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 -- the corpus, @Regulation Crowdfunding (17 CFR Part 227)@ in this table, and
 -- @regcf@ from the CLI.
 --
--- Two subjects, and the difference between them is the whole point:
+-- Four subjects, and the difference between them is the whole point:
 --
 -- * @dmn\/reg-cf.l4@ is the SHAPE exhibit — five decisions chosen so the
 --   goldens show every outcome the exporter has, written module-level-scalar
 --   (@ASSUME@) style because that is the program model DMN itself has. Its
 --   figures are illustrative and its own header says so.
--- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,268 lines and 102
+-- * @dmn\/gst-rate.l4@ is the DATED-REGIME exhibit — the smallest module that
+--   exercises law time end to end (spec §15): two rule-date chains, one in the
+--   PREDICATE idiom and one INLINE — and the inline one writes an arm against a
+--   NAMED regime constant and an arm against a bare @Date d m y@, because those
+--   are the two things an inline right-hand side may be and they reach different
+--   code. Both lower to a single-column @UNIQUE@ table over
+--   @RULES_EFFECTIVE_DATE@ with half-open date intervals, plus one downstream
+--   arithmetic decision so a date is shown driving a number driving a number.
+--   It is the only subject with an engine leg whose cases FEED DATES.
+-- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
 --   decisions since the rule-version axis landed — written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
 --   that costs: a DMN decision is a 0-ary variable, so every cross-decision
@@ -1751,6 +2015,10 @@ goldenSubjects =
   [ ( "dmn" </> "reg-cf.l4"
     , "reg-cf"
     , "the Reg CF shape exhibit"
+    )
+  , ( "dmn" </> "gst-rate.l4"
+    , "gst-rate"
+    , "the dated-regime exhibit"
     )
   , ( "legal" </> "regcf" </> "regcf.l4"
     , "regcf-corpus"
@@ -1857,6 +2125,12 @@ itemDefNamed :: Text -> Drg -> ItemDefinition
 itemDefNamed nm drg = case [i | i <- drg.drgItemDefs, i.idfName == nm] of
   (i : _) -> i
   []      -> error ("no itemDefinition named " <> show nm)
+
+-- | A rule's first (and, on a rule-date interval table, only) input cell.
+headTest :: DmnRule -> UnaryTest
+headTest r = case r.drInputs of
+  (t : _) -> t
+  []      -> error ("rule " <> show r.drId <> " has no input cell")
 
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of

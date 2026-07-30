@@ -3,26 +3,33 @@
 The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-superset
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
-There are **two** subjects, and the difference between them is the deliverable.
+There are **four** subjects here — `reg-cf.l4` (shape), `gst-rate.l4` (dated regime),
+`../legal/regcf/regcf.l4` (the real corpus) and `sumtype.l4` (data model) — and the
+difference between them is the deliverable.
 
-| File                              | What it is                                                                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| `reg-cf.l4`                       | the **shape** exhibit: five decisions, one of each shape the exporter can produce           |
-| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                                     |
-| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                                         |
-| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                                           |
-| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list                             |
-| `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each                       |
-| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 992-line corpus at `../legal/regcf/regcf.l4` |
+| File                              | What it is                                                                                   |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `reg-cf.l4`                       | the **shape** exhibit: five decisions, one of each shape the exporter can produce             |
+| `expected/reg-cf.dmn`             | the emitted DMN 1.3 XML                                                                       |
+| `expected/reg-cf.fidelity.txt`    | what the XML target could not carry                                                           |
+| `expected/reg-cf.dmn.md`          | the same module as dmnmd markdown                                                             |
+| `expected/reg-cf.md.fidelity.txt` | what the **markdown** target could not carry — a different list                               |
+| `reg-cf.cases.json`               | five input contexts + the value every decision must answer under each                         |
+| `gst-rate.l4`                     | the **dated-regime** exhibit: law time as a date axis (spec §15) — see below                  |
+| `gst-rate.cases.json`             | ten **rule dates** + every decision's answer under each; the dates are fed as `{"$date": …}`  |
+| `expected/gst-rate.*`             | its four artifacts — two `UNIQUE` date-interval tables, one `D-RULEDATE`, zero blocking on them |
+| `not-ok/dated-chain-*.l4`         | six negative fixtures: mis-ordered arms, duplicate dates, a rolling `Date 32 1 2024`, a mixed chain (all `D-DATEDCHAIN`), a law-time-guarded obligation, and a nested `OTHERWISE` (the last two must stay off the dated path entirely) |
+| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 1,241-line corpus at `../legal/regcf/regcf.l4`  |
 
-Both sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
+All four sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
 deleting a golden and re-running `cabal test jl4:jl4-test` twice.
 
 `reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program
 model DMN itself has, and its **figures are illustrative** — its own header says so, and
 it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
-and it is here to be honest about what the real thing costs: **73 decisions, 3 tables,
-70 boxed literal expressions, 61 `inputData` under 27 names, 84 blocking notes.** The
+and it is here to be honest about what the real thing costs. Measured 2026-07-31 on the
+shipped goldens: **102 decisions, 11 tables, 91 boxed literal expressions, 68 `inputData`,
+114 blocking notes.** The
 diagnosis is one sentence — a DMN decision is a 0-ary variable, so the house
 `GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
 and it is written up at `../legal/regcf/PROJECTIONS.md` §1, which also records what
@@ -83,6 +90,35 @@ decision table is for.
   earlier one did not fire. `First` already means that, and materialising the negated
   prefixes (which the ladder expansion has no choice but to do) would turn a readable
   table into a triangular mess.
+
+### The dated-regime exhibit (`gst-rate.l4`)
+
+`gst-rate.l4` is the smallest module that exercises **law time** end to end, and it is the
+one exhibit whose engine cases feed **dates**. Two chains, deliberately in the two idioms
+the recogniser admits:
+
+- **`GST rate percent`** — the PREDICATE idiom, as the Reg CF corpus writes it: a
+  one-parameter `DATE`-typed helper applied to named regime constants.
+- **`tourist refund minimum spend`** — the INLINE idiom: the same comparison with no
+  helper predicate, written once against a **named** regime constant and once against a
+  bare `Date d m y`. Those are the two things an inline right-hand side may be, and they
+  reach different code, so the exhibit writes one of each.
+
+Both lower to a **single-column `hitPolicy="UNIQUE"` table** over `RULES_EFFECTIVE_DATE`
+whose cells are half-open FEEL date intervals — `>= date("2024-01-01")`,
+`[date("2023-01-01")..date("2024-01-01"))`, and a floor row `< date("1994-04-01")` for the
+pre-commencement refusal. That is inside S-FEEL, so the table is gap/overlap-analysable by
+construction rather than by inspection.
+
+`GST payable on` is there to show a **date driving a number driving a number** across
+`informationRequirement` edges. `GST rate percent` has four rules and therefore **three
+seams**, and `gst-rate.cases.json` straddles every one of them with a day-of/day-before
+pair — that is what pins the closed-low/open-high convention. Straddling only the newest
+seam (which the first version did) leaves an off-by-one on the middle interval, or on the
+floor row, invisible.
+
+Both engines answer all ten: `70/70 value(s) as expected` on KIE 8.44.0.Final and on
+Camunda 8.7.6. See `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.
 
 ### The discriminator between the last two
 

@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -278,8 +280,69 @@ public final class CamundaDmnCheck {
       out.add(
           new Case(
               name,
-              (Map<String, Object>) c.getOrDefault("context", new LinkedHashMap<String, Object>()),
-              (Map<String, Object>) c.get("expect")));
+              convert((Map<String, Object>) c.getOrDefault("context", new LinkedHashMap<String, Object>())),
+              convert((Map<String, Object>) c.get("expect"))));
+    }
+    return out;
+  }
+
+  /**
+   * Rewrite the fixture's date tags into FEEL dates.
+   *
+   * <p>{@code {"$date": "YYYY-MM-DD"}} is the fixture vocabulary's only way to say "this is a FEEL
+   * date". Deliberately NOT an ISO-shape sniff on strings: both harnesses convert by DECLARED TYPE
+   * and never by appearance, and a sniff would silently retype any genuine string that happened to
+   * look like a date.
+   */
+  @SuppressWarnings("unchecked")
+  private static Object jsonToFeel(Object o) {
+    if (o instanceof Map) {
+      Map<String, Object> m = (Map<String, Object>) o;
+      if (m.size() == 1 && m.containsKey("$date")) {
+        return parseDateTag(m.get("$date"));
+      }
+      return convert(m);
+    }
+    if (o instanceof List) {
+      List<Object> l = new ArrayList<>();
+      for (Object x : (List<Object>) o) {
+        l.add(jsonToFeel(x));
+      }
+      return l;
+    }
+    return o;
+  }
+
+  /**
+   * The {@code {"$date": ...}} tag's ONE reading, with a malformed tag treated as a fixture error.
+   *
+   * <p>Kept character-for-character in step with {@code KieDmnCheck.parseDateTag}. The two used to
+   * disagree: this side tested {@code instanceof String}, so {@code {"$date": 20240101}} fell
+   * through to {@code convert} and was reported as an ordinary value mismatch, while the KIE side
+   * accepted any non-null node and died with a DateTimeParseException. A malformed fixture must
+   * produce the same, named, exit-2 fixture error on both engines.
+   */
+  private static LocalDate parseDateTag(Object v) {
+    if (v instanceof String) {
+      try {
+        return LocalDate.parse((String) v);
+      } catch (DateTimeParseException e) {
+        // fall through to the fixture-error path below
+      }
+    }
+    System.err.println(
+        "CamundaDmnCheck: `{\"$date\": ...}` wants an ISO-8601 YYYY-MM-DD string, got: " + v);
+    System.exit(2);
+    return null; // unreachable: System.exit does not return
+  }
+
+  private static Map<String, Object> convert(Map<String, Object> m) {
+    Map<String, Object> out = new LinkedHashMap<>();
+    if (m == null) {
+      return out;
+    }
+    for (Map.Entry<String, Object> e : m.entrySet()) {
+      out.put(e.getKey(), jsonToFeel(e.getValue()));
     }
     return out;
   }
@@ -298,6 +361,17 @@ public final class CamundaDmnCheck {
     }
     if (want instanceof Number && got instanceof Number) {
       return new BigDecimal(want.toString()).compareTo(new BigDecimal(got.toString())) == 0;
+    }
+    // MEASURED on jl4/tests-cli/fixtures/dmn-date-probe/date-axis.dmn, not inferred.
+    // A date-valued decision comes back differently from the two engines: KIE hands back a
+    // java.time.LocalDate, while zeebe-dmn serialises results through MessagePack, which has no
+    // date type, so the same decision arrives here as the String "2024-01-01". Both harnesses
+    // take a LocalDate from the fixture's {"$date": ...} tag, so without this branch the probe
+    // reported `3/6 value(s) as expected` on three correct answers.
+    // A date the engine ACCEPTS on the input side is a LocalDate on both engines; only the
+    // RESULT side differs, which is why the asymmetry is repaired here and not in jsonToFeel.
+    if (want instanceof LocalDate && got instanceof String) {
+      return want.toString().equals(got);
     }
     if (want instanceof List && got instanceof List) {
       List<?> a = (List<?>) want;
@@ -333,7 +407,7 @@ public final class CamundaDmnCheck {
     if (ctxFile == null) {
       return new LinkedHashMap<>();
     }
-    return JSON.readValue(ctxFile, Map.class);
+    return convert(JSON.readValue(ctxFile, Map.class));
   }
 
   private static String pad(String s, int n) {

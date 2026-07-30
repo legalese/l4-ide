@@ -139,6 +139,11 @@ python3 scratchpad/repair/nonartifacts.py scratchpad/ruling/mycorpus.jsonl
 The 30 timeouts are inside those columns, not additional to them. They are ten files × three targets;
 see §8 for which files, and for the load-dependence of that set.
 
+> **Measured before 2026-07-30.** Three codes postdate this census — `D-RULEDATE`,
+> `D-RULEDATE-UNBOUND` and `D-DATEDCHAIN` (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15) — and have no row
+> here; no EXPORTS/FILES/INSTANCES figures are invented for them. The "never fired" list below is a
+> claim about the **31 codes that existed when the census was taken**, not about the code set today.
+
 | CODE                  | SEV      | TARGET | EXPORTS | FILES | INSTANCES |
 | --------------------- | -------- | ------ | ------- | ----- | --------- |
 | `D-MD-NOLITERAL`      | blocking | dmn-md | 492     | 492   | 4269      |

@@ -146,8 +146,8 @@ renderTable t =
 mdCell :: UnaryTest -> Maybe Text
 mdCell = \case
   TestAny      -> Just "-"
-  TestEq v     -> Just (mdValue v)
-  TestCmp op v -> Just (cmp op <> " " <> mdValue v)
+  TestEq v     -> mdConstant v
+  TestCmp op v -> (\t -> cmp op <> " " <> t) <$> mdConstant v
   TestOneOf ts -> Text.intercalate ", " <$> traverse mdCell ts
   -- `not(...)` has no dmnmd form.
   TestNot _    -> Nothing
@@ -180,14 +180,75 @@ mdOutput ty e
  where
   txt = e.feText
 
--- | Values, sharing 'renderNumber' with the XML emitter so the two cannot drift
--- apart on what a number looks like. Strings differ deliberately: dmnmd reads a
--- bare token as a string, and a quoted one would keep its quotes.
-mdValue :: FeelValue -> Text
-mdValue = \case
-  VNum r  -> renderNumber r
-  VStr t  -> t
-  VBool b -> if b then "true" else "false"
+-- | A cell CONSTANT, sharing 'renderNumber' with the XML emitter so the two
+-- cannot drift apart on what a number looks like. Strings differ deliberately:
+-- dmnmd reads a bare token as a string, and a quoted one would keep its quotes.
+--
+-- __A date has no dmnmd form and is refused, not rendered.__ dmnmd's cell
+-- grammar has no date datatype at all: @mkF@ reads a cell as a number, a range
+-- of integers, or a bare token, so @>= 1994-04-01@ would be /emitted/ and then
+-- misread by dmnmd's own numeric parser. Returning 'Nothing' routes the whole
+-- table to @D-MD-CELLSYNTAX@ Blocking and omits it honestly, which is what this
+-- module already does for a half-open range. That is not a workaround for the
+-- gap; it __is__ the gap being reported.
+mdConstant :: FeelValue -> Maybe Text
+mdConstant = \case
+  VNum r  -> Just (renderNumber r)
+  VStr t  -> Just t
+  VBool b -> Just (if b then "true" else "false")
+  VDate _ -> Nothing
+
+-- | Which of dmnmd's cell-grammar gaps this rule actually fell into.
+--
+-- __Naming the enumeration rather than the instance was wrong the moment dates
+-- existed.__ @>= date("2024-01-01")@ is not a negation, not a range and not an
+-- output with parentheses, so a reader told "a negation, a half-open or
+-- non-integer range, or an output with parentheses or a comma" would go looking
+-- for a defect that is not there — and on the Reg CF corpus that misdiagnosis
+-- would be the MAJORITY of the instances.
+cellSyntaxReason :: DmnType -> DmnRule -> Text
+cellSyntaxReason outTy r
+  | null reasons = "a cell outside dmnmd's grammar"
+  | otherwise    = Text.intercalate "; " reasons
+ where
+  reasons =
+    [ "a DATE cell -- dmnmd's cell grammar has no date datatype at all"
+    | any (anyTest isDateTest) r.drInputs
+    ]
+      <> [ "a `not(...)` cell, which dmnmd's grammar cannot spell"
+         | any (anyTest isNotTest) r.drInputs
+         ]
+      <> [ "a half-open or non-integer range"
+         | any (anyTest isBadRange) r.drInputs
+         ]
+      <> [ "an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL"
+         | isNothing (mdOutput outTy r.drOutput)
+         ]
+
+  -- 'TestOneOf' nests, so the search must too.
+  anyTest p u = p u || case u of
+    TestOneOf ts -> any (anyTest p) ts
+    TestNot t    -> anyTest p t
+    _            -> False
+
+  isDateTest = \case
+    TestEq v            -> isDate v
+    TestCmp _ v         -> isDate v
+    TestRange _ lo hi _ -> isDate lo || isDate hi
+    _                   -> False
+
+  isDate = \case
+    VDate _ -> True
+    _       -> False
+
+  isNotTest = \case
+    TestNot _ -> True
+    _         -> False
+
+  isBadRange = \case
+    TestRange lc lo hi hc ->
+      not (lc && hc) || isNothing (wholeNumber lo) || isNothing (wholeNumber hi)
+    _ -> False
 
 wholeNumber :: FeelValue -> Maybe Text
 wholeNumber = \case
@@ -284,8 +345,8 @@ markdownReport drg =
     , not (columnHeaderOk c)
     ]
       <> [ note "D-MD-CELLSYNTAX" Blocking d.dcnId
-             ("rule " <> r.drId <> " has a cell dmnmd cannot read (a negation, a half-open or \
-                \non-integer range, or an output with parentheses or a comma), so this table is omitted")
+             ("rule " <> r.drId <> " has a cell dmnmd cannot read ("
+                <> cellSyntaxReason t.dtOutput.ocType r <> "), so this table is omitted")
              "the whole table"
          | r <- t.dtRules
          , any (isNothing . mdCell) r.drInputs || isNothing (mdOutput t.dtOutput.ocType r.drOutput)

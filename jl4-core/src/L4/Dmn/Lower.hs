@@ -109,11 +109,13 @@ import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
+import Data.Ratio (denominator, numerator)
+import Data.Time.Calendar (Day, fromGregorianValid, showGregorian, toModifiedJulianDay)
 import Optics
 
 import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
 import L4.Desugar (carameliseExpr)
-import L4.Parser.SrcSpan (SrcRange)
+import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
 import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
@@ -184,6 +186,12 @@ data TableCtx = MkTableCtx
   , tcOutputValues :: !(Maybe [Text])
     -- ^ the @GIVETH@ type's domain, when it has one. Becomes
     -- @\<outputValues\>@; see 'OutputColumn'.
+  , tcDateConstants :: !(Map Unique Day)
+    -- ^ nullary decisions whose body folds to a DATE literal, i.e. named
+    -- effective dates. A CELL may inline such a constant's value as an endpoint
+    -- (that is what an endpoint is for); an EXPRESSION may not, because there
+    -- the constant is a DMN decision variable and inlining would erase the
+    -- reference. See 'constantOf' and 'renderFeelIn' respectively.
   , tcSubst        :: !TC.Substitution
   , tcUri          :: !NormalizedUri
   }
@@ -202,6 +210,7 @@ defaultTableCtx = MkTableCtx
   , tcConstants    = Set.empty
   , tcTypes        = emptyTypeEnv
   , tcOutputValues = Nothing
+  , tcDateConstants = Map.empty
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
   }
@@ -338,6 +347,7 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
     -- only the oracle is new here.
     , drOutput      = renderFeelIn ctx.tcNames Set.empty (oracleOf ctx) body
     , drDescription = Just (oneLine (prettyLayout guardE))
+    , drAnnotations = []
     }
 
   -- Under First the catch-all is a final rule with all-`-` inputs, which is
@@ -350,6 +360,7 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
           , drInputs      = map (const TestAny) columnKeys
           , drOutput      = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) b0
           , drDescription = Just "OTHERWISE"
+          , drAnnotations = []
           }
       ]
     _ -> []
@@ -384,6 +395,8 @@ rowsToDmnWith' ctx inlined cappedBodies rows = do
     , dtInputs    = typedColumns
     , dtOutput    = outColumn
     , dtRules     = allRules
+      -- Only a rule-date interval table carries an annotation column (§15.3).
+    , dtAnnotations = []
     , dtNotes     = tableNotes ctx decomposed columnCells typedColumns policy rows inlined cappedBodies
     }
 
@@ -538,8 +551,53 @@ constantOf :: TableCtx -> Expr Resolved -> Maybe FeelValue
 constantOf ctx = \case
   Lit _ (NumericLit _ r) -> Just (VNum r)
   Lit _ (StringLit _ t)  -> Just (VStr t)
+  -- A NULLARY reference to a named date constant folds to its VALUE here, and
+  -- only here. A cell endpoint IS a value, so inlining is what an endpoint
+  -- means; the same reference inside an /expression/ must stay a name, because
+  -- there it denotes a DMN decision variable (see 'renderFeelIn').
+  App _ r [] | Just d <- Map.lookup (getUnique r) ctx.tcDateConstants -> Just (VDate d)
   App _ r []             -> constantRef ctx r
+  e | Just d <- foldDateLiteral (oracleOf ctx) e -> Just (VDate d)
   _                      -> Nothing
+
+-- | The 'Day' a @Date d m y@ application denotes, when every component is an
+-- integer literal and the three name a real calendar day.
+--
+-- __A refusal, not a repair.__ @Date@ is LENIENT: @daydate.l4@:52-56 computes
+-- @DATE_FROM_SERIAL (jan1serial + monthDays + day - 1)@, so @Date 32 1 2024@
+-- rolls forward to 2024-02-01. Replicating the roll would put a date into the
+-- artifact that the source does not obviously say, so an out-of-range component
+-- falls through to the existing path instead, which is honest.
+--
+-- @YMD@ (@daydate.l4@:83-118) is deliberately NOT folded: its body is an
+-- @IF ... THEN candidate ELSE \<ASSUME bottom\>@, so a naive structural match
+-- would silently drop the refusal arm.
+--
+-- Prior art for the same predicate, on the NLG side:
+-- "L4.Export.Document"'s @dateFromArgs@ (:1307-1315), reached from :1229.
+foldDateLiteral :: TypeOracle -> Expr Resolved -> Maybe Day
+foldDateLiteral oracle e = case e of
+  App _ r [dE, mE, yE]
+    | dateHead r
+      -- Belt and braces against a user module shadowing `Date` with something
+      -- of another type: ask the typechecker what the WHOLE application is.
+    , oracleType oracle e == DmnDate
+    , Just d <- intLitOf dE
+    , Just m <- intLitOf mE
+    , Just y <- intLitOf yE
+    , d >= 1, d <= 31, m >= 1, m <= 12 ->
+        fromGregorianValid y (fromInteger m) (fromInteger d)
+  _ -> Nothing
+ where
+  dateHead r =
+    getUnique r == TC.dateFromDMYUnique
+      || nameOf r `elem` ["Date", "Days to date"]
+      || unqualifiedNameToText (getActual r) `elem` ["Date", "Days to date"]
+
+intLitOf :: Expr Resolved -> Maybe Integer
+intLitOf = \case
+  Lit _ (NumericLit _ r) | denominator r == 1 -> Just (numerator r)
+  _                                           -> Nothing
 
 constantRef :: TableCtx -> Resolved -> Maybe FeelValue
 constantRef ctx = constantRefIn ctx.tcConstructors
@@ -684,6 +742,7 @@ typeFromCells tests = case nub (concatMap kinds tests) of
     VNum _  -> DmnNumber
     VStr _  -> DmnString
     VBool _ -> DmnBoolean
+    VDate _ -> DmnDate
 
 -- | @GIVETH@ wins; failing that, agreement among the output entries' own
 -- literals. Deliberately syntactic, because this only runs when the declared
@@ -726,8 +785,12 @@ mergeTests a b = case (a, b) of
   _                                    -> Nothing
  where
   range lc lo hi hc = case (lo, hi) of
-    (VNum x, VNum y) | x <= y -> Just (TestRange lc lo hi hc)
-    _                         -> Nothing
+    (VNum x, VNum y)   | x <= y -> Just (TestRange lc lo hi hc)
+    -- The same merge on the DATE axis, which is what turns an inline law-time
+    -- window (`RULES EFFECTIVE DATE AT LEAST d1 AND AT MOST d2`) into one
+    -- interval cell rather than two boolean columns.
+    (VDate x, VDate y) | x <= y -> Just (TestRange lc lo hi hc)
+    _                           -> Nothing
 
 -- | Can no input satisfy both cells? Sound but incomplete: a 'False' costs only
 -- a hit-policy downgrade, never correctness.
@@ -760,28 +823,42 @@ rangeBounds = \case
 inRange :: FeelValue -> UnaryTest -> Bool
 inRange x r = and [fromMaybe True (satisfies x op v) | (op, v) <- rangeBounds r]
 
--- | Does @x@ satisfy @x op v@? 'Nothing' when the two are not comparable
--- numbers, in which case every caller degrades to "assume it might".
+-- | Does @x@ satisfy @x op v@? 'Nothing' when the two are not comparable, in
+-- which case every caller degrades to "assume it might".
 satisfies :: FeelValue -> CmpOp -> FeelValue -> Maybe Bool
-satisfies x op v = do
-  p <- numberOf x
-  q <- numberOf v
-  pure $ case op of
-    OpLt  -> p < q
-    OpLeq -> p <= q
-    OpGt  -> p > q
-    OpGeq -> p >= q
+satisfies x op v = case (ordKey x, ordKey v) of
+  (Just (kx, p), Just (kv, q)) | kx == kv ->
+    Just $ case op of
+      OpLt  -> p < q
+      OpLeq -> p <= q
+      OpGt  -> p > q
+      OpGeq -> p >= q
+  _ -> Nothing
 
-numberOf :: FeelValue -> Maybe Rational
-numberOf = \case
-  VNum r -> Just r
-  _      -> Nothing
+-- | An ORDER KEY: which axis a value lives on, and where on it.
+--
+-- __Replaces a bare @Rational@, and the axis tag is the point.__ Two values on
+-- DIFFERENT axes are not comparable at all, and every caller must degrade to
+-- "assume they might overlap" rather than compare their positions — which is
+-- exactly what a bare @Rational@ would have let it do the moment 'VDate'
+-- existed, since a date's Modified Julian Day is a perfectly good number and
+-- @TestEq (VNum 5)@ would have been declared disjoint from
+-- @TestCmp OpLt (VDate ...)@ on arithmetic that means nothing.
+--
+-- Behaviour on every @VNum@-only table is unchanged.
+ordKey :: FeelValue -> Maybe (Int, Rational)
+ordKey = \case
+  VNum r  -> Just (0, r)
+  VDate d -> Just (1, fromInteger (toModifiedJulianDay d))
+  VStr _  -> Nothing
+  VBool _ -> Nothing
 
 -- | Is @x op1 v1 AND x op2 v2@ unsatisfiable?
 cmpDisjoint :: CmpOp -> FeelValue -> CmpOp -> FeelValue -> Bool
 cmpDisjoint o1 v1 o2 v2 = fromMaybe False $ do
-  p <- numberOf v1
-  q <- numberOf v2
+  (k1, p) <- ordKey v1
+  (k2, q) <- ordKey v2
+  guard (k1 == k2)
   pure $ case (o1, o2) of
     (OpLt,  OpGeq) -> p <= q
     (OpLt,  OpGt)  -> p <= q
@@ -805,6 +882,328 @@ cmpDisjoint o1 v1 o2 v2 = fromMaybe False $ do
 rulesPairwiseDisjoint :: [[UnaryTest]] -> Bool
 rulesPairwiseDisjoint rules =
   and [or (zipWith testsDisjoint r1 r2) | (r1 : rest) <- tails rules, r2 <- rest]
+
+------------------------------------------------------------------------
+-- Law time: rule-date interval tables (spec §15.3)
+------------------------------------------------------------------------
+
+-- | One arm of a recognised rule-date chain.
+data DatedArm = MkDatedArm
+  { daDay    :: !Day
+  , daRegime :: !(Maybe Resolved)
+    -- ^ the named regime constant the guard applied the law-time predicate to,
+    -- when the guard was written in the PREDICATE idiom. 'Nothing' for the
+    -- inline idiom, which names no constant at all.
+  , daGuard  :: !(Expr Resolved)
+  , daBody   :: !(Expr Resolved)
+  }
+
+-- | What a guarded chain turned out to be.
+data DatedChain
+  = NotDated
+    -- ^ take the existing path, with its existing findings, unchanged.
+  | Dated ![DatedArm] !(Expr Resolved) !Resolved
+    -- ^ arms newest-first, the @OTHERWISE@ body, and the law-time reference the
+    -- emitted column's subject is built from (a real 'Resolved', never a
+    -- synthesised one).
+  | DatedRefused !Text
+    -- ^ it looked dated and could not be tabled; say why, loudly.
+
+-- | Does this chain read the rule date on every arm, against a foldable
+-- constant date, in strictly descending order?
+--
+-- __Conservative and all-or-nothing__, in the manner of
+-- "L4.OpenFisca.Lower"'s @splitDated@ (:589-593). A chain that mixes a
+-- rule-date arm with an ordinary one is exactly how a temporal bug hides, and
+-- half-converting it would be worse than either alternative.
+datedChain
+  :: TableCtx
+  -> Map Unique Resolved   -- ^ law-time PREDICATES: their 'Unique' ↦ the law-time ref in the body
+  -> GuardedRows
+  -> DatedChain
+datedChain ctx preds rows = case rows.grOtherwise of
+  -- A CONSIDER-derived chain with no OTHERWISE has no floor row to derive.
+  Nothing -> NotDated
+  Just oth
+    -- 'rowsToDmnWith'' refuses three shapes BEFORE it builds anything (:315-319)
+    -- and this path does not go through it, so those refusals must be restated
+    -- here or they stop applying the moment a chain happens to look dated.
+    -- @NoRules@ is unreachable ('Dated' means a non-empty `arms`), but the other
+    -- two are NOT: a deontic body is a transition system rather than a value —
+    -- DMN "has no notion of time" and cannot hold an obligation as a state — and
+    -- tabulating an effectful guard changes how often the effect runs. Both
+    -- shapes are one law-time guard away in this very corpus (`regcf.l4:638-642`
+    -- is @IF cond THEN <regulative> ELSE <regulative>@), so returning 'NotDated'
+    -- here is what keeps 'RegulativeBody' and 'EffectfulGuard' reachable.
+    | any isRegulative (guards <> bodies <> [oth]) -> NotDated
+    | any hasEffectfulNode guards -> NotDated
+    -- Zero arms matched: this is an ordinary chain, and nothing is refused.
+    | null arms, null badDates -> NotDated
+    | (i, why) : _ <- badDates ->
+        DatedRefused ("arm " <> tshow i <> " of the chain " <> why)
+    | (i, g) : _ <- others     ->
+        DatedRefused
+          ("arm " <> tshow i <> " of the chain (`" <> oneLine (prettyLayout g)
+             <> "`) is not a rule-date guard while "
+             <> tshow (length arms) <> " other arm(s) are, so the chain has no \
+                \single date axis")
+    | Just why <- outOfOrder   -> DatedRefused why
+    | not (rulesPairwiseDisjoint (map (: []) (datedTests arms))) ->
+        DatedRefused
+          "the derived intervals are not pairwise disjoint -- this is an exporter \
+          \defect, please report it"
+    -- The cross product of a date axis with an inner axis is a bigger design;
+    -- v1 handles the flat case, which is 8 of 8 in the corpus. The @OTHERWISE@
+    -- counts as an arm body here: on the ordinary path @expandOtherwise@ splices
+    -- a nested catch-all chain's rows into the table (and reports what it
+    -- declines to splice as @D-FLATTENCAP@), whereas the dated path would
+    -- collapse the whole nested chain into one floor-row output entry with no
+    -- note at all.
+    | any (isJust . normaliseGuarded) (oth : map (.daBody) arms) -> NotDated
+    | (lawRef : _) <- lawRefs -> Dated arms oth lawRef
+    -- Unreachable: a non-empty `arms` implies a non-empty `lawRefs`, since both
+    -- come from the same 'RowDated' constructor. Spelled as a fallthrough
+    -- rather than a `head` so that the invariant cannot become a crash.
+    | otherwise -> NotDated
+ where
+  classified = zip [1 :: Int ..] (map classifyRow rows.grRows)
+
+  guards = map fst rows.grRows
+  bodies = map snd rows.grRows
+
+  -- Every ordinal a refusal quotes is an index into the CHAIN's own rows, so
+  -- "arm 3" means the same source arm in all three messages. Numbering the
+  -- matched arms separately (which an earlier draft did for the ordering
+  -- refusal) made "arm 3" mean two different things on one file.
+  armsIx   = [(i, a)   | (i, RowDated a _)   <- classified]
+  arms     = map snd armsIx
+  lawRefs  = [r        | (_, RowDated _ r)   <- classified]
+  badDates = [(i, why) | (i, RowBadDate why) <- classified]
+  others   = [(i, fst row) | ((i, RowOther), row) <- zip classified rows.grRows]
+
+  -- Strictly descending, which also covers DUPLICATE dates: two arms on one day
+  -- make the second dead, and an empty @[d..d)@ interval would be isomorphic to
+  -- that but un-analysable. Same predicate as "L4.OpenFisca.Lower"'s
+  -- @strictlyDescDates@ (:521-523).
+  outOfOrder = listToMaybe
+    [ "arm " <> tshow j <> " of the chain (`" <> oneLine (prettyLayout b.daGuard)
+        <> "`) is dated " <> Text.pack (showGregorian b.daDay)
+        <> ", which is not strictly earlier than arm " <> tshow i <> "'s "
+        <> Text.pack (showGregorian a.daDay)
+    | ((i, a), (j, b)) <- zip armsIx (drop 1 armsIx)
+    , not (a.daDay > b.daDay)
+    ]
+
+  oracle = oracleOf ctx
+
+  isLawTime r = getUnique r == TC.rulesEffectiveDateUnique
+
+  -- Only the conjunct COUNT is structural here; a multi-conjunct dated guard
+  -- (`lawtime >= d AND something`) is a v1 non-goal and takes the ordinary path.
+  classifyRow (g, b) = case filter (not . inertNode) (conjuncts (carameliseExpr g)) of
+    [c] -> lawTimeGuard g b c
+    _   -> RowOther
+
+  inertNode = \case
+    Inert {} -> True
+    _        -> False
+
+  lawTimeGuard g b = \case
+    -- (a) the PREDICATE idiom, as the Reg CF corpus writes it.
+    App _ f [arg] | Just lawRef' <- Map.lookup (getUnique f) preds ->
+      case constantDay arg of
+        Just (d, reg) -> RowDated (MkDatedArm d reg g b) lawRef'
+        Nothing       -> RowBadDate (badDateReason arg)
+    -- (b) the same comparison written INLINE against a `Date d m y` literal.
+    -- `AT LEAST` desugars to an application that 'carameliseExpr' turns back
+    -- into 'Geq'; the mirrored `AT MOST` form is 'Leq' and means the same
+    -- relation. Strict comparators are a v1 non-goal and reach 'RowOther'.
+    Geq _ (App _ r []) e | isLawTime r -> inlineArm g b r e
+    Leq _ e (App _ r []) | isLawTime r -> inlineArm g b r e
+    _ -> RowOther
+
+  -- 'constantDay', NOT the bare literal fold. The inline idiom is the predicate
+  -- idiom with the one-line helper elided, so
+  -- @`RULES EFFECTIVE DATE` AT LEAST `the 2024 rate change`@ carries exactly the
+  -- information the predicate form does and must fold the same way — and the
+  -- regime constant it names is then available to the annotation column, which
+  -- is strictly better than degrading to a bare @from <day>@. An earlier draft
+  -- called 'foldDateLiteral' here, which refused every such chain while
+  -- 'badDateReason' told the reader that nullary constants ARE folded.
+  inlineArm g b r e = case constantDay e of
+    Just (d, reg) -> RowDated (MkDatedArm d reg g b) r
+    Nothing       -> RowBadDate (badDateReason e)
+
+  badDateReason e =
+    "has date `" <> oneLine (prettyLayout e)
+      <> "`, which is not a foldable date constant (only `Date d m y` over three \
+         \integer literals, or a nullary decision whose body is one, is folded; \
+         \`YMD` and computed dates are not)"
+
+  -- One hop through the module's named date constants, then the literal fold.
+  constantDay e = case e of
+    App _ c [] | Just d <- Map.lookup (getUnique c) ctx.tcDateConstants -> Just (d, Just c)
+    _ -> (\d -> (d, Nothing)) <$> foldDateLiteral oracle e
+
+-- | Internal: a row's classification, and the law-time reference it found.
+data RowKind
+  = RowDated !DatedArm !Resolved
+  | RowBadDate !Text
+  | RowOther
+
+-- | The half-open interval cells a chain's arms denote, plus the floor row.
+--
+-- For arms dated @d₁ > d₂ > … > dₙ@, L4's first-match semantics are exactly
+-- @r₁ ⟺ x ≥ d₁@, @rᵢ ⟺ dᵢ ≤ x < dᵢ₋₁@, @floor ⟺ x < dₙ@ — total over the date
+-- axis and pairwise disjoint, which is what buys @hitPolicy="UNIQUE"@ and, with
+-- it, gap and overlap analysis __by construction__.
+datedTests :: [DatedArm] -> [UnaryTest]
+datedTests [] = []
+datedTests arms =
+  zipWith mk (Nothing : map (Just . (.daDay)) arms) arms <> [floorTest]
+ where
+  mk Nothing     a = TestCmp OpGeq (VDate a.daDay)
+  mk (Just prev) a = TestRange True (VDate a.daDay) (VDate prev) False
+  floorTest = TestCmp OpLt (VDate (last arms).daDay)
+
+-- | Build the interval table directly, rather than routing through
+-- 'rowsToDmnWith''.
+--
+-- __The generic path cannot produce this and was not asked to.__ @policy@
+-- (:330) requires @rows.grDisjoint@, which comes from @guardsDisjoint@
+-- ("L4.Viz.GuardedRows":182-197); its @exclusive@ relation has no @(Geq, Geq)@
+-- case, so two @>=@ guards are never exclusive there and every dated chain would
+-- stay @FIRST@ no matter what the cells said.
+--
+-- 'tableNotes' is REUSED rather than duplicated, so the output-side families
+-- (@D-NONFEELOUTPUT@, @D-COMPUTEDOUTPUT@) still see exactly the bodies they see
+-- today, and the input-side families fall silent because the one column really
+-- is S-FEEL.
+datedTable
+  :: TableCtx
+  -> Map Unique Text        -- ^ @\@ref@ text, by decide 'Unique'
+  -> Map Unique SrcRange    -- ^ definition position, by decide 'Unique'
+  -> GuardedRows
+  -> [DatedArm]
+  -> Expr Resolved          -- ^ the @OTHERWISE@ body
+  -> Resolved               -- ^ the law-time reference
+  -> [Text]                 -- ^ names of inlined WHERE\/LET locals
+  -> DecisionTable
+datedTable ctx refs ranges rows arms oth lawRef inlined = table
+ where
+  lawExpr = App emptyAnno lawRef []
+  tests   = datedTests arms
+
+  -- Asserted, not inferred: the subject is SYNTHESISED, so 'oracleClassify'
+  -- would answer 'DmnAny' on it. ('retype' only fires on 'DmnAny' and so will
+  -- not touch this.) 'icValues' stays Nothing because the date axis is
+  -- unbounded; §3.1's inputValues is for finite domains.
+  column = MkInputColumn
+    { icId     = ctx.tcIdPrefix <> "_i1"
+    , icLabel  = oneLine (prettyLayout lawExpr)
+      -- 'feelIdentIn' reads 'neVars', so a collision rename propagates here.
+    , icExpr   = MkFeelExpr (feelIdentIn ctx.tcNames lawRef) SFeel
+    , icType   = DmnDate
+    , icValues = Nothing
+    }
+
+  cellOf t = MkCell
+    { cellKey      = clearAnno lawExpr
+    , cellSubject  = lawExpr
+    , cellTest     = t
+    , cellFallback = False
+    , cellNote     = False
+    }
+
+  decomposed  = [[cellOf t] | t <- tests]
+  columnCells = take 1 (map cellOf tests)
+
+  -- The output-rendering asymmetry of 'rowsToDmnWith'' is REPRODUCED, not
+  -- repaired: dated rows render their output with an empty constructor set and
+  -- the floor row with the module's, exactly as :339 and :351 already do. So
+  -- every output entry is byte-identical to today's, and the golden diff is
+  -- confined to columns and cells. Unifying the two is a separate change.
+  ruleSpecs =
+    [ (t, Just (oneLine (prettyLayout a.daGuard)), a.daBody, Set.empty, armAnnotation a)
+    | (t, a) <- zip tests arms
+    ]
+      <> [ ( last tests
+           , Just "OTHERWISE"
+           , oth
+           , ctx.tcConstructors
+           , floorAnnotation
+           )
+         ]
+
+  allRules =
+    [ MkDmnRule
+        { drId          = ctx.tcIdPrefix <> "_r" <> tshow i
+        , drInputs      = [t]
+        , drOutput      = renderFeelIn ctx.tcNames ctors (oracleOf ctx) b
+        , drDescription = desc
+        , drAnnotations = [ann]
+        }
+    | (i, (t, desc, b, ctors, ann)) <- zip [1 :: Int ..] ruleSpecs
+    ]
+
+  named r =
+    nameOf r
+      <> maybe "" ((" \8212 " <>) . stripRefKeyword) (Map.lookup (getUnique r) refs)
+      <> maybe "" (\sr -> " (" <> prettySrcRange sr <> ")")
+           (Map.lookup (getUnique r) ranges)
+
+  -- The lexed `Ref` text keeps its own `@ref` keyword. That token is L4 syntax,
+  -- not part of the citation, and an annotation column is read by a human.
+  stripRefKeyword t = fromMaybe t (Text.stripPrefix "@ref " (Text.strip t))
+
+  armAnnotation a = case a.daRegime of
+    Just r  -> named r
+    -- The inline idiom names no constant, so the day itself is the whole of
+    -- what the source says about this regime.
+    Nothing -> "from " <> Text.pack (showGregorian a.daDay)
+
+  floorAnnotation = case oth of
+    App _ r [] -> named r
+    _          -> "before " <> Text.pack (showGregorian (last arms).daDay)
+
+  outColumn = MkOutputColumn
+    { ocId      = ctx.tcIdPrefix <> "_o1"
+    , ocName    = ctx.tcFeelName
+    , ocType    = resolveOutputType ctx (map (.drOutput) allRules)
+    , ocValues  = if ctx.tcOutputType /= DmnAny then ctx.tcOutputValues else Nothing
+      -- R9: the OTHERWISE is a floor ROW, so there is no defaultOutputEntry.
+      -- §3.3.1's SHALL then REQUIRES omitting it: the rules already cover the
+      -- input space, and a default on a complete table declares it incomplete.
+    , ocDefault = Nothing
+    }
+
+  table = MkDecisionTable
+    { dtId          = ctx.tcIdPrefix <> "_table"
+    , dtName        = ctx.tcName
+    , dtHitPolicy   = HitUnique
+    , dtInputs      = [column]
+    , dtOutput      = outColumn
+    , dtRules       = allRules
+    , dtAnnotations = ["regime"]
+    , dtNotes       = tableNotes ctx decomposed columnCells [column] HitUnique rows inlined []
+    }
+
+-- | 'freeRefs', over one expression rather than a whole @DECIDE@.
+--
+-- Used by the requirement rewrite (R11): a dated table's cells reference the
+-- rule-date input and its expression no longer references the guard predicate
+-- or the regime constants, so its @informationRequirement@s must be computed
+-- from the bodies that SURVIVE into the artifact rather than from the source.
+exprFreeRefs :: Expr Resolved -> [Resolved]
+exprFreeRefs body =
+  [r | r <- refs, not (Set.member (getUnique r) bound)]
+ where
+  allResolved = toList body
+  bound = Set.fromList [u | Def u _ <- allResolved]
+  projFields = Set.fromList
+    [getUnique n | Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) body]
+  refs = nubOrdOn getUnique
+    [r | r@Ref {} <- allResolved, not (Set.member (getUnique r) projFields)]
 
 ------------------------------------------------------------------------
 -- L4 -> FEEL
@@ -951,6 +1350,17 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- null. So it is verbatim, and the report says Blocking. The FEEL builtins
     -- this backend DOES emit (@not@, @modulo@, @max@, @min@, @concatenate@) are
     -- constructed here by name and never routed through this case.
+    -- ...with one exception, and it is a LITERAL rather than a call: `Date d m
+    -- y` over three integer literals denotes a day, and FEEL can spell a day.
+    -- `date("YYYY-MM-DD")` is DMN 1.3 grammar rule 21's `date time literal` and
+    -- rule 33's `simple literal`, so the fragment claim is SFeel, not FullFeel.
+    --
+    -- A NULLARY reference to a named date constant is deliberately NOT folded
+    -- here: it names a DMN decision variable, and inlining its value into an
+    -- expression would erase a reference the DRG records. Only cells inline
+    -- (see 'constantOf').
+    App _ _ (_ : _) | Just d <- foldDateLiteral oracle e ->
+      (atomPrec, renderFeelValue (VDate d), SFeel)
     App _ _ (_ : _) -> verbatim e
     _ -> verbatim e
    where
@@ -1627,8 +2037,21 @@ builtinType u
 -- [@D-NONFEELOUTPUT@ (Blocking)] an output entry is L4 source, not FEEL.
 -- [@D-LITERALEXPR@ (Blocking)] the decision has no table shape and became a
 --   boxed literal expression.
+-- [@D-DATEDCHAIN@ (Blocking)] the decision is a chain of rule-date guards that
+--   could not be lowered to a date-interval table, so it shipped as boolean
+--   columns over raw L4 that no engine can evaluate (spec §15.3, R10).
+-- [@D-RULEDATE-UNBOUND@ (Blocking)] the decision rebinds law time with
+--   @EVAL UNDER RULES EFFECTIVE AT@; a DRG has one global rule-date input and no
+--   scoped rebinding, so supplying that input does not make it answer. The
+--   message has TWO forms, chosen from the emitted logic: a boxed literal gets
+--   the whole-decision claim, and a decision that still ships a table gets the
+--   sub-expression claim, because "no engine can evaluate this decision" would
+--   be false of a table an engine will run (spec §15.5).
 -- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
 --   @inputData@ name.
+-- [@D-RULEDATE@ (Advisory)] the model is temporally parameterised: the rule-date
+--   @inputData@ was emitted and named decisions depend on it. Exactly one per
+--   DRG (spec §15.5).
 -- [@D-NONFEEL@ (Advisory)] the input expression is /valid/ FEEL but outside
 --   S-FEEL.
 -- [@D-COMPUTEDOUTPUT@ (Advisory)] the output entry is /valid/ FEEL but an
@@ -1934,6 +2357,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgNodes     = nodes
     , drgNotes     = sharedInputNotes <> renameNotes <> feelNameCollisionNotes
                        <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
+                       <> ruleDateNotes
                        <> concatMap snd lowered
     }
  where
@@ -1945,8 +2369,30 @@ lowerModule opts modul@(MkModule _ uri _) =
   nodes = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
 
   decls   = topDecls modul
-  decides = [d | Decide _ d <- decls]
+  -- The TopDecl's own annotation is kept, not discarded: `attachRef` claims an
+  -- `@ref` at the TopDecl level ("L4.Parser.ResolveAnnotation":1050-1061), so
+  -- reading only the inner MkDecide's annotation loses every citation. Both are
+  -- read, joined with `<|>`, so the annotation column does not depend on which
+  -- node ends up holding it.
+  decidesAnn = [(ann, d) | Decide ann d <- decls]
+  decides = map snd decidesAnn
   assumes = [a | Assume _ a <- decls]
+
+  -- @ref text and definition position, by the decide's own Unique. Both feed
+  -- the interval table's annotation column (§15.9).
+  decideRefs :: Map Unique Text
+  decideRefs = Map.fromList
+    [ (getUnique (decideResolved d), getRef r)
+    | (ann, d) <- decidesAnn
+    , Just r <- [listToMaybe (catMaybes [view annRef ann, view annRef (getAnno d)])]
+    ]
+
+  decideRanges :: Map Unique SrcRange
+  decideRanges = Map.fromList
+    [ (getUnique (decideResolved d), rng)
+    | d <- decides
+    , Just rng <- [(getAnno d).range]
+    ]
 
   constructors = Set.fromList
     [ getUnique n | Declare _ (MkDeclare _ _ _ td) <- decls, n <- constructorNames td ]
@@ -2255,20 +2701,82 @@ lowerModule opts modul@(MkModule _ uri _) =
     ]
   decideByUnique = Map.fromList (zip (map (getUnique . decideResolved) decides) decideIds)
 
+  ------------------------------------------------------------------------
+  -- Law time (§15.2, §15.3)
+  ------------------------------------------------------------------------
+
+  -- Nullary decisions whose body folds to a DATE literal, i.e. the module's
+  -- named effective dates. In the Reg CF corpus this is the four constants at
+  -- regcf.l4:104,108,112,116.
+  dateConstants :: Map Unique Day
+  dateConstants = Map.fromList
+    [ (getUnique n, day)
+    | MkDecide _ _ (MkAppForm _ n [] _) b <- decides
+    , Just day <- [foldDateLiteral moduleOracle (carameliseExpr b)]
+    ]
+
+  moduleOracle = MkTypeOracle
+    { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+
+  -- The law-time PREDICATE idiom (regcf.l4:119-121):
+  --
+  -- > GIVEN amendment IS A DATE
+  -- > GIVETH A BOOLEAN
+  -- > `the rules in force include` amendment MEANS `RULES EFFECTIVE DATE` AT LEAST amendment
+  --
+  -- The value is the law-time 'Resolved' found in the body, kept so the emitted
+  -- column's subject is a real reference rather than a synthesised one.
+  lawTimePreds :: Map Unique Resolved
+  lawTimePreds = Map.fromList
+    [ (getUnique f, r)
+    | MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) (MkAppForm _ f [p'] _) b <- decides
+    , [MkOptionallyTypedName _ p (Just ty) _] <- [gs]
+    , let (pty, _, _) = classifyType typeEnv ty
+    , pty == DmnDate
+    , getUnique p' == getUnique p
+    , Just r <- [lawTimeComparison (getUnique p) (carameliseExpr b)]
+    ]
+   where
+    lawTimeComparison pu = \case
+      Geq _ (App _ r []) (App _ q []) | isLaw r, getUnique q == pu -> Just r
+      Leq _ (App _ q []) (App _ r []) | isLaw r, getUnique q == pu -> Just r
+      _ -> Nothing
+    isLaw r = getUnique r == TC.rulesEffectiveDateUnique
+
   -- Free terms, collected across every decision first so that ids and types are
   -- assigned once, in a source-determined order.
+  -- Law time is APPENDED rather than interleaved in source order (D1, §15.2).
+  -- A GIVEN is written at a source position and source order is the right key
+  -- for it; a builtin is written at NO source position, so its "first mention"
+  -- is an accident of which decision happens to read law time first. Appending
+  -- also keeps the existing inputData block byte-identical, which is what makes
+  -- the binding diff reviewable.
   freeTerms :: [(Unique, Text)]
-  freeTerms = nubOrdOn fst (concatMap decideFreeTerms decides)
+  freeTerms = ordinaryTerms <> lawTimeTerms
+   where
+    allTerms = nubOrdOn fst (concatMap decideFreeTerms decides)
+    isLawTime (u, _) = u == TC.rulesEffectiveDateUnique
+    lawTimeTerms  = filter isLawTime allTerms
+    ordinaryTerms = filter (not . isLawTime) allTerms
 
   decideFreeTerms d =
     [ (getUnique r, nameOf r)
     | r <- freeRefs d
     , let u = getUnique r
-    , u.moduleUri == uri
+    -- Every OTHER builtin lives in `jl4:builtin` and is correctly excluded:
+    -- FEEL has its own `not`, `max`, `min`, and a DMN model does not declare
+    -- them. Law time is the one builtin whose VALUE the caller must supply, so
+    -- it is the one builtin that is an inputData.
+    , u.moduleUri == uri || u == TC.rulesEffectiveDateUnique
     , not (Map.member u decideByUnique)
     , not (Set.member u constructors)
     , not (Set.member u selectors)
     ]
+
+  -- The emitted element id of the rule-date input, when the module reaches law
+  -- time at all. Everything in D1/D2/D3 keys off this being 'Just'.
+  lawTimeInputId :: Maybe Text
+  lawTimeInputId = Map.lookup TC.rulesEffectiveDateUnique inputByUnique
 
   inputIds      = assignIds "input_" (map snd freeTerms)
   inputByUnique = Map.fromList (zip (map fst freeTerms) inputIds)
@@ -2309,10 +2817,17 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- is the other source. Anything else stays Any.
   freeTermSrc :: Map Unique (Type' Resolved)
   freeTermSrc = Map.fromList
-    ( [ (getUnique n, ty)
-      | MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _ <- decides
-      , MkOptionallyTypedName _ n (Just ty) _ <- gs
+    ( -- Law time's declared type is the builtin's own: `date`
+      -- ("L4.TypeCheck.Environment":264-265). Putting it HERE rather than
+      -- post-patching 'freeTermTypes' is what keeps the type and the two note
+      -- families ('inputMaybeNotes', 'sharedInputNotes') in one place.
+      [ (TC.rulesEffectiveDateUnique, TC.rulesEffectiveDateBuiltin)
+      | isJust lawTimeInputId
       ]
+        <> [ (getUnique n, ty)
+           | MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _ <- decides
+           , MkOptionallyTypedName _ n (Just ty) _ <- gs
+           ]
         <> [ (getUnique n, ty)
            | MkAssume _ _ (MkAppForm _ n _ _) (Just ty) _ <- assumes
            ]
@@ -2372,6 +2887,39 @@ lowerModule opts modul@(MkModule _ uri _) =
     , let l4spellings = nubOrd [tnm | (u, tnm) <- freeTerms, u `elem` us]
     , let feelSpellings =
             [ feel | (feel, (u, _)) <- zip inputFeelNames freeTerms, u `elem` us ]
+    ]
+
+  -- D-RULEDATE (§15.5), Advisory, exactly ONE per DRG. Structural model:
+  -- 'sharedInputNotes' -- one note naming a list of dependent elements.
+  --
+  -- Knot 5's complaint is that the report was SILENT about law time. This is
+  -- what makes it speak: an unbound `RULES_EFFECTIVE_DATE` is a well-formed DMN
+  -- model that answers null in every dated decision, and nothing in the emitted
+  -- artifact said so.
+  --
+  -- The FEEL name is READ OFF 'inputNodes', never re-folded: 'uniquifyIn' makes
+  -- it a property of the whole DRG (see "L4.Dmn.Emit":200-208). The dependent
+  -- list is read off the emitted IR, so it reflects R11's requirement rewrite
+  -- and therefore includes every dated table.
+  ruleDateNotes =
+    [ dmnNote "D-RULEDATE" Advisory lawId Nothing
+        ("this model is temporally parameterised: " <> tshow (length dependents)
+           <> " decision(s) read the rule date, which is supplied as the DMN input `"
+           <> feel <> "` (L4: `" <> nm <> "`) -- "
+           <> Text.intercalate ", " (map tick dependents)
+           <> ". Bind that input or every dated decision answers null")
+        ("the reader's ability to run this model without knowing it has a rule-date \
+         \precondition: an unbound `" <> feel <> "` is a well-formed DMN model that \
+         \silently answers null in every dated decision")
+    | Just lawId <- [lawTimeInputId]
+    , i <- take 1 [n | n <- inputNodes, n.idId == lawId]
+    , let feel = i.idFeelName
+    , let nm = i.idName
+    , let dependents =
+            [ dn.dcnName
+            | NodeDecision dn <- nodes
+            , RequiredInput lawId `elem` dn.dcnRequirements
+            ]
     ]
 
   sharedNames = Map.fromListWith (flip (<>))
@@ -2532,6 +3080,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       , tcConstants    = namedConstants
       , tcTypes        = typeEnv
       , tcOutputValues = declaredDomain
+      , tcDateConstants = dateConstants
       , tcSubst        = opts.dloSubstitution
       , tcUri          = uri
       }
@@ -2668,7 +3217,73 @@ lowerModule opts modul@(MkModule _ uri _) =
       reason : _ -> literalFallback (SumTypeRead reason)
       [] -> plainLowering
 
-    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes
+    notes = tableNotes' <> sumTypeLossyNotes <> decisionMaybeNotes <> ruleDateUnboundNotes
+
+    -- D-RULEDATE-UNBOUND (§15.5). A decision that evaluates a sub-graph under
+    -- its OWN rule date cannot be governed by the DRG's single global rule-date
+    -- input, because DMN has no scoped rebinding. This ACCOMPANIES its
+    -- D-LITERALEXPR; it does not replace it.
+    --
+    -- v1 matches `EVAL UNDER RULES EFFECTIVE AT` only. The valid-time /
+    -- transaction-time builtins stamp a DIFFERENT temporal context and were not
+    -- measured; adding them silently would change counts with nothing behind
+    -- them (§15.5).
+    ruleDateUnboundNotes =
+      [ uncurry (dmnNote "D-RULEDATE-UNBOUND" Blocking did (bestRange body))
+          ruleDateUnboundText
+      | any isEvalUnderRules subExprs
+      ]
+
+    -- The claim is SCOPED TO WHAT WAS EMITTED. `EVAL UNDER RULES EFFECTIVE AT`
+    -- can sit inside an arm body of a chain that still tabulates, and saying "no
+    -- DMN engine can evaluate this decision" of a decision that ships a real
+    -- <decisionTable> would be false about the rest of the table. On today's
+    -- corpus all 15 instances are boxed literals, which is asserted rather than
+    -- assumed (jl4/tests/DmnExport.hs, "scopes D-RULEDATE-UNBOUND's claim") --
+    -- but the note must not depend on that staying true.
+    ruleDateUnboundText = case logic of
+      LogicLiteral _ ->
+        ( "`" <> decideName d
+            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
+               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
+               \rebinding, so this decision is not governed by it and cannot be"
+        , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
+          \most likely to get wrong -- supplying the model's rule-date input does not make \
+          \it answer"
+        )
+      LogicTable _ ->
+        ( "a sub-expression of `" <> decideName d
+            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
+               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
+               \rebinding, so that sub-graph is not governed by it and cannot be, even \
+               \though the surrounding decision table is"
+        , "execution of the rebound sub-graph: supplying the model's rule-date input does \
+          \not make it answer, and the table around it will answer as though it had"
+        )
+
+    isEvalUnderRules = \case
+      App _ r _ -> getUnique r == TC.evalUnderRulesEffectiveAtUnique
+      _         -> False
+
+    -- Computed ONCE and shared by 'plainLowering' and the requirement rewrite
+    -- below, so the emitted logic and the emitted DRG edges cannot disagree.
+    guardedRows = case peeled of
+      Left _ -> Nothing
+      Right _ | isSelectIdiomIn (oracleOf tctx) body -> Nothing
+      Right _ -> normaliseGuarded body
+
+    datedResult = case (sumTypeReasons, guardedRows) of
+      ([], Just rs0) -> datedChain tctx lawTimePreds rs0
+      _              -> NotDated
+
+    -- R11: what SURVIVES into the artifact. D2 inlines the guard predicate and
+    -- the regime constants into interval endpoints, so a dated decision's
+    -- emitted expression no longer references them while its cells now
+    -- reference the rule-date input. Computing 'dcnRequirements' from the
+    -- source 'freeRefs' would describe a graph the expression contradicts.
+    datedSurvivors = case datedResult of
+      Dated arms oth _ -> Just (map (.daBody) arms <> [oth])
+      _                -> Nothing
 
     plainLowering = case peeled of
       Left loss -> literalFallback loss
@@ -2695,15 +3310,41 @@ lowerModule opts modul@(MkModule _ uri _) =
              | rendered.feFragment == L4Verbatim
              ]
         )
-      Right _ -> case normaliseGuarded body of
+      Right _ -> case guardedRows of
         Nothing -> literalFallback NotAGuardedChain
-        Just rs0
-          | rowsElided body rs0 -> literalFallback RowsElided
-          | otherwise ->
-              let (rs, capped) = flattenGuarded rs0
-              in case rowsToDmnWith' tctx inlined capped rs of
-                   Right t   -> (LogicTable t, [])
-                   Left loss -> literalFallback loss
+        Just rs0 -> case datedResult of
+          -- D2: a newest-first chain of rule-date guards becomes ONE column
+          -- over the rule-date input with half-open interval cells, UNIQUE.
+          Dated arms oth lawRef ->
+            ( LogicTable
+                (datedTable tctx decideRefs decideRanges rs0 arms oth lawRef inlined)
+            , []
+            )
+          -- It looked dated and could not be tabled. The SOUND fallback still
+          -- ships (with its own D-NONFEELINPUT), and the refusal says why.
+          DatedRefused why ->
+            let (lg, ns) = ordinaryPath rs0
+            in ( lg
+               , ns
+                   <> [ dmnNote "D-DATEDCHAIN" Blocking did
+                          (listToMaybe (mapMaybe (bestRange . fst) rs0.grRows))
+                          ("`" <> decideName d
+                             <> "` is a chain of rule-date guards, but " <> why
+                             <> ", so it was emitted as boolean columns over raw L4 rather \
+                                \than as a date-interval table")
+                          "interval gap and overlap analysis over the rule-date axis, which is \
+                          \the whole reason a dated chain is worth tabulating"
+                      ]
+               )
+          NotDated -> ordinaryPath rs0
+     where
+      ordinaryPath rs0
+        | rowsElided body rs0 = literalFallback RowsElided
+        | otherwise =
+            let (rs, capped) = flattenGuarded rs0
+            in case rowsToDmnWith' tctx inlined capped rs of
+                 Right t   -> (LogicTable t, [])
+                 Left loss -> literalFallback loss
 
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
@@ -2732,7 +3373,19 @@ lowerModule opts modul@(MkModule _ uri _) =
           LogicTable t -> t.dtOutput.ocType
           LogicLiteral _ -> declaredType
       , dcnLogic        = logic
-      , dcnRequirements = sort (nubOrd (mapMaybe (classifyRef did) (freeRefs d)))
+      -- R11 (§15.3): a dated table's requirements are computed from what
+      -- SURVIVES into the artifact -- the arm bodies and the OTHERWISE -- plus
+      -- the rule-date input its cells now name. Guards are excluded because D2
+      -- has inlined their content into interval endpoints. Consequence, and it
+      -- is intended: the regime constants and the guard predicate become DRG
+      -- leaves with no dependents. They are NOT dropped (see 'literalFallback');
+      -- the annotation column carries their provenance into the artifact.
+      , dcnRequirements = case (datedSurvivors, lawTimeInputId) of
+          (Just bodies, Just lawId) ->
+            sort . nubOrd $
+              RequiredInput lawId
+                : mapMaybe (classifyRef did) (concatMap exprFreeRefs bodies)
+          _ -> sort (nubOrd (mapMaybe (classifyRef did) (freeRefs d)))
       }
 
   -- DMN 7.3.1: a Decision SHALL not require itself, "directly or indirectly".

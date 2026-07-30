@@ -1,0 +1,39 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.4).
+--
+-- `Date` is LENIENT: daydate.l4:52-56 computes
+-- `DATE_FROM_SERIAL (jan1serial + monthDays + day - 1)`, so `Date 32 1 2024`
+-- does not fail -- it ROLLS FORWARD to 2024-02-01. The exporter REFUSES to fold
+-- it rather than replicating the roll, because replicating it would put a date
+-- into the artifact that the source does not obviously say, and a reader
+-- checking the interval endpoints against the L4 would find a day nobody wrote.
+--
+-- So this chain is refused with D-DATEDCHAIN (Blocking), naming the arm date it
+-- could not fold, and the sound boolean-column fallback still ships.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `rolling date in a dated chain`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`the rolled change` MEANS Date 32 1 2024
+
+GIVETH A DATE
+`GST commenced` MEANS Date 1 4 1994
+
+ASSUME `no GST rate exists before commencement` IS A NUMBER
+
+GIVEN change IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` change MEANS
+    `RULES EFFECTIVE DATE` AT LEAST change
+
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `the rules in force include` `the rolled change` THEN 9
+           IF ^                            `GST commenced`     THEN 3
+           OTHERWISE `no GST rate exists before commencement`
