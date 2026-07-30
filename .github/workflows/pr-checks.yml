@@ -97,9 +97,11 @@ jobs:
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
               - 'etc/validate-dmn.mjs'
-              # The XSD sequence-order pair: hand-written fixtures, not goldens,
-              # so nothing else here matches them.
+              # The XSD sequence-order pair and the law-time date probe:
+              # hand-written fixtures, not goldens, so nothing else here matches
+              # them.
               - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
+              - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures
@@ -588,6 +590,97 @@ jobs:
             jl4/examples/dmn/expected/reg-cf.dmn \
             --cases jl4/examples/dmn/reg-cf.cases.json | tee camunda.log
           grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected' camunda.log
+
+      # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
+      #
+      # What these add that the reg-cf steps above cannot: the SAME model
+      # answering DIFFERENTLY for different rule dates, driven only by half-open
+      # date intervals on a UNIQUE decision table. Ten rule dates x seven
+      # decisions = 70, and seven of the ten exist purely to pin the
+      # closed-low/open-high convention: a day-of/day-before pair on EACH of the
+      # table's three seams, plus a date well before commencement. Straddling
+      # only the newest seam (which an earlier version did) would have let an
+      # off-by-one on the middle interval or on the floor row pass green.
+      - name: Law time -- the dated-regime exhibit (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 70/70 decision(s) SUCCEEDED, 70/70 value(s) as expected' kie-gst.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 70/70 decision(s) evaluated, 70/70 value(s) as expected' camunda-gst.log
+
+      # The hand-written probe PAIR (spec §15.6). Not redundant with the step
+      # above: the emitter cannot produce an <annotationEntry> carrying an @id,
+      # so only a fixture can ask whether Xerces objects to one.
+      #
+      # And the POSITIVE ALONE IS NOT EVIDENCE. A valid file validating is
+      # equally consistent with Xerces ignoring <annotation>/<annotationEntry>
+      # entirely, which is exactly the failure this step claims to exclude. So
+      # the negative sibling runs here too, with `!` on both engines. Same
+      # rationale, and the same construction, as the xsd-order pair below.
+      - name: Law time -- the hand-written date-axis probe (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          probe=jl4/tests-cli/fixtures/dmn-date-probe
+
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee kie-date-probe.log
+          grep -q 'XSD    valid' kie-date-probe.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-probe.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee camunda-date-probe.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-probe.log
+
+          # The NEGATIVE control: the same model with an @id on each
+          # <annotationEntry>. tRuleAnnotation is not a tDMNElement, so the
+          # attribute is schema-invalid and both harnesses must come back red.
+          # `&& rc=0 || rc=$?` is what keeps `set -e` from ending the step on the
+          # very exit code being asserted (same device as the xsd-order pair).
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > kie-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the schema gate ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running also
+          # exits non-zero. The banner says it ran; the schema rule says it
+          # failed for the reason this fixture exists.
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-date-negative.log
+          grep -q 'XSD    INVALID' kie-date-negative.log
+          grep -q "cvc-complex-type.3.2.2: Attribute 'id' is not allowed to appear in element 'annotationEntry'" kie-date-negative.log
+          # MEASURED, and the reason the negative earns its keep: Drools BUILDS
+          # the file anyway and answers every case correctly, so the schema leg
+          # is the only thing objecting.
+          grep -q 'BUILD  clean' kie-date-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > camunda-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-date-negative.log
+          grep -q 'PARSE  INVALID' camunda-date-negative.log
 
       # The negative control for the placement rule (DMN-EXPORT-PROGRAM-MODEL-SPEC.md
       # §4.3, §9). Every other step above asserts that a gate stays GREEN, which

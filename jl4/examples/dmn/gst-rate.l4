@@ -1,0 +1,97 @@
+-- The DATED-REGIME exhibit for the DMN exporter (spec §15, Knots 4 + 5).
+--
+-- This is what an OpenFisca parameter file looks like when it is re-expressed
+-- as engine-evaluable DMN: a quantity that is not one number but a function of
+-- the RULE DATE, and a downstream calculation that inherits that dependency.
+--
+-- Deliberately small and deliberately two-idiom, because those are exactly the
+-- two shapes the recogniser admits (R10):
+--
+--   * `GST rate percent`               the PREDICATE idiom, as the Reg CF
+--                                      corpus writes it: a one-parameter
+--                                      DATE-typed helper applied to named
+--                                      regime constants;
+--   * `tourist refund minimum spend`   the INLINE idiom: the same comparison
+--                                      with no helper predicate, written once
+--                                      against a NAMED regime constant and once
+--                                      against a bare `Date d m y` literal,
+--                                      because those are the two things the
+--                                      inline right-hand side may be and they
+--                                      reach different code (`constantDay`'s
+--                                      one hop, then the literal fold).
+--
+-- Both must lower to a SINGLE-COLUMN `hitPolicy="UNIQUE"` table over
+-- `RULES_EFFECTIVE_DATE` with half-open interval cells, so the table is
+-- gap/overlap-analysable by construction rather than by inspection. Both are
+-- driven through Drools/KIE and Camunda 8 from `gst-rate.cases.json`, whose
+-- boundary cases (the day of a change, and the day before) are what pin the
+-- closed-low/open-high convention.
+--
+-- `GST payable on` is here to prove the chain end to end: a DATE drives a
+-- NUMBER drives a NUMBER, across `informationRequirement` edges, in a real
+-- engine.
+--
+-- Figures are the real Singapore GST rates (3% from commencement, 8% from
+-- 2023-01-01, 9% from 2024-01-01) because a reader should be able to check
+-- them; the module is still an exhibit, not a formalisation of the Act.
+--
+-- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- `--model-name` takes the model name from the outermost `§`.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `GST rate`
+
+-- Required by the rule-version axis: an unpinned `RULES EFFECTIVE DATE` read
+-- resolves to the localized current day, and localization needs a timezone.
+TIMEZONE IS "Asia/Singapore"
+
+@ref Goods and Services Tax (Amendment) Act 2022 — second step of the Budget 2022 increase
+GIVETH A DATE
+`the 2024 rate change` MEANS Date 1 1 2024
+
+@ref Goods and Services Tax (Amendment) Act 2022 — first step of the Budget 2022 increase
+GIVETH A DATE
+`the 2023 rate change` MEANS Date 1 1 2023
+
+@ref Goods and Services Tax Act 1993, s 16 — commencement
+GIVETH A DATE
+`GST commenced` MEANS Date 1 4 1994
+
+-- Before commencement there is no GST to answer for, so a rule date earlier
+-- than 1994-04-01 is a curated refusal rather than an answer. Same device, and
+-- the same reasoning, as the Reg CF corpus's ASSUME floor.
+ASSUME `no GST rate exists before commencement on 1994-04-01` IS A NUMBER
+
+GIVEN change IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` change MEANS
+    `RULES EFFECTIVE DATE` AT LEAST change
+
+-- The PREDICATE idiom.
+@ref Goods and Services Tax Act 1993, s 16(1) — rate of tax
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `the rules in force include` `the 2024 rate change` THEN 9
+           IF ^                            `the 2023 rate change` THEN 8
+           IF ^                            `GST commenced`        THEN 3
+           OTHERWISE `no GST rate exists before commencement on 1994-04-01`
+
+-- The INLINE idiom: the same comparison with no helper predicate. Arm 1 names
+-- a regime constant, arm 2 writes the day out as a literal -- both are legal
+-- inline right-hand sides, and both must fold, because the inline form IS the
+-- predicate form with the one-line helper elided and carries exactly the same
+-- information. The annotation column shows the difference the source really
+-- makes: arm 1 can be named (and cited), arm 2 has nothing but its day.
+@ref Tourist Refund Scheme — minimum qualifying purchase
+GIVETH A NUMBER
+`tourist refund minimum spend` MEANS
+    BRANCH IF `RULES EFFECTIVE DATE` AT LEAST `the 2024 rate change` THEN 100
+           IF `RULES EFFECTIVE DATE` AT LEAST Date 1 4 1994          THEN 300
+           OTHERWISE `no GST rate exists before commencement on 1994-04-01`
+
+GIVEN `supply value` IS A NUMBER
+GIVETH A NUMBER
+`GST payable on` `supply value` MEANS
+    `supply value` TIMES `GST rate percent` DIVIDED BY 100

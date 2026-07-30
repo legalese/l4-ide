@@ -493,6 +493,36 @@ dmnXsdOrderCases    = dmnXsdOrderDir </> "M1-itemdef.cases.json"
 dmnXsdOrderDir :: FilePath
 dmnXsdOrderDir = fixtureDir </> "dmn-xsd-order"
 
+-- The LAW-TIME date axis (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
+--
+-- `gstGolden` is EMITTED (jl4/tests/DmnExport.hs owns the golden); the two
+-- chains inside it lower to single-column UNIQUE tables over
+-- `RULES_EFFECTIVE_DATE` with half-open date intervals, and `gstEngineCases`
+-- FEEDS DATES -- `{"$date": "YYYY-MM-DD"}` -- so both engines are made to
+-- answer differently for different rule dates. `GST rate percent` has THREE
+-- seams and every one is straddled by a day-of/day-before pair, which is what
+-- pins the closed-low/open-high convention; straddling only the newest seam
+-- (which an earlier version did) leaves an off-by-one on the middle interval
+-- or on the floor row invisible.
+--
+-- `dateProbe*` is HAND-WRITTEN and never regenerated, for the same reason
+-- `dmn-xsd-order` is: it asks the questions the emitter's own output cannot
+-- ask -- does Xerces accept <annotation>/<annotationEntry> where DMN13.xsd's
+-- sequences put them, and does each engine evaluate a date-interval cell at
+-- all. §15.6 records what it returned. `dateProbeNegative` is its NEGATIVE
+-- CONTROL, and it is not optional: the positive on its own shows that a valid
+-- file validates, which is equally consistent with Xerces ignoring the
+-- annotation elements entirely.
+gstGolden, gstEngineCases, dateProbeModel, dateProbeCases, dateProbeNegative :: FilePath
+gstGolden         = "examples/dmn/expected/gst-rate.dmn"
+gstEngineCases    = "examples/dmn/gst-rate.cases.json"
+dateProbeModel    = dmnDateProbeDir </> "date-axis.dmn"
+dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
+dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
+
+dmnDateProbeDir :: FilePath
+dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -534,7 +564,9 @@ main = do
        , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
        , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
-       , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases ] \fp -> do
+       , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
+       , gstGolden, gstEngineCases, dateProbeModel, dateProbeCases
+       , dateProbeNegative ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1328,6 +1360,89 @@ spec bin = do
         out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
+
+  -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
+  -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
+  -- in a real engine, driven only by half-open date intervals on a UNIQUE
+  -- table. `70/70 value(s) as expected` over ten cases is the claim -- ten rule
+  -- dates x seven decisions -- and seven of those ten exist purely to pin the
+  -- interval convention: a day-of/day-before pair on each of the three seams,
+  -- plus a rule date well before commencement.
+  describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE answers the dated-regime exhibit correctly for ten rule dates" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
+          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("70/70 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers the dated-regime exhibit correctly for ten rule dates" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
+          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("70/70 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+
+    -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
+    -- the emitter cannot generate an <annotationEntry> carrying an @id, so only
+    -- a fixture can ask whether Xerces objects to one -- and only the NEGATIVE
+    -- half can show that it does. Same rationale, and the same construction, as
+    -- the dmn-xsd-order pair.
+    it "the date-axis probe pair differs ONLY in the @id on the annotationEntry" $ do
+      pos <- readUtf8 dateProbeModel
+      neg <- readUtf8 dateProbeNegative
+      -- The headers differ (each says why its own file exists), so compare from
+      -- <definitions> down. Without this the negative could drift and a red run
+      -- would no longer isolate the @id as the cause.
+      -- `<definitions xmlns` and not `<definitions`: each header comment names
+      -- the element in prose, and matching the prose made the negative's body
+      -- start inside its own comment.
+      let body = dropWhile (not . isInfixOf "<definitions xmlns") . lines
+          isAE = isInfixOf "<annotationEntry"
+      filter (not . isAE) (body pos) `shouldBe` filter (not . isAE) (body neg)
+      filter isAE (body pos) `shouldSatisfy` all (not . isInfixOf "id=")
+      filter isAE (body neg) `shouldSatisfy` \ls ->
+        not (null ls) && all (isInfixOf "id=") ls
+
+    it "KIE (Xerces) accepts the annotation elements and the date-interval cells" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dateProbeModel [dateProbeModel, "--cases", dateProbeCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    it "KIE (Xerces) REJECTS an @id on the annotationEntry, naming the rule" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dateProbeNegative [dateProbeNegative, "--cases", dateProbeCases] \out -> do
+          out `shouldSatisfy` ("XSD    INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("cvc-complex-type.3.2.2" `isInfixOf`)
+          out `shouldSatisfy` ("'id' is not allowed to appear in element 'annotationEntry'"
+                                 `isInfixOf`)
+          -- MEASURED, and the reason the negative earns its keep: KIE 8.44
+          -- BUILDS the file anyway and answers all three cases correctly. The
+          -- schema leg is the only thing objecting -- exactly as with the
+          -- itemDefinition pair.
+          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    it "Camunda evaluates the hand-written date axis" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dateProbeModel [dateProbeModel, "--cases", dateProbeCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    -- Camunda 8 is stricter than Drools here: it does not merely flag the file,
+    -- it refuses to parse it at all.
+    it "Camunda 8 REJECTS the same file outright, at parse" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dateProbeNegative [dateProbeNegative, "--cases", dateProbeCases] \out -> do
+          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing

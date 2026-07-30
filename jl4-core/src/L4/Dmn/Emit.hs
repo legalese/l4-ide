@@ -256,7 +256,18 @@ decisionTableXml t =
     , ("preferredOrientation", "Rule-as-Row")
     , ("outputLabel", t.dtName)
     ]
-    (map inputXml t.dtInputs <> [outputXml t.dtOutput] <> map ruleXml t.dtRules)
+    -- tDecisionTable is an xsd:SEQUENCE -- input*, output+, annotation*, rule*.
+    -- Verified in DMN13.xsd:302-308 inside kie-dmn-validation-8.44.0.Final.jar,
+    -- which is the schema etc/kie-dmn-check validates against, and confirmed by
+    -- running jl4/tests-cli/fixtures/dmn-date-probe/date-axis.dmn through it
+    -- ("XSD valid"). Put <annotation> after <output> and before <rule>, or
+    -- Xerces rejects the file while libxml2 and dmn-moddle accept it -- the same
+    -- failure class fixtures/dmn-xsd-order/ exists to catch.
+    ( map inputXml t.dtInputs
+        <> [outputXml t.dtOutput]
+        <> [Elem "annotation" [("name", n)] [] | n <- t.dtAnnotations]
+        <> map ruleXml t.dtRules
+    )
 
 -- | One input clause. @tInputClause@ is @inputExpression@ then @inputValues?@.
 --
@@ -318,6 +329,14 @@ ruleXml r =
          ]
       <> [ Elem "outputEntry" [("id", r.drId <> "_o1")]
              [Elem "text" [] [Chars r.drOutput.feText]]
+         ]
+      -- tDecisionRule: inputEntry*, outputEntry+, annotationEntry*
+      -- (DMN13.xsd:344-348). tRuleAnnotation (DMN13.xsd:352-356) is NOT a
+      -- tDMNElement -- it has a <text> child and NO @id. Every other entry
+      -- element here carries an id; this one must not, and Xerces is the only
+      -- checker in the tree that would say so.
+      <> [ Elem "annotationEntry" [] [Elem "text" [] [Chars a]]
+         | a <- r.drAnnotations
          ]
 
 ------------------------------------------------------------------------

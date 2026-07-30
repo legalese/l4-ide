@@ -87,6 +87,7 @@ import qualified Base.Text as Text
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
+import Data.Time.Calendar (Day, showGregorian)
 
 import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, emptyReport)
 
@@ -196,10 +197,19 @@ data ItemDefinition = MkItemDefinition
 -- cannot tell at a glance whether the cell is a value or a reference. A guard we
 -- cannot reduce to a constant endpoint therefore becomes its own boolean column
 -- instead (see 'GuardNotDecomposable'), which is always sound.
+-- __'VDate' is appended last on purpose.__ The derived 'Ord' is consulted by
+-- nothing that cares about the cross-constructor order, but appending keeps the
+-- relative order of the three that existed before, so no @Set FeelValue@
+-- anywhere reorders.
 data FeelValue
   = VNum !Rational
   | VStr !Text
   | VBool !Bool
+  | VDate !Day
+    -- ^ a FEEL @date@. Rendered @date("YYYY-MM-DD")@, which DMN 1.3 grammar rule
+    -- 21 calls a @date time literal@ and rule 33 admits as a @simple literal@ —
+    -- so it is a legal S-FEEL unary-test ENDPOINT, which is the whole reason a
+    -- chain of rule-date guards can become an analysable interval table.
   deriving stock (Eq, Ord, Show, Generic)
 
 data CmpOp = OpLt | OpLeq | OpGt | OpGeq
@@ -284,6 +294,10 @@ renderFeelValue = \case
   VNum r  -> renderNumber r
   VStr t  -> quoteFeelString t
   VBool b -> if b then "true" else "false"
+  -- DMN 1.3 grammar rule 21: a `date time literal` is ("date"|"time"|...) "("
+  -- string ")". Rule 33 makes it a `simple literal`, hence a legal endpoint.
+  -- MEASURED on both engines via jl4/tests-cli/fixtures/dmn-date-probe.
+  VDate d -> "date(\"" <> Text.pack (showGregorian d) <> "\")"
 
 -- | A FEEL string literal. FEEL strings are double-quoted with Java-style
 -- escapes (DMN grammar rule 62).
@@ -604,6 +618,9 @@ data DmnRule = MkDmnRule
   , drInputs      :: ![UnaryTest]   -- ^ same length and order as 'dtInputs'
   , drOutput      :: !FeelExpr
   , drDescription :: !(Maybe Text)  -- ^ the L4 source text of the row's guard
+  , drAnnotations :: ![Text]
+    -- ^ same length and order as the table's 'dtAnnotations'. Empty on every
+    -- table that declares no annotation column.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -614,6 +631,10 @@ data DecisionTable = MkDecisionTable
   , dtInputs    :: ![InputColumn]
   , dtOutput    :: !OutputColumn
   , dtRules     :: ![DmnRule]
+  , dtAnnotations :: ![Text]
+    -- ^ annotation column NAMES (DMN 8.2.12's @tRuleAnnotationClause@, which has
+    -- a @\@name@ and no content). @[]@ on every table but a rule-date interval
+    -- table, which carries one column named @regime@.
   , dtNotes     :: ![FidelityNote]
     -- ^ non-fatal fidelity losses incurred while building /this/ table. A fatal
     -- one is a 'FidelityLoss' and means there is no table at all.

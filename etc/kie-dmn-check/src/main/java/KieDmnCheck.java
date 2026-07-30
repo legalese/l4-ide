@@ -31,6 +31,8 @@ import javax.xml.validation.Validator;
 import java.io.File;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -563,11 +565,47 @@ public final class KieDmnCheck {
       return l;
     }
     if (n.isObject()) {
+      // {"$date": "YYYY-MM-DD"} is the fixture vocabulary's only way to say
+      // "this is a FEEL date". Deliberately NOT an ISO-shape sniff on strings:
+      // this harness converts by DECLARED TYPE and never by appearance (see the
+      // BigDecimal note above), and a sniff would silently retype any genuine
+      // string that happened to look like a date.
+      //
+      // MEASURED: KIE's DMNContext accepts a java.time.LocalDate for a
+      // typeRef="date" input and returns one for a date-valued decision, so
+      // both the context side and the `expect` side go through this branch and
+      // sameValue's equals() fallthrough compares two LocalDates.
+      if (n.size() == 1 && n.has("$date")) {
+        return parseDateTag(n.get("$date"));
+      }
       Map<String, Object> m = new LinkedHashMap<>();
       n.fields().forEachRemaining(e -> m.put(e.getKey(), jsonToFeel(e.getValue())));
       return m;
     }
     return n.asText();
+  }
+
+  /**
+   * The {@code {"$date": ...}} tag's ONE reading, with a malformed tag treated as a fixture error.
+   *
+   * <p>A malformed tag is a defect in the fixture, not in the model under test, so it is named and
+   * exits 2 — the same convention as "case `X` has no `expect` block". It used to reach {@code
+   * LocalDate.parse} unguarded, so {@code {"$date": 20240101}} aborted this harness with a
+   * DateTimeParseException stack trace while the Camunda harness silently degraded the same fixture
+   * to an ordinary map and reported a value mismatch. One malformed fixture, two different wrong
+   * answers.
+   */
+  private static LocalDate parseDateTag(JsonNode v) {
+    if (v != null && v.isTextual()) {
+      try {
+        return LocalDate.parse(v.asText());
+      } catch (DateTimeParseException e) {
+        // fall through to the fixture-error path below
+      }
+    }
+    System.err.println("KieDmnCheck: `{\"$date\": ...}` wants an ISO-8601 YYYY-MM-DD string, got: " + v);
+    System.exit(2);
+    return null; // unreachable: System.exit does not return
   }
 
   private KieDmnCheck() {}

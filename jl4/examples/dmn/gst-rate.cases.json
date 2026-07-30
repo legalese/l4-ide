@@ -1,0 +1,214 @@
+{
+  "note": [
+    "Engine cases for the DATED-REGIME exhibit (gst-rate.l4, spec §15).",
+    "",
+    "WHAT THESE COVER, and it is the whole point of the exhibit: the SAME model",
+    "answers differently for different RULE DATES, in two real engines, driven",
+    "entirely by half-open date intervals on a UNIQUE decision table.",
+    "",
+    "`GST rate percent` lowers to four rules and therefore THREE seams --",
+    "2024-01-01, 2023-01-01 and 1994-04-01 -- and every one of them is straddled",
+    "by a day-of / day-before pair: D+E, G+H, I+J. That is what pins the",
+    "closed-low / open-high convention, and it is per-seam on purpose: an earlier",
+    "version straddled only 2024-01-01, so an off-by-one on the middle interval's",
+    "low end, or on the floor row's `< date(\"1994-04-01\")`, would have passed",
+    "every case. Delete any of the three pairs and that hole comes back.",
+    "",
+    "`{\"$date\": \"YYYY-MM-DD\"}` is the fixture vocabulary's only way to say",
+    "\"this is a FEEL date\", and it is deliberately an explicit tag rather than",
+    "an ISO-shape sniff: both harnesses convert by declared type, never by",
+    "appearance (see KieDmnCheck.jsonToFeel's BigDecimal note).",
+    "",
+    "WHAT THEY DO NOT COVER, so a green run is not read as more than it is:",
+    "  * `change` is an inputData only because `the rules in force include` is a",
+    "    GIVEN-parameterised decision and DMN has no scoped parameters. Its value",
+    "    below is supplied to keep that decision live; it does NOT drive any",
+    "    interval cell, because D2 inlined the regime constants into endpoints.",
+    "  * the floor row's answer is the ASSUME bottom, which L4 refuses to",
+    "    evaluate. Here it is an ordinary DMN input, and -1 is a sentinel chosen",
+    "    because no real rate could be negative, so a floor-row hit is",
+    "    unmistakable in the harness output."
+  ],
+  "cases": [
+    {
+      "name": "A. the 2024 regime",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2024-06-30" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": true,
+        "GST_rate_percent": 9,
+        "tourist_refund_minimum_spend": 100,
+        "GST_payable_on": 90
+      }
+    },
+    {
+      "name": "B. the 2023 regime",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2023-06-30" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 8,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 80
+      }
+    },
+    {
+      "name": "C. the original regime",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2000-01-01" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 3,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 30
+      }
+    },
+    {
+      "name": "D. boundary -- the day OF the 2024 change: the low end is CLOSED",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2024-01-01" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": true,
+        "GST_rate_percent": 9,
+        "tourist_refund_minimum_spend": 100,
+        "GST_payable_on": 90
+      }
+    },
+    {
+      "name": "E. boundary -- the day BEFORE: the high end is OPEN",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2023-12-31" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 8,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 80
+      }
+    },
+    {
+      "name": "F. pre-commencement -- the floor row fires",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1990-01-01" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": -1,
+        "tourist_refund_minimum_spend": -1,
+        "GST_payable_on": -10
+      }
+    },
+    {
+      "name": "G. boundary -- the day OF the 2023 change: the MIDDLE interval's low end is CLOSED",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2023-01-01" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 8,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 80
+      }
+    },
+    {
+      "name": "H. boundary -- the day BEFORE the 2023 change: the interval below still holds it",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2022-12-31" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 3,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 30
+      }
+    },
+    {
+      "name": "I. boundary -- commencement day itself: the LAST interval's low end is CLOSED",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1994-04-01" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": 3,
+        "tourist_refund_minimum_spend": 300,
+        "GST_payable_on": 30
+      }
+    },
+    {
+      "name": "J. boundary -- the day BEFORE commencement: the FLOOR ROW's `<` is exact",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1994-03-31" },
+        "supply_value": 1000,
+        "change": { "$date": "2024-01-01" },
+        "no_GST_rate_exists_before_commencement_on_1994_04_01": -1
+      },
+      "expect": {
+        "the_2024_rate_change": { "$date": "2024-01-01" },
+        "the_2023_rate_change": { "$date": "2023-01-01" },
+        "GST_commenced": { "$date": "1994-04-01" },
+        "the_rules_in_force_include": false,
+        "GST_rate_percent": -1,
+        "tourist_refund_minimum_spend": -1,
+        "GST_payable_on": -10
+      }
+    }
+  ]
+}
