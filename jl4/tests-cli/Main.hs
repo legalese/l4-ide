@@ -523,6 +523,23 @@ dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
 dmnDateProbeDir :: FilePath
 dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
 
+-- The ENGINE-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
+-- measured note of 2026-07-30). One statute-shaped predicate — "either spouse
+-- earns under $100,000 or is a Qualifying Candidate" — spelled three ways
+-- over one shared cases file: inline in the quantifier's @satisfies@, as a
+-- decision table bound in a boxed-context entry, and as the same table in a
+-- BKM. Hand-written, never regenerated: the emitter produces none of the
+-- three shapes today, and the middle one exists precisely because only half
+-- the market can read it.
+spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases :: FilePath
+spouseInlineDmn       = dmnIntersectionDir </> "spouse-inline.dmn"
+spouseContextTableDmn = dmnIntersectionDir </> "spouse-context-table.dmn"
+spouseBkmTableDmn     = dmnIntersectionDir </> "spouse-bkm-table.dmn"
+spouseCases           = dmnIntersectionDir </> "spouse.cases.json"
+
+dmnIntersectionDir :: FilePath
+dmnIntersectionDir = fixtureDir </> "dmn-engine-intersection"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -566,7 +583,8 @@ main = do
        , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
        , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
        , gstGolden, gstEngineCases, dateProbeModel, dateProbeCases
-       , dateProbeNegative ] \fp -> do
+       , dateProbeNegative
+       , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1498,6 +1516,63 @@ spec bin = do
         dmnXsdOrderNegative [dmnXsdOrderNegative, "--cases", dmnXsdOrderCases] \out -> do
           out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
           out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
+
+  -- The engine-INTERSECTION triple (spec §6 measured note, 2026-07-30). What
+  -- it pins: the two-engine-portable spellings of a per-element predicate are
+  -- an opaque inline `satisfies` string or a BKM — NOTHING in between. The
+  -- boxed-context placement is schema-valid DMN 1.3 (Xerces and KIE's
+  -- validator both take it) that zeebe-dmn cannot parse, so "schema-valid"
+  -- and "portable" are different properties, measured on the same file.
+  describe "the engine-intersection triple (per-element predicate as a table)" $ do
+    it "KIE accepts the inline control, warning-free" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        spouseInlineDmn [spouseInlineDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+
+    it "Camunda 8 accepts the inline control" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        spouseInlineDmn [spouseInlineDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+
+    -- The one warning is pinned BY NAME because it is a finding, not noise:
+    -- MISSING_TYPE_REF asks for the type of `eligible`, and the type it wants
+    -- is the function type Spouse -> boolean — which DMN's itemDefinition
+    -- language cannot spell. "No function types on the edges", stated by the
+    -- vendor's own validator.
+    it "KIE accepts the boxed-context table, with exactly the unspellable-type warning" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        spouseContextTableDmn [spouseContextTableDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("0 error(s), 1 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("MISSING_TYPE_REF" `isInfixOf`)
+          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+
+    -- UPGRADE RISK, wired on purpose. If a future zeebe-dmn bump LEARNS to
+    -- parse a decision table inside a context entry, HarnessMustFail turns
+    -- this test red — and that red is good news, not a regression: the engine
+    -- intersection has widened. Flip this expectation to HarnessMustPass and
+    -- update the two write-ups that cite the split (the fixture's own header
+    -- and the §6 measured note), then reconsider whether BKM emission is
+    -- still the ONLY portable route to an analyzable per-element predicate.
+    it "Camunda 8 REJECTS the boxed-context table at parse — the pinned negative" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        spouseContextTableDmn [spouseContextTableDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
+          out `shouldSatisfy` ("expected literal expression" `isInfixOf`)
+          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
+
+    it "KIE accepts the BKM table, warning-free" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        spouseBkmTableDmn [spouseBkmTableDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+
+    it "Camunda 8 accepts the BKM table — the only portable tabular predicate" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        spouseBkmTableDmn [spouseBkmTableDmn, "--cases", spouseCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
 
   describe "l4 openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $

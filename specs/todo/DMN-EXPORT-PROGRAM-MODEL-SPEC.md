@@ -2237,6 +2237,32 @@ required-steps notices and appeals all route through it. A v1 that refuses it ex
 model **missing the statute's constitutive test**. Given BKM turns out to be cheap, refusing buys
 nothing.
 
+**Measured 2026-07-30 — the engine-intersection triple.** BKM emission is not only the faithful
+spelling of a parameterised callee; it is the **only two-engine-portable** spelling of a
+per-element predicate with a tabular body. Three hand-written fixtures in
+`jl4/tests-cli/fixtures/dmn-engine-intersection/` express one statute-shaped predicate ("either
+spouse earns under $100,000 or is a Qualifying Candidate") over one shared cases file, and both
+committed engine harnesses were run over all three:
+
+| predicate spelled as                    | KIE 8.44         | zeebe-dmn 8.7.6   |
+| --------------------------------------- | ---------------- | ----------------- |
+| inline in the quantifier's `satisfies`  | pass, 0 warnings | pass              |
+| decision table in a boxed-context entry | pass, 1 warning  | **parse failure** |
+| decision table in a BKM                 | pass, 0 warnings | pass              |
+
+The boxed-context placement is schema-valid DMN 1.3 — a context entry holds any expression, and
+`tFunctionDefinition` is an expression — yet zeebe-dmn rejects it at parse (`expected literal
+expression but found '...DecisionTableImpl...'`). So "schema-valid" and "portable" are distinct
+properties, and the middle row is the measured gap between them. The KIE warning on that row is
+itself a finding: `MISSING_TYPE_REF` on the context-bound function asks for the type
+`Spouse → boolean`, which the `itemDefinition` language cannot spell (§4's type table has no
+function type). Consequence for this section: without BKMs, the exportable per-element predicate
+is an opaque FEEL string that no gap/overlap analysis can reach; with them, it is a table both
+engines accept and KIE's analyser checks. The Camunda failure is **pinned** as a negative
+control in `jl4/tests-cli/Main.hs` and in the `dmn-engines` CI job; if a zeebe-dmn upgrade
+learns to parse the boxed-context file, those legs go red with instructions to flip the pin and
+narrow this note.
+
 ### 6.3 Refuse loudly — three cases, not BKMs in general
 
 > **Case 3 narrowed 2026-07-27 by R7 (§13.3).** It read as an instruction to _suppress_ BKM

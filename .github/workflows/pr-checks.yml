@@ -102,6 +102,8 @@ jobs:
               # them.
               - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
               - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
+              # The engine-intersection triple: likewise hand-written.
+              - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures
@@ -720,6 +722,79 @@ jobs:
           # is what says it failed for the reason this fixture exists.
           grep -q 'KIE 8.44.0.Final VERDICT' xsd-order-bad.log
           grep -q 'cvc-complex-type.2.4.a' xsd-order-bad.log
+
+      # The engine-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
+      # measured 2026-07-30). One per-element predicate spelled three ways:
+      # inline in a FEEL quantifier, as a decision table in a boxed-context
+      # entry, and as the same table in a BKM. The measured fact this step
+      # keeps true: KIE takes all three; zeebe-dmn takes the inline and BKM
+      # forms and CANNOT PARSE the boxed-context one, although it is
+      # schema-valid DMN 1.3 — so the only two-engine spelling of an
+      # ANALYZABLE (tabular) per-element predicate is the BKM.
+      #
+      # The negative leg is a deliberate tripwire for engine upgrades: the day
+      # a zeebe-dmn bump learns to parse the boxed-context file, this step
+      # goes red HERE, with the message below. That red is good news — the
+      # engine intersection has widened. Flip the leg to a positive control,
+      # update the fixture's own header and the §6 measured note, and
+      # reconsider whether BKM emission is still the only portable route.
+      - name: Engine-intersection triple (BKM portable; boxed-context pinned unparseable)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          fixtures=jl4/tests-cli/fixtures/dmn-engine-intersection
+
+          # KIE: all three, with warning counts pinned. The boxed-context
+          # file's ONE warning is MISSING_TYPE_REF on the context-bound
+          # function — the validator asking for the type Spouse -> boolean,
+          # which DMN's type language cannot spell. A finding, not noise.
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-inline.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-inline.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-ctx.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 1 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-ctx.log
+          grep -q 'MISSING_TYPE_REF' kie-ctx.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-bkm.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-bkm.log
+
+          # Camunda: inline and BKM green...
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-inline.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-inline.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-bkm.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-bkm.log
+
+          # ...and the boxed-context file MUST come back red, at parse, for
+          # the reason this fixture exists. `&& rc=0 || rc=$?` keeps `set -e`
+          # from ending the step on the very exit code being asserted.
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" > cam-ctx.log 2>&1 && rc=0 || rc=$?
+          cat cam-ctx.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::zeebe-dmn now PARSES a decision table inside a boxed-context entry. This is GOOD NEWS from an engine upgrade, not a regression — the two-engine intersection has widened. Flip this leg to a positive control, update jl4/tests-cli/fixtures/dmn-engine-intersection/spouse-context-table.dmn's header and the DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6 measured note, and reconsider whether BKM emission is still the only portable route to an analyzable per-element predicate."
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running
+          # also exits non-zero. The banner says it ran; the parse message
+          # says it failed for the pinned reason.
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' cam-ctx.log
+          grep -q 'expected literal expression' cam-ctx.log
 
       - name: dmn-moddle (DMN 1.3 metamodel)
         run: npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
