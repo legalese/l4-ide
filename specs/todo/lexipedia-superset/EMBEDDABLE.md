@@ -259,14 +259,14 @@ for; §4.6 makes it a test rather than a hope.
 **Two seams Track E genuinely does depend on**, neither of which appears in SPEC.md's Track E
 row (now amended):
 
-- **Seam S6 — pan/zoom.** ✅ **CLOSED in ladder Step 4** (`<hash>`). It was open and total
+- **Seam S6 — pan/zoom.** ✅ **CLOSED in ladder Step 4** (`e720e3da`). It was open and total
   (§0), and the R1 layout spike measured p99 width 2882px, max 4372px
   (E1-IDE-INTEGRATION.md:214-220), which in a wiki column is not optional. It is now
   hand-rolled `viewBox` pan/zoom/fit in `ladder-svg` — pure arithmetic in `src/viewport.ts`,
   listeners in `controller.ts`, **no dependency**, and a plain wheel deliberately left to the
   page **unless the ladder has focus**, exactly as §3.3 words it (and note that a click
   focuses the host, since the controller makes it `tabindex="0"`).
-- **Seam S8 — baked palettes.** ⚠️ **HALF-CLOSED in ladder Step 4** (`<hash>`). The palette is
+- **Seam S8 — baked palettes.** ⚠️ **HALF-CLOSED in ladder Step 4** (`e720e3da`). The palette is
   a **parameter** now, not a bake: all 26 colours the emit names are fields of an exported
   `Palette`, `sceneToSvg` takes one, `LadderController.setTheme` re-themes a live diagram
   without remounting it, and `DARK_PALETTE` is the proof — so a widget pasted into
@@ -333,7 +333,7 @@ implementable, and there is one render path.
                  └──────────────────────────────────────┘
 ```
 
-The surface, deliberately small. **AS BUILT in ladder Step 4** (`<hash>`) — this block was
+The surface, deliberately small. **AS BUILT in ladder Step 4** (`e720e3da`) — this block was
 "proposed" until then; the three additions since, and why, are noted inline.
 
 ```ts
@@ -458,7 +458,7 @@ Everything except FLIP and pan/zoom is then testable under `tsx --test` with an 
 
 ### 3.5 Landing checklist
 
-- ✅ **DONE in Step 4** (`<hash>`). `ts-shared/l4-ladder-visualizer/package.json` did not
+- ✅ **DONE in Step 4** (`e720e3da`). `ts-shared/l4-ladder-visualizer/package.json` did not
   declare `@repo/ladder-core`, yet `src/lib/model/ladder-model.ts:22` imported it; it resolved
   only through npm-workspace hoisting, and `turbo.json` derives `build`/`check`'s
   `dependsOn: ["^build"]` from declared deps, so ladder-core's `dist/` was not ordered before
@@ -470,7 +470,7 @@ Everything except FLIP and pan/zoom is then testable under `tsx --test` with an 
   `HTMLElement`/`SVGSVGElement`/`PointerEvent`/`WheelEvent`/`ResizeObserver` already.
   `controller.ts` compiles under the unmodified config. If a future commit adds an explicit
   `lib`, `controller.ts` is what breaks first.
-- ⏭️ **DELIBERATELY NOT TAKEN in Step 4** (`<hash>`), and recorded here rather than left
+- ⏭️ **DELIBERATELY NOT TAKEN in Step 4** (`e720e3da`), and recorded here rather than left
   ambiguous: neither `@repo/ladder-core` nor `@repo/ladder-svg` has a `lint` script or an
   eslint config, so `turbo lint` silently skips both. Adding eslint to two packages is a
   config change with its own churn and its own failure modes, unrelated to Step 4's risk. It
@@ -1052,7 +1052,7 @@ Criteria 8 and 9 do **not** gate M2 or M3 (§1.3). They gate the distribution cl
   half of seam S4, which does not exist (`ViewSpec` has no `marks`; `ClickAct` has two verbs).
   If they gate, E1 waits on ladder 6a. Leaning: they gate E2/live (where the ask ranking is on
   the wire for free) and not E1a/static.
-- **R8 — ANSWERED 2026-07-30 (ladder Step 4, `<hash>`). It does not gate E1, because the half
+- **R8 — ANSWERED 2026-07-30 (ladder Step 4, `e720e3da`). It does not gate E1, because the half
   that mattered landed.** The palette is no longer baked: it is a **parameter**. `Palette` is
   exported from `@repo/ladder-svg` with all 26 colours the emit names (the seven that were
   already a `Palette` plus the nineteen that were inline literals), `sceneToSvg(scene, theme
