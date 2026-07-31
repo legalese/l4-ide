@@ -63,6 +63,14 @@ buildNpmPackage rec {
     npm run build
     popd
 
+    pushd ./ladder-core
+    npm run build
+    popd
+
+    pushd ./ladder-svg
+    npm run build
+    popd
+
     pushd ./l4-ladder-visualizer
     npm run build
     popd
