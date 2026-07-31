@@ -69,15 +69,47 @@ prelude-min-max.l4:66:1-44:
   assertion satisfied
 prelude-min-max.l4:67:1-44:
   assertion satisfied
-prelude-min-max.l4:79:1-27:
-  NOTHING
-prelude-min-max.l4:80:1-27:
+prelude-min-max.l4:88:1-27:
   JUST OF 3
-prelude-min-max.l4:81:1-27:
-  NOTHING
-prelude-min-max.l4:82:1-27:
+prelude-min-max.l4:89:1-27:
   JUST OF 3
-prelude-min-max.l4:83:1-49:
+prelude-min-max.l4:90:1-27:
+  JUST OF 3
+prelude-min-max.l4:91:1-27:
+  JUST OF 3
+prelude-min-max.l4:92:1-43:
+  assertion satisfied
+prelude-min-max.l4:93:1-43:
+  assertion satisfied
+prelude-min-max.l4:94:1-43:
+  assertion satisfied
+prelude-min-max.l4:95:1-43:
+  assertion satisfied
+prelude-min-max.l4:99:1-49:
   JUST OF 5
-prelude-min-max.l4:84:1-49:
-  JUST OF 5
+prelude-min-max.l4:100:1-49:
+  JUST OF 3
+prelude-min-max.l4:101:1-65:
+  assertion satisfied
+prelude-min-max.l4:102:1-65:
+  assertion satisfied
+prelude-min-max.l4:105:1-65:
+  assertion satisfied
+prelude-min-max.l4:106:1-65:
+  assertion satisfied
+prelude-min-max.l4:107:1-65:
+  assertion satisfied
+prelude-min-max.l4:108:1-65:
+  assertion satisfied
+prelude-min-max.l4:118:1-27:
+  NOTHING
+prelude-min-max.l4:119:1-28:
+  NOTHING
+prelude-min-max.l4:120:1-44:
+  assertion satisfied
+prelude-min-max.l4:121:1-44:
+  assertion satisfied
+prelude-min-max.l4:122:1-45:
+  assertion satisfied
+prelude-min-max.l4:123:1-45:
+  assertion satisfied
