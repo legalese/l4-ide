@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+list-missing-empty.l4:8:3-9:33:
+  I found a problem while checking the definition of `first`:
+    The following branches still need to be considered:
+    
+      WHEN EMPTY THEN
+    
