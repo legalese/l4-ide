@@ -356,6 +356,14 @@ DECLARE InvestorProfile HAS
     `annual income`                                          IS A NUMBER
     `net worth`                                              IS A NUMBER
     `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS A NUMBER
+    `greater of annual income or net worth`                  IS A NUMBER
+        MEANS IF   `annual income` AT LEAST `net worth`
+              THEN `annual income`
+              ELSE `net worth`
+    `lesser of annual income or net worth`                   IS A NUMBER
+        MEANS IF   `annual income` AT MOST `net worth`
+              THEN `annual income`
+              ELSE `net worth`
 
 -- Rule 100(a)(2)(i) and (ii) both measure against "the GREATER of the investor's
 -- annual income or net worth".
@@ -380,23 +388,10 @@ DECLARE InvestorProfile HAS
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
 `the applicable measure of annual income or net worth` investor MEANS
-    BRANCH IF `the rules in force include` `the 2021 amendments` THEN `greater of annual income or net worth` investor
-           IF ^                            `Reg CF commenced`    THEN `lesser of annual income or net worth` investor
+    BRANCH IF `the rules in force include` `the 2021 amendments` THEN investor's `greater of annual income or net worth`
+           IF ^                            `Reg CF commenced`    THEN investor's `lesser of annual income or net worth`
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
 
-GIVEN investor IS AN InvestorProfile
-GIVETH A NUMBER
-`greater of annual income or net worth` investor MEANS
-    IF   investor's `annual income` AT LEAST investor's `net worth`
-    THEN investor's `annual income`
-    ELSE investor's `net worth`
-
-GIVEN investor IS AN InvestorProfile
-GIVETH A NUMBER
-`lesser of annual income or net worth` investor MEANS
-    IF   investor's `annual income` AT MOST investor's `net worth`
-    THEN investor's `annual income`
-    ELSE investor's `net worth`
 
 -- The (i)/(ii) selector. Limb (i) applies "if EITHER the investor's annual
 -- income or net worth is less than $124,000"; limb (ii) applies "if BOTH ...

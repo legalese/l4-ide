@@ -56,6 +56,19 @@ import java.util.Map;
  * be named in `expect`, and every name in `expect` must be a decision. Adding a
  * decision without an expectation is therefore a failure, not a silent gap.
  *
+ * A decision answering null is a failure BY DEFAULT and stays one, for the
+ * reason below — but an EXPLICIT JSON null in `expect` licenses it, for that
+ * decision and that case only. Added 2026-07-31 with R8-d′ (MAYBE lowers to
+ * FEEL null), which made "answers null" a CORRECT answer for the first time:
+ * `capped at ten` at n = 20 is NOTHING, and a suite that could only score that
+ * as a failure would be answered by writing cases that avoid the absent branch,
+ * i.e. by a green test measuring nothing. `containsKey`, not `get(…) == null`,
+ * so "no expectation for this decision" keeps raising its own error.
+ *
+ * Kept SYMMETRIC with {@code CamundaDmnCheck} by the same house rule as
+ * {@code parseDateTag}: the fixture vocabulary means one thing on both engines,
+ * or a fixture measures two different things.
+ *
  * Four legs, in the order a real deployment meets them:
  *
  *   XSD    JAXP/Xerces against the DMN 1.3 schema that ships inside
@@ -347,13 +360,29 @@ public final class KieDmnCheck {
           seen.add(dr.getDecisionName());
           Object val = dr.getResult();
           DMNDecisionResult.DecisionEvaluationStatus st = dr.getEvaluationStatus();
+          // An EXPLICIT JSON null in `expect` LICENSES a null answer for this
+          // decision, and only for this decision. See the class comment; kept
+          // symmetric with CamundaDmnCheck by the same rule as parseDateTag.
+          //
+          // containsKey, not get(...) == null: "no expectation for this
+          // decision" must stay distinguishable from "expected null", and it
+          // still raises its own error below.
+          boolean nullLicensed =
+              c.expect != null
+                  && c.expect.containsKey(dr.getDecisionName())
+                  && c.expect.get(dr.getDecisionName()) == null;
           String flag = "";
-          if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED && val == null) {
+          if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED
+              && val == null
+              && !nullLicensed) {
             flag = "   <<< SUCCEEDED-BUT-NULL";
           } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SKIPPED) {
             flag = "   <<< SKIPPED";
           } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED) {
             succeeded++;
+            if (val == null) {
+              flag = "   <<< NULL (licensed by expect)";
+            }
           } else {
             flag = "   <<< " + st;
           }

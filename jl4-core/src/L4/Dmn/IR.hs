@@ -68,6 +68,7 @@ module L4.Dmn.IR
   , DrgNode (..)
   , Decision (..)
   , DecisionLogic (..)
+  , ContextEntry (..)
   , InputData (..)
   , Requirement (..)
   , requirementTarget
@@ -712,16 +713,43 @@ requirementTarget = \case
   RequiredDecision t -> t
   RequiredInput t    -> t
 
--- | What a decision's logic is. DMN calls both of these /boxed expressions/.
+-- | One @\<contextEntry\>@ of a 'LogicContext'.
+--
+-- __Every entry is NAMED.__ A context entry with no @\<variable\>@ is DMN's
+-- /final result entry/, and a context that has one evaluates to that entry
+-- alone. A hydrator's value IS the record, so it emits none and the context
+-- itself is the decision's value. Measured on KIE 8.44.0.Final and zeebe-dmn
+-- 8.7.6 (@jl4\/tests-cli\/fixtures\/dmn-hydration-probe@).
+data ContextEntry = MkContextEntry
+  { ceId    :: !Text
+  , ceName  :: !Text
+    -- ^ the FEEL entry name, and also the path step a downstream reader uses.
+    -- It comes from the SAME @neFields@ map the 'ItemComponent' name does, so
+    -- the two agree by construction rather than by an emitter remembering.
+  , ceLabel :: !Text   -- ^ the verbatim L4 field name
+  , ceType  :: !DmnType
+  , ceExpr  :: !FeelExpr
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | What a decision's logic is. DMN calls all three of these /boxed expressions/.
 --
 -- 'LogicLiteral' is not a failure mode to be ashamed of: a decision whose body is
 -- not a guarded chain (an arithmetic formula, a plain conjunction, a deontic rule)
 -- has no decision-table shape, and DMN's answer for that is a
 -- @\<literalExpression\>@. Silently dropping such a decision would leave the DRG
 -- describing a different rule set than the module does.
+--
+-- 'LogicContext' is a __hydrator__ (§4.4): a record instance re-emitted as a
+-- boxed context whose stored components are copied from the source and whose
+-- COMPUTED components are calculated from the entries declared before them. It
+-- is not a fallback at all — it is the only shape in which a derived field can
+-- reach a DMN engine, since FEEL has no notion of a derived component and an L4
+-- call is not a FEEL invocation.
 data DecisionLogic
   = LogicTable !DecisionTable
   | LogicLiteral !FeelExpr
+  | LogicContext ![ContextEntry]
   deriving stock (Eq, Show, Generic)
 
 -- | A @\<decision\>@.

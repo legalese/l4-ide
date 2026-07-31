@@ -58,6 +58,16 @@ import java.util.Map;
  * would pass a file that answers null; reading only isFailure() and null would
  * pass a file that answers `true` where a number was meant.
  *
+ * UNLESS `expect` says null EXPLICITLY, which licenses it for that decision in
+ * that case. Added 2026-07-31 with R8-d′ (MAYBE lowers to FEEL null), which made
+ * "answers null" a CORRECT answer for the first time; without the carve-out the
+ * only way to keep this suite green would be to write cases that avoid the
+ * absent branch, which is a green test measuring nothing. `containsKey`, not
+ * `get(…) == null`, so "no expectation for this decision" keeps raising its own
+ * error. Kept SYMMETRIC with {@code KieDmnCheck} by the same house rule as
+ * {@code parseDateTag}: the fixture vocabulary means one thing on both engines,
+ * or a fixture measures two different things.
+ *
  * On success the last line is a VERDICT banner. The test harness asserts the
  * BANNER, not the exit code, so that "exited 0 without running anything" cannot
  * read as a pass.
@@ -204,7 +214,11 @@ public final class CamundaDmnCheck {
         byte[] bs = new byte[r.getOutput().capacity()];
         r.getOutput().getBytes(0, bs);
         Object val = MSGPACK.readValue(bs, Object.class);
-        if (val == null) {
+        // An EXPLICIT JSON null in `expect` licenses a null answer here, and
+        // only here. See the class comment; symmetric with KieDmnCheck.
+        boolean nullLicensed =
+            c.expect != null && c.expect.containsKey(d.getName()) && c.expect.get(d.getName()) == null;
+        if (val == null && !nullLicensed) {
           // Necessary but not sufficient: see the class comment. A mis-resolved
           // FEEL name does not throw, and often does not even answer null.
           System.out.println("       " + pad(d.getName(), 40) + " = NULL   <<< EVALUATED-TO-NULL");

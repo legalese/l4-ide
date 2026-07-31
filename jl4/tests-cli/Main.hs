@@ -540,6 +540,56 @@ spouseCases           = dmnIntersectionDir </> "spouse.cases.json"
 dmnIntersectionDir :: FilePath
 dmnIntersectionDir = fixtureDir </> "dmn-engine-intersection"
 
+-- The HYDRATION probe (H4). Hand-written for the same reason `dateProbe*` is:
+-- it pins the portability of the boxed-context idiom ITSELF, independently of
+-- whether the emitter currently produces it. Unlike the date and xsd-order
+-- pairs there is no negative control, and the fixture's own header says why:
+-- those two ask whether a gate REJECTS, which needs a negative; this one asks
+-- whether an idiom EVALUATES, which the positive answers on its own.
+hydrationProbeModel, hydrationProbeCases :: FilePath
+hydrationProbeModel = dmnHydrationProbeDir </> "hydration-context.dmn"
+hydrationProbeCases = dmnHydrationProbeDir </> "hydration.cases.json"
+
+dmnHydrationProbeDir :: FilePath
+dmnHydrationProbeDir = fixtureDir </> "dmn-hydration-probe"
+
+-- The EMITTER'S OWN hydration output, and its cases. Strictly stronger than the
+-- hand-written probe above: that one pins that the boxed-context idiom
+-- evaluates, this one pins that jl4-core/src/L4/Dmn/Lower.hs emits it. A red run
+-- there isolates the ENGINE; a red run here isolates the LOWERING.
+--
+-- It is also the file that carries the two-engine measurement `sumtype.dmn`
+-- cannot: sumtype exists to exhibit REFUSALS, and one of them (`stated term`,
+-- R4-a) emits L4 source no engine can compile.
+hydrationGolden, hydrationEngineCases :: FilePath
+hydrationGolden      = "examples/dmn/expected/hydration.dmn"
+hydrationEngineCases = "examples/dmn/hydration.cases.json"
+
+-- The data-model exhibit, driven through KIE as a MustFail. There is no cases
+-- file: the point is that the model does not BUILD, which is settled before any
+-- case runs.
+sumtypeGolden :: FilePath
+sumtypeGolden = "examples/dmn/expected/sumtype.dmn"
+
+-- The NULL probe (R8-d′). Written and measured BEFORE the MAYBE→null lowering,
+-- because the whole ruling rests on FEEL's `=` against null being a proper
+-- boolean; if it were not, `if x != null then a else b` would take the else
+-- branch on a non-boolean condition and the absence-test half of R8-d′ would
+-- have been an ANSWER CHANGE. It is a boolean on both engines, so it shipped.
+--
+-- `nullAbsent*` is split out because it is the one question the two engines
+-- ANSWER DIFFERENTLY: an unbound name is null on zeebe-dmn and a model error on
+-- KIE. It is therefore MustPass on one and MustFail on the other, and each leg
+-- asserts that engine's own words.
+nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases :: FilePath
+nullProbeModel  = dmnNullProbeDir </> "null-semantics.dmn"
+nullProbeCases  = dmnNullProbeDir </> "null-semantics.cases.json"
+nullAbsentModel = dmnNullProbeDir </> "null-absent.dmn"
+nullAbsentCases = dmnNullProbeDir </> "null-absent.cases.json"
+
+dmnNullProbeDir :: FilePath
+dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
+
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
 -- companion with a project-local prelude override (which must win over the
@@ -584,7 +634,10 @@ main = do
        , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
        , gstGolden, gstEngineCases, dateProbeModel, dateProbeCases
        , dateProbeNegative
-       , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases ] \fp -> do
+       , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases
+       , hydrationProbeModel, hydrationProbeCases
+       , nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases
+       , hydrationGolden, hydrationEngineCases, sumtypeGolden ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1461,6 +1514,138 @@ spec bin = do
         dateProbeNegative [dateProbeNegative, "--cases", dateProbeCases] \out -> do
           out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
           out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
+
+  -- H4. The permanent record that the HYDRATION idiom is portable, and the
+  -- tripwire for an engine upgrade that changes the answer. The emitter's own
+  -- hydration output is measured separately (the `hydration.l4` golden subject
+  -- through both engines); this fixture is the idiom in isolation, so a red run
+  -- here isolates the ENGINE and a red run there isolates the EMITTER.
+  describe "the hydration idiom (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE evaluates a boxed context whose entries read earlier siblings" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        hydrationProbeModel [hydrationProbeModel, "--cases", hydrationProbeCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- Zero warnings is part of the measurement, not decoration: KIE warns
+          -- on plenty it still evaluates, and the claim being pinned is that
+          -- this idiom is unremarkable to the engine, not merely tolerated.
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+    it "Camunda (zeebe-dmn) evaluates the same boxed context" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        hydrationProbeModel [hydrationProbeModel, "--cases", hydrationProbeCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
+
+  -- The EMITTER's hydration output through both engines. This is the leg that
+  -- turns §4.4 from a design into a measurement: 44 decision values per engine,
+  -- over an artifact jl4-core/src/L4/Dmn/Lower.hs produced.
+  --
+  -- Case D supplies a NULL source record, which is the one input shape under
+  -- which D-COMPUTEDFIELD's "nothing an engine needs is lost" could have been
+  -- engine-visibly wrong. Both engines agree exactly, and the answer is not the
+  -- obvious one -- `band` comes back 1, not null -- so it is measured rather
+  -- than reasoned about. See hydration.cases.json's own note and §4.4.6.
+  describe "emitted hydration (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE evaluates the emitted hydrators, their sources and their readers" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+
+    it "Camunda evaluates the same emitted model" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+
+    -- The COUNTERPART, and it is not a consolation prize. `sumtype.dmn` is the
+    -- exhibit of what the exporter REFUSES, and R4-a's refusal emits L4 source
+    -- by design -- so an engine must reject it, and until this leg existed
+    -- nothing in the repo said so. `grep -n sumtype jl4/tests-cli/Main.hs`
+    -- returned nothing before 2026-07-31: no engine had ever looked at this
+    -- file. So this is coverage that never existed, not a defect retired.
+    --
+    -- It goes RED if someone "fixes" `stated term`, which is the point: the
+    -- refusal is now a measurement rather than an argument.
+    it "KIE REJECTS the refusal exhibit, and names the payload projection" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        sumtypeGolden [sumtypeGolden] \out -> do
+          -- Not a schema failure: the file is valid DMN. It is the FEEL that
+          -- cannot compile, which is exactly what a Blocking note claims.
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          -- ★ Assert the CAUSE, not merely that the id appears. Every decision
+          -- id shows up in KIE's per-decision listing on any run, pass or fail,
+          -- so `"decision_stated_term" isInfixOf out` -- which is all this leg
+          -- asserted when it was written -- carries no information about WHY
+          -- the run failed, and a change that made the file fail for an
+          -- entirely different reason would have kept it green.
+          out `shouldSatisfy` ("ERR_COMPILING_FEEL" `isInfixOf`)
+          out `shouldSatisfy` ("decision_stated_term_literal" `isInfixOf`)
+          out `shouldSatisfy` ("Unknown variable 'disposal.term_in_years'" `isInfixOf`)
+          out `shouldSatisfy` ("<<< FAILED" `isInfixOf`)
+          -- A SECOND, independent error, measured 2026-07-31 and recorded here
+          -- rather than tidied away: KIE resolves itemDefinition typeRefs in
+          -- DOCUMENT ORDER, and `itemdef_claim`'s `assessed grade` component
+          -- points at `Grade_optional`, which this emitter appends AFTER the
+          -- definitions that reference it. Pre-existing (HEAD's sumtype.dmn has
+          -- the same ordering) and previously unmeasured, because no engine had
+          -- ever looked at this file. It is confined to the `_optional` alias
+          -- machinery and `sumtype.dmn` is the only DMN golden that uses it, so
+          -- it changes no MustPass leg -- but it is a real portability defect
+          -- and pinning it here is what stops it being lost. See §11-R8-a.
+          out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
+          out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+
+  -- R8-d′'s evidence. Written and MEASURED before the MAYBE→null lowering
+  -- existed, because the ruling is only safe if `=` against null is a proper
+  -- boolean on both engines. It is. See the fixture headers for the fallback
+  -- that was pre-declared in case it had not been.
+  describe "FEEL null semantics (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    it "KIE: comparison against null is boolean, and a table may default to null" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        nullProbeModel [nullProbeModel, "--cases", nullProbeCases] \out -> do
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- The single-output table carries no @name and no @typeRef on its
+          -- <output>, matching what Emit.hs emits; carrying them draws two
+          -- ILLEGAL_USE_OF_* warnings, so zero here is also a statement that
+          -- the probe is written in the emitter's shape.
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("15/15 value(s) as expected" `isInfixOf`)
+
+    it "Camunda: same five questions, same five answers" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        nullProbeModel [nullProbeModel, "--cases", nullProbeCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("15/15 value(s) as expected" `isInfixOf`)
+
+    -- The ONE null question the engines answer differently, asserted in both
+    -- directions. A shared expectation would have had to pick a side and would
+    -- then have read as a bug in the other.
+    it "Camunda treats a name that was never supplied as null" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        nullAbsentModel [nullAbsentModel, "--cases", nullAbsentCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("1/1 value(s) as expected" `isInfixOf`)
+
+    it "KIE calls the same thing a model error and SKIPS the decision" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        nullAbsentModel [nullAbsentModel, "--cases", nullAbsentCases] \out -> do
+          out `shouldSatisfy` ("Required dependency 'r' not found" `isInfixOf`)
+          out `shouldSatisfy` ("SKIPPED" `isInfixOf`)
+          out `shouldSatisfy` ("0/1 decision(s) SUCCEEDED" `isInfixOf`)
+          -- It is a RUNTIME divergence, not a schema or build one: the file is
+          -- perfectly valid and KIE builds it without complaint.
+          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
+          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing

@@ -22,11 +22,21 @@
 --   * `claim amount`           merely THREADS a record with a sum-typed field,
 --                              never reading it            [D-SUMTYPE, lossy];
 --   * `capped at ten`          GIVETH A MAYBE NUMBER, constructing JUST/NOTHING.
---                              Refused, and half the point of the fixture is
---                              that `NOTHING` appears NOWHERE as a FEEL string
---                              constant  [D-SUMTYPE blocking, D-MAYBE-NULL lossy];
---   * `grade is settled`       takes a MAYBE over a type that HAS a domain, so
---                              `q` shows R8-a's CARVE-OUT: its typeRef is
+--                              Since R8-d' (2026-07-31) this TABULATES: one row
+--                              `<= 10 -> n`, and the absent case is the
+--                              <defaultOutputEntry>, which is FEEL `null`. The
+--                              other half of the point is UNCHANGED and still
+--                              holds: `NOTHING` appears NOWHERE as a FEEL string
+--                              constant -- it is a literal now, not a string and
+--                              not a name         [D-MAYBE-NULL lossy];
+--   * `grade is settled` and   the TWO SPELLINGS of an absence test, lowered by
+--     `..., spelled longhand`  two different routes. The first is `isJust q`,
+--                              recognised by the prelude definition's own
+--                              Unique and rendered `q != null`; the second is
+--                              the explicit CONSIDER, rendered
+--                              `if p != null then true else false`. Both are
+--                              kept so a narrowing cannot take one silently.
+--                              `q` also shows R8-a's CARVE-OUT: its typeRef is
 --                              `Grade_optional`, a minted alias over `string`
 --                              with NO allowedValues, not `Grade`. Pointing at
 --                              `Grade` would re-assert the complete range one
@@ -38,7 +48,11 @@
 --                              `q` a value outside the three constructors is
 --                              no longer rejected either  [D-MAYBE-NULL lossy];
 --   * `Claim`                  a record with a MAYBE field, a LIST OF field and
---                              a COMPUTED field  [D-MAYBE-NULL, D-ITEMDEF lossy];
+--                              a COMPUTED field. The computed one is read by
+--                              `claim payout`, which is what mints the HYDRATOR
+--                              and `Claim_hydrated`
+--                              [D-MAYBE-NULL, D-ITEMDEF lossy;
+--                               D-COMPUTEDFIELD advisory on the hydrated type];
 --   * `deep`                   GIVEN a MAYBE (MAYBE NUMBER). `null` does not
 --                              nest, so JUST NOTHING and NOTHING would become
 --                              one FEEL value and FEEL `=` would answer TRUE
@@ -65,14 +79,27 @@
 -- typeRef="number": a builtin asserts no range, so there is nothing for the
 -- typeRef hop to re-assert and nothing an alias would buy.
 --
--- And one more: `Claim`'s
--- COMPUTED field does not appear as an <itemComponent>, and it raises no note
--- either. That is not an omission — `L4.Desugar` rewrites a computed field into
--- a synthetic top-level DECIDE before type checking, so by the time the exporter
--- sees the DECLARE the field is already a decision of its own, reading a `_self`
--- inputData typed `Claim`. The information is relocated, not dropped.
+-- And one more, which changed with H1 (2026-07-31): `Claim`'s COMPUTED field
+-- `doubled amount` is still absent from `Claim`'s own <itemComponent> list --
+-- the base itemDefinition is the model's INPUT CONTRACT and a derived field is
+-- not part of it -- but it is no longer merely relocated to a decision reading a
+-- synthetic `_self` inputData. `claim payout` reads it, which mints a HYDRATOR:
+-- decision `claim payout` (hydrated), a boxed <context> whose entries are
+-- `Claim`'s stored fields copied from `cl` followed by `doubled_amount`
+-- computed from the sibling entry before it, typed by `Claim_hydrated`. The
+-- read itself is then plain path access. So `_self` and the synthetic decision
+-- BOTH disappear from the model, and the type `Claim_hydrated` carries
+-- D-COMPUTEDFIELD (advisory): DMN's tItemDefinition has no derived flag, so a
+-- reader of the hydrated type alone cannot tell a derived component from a
+-- stored one. Nothing an ENGINE needs is lost -- hydration means no caller ever
+-- supplies one.
 --
 -- Figures and terms are illustrative; the point is the TYPE, not the statute.
+
+-- `isJust` lives in the prelude, which this file did not import before R8-d'.
+-- Safe: `topDecls` walks only this module's own section, so no prelude decision
+-- enters the DRG.
+IMPORT prelude
 
 § `Sum types and the data model`
 
@@ -128,14 +155,36 @@ GIVETH A MAYBE NUMBER
 `capped at ten` n MEANS
   IF n AT MOST 10 THEN JUST n ELSE NOTHING
 
--- R8-a and R8-b at an inputData: `q` is emitted as typeRef="Grade", and Grade's
--- domain is NOT emitted, because `null` cannot be listed in it.
+-- R8-a and R8-b at an inputData, and the TWO SPELLINGS of an absence test.
+-- The first is what L4 house style writes; the second is what it desugars to in
+-- the reader's head. Both are here on purpose, because R8-d' lowers them by two
+-- different routes and keeping only one would leave the other unexercised: the
+-- combinator table recognises `isJust` by the PRELUDE'S OWN UNIQUE, while the
+-- CONSIDER case handles the shape the table does not see.
 GIVEN q IS A MAYBE Grade
 GIVETH A BOOLEAN
 `grade is settled` q MEANS
-  CONSIDER q
+  isJust q
+
+-- The binder is `p`, not `q`: two GIVENs spelled `q` would fold to one
+-- inputData name and raise a D-SCOPE note that has nothing to do with what this
+-- fixture is about.
+GIVEN p IS A MAYBE Grade
+GIVETH A BOOLEAN
+`grade is settled, spelled longhand` p MEANS
+  CONSIDER p
   WHEN JUST g  THEN TRUE
   WHEN NOTHING THEN FALSE
+
+-- H1's GATE, and the PROJECTION spelling of a computed-field read. Without a
+-- reader, `Claim` gets no hydrator at all: a hydration decision with no
+-- dependents is noise in an artifact whose whole claim is that every line in it
+-- means something -- the same rule the `_optional` aliases follow. The binder is
+-- `cl` for the same D-SCOPE reason `p` is `p`.
+GIVEN cl IS A Claim
+GIVETH A NUMBER
+`claim payout` cl MEANS
+  cl's `doubled amount`
 
 -- R8-c. `null` does not nest.
 GIVEN m IS A MAYBE (MAYBE NUMBER)
