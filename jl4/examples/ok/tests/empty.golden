@@ -4,27 +4,17 @@ empty.l4:11:10-13:18:
   I found a problem while checking the definition of `x2`:
     The following branches still need to be considered:
     
-      WHEN faz `_`
-          bar THEN
-      WHEN faz `_`
-          qux THEN
+      WHEN faz `_` bar THEN
+      WHEN faz `_` qux THEN
     
 empty.l4:16:10-19:26:
   I found a problem while checking the definition of `xx`:
     The following branches still need to be considered:
     
-      WHEN faz qux
-          bar THEN
-      WHEN faz qux
-          baz THEN
-      WHEN faz bar
-          bar THEN
-      WHEN faz bar
-          baz THEN
-      WHEN faz baz
-          bar THEN
-      WHEN faz baz
-          baz THEN
+      WHEN faz bar `_` THEN
+      WHEN faz baz `_` THEN
+      WHEN faz qux bar THEN
+      WHEN faz qux baz THEN
     
 empty.l4:16:10-19:26:
   I found a problem while checking the definition of `xx`:
