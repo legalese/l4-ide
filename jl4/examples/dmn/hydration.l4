@@ -39,18 +39,18 @@
 --                               make the other silently worse.
 --                               ITS BINDER IS ALSO SPELLED `applicant`, AND
 --                               THAT IS DELIBERATE, not the oversight
---                               sumtype.l4:161-163 warns against. Two GIVENs of
---                               one name fold to one inputData name, so the
---                               model carries `input_applicant` +
---                               `input_applicant_2` and TWO hydrators of ONE
---                               record type -- which is what exercises the
---                               hydrated-itemDefinition name reuse and the
---                               `applicant_hydrated_2` uniquifier. The price is
---                               that this file's fidelity report opens with
---                               D-SCOPE and D-RENAME (both Lossy) before the
---                               notes it exists to demonstrate. Paid on
---                               purpose; sumtype.l4 avoids the same collision
---                               because there it would buy nothing;
+--                               sumtype.l4:161-163 warns against. Since Phase 4
+--                               (§2.1 un-lifting) two same-named, same-typed
+--                               GIVENs MERGE into ONE `input_applicant` feeding
+--                               ONE hydrator, and D-PARAM-AS-INPUT names the
+--                               price: the two decisions read one shared
+--                               subject and can no longer be applied to
+--                               different applicants in this model. (Before
+--                               Phase 4 this pair minted `input_applicant_2`
+--                               and a second hydrator, and the report opened
+--                               with D-SCOPE and D-RENAME; the cases file
+--                               changed in the same commit, and its git history
+--                               holds the two-subject shape.)
 --   * `the leading applicant`   a record-valued DECISION, read through a
 --                               computed field by `leading total`. That is the
 --                               RequiredDecision branch of hydration: a

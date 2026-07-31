@@ -36,9 +36,6 @@
   <inputData id="input_applicant" name="applicant">
     <variable id="input_applicant_var" name="applicant" typeRef="Applicant"/>
   </inputData>
-  <inputData id="input_applicant_2" name="applicant_2" label="applicant">
-    <variable id="input_applicant_2_var" name="applicant_2" label="applicant" typeRef="Applicant"/>
-  </inputData>
   <inputData id="input_the_submission" name="the_submission" label="the submission">
     <variable id="input_the_submission_var" name="the_submission" label="the submission" typeRef="Submission"/>
   </inputData>
@@ -66,10 +63,10 @@
   <decision id="decision_applicant_band_width" name="applicant_band_width" label="applicant band width">
     <variable id="decision_applicant_band_width_var" name="applicant_band_width" label="applicant band width" typeRef="number"/>
     <informationRequirement id="decision_applicant_band_width_ir1">
-      <requiredDecision href="#hydration_applicant_2"/>
+      <requiredDecision href="#hydration_applicant"/>
     </informationRequirement>
     <literalExpression id="decision_applicant_band_width_literal">
-      <text>applicant_hydrated_2.band_width</text>
+      <text>applicant_hydrated.band_width</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_leading_applicant" name="the_leading_applicant" label="the leading applicant">
@@ -182,44 +179,6 @@
       </contextEntry>
     </context>
   </decision>
-  <decision id="hydration_applicant_2" name="applicant_hydrated_2" label="applicant">
-    <variable id="hydration_applicant_2_var" name="applicant_hydrated_2" label="applicant" typeRef="Applicant_hydrated"/>
-    <informationRequirement id="hydration_applicant_2_ir1">
-      <requiredInput href="#input_applicant_2"/>
-    </informationRequirement>
-    <context id="hydration_applicant_2_ctx">
-      <contextEntry id="hydration_applicant_2_ce1">
-        <variable id="hydration_applicant_2_ce1_var" name="salary" typeRef="number"/>
-        <literalExpression id="hydration_applicant_2_ce1_lit">
-          <text>applicant_2.salary</text>
-        </literalExpression>
-      </contextEntry>
-      <contextEntry id="hydration_applicant_2_ce2">
-        <variable id="hydration_applicant_2_ce2_var" name="other_income" label="other income" typeRef="number"/>
-        <literalExpression id="hydration_applicant_2_ce2_lit">
-          <text>applicant_2.other_income</text>
-        </literalExpression>
-      </contextEntry>
-      <contextEntry id="hydration_applicant_2_ce3">
-        <variable id="hydration_applicant_2_ce3_var" name="total_income" label="total income" typeRef="number"/>
-        <literalExpression id="hydration_applicant_2_ce3_lit">
-          <text>salary + other_income</text>
-        </literalExpression>
-      </contextEntry>
-      <contextEntry id="hydration_applicant_2_ce4">
-        <variable id="hydration_applicant_2_ce4_var" name="band" typeRef="number"/>
-        <literalExpression id="hydration_applicant_2_ce4_lit">
-          <text>(if total_income &gt;= 100000 then 3 else (if total_income &gt;= 50000 then 2 else 1))</text>
-        </literalExpression>
-      </contextEntry>
-      <contextEntry id="hydration_applicant_2_ce5">
-        <variable id="hydration_applicant_2_ce5_var" name="band_width" label="band width" typeRef="number"/>
-        <literalExpression id="hydration_applicant_2_ce5_lit">
-          <text>band * 25000</text>
-        </literalExpression>
-      </contextEntry>
-    </context>
-  </decision>
   <decision id="hydration_the_leading_applicant" name="the_leading_applicant_hydrated" label="the leading applicant">
     <variable id="hydration_the_leading_applicant_var" name="the_leading_applicant_hydrated" label="the leading applicant" typeRef="Applicant_hydrated"/>
     <informationRequirement id="hydration_the_leading_applicant_ir1">
@@ -263,23 +222,20 @@
       <dmndi:DMNShape id="input_applicant_shape" dmnElementRef="input_applicant">
         <dc:Bounds x="60" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_applicant_2_shape" dmnElementRef="input_applicant_2">
+      <dmndi:DMNShape id="input_the_submission_shape" dmnElementRef="input_the_submission">
         <dc:Bounds x="280" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_the_submission_shape" dmnElementRef="input_the_submission">
+      <dmndi:DMNShape id="input_n_shape" dmnElementRef="input_n">
         <dc:Bounds x="500" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_n_shape" dmnElementRef="input_n">
+      <dmndi:DMNShape id="input_b_shape" dmnElementRef="input_b">
         <dc:Bounds x="720" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_b_shape" dmnElementRef="input_b">
+      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
         <dc:Bounds x="940" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
-        <dc:Bounds x="1160" y="540" width="180" height="80"/>
-      </dmndi:DMNShape>
       <dmndi:DMNShape id="input_m_shape" dmnElementRef="input_m">
-        <dc:Bounds x="1380" y="540" width="180" height="80"/>
+        <dc:Bounds x="1160" y="540" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_the_leading_applicant_shape" dmnElementRef="decision_the_leading_applicant">
         <dc:Bounds x="60" y="380" width="180" height="80"/>
@@ -299,9 +255,6 @@
       <dmndi:DMNShape id="hydration_applicant_shape" dmnElementRef="hydration_applicant">
         <dc:Bounds x="1160" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="hydration_applicant_2_shape" dmnElementRef="hydration_applicant_2">
-        <dc:Bounds x="1380" y="380" width="180" height="80"/>
-      </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_applicant_score_shape" dmnElementRef="decision_applicant_score">
         <dc:Bounds x="60" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
@@ -319,11 +272,11 @@
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_applicant_band_width_ir1_edge" dmnElementRef="decision_applicant_band_width_ir1">
-        <di:waypoint x="1470" y="380"/>
+        <di:waypoint x="1250" y="380"/>
         <di:waypoint x="370" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_leading_applicant_ir1_edge" dmnElementRef="decision_the_leading_applicant_ir1">
-        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="370" y="540"/>
         <di:waypoint x="150" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_leading_total_ir1_edge" dmnElementRef="decision_leading_total_ir1">
@@ -331,28 +284,24 @@
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_capped_bonus_ir1_edge" dmnElementRef="decision_capped_bonus_ir1">
-        <di:waypoint x="810" y="540"/>
+        <di:waypoint x="590" y="540"/>
         <di:waypoint x="370" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_bonus_is_settled_ir1_edge" dmnElementRef="decision_bonus_is_settled_ir1">
-        <di:waypoint x="1030" y="540"/>
+        <di:waypoint x="810" y="540"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_bonus_is_unsettled_ir1_edge" dmnElementRef="decision_bonus_is_unsettled_ir1">
-        <di:waypoint x="1250" y="540"/>
+        <di:waypoint x="1030" y="540"/>
         <di:waypoint x="810" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_bonus_or_zero_ir1_edge" dmnElementRef="decision_bonus_or_zero_ir1">
-        <di:waypoint x="1470" y="540"/>
+        <di:waypoint x="1250" y="540"/>
         <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="hydration_applicant_ir1_edge" dmnElementRef="hydration_applicant_ir1">
         <di:waypoint x="150" y="540"/>
         <di:waypoint x="1250" y="460"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="hydration_applicant_2_ir1_edge" dmnElementRef="hydration_applicant_2_ir1">
-        <di:waypoint x="370" y="540"/>
-        <di:waypoint x="1470" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="hydration_the_leading_applicant_ir1_edge" dmnElementRef="hydration_the_leading_applicant_ir1">
         <di:waypoint x="150" y="380"/>

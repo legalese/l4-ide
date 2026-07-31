@@ -46,13 +46,13 @@ import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified Data.ByteString as BS
 import qualified Data.List as List
+import UnliftIO
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as TextEncoding
 import System.Directory
 import System.Environment (getExecutablePath, lookupEnv)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import qualified L4.Utils.IntervalMap as IV
-import UnliftIO
 
 type instance RuleResult GetLexTokens = ([PosToken], Text)
 data GetLexTokens = GetLexTokens

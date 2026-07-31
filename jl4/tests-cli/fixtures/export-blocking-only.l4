@@ -1,0 +1,16 @@
+-- Fixture for the `l4 export --to=dmn --fail-on` threshold tests: a DMN
+-- report that is blocking-ONLY (2 blocking, 0 lossy, 0 advisory).
+--
+-- Two formula decisions over one ASSUMEd input: each is a boxed literal
+-- expression (D-LITERALEXPR, Blocking) and nothing else fires — no MAYBE, no
+-- rename, no fixture, no regulative body. (This role used to be played by
+-- export-two-rules.l4's two regulative decides, until Phase 4's population
+-- filter correctly routed uncalled regulative bodies out of the DRG.)
+
+ASSUME x IS A NUMBER
+
+GIVETH A NUMBER
+`twice x` MEANS x TIMES 2
+
+GIVETH A NUMBER
+`thrice x` MEANS x TIMES 3

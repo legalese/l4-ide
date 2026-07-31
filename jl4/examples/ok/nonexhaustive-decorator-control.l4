@@ -1,6 +1,8 @@
 -- Control fixture for the @nonexhaustive decorator: this is ok/nonexhaustive-decorator.l4
 -- WITHOUT the decorator, so the non-exhaustive CONSIDER in `unwrap` (missing
--- WHEN NOTHING) must fail the typecheck.
+-- WHEN NOTHING) must WARN. (On this line warnings are non-fatal to
+-- SuccessfulTypeCheck, so the file lives in ok/ and the golden pins the
+-- warning text; the decorated twin's golden pins its absence.)
 GIVEN m IS A MAYBE NUMBER
 GIVETH A NUMBER
 unwrap m MEANS

@@ -44,6 +44,12 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-SUMTYPE] blocking — decision_deep  (main.l4:193:3-7)
       `deep` is typed `MAYBE OF MAYBE OF NUMBER` at its own boundary: FEEL's `null` does not nest and FEEL has no EITHER, so the type has no faithful image, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-INERT] advisory — decision_deep  (main.l4:190:1-193:7)
+      `deep` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-PARTIAL] blocking — decision_stated_term  (main.l4:142:3-29)
+      `stated term` could not be certified total (L11 at main.l4:142:3-29: the projection `term in years` scrutinises a multi-constructor IS ONE OF whose constructors do not all declare that field; the selector application raises NonExhaustivePatterns at run time even though no CONSIDER is in sight), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. No call site consumes it (it is a DRG root), so no guard can fence the null
+      lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
   [D-COMPUTEDOUTPUT] advisory — decision_capped_at_ten  (main.l4:156:24-30)
       the output entry `n` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

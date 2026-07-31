@@ -431,13 +431,25 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- are local.
 --
 -- The two --fail-on fixtures are a matched pair, and both are needed: the
--- `export-two-rules` DMN report is blocking-ONLY and the `export-advisory-only`
--- DMN report is advisory-ONLY, so between them every @FidelityGate@ value has
--- both a case that must trip and a case that must not.
-exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture :: FilePath
+-- `export-blocking-only` DMN report is blocking-ONLY and the
+-- `export-advisory-only` DMN report is advisory-ONLY, so between them every
+-- @FidelityGate@ value has both a case that must trip and a case that must
+-- not. (`export-two-rules` used to play the blocking-only role, until Phase
+-- 4's population filter correctly routed its two uncalled regulative bodies
+-- out of the DRG — it keeps its BPMN rule-selection role, and its DMN export
+-- now refuses with an EMPTY model, which its own test below pins.)
+exportTwoRulesFixture, exportNothingFixture :: FilePath
+exportBlockingOnlyFixture, exportAdvisoryOnlyFixture :: FilePath
 exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
 exportNothingFixture      = fixtureDir </> "export-nothing.l4"
+exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
+
+-- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
+-- that imports it backticked (the only legal spelling for a hyphenated name)
+-- and references `statute`.
+importViewFixture :: FilePath
+importViewFixture = fixtureDir </> "import-view" </> "interp-common.l4"
 
 bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
 bpmnOfferingSource   = "examples/bpmn/offering.l4"
@@ -628,7 +640,8 @@ main = do
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
        , shadowExtraEntry, shadowImporterEntry
-       , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
+       , exportTwoRulesFixture, exportNothingFixture
+       , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
        , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
        , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
@@ -1222,16 +1235,16 @@ spec bin = do
             code `shouldBe` ExitSuccess
 
       it "a blocking-only report is caught by every threshold" $ do
-        -- `l4 export --to=dmn export-two-rules.l4` reports 2 blocking, 0 lossy,
-        -- 0 advisory: the pure-Blocking end of the lattice. Assert that first,
-        -- so the rows below cannot go green for the wrong reason if the
-        -- fixture's notes ever change severity.
-        Output tally _ serr <- dmnGate exportTwoRulesFixture []
+        -- `l4 export --to=dmn export-blocking-only.l4` reports 2 blocking,
+        -- 0 lossy, 0 advisory: the pure-Blocking end of the lattice. Assert
+        -- that first, so the rows below cannot go green for the wrong reason
+        -- if the fixture's notes ever change severity.
+        Output tally _ serr <- dmnGate exportBlockingOnlyFixture []
         tally `shouldBe` ExitSuccess
         serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
         serr `shouldSatisfy` (not . ("lossy" `isInfixOf`))
         serr `shouldSatisfy` (not . ("advisory" `isInfixOf`))
-        mapM_ (\g -> exitsNonZero exportTwoRulesFixture ["--fail-on=" ++ g])
+        mapM_ (\g -> exitsNonZero exportBlockingOnlyFixture ["--fail-on=" ++ g])
           ["blocking", "lossy", "advisory"]
 
       it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
@@ -1250,7 +1263,31 @@ spec bin = do
         mapM_ (\fixture -> do
                  exitsZero fixture ["--fail-on=none"]
                  exitsZero fixture [])
-          [exportTwoRulesFixture, exportAdvisoryOnlyFixture]
+          [exportBlockingOnlyFixture, exportAdvisoryOnlyFixture]
+
+      -- Phase 4's population filter (§2.5.6 rule 3) routes uncalled
+      -- regulative bodies out of the DRG; a module holding ONLY those now
+      -- exports an empty model, which the CLI refuses loudly rather than
+      -- writing a decision-free document. This is the behaviour change that
+      -- retired export-two-rules.l4 from the blocking-only role above.
+      it "refuses an all-regulative module as DMN (empty model after the population filter)" $
+        expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
+
+    -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
+    -- module name can only be imported as IMPORT `interp-common`, and the
+    -- textual sibling scan used to match only the bare spelling — so every
+    -- hyphenated module (the whole housing-act/charities/reg-cf population)
+    -- saw "no importers", returned Just Set.empty ("verified clear") instead
+    -- of the fail-safe Nothing, and dropped its externally-called
+    -- fixture-shaped decisions: the "delete a statute" case §2.5.7 names.
+    -- `local sample` is the in-fixture negative control: same module-local
+    -- shape, unreferenced by the importer, so it must still drop — proving
+    -- the scan discriminates by name rather than failing open.
+    it "keeps a fixture-shaped decision whose importer spells the IMPORT with backticks" $ do
+      Output code sout _ <- runL4 bin ["export", "--to=dmn", importViewFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("decision_statute" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("local sample" `isInfixOf`))
 
     it "still writes the document when --fail-on trips" $ do
       Output code sout _ <- runL4 bin
@@ -1540,7 +1577,7 @@ spec bin = do
           out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
 
   -- The EMITTER's hydration output through both engines. This is the leg that
-  -- turns §4.4 from a design into a measurement: 44 decision values per engine,
+  -- turns §4.4 from a design into a measurement: 40 decision values per engine,
   -- over an artifact jl4-core/src/L4/Dmn/Lower.hs produced.
   --
   -- Case D supplies a NULL source record, which is the one input shape under
@@ -1555,14 +1592,14 @@ spec bin = do
           out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
 
     it "Camunda evaluates the same emitted model" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
 
     -- The COUNTERPART, and it is not a consolation prize. `sumtype.dmn` is the
     -- exhibit of what the exporter REFUSES, and R4-a's refusal emits L4 source

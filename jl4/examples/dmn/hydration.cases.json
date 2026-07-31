@@ -6,6 +6,17 @@
     "emits that idiom correctly, which is the stronger claim and the one that",
     "goes red if the LOWERING breaks rather than the engine.",
     "",
+    "PHASE 4 (un-lifting, §2.1): hydration.l4's two same-named, same-typed",
+    "`applicant` GIVENs now MERGE into ONE `input_applicant` feeding ONE",
+    "hydrator, so these cases supply one `applicant` where they used to supply",
+    "`applicant` + `applicant_2`, and `applicant_hydrated_2` no longer exists",
+    "to assert on. That is the loss D-PARAM-AS-INPUT names -- the model reads",
+    "one shared subject -- measured here rather than assumed. The exactly-50000",
+    "closed-boundary probe that used to ride on the second applicant now rides",
+    "on `the_submission.primary` in case C; the just-below probe (49999 -> band",
+    "1) was ceded with the second subject, band 1 remaining attested by cases B",
+    "and D. The two-subject shape survives in this file's git history.",
+    "",
     "Read the hydrated records for the topological sort: `total_income` is the",
     "SUM of the two stored entries and `band` is computed FROM `total_income`,",
     "yet `band` is declared FIRST in hydration.l4. If the exporter emitted",
@@ -39,10 +50,6 @@
           "salary": 50000,
           "other_income": 15000
         },
-        "applicant_2": {
-          "salary": 50000,
-          "other_income": 15000
-        },
         "the_submission": {
           "primary": {
             "salary": 90000,
@@ -60,13 +67,6 @@
       },
       "expect": {
         "applicant_hydrated": {
-          "salary": 50000,
-          "other_income": 15000,
-          "total_income": 65000,
-          "band": 2,
-          "band_width": 50000
-        },
-        "applicant_hydrated_2": {
           "salary": 50000,
           "other_income": 15000,
           "total_income": 65000,
@@ -100,10 +100,6 @@
           "salary": 20000,
           "other_income": 5000
         },
-        "applicant_2": {
-          "salary": 20000,
-          "other_income": 5000
-        },
         "the_submission": {
           "primary": {
             "salary": 30000,
@@ -121,13 +117,6 @@
       },
       "expect": {
         "applicant_hydrated": {
-          "salary": 20000,
-          "other_income": 5000,
-          "total_income": 25000,
-          "band": 1,
-          "band_width": 25000
-        },
-        "applicant_hydrated_2": {
           "salary": 20000,
           "other_income": 5000,
           "total_income": 25000,
@@ -155,19 +144,15 @@
       }
     },
     {
-      "name": "C. band boundaries: exactly 100000 and exactly 50000 are both closed",
+      "name": "C. band boundaries: exactly 100000 (the applicant) and exactly 50000 (the leading applicant) are both closed",
       "context": {
         "applicant": {
           "salary": 100000,
           "other_income": 0
         },
-        "applicant_2": {
-          "salary": 50000,
-          "other_income": 0
-        },
         "the_submission": {
           "primary": {
-            "salary": 49999,
+            "salary": 50000,
             "other_income": 0
           },
           "secondary": {
@@ -188,27 +173,20 @@
           "band": 3,
           "band_width": 75000
         },
-        "applicant_hydrated_2": {
+        "the_leading_applicant_hydrated": {
           "salary": 50000,
           "other_income": 0,
           "total_income": 50000,
           "band": 2,
           "band_width": 50000
         },
-        "the_leading_applicant_hydrated": {
-          "salary": 49999,
-          "other_income": 0,
-          "total_income": 49999,
-          "band": 1,
-          "band_width": 25000
-        },
         "the_leading_applicant": {
-          "salary": 49999,
+          "salary": 50000,
           "other_income": 0
         },
         "applicant_score": 100,
-        "applicant_band_width": 50000,
-        "leading_total": 49999,
+        "applicant_band_width": 75000,
+        "leading_total": 50000,
         "capped_bonus": 5000,
         "bonus_is_settled": true,
         "bonus_is_unsettled": false,
@@ -219,7 +197,6 @@
       "name": "D. the SOURCE RECORD is null: hydration propagates, and `band` is NOT null",
       "context": {
         "applicant": null,
-        "applicant_2": null,
         "the_submission": {
           "primary": {
             "salary": 90000,
@@ -237,13 +214,6 @@
       },
       "expect": {
         "applicant_hydrated": {
-          "salary": null,
-          "other_income": null,
-          "total_income": null,
-          "band": 1,
-          "band_width": 25000
-        },
-        "applicant_hydrated_2": {
           "salary": null,
           "other_income": null,
           "total_income": null,

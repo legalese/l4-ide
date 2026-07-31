@@ -440,6 +440,7 @@ fixityAnnotation =
       ((FixityLeft,)  . fst <$> lineAnno "@infixl")
   <|> ((FixityRight,) . fst <$> lineAnno "@infixr")
   <|> ((FixityNone,)  . fst <$> lineAnno "@infix")
+
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 

@@ -125,6 +125,7 @@ import qualified L4.TypeCheck as TC
 import L4.Viz.GuardedRows (GuardedRows (..), hasEffectfulNode, normaliseGuarded)
 import L4.Interchange.Fidelity
 
+import qualified L4.Dmn.Analysis as A
 import L4.Dmn.IR
 
 ------------------------------------------------------------------------
@@ -166,6 +167,21 @@ data NameEnv = MkNameEnv
     -- ^ receivers whose projections render BARE. Holds the @_self@ binder while
     -- a computed field's own body is being rendered INSIDE the hydrator, where
     -- a sibling entry is named by its bare entry name and not by a path.
+  , neUnlifted   :: !(Set Unique)
+    -- ^ tier-1, @DMN-SAFE@ decides that Phase 4 un-lifted (§2.1): a
+    -- /saturated call/ to one renders as the callee's bare FEEL name
+    -- (fragment 'SFeel'), because its parameters are now module-level
+    -- @inputData@ and the argument expression at the call site is discarded
+    -- (@D-PARAM-AS-INPUT@ names that loss). Everything else still falls to
+    -- the verbatim case.
+  , neComputedFields :: !(Set Unique)
+    -- ^ the COMPUTED selectors (§4.4). A projection of one that was not
+    -- folded onto a hydrator (D12's boundary: a non-nullary receiver) must
+    -- render VERBATIM: the emitted record carries stored components only, so
+    -- @base.computedField@ would be valid FEEL silently answering null.
+    -- Phase 4 made this guard load-bearing — an un-lifted call in base
+    -- position now renders as a clean bare name, which would otherwise
+    -- launder the whole projection into 'SFeel'.
   }
 
 -- | The resolved 'Unique's of the prelude's @isJust@ and @isNothing@.
@@ -190,6 +206,8 @@ emptyNameEnv = MkNameEnv
   , neMaybePreds = Nothing
   , neHydrated   = Map.empty
   , neBareProj   = Set.empty
+  , neUnlifted   = Set.empty
+  , neComputedFields = Set.empty
   }
 
 -- | What a single table needs to know beyond its rows.
@@ -333,14 +351,35 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- Resolved ONCE, at the lowering boundary, by 'resolveMaybePredicates', and
     -- compared by 'Unique' thereafter: the name is read exactly once, under a
     -- type check, and never again.
+  , dloIncludeTests :: !Bool
+    -- ^ @--include-tests@ (§2.5.6 rule 2): emit test fixtures and their
+    -- fixture-side helper closure anyway. Default OFF — the filter's whole
+    -- point is that a fixture emitted as a @\<decision\>@ misdescribes the
+    -- rule set — but the switch must exist because the filter is a
+    -- measurement about four corpora, not a soundness property (§2.5.8).
+  , dloMissingMatchRanges :: ![SrcRange]
+    -- ^ the source ranges of the checker's @PatternMatchesMissing@ warnings,
+    -- for @DMN-SAFE@'s L1 (§2.4.1). Empty means "no warnings", which is only
+    -- sound when the caller really ran the checker — both call sites
+    -- (@jl4\/app\/L4\/Cli\/Export.hs@ and the golden harness) extract these
+    -- from the same 'TC.CheckErrorWithContext' list the module came from.
+  , dloExternalRefNames :: !(Maybe (Set Text))
+    -- ^ @FIXTURE(d)@'s importer view (§2.5.7): the L4 names referenced by
+    -- modules that import this one. 'Nothing' = unavailable — the population
+    -- filter then FAILS SAFE (drops nothing, reports what it would have
+    -- dropped). The CLI supplies a sibling-directory scan; the golden harness
+    -- supplies its VFS's contents.
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
 defaultDmnLowerOptions = MkDmnLowerOptions
-  { dloModelName       = "L4"
-  , dloSubstitution    = Map.empty
-  , dloFlavor          = defaultDmnFlavor
-  , dloMaybePredicates = Nothing
+  { dloModelName          = "L4"
+  , dloSubstitution       = Map.empty
+  , dloFlavor             = defaultDmnFlavor
+  , dloMaybePredicates    = Nothing
+  , dloIncludeTests       = False
+  , dloMissingMatchRanges = []
+  , dloExternalRefNames   = Nothing
   }
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
@@ -1570,6 +1609,14 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     _ | Just (x, f) <- foldableComputedRead e
       , Just h <- Map.lookup (getUnique x) names.neHydrated ->
           (atomPrec, h <> "." <> feelFieldIn names f, SFeel)
+    -- §4.4, D12's boundary, preserved under Phase 4 un-lifting: a COMPUTED
+    -- field that was NOT folded onto a hydrator (the arm above) has no image
+    -- in the artifact — the emitted record carries stored components only —
+    -- so `base.computedField` would be valid FEEL silently answering null.
+    -- Verbatim, and Blocking-noted, is the honest form. Before un-lifting
+    -- this arm was unreachable in practice, because the refused receivers
+    -- were themselves verbatim and poisoned the whole projection.
+    Proj _ _ n | Set.member (getUnique n) names.neComputedFields -> verbatim e
     -- A projection path is FEEL's `qualified name`, and its steps live in the
     -- FIELD namespace (§5.2 scope 2), not the DRG's variable namespace. That is
     -- where the one executed corpus collision lands (§5.3.4): two distinct
@@ -1679,6 +1726,17 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- (see 'constantOf').
     App _ _ (_ : _) | Just d <- foldDateLiteral oracle e ->
       (atomPrec, renderFeelValue (VDate d), SFeel)
+    -- Phase 4 un-lifting (§2.1): a saturated call to a tier-1, DMN-SAFE
+    -- decision renders as the callee's bare FEEL name. The decision's
+    -- parameters are module-level inputData now, so the FEEL name resolves to
+    -- its <decision> variable and the requiredDecision edge (already emitted
+    -- by 'classifyRef', which records every body reference) makes the DRG
+    -- agree with the text. The ARGUMENT expression is discarded — that is the
+    -- loss @D-PARAM-AS-INPUT@ names, and binding the parameter to the shared
+    -- argument instead is a strictly better lowering the spec does not rule
+    -- (deliberately not built in Phase 4).
+    App _ f (_ : _) | Set.member (getUnique f) names.neUnlifted ->
+      (atomPrec, feelIdentIn names f, SFeel)
     App _ _ (_ : _) -> verbatim e
     -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
     -- with a comparison against null. Two arms, in either source order, one
@@ -2786,6 +2844,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
                        <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
                        <> concatMap snd lowered
+                       <> phase4Notes
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -2814,13 +2873,162 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- inputData named after the field) and 'fieldScopes' (or the hydrated
   -- component would miss the record's own uniquifyIn scope and could collide
   -- with a stored field's path step in silence).
-  (computedSelectorDecides, decidesAnn) =
+  (computedSelectorDecides, allDecidesAnn) =
     partitionEithers
       [ if isComputedSelectorKind (decideResolved d) then Left d else Right (ann, d)
       | Decide ann d <- decls
       ]
-  decides = map snd decidesAnn
+  allDecides = map snd allDecidesAnn
   assumes = [a | Assume _ a <- decls]
+
+  ------------------------------------------------------------------------
+  -- Phase 4: the call-graph analysis (L4.Dmn.Analysis), over the FULL
+  -- decide population — the population filter itself is one of its outputs.
+  ------------------------------------------------------------------------
+
+  callGraph :: A.CallGraph
+  callGraph =
+    A.buildCallGraph allDecides
+      [dir | Directive _ dir <- decls]
+      -- non-Decide top-level expressions whose references keep a decide
+      -- alive: TIMEZONE declarations and the computed-field selector bodies
+      -- (those left 'decides' in the §4.4 partition above, but a computed
+      -- field reading a decision is a real, live reference).
+      ( [e | Timezone _ e <- decls]
+          <> map (view decideBody) computedSelectorDecides
+      )
+
+  safetyIssues :: Map Unique [A.SafetyIssue]
+  safetyIssues =
+    A.analyzeSafety
+      A.MkSafetyInput
+        { A.siMissingRanges  = opts.dloMissingMatchRanges
+        , A.siNonexhaustive  = A.nonexhaustiveDecides allDecides
+        , A.siEnumFields     =
+            Map.fromList
+              [ ( getUnique tn
+                , [ (nameOf cn, Set.fromList [nameOf fn | MkTypedName _ fn _ _ _ <- fs])
+                  | MkConDecl _ cn fs <- cds
+                  ]
+                )
+              | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) (EnumDecl _ cds)) <- decls
+              , length cds > 1
+              ]
+        , A.siComponentTypes =
+            Map.fromList
+              [ (getUnique tn, componentTysOf td)
+              | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) td) <- decls
+              ]
+        , A.siSubst          = opts.dloSubstitution
+        , A.siUri            = uri
+        }
+      callGraph allDecides
+   where
+    componentTysOf = \case
+      RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
+      EnumDecl _ cds    -> [ty | MkConDecl _ _ fs <- cds, MkTypedName _ _ ty _ _ <- fs]
+      SynonymDecl _ ty  -> [ty]
+
+  popVerdict :: A.PopulationVerdict
+  popVerdict =
+    A.classifyPopulation
+      A.MkPopulationInput
+        { A.piIncludeTests     = opts.dloIncludeTests
+        , A.piExternalRefNames = opts.dloExternalRefNames
+        , A.piForcedRef        = \r ->
+            let u = getUnique r
+            in (u.moduleUri == uri || u == TC.rulesEffectiveDateUnique)
+                 && not (Set.member u constructors)
+                 && not (Set.member u selectors)
+                 && not (Set.member u computedSelfUniques)
+        }
+      callGraph allDecides
+
+  -- The EMITTED population: everything the filter did not drop. Every
+  -- consumer below reads this list, so a dropped decision mints no node, no
+  -- FEEL name and no inputData — and its absence is never silent, because
+  -- 'populationNotes' names every drop.
+  decidesAnn = [p | p@(_, d) <- allDecidesAnn, kept d]
+   where
+    kept d = not (Map.member (getUnique (decideResolved d)) popVerdict.pvDropped)
+  decides = map snd decidesAnn
+
+  -- Tier-1, DMN-SAFE, parameterised, kept: the un-lift set (§2.1, §2.4).
+  -- Everything else keeps today's behaviour — a <decision> whose saturated
+  -- call sites render verbatim (already Blocking-noted) — which is OPEN-1's
+  -- ruling: Phase 4 classifies and reports; it does not change node kind.
+  unliftedSet :: Set Unique
+  unliftedSet = Set.fromList
+    [ u
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , not (null (A.decideParams d))
+    , A.tierOf callGraph u == A.Tier1
+    , not (Map.member u safetyIssues)
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 4: the name-keyed parameter merge (§2.1, §2.5.3)
+  ------------------------------------------------------------------------
+
+  -- GIVEN parameters of un-lifted decisions, grouped by VERBATIM L4 name
+  -- (OPEN-2: two spellings that merely FOLD to one FEEL identifier are
+  -- different parameters; 'uniquifyIn' renames them apart and @D-RENAME@
+  -- reports it). Each entry: binder unique, declared-type spelling
+  -- ('Nothing' = the GIVEN carries no declared type), owner name, owner
+  -- unique.
+  paramGroups :: Map Text [(Unique, Maybe Text, Text, Unique)]
+  paramGroups = Map.fromListWith (flip (<>))
+    [ ( nameOf p
+      , [ ( getUnique p
+          , oneLine . prettyLayout <$> mty
+          , decideName d
+          , getUnique (decideResolved d)
+          )
+        ]
+      )
+    | d <- decides
+    , Set.member (getUnique (decideResolved d)) unliftedSet
+    , (p, mty) <- A.decideParams d
+    ]
+
+  -- The merge, refused per group on type conflict: the group map is built
+  -- with 'Map.fromListWith' and consumed as a whole list — NEVER
+  -- 'Map.fromList', which is last-wins and is the genuine defect §7 names
+  -- (latent while 'freeTermSrc' was keyed by 'Unique'; a name-keyed merge is
+  -- exactly what makes it live). On conflict nothing merges and
+  -- 'paramTypeNotes' says so at Blocking; un-lifting of each individual
+  -- decision still proceeds — what is refused is the MERGE.
+  --
+  -- A merge needs POSITIVE evidence of agreement: every member DECLARES a
+  -- type, and all the spellings agree. An untyped GIVEN supplies no evidence
+  -- at all, so any group containing one is a conflict. This used to compare
+  -- the sentinel spelling @\"\<untyped\>\"@ instead, under which two untyped
+  -- same-named GIVENs of different INFERRED types compared equal, merged into
+  -- one @typeRef=Any@ element, and silenced both D-PARAMTYPE and D-SCOPE —
+  -- one decision then read the other's NUMBER as its BOOLEAN and answered
+  -- null\/SUCCEEDED with zero notes, the precise hazard the conflict test was
+  -- written to stop.
+  mergedGroups, conflictGroups :: [(Text, [(Unique, Maybe Text, Text, Unique)])]
+  (mergedGroups, conflictGroups) =
+    partitionEithers
+      [ case traverse (\(_, mty, _, _) -> mty) members of
+          Just tys | length (nubOrd tys) == 1 -> Left (nm, members)
+          _                                   -> Right (nm, members)
+      | (nm, members) <- Map.toAscList paramGroups
+      , length members > 1
+      ]
+
+  -- member unique -> canonical unique (the first claimant in source order).
+  mergeMap :: Map Unique Unique
+  mergeMap = Map.fromList
+    [ (u, canonical)
+    | (_, members@((canonical, _, _, _) : _)) <- mergedGroups
+    , (u, _, _, _) <- members
+    ]
+
+  canonUnique :: Unique -> Unique
+  canonUnique u = Map.findWithDefault u u mergeMap
 
   -- @ref text and definition position, by the decide's own Unique. Both feed
   -- the interval table's annotation column (§15.9).
@@ -3549,7 +3757,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Every read of a computed field, by the instance it reads through.
   computedlyRead :: Set Unique
   computedlyRead = Set.fromList
-    [ getUnique x
+    [ canonUnique (getUnique x)
     | d <- decides
     , e <- toListOf (cosmosOf (gplate @(Expr Resolved))) (view decideBody d)
     , Just (x, _) <- [foldableComputedRead e]
@@ -3578,7 +3786,8 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   hydratorIdByInstance :: Map Unique Text
   hydratorIdByInstance =
-    Map.fromList (zip [u | (u, _, _) <- hydratedInstances] hydratorIds)
+    let base = Map.fromList (zip [u | (u, _, _) <- hydratedInstances] hydratorIds)
+    in Map.union base (aliasThrough base)
 
   hydratorFeelNameByInstance :: Map Unique Text
   hydratorFeelNameByInstance =
@@ -3672,7 +3881,12 @@ lowerModule opts modul@(MkModule _ uri _) =
     ordinaryTerms = filter (not . isLawTime) allTerms
 
   decideFreeTerms d =
-    [ (getUnique r, nameOf r)
+    -- Phase 4: the merge is applied HERE, at the source of every free-term
+    -- list — a member of a merged parameter group is replaced by its
+    -- canonical 'Unique', so one <inputData> is minted per group and every
+    -- downstream consumer ('freeTerms', 'varFolded', 'sharedNames', the
+    -- hydration instance maps) sees the canonical identity only.
+    [ (canonUnique u, nameOf r)
     | r <- freeRefs d
     , let u = getUnique r
     -- Every OTHER builtin lives in `jl4:builtin` and is correctly excluded:
@@ -3691,7 +3905,22 @@ lowerModule opts modul@(MkModule _ uri _) =
   lawTimeInputId = Map.lookup TC.rulesEffectiveDateUnique inputByUnique
 
   inputIds      = assignIds "input_" (map snd freeTerms)
-  inputByUnique = Map.fromList (zip (map fst freeTerms) inputIds)
+  -- Merged members ALIAS their canonical element: a reference through any
+  -- member 'Unique' (a body edge via 'classifyRef', a hydration read) reaches
+  -- the one merged element.
+  inputByUnique =
+    Map.union
+      (Map.fromList (zip (map fst freeTerms) inputIds))
+      (aliasThrough (Map.fromList (zip (map fst freeTerms) inputIds)))
+
+  -- member -> canonical's value, for every map keyed by instance 'Unique'.
+  aliasThrough :: Map Unique a -> Map Unique a
+  aliasThrough m = Map.fromList
+    [ (member, v)
+    | (member, canonical) <- Map.toList mergeMap
+    , member /= canonical
+    , Just v <- [Map.lookup canonical m]
+    ]
 
   inputNodes =
     [ MkInputData
@@ -3725,14 +3954,21 @@ lowerModule opts modul@(MkModule _ uri _) =
   (decideFeelNames, hydratorFeelNames) = splitAt (length decides) varRest
 
   nameEnv = MkNameEnv
-    { neVars   = Map.fromList
-        ( zip (map fst freeTerms) inputFeelNames
-            <> zip (map (getUnique . decideResolved) decides) decideFeelNames
-        )
+    { neVars   =
+        let base = Map.fromList
+              ( zip (map fst freeTerms) inputFeelNames
+                  <> zip (map (getUnique . decideResolved) decides) decideFeelNames
+              )
+        -- a body reference through a merged MEMBER binder renders the
+        -- canonical (shared) FEEL name
+        in Map.union base (aliasThrough base)
     , neFields = fieldNames
     , neMaybePreds = opts.dloMaybePredicates
-    , neHydrated   = hydratorFeelNameByInstance
+    , neHydrated   = Map.union hydratorFeelNameByInstance (aliasThrough hydratorFeelNameByInstance)
     , neBareProj   = Set.empty
+    , neUnlifted   = unliftedSet
+    , neComputedFields =
+        Set.fromList (map (getUnique . decideResolved) computedSelectorDecides)
     }
 
   -- A GIVEN's declared type is the best evidence about a free term; an ASSUME's
@@ -3801,14 +4037,258 @@ lowerModule opts modul@(MkModule _ uri _) =
            <> "); they are emitted as the distinct globals "
            <> Text.intercalate ", " (map tick feelSpellings)
            <> ", because DMN's inputData is global and has no scope at all")
-        "L4's lexical scoping of GIVEN parameters: a caller must now supply one value per \
-        \element where the L4 has one locally-scoped name"
+        -- The lost: text branches on WHAT collided (§7): "L4's lexical
+        -- scoping of GIVEN parameters" is false when two global ASSUMEs
+        -- collide — an ASSUME has module scope, and what is lost there is the
+        -- distinct identity of two same-named globals, not any local scoping.
+        ( if all (`Set.member` assumeUniques) us
+            then
+              "the distinct identities of same-named global ASSUMEs: the collision is \
+              \between module-scoped terms, and a caller must supply one value per element"
+            else
+              "L4's lexical scoping of GIVEN parameters: a caller must now supply one value per \
+              \element where the L4 has one locally-scoped name"
+        )
     | (nm, us) <- Map.toAscList sharedNames
     , length us > 1
     , let users = nubOrd [decideName d | d <- decides, any ((`elem` us) . fst) (decideFreeTerms d)]
     , let l4spellings = nubOrd [tnm | (u, tnm) <- freeTerms, u `elem` us]
     , let feelSpellings =
             [ feel | (feel, (u, _)) <- zip inputFeelNames freeTerms, u `elem` us ]
+    ]
+
+  assumeUniques :: Set Unique
+  assumeUniques = Set.fromList
+    [getUnique n | MkAssume _ _ (MkAppForm _ n _ _) _ _ <- assumes]
+
+  ------------------------------------------------------------------------
+  -- Phase 4 notes: the population filter, the merge, and D-PARTIAL
+  ------------------------------------------------------------------------
+
+  phase4Notes :: [FidelityNote]
+  phase4Notes =
+    populationNotes <> paramTypeNotes <> paramAsInputNotes
+      <> partialNotes <> bkmNotes
+
+  allDecideByUnique :: Map Unique (Decide Resolved)
+  allDecideByUnique =
+    Map.fromList [(getUnique (decideResolved d), d) | d <- allDecides]
+
+  droppedNameOf u = maybe "?" decideName (Map.lookup u allDecideByUnique)
+  droppedRangeOf u =
+    Map.lookup u allDecideByUnique >>= \d -> (getAnno d).range
+
+  -- D-FIXTURE / D-REGULATIVE: a drop is NEVER silent — the filter is a
+  -- measurement about four corpora, not a soundness property (§2.5.8), and
+  -- the note is how a reader finds out that adding a test changed the model.
+  populationNotes =
+    [ case reason of
+        A.DroppedFixture ->
+          dmnNote "D-FIXTURE" Advisory nm rng
+            ("`" <> nm <> "` is test scaffolding (referenced only from directive argument \
+             \positions, with no callers in this module or its importers), so it is not \
+             \emitted; pass --include-tests to emit it")
+            "nothing about the rule set: the decision exists to exercise it, not to state it"
+        A.DroppedFixtureHelper ->
+          dmnNote "D-FIXTURE" Advisory nm rng
+            ("`" <> nm <> "` is referenced only from test scaffolding (the fixture-side \
+             \transitive closure), so it is not emitted; pass --include-tests to emit it")
+            "nothing about the rule set: the decision exists to exercise it, not to state it"
+        A.DroppedRegulative ->
+          dmnNote "D-REGULATIVE" Lossy nm rng
+            ("`" <> nm <> "` has a regulative body and no callers, so it is not emitted as a \
+             \decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a \
+             \<decision> whose logic is raw deontic L4 misdescribes both")
+            "the obligation's lifecycle: route this rule to the BPMN exporter instead"
+    | (u, reason) <- Map.toAscList popVerdict.pvDropped
+    , let nm  = droppedNameOf u
+    , let rng = droppedRangeOf u
+    ]
+      <> [ dmnNote "D-FIXTURE" Advisory nm rng
+             ("`" <> nm <> "` satisfies the module-local fixture criterion (referenced only \
+              \from directive argument positions, no callers in this module), but no importer \
+              \view was available, so conjunct (d) — no caller in any importing module — was \
+              \NOT checked and the decision is KEPT. Dropping on an unverified conjunct is \
+              \how this filter would delete a statute")
+             "nothing yet: this is a report-only advisory"
+         | u <- Set.toAscList popVerdict.pvFixtureUnverified
+         , let nm  = droppedNameOf u
+         , let rng = droppedRangeOf u
+         ]
+      <> [ dmnNote "D-INERT" Advisory (Map.findWithDefault nm u decideByUnique) rng
+             ("`" <> nm <> "` is kept, but its body forces no reference and no input — an \
+              \inert prose carrier (typically statutory text plus a constant)")
+             "nothing: the note exists so a reader can tell a constant stub from a live rule"
+         | u <- Set.toAscList popVerdict.pvInert
+         , let nm  = droppedNameOf u
+         , let rng = droppedRangeOf u
+         ]
+
+  -- D-PARAMTYPE (OPEN-4's chosen spelling), Blocking: same-L4-named GIVEN
+  -- parameters of un-lifted decisions whose DECLARED types differ. The merge
+  -- is refused — the members stay distinct elements, exactly as today — and
+  -- this note is what keeps the hazard visible: merging them anyway measures
+  -- `null [SUCCEEDED]` with zero runtime messages on both target engines
+  -- (GCO-first-version.l4:157,164), and D-SCOPE goes quiet at precisely the
+  -- moment the merge happens, so a silent refusal would be undetectable.
+  paramTypeNotes =
+    [ dmnNote "D-PARAMTYPE" Blocking (Text.intercalate ", " elemIds) Nothing
+        ("the GIVEN parameter `" <> nm <> "` "
+           <> ( if hasUntyped
+                  -- an untyped GIVEN is not a type CLASH, it is a type
+                  -- UNKNOWN: nothing certifies agreement, so the refusal
+                  -- wording must say "could not be certified", not "differ"
+                  then
+                    "is not declared at one certifiable type across un-lifted \
+                    \decisions ("
+                  else
+                    "is bound at " <> englishCount (length distinctTys)
+                      <> " different declared types across un-lifted decisions ("
+              )
+           <> Text.intercalate "; " claimantDescs
+           <> "), so the Phase 4 merge is REFUSED and the parameters are emitted as the \
+              \distinct elements "
+           <> Text.intercalate ", " (map tick feelsOf)
+           <> ". Merging them would make every decision read whichever value the caller \
+              \bound to the one name — measured on both target engines as a null answer \
+              \with status SUCCEEDED and zero runtime messages")
+        "the one-input-per-name economy of the merge; every claimant keeps its own element, \
+        \and a caller must bind each one"
+    | (nm, members) <- conflictGroups
+    , let hasUntyped = any (\(_, mty, _, _) -> isNothing mty) members
+    , let distinctTys = nubOrd [ty | (_, Just ty, _, _) <- members]
+    , let claimantDescs =
+            [ maybe "no declared type" tick mty <> " in " <> tick owner
+            | (_, mty, owner, _) <- members
+            ]
+    , let elemIds =
+            [ Map.findWithDefault ("input_" <> sanitiseId nm) u inputByUnique
+            | (u, _, _, _) <- members
+            ]
+    , let feelsOf =
+            [ feel
+            | (u, _, _, _) <- members
+            , (feel, (fu, _)) <- zip inputFeelNames freeTerms
+            , fu == u
+            ]
+    ]
+
+  -- D-PARAM-AS-INPUT (OPEN-3, amended): one note per merged group of size
+  -- >= 2, AND one per singleton group whose owner has an applied call site.
+  -- The original size >= 2 gate was justified on the inputData side only
+  -- ("a singleton parameter becomes a global input, which is unremarkable")
+  -- — but the un-lift render discards the call-site ARGUMENT expression for
+  -- a singleton exactly as for a merged group: `a MEANS net 100` renders as
+  -- the bare FEEL name `net`, the literal 100 vanishes, and `a` evaluates to
+  -- whatever the caller binds to the input — a Blocking verbatim note turned
+  -- into a silently wrong number. So the singleton case notes too. A vacuous
+  -- tier-1 decision (zero applied call sites) discards nothing and stays
+  -- silent — there the old justification really does hold.
+  paramAsInputNotes =
+    [ dmnNote "D-PARAM-AS-INPUT" Advisory elemId Nothing body lost
+    | (nm, members@((canonical, _, _, _) : _)) <- mergedGroups <> singletonArgGroups
+    , let owners = nubOrd [owner | (_, _, owner, _) <- members]
+    , let elemId = Map.findWithDefault ("input_" <> sanitiseId nm) canonical inputByUnique
+    , let (body, lost) = case owners of
+            [owner] ->
+              ( "the GIVEN parameter `" <> nm <> "` of " <> tick owner
+                  <> " became the model input " <> tick elemId
+                  <> "; the decision can no longer be applied to different subjects \
+                     \within this model, and the argument expressions at its call sites \
+                     \are discarded — each call site now reads the one global value"
+              , "per-call-site argument binding: L4 applied this decision to an \
+                \expression; the DMN model reads one global value"
+              )
+            _ ->
+              ( "the GIVEN parameter `" <> nm <> "` of " <> englishCount (length members)
+                  <> " decisions (" <> Text.intercalate ", " (map tick owners)
+                  <> ") became the one shared model input " <> tick elemId
+                  <> "; those decisions can no longer be applied twice to different subjects \
+                     \within this model, and the argument expressions at their call sites are \
+                     \discarded"
+              , "per-call-site argument binding: L4 applied these decisions to expressions; \
+                \the DMN model reads one global value"
+              )
+    ]
+
+  -- Singleton parameter groups whose owning decision is actually APPLIED
+  -- somewhere: those call sites' argument expressions are what the un-lift
+  -- discards, so they join 'paramAsInputNotes' above.
+  singletonArgGroups :: [(Text, [(Unique, Maybe Text, Text, Unique)])]
+  singletonArgGroups =
+    [ (nm, members)
+    | (nm, members@[(_, _, _, ownerU)]) <- Map.toAscList paramGroups
+    , any (.csApplied) (Map.findWithDefault [] ownerU callGraph.cgCalls)
+    ]
+
+  -- D-PARTIAL (§2.4.2, OPEN-1): Phase 4 classifies and reports; it does not
+  -- change node kind. A ¬DMN-SAFE decision simply does not un-lift — it keeps
+  -- today's <decision> + verbatim call sites — and carries this note at the
+  -- ruled severity, keyed off the CALL SITE, not the node kind (null arrives
+  -- identically from a <decision> body, a BKM's encapsulatedLogic or an
+  -- inlined cell; routing removes the widening, never the coercion).
+  partialNotes =
+    [ dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+        ("`" <> decideName d <> "` could not be certified total ("
+           <> clauseText
+           <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
+              \call sites remain raw L4 (Phase 5 routes such decisions to a \
+              \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
+              \on every input any requiring decision is evaluated on, and an undefined \
+              \FEEL result is null, which reads as false in every consuming boolean \
+              \position"
+           <> fallbackText)
+        "the certainty that this node evaluates wherever the DRG reaches it: an input \
+        \outside the decision's domain answers null with status SUCCEEDED, not an error"
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , Just issues <- [Map.lookup u safetyIssues]
+    , let did = Map.findWithDefault (decideName d) u decideByUnique
+    , let headIssue = listToMaybe issues
+    , let clauseText = case issues of
+            [] -> "unknown clause"
+            (i : rest) ->
+              i.safClause
+                <> maybe "" (\r -> " at " <> prettySrcRange r) i.safRange
+                <> ": " <> i.safDetail
+                <> (if null rest
+                      then ""
+                      else "; and " <> tshow (length rest) <> " further clause(s)")
+    , let sites = Map.findWithDefault [] u callGraph.cgCalls
+    , let (sev, fallbackText)
+            | null sites =
+                (Blocking, ". No call site consumes it (it is a DRG root), so no guard can fence the null")
+            | any (\s -> s.csStrict == A.StrictPos) sites =
+                (Blocking, ". At least one call site consumes it from a strict position, so no guard fences the null")
+            | otherwise =
+                (Lossy, ". Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null")
+    ]
+
+  -- D-BKM (W9, report-only in Phase 4): tier-2 classification made visible a
+  -- phase early. The decision keeps today's behaviour — a <decision> whose
+  -- saturated call sites render verbatim, already Blocking-noted — and
+  -- Phase 5's BKM emission is what will change it (the golden pinning this is
+  -- the tripwire that goes red that day).
+  bkmNotes =
+    [ dmnNote "D-BKM" Advisory did Nothing
+        ("`" <> decideName d <> "` is classified as a businessKnowledgeModel candidate \
+          \(tier 2): it is applied to distinct argument expressions"
+           <> (if null callerNames
+                 then ""
+                 else " by " <> Text.intercalate ", " (map tick callerNames))
+           <> ". In Phase 4 it keeps its <decision> node and its call sites stay verbatim; \
+              \Phase 5 emits it as a BKM with knowledgeRequirement edges")
+        "nothing yet: this is a classification, not a change of behaviour"
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , not (null (A.decideParams d))
+    , A.tierOf callGraph u == A.Tier2
+    , let did = Map.findWithDefault (decideName d) u decideByUnique
+    , let callerNames = nubOrd
+            [ droppedNameOf c
+            | s <- Map.findWithDefault [] u callGraph.cgCalls
+            , Just c <- [s.csCaller]
+            ]
     ]
 
   -- D-RULEDATE (§15.5), Advisory, exactly ONE per DRG. Structural model:

@@ -120,6 +120,47 @@ floor row, invisible.
 Both engines answer all ten: `70/70 value(s) as expected` on KIE 8.44.0.Final and on
 Camunda 8.7.6. See `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.
 
+### The Phase 4 exhibit (`unlift.l4`)
+
+`unlift.l4` holds one of each Phase 4 behaviour, deliberately, in one module — see the
+comment at the top of the file for the per-decision map. The behaviours, and the codes
+that report them:
+
+- **Un-lifting (tier 1).** A top-level `DECIDE` with `GIVEN` parameters that is applied
+  to the **same** argument expression at every (non-directive) call site is not a
+  function; it is a decision over shared inputs. Its parameters become module-level
+  `<inputData>` **merged by L4 name** with every other un-lifted decision's same-named,
+  same-typed parameters, and calls to it render as its **bare FEEL name** over a
+  `requiredDecision` edge — where they used to be verbatim L4 no engine could compile.
+  `D-PARAM-AS-INPUT` (Advisory, one per merged group) names the cost: the model reads
+  one shared subject, and the call sites' argument expressions are discarded.
+- **The type-conflict refusal.** Same parameter name at **different declared types**:
+  the merge is refused, the parameters stay distinct elements, and `D-PARAMTYPE`
+  (Blocking) names every claimant and every type. Merging anyway was measured on both
+  engines as `null` with status `SUCCEEDED` and zero messages — the silent-wrong-answer
+  shape this exporter exists to refuse.
+- **Tier 2 (`D-BKM`, Advisory).** Applied to two *distinct* argument expressions — a
+  real function. Classified now, emitted as a `businessKnowledgeModel` in Phase 5; its
+  call sites stay verbatim (Blocking) until then.
+- **`DMN-SAFE` (`D-PARTIAL`, Blocking or Lossy).** A decision that cannot be certified
+  total, pure and deterministic does not un-lift: DMN has no `undefined`, an undefined
+  FEEL result is `null`, and `null` reads as `false` at the first boolean consumer.
+  Severity keys off the call sites (any strict consumer, or none ⇒ Blocking; all lazy ⇒
+  Lossy), the note names the failing clause and range, and says *not certified total* —
+  the analysis refuses to certify; it does not prove partiality.
+- **The population filter.** Test fixtures (referenced only from `#EVAL`/`#ASSERT`
+  argument positions, no callers here or in any importing sibling) and their
+  fixture-side helper closure are **not emitted** — `D-FIXTURE` (Advisory) names each,
+  and `--include-tests` restores them. Uncalled **regulative** bodies route to the BPMN
+  exporter instead of becoming fake decisions — `D-REGULATIVE` (Lossy). Inert prose
+  carriers (a body forcing no reference and no input) are **kept** and flagged
+  `D-INERT` (Advisory).
+
+The measured effect on the corpus golden: `regcf-corpus.dmn` went from 66 `<inputData>`
+to 37, and from KIE refusing the whole model (`Compiled model is null!`) to a
+node-by-node build whose 37 residual errors are all verbatim tier-2/refused call sites —
+Phase 5's work.
+
 ### The discriminator between the last two
 
 > Flatten a nested chain only when the inner guard introduces a condition the outer one
@@ -336,6 +377,13 @@ A one-line tally goes to stderr either way, whether or not the flag was passed.
 report holds `blocking` notes — `blocking` describes what DMN cannot express (see
 below), and this exhibit has one. Pass `--fail-on=blocking|lossy|advisory` if a
 pipeline wants a gate.
+
+`--include-tests` (DMN targets only) also emits decisions the population filter
+classifies as test scaffolding. It defaults **off** — a fixture emitted as a
+`<decision>` misdescribes the rule set — but the switch exists because the filter is a
+measurement about four corpora, not a soundness property: it keys off `#ASSERT`
+placement, so adding a test can change the exported model. Every drop is named by a
+`D-FIXTURE` or `D-REGULATIVE` note; the filter is never silent.
 
 `--flavor camunda|kie` picks which engine the document is shaped for; `camunda` (meaning
 Camunda 8) is the default, and `drools` is accepted as a synonym for `kie`. The two

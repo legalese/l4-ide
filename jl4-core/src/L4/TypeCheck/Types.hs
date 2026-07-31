@@ -519,11 +519,11 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , assumeDeclarations = Map.empty
     , mixfixRegistry = unionMixfixRegistry accEnv.mixfixRegistry depMixfixRegistry
     , computedFields = Map.empty
-    , inNonexhaustiveDecide = False
     , cyclicSynonyms = mempty
+    , inNonexhaustiveDecide = False
     , errorContext = None
     , sectionStack = []
-    , localBindings = mempty
+    , localBindings = Set.empty
     }
 
 newtype SectionNames =

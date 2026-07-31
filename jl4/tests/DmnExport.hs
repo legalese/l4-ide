@@ -24,11 +24,14 @@ module DmnExport (spec) where
 import Base
 import qualified Base.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVFS)
+import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
+import qualified Base.Set as Set
+import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
+import L4.EvaluateLazy.Exceptions (UserEvalException (..))
 import L4.Interchange.Fidelity
 import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
@@ -290,9 +293,16 @@ fullFeelColumn =
 -- @Unknown variable 'double'@. The text is therefore L4 source, not FEEL.
 nonSFeelColumn :: Text
 nonSFeelColumn =
+  -- `other` applies `double` to a SECOND, distinct argument, keeping it
+  -- tier 2 (Phase 4): a tier-1 `double` would un-lift and the call would
+  -- render as a clean bare FEEL name, which is precisely not this test's
+  -- subject — verbatim L4 in a <text> position.
   "GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVETH A NUMBER\n\
+  \other MEANS double 99\n\
   \\n\
   \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
@@ -305,9 +315,13 @@ nonSFeelColumn =
 -- entry, fails, and the decision evaluates to null with status FAILED.
 verbatimOutput :: Text
 verbatimOutput =
+  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
   "GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVETH A NUMBER\n\
+  \other MEANS double 99\n\
   \\n\
   \GIVEN c IS A BOOLEAN\n\
   \GIVETH A NUMBER\n\
@@ -321,9 +335,13 @@ verbatimOutput =
 -- null with status SUCCEEDED and no evaluation-time message.
 verbatimDefault :: Text
 verbatimDefault =
+  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
   "GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVETH A NUMBER\n\
+  \other MEANS double 99\n\
   \\n\
   \GIVEN c IS A BOOLEAN\n\
   \GIVETH A NUMBER\n\
@@ -337,9 +355,13 @@ verbatimDefault =
 -- @max(cash out, conversion amount(liq))@ in @safe-post-new.l4@.
 verbatimSelect :: Text
 verbatimSelect =
+  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
   "GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
+  \\n\
+  \GIVETH A NUMBER\n\
+  \other MEANS double 99\n\
   \\n\
   \ASSUME cash IS A NUMBER\n\
   \GIVETH A NUMBER\n\
@@ -1643,9 +1665,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           LogicContext _ -> expectationFailure "unexpected boxed context"
       it "refuses a NESTED MAYBE, because null does not nest (R8-c)" $ do
         drg <- sumtypeDrg
+        -- Phase 4 adds D-INERT: `deep m MEANS TRUE` forces no reference and
+        -- no input, which is rule 4's ruled predicate doing its job on a
+        -- fixture that happens to be a constant stub.
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_deep"]
-          `shouldBe` [("D-SUMTYPE", Blocking)]
-        [n.message | n <- drgNotesAll drg, n.element == "decision_deep"]
+          `shouldBe` [("D-SUMTYPE", Blocking), ("D-INERT", Advisory)]
+        [n.message | n <- drgNotesAll drg, n.element == "decision_deep", n.code == "D-SUMTYPE"]
           `shouldSatisfy` all (Text.isInfixOf "does not nest")
 
       it "keeps the nullary-only CONSIDER's table and reports the DOMAIN, not a refusal" $ do
@@ -1667,8 +1692,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
       it "refuses a payload PROJECTION and only Lossy-reports a record that threads one" $ do
         drg <- sumtypeDrg
+        -- Phase 4 adds D-PARTIAL: the payload projection is ALSO L11's
+        -- refusal — a selector over a multi-constructor union raises
+        -- NonExhaustivePatterns at run time — so DMN-SAFE and the data-model
+        -- analysis state the same hazard from two sides, deliberately.
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_stated_term"]
-          `shouldBe` [("D-SUMTYPE", Blocking)]
+          `shouldBe` [("D-SUMTYPE", Blocking), ("D-PARTIAL", Blocking)]
         -- Threading is NOT reading: R4-a keeps this one, and only says the
         -- component's type could not be carried.
         -- (it is also a plain projection rather than a chain, so it carries the
@@ -2396,6 +2425,600 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         , n.code == "D-MD-CELLSYNTAX"
         ] `shouldSatisfy` (not . null)
 
+  describe "Phase 4: un-lifting, DMN-SAFE, and the population filter" $ do
+    let notesOf code drg = [n | n <- (dmnReport drg).notes, n.code == code]
+        firstNote = \case
+          (n : _) -> n
+          []      -> error "expected at least one note"
+        inputsNamed nm drg = [i | NodeInputData i <- drg.drgNodes, i.idName == nm]
+        decisionNames drg = map (.dcnName) (drgDecisions drg)
+
+    describe "tier 1: the un-lift (§2.1)" $ do
+      -- fixture 1+4: two decisions sharing a GIVEN name, called by a third
+      -- with identical argument expressions -> ONE inputData, bare FEEL call
+      -- sites, requiredDecision edges, one D-PARAM-AS-INPUT.
+      let tier1Merge =
+            "DECLARE P HAS v IS A NUMBER\n\
+            \GIVEN p IS A P\n\
+            \GIVETH A NUMBER\n\
+            \f1 p MEANS p's v PLUS 1\n\
+            \GIVEN p IS A P\n\
+            \GIVETH A NUMBER\n\
+            \f2 p MEANS p's v TIMES 2\n\
+            \GIVEN p IS A P\n\
+            \GIVETH A NUMBER\n\
+            \both p MEANS f1 p PLUS f2 p\n"
+
+      it "merges same-named, same-typed parameters into one inputData" $ do
+        let drg = drgOf tier1Merge
+        length (inputsNamed "p" drg) `shouldBe` 1
+
+      it "renders a saturated call to an un-lifted decision as its bare FEEL name" $ do
+        let d = decisionNamed "both" (drgOf tier1Merge)
+        case d.dcnLogic of
+          LogicLiteral fe -> do
+            fe.feText `shouldBe` "f1 + f2"
+            fe.feFragment `shouldBe` SFeel
+          _ -> expectationFailure "expected a boxed literal"
+
+      it "keeps the requiredDecision edges classifyRef already emits" $ do
+        let d = decisionNamed "both" (drgOf tier1Merge)
+        d.dcnRequirements `shouldSatisfy`
+          (\rs -> RequiredDecision "decision_f1" `elem` rs
+               && RequiredDecision "decision_f2" `elem` rs)
+
+      it "notes the loss once per merged group (D-PARAM-AS-INPUT, OPEN-3)" $ do
+        let ns = notesOf "D-PARAM-AS-INPUT" (drgOf tier1Merge)
+        map (.severity) ns `shouldBe` [Advisory]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`p`"
+
+      -- the SINGLETON un-lift: no merge, but the call-site argument is
+      -- discarded all the same — `a MEANS net 100` renders as the bare name
+      -- `net` and the literal 100 vanishes, so gating D-PARAM-AS-INPUT on
+      -- merged groups turned a Blocking verbatim call into a silently wrong
+      -- number. One decision, one parameter, two identical applied sites.
+      let singletonUnlift =
+            "GIVEN amount IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \net amount MEANS amount TIMES 0.9\n\
+            \GIVETH A NUMBER\n\
+            \a MEANS net 100\n\
+            \GIVETH A NUMBER\n\
+            \b MEANS net 100\n"
+
+      it "notes the discarded argument on a singleton un-lift (no merge required)" $ do
+        let drg = drgOf singletonUnlift
+            ns  = notesOf "D-PARAM-AS-INPUT" drg
+        map (.severity) ns `shouldBe` [Advisory]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`amount`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "discarded"
+        -- the un-lift itself still happens; the note is the record of its cost
+        (decisionNamed "a" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feText == "net" && fe.feFragment == SFeel
+          _               -> False
+
+      it "stays silent on a vacuous singleton (zero applied call sites discard nothing)" $ do
+        let drg = drgOf
+              "GIVEN q IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \solo2 q MEANS q PLUS 1\n\
+              \#EVAL solo2 5\n"
+        notesOf "D-PARAM-AS-INPUT" drg `shouldBe` []
+
+      -- fixture 2: ZERO non-directive call sites (27% of the measured
+      -- population, §2.4.3) still un-lift, vacuously; the #EVAL is not a call
+      -- site, and — being the directive's applied head — it also keeps the
+      -- decision out of the fixture bucket (§2.5.7(c), fixture 20's negative).
+      it "un-lifts a decision whose only reference is a directive (vacuous tier 1)" $ do
+        let drg = drgOf
+              "GIVEN q IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \solo q MEANS q PLUS 1\n\
+              \#EVAL solo 5\n"
+        length (inputsNamed "q" drg) `shouldBe` 1
+        decisionNames drg `shouldBe` ["solo"]
+        notesOf "D-FIXTURE" drg `shouldBe` []
+        notesOf "D-BKM" drg `shouldBe` []
+
+      -- fixture 3: directive polarity, both ways in one file. Two #ASSERTs
+      -- apply `dbl` to two DIFFERENT argument expressions; one decision body
+      -- applies it to one. Directives are excluded from tiering (§2.1 as
+      -- amended by R6) so `dbl` is tier 1 — while the same directives are the
+      -- fixture criterion's evidence, dropping `sample` (§2.5.7(b),(c)).
+      it "excludes directives from tiering while the fixture verdict reads them as evidence" $ do
+        let drg = drgOf
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \dbl n MEANS n TIMES 2\n\
+              \GIVETH A NUMBER\n\
+              \use MEANS dbl 7\n\
+              \GIVETH A NUMBER\n\
+              \sample MEANS 42\n\
+              \#ASSERT dbl 1 EQUALS 2\n\
+              \#ASSERT dbl 2 EQUALS 4\n\
+              \#ASSERT dbl sample EQUALS 84\n"
+        -- tier 1: no BKM classification, and the body call renders bare
+        notesOf "D-BKM" drg `shouldBe` []
+        (decisionNamed "use" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feText == "dbl"
+          _               -> False
+        -- the same directives are FIXTURE evidence: `sample` is referenced
+        -- only from their argument positions, so it is dropped and named
+        decisionNames drg `shouldNotSatisfy` elem "sample"
+        map (.element) (notesOf "D-FIXTURE" drg) `shouldBe` ["sample"]
+
+    describe "tier 2: the real λ (§2.1)" $ do
+      -- fixture 5. THE PHASE 5 TRIPWIRE: when BKM emission lands, `half`
+      -- stops being a <decision> with verbatim call sites and this test goes
+      -- red — that is its job. Do not silence it; rewrite it against the BKM.
+      let tier2Lambda =
+            "GIVEN pot IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \half pot MEANS pot TIMES 0.5\n\
+            \GIVETH A NUMBER\n\
+            \a MEANS half 100\n\
+            \GIVETH A NUMBER\n\
+            \b MEANS half 200\n"
+
+      it "classifies two distinct argument shapes as a BKM candidate (D-BKM), behaviour unchanged" $ do
+        let drg = drgOf tier2Lambda
+            ns  = notesOf "D-BKM" drg
+        map (.severity) ns `shouldBe` [Advisory]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`a`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`b`"
+        -- byte-identical to today: the call sites stay verbatim L4
+        (decisionNamed "a" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feFragment == L4Verbatim
+          _               -> False
+        -- and no merge happened: `pot` stays one per-binder input
+        length (inputsNamed "pot" drg) `shouldBe` 1
+        notesOf "D-PARAM-AS-INPUT" drg `shouldBe` []
+
+    describe "D-PARTIAL: the DMN-SAFE side-condition (§2.4)" $ do
+      -- fixtures 6+8, one adjacent pair: the SAME division is accepted when
+      -- its guard travels in the same decision (one FEEL if) and refused when
+      -- the guard lives in a different decision — which is exactly the
+      -- configuration un-lifting would create.
+      it "L3, strict: a split-off division is refused, and partiality is contagious" $ do
+        let drg = drgOf
+              "GIVEN\n\
+              \  pot IS A NUMBER\n\
+              \  n   IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \share pot n MEANS pot DIVIDED BY n\n\
+              \GIVEN c IS A NUMBER\n\
+              \GIVETH A BOOLEAN\n\
+              \above c MEANS share c 4 GREATER THAN 10\n"
+            ns = notesOf "D-PARTIAL" drg
+        -- `share` itself: L3, Blocking (its one call site is strict)
+        [n | n <- ns, n.element == "decision_share"]
+          `shouldSatisfy` \case
+            [n] -> n.severity == Blocking && Text.isInfixOf "L3" n.message
+            _   -> False
+        -- contagion: `above` calls a ¬DMN-SAFE decision and is itself refused
+        [n | n <- ns, n.element == "decision_above"]
+          `shouldSatisfy` \case
+            [n] -> Text.isInfixOf "TOTAL" n.message
+            _   -> False
+        -- and the refusal wording (§2.4.4): not certified, never a remedy
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "could not be certified total"
+        forM_ ns \n -> n.message `shouldNotSatisfy` Text.isInfixOf "@nonexhaustive"
+
+      it "accepts the same division when the guard sits in the same decision" $ do
+        let drg = drgOf
+              "GIVEN\n\
+              \  n IS A NUMBER\n\
+              \  d IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \safediv n d MEANS IF d EQUALS 0 THEN 0 ELSE n DIVIDED BY d\n"
+        notesOf "D-PARTIAL" drg `shouldBe` []
+        length (inputsNamed "d" drg) `shouldBe` 1
+
+      -- fixture 7: the same partial decision consumed ONLY from a lazy
+      -- position (an IF arm) is Lossy, not Blocking — the consumer's guard
+      -- can fence the null.
+      it "downgrades to Lossy when every consumer is lazy" $ do
+        let drg = drgOf
+              "GIVEN\n\
+              \  pot IS A NUMBER\n\
+              \  n   IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \share2 pot n MEANS pot DIVIDED BY n\n\
+              \GIVEN c IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \guarded c MEANS IF c EQUALS 0 THEN 0 ELSE share2 100 c\n"
+        [n | n <- notesOf "D-PARTIAL" drg, n.element == "decision_share2"]
+          `shouldSatisfy` \case
+            [n] -> n.severity == Lossy && Text.isInfixOf "lazy position" n.message
+            _   -> False
+
+      -- fixture 9: L11's accepting AND rejecting branches. No corpus
+      -- exercises this (0 Proj sites over a multi-constructor enum across
+      -- all 62 files), so both sides are synthetic — deliberately. `l4 check`
+      -- says "Check succeeded" on the rejecting shape; the exporter must
+      -- still refuse, because the selector application raises
+      -- NonExhaustivePatterns at run time with no CONSIDER in sight.
+      it "L11: refuses a projection over a multi-constructor enum missing the field" $ do
+        let drg = drgOf
+              "DECLARE Shape IS ONE OF\n\
+              \    Circle HAS radius IS A NUMBER\n\
+              \    Square HAS side   IS A NUMBER\n\
+              \GIVEN s IS A Shape\n\
+              \GIVETH A NUMBER\n\
+              \`the radius` s MEANS s's radius\n"
+        [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L11" n.message]
+          `shouldSatisfy` (not . null)
+
+      -- The "every constructor declares the field" acceptance is DEFENSIVE:
+      -- probing shows the checker rejects that shape as an ambiguous selector
+      -- (two same-typed `size` definitions), so today the reachable accepting
+      -- branch is the single-payload-constructor enum. Should the checker
+      -- learn to disambiguate, the exporter's all-constructors test is
+      -- already right.
+      it "L11: accepts the projection on a single-payload-constructor enum" $ do
+        let drg = drgOf
+              "DECLARE Wrapped IS ONE OF\n\
+              \    W HAS val IS A NUMBER\n\
+              \GIVEN s IS A Wrapped\n\
+              \GIVETH A NUMBER\n\
+              \`the val` s MEANS s's val\n"
+        notesOf "D-PARTIAL" drg `shouldBe` []
+
+      -- fixture 10: L12. The WHERE-locals' mutual cycle typechecks (probed)
+      -- and BlackholeForces at run time; the exporter refuses. This is also a
+      -- robustness fix for the exporter itself, since Lower INLINES
+      -- WHERE-locals.
+      it "L12: refuses a WHERE-local dependency cycle" $ do
+        let drg = drgOf
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \loopy n MEANS y PLUS n\n\
+              \  WHERE\n\
+              \    y MEANS z PLUS 1\n\
+              \    z MEANS y PLUS 1\n"
+        [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L12" n.message]
+          `shouldSatisfy` (not . null)
+
+      -- fixture 11: L7 at the TRANSITIVE granularity — the head type is a
+      -- record; the function hides in a component, where runBinOpEquals's
+      -- componentwise recursion finds it at run time.
+      it "L7: refuses EQUALS at a record type with a function-typed field" $ do
+        let drg = drgOf
+              "DECLARE Policy HAS\n\
+              \  name   IS A STRING\n\
+              \  payout IS A FUNCTION FROM NUMBER TO NUMBER\n\
+              \GIVEN\n\
+              \  a IS A Policy\n\
+              \  b IS A Policy\n\
+              \GIVETH A BOOLEAN\n\
+              \same a b MEANS a EQUALS b\n"
+        [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "L7" n.message]
+          `shouldSatisfy` (not . null)
+
+      -- fixture 12, both sides — the structural TERMINATES check is
+      -- untested against the corpora on both sides, so both live here.
+      it "TERMINATES: accepts structural recursion through FOLLOWED BY" $ do
+        let drg = drgOf
+              "IMPORT prelude\n\
+              \GIVEN xs IS A LIST OF NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \total xs MEANS\n\
+              \  CONSIDER xs\n\
+              \  WHEN EMPTY THEN 0\n\
+              \  WHEN x FOLLOWED BY rest THEN x PLUS total rest\n"
+        notesOf "D-PARTIAL" drg `shouldBe` []
+
+      it "TERMINATES: rejects NUMBER-measure recursion (a don't-know, not a proof)" $ do
+        let drg = drgOf
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \countdown n MEANS IF n EQUALS 0 THEN 0 ELSE countdown (n MINUS 1)\n"
+        [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "TERMINATES" n.message]
+          `shouldSatisfy` (not . null)
+
+      -- TOTAL's contagion must not depend on declaration order. Forward
+      -- references are legal L4 (`l4 check` accepts a caller defined before
+      -- its callee), so a source-order fold silently certified any caller
+      -- defined before its ¬DMN-SAFE callee — byte-identical logic, one
+      -- D-PARTIAL in one order and two in the other. Both orders, one test.
+      it "TOTAL: refuses a caller whichever side of its ¬DMN-SAFE callee it is defined on" $ do
+        let calleeLast =
+              "GIVEN x IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \caller x MEANS callee x\n\
+              \GIVEN y IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \callee y MEANS 100 DIVIDED BY y\n"
+            calleeFirst =
+              "GIVEN y IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \callee y MEANS 100 DIVIDED BY y\n\
+              \GIVEN x IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \caller x MEANS callee x\n"
+        forM_ [calleeLast, calleeFirst] \src -> do
+          let ns = notesOf "D-PARTIAL" (drgOf src)
+          map (.element) ns `shouldMatchList` ["decision_caller", "decision_callee"]
+          [n | n <- ns, n.element == "decision_caller"]
+            `shouldSatisfy` \case
+              [n] -> Text.isInfixOf "TOTAL" n.message
+                       && Text.isInfixOf "`callee`" n.message
+              _   -> False
+
+      -- Mutual recursion: a two-cycle escapes 'selfRecursionIssues' (which
+      -- only sees calls whose head is the decide's own Unique) and no fold
+      -- order can see it — only the condensation can. Un-lifting the pair
+      -- would emit mutually requiring <decision> elements (a DMN 1.3 §6.3.2
+      -- acyclicity violation) with bare-FEEL-name call sites, silently.
+      it "TERMINATES: rejects mutual recursion on every cycle member, and does not un-lift it" $ do
+        let drg = drgOf
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \ping n MEANS IF n LESS THAN 1 THEN 100 DIVIDED BY n ELSE pong (n MINUS 1)\n\
+              \GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \pong n MEANS ping (n MINUS 1)\n"
+            ns = notesOf "D-PARTIAL" drg
+        map (.element) ns `shouldMatchList` ["decision_ping", "decision_pong"]
+        forM_ ns \n -> do
+          n.message `shouldSatisfy` Text.isInfixOf "TERMINATES"
+          n.message `shouldSatisfy` Text.isInfixOf "mutually recursive"
+          n.message `shouldSatisfy` Text.isInfixOf "could not be certified"
+        -- the refusal keeps the call sites verbatim: no bare-name un-lift
+        (decisionNamed "pong" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feFragment == L4Verbatim
+          _               -> False
+
+      -- fixture 13's wording assertion rides on the L3 test above.
+
+    describe "the type-conflict refusal (D-PARAMTYPE, OPEN-4)" $ do
+      -- fixture 14+17: the GCO-first-version.l4:157,164 shape — one GIVEN
+      -- name at two declared types on two @export-style uncalled roots.
+      -- Merging measured `null [SUCCEEDED]` with zero runtime messages on
+      -- both engines, so the refusal is Blocking and D-SCOPE must still fire
+      -- (the hazard of two same-folded names is real precisely because the
+      -- merge did NOT happen).
+      let conflictTwo =
+            "DECLARE Art3 HAS x IS A NUMBER\n\
+            \DECLARE Art7 HAS y IS A NUMBER\n\
+            \GIVEN s IS AN Art3\n\
+            \GIVETH A NUMBER\n\
+            \art3 s MEANS s's x\n\
+            \GIVEN s IS AN Art7\n\
+            \GIVETH A NUMBER\n\
+            \art7 s MEANS s's y\n"
+
+      it "refuses the merge on a declared-type conflict, at Blocking, naming everyone" $ do
+        let drg = drgOf conflictTwo
+            ns  = notesOf "D-PARAMTYPE" drg
+        map (.severity) ns `shouldBe` [Blocking]
+        length (inputsNamed "s" drg) `shouldBe` 2
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`Art3`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`Art7`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`art3`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`art7`"
+        -- D-SCOPE does not go quiet where the hazard is real (fixture 17)
+        notesOf "D-SCOPE" drg `shouldSatisfy` (not . null)
+
+      -- fixture 15: same name, same type -> merged, and NEITHER code fires.
+      it "merges silently when the declared types agree" $ do
+        let drg = drgOf
+              "DECLARE Art3 HAS x IS A NUMBER\n\
+              \GIVEN s IS AN Art3\n\
+              \GIVETH A NUMBER\n\
+              \art3a s MEANS s's x\n\
+              \GIVEN s IS AN Art3\n\
+              \GIVETH A NUMBER\n\
+              \art3b s MEANS s's x PLUS 1\n"
+        length (inputsNamed "s" drg) `shouldBe` 1
+        notesOf "D-PARAMTYPE" drg `shouldBe` []
+        notesOf "D-SCOPE" drg `shouldBe` []
+
+      -- fixture 16: the anti-regression on the last-wins defect — A, B, A
+      -- must name ALL THREE claimants and BOTH types, not "the last one
+      -- wins". (The old freeTermTypes map was Unique-keyed and could not
+      -- collide; a name-keyed merge built with Map.fromList would silently
+      -- keep one claimant, which is the §7 defect this pins.)
+      it "names all three claimants and both types on an A, B, A conflict" $ do
+        let drg = drgOf
+              "DECLARE A1 HAS x IS A NUMBER\n\
+              \DECLARE B1 HAS y IS A NUMBER\n\
+              \GIVEN s IS AN A1\n\
+              \GIVETH A NUMBER\n\
+              \first s MEANS s's x\n\
+              \GIVEN s IS A B1\n\
+              \GIVETH A NUMBER\n\
+              \second s MEANS s's y\n\
+              \GIVEN s IS AN A1\n\
+              \GIVETH A NUMBER\n\
+              \third s MEANS s's x PLUS 1\n"
+            ns = notesOf "D-PARAMTYPE" drg
+        length ns `shouldBe` 1
+        forM_ ["`first`", "`second`", "`third`", "`A1`", "`B1`"] \frag ->
+          (firstNote ns).message `shouldSatisfy` Text.isInfixOf frag
+        length (inputsNamed "s" drg) `shouldBe` 3
+
+      -- The untyped hole: an omitted GIVEN type is not a spelling, it is the
+      -- ABSENCE of evidence. Comparing the sentinel "<untyped>" made two
+      -- same-named untyped GIVENs of different INFERRED types (a NUMBER
+      -- comparison in one decision, a BOOLEAN conjunction in the other)
+      -- compare equal, merge into one typeRef=Any element, and silence both
+      -- D-PARAMTYPE and D-SCOPE — `q` then read a NUMBER as its BOOLEAN and
+      -- answered null/SUCCEEDED with zero notes on both engines.
+      it "refuses to merge same-named UNTYPED parameters: no declared type certifies no agreement" $ do
+        let drg = drgOf
+              "GIVEN x\n\
+              \GIVETH A BOOLEAN\n\
+              \p1 x MEANS x GREATER THAN 10\n\
+              \GIVEN x\n\
+              \GIVETH A BOOLEAN\n\
+              \q1 x MEANS x AND TRUE\n"
+            ns = notesOf "D-PARAMTYPE" drg
+        map (.severity) ns `shouldBe` [Blocking]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "no declared type"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "REFUSED"
+        length (inputsNamed "x" drg) `shouldBe` 2
+        -- and D-SCOPE keeps naming the two same-folded elements
+        notesOf "D-SCOPE" drg `shouldSatisfy` (not . null)
+
+      it "refuses a typed/untyped mix for the same reason" $ do
+        let drg = drgOf
+              "DECLARE A2 HAS v IS A NUMBER\n\
+              \GIVEN s IS AN A2\n\
+              \GIVETH A NUMBER\n\
+              \typed s MEANS s's v\n\
+              \GIVEN s\n\
+              \GIVETH A BOOLEAN\n\
+              \untyped s MEANS s AND TRUE\n"
+            ns = notesOf "D-PARAMTYPE" drg
+        map (.severity) ns `shouldBe` [Blocking]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`A2`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "no declared type"
+        length (inputsNamed "s" drg) `shouldBe` 2
+
+    describe "the population filter (§2.5.6, §2.5.7)" $ do
+      -- fixture 18: FIXTURE positive, and --include-tests restores it.
+      let fixtureSrc =
+            "DECLARE R HAS v IS A NUMBER\n\
+            \GIVEN r IS A R\n\
+            \GIVETH A NUMBER\n\
+            \rule r MEANS r's v\n\
+            \GIVETH A R\n\
+            \sample MEANS R OF 42\n\
+            \#ASSERT rule sample EQUALS 42\n"
+
+      it "drops a directive-argument-only decision as a fixture, with a note" $ do
+        let drg = drgOf fixtureSrc
+        decisionNames drg `shouldNotSatisfy` elem "sample"
+        map (.element) (notesOf "D-FIXTURE" drg) `shouldBe` ["sample"]
+
+      it "emits it anyway under --include-tests, with no note" $ do
+        let drg = drgAdjusted (\o -> o { dloIncludeTests = True }) fixtureSrc
+        decisionNames drg `shouldSatisfy` elem "sample"
+        notesOf "D-FIXTURE" drg `shouldBe` []
+
+      -- fixture 19: FIXTURE(b)'s negative — a decision referenced by NOTHING
+      -- is kept (it is the inert-prose-carrier case, not a fixture; without
+      -- (b) the rule would delete every unreferenced genuine root too).
+      it "keeps a wholly unreferenced decision, flagging inert prose (D-INERT)" $ do
+        let drg = drgOf
+              "GIVETH A BOOLEAN\n\
+              \`definition x` MEANS \"statutory text\" AND TRUE\n"
+        decisionNames drg `shouldBe` ["definition x"]
+        map (.severity) (notesOf "D-INERT" drg) `shouldBe` [Advisory]
+
+      -- fixture 22's negative control: a body that reads one input is NOT
+      -- inert — the predicate is "forces no reference and no input", which a
+      -- Lit-shaped detector would pass trivially and this test would miss.
+      it "does not flag a body that reads an input" $ do
+        let drg = drgOf
+              "GIVEN flag IS A BOOLEAN\n\
+              \GIVETH A BOOLEAN\n\
+              \live flag MEANS flag\n"
+        notesOf "D-INERT" drg `shouldBe` []
+
+      -- fixture 21: FIXTURE(d), the conjunct that stops the rule deleting a
+      -- statute. `statute` satisfies (a)+(b)+(c) module-locally — exactly the
+      -- `relevant date` shape — and the three importer views give the three
+      -- ruled outcomes.
+      let statuteSrc =
+            "GIVEN n IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \wrap n MEANS n TIMES 2\n\
+            \GIVEN n IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \statute n MEANS n PLUS 1\n\
+            \#EVAL wrap (statute 1)\n"
+
+      it "drops the statute-shaped decision only when the importer view clears it" $ do
+        let drg = drgOf statuteSrc   -- harness default: Just Set.empty
+        decisionNames drg `shouldNotSatisfy` elem "statute"
+
+      it "keeps it when an importing module references it (conjunct (d))" $ do
+        let drg = drgAdjusted
+              (\o -> o { dloExternalRefNames = Just (Set.singleton "statute") })
+              statuteSrc
+        decisionNames drg `shouldSatisfy` elem "statute"
+        notesOf "D-FIXTURE" drg `shouldBe` []
+
+      it "fails safe when no importer view is available: kept, report-only advisory" $ do
+        let drg = drgAdjusted
+              (\o -> o { dloExternalRefNames = Nothing })
+              statuteSrc
+        decisionNames drg `shouldSatisfy` elem "statute"
+        [n | n <- notesOf "D-FIXTURE" drg, Text.isInfixOf "NOT checked" n.message]
+          `shouldSatisfy` (not . null)
+
+      -- fixture 23: D-REGULATIVE, both directions. An uncalled regulative
+      -- body routes to BPMN; a module-CALLED one stays in the DRG, still
+      -- emitting raw L4 — rule 3 must not be read as closing §2.4.2's gap.
+      let dutySrc =
+            "DECLARE Actor IS ONE OF Buyer, Seller\n\
+            \DECLARE Act IS ONE OF Pay, Deliver\n\
+            \GIVETH A DEONTIC Actor Act\n\
+            \`payment duty` MEANS\n\
+            \  PARTY Buyer\n\
+            \  MUST Pay\n\
+            \  WITHIN 30\n\
+            \  HENCE FULFILLED\n"
+
+      it "drops an uncalled regulative body (D-REGULATIVE, Lossy)" $ do
+        let drg = drgOf dutySrc
+        decisionNames drg `shouldNotSatisfy` elem "payment duty"
+        map (.severity) (notesOf "D-REGULATIVE" drg) `shouldBe` [Lossy]
+
+      it "keeps a module-called regulative body, with no D-REGULATIVE" $ do
+        let drg = drgOf
+              (dutySrc
+                 <> "GIVETH A DEONTIC Actor Act\n\
+                    \another MEANS `payment duty`\n")
+        decisionNames drg `shouldSatisfy` elem "payment duty"
+        notesOf "D-REGULATIVE" drg `shouldBe` []
+
+      -- fixture 24: closure orientation — fixture-side, computed BEFORE rule
+      -- 3, which is the 46%-vs-74.6% distinction (§2.5.6).
+      it "drops a helper called only from fixtures; keeps one also called live" $ do
+        let helperSrc =
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \helper n MEANS n PLUS 1\n\
+              \GIVEN r IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \builder r MEANS helper r\n\
+              \GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \mainrule n MEANS n TIMES 2\n\
+              \#EVAL mainrule (builder 1)\n"
+        decisionNames (drgOf helperSrc) `shouldNotSatisfy` elem "helper"
+        decisionNames
+          (drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n"))
+          `shouldSatisfy` elem "helper"
+
+    -- §7.7: the 9th-constructor tripwire. 'UserEvalException' has exactly 8
+    -- constructors, and every one is either foreclosed by a DMN-SAFE clause
+    -- or deliberately NOT foreclosed. A ninth constructor makes the case
+    -- below incomplete — under -Wall -Werror the WARNING is the alarm — and
+    -- the count assertion is the belt to those braces. When it fires: add the
+    -- constructor to the coverage map AND to L4.Dmn.Analysis, or record why
+    -- it needs no clause.
+    describe "the DMN-SAFE / UserEvalException coverage map (§2.4.1)" $ do
+      it "accounts for every UserEvalException constructor" $ do
+        let coveredBy :: UserEvalException -> Text
+            coveredBy = \case
+              NonExhaustivePatterns _     -> "L1, L2, L11"   -- L1+L2 alone do NOT cover it
+              EqualityOnUnsupportedType _ _ -> "L7, transitively stated"
+              DivisionByZero _            -> "L3"
+              NotAnInteger _ _            -> "L4"
+              UserError _                 -> "L4, L6, L8, L9, L10; JSON via PURE"
+              BlackholeForced _           -> "L12"
+              StackOverflow               -> "TERMINATES (a resource bound, not a clause)"
+              Stuck _                     -> "deliberately NOT foreclosed: the ASSUME input channel"
+            constructorCount = 8 :: Int
+        -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
+        -- on a ninth constructor before this assertion ever runs
+        coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
+        constructorCount `shouldBe` 8
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -2469,6 +3092,20 @@ goldenSubjects =
     , "hydration"
     , "the hydration exhibit"
     )
+    -- The Phase 4 exhibit: one module holding, deliberately, one of each —
+    -- a tier-1 merge (`basic monthly benefit`/`benefit cap`/`capped benefit`
+    -- share one `claimant` inputData and call by bare FEEL name), a tier-2 λ
+    -- (`scaled amount`, D-BKM), a type conflict (`s` at Article3Case vs
+    -- Article7Case, D-PARAMTYPE, merge refused), a dropped test fixture
+    -- (`sample claimant`, D-FIXTURE), an inert prose carrier
+    -- (`definition — benefit`, D-INERT), an uncalled regulative body
+    -- (`payment duty`, D-REGULATIVE), and a SINGLETON un-lift (`net payout`,
+    -- whose discarded literal argument D-PARAM-AS-INPUT must name even
+    -- though no merge happened).
+  , ( "dmn" </> "unlift.l4"
+    , "unlift"
+    , "the Phase 4 un-lifting exhibit"
+    )
   ]
 
 -- | One golden: read the source, lower it the way the CLI would, render it
@@ -2537,7 +3174,28 @@ drgNamed = drgFlavored defaultDmnFlavor
 -- typechecking would degrade /both/ sides equally, keep the equality true, and
 -- let the one test whose job is to announce Phase 5 go green on garbage.
 drgFlavoredWith :: DmnFlavor -> (Module Resolved -> Text) -> Text -> Drg
-drgFlavoredWith flavor mkName src = case checkWithImports emptyVFS src of
+drgFlavoredWith = drgGeneral emptyVFS id
+
+-- | The one general helper 'drgFlavoredWith' promises to be, extended for
+-- Phase 4 with a VFS (so a two-module fixture can exercise @FIXTURE(d)@) and
+-- an options adjuster (so a fixture can flip @--include-tests@ or supply an
+-- importer view). The Phase 4 defaults mirror the CLI:
+--
+--   * 'dloMissingMatchRanges' is extracted from the SAME check result the
+--     module came from, by the same pattern @jl4\/app\/L4\/Cli\/Export.hs@
+--     uses, so the two cannot drift on what "the checker warned" means;
+--   * 'dloExternalRefNames' is @Just Set.empty@ — a VFS fixture's universe is
+--     closed, so "no importers" is a FACT here, where the CLI has to scan for
+--     it. A fixture that wants the fail-safe path passes
+--     @Nothing@ through the adjuster.
+drgGeneral
+  :: VFS
+  -> (DmnLowerOptions -> DmnLowerOptions)
+  -> DmnFlavor
+  -> (Module Resolved -> Text)
+  -> Text
+  -> Drg
+drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
   Left errs -> error ("source failed to parse: " <> show errs)
   Right tc
     | errs@(_ : _) <- filter ((== SError) . TC.severity) tc.tcdErrors ->
@@ -2547,17 +3205,31 @@ drgFlavoredWith flavor mkName src = case checkWithImports emptyVFS src of
           )
     | otherwise ->
         lowerModule
-          MkDmnLowerOptions
-            { dloModelName    = mkName tc.tcdModule
-            , dloSubstitution = tc.tcdSubstitution
-            , dloFlavor       = flavor
-            -- Resolved from the SAME check result, by the SAME function the
-            -- CLI uses (jl4/app/L4/Cli/Export.hs). If these two ever stopped
-            -- agreeing, a golden would move without any source moving.
-            , dloMaybePredicates =
-                resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
-            }
+          ( adjust
+              MkDmnLowerOptions
+                { dloModelName    = mkName tc.tcdModule
+                , dloSubstitution = tc.tcdSubstitution
+                , dloFlavor       = flavor
+                -- Resolved from the SAME check result, by the SAME function the
+                -- CLI uses (jl4/app/L4/Cli/Export.hs). If these two ever stopped
+                -- agreeing, a golden would move without any source moving.
+                , dloMaybePredicates =
+                    resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
+                , dloIncludeTests = False
+                , dloMissingMatchRanges =
+                    [ r
+                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <-
+                        tc.tcdErrors
+                    , Just r <- [rangeOf e]
+                    ]
+                , dloExternalRefNames = Just Set.empty
+                }
+          )
           tc.tcdModule
+
+-- | Phase 4 fixtures: the default lowering with an options adjuster.
+drgAdjusted :: (DmnLowerOptions -> DmnLowerOptions) -> Text -> Drg
+drgAdjusted adjust = drgGeneral emptyVFS adjust defaultDmnFlavor (const "Test")
 
 -- | As 'drgFlavoredWith', with a fixed model name.
 drgFlavored :: DmnFlavor -> Text -> Text -> Drg

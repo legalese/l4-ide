@@ -117,6 +117,7 @@ library
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
+    L4.Dmn.Analysis
     L4.Dmn.IR
     L4.Dmn.Lower
     L4.Dmn.Emit
