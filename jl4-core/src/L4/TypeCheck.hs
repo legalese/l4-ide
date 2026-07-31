@@ -784,11 +784,15 @@ checkClauseMatrix dec dHead =
           -- 'quietly': the same patterns were already checked inside the
           -- desugared tree, so all diagnostics are discarded (re-emitting
           -- would duplicate every error), and any pattern with no viable
-          -- (error-free) candidate bails the whole analysis.
+          -- (error-free) candidate bails the whole analysis. EXCEPT the
+          -- column-wildcard idiom, which must be intercepted BEFORE
+          -- resolution: see 'patIsColumnWildcard'.
           rpatssM <-
             forM clauseRows \ cl ->
               forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
-                fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+                if patIsColumnWildcard scrutR pat
+                  then pure (Just (PatVar (getAnno pat) scrutR))
+                  else fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
           case traverse sequence rpatssM of
             Just rpatss
               | all (all patternInfoComplete) rpatss ->
@@ -870,6 +874,27 @@ checkClauseMatrix dec dHead =
     renderColumnWildcard scrutR = \ case
       PatVar a v | v `sameResolved` underscoreRef -> PatVar a scrutR
       p -> p
+
+    -- | Mirror of 'L4.Parser.patAlwaysMatchesAs', which the matrix analysis
+    -- MUST agree with: a bare pattern that reuses its own column's
+    -- GIVEN\/scrutinee name (or the anonymous wildcard) is compiled by the
+    -- desugarer as an unconditional match — 'L4.Parser.matchOne'\/'matchLast'
+    -- skip the column entirely, emitting no test — EVEN when that name is
+    -- also a nullary constructor of the column type. Re-resolving such a
+    -- pattern through 'checkPattern' would try constructor resolution first
+    -- ('inferPatternApp' before the variable fallback) and mis-read the row
+    -- as covering only that one constructor, producing a
+    -- 'PatternClausesMissing' warning (and, downstream, a DMN D-PARTIAL
+    -- Blocking) that contradicts the shipped runtime semantics of a
+    -- runtime-total group. Intercept before resolution and stand in the
+    -- wildcard the desugarer actually compiled ('desugarPat' turns 'PatVar'
+    -- into no guards). Note the reuse test is against THIS column's
+    -- scrutinee only: a bare name matching a DIFFERENT column's GIVEN, or
+    -- no GIVEN at all, still resolves normally — exactly as at runtime.
+    patIsColumnWildcard :: Resolved -> Pattern Name -> Bool
+    patIsColumnWildcard scrutR = \ case
+      PatApp _ n [] -> nameToText n == "_" || rawName n == rawName (getName scrutR)
+      _ -> False
 
     -- | Defensive: 'desugarPat' calls 'error' on a PatApp\/PatCons whose
     -- anno lacks 'resolvedInfo' (possible only for a rangeless anno —
