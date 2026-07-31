@@ -1,4 +1,6 @@
-> Status: DONE (core) — Phase 1 (function-clause pattern matching desugared to CONSIDER/WHEN, PMClause in Parser.hs) is shipped and tested on unstable. Deferred/optional: static compile-time non-exhaustive/redundant-pattern warnings (currently only a runtime NonExhaustivePatterns exception); guard patterns (WHEN/WHERE on arms); tabular |...|...| sugar; Approach-2 decision-tree optimization.
+> Status: DONE (core) — Phase 1 (function-clause pattern matching desugared to CONSIDER/WHEN, PMClause in Parser.hs) is shipped and tested on unstable. Deferred/optional: guard patterns (WHEN/WHERE on arms); tabular |...|...| sugar; Approach-2 decision-tree optimization.
+>
+> Note (2026-08-01): static non-exhaustiveness warnings for multi-clause groups now exist. `desugarPatternClauses` attaches the source clause matrix (scrutinees + per-clause head range and patterns) to the fused Decide's annotation as `Extension.pmMatrix`, and the type checker's `checkClauseMatrix` (TypeCheck.hs) analyses n ≥ 2 groups as a unit, warning with `PatternClausesMissing` (pasteable `DECIDE … IS` clause suggestions at the clause-head hull). Literal-pattern groups still bail (opaque to the guard model), so those remain runtime-only. The owning document for the mechanism is `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §14.7.
 
 # Specification: Pattern Matching in Function Definitions
 
