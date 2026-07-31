@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+nonexhaustive-decorator-control.l4:9:3-10:21:
+  I found a problem while checking the definition of `unwrap`:
+    The following branches still need to be considered:
+    
+      WHEN NOTHING THEN
+    
