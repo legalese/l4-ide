@@ -2572,6 +2572,13 @@ control in `jl4/tests-cli/Main.hs` and in the `dmn-engines` CI job; if a zeebe-d
 learns to parse the boxed-context file, those legs go red with instructions to flip the pin and
 narrow this note.
 
+**Ruled 2026-07-31 (Meng): "the execution is the exhibit."** The corpus export is not an
+exhibit-only artifact: the demo requires it to _execute_, so Phase 5 BKM emission sits on the
+demo's critical path — demo-criticality on top of the portability case measured above. The
+pipeline that imposes this is `specs/todo/single-instruction-demo/SPEC.md` (its R0); this
+paragraph is the DMN-side record of that ruling, landed in the same PR that introduced that
+spec.
+
 ### 6.3 Refuse loudly — three cases, not BKMs in general
 
 > **Case 3 narrowed 2026-07-27 by R7 (§13.3).** It read as an instruction to _suppress_ BKM
