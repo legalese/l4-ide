@@ -284,6 +284,18 @@ single-member sections §2.5.5 measures. Measured:
 reasoner**, and nothing downstream catches it. The prohibition is spec-mandated; the detection gap
 is KIE's.
 
+> **Measured 2026-07-31 — two of three silence claims survive, the third does not.** Probe
+> `svc-cycle` (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), KIE 8.44.0.Final: Xerces **valid**,
+> validator **clean**, `KieBuilder` **clean**, all three decisions SUCCEEDED-but-null — all as the
+> table says. But the **runtime message channel does fire**, 10 errors: `Error evaluating Decision
+node 'a_out': null`, plus a per-service `Errors occured while evaluating Decision Service node
+'alpha'.` So "nothing downstream catches it" is wrong as written: a harness reading
+> `DMNResult.getMessages()` — which §13.6's assertion set already requires — catches it. What is
+> unchanged, and is the reason this subsection exists, is the **practical** consequence: a
+> design-time exporter has no runtime, so **§2.3.2's own SCC splitter remains mandatory** and cannot
+> be replaced by "the engine will tell us". (Camunda 8 never reaches the question: it rejects the
+> file at parse with the §13.4 `ClassCastException`.)
+
 **Therefore `§` is the _proposed_ seam, not the emitted one.** The exporter must run its own SCC
 check over the **service-level** graph and, where a section would close a cycle, split it into
 finer services until the graph is acyclic. Verified: the same decisions with the offending section
@@ -2190,6 +2202,40 @@ first claimant keeps the base, the nth gets `base_<n>` for the least free `n ≥
    list predates;
 4. **BKM `formalParameter` names** (§6.2), likewise.
 
+> **Measured 2026-07-31 — Group E of the Phase 5 probe matrix
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), and it adds a fifth scope member the list did not
+> have.** These scopes were named untested; `Lower.hs:3712-3716` records the same guess. What was
+> executed on KIE 8.44.0.Final and zeebe-dmn 8.7.6:
+>
+> - **BKM element/`variable` names belong in scope 1**, i.e. uniquified against `inputData` and
+>   decision variables — a **hard requirement, not a convenience**, and not previously stated here.
+>   `collide-bkm-decision` measured the two engines **disagreeing about what the document means**:
+>   KIE raises `DUPLICATE_NAME` ×2, **builds clean**, lets the BKM win (`call_dup = 300`) and
+>   reports the colliding **decision** NOT_EVALUATED/null, taking its readers down with it; Camunda
+>   is silent and gives **both** answers right (`dup=5`, `read_dup=6`, `call_dup=300`), because
+>   zeebe-dmn keeps invocables and variables in **disjoint namespaces**. Neither portability nor
+>   either engine can serve as the emitter's backstop, so the exporter must resolve it. This
+>   sharpens §13.7-1's "an element wins silently" prediction in the bad direction on KIE (the
+>   decision is deleted from the result) and the harmless direction on Camunda.
+> - **`decisionService` names are their own scope, and the harm is real.** `collide-svc-svc`: KIE
+>   `DUPLICATE_NAME` ×2, build clean, both decisions correct — and **both** by-name
+>   `evaluateDecisionService` calls resolve to the **first** service (`SVC twin -> {n=4, left=8}`
+>   printed twice; the second service's own output never appears), with no runtime error. By
+>   contrast `collide-svc-decision` is **validator-only** on KIE: same `DUPLICATE_NAME` code, all
+>   four decisions correct, the name resolving to the decision, and the service still reachable. So
+>   services need uniquifying against each other and **not** against decisions — same code, different
+>   severity in fact, which is why the two are separate fixtures.
+> - **BKM `formalParameter` names are their own scope, one per `encapsulatedLogic`.** A parameter
+>   shadows a same-named `inputData` (`collide-param-input`, 6/6 both) and a same-named decision
+>   (`collide-param-shadow-visible`, 6/6 both), and parameters do not collide across BKMs
+>   (`collide-param-param`, 6/6 both). `Lower.hs:3714`'s "adding a scope, not widening it" stands
+>   measured for this member. `collide-param-decision` closes the scope from the other side: a BKM
+>   body may **not** read a decision variable at all (KIE whole-model `Unknown variable`; Camunda
+>   null).
+> - **`D-FEELNAME` must be extended in the same change**, or it goes silent on exactly these
+>   classes: its `varClaimants` (`Lower.hs:3879-3896`) is built from `freeTerms` and `decides` only,
+>   which is the §13.7-1 `D-SCOPE` defect one element kind later.
+
 **Stage 2 is a port, not a design.** **[D]** `assignIds` (`Lower.hs:1721-1730`) is already exactly
 `uniquifyIn` — first claimant keeps the base, the nth gets `base_<n>` — applied to XML **ids**, and
 `DmnExport.hs` pins `["input_n", "input_n_2"]`. Its character map is already byte-identical to the one
@@ -2505,11 +2551,37 @@ third witness, which this pass strengthened into an executed wrong answer.
 
 ### 6.1 What is already right
 
-`Lower.hs:678` — `App _ r args -> call e (feelIdent r) args`, rendering `f(x)` — **is correct**.
+~~`Lower.hs:678` — `App _ r args -> call e (feelIdent r) args`, rendering `f(x)` — **is correct**.~~
 A FEEL invocation resolves against a BKM and evaluates, verified on Drools/KIE 8.44 in a
 `<literalExpression>` and inside a decision table's `inputExpression` **and** `outputEntry`
-cells. The bug is entirely on the **callee** side: the callee is emitted as a `<decision>` when
+cells. ~~The bug is entirely on the **callee** side:~~ the callee is emitted as a `<decision>` when
 it should be a `<businessKnowledgeModel>`, and the `<knowledgeRequirement>` edge is missing.
+
+> **CORRECTED 2026-07-31, against the tree at `05e46d9a`.** The claim that the call-site half is
+> already built is **false, and has been for the life of this section** — it told at least two
+> readers Phase 5 was half done. There is no `App _ r args -> call …` case anywhere in `Lower.hs`,
+> and `feelIdent` does not exist (the only related helper is `feelIdentText`, a per-name fold). The
+> live arm is `Lower.hs:1682`:
+>
+> ```haskell
+>     App _ _ (_ : _) -> verbatim e
+> ```
+>
+> with a comment stating the reason deliberately — a user-defined L4 function is not a FEEL
+> function, so a saturated call with arguments is emitted as **raw L4 text** and reported
+> `D-NONFEELOUTPUT`/`D-NONFEELINPUT` at Blocking. What survives of this section is only its last
+> sentence: the un-lifting analysis decides what kind of node the **callee** is. **Phase 5 must
+> build both sides** — an `App _ r args` arm rendering a FEEL invocation, gated on `r` resolving
+> into Phase 4's emitted-BKM set, with `verbatim` retained as the fallback for a prelude builtin, a
+> cross-module callee or a partial application.
+>
+> The spelling is settled by measurement rather than taste: probe `bkm-named-args` (2026-07-31,
+> `jl4/tests-cli/fixtures/dmn-bkm-probe/`) shows **zeebe-dmn accepts named arguments to a BKM in
+> scrambled order**, KIE 6/6 and Camunda 6/6, so the call site emits `f(p: x, q: y)` at both flavors.
+> Positional also works at arity 3 (`bkm-multiparam`, 8/8 on both); named is chosen because it makes
+> the position→name binding of §6.2 visible in the artifact and removes a class of silent argument
+> transposition. This is also where the corpus win lands: all 8 `D-NONFEEL*` notes in
+> `regcf-corpus.fidelity.txt` are `X OF y` applications of exactly this shape.
 
 The un-lifting analysis therefore decides **what kind of node the callee is**, not how the call
 site is spelled.
@@ -2535,6 +2607,33 @@ Requirements:
   binding).
 - Formal parameters take the (mangled) L4 `GIVEN` names. DMN binds by **name**, L4 by
   **position**; emit bindings position→name at the seam.
+
+> **Measured 2026-07-31 — the Phase 5 probe matrix.** Twenty-three hand-written fixtures under
+> `jl4/tests-cli/fixtures/dmn-bkm-probe/`, run against KIE 8.44.0.Final (JDK 17) and zeebe-dmn
+> 8.7.6. Five things this section asserted or left open are now measured:
+>
+> - **A parameterised guarded chain really does stay a table, executably.** `bkm-table-multiparam`
+>   passes 12/12 on both engines, moving §13.3's row 4 from QUOTED to EXECUTED at arity 2.
+> - **Do not emit `typeRef` on a single `<output>` inside a BKM table.** KIE raises
+>   `WARN [ILLEGAL_USE_OF_TYPEREF]`; no value changes on either engine. This matches §13.5's
+>   existing single-output rule, and the probe fixture records it in its header.
+> - **The `@name` == `variable/@name` invariant is unchecked on the default flavor.** > `bkm-name-mismatch`: KIE raises `VARIABLE_NAME_MISMATCH` at the validator, **builds clean**, and
+>   then fails at runtime (`Not an invocable: 'null'`) — but **Camunda tolerates the mismatch
+>   completely and answers correctly**, binding by `@name` and never reading `variable/@name`. So
+>   this invariant is engine-checked on `kie` and **wholly unchecked** on `camunda`. Making it true
+>   by construction in the IR — mirroring the `dcnName`/`dcnFeelName` split at `IR.hs:764-777` — is
+>   the only backstop. This resolves half of §13.8's open Camunda question.
+> - **The `knowledgeRequirement` edge set is the DIRECT-call set, not its transitive closure**, on
+>   both engines: `bkm-chain` (edge on the calling BKM) passes 2/2 on both, while `bkm-chain-flat`
+>   (edges hoisted to the top-level caller) fails on both. Consequence for §6.4: §6.3.9's SCC runs
+>   over exactly the graph the engines consume.
+> - **Hydration composes with BKMs, so §4.4 × §6.2 needs no fallback.** `bkm-in-context` 6/6 both
+>   engines: a boxed-context `literalExpression` entry MAY invoke a BKM declared by a
+>   `knowledgeRequirement` on the **enclosing decision**. `bkm-in-context-sibling` 6/6: the call may
+>   take an earlier sibling entry as argument, including one itself computed by an earlier BKM call.
+>   `bkm-null` 9/9: FEEL `null` survives a BKM return, so R8-d′ extends to tier 2 unchanged.
+>
+> Full matrix and the harness wiring in `DMN-PHASE5-BUILD-PLAN.md` §1.
 
 Boxed `<invocation>` is an optional second form for a decision whose whole logic is exactly one
 saturated call. It buys better modeller rendering plus a validator check ("Unknown parameter
@@ -2602,11 +2701,15 @@ spec.
    an unresolvable callee in a cell logs `resolved to undefined` and the table falls through to
    the next rule, returning a plausible wrong answer. ~~If the exporter claims a target engine,
    gate BKM emission on it.~~ **Superseded — name it in the fidelity report; do not gate emission
-   on it.** See the note at the head of this section.
-   the next rule, returning a plausible wrong answer. If the exporter claims a target engine,
-   gate BKM emission on it. (**Narrowed 2026-07-27 by R7/§13:** KIE and Camunda 8 both execute BKMs
-   in every probed form, so this is not a flavor axis. It survives as a refusal keyed to
-   `dmn-eval-js` and Camunda 7, neither of which is a flavor we emit for.)
+   on it.** See the note at the head of this section. (**Narrowed 2026-07-27 by R7/§13:** KIE and
+   Camunda 8 both execute BKMs in every probed form, so this is not a flavor axis. It survives as a
+   refusal keyed to `dmn-eval-js` and Camunda 7, neither of which is a flavor we emit for.)
+
+> **Editorial repair, 2026-07-31.** The R7 narrowing edit above left a **duplicated copy** of case
+> 3's tail as live prose after the strikethrough — "If the exporter claims a target engine, gate BKM
+> emission on it." — which stated the **superseded** ruling in the section Phase 5 implements. It is
+> deleted; the surviving parenthetical is the 2026-07-27 narrowing. Nothing was decided here, only
+> un-said.
 
 ### 6.4 Acyclicity: three graphs, one check — R5, ruled 2026-07-27
 
@@ -3908,6 +4011,30 @@ to the next rule with a plausible wrong answer, and Camunda 7, which returns `nu
 **Consequence for §6.2:** build BKM once, for both flavors, unconditionally. The "gating" clause in
 §6.3-3 is hereby narrowed to a fidelity note, not a suppression.
 
+> **Measured 2026-07-31 — the two UNKNOWN cells are filled, and one row's reading was too weak.**
+> Probes `bkm-chain-nokr` and `bkm-name-mismatch`
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), KIE 8.44.0.Final and zeebe-dmn 8.7.6:
+>
+> | Probe                                     | KIE 8.44                                      | Camunda 8.7.6                                               |
+> | ----------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+> | caller `knowledgeRequirement` **removed** | `ERROR [ERR_COMPILING_FEEL] Unknown variable` | **parses; the calling decision answers `null`, no message** |
+> | BKM `@name` ≠ `variable/@name`            | validator ERROR, build clean, runtime FAILS   | **silent, and answers correctly**                           |
+>
+> Both rows are now EXECUTED on both engines. Two consequences:
+>
+> 1. **The `knowledgeRequirement` edge is not an optional decoration KIE tolerates — it is what puts
+>    an invocable's name into a caller's FEEL scope on KIE**, uniformly for BKMs and for services
+>    (§13.4/§13.5's D3 probe gives the **byte-identical** diagnostic for a service). Remove it and
+>    KIE refuses at compile time.
+> 2. **Camunda has no compile-time backstop at all.** It degrades to `null` in silence for a missing
+>    edge, and it never reads `variable/@name`. So on the **default** flavor, both of §6.2's
+>    load-bearing structural invariants are checked by nobody but us, and a `checkDrg` assertion over
+>    `knowledgeRequirement` completeness is **mandatory rather than belt-and-braces**.
+>
+> Also measured, and it retires an assumption rather than a cell: the engines consume the
+> **direct-call** edge set, not its transitive closure (`bkm-chain` passes on both, `bkm-chain-flat`
+> fails on both, with byte-identical diagnostics to `bkm-chain-nokr`).
+
 ### 13.4 Axis 3 — `§`-as-`decisionService`. The one real bit.
 
 | Shape                                                                                   | KIE 8.44                                                                                                              | Camunda 7.23                                                                                               | Camunda 8.7.6                                                                                                                       |
@@ -3942,6 +4069,32 @@ export against.
 And it is the worst possible shape of divergence: **whole-file, at parse, before any decision runs**.
 There is no partial credit and no diagnostic pointing at the cause.
 
+> **Re-executed and sharpened 2026-07-31** on the Phase 5 fixtures `svc-invoked`,
+> `svc-invoked-minus-kr`, `svc-grouping`, `svc-plus-bkm`, `svc-no-output`
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`). Rows 1 and 2 reproduce exactly, independently of the
+> 2026-07-27 probe. **Row 3 needed a qualification and now has one.** "Parses, 3/3 decisions
+> evaluate" is true of the parse and false of the answers: with the one `knowledgeRequirement`
+> deleted, Camunda parses and the **non-calling** decisions are correct, but the **calling** decision
+> answers `null` — `step` and `total` correct, `via_bundle = null` — **with no message at any
+> severity**. And KIE, on the same file, refuses at compile time:
+> `ERROR [ERR_COMPILING_FEEL] … 'bundle(n: n + 100)' … Unknown variable 'bundle'`, which is the
+> **byte-identical** diagnostic it gives for a BKM whose edge is missing (§13.3). So on KIE the edge
+> is **required** for invocables of both kinds, and on Camunda it is **fatal** for services — which
+> is a sharper statement of the flavor bit than "KIE additionally accepts".
+>
+> Two further measurements from the same run, both about what a harness may assume:
+>
+> - **Grouping-only services are portable, including over BKMs.** `svc-grouping` passes 4/4 on both
+>   engines; `svc-plus-bkm` — a grouping service whose encapsulated decisions reach BKMs, which is
+>   the shape every Phase 5 corpus file will have — passes 6/6 on both, with KIE's
+>   `evaluateDecisionService` resolving both BKMs from inside the service.
+> - **KIE's `evaluateDecisionService` return context includes the service's INPUTS**, not only its
+>   output decisions (`SVC bundle -> {n=4, total=9}`). Anyone writing an assertion against a
+>   service's return shape must expect that. And a service with **no** output decisions is Xerces
+>   **valid** (`DMN13.xsd:516`, `minOccurs="0"`), KIE-validator ERROR, **build clean**, then a
+>   runtime `IllegalArgumentException: … 'decisionIds' cannot be empty` — while Camunda is
+>   completely silent (`svc-no-output`).
+
 ### 13.5 The ruling, and the option
 
 **Two flavors. One bit. `camunda` is the default.**
@@ -3955,6 +4108,18 @@ There is no partial credit and no diagnostic pointing at the cause.
 | `knowledgeRequirement` → `decisionService`                | **never emitted**                                                                 | emitted                 |
 | FEEL invocation of a `§` (`Article 6(q)`)                 | **not available** — route to a BKM, else refuse with the existing `Blocking` note | available (§2.3)        |
 | `output/@name`, `output/@typeRef` on single-output tables | omitted                                                                           | omitted — **identical** |
+
+> **Sharpened 2026-07-31 (probes `svc-invoked-minus-kr`, `bkm-chain-nokr`).** Read the
+> `knowledgeRequirement` → `decisionService` row as **required on `kie`, fatal on `camunda`** — not
+> as "KIE additionally accepts it". Deleting that single element does not merely lose the invocation
+> on KIE; KIE refuses the model at **compile** time with the same diagnostic it gives a BKM missing
+> its edge. So the row is a genuine two-sided bit: emitting it breaks Camunda at parse, omitting it
+> breaks KIE at compile. There is no third spelling that satisfies both, which is why the flavor
+> exists at all.
+>
+> The single-output row extends unchanged to BKM tables: a `<output>` carrying a `typeRef` inside a
+> BKM's `encapsulatedLogic` table draws KIE `WARN [ILLEGAL_USE_OF_TYPEREF]` and changes no value on
+> either engine (probe `bkm-table-multiparam`).
 
 The camunda flavor pays a real price and the spec should say so rather than imply parity: a `§`
 with N `GIVEN p` decisions that must be applied per list element needs N BKMs with duplicated
@@ -4204,6 +4369,27 @@ Four deviations from the letter of §13.5/§13.6, all deliberate:
    `Blocking` rather than `Lossy` for that reason: nothing was approximated, an answer was changed.
    Detecting is not resolving; `uniquifyIn` is still the fix, and it is still Phase 2.
 
+   > **Extended 2026-07-31 to the two element kinds Phase 5 introduces** (probes
+   > `collide-bkm-decision`, `collide-svc-decision`, `collide-svc-svc`, and see §5.2). Two
+   > corrections to how the table above generalises:
+   >
+   > | Collision                         | KIE 8.44                                                                                            | Camunda 8.7.6                  |
+   > | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------ |
+   > | BKM × decision                    | `DUPLICATE_NAME` ×2, build clean, BKM wins, **decision NOT_EVALUATED**                              | silent, **both answers right** |
+   > | decisionService × decision        | `DUPLICATE_NAME` ×2, build clean, **no runtime effect at all**                                      | silent, all correct            |
+   > | decisionService × decisionService | `DUPLICATE_NAME` ×2, build clean, **second service unreachable, answers with the first's contents** | silent, correct                |
+   >
+   > First: "an element wins silently" understates KIE on BKM × decision. The colliding **decision**
+   > is removed from the result set entirely — NOT_EVALUATED with a null value — and everything
+   > requiring it goes SUCCEEDED-but-null, while the build stays clean. Second: Camunda is not
+   > "silent, wrong answer" here but **silent and right**, because zeebe-dmn keeps invocables and
+   > variables in disjoint namespaces. That is worse for us, not better: the engines now **disagree
+   > about what the document means**, so neither portability nor either engine is available as a
+   > backstop and the exporter must resolve the name itself. Third, and not a generalisation of this
+   > table at all: `DUPLICATE_NAME` is the same code across all three rows and means three different
+   > things in fact — harmless on the middle row, a silently substituted answer on the last.
+   > `D-FEELNAME`'s claimant set must gain BKM and service names or it sees none of this.
+
 2. **Spelling: `flavor`, not `flavour`** — §13.5 wrote the report target as
    `"DMN 1.3 (XML), camunda flavour"` once, against the American spelling used by `--flavor`
    and by every heading in this section. The code says `flavor` throughout.
@@ -4243,9 +4429,15 @@ Stated so nobody reads absence as evidence:
 - **`@camunda/linting`** is BPMN-only — there are no Camunda DMN lint rules on the npm side. So
   there is no JS-side Camunda check to add alongside `etc/validate-dmn.mjs`; the engine harness is
   the only Camunda opinion available.
-- **Camunda 8 behaviour on a malformed BKM** (missing `knowledgeRequirement`, `@name` ≠
-  `variable/@name`). KIE is loud on both; C8 is UNKNOWN. Worth a probe before Phase 5 ships BKM,
-  since a silent C8 would change §6.2's invariants from "checked by the engine" to "checked by us".
+- ~~**Camunda 8 behaviour on a malformed BKM** (missing `knowledgeRequirement`, `@name` ≠
+  `variable/@name`). KIE is loud on both; C8 is UNKNOWN.~~ **MEASURED 2026-07-31, and the
+  pessimistic branch is the one that happened.** Probes `bkm-chain-nokr` and `bkm-name-mismatch`
+  (`jl4/tests-cli/fixtures/dmn-bkm-probe/`): with the edge missing, Camunda **parses and answers
+  `null`, with no message at any severity**; with `@name` ≠ `variable/@name`, Camunda is silent and
+  **answers correctly**, binding by `@name` and never consulting `variable/@name`. This bullet's own
+  closing sentence is therefore now the ruling: **§6.2's invariants move from "checked by the engine"
+  to "checked by us"** on the default flavor, which makes a `checkDrg` assertion over
+  `knowledgeRequirement` completeness mandatory rather than defensive. Recorded at §6.2 and §13.3.
 
 ### 13.9 Review triage — what was rejected, and on what measurement
 
