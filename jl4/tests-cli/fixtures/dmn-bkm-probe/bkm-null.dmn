@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE B3. What this asks: does FEEL `null` survive a BKM RETURN, and can a
+  downstream decision guard on it?
+
+  dmn-null-probe/null-semantics.dmn measured null for plain decisions and for a
+  table defaultOutputEntry, which is what rule 1 and rule 3 of section 11-R8-d'
+  rest on. It never crossed an invocation boundary. Phase 5 puts every MAYBE
+  returning tier 2 decide behind a BKM, so the return path is the one that has
+  to hold.
+
+      cap(v)          = if v > 10 then null else v * 10   <<< R8-d' rule 1
+      capped          = cap(n)                            null flows OUT of a BKM
+      guarded         = if capped != null then capped + 1 else -1   <<< rule 3
+      guarded_inline  = if cap(n) != null then cap(n) + 1 else -1
+                        (the same guard applied to the CALL rather than to a
+                         decision that holds its result: measures whether a
+                         null-valued call composes in expression position, which
+                         is not the same question)
+
+  `capped` is asserted as an EXPLICIT JSON null in the cases file for the case
+  where it is null, which is what licenses the null answer in both harnesses
+  (KieDmnCheck.java:363-373 and the symmetric rule in CamundaDmnCheck). Without
+  the explicit null the harness would flag SUCCEEDED-BUT-NULL and fail, so this
+  probe also exercises the licensing path itself.
+
+  WHAT A FLIP MEANS. If a BKM cannot return null, or if a decision holding a
+  null cannot be guarded, then R8-d' (MAYBE lowers to FEEL null) does not extend
+  to tier 2 and every MAYBE returning decide has to stay un-lifted, i.e. Phase 4
+  and Phase 5 collide.
+
+  MEASURED 2026-07-31: 9/9 values on BOTH engines, KIE clean, Camunda clean. A
+  BKM may return FEEL null; a downstream decision holding that null may be
+  guarded with `!=  null`; and the same guard applied to the CALL rather than to
+  a held result behaves identically. R8-d' extends to tier 2 unchanged.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_null" name="bkm_null" namespace="https://legalese.com/l4/dmn/bkm_null" exporter="hand">
+  <businessKnowledgeModel id="bkm_cap" name="cap">
+    <variable id="bkm_cap_var" name="cap" typeRef="number"/>
+    <encapsulatedLogic id="bkm_cap_logic">
+      <formalParameter id="bkm_cap_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_cap_lit">
+        <text>if v &gt; 10 then null else v * 10</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_capped" name="capped">
+    <variable id="decision_capped_var" name="capped" typeRef="number"/>
+    <informationRequirement id="ir_capped_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_capped">
+      <requiredKnowledge href="#bkm_cap"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_capped_lit">
+      <text>cap(n)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_guarded" name="guarded">
+    <variable id="decision_guarded_var" name="guarded" typeRef="number"/>
+    <informationRequirement id="ir_guarded_capped">
+      <requiredDecision href="#decision_capped"/>
+    </informationRequirement>
+    <literalExpression id="decision_guarded_lit">
+      <text>if capped != null then capped + 1 else -1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_guarded_inline" name="guarded_inline">
+    <variable id="decision_guarded_inline_var" name="guarded_inline" typeRef="number"/>
+    <informationRequirement id="ir_guarded_inline_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_guarded_inline">
+      <requiredKnowledge href="#bkm_cap"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_guarded_inline_lit">
+      <text>if cap(n) != null then cap(n) + 1 else -1</text>
+    </literalExpression>
+  </decision>
+</definitions>

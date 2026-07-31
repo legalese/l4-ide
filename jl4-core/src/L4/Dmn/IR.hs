@@ -68,6 +68,7 @@ module L4.Dmn.IR
   , DrgNode (..)
   , Decision (..)
   , DecisionLogic (..)
+  , ContextEntry (..)
   , InputData (..)
   , Requirement (..)
   , requirementTarget
@@ -87,6 +88,7 @@ import qualified Base.Text as Text
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
+import Data.Time.Calendar (Day, showGregorian)
 
 import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, emptyReport)
 
@@ -196,10 +198,19 @@ data ItemDefinition = MkItemDefinition
 -- cannot tell at a glance whether the cell is a value or a reference. A guard we
 -- cannot reduce to a constant endpoint therefore becomes its own boolean column
 -- instead (see 'GuardNotDecomposable'), which is always sound.
+-- __'VDate' is appended last on purpose.__ The derived 'Ord' is consulted by
+-- nothing that cares about the cross-constructor order, but appending keeps the
+-- relative order of the three that existed before, so no @Set FeelValue@
+-- anywhere reorders.
 data FeelValue
   = VNum !Rational
   | VStr !Text
   | VBool !Bool
+  | VDate !Day
+    -- ^ a FEEL @date@. Rendered @date("YYYY-MM-DD")@, which DMN 1.3 grammar rule
+    -- 21 calls a @date time literal@ and rule 33 admits as a @simple literal@ —
+    -- so it is a legal S-FEEL unary-test ENDPOINT, which is the whole reason a
+    -- chain of rule-date guards can become an analysable interval table.
   deriving stock (Eq, Ord, Show, Generic)
 
 data CmpOp = OpLt | OpLeq | OpGt | OpGeq
@@ -284,6 +295,10 @@ renderFeelValue = \case
   VNum r  -> renderNumber r
   VStr t  -> quoteFeelString t
   VBool b -> if b then "true" else "false"
+  -- DMN 1.3 grammar rule 21: a `date time literal` is ("date"|"time"|...) "("
+  -- string ")". Rule 33 makes it a `simple literal`, hence a legal endpoint.
+  -- MEASURED on both engines via jl4/tests-cli/fixtures/dmn-date-probe.
+  VDate d -> "date(\"" <> Text.pack (showGregorian d) <> "\")"
 
 -- | A FEEL string literal. FEEL strings are double-quoted with Java-style
 -- escapes (DMN grammar rule 62).
@@ -604,6 +619,9 @@ data DmnRule = MkDmnRule
   , drInputs      :: ![UnaryTest]   -- ^ same length and order as 'dtInputs'
   , drOutput      :: !FeelExpr
   , drDescription :: !(Maybe Text)  -- ^ the L4 source text of the row's guard
+  , drAnnotations :: ![Text]
+    -- ^ same length and order as the table's 'dtAnnotations'. Empty on every
+    -- table that declares no annotation column.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -614,6 +632,10 @@ data DecisionTable = MkDecisionTable
   , dtInputs    :: ![InputColumn]
   , dtOutput    :: !OutputColumn
   , dtRules     :: ![DmnRule]
+  , dtAnnotations :: ![Text]
+    -- ^ annotation column NAMES (DMN 8.2.12's @tRuleAnnotationClause@, which has
+    -- a @\@name@ and no content). @[]@ on every table but a rule-date interval
+    -- table, which carries one column named @regime@.
   , dtNotes     :: ![FidelityNote]
     -- ^ non-fatal fidelity losses incurred while building /this/ table. A fatal
     -- one is a 'FidelityLoss' and means there is no table at all.
@@ -691,16 +713,43 @@ requirementTarget = \case
   RequiredDecision t -> t
   RequiredInput t    -> t
 
--- | What a decision's logic is. DMN calls both of these /boxed expressions/.
+-- | One @\<contextEntry\>@ of a 'LogicContext'.
+--
+-- __Every entry is NAMED.__ A context entry with no @\<variable\>@ is DMN's
+-- /final result entry/, and a context that has one evaluates to that entry
+-- alone. A hydrator's value IS the record, so it emits none and the context
+-- itself is the decision's value. Measured on KIE 8.44.0.Final and zeebe-dmn
+-- 8.7.6 (@jl4\/tests-cli\/fixtures\/dmn-hydration-probe@).
+data ContextEntry = MkContextEntry
+  { ceId    :: !Text
+  , ceName  :: !Text
+    -- ^ the FEEL entry name, and also the path step a downstream reader uses.
+    -- It comes from the SAME @neFields@ map the 'ItemComponent' name does, so
+    -- the two agree by construction rather than by an emitter remembering.
+  , ceLabel :: !Text   -- ^ the verbatim L4 field name
+  , ceType  :: !DmnType
+  , ceExpr  :: !FeelExpr
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | What a decision's logic is. DMN calls all three of these /boxed expressions/.
 --
 -- 'LogicLiteral' is not a failure mode to be ashamed of: a decision whose body is
 -- not a guarded chain (an arithmetic formula, a plain conjunction, a deontic rule)
 -- has no decision-table shape, and DMN's answer for that is a
 -- @\<literalExpression\>@. Silently dropping such a decision would leave the DRG
 -- describing a different rule set than the module does.
+--
+-- 'LogicContext' is a __hydrator__ (§4.4): a record instance re-emitted as a
+-- boxed context whose stored components are copied from the source and whose
+-- COMPUTED components are calculated from the entries declared before them. It
+-- is not a fallback at all — it is the only shape in which a derived field can
+-- reach a DMN engine, since FEEL has no notion of a derived component and an L4
+-- call is not a FEEL invocation.
 data DecisionLogic
   = LogicTable !DecisionTable
   | LogicLiteral !FeelExpr
+  | LogicContext ![ContextEntry]
   deriving stock (Eq, Show, Generic)
 
 -- | A @\<decision\>@.

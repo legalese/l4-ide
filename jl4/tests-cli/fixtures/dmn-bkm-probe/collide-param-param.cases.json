@@ -1,0 +1,12 @@
+{
+  "note": [
+    "Cases for collide-param-param.dmn (probe E2). 2 cases x 3 decisions = 6",
+    "value checks per engine. g = (n - 1) + (1 - n) * 100, which is 0 only at",
+    "n = 1; both cases avoid that so a collapsed parameter frame cannot pass by",
+    "landing on zero."
+  ],
+  "cases": [
+    { "name": "A. n = 10", "context": { "n": 10 }, "expect": { "a": 7, "b": -7, "g": -891 } },
+    { "name": "B. n = 0",  "context": { "n": 0 },  "expect": { "a": -3, "b": 3, "g": 99 } }
+  ]
+}

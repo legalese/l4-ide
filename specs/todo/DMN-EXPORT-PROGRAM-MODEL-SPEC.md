@@ -136,6 +136,14 @@ GIVEN investor IS AN InvestorProfile
 `within the investment limit`           investor MEANS … `greater of …` investor …
 ```
 
+> **The example is kept in its ORIGINAL spelling on purpose, and it is no longer the corpus's.**
+> As of 2026-07-31 `greater of annual income or net worth` is a **computed field** on
+> `InvestorProfile` rather than a standalone unary decide, and `regcf.l4` reads it as a
+> projection — `` investor's `greater of …` `` (§4.4, and §4.4.7 for what that bought). The
+> lambda-lifting point above is about the SHAPE of house-style L4 in general and is unaffected —
+> plenty of the corpus is still written this way — but a reader who greps for this text in
+> `regcf.l4` will not find it, and that is the drift this note exists to stop.
+
 So the translation is **un-lambda-lifting**, and DMN's answer to "where did the arity go?" is
 _the model itself is the lambda_ — you invoke a DMN model by supplying its `inputData`. Arity
 moves from each decision up to the model, where DMN puts it.
@@ -275,6 +283,18 @@ single-member sections §2.5.5 measures. Measured:
 **A silent null under a SUCCEEDED status is the worst available failure mode for a legal
 reasoner**, and nothing downstream catches it. The prohibition is spec-mandated; the detection gap
 is KIE's.
+
+> **Measured 2026-07-31 — two of three silence claims survive, the third does not.** Probe
+> `svc-cycle` (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), KIE 8.44.0.Final: Xerces **valid**,
+> validator **clean**, `KieBuilder` **clean**, all three decisions SUCCEEDED-but-null — all as the
+> table says. But the **runtime message channel does fire**, 10 errors: `Error evaluating Decision
+node 'a_out': null`, plus a per-service `Errors occured while evaluating Decision Service node
+'alpha'.` So "nothing downstream catches it" is wrong as written: a harness reading
+> `DMNResult.getMessages()` — which §13.6's assertion set already requires — catches it. What is
+> unchanged, and is the reason this subsection exists, is the **practical** consequence: a
+> design-time exporter has no runtime, so **§2.3.2's own SCC splitter remains mandatory** and cannot
+> be replaced by "the engine will tell us". (Camunda 8 never reaches the question: it rejects the
+> file at parse with the §13.4 `ClassCastException`.)
 
 **Therefore `§` is the _proposed_ seam, not the emitted one.** The exporter must run its own SCC
 check over the **service-level** graph and, where a section would close a cycle, split it into
@@ -1759,6 +1779,307 @@ would otherwise be re-asserted through the `typeRef` hop, which is a difference 
 not only in the reader's convenience. A `MAYBE NUMBER` still gets no alias, and this paragraph is
 why — a builtin asserts no range, so there is nothing to subtract.
 
+### 4.4 Hydration: a record with computed fields is a boxed context
+
+**LANDED 2026-07-31.** Everything in this section is true of the tree.
+
+An L4 record may carry a **computed field** — `` `doubled amount` IS A NUMBER MEANS `amount` TIMES 2 ``
+inside a `DECLARE`. DMN has no such thing: `tItemDefinition` has no derived flag, and an L4 call is
+not a FEEL invocation (§4.2.1-8's reason — a `DECIDE` becomes a 0-ary decision variable, so `f(x)`
+names nothing an engine can resolve). The lowering is therefore a **hydrator**: the record instance
+is re-emitted as a boxed `<context>` whose stored components are copied from the source and whose
+derived components are computed **from the entries declared before them**, and every downstream read
+becomes plain path access on the hydrated value.
+
+**[E] The idiom is measured, not assumed.** `jl4/tests-cli/fixtures/dmn-hydration-probe/` is a
+hand-written model in exactly this shape — later context entries referencing earlier siblings by
+bare name, no final result entry, read downstream by path access — and it answers **6/6 on KIE
+8.44.0.Final with zero warnings, and 6/6 on zeebe-dmn 8.7.6**, measured 2026-07-31. The boundary
+from PR #176 still holds and is why this works at all: a decision **table** inside a context entry is
+zeebe-unparseable; **literal-expression** entries are fine, and that is all hydration needs.
+`jl4/examples/dmn/hydration.l4` then carries the same measurement on **emitter-produced** XML —
+33/33 on both engines — so a red run in one isolates the engine and a red run in the other isolates
+the lowering.
+
+#### 4.4.1 Which instances are hydrated
+
+An instance is hydrated iff **all** of: it is a free term or a surviving decide whose type head is a
+record; that record owns at least one computed field; and **some surviving decide contains a foldable
+computed read of that instance**.
+
+The third condition is a **use gate**, and it follows the `_optional` alias precedent verbatim: a
+base `itemDefinition` is inert and is therefore minted ungated, but a hydrator is a `<decision>`, and
+one with no dependents is noise in an artifact whose whole claim is that every line in it means
+something. It costs the Reg CF corpus eight hydrators it would otherwise mint and never read; it
+mints exactly one. There is no knot — the gate is a purely syntactic scan of decide bodies, computed
+before the decisions are lowered.
+
+**Only computed reads rewire.** A raw-field read stays on the source instance. Hydrated stored
+entries are literal copies, so rewiring them would buy nothing and would churn every existing table.
+
+#### 4.4.2 ★ Entry order is TOPOLOGICAL, and getting it wrong is silent
+
+A boxed context's entries evaluate in order, and only **earlier** siblings are in scope.
+`detectComputedFieldCycles` (`jl4-core/src/L4/Desugar.hs`) guarantees **acyclicity only** —
+declaration order is not guaranteed topological. An entry that reads a later sibling resolves to
+nothing and **FEEL answers `null`**: no error, no warning, a wrong number.
+
+The fields are therefore emitted by a **depth-first walk in declaration order**: take the fields as
+declared, and before emitting one, emit any sibling it reads that is not out yet. Dependencies come
+first where there is a dependency; declaration order holds everywhere else.
+
+> **CORRECTED 2026-07-31 in review.** The first implementation used
+> `Data.Graph.stronglyConnComp`, and this paragraph asserted that "independent fields keep
+> declaration order because the input list is in declaration order". `stronglyConnComp` gives no
+> such guarantee for edge-free vertices, and the shipped artifact refuted the claim: Reg CF's
+> `greater of annual income or net worth` and `lesser of …` are mutually independent and were
+> declared in that order, and `regcf-corpus.dmn` emitted them **reversed** (`ce6` = lesser, `ce7` =
+> greater). Harmless to evaluate — independent entries evaluate in any order — but false as a
+> claim, and it is the claim `D-COMPUTEDFIELD` itself makes when it says the derived components are
+> computed "from the components declared before them". Pinned by "keeps INDEPENDENT computed fields
+> in declaration order" in `jl4/tests/DmnExport.hs`.
+
+Termination does not depend on acyclicity: a field is marked emitted **before** its dependencies
+are walked, so a cycle stops rather than loops. Acyclicity itself still comes from
+`detectComputedFieldCycles`, which runs long before this.
+
+`jl4/examples/ok/computed-fields.l4` **cannot catch the omission**, because its declaration order
+already happens to be topological. `jl4/examples/dmn/hydration.l4` declares `band` **before** the
+`total income` it reads, precisely so that it can, and its engine cases assert the hydrated records
+in full rather than only the decisions downstream.
+
+#### 4.4.3 Recognising a computed field after the desugaring
+
+`L4.Desugar.desugarComputedFields` runs **before** typechecking and splits the `DECLARE`: stored
+fields stay, and each computed field becomes a synthetic top-level
+`GIVEN … _self IS A R / GIVETH τ / f _self MEANS …`. So the exporter never sees a computed field on a
+`DECLARE` at all.
+
+Recognition is by **provenance**, not reconstruction: `TypeCheck` stamps those decides
+`ComputedSelector` rather than `Computable`, and `resolveTermFiltered` writes the kind onto every
+**reference** occurrence as well as the definition — so no environment has to be threaded. The owning
+record is the head **type** of the last `GIVEN` parameter (the parameter being spelled `_self`
+corroborates but is not the key).
+
+This is deliberately **not** the test in `jl4-core/src/L4/Export/Document.hs`, which recognises the
+same thing by comparing a receiver's name to the string `"_self"`. A name test is what R8-f was.
+
+Both spellings of a read fold, because both occur in real corpora: `x's f` (L4 house style) and
+`f x` (what `jl4/examples/legal/regcf/regcf-wizard.l4` writes).
+
+**A computed read whose receiver is not a nullary reference refuses gracefully, with no new code.**
+`` `greater of …` (`investor profile from` facts) `` applies a computed selector to a record-valued
+_expression_, which no hydrator names; it renders verbatim exactly as any unrenderable `App` does and
+the existing `D-LITERALEXPR`/`D-NONFEEL*` machinery reports it. `regcf-wizard.l4` is left carrying
+that untouched **on purpose**, so the path stays exercised by a real file.
+
+#### 4.4.4 The DRG rewiring, and R11
+
+Requirements are computed from `survivingRefs`, a **fold-aware** traversal that on a foldable
+computed read records the instance and does **not** descend into the receiver or the selector,
+because after the fold neither appears in the emitted FEEL. It is the same function §15.3's law-time
+rewrite uses, and it subsumes the `exprFreeRefs` it replaced.
+
+> **The fold is a PRUNE, not a whitelist — corrected 2026-07-31 in review, and the shape is
+> load-bearing.** The first implementation walked the tree collecting names per node from a
+> whitelist (`App` contributes its head, `Proj` contributes nothing, **everything else contributes
+> nothing**). That silently dropped every name that is not an `App` head — an `AppNamed` head above
+> all, but also `Regulative`, `Event` and `Record` — while `exprFreeRefs` had collected every `Ref`
+> in the tree. Because `dcnRequirements` can only ever REMOVE edges relative to the source, the loss
+> was invisible in every golden, and showed up only as a decision whose `<text>` named a decision
+> its `informationRequirement`s did not: `` `sum of` WITH x IS `the base` y IS 7 `` renders verbatim
+> and lost its edge to `decision_sum_of` — the exact inverse of the R11 property this function
+> exists to establish. `survivingRefs` now replaces each folded read with a name-free placeholder
+> and then collects exactly as `exprFreeRefs` did, so what is **not** folded is collected as before
+> and the failure mode cannot recur. Pinned by "a NAMED-ARGUMENT call keeps its edge" in
+> `jl4/tests/DmnExport.hs`.
+
+**Consequence, and it is intended:** where every read of `x` in a decide is folded, the direct
+`RequiredInput` edge **disappears** and the graph becomes `x → hydration_x → decide`. That is what
+R11 demands — the emitted FEEL no longer names `x`, so the DRG must not claim it does. A decide that
+reads **both** raw and computed fields keeps both edges, which is also correct. Free-term collection
+is **not** filtered this way: `x` must still become an `inputData`, because the hydrator requires it.
+
+Two further couplings are load-bearing and are silent if omitted:
+
+- **`ComputedSelector` uniques join the `selectors` set.** Removing the synthetic decides from the
+  decision list removes them from `decideByUnique`, and free-term collection excludes a reference only
+  if it is a known decide, a constructor or a selector — so without this, a read of `doubled amount`
+  would mint a **bogus `inputData` named after the field**: a supplied value where the model computes
+  one.
+- **`fieldScopes` learns the computed selectors**, inside the record's own `uniquifyIn` call. Without
+  it a hydrated computed component would miss the field namespace and could collide with a stored
+  field's path step in silence — §5.3.4's executed collision, reintroduced. Because one map then
+  serves both the context entry names and the downstream path steps, the two agree **by
+  construction**.
+
+**A hydrator's own edges are computed the same way, and are NOT just its source instance.** ADDED
+2026-07-31 in review, closing a defect that shipped:
+
+`Desugar.rewriteFieldRefs` rewrites only the names that are the record's **own** fields; every other
+name in a `MEANS` body resolves in module scope and is emitted into the context entry unchanged. So
+
+```l4
+DECLARE R HAS
+    `a` IS A NUMBER
+    `b` IS A NUMBER MEANS `a` TIMES `vat rate`
+```
+
+renders `a * vat_rate` inside `hydration_r`'s context. With the source instance as the hydrator's
+only `informationRequirement`, `vat_rate` is not in the hydrator's evaluation scope — and this
+change's own fixture measured both outcomes for exactly that shape: KIE 8.44 reports
+`Required dependency 'r' not found` and **SKIP**s, zeebe-dmn 8.7.6 reads `null` and multiplies by it
+(`jl4/tests-cli/fixtures/dmn-null-probe/null-absent.dmn`). Either a hard engine failure or a silently
+wrong number, with a clean fidelity report.
+
+The hydrator therefore runs `survivingRefs` over its **rendered** computed bodies and takes
+`classifyRef` over the result, minus the synthetic `_self` binders, unioned with the source-instance
+edge — the same pair every other decision uses. Two couplings come with it:
+
+- **A free term reachable only from a computed body still becomes an `inputData`.** `freeTerms`
+  scans the computed-selector decides as well, minus `_self` (which is a `GIVEN` parameter and
+  therefore a `Ref` rather than a `Def`, so letting it through would put `input_self` — the
+  desugaring's own scaffolding — back in the model's input contract). Before hydration the field
+  **was** its own decision and did mint that input; after it, the context entry names it just the
+  same.
+- The rule is pinned by "requires every DECISION a computed field's body names" in
+  `jl4/tests/DmnExport.hs`.
+
+#### 4.4.4a A hydrator's entries pass the SAME verbatim gate as every other expression
+
+ADDED 2026-07-31 in review, closing a defect that shipped.
+
+Every other rendering path in `L4.Dmn.Lower` asks `feFragment == L4Verbatim` before emitting — that
+gate **is** `D-NONFEELOUTPUT`. Hydrators are built outside the per-decide note machinery, so for a
+time nothing looked at a context entry at all, and a computed field whose body `renderFeelIn` cannot
+render shipped **raw L4 source** inside a `<literalExpression>` with a **clean fidelity report and
+exit 0**. Reproduced with the built binary on a computed field that is a `CONSIDER` over a
+payload-carrying sum:
+
+```xml
+<literalExpression id="hydration_r_ce3_lit">
+  <text>CONSIDER `_self`'s d WHEN lease t THEN t, WHEN sale THEN `_self`'s a</text>
+```
+
+reported `1 lossy, 1 advisory`, no Blocking note, so `--fail-on blocking` passed it. That is exactly
+the "green in the validator, wrong in the engine" failure this exporter exists to close, and it also
+falsified two claims in this document at once: §4.4.3's "`_self` disappears from the model" (it is
+right there, unbound) and `D-COMPUTEDFIELD`'s `lost:` clause "nothing an engine needs".
+
+The gate is now applied: any context entry whose fragment is `L4Verbatim` raises `D-NONFEELOUTPUT`
+**Blocking** against the hydrator, with a message written for a context entry rather than an output
+entry. The corpora did not catch it because every committed hydrator's body happens to render
+cleanly — `hydration.l4`'s header even says "everything here must stay engine-clean" — which is
+precisely why the test is synthetic. Pinned by "reports a computed field body it cannot render as
+FEEL, Blocking".
+
+#### 4.4.4b A stated boundary: the select idiom does not fold inside a hydrator
+
+`IF a AT LEAST b THEN a ELSE b` folds to `max(a, b)` everywhere else, **including through a
+source-written projection** (`max(p.x, p.y)`, measured) — but not inside a hydrator, where Reg CF's
+`greater of annual income or net worth` emits `(if annual_income >= net_worth then annual_income else
+net_worth)`.
+
+**Cause, narrowed by measurement rather than left as a hypothesis:** `Desugar.rewriteFieldRefs`
+builds a sibling read as `Proj emptyAnno (Var emptyAnno _self) n`, a node with **no source range**;
+the typechecker's annotation machinery skips rangeless nodes, so `annTypeSource` answers `Nothing`,
+`builtinOperandType` answers `DmnAny`, `feelOrderable` is `False` and `selectIdiomIn` declines. The
+same body written as a top-level decide over the same fields folds normally, which is the control.
+
+**Not repaired, deliberately.** Both forms are `FullFeel`, both evaluate (33/33 on KIE 8.44 and
+zeebe-dmn 8.7.6), so the cost is legibility and not fidelity — and the repair would be in
+`L4.Desugar`, whose output every computed-field module and the exactprint goldens depend on. It is
+**pinned** instead, by "does not fold the SELECT idiom inside a hydrator — a stated boundary" in
+`jl4/tests/DmnExport.hs`, so the golden cannot move without someone reading this section. The
+committed probe `jl4/tests-cli/fixtures/dmn-hydration-probe/hydration-context.dmn` uses
+`max(annual_income, net_worth)` by hand and is therefore **not** byte-for-byte the emitter's output;
+what it pins is the boxed-context **idiom**, not the expression text.
+
+#### 4.4.5 A latent silent-null defect, found and FIXED
+
+This is reported as a **defect the work uncovered**, not as new behaviour.
+
+`alice's adult` (`jl4/examples/ok/computed-fields.l4`) type-checks through `inferRecordProjection`,
+which resolves with an unfiltered `resolveTerm` and builds a `Proj` node whose selector is the
+`ComputedSelector` decide — structurally identical to a stored-field projection. On the tree before
+this change, `renderFeelIn`'s `Proj` case emitted `alice.adult` tagged **`SFeel`**: a path step into a
+FEEL context whose `itemDefinition` **has no such component**, so FEEL answers `null` — while
+`classifyRef` found the selector in `decideByUnique` and emitted a `RequiredDecision` beside it. The
+artifact's edges and its expression contradicted each other, which is R11's exact complaint, and the
+answer was silently wrong.
+
+It was **latent rather than shipped**: `sumtype.l4` never called `doubled amount` and the Reg CF
+corpus had no computed fields. Hydration closes it by construction, because it handles both the
+`Proj` and the `App` spellings.
+
+#### 4.4.6 `D-COMPUTEDFIELD`
+
+**Advisory**, one per hydrated **type**, raised on the hydrated `itemDefinition`. It says that the
+derived components are not marked derived in DMN, because `tItemDefinition` has no such flag and a
+`contextEntry` is indistinguishable from a supplied value.
+
+Advisory is the right severity and is not a fudge: **nothing an engine needs is missing**, because
+hydration means no caller ever supplies a derived component. What is lost is a reader's ability to
+tell, _from the type alone_, which components are the model's input contract and which the model
+computes for itself. `FIDELITY-SEVERITY-AXIS-SPEC.md` §3.2 binds Advisory to the `Faithful` effect,
+which is exactly the claim being made.
+
+Component-level notes (`D-MAYBE-NULL`, `D-ITEMDEF`) fire on the **base** definition only and never on
+the hydrated one, or every component note would double. The base is where a reader looks up the input
+contract.
+
+**[E] The one input shape that could have refuted "nothing an engine needs is missing" — MEASURED
+2026-07-31, and it does not, but the answer is not the obvious one.** A hydrator's stored entries are
+path accesses on the source instance, so if the SOURCE RECORD ITSELF is `null` every stored entry
+answers `null`. Case D of `jl4/examples/dmn/hydration.cases.json` supplies exactly that, and **KIE
+8.44.0.Final and zeebe-dmn 8.7.6 return byte-identical values**:
+
+| entry / decision                     | value  |
+| ------------------------------------ | ------ |
+| `salary`, `other_income`             | `null` |
+| `total_income` (`salary + other_…`)  | `null` |
+| `band` (`if total_income >= …`)      | **1**  |
+| `band_width` (`band * 25000`)        | 25000  |
+| `applicant_score` (`total_… / 1000`) | `null` |
+
+`band` is **not** `null`, and that is the finding. Its body is
+`if total_income >= 100000 then 3 else if total_income >= 50000 then 2 else 1`; a non-boolean FEEL
+condition yields `null`, `null` is not `true`, so each `if` takes its ELSE arm and the chain bottoms
+out at `1`. The hydrated record therefore carries a **plausible, non-null derived component computed
+from an absent record** — and its reader `applicant band width` answers `25000` rather than `null`.
+
+The `D-COMPUTEDFIELD` claim survives, because it is about a caller never SUPPLYING a derived
+component and that is still true. What this measures is a different boundary, stated here rather than
+assumed away: **L4 has no null record**, so no L4 program can ask this question; the emitted DMN model
+_can_ be asked it, and answers without complaint. Any caller that can produce a null record is outside
+the model's contract, and the artifact does not say so anywhere an engine would enforce.
+
+#### 4.4.7 The measurable win
+
+`regcf-corpus.fidelity.txt` carried **four** `D-NONFEELOUTPUT` **Blocking** notes; two of them named
+output entries that were literally `` `greater of annual income or net worth` OF investor `` and its
+`lesser of` twin. After converting those two functions to computed fields, the entries read
+`investor_hydrated.greater_of_annual_income_or_net_worth` — real S-FEEL — and **both Blocking notes
+are gone** (4 → 2). The two that remain name `the applicable measure … OF investor`, a decision call
+rather than a computed field, and are unaffected.
+
+Six of the eight record functions over `InvestorProfile` were **left alone**, and the split is
+**four and two**, not five and one:
+
+- **Four are unary and read other module decisions** — `the applicable measure of annual income or
+net worth` (`regcf.l4:388`), `either annual income or net worth is less than the cut point`
+  (`:401`), `investment limit` (`:408`) and `the accredited-investor carve-out applies to` (`:436`).
+  The first, third and fourth reach the dated rule-date predicate and the dated cut point, which
+  would put law time inside a context entry where the DRG's single global rule-date input cannot
+  reach, destroying #178's interval table.
+- **Two are binary, not unary** — `aggregate amount sold to this investor including this
+transaction` (`:423`) and `investor is within the investment limit` (`:443`). Each takes the
+  amount to be sold alongside the investor, so neither is a candidate at all: a computed field's
+  only parameter is the record.
+
+(Corrected 2026-07-31 in review; this paragraph read "five … and one is binary" and also called all
+eight "unary record functions" while counting two binary ones among them.)
+
 ---
 
 ## 5. Naming
@@ -1880,6 +2201,40 @@ first claimant keeps the base, the nth gets `base_<n>` for the least free `n ≥
 3. **`decisionService` names** (§2.3), which are FEEL names under R1 and which the original scope
    list predates;
 4. **BKM `formalParameter` names** (§6.2), likewise.
+
+> **Measured 2026-07-31 — Group E of the Phase 5 probe matrix
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), and it adds a fifth scope member the list did not
+> have.** These scopes were named untested; `Lower.hs:3712-3716` records the same guess. What was
+> executed on KIE 8.44.0.Final and zeebe-dmn 8.7.6:
+>
+> - **BKM element/`variable` names belong in scope 1**, i.e. uniquified against `inputData` and
+>   decision variables — a **hard requirement, not a convenience**, and not previously stated here.
+>   `collide-bkm-decision` measured the two engines **disagreeing about what the document means**:
+>   KIE raises `DUPLICATE_NAME` ×2, **builds clean**, lets the BKM win (`call_dup = 300`) and
+>   reports the colliding **decision** NOT_EVALUATED/null, taking its readers down with it; Camunda
+>   is silent and gives **both** answers right (`dup=5`, `read_dup=6`, `call_dup=300`), because
+>   zeebe-dmn keeps invocables and variables in **disjoint namespaces**. Neither portability nor
+>   either engine can serve as the emitter's backstop, so the exporter must resolve it. This
+>   sharpens §13.7-1's "an element wins silently" prediction in the bad direction on KIE (the
+>   decision is deleted from the result) and the harmless direction on Camunda.
+> - **`decisionService` names are their own scope, and the harm is real.** `collide-svc-svc`: KIE
+>   `DUPLICATE_NAME` ×2, build clean, both decisions correct — and **both** by-name
+>   `evaluateDecisionService` calls resolve to the **first** service (`SVC twin -> {n=4, left=8}`
+>   printed twice; the second service's own output never appears), with no runtime error. By
+>   contrast `collide-svc-decision` is **validator-only** on KIE: same `DUPLICATE_NAME` code, all
+>   four decisions correct, the name resolving to the decision, and the service still reachable. So
+>   services need uniquifying against each other and **not** against decisions — same code, different
+>   severity in fact, which is why the two are separate fixtures.
+> - **BKM `formalParameter` names are their own scope, one per `encapsulatedLogic`.** A parameter
+>   shadows a same-named `inputData` (`collide-param-input`, 6/6 both) and a same-named decision
+>   (`collide-param-shadow-visible`, 6/6 both), and parameters do not collide across BKMs
+>   (`collide-param-param`, 6/6 both). `Lower.hs:3714`'s "adding a scope, not widening it" stands
+>   measured for this member. `collide-param-decision` closes the scope from the other side: a BKM
+>   body may **not** read a decision variable at all (KIE whole-model `Unknown variable`; Camunda
+>   null).
+> - **`D-FEELNAME` must be extended in the same change**, or it goes silent on exactly these
+>   classes: its `varClaimants` (`Lower.hs:3879-3896`) is built from `freeTerms` and `decides` only,
+>   which is the §13.7-1 `D-SCOPE` defect one element kind later.
 
 **Stage 2 is a port, not a design.** **[D]** `assignIds` (`Lower.hs:1721-1730`) is already exactly
 `uniquifyIn` — first claimant keeps the base, the nth gets `base_<n>` — applied to XML **ids**, and
@@ -2196,11 +2551,37 @@ third witness, which this pass strengthened into an executed wrong answer.
 
 ### 6.1 What is already right
 
-`Lower.hs:678` — `App _ r args -> call e (feelIdent r) args`, rendering `f(x)` — **is correct**.
+~~`Lower.hs:678` — `App _ r args -> call e (feelIdent r) args`, rendering `f(x)` — **is correct**.~~
 A FEEL invocation resolves against a BKM and evaluates, verified on Drools/KIE 8.44 in a
 `<literalExpression>` and inside a decision table's `inputExpression` **and** `outputEntry`
-cells. The bug is entirely on the **callee** side: the callee is emitted as a `<decision>` when
+cells. ~~The bug is entirely on the **callee** side:~~ the callee is emitted as a `<decision>` when
 it should be a `<businessKnowledgeModel>`, and the `<knowledgeRequirement>` edge is missing.
+
+> **CORRECTED 2026-07-31, against the tree at `05e46d9a`.** The claim that the call-site half is
+> already built is **false, and has been for the life of this section** — it told at least two
+> readers Phase 5 was half done. There is no `App _ r args -> call …` case anywhere in `Lower.hs`,
+> and `feelIdent` does not exist (the only related helper is `feelIdentText`, a per-name fold). The
+> live arm is `Lower.hs:1682`:
+>
+> ```haskell
+>     App _ _ (_ : _) -> verbatim e
+> ```
+>
+> with a comment stating the reason deliberately — a user-defined L4 function is not a FEEL
+> function, so a saturated call with arguments is emitted as **raw L4 text** and reported
+> `D-NONFEELOUTPUT`/`D-NONFEELINPUT` at Blocking. What survives of this section is only its last
+> sentence: the un-lifting analysis decides what kind of node the **callee** is. **Phase 5 must
+> build both sides** — an `App _ r args` arm rendering a FEEL invocation, gated on `r` resolving
+> into Phase 4's emitted-BKM set, with `verbatim` retained as the fallback for a prelude builtin, a
+> cross-module callee or a partial application.
+>
+> The spelling is settled by measurement rather than taste: probe `bkm-named-args` (2026-07-31,
+> `jl4/tests-cli/fixtures/dmn-bkm-probe/`) shows **zeebe-dmn accepts named arguments to a BKM in
+> scrambled order**, KIE 6/6 and Camunda 6/6, so the call site emits `f(p: x, q: y)` at both flavors.
+> Positional also works at arity 3 (`bkm-multiparam`, 8/8 on both); named is chosen because it makes
+> the position→name binding of §6.2 visible in the artifact and removes a class of silent argument
+> transposition. This is also where the corpus win lands: all 8 `D-NONFEEL*` notes in
+> `regcf-corpus.fidelity.txt` are `X OF y` applications of exactly this shape.
 
 The un-lifting analysis therefore decides **what kind of node the callee is**, not how the call
 site is spelled.
@@ -2227,6 +2608,33 @@ Requirements:
 - Formal parameters take the (mangled) L4 `GIVEN` names. DMN binds by **name**, L4 by
   **position**; emit bindings position→name at the seam.
 
+> **Measured 2026-07-31 — the Phase 5 probe matrix.** Twenty-three hand-written fixtures under
+> `jl4/tests-cli/fixtures/dmn-bkm-probe/`, run against KIE 8.44.0.Final (JDK 17) and zeebe-dmn
+> 8.7.6. Five things this section asserted or left open are now measured:
+>
+> - **A parameterised guarded chain really does stay a table, executably.** `bkm-table-multiparam`
+>   passes 12/12 on both engines, moving §13.3's row 4 from QUOTED to EXECUTED at arity 2.
+> - **Do not emit `typeRef` on a single `<output>` inside a BKM table.** KIE raises
+>   `WARN [ILLEGAL_USE_OF_TYPEREF]`; no value changes on either engine. This matches §13.5's
+>   existing single-output rule, and the probe fixture records it in its header.
+> - **The `@name` == `variable/@name` invariant is unchecked on the default flavor.** > `bkm-name-mismatch`: KIE raises `VARIABLE_NAME_MISMATCH` at the validator, **builds clean**, and
+>   then fails at runtime (`Not an invocable: 'null'`) — but **Camunda tolerates the mismatch
+>   completely and answers correctly**, binding by `@name` and never reading `variable/@name`. So
+>   this invariant is engine-checked on `kie` and **wholly unchecked** on `camunda`. Making it true
+>   by construction in the IR — mirroring the `dcnName`/`dcnFeelName` split at `IR.hs:764-777` — is
+>   the only backstop. This resolves half of §13.8's open Camunda question.
+> - **The `knowledgeRequirement` edge set is the DIRECT-call set, not its transitive closure**, on
+>   both engines: `bkm-chain` (edge on the calling BKM) passes 2/2 on both, while `bkm-chain-flat`
+>   (edges hoisted to the top-level caller) fails on both. Consequence for §6.4: §6.3.9's SCC runs
+>   over exactly the graph the engines consume.
+> - **Hydration composes with BKMs, so §4.4 × §6.2 needs no fallback.** `bkm-in-context` 6/6 both
+>   engines: a boxed-context `literalExpression` entry MAY invoke a BKM declared by a
+>   `knowledgeRequirement` on the **enclosing decision**. `bkm-in-context-sibling` 6/6: the call may
+>   take an earlier sibling entry as argument, including one itself computed by an earlier BKM call.
+>   `bkm-null` 9/9: FEEL `null` survives a BKM return, so R8-d′ extends to tier 2 unchanged.
+>
+> Full matrix and the harness wiring in `DMN-PHASE5-BUILD-PLAN.md` §1.
+
 Boxed `<invocation>` is an optional second form for a decision whose whole logic is exactly one
 saturated call. It buys better modeller rendering plus a validator check ("Unknown parameter
 'X'"), at the cost of not composing with a table body. Not v1.
@@ -2236,6 +2644,39 @@ is tier 2 with six call sites across four modules, and registration, deregistrat
 required-steps notices and appeals all route through it. A v1 that refuses it exports a Charities
 model **missing the statute's constitutive test**. Given BKM turns out to be cheap, refusing buys
 nothing.
+
+**Measured 2026-07-30 — the engine-intersection triple.** BKM emission is not only the faithful
+spelling of a parameterised callee; it is the **only two-engine-portable** spelling of a
+per-element predicate with a tabular body. Three hand-written fixtures in
+`jl4/tests-cli/fixtures/dmn-engine-intersection/` express one statute-shaped predicate ("either
+spouse earns under $100,000 or is a Qualifying Candidate") over one shared cases file, and both
+committed engine harnesses were run over all three:
+
+| predicate spelled as                    | KIE 8.44         | zeebe-dmn 8.7.6   |
+| --------------------------------------- | ---------------- | ----------------- |
+| inline in the quantifier's `satisfies`  | pass, 0 warnings | pass              |
+| decision table in a boxed-context entry | pass, 1 warning  | **parse failure** |
+| decision table in a BKM                 | pass, 0 warnings | pass              |
+
+The boxed-context placement is schema-valid DMN 1.3 — a context entry holds any expression, and
+`tFunctionDefinition` is an expression — yet zeebe-dmn rejects it at parse (`expected literal
+expression but found '...DecisionTableImpl...'`). So "schema-valid" and "portable" are distinct
+properties, and the middle row is the measured gap between them. The KIE warning on that row is
+itself a finding: `MISSING_TYPE_REF` on the context-bound function asks for the type
+`Spouse → boolean`, which the `itemDefinition` language cannot spell (§4's type table has no
+function type). Consequence for this section: without BKMs, the exportable per-element predicate
+is an opaque FEEL string that no gap/overlap analysis can reach; with them, it is a table both
+engines accept and KIE's analyser checks. The Camunda failure is **pinned** as a negative
+control in `jl4/tests-cli/Main.hs` and in the `dmn-engines` CI job; if a zeebe-dmn upgrade
+learns to parse the boxed-context file, those legs go red with instructions to flip the pin and
+narrow this note.
+
+**Ruled 2026-07-31 (Meng): "the execution is the exhibit."** The corpus export is not an
+exhibit-only artifact: the demo requires it to _execute_, so Phase 5 BKM emission sits on the
+demo's critical path — demo-criticality on top of the portability case measured above. The
+pipeline that imposes this is `specs/todo/single-instruction-demo/SPEC.md` (its R0); this
+paragraph is the DMN-side record of that ruling, landed in the same PR that introduced that
+spec.
 
 ### 6.3 Refuse loudly — three cases, not BKMs in general
 
@@ -2260,11 +2701,15 @@ nothing.
    an unresolvable callee in a cell logs `resolved to undefined` and the table falls through to
    the next rule, returning a plausible wrong answer. ~~If the exporter claims a target engine,
    gate BKM emission on it.~~ **Superseded — name it in the fidelity report; do not gate emission
-   on it.** See the note at the head of this section.
-   the next rule, returning a plausible wrong answer. If the exporter claims a target engine,
-   gate BKM emission on it. (**Narrowed 2026-07-27 by R7/§13:** KIE and Camunda 8 both execute BKMs
-   in every probed form, so this is not a flavor axis. It survives as a refusal keyed to
-   `dmn-eval-js` and Camunda 7, neither of which is a flavor we emit for.)
+   on it.** See the note at the head of this section. (**Narrowed 2026-07-27 by R7/§13:** KIE and
+   Camunda 8 both execute BKMs in every probed form, so this is not a flavor axis. It survives as a
+   refusal keyed to `dmn-eval-js` and Camunda 7, neither of which is a flavor we emit for.)
+
+> **Editorial repair, 2026-07-31.** The R7 narrowing edit above left a **duplicated copy** of case
+> 3's tail as live prose after the strikethrough — "If the exporter claims a target engine, gate BKM
+> emission on it." — which stated the **superseded** ruling in the section Phase 5 implements. It is
+> deleted; the surviving parenthetical is the 2026-07-27 narrowing. Nothing was decided here, only
+> un-said.
 
 ### 6.4 Acyclicity: three graphs, one check — R5, ruled 2026-07-27
 
@@ -2564,27 +3009,81 @@ the census showed 0 cyclic files. The census is blind to suppressed self-edges b
 > existing predicate must not be deleted until something else reports the duplicate, because DMN 1.3
 > §7.3.4 makes that duplicate a violation of a normative `SHALL`.
 
-| Code               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `D-SCOPE`          | **Repurpose.** Today it fires on "two Uniques, one FEEL name" (`Lower.hs:1245-1258`) — universal under GIVEN style, so pure noise. Replace the predicate with a **type conflict** test: two same-named terms with _different_ declared types.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `freeTermTypes` is a plain `Map.fromList` (`Lower.hs:1228`), i.e. **last-wins** — that is the genuine defect currently hidden behind the false positives. Also fix: the message hardcodes "two different terms" for 3+, anchors only to the first element's id, and its `lost:` text ("L4's lexical scoping of GIVEN parameters") is false when two global `ASSUME`s collide. **Severity raised to `Blocking` 2026-07-27 by R6 (§2.5.3):** merging two same-named parameters of different declared types is a `null [SUCCEEDED]` in both target engines, and R7's `D-FEELNAME` — which does catch it today — goes quiet the moment un-lifting collapses the N elements to one. Also fix: the message renders the _folded_ name, so it should name both L4 spellings (§5.3.6). **Message rewritten 2026-07-29 (predicate and severity untouched):** after `uniquifyIn` the old sentence — "the emitted model has eight elements a FEEL expression cannot tell apart" — is **false**, since the elements are renamed apart and every reference reaches the one it means. It now names both L4 spellings and the resolved FEEL names (`issuer`, `issuer_2`, …) and states the loss that survives: L4 scoped N parameters locally, DMN has N globals, so a caller must supply N values. |
-| `D-PARAM-AS-INPUT` | **New**, `Advisory`. A tier-1 decision's parameters became model inputs; the decision can no longer be applied twice to different subjects within this model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Names what un-lifting costs, without pretending it is free.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `D-BKM`            | **New**, `Advisory`. A tier-2 decision became a BKM, with the differing call sites listed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | The reader should know which decisions are functions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `D-RECURSIVE`      | **New**, `Blocking`. §6.3 case 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `D-PARTIAL`        | **New**, two severities, **keyed off the call site and not off the node kind** (§2.4.2). `Lossy` only when every call site consumes the decision from a _lazy_ position and it was inlined or emitted as a BKM; `Blocking` when any call site consumes it strictly, and when it is a DRG root. Names the failing clause and its range, says _not certified total_ rather than _partial_, and never offers `@nonexhaustive` as a remedy.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | §2.4. Not decision-node-ness: an undefined FEEL result is `null` wherever it arises — `<decision>` body, BKM `encapsulatedLogic`, or inlined cell alike — and `null` reads as `false` at the first boolean consumer. Routing to a BKM removes the input _widening_; only a lazy consuming position removes the _coercion_.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `D-SUMTYPE`        | **LANDED 2026-07-29 (Phase 3)**, **two severities** (§4.2.1). `Blocking` on a decision that _reads_ a user-declared payload-carrying `IS ONE OF` — payload-field projection, payload-constructor construction, or a `CONSIDER` with a payload-binding arm — propagated to its callers. `Lossy` on a decision that `CONSIDER`s one over its _nullary arms only_, naming the constructors with no cell, and on a decision that merely threads a record containing one. Names the type, the constructor and the reading site.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | §4.2.1. Reported **before** `D-LITERALEXPR`, which otherwise misdiagnoses the same decision as "not a guarded chain". ~~Does **not** fire on builtin `MAYBE`/`EITHER` (R8).~~ **SUPERSEDED 2026-07-29:** R8-d and R8-e put both inside it — a decision that constructs `JUST`/`NOTHING`/`LEFT`/`RIGHT`, or whose `CONSIDER` scrutinee is a `MAYBE`/`EITHER`, is `Blocking`, and so is a nested `MAYBE` at a boundary (R8-c). Propagation along `calls` is **not** built; see §4.2.1-8 for why and where it goes. The `Lossy` arm exists because the emitted table is _correct_ — measured in KIE 8.44 — while its _domain_ is not: the payload constructor has no cell and no `allowedValues`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `D-MAYBE-NULL`     | **New 2026-07-29 (Phase 3)**, `Lossy`. R8-a/R8-b. One per element whose `MAYBE τ` was lowered to τ's own `typeRef` — a decision's `<variable>`, an `inputData`'s, a column's, an `itemComponent`'s. Names the L4 type, says FEEL has one `null` for both "there is none" and "it could not be computed", and — when τ is a **named** type with a finite domain — that no `allowedValues`/`inputValues` is emitted **at this element** and that the element therefore points at a minted **domain-free alias** `<τ>_optional` rather than at τ itself. ~~that the domain was **dropped**~~ **CORRECTED 2026-07-30 (twice): the range is read through the `typeRef`, so suppressing it at the element alone was defeated one hop away — an answer change, repaired in the artifact by §11-R8-a's carve-out rather than in the note.** The note names the alias and τ, and reports what the alias costs: at that element an engine no longer validates the values that **are** present. See §11-R8-a and §11-R8-b. | §11-R8. The output clause has no site of its own because this emitter emits no `typeRef` on an `<output>` (measured: KIE says `ILLEGAL_USE_OF_TYPEREF`), so a `MAYBE`-typed output is reported at the decision's `<variable>`. **Explicit and mandatory rather than silent**, because once `NOTHING` is spelled `null` no reader and no analyser can recover which channel was meant.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `D-ITEMDEF`        | **New 2026-07-29 (Phase 3)**, `Lossy`. One code, three reasons: a **computed** record field was skipped; a field or element type is declared in **another module**, so no `itemDefinition` could be minted and it is typed `Any`; a `LIST OF τ` has no `itemDefinition`, because `isCollection` is an attribute of `tItemDefinition` and needs one of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | §4.1, §4.2. **[E]** The computed-field reason has **zero exercise** and the reason is worth knowing: `L4.Desugar` rewrites a computed field into a synthetic top-level `DECIDE` **before type checking**, so the `Declare` the exporter sees never carries one — the field is relocated to a `<decision>` reading a `_self` `inputData`, not dropped. The arm is kept for the reason `D-FEELNAME`'s is (below). The other two fire 10 times on `regcf-wizard.l4`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `D-RENAME`         | **LANDED 2026-07-29, collision arm only**, `Lossy` — the condition is discharged, because `uniquifyIn` now makes the names distinct (§5.2 stage 2). One note per element whose FEEL name was suffixed, naming the L4 name, the resolved name and the other claimants on the base. 37 instances on the Reg CF corpus. **The benign-mangle `Advisory` arm is NOT built**, and stays deferred to this section's own re-ruling against `FIDELITY-SEVERITY-AXIS-SPEC.md` §5: it would emit ~169 `Advisory` notes on one module while `@label` already carries the source name.                                                                                                                                                                                                                                                                                                                                                                                                                                       | §5.2, §5.3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `D-FEELNAME`       | **Landed on PR #160** (R7), `Blocking`. Two or more DRG elements share one FEEL name. R3's proposed extension to the record-field / projection-path namespace was **superseded 2026-07-29 rather than built**: `uniquifyIn` covers that namespace too, so the projection collision is now renamed apart and reported by `D-RENAME`. **Code, severity and predicate are unchanged, and it now fires zero times by construction** — kept, per this section's header, because nothing else reports a duplicate `inputData/@name`, which DMN 1.3 §7.3.4 makes a violation of a normative SHALL. A test pins the count at 0 on `regcf.l4`.                                                                                                                                                                                                                                                                                                                                                                           | §5.3.4. `(p's \`foo bar\`) PLUS (p's foo_bar)`emits`p.foo_bar + p.foo_bar` under the ruled fold — a wrong number, unreported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `D-CYCLE`          | **New**, `Blocking`. §6.4. One per SCC of the `informationRequirement` graph, side condition `\|SCC\| ≥ 2` **or** `\|SCC\| = 1` with a self-edge. Names every member by **name and id**; `range = Nothing`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | DMN 1.3 §6.3.7. KIE reports `Cyclic dependency detected` and skips; Camunda 7 and Camunda 8 refuse to parse.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `D-FIXTURE`        | **New**, `Advisory`. §2.5.6-2. Names every decision not emitted because it is test scaffolding, so the omission is visible in the artifact rather than inferred from absence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | §2.5. The filter is a measurement about four corpora, not a soundness property; it must never be silent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `D-INERT`          | **New**, `Advisory`. §2.5.6-4. A decision that carries statutory text and no operative logic. Predicate: **the body forces no reference and no input** — not "the body is a literal", which misses the corpus's dominant `\"text\" ... TRUE` idiom.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | §2.5. Stops a reader mistaking a tautology for a rule. 12 decisions in 5 of the 51 exported modules emit the body `true and true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `D-REGULATIVE`     | **New**, `Lossy`. §2.5.6-3. A regulative body belongs to the BPMN artifact (§12), not to a fake decision emitting raw L4. Drops to `Advisory` once PR #141 gives it a target to point at.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | §2.5. Today `ground 8 possession order` emits raw L4 and fails KIE with `Unknown variable 'IF'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `D-MD-FLATRECORD`  | **New**, `Lossy`, markdown carrier only. §8.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Code                 | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `D-SCOPE`            | **Repurpose.** Today it fires on "two Uniques, one FEEL name" (`Lower.hs:1245-1258`) — universal under GIVEN style, so pure noise. Replace the predicate with a **type conflict** test: two same-named terms with _different_ declared types.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `freeTermTypes` is a plain `Map.fromList` (`Lower.hs:1228`), i.e. **last-wins** — that is the genuine defect currently hidden behind the false positives. Also fix: the message hardcodes "two different terms" for 3+, anchors only to the first element's id, and its `lost:` text ("L4's lexical scoping of GIVEN parameters") is false when two global `ASSUME`s collide. **Severity raised to `Blocking` 2026-07-27 by R6 (§2.5.3):** merging two same-named parameters of different declared types is a `null [SUCCEEDED]` in both target engines, and R7's `D-FEELNAME` — which does catch it today — goes quiet the moment un-lifting collapses the N elements to one. Also fix: the message renders the _folded_ name, so it should name both L4 spellings (§5.3.6). **Message rewritten 2026-07-29 (predicate and severity untouched):** after `uniquifyIn` the old sentence — "the emitted model has eight elements a FEEL expression cannot tell apart" — is **false**, since the elements are renamed apart and every reference reaches the one it means. It now names both L4 spellings and the resolved FEEL names (`issuer`, `issuer_2`, …) and states the loss that survives: L4 scoped N parameters locally, DMN has N globals, so a caller must supply N values. |
+| `D-PARAM-AS-INPUT`   | **New**, `Advisory`. A tier-1 decision's parameters became model inputs; the decision can no longer be applied twice to different subjects within this model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Names what un-lifting costs, without pretending it is free.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `D-BKM`              | **New**, `Advisory`. A tier-2 decision became a BKM, with the differing call sites listed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | The reader should know which decisions are functions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `D-RECURSIVE`        | **New**, `Blocking`. §6.3 case 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `D-PARTIAL`          | **New**, two severities, **keyed off the call site and not off the node kind** (§2.4.2). `Lossy` only when every call site consumes the decision from a _lazy_ position and it was inlined or emitted as a BKM; `Blocking` when any call site consumes it strictly, and when it is a DRG root. Names the failing clause and its range, says _not certified total_ rather than _partial_, and never offers `@nonexhaustive` as a remedy.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | §2.4. Not decision-node-ness: an undefined FEEL result is `null` wherever it arises — `<decision>` body, BKM `encapsulatedLogic`, or inlined cell alike — and `null` reads as `false` at the first boolean consumer. Routing to a BKM removes the input _widening_; only a lazy consuming position removes the _coercion_.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `D-SUMTYPE`          | **LANDED 2026-07-29 (Phase 3)**, **two severities** (§4.2.1). `Blocking` on a decision that _reads_ a user-declared payload-carrying `IS ONE OF` — payload-field projection, payload-constructor construction, or a `CONSIDER` with a payload-binding arm — propagated to its callers. `Lossy` on a decision that `CONSIDER`s one over its _nullary arms only_, naming the constructors with no cell, and on a decision that merely threads a record containing one. Names the type, the constructor and the reading site.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | §4.2.1. Reported **before** `D-LITERALEXPR`, which otherwise misdiagnoses the same decision as "not a guarded chain". ~~Does **not** fire on builtin `MAYBE`/`EITHER` (R8).~~ **SUPERSEDED 2026-07-29:** R8-d and R8-e put both inside it — a decision that constructs `JUST`/`NOTHING`/`LEFT`/`RIGHT`, or whose `CONSIDER` scrutinee is a `MAYBE`/`EITHER`, is `Blocking`, and so is a nested `MAYBE` at a boundary (R8-c). Propagation along `calls` is **not** built; see §4.2.1-8 for why and where it goes. The `Lossy` arm exists because the emitted table is _correct_ — measured in KIE 8.44 — while its _domain_ is not: the payload constructor has no cell and no `allowedValues`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `D-MAYBE-NULL`       | **New 2026-07-29 (Phase 3)**, `Lossy`. R8-a/R8-b. One per element whose `MAYBE τ` was lowered to τ's own `typeRef` — a decision's `<variable>`, an `inputData`'s, a column's, an `itemComponent`'s. Names the L4 type, says FEEL has one `null` for both "there is none" and "it could not be computed", and — when τ is a **named** type with a finite domain — that no `allowedValues`/`inputValues` is emitted **at this element** and that the element therefore points at a minted **domain-free alias** `<τ>_optional` rather than at τ itself. ~~that the domain was **dropped**~~ **CORRECTED 2026-07-30 (twice): the range is read through the `typeRef`, so suppressing it at the element alone was defeated one hop away — an answer change, repaired in the artifact by §11-R8-a's carve-out rather than in the note.** The note names the alias and τ, and reports what the alias costs: at that element an engine no longer validates the values that **are** present. See §11-R8-a and §11-R8-b. **AMENDED 2026-07-31 (R8-d′): the null lowering is now ADOPTED rather than hypothetical** — `NOTHING` lowers to FEEL `null` on the value channel, so the absence-vs-undefined conflation this note reports is a price paid deliberately, and the note's message says so. The `lost:` clause is unchanged: that distinction is exactly what is still lost. | §11-R8. The output clause has no site of its own because this emitter emits no `typeRef` on an `<output>` (measured: KIE says `ILLEGAL_USE_OF_TYPEREF`), so a `MAYBE`-typed output is reported at the decision's `<variable>`. **Explicit and mandatory rather than silent**, because once `NOTHING` is spelled `null` no reader and no analyser can recover which channel was meant.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `D-COMPUTEDFIELD`    | **New 2026-07-31 (§4.4)**, `Advisory`. One per hydrated **type**, on the hydrated `itemDefinition`. Names the derived components and says DMN cannot mark them derived: `tItemDefinition` has no such flag and a `contextEntry` is indistinguishable from a supplied value, so a reader of the hydrated type alone cannot tell a derived component from a stored one.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | §4.4.6. Advisory, not Lossy, and the severity is the claim: nothing an **engine** needs is missing, because hydration means no caller ever supplies a derived component. What is lost is legibility of the type, not correctness of the model. `FIDELITY-SEVERITY-AXIS-SPEC.md` §3.2 binds Advisory to `Faithful`. Component-level notes (`D-MAYBE-NULL`, `D-ITEMDEF`) fire on the **base** definition only, or every one of them would double.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `D-MD-NOCONTEXT`     | **New 2026-07-31 (§4.4)**, `Blocking`, dmnmd only. A hydrator is a boxed **context**, and dmnmd can say a decision over cases and nothing else, so the decision is omitted from the markdown. Names the component count.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | §8. Its **own** code rather than a widening of `D-MD-NOLITERAL`: that note's message says "is a formula", which is false of a context, and it is a separately counted code in `FIDELITY-SEVERITY-AXIS-SPEC.md` §5.2 — widening it would make one line of that table describe two different losses. What it costs is larger than a literal's: the tables downstream read derived components _through_ the omitted decision, so in the markdown those reads name a decision that is not there.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `D-ITEMDEF`          | **New 2026-07-29 (Phase 3)**, `Lossy`. One code, three reasons: a **computed** record field was skipped; a field or element type is declared in **another module**, so no `itemDefinition` could be minted and it is typed `Any`; a `LIST OF τ` has no `itemDefinition`, because `isCollection` is an attribute of `tItemDefinition` and needs one of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | §4.1, §4.2. **[E]** The computed-field reason has **zero exercise** and the reason is worth knowing: `L4.Desugar` rewrites a computed field into a synthetic top-level `DECIDE` **before type checking**, so the `Declare` the exporter sees never carries one — the field is relocated to a `<decision>` reading a `_self` `inputData`, not dropped. The arm is kept for the reason `D-FEELNAME`'s is (below). The other two fire 10 times on `regcf-wizard.l4`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `D-RENAME`           | **LANDED 2026-07-29, collision arm only**, `Lossy` — the condition is discharged, because `uniquifyIn` now makes the names distinct (§5.2 stage 2). One note per element whose FEEL name was suffixed, naming the L4 name, the resolved name and the other claimants on the base. 37 instances on the Reg CF corpus. **The benign-mangle `Advisory` arm is NOT built**, and stays deferred to this section's own re-ruling against `FIDELITY-SEVERITY-AXIS-SPEC.md` §5: it would emit ~169 `Advisory` notes on one module while `@label` already carries the source name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | §5.2, §5.3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `D-FEELNAME`         | **Landed on PR #160** (R7), `Blocking`. Two or more DRG elements share one FEEL name. R3's proposed extension to the record-field / projection-path namespace was **superseded 2026-07-29 rather than built**: `uniquifyIn` covers that namespace too, so the projection collision is now renamed apart and reported by `D-RENAME`. **Code, severity and predicate are unchanged, and it now fires zero times by construction** — kept, per this section's header, because nothing else reports a duplicate `inputData/@name`, which DMN 1.3 §7.3.4 makes a violation of a normative SHALL. A test pins the count at 0 on `regcf.l4`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | §5.3.4. `(p's \`foo bar\`) PLUS (p's foo_bar)`emits`p.foo_bar + p.foo_bar` under the ruled fold — a wrong number, unreported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `D-CYCLE`            | **New**, `Blocking`. §6.4. One per SCC of the `informationRequirement` graph, side condition `\|SCC\| ≥ 2` **or** `\|SCC\| = 1` with a self-edge. Names every member by **name and id**; `range = Nothing`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | DMN 1.3 §6.3.7. KIE reports `Cyclic dependency detected` and skips; Camunda 7 and Camunda 8 refuse to parse.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `D-FIXTURE`          | **New**, `Advisory`. §2.5.6-2. Names every decision not emitted because it is test scaffolding, so the omission is visible in the artifact rather than inferred from absence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | §2.5. The filter is a measurement about four corpora, not a soundness property; it must never be silent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `D-INERT`            | **New**, `Advisory`. §2.5.6-4. A decision that carries statutory text and no operative logic. Predicate: **the body forces no reference and no input** — not "the body is a literal", which misses the corpus's dominant `\"text\" ... TRUE` idiom.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | §2.5. Stops a reader mistaking a tautology for a rule. 12 decisions in 5 of the 51 exported modules emit the body `true and true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `D-REGULATIVE`       | **New**, `Lossy`. §2.5.6-3. A regulative body belongs to the BPMN artifact (§12), not to a fake decision emitting raw L4. Drops to `Advisory` once PR #141 gives it a target to point at.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | §2.5. Today `ground 8 possession order` emits raw L4 and fails KIE with `Unknown variable 'IF'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `D-MD-FLATRECORD`    | **New**, `Lossy`, markdown carrier only. §8.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `D-RULEDATE`         | **New 2026-07-30 (Phase 3.5)**, `Advisory`, **one severity**. §15.5. Exactly one per DRG: the rule-date `inputData` was emitted, and these named decisions depend on it. An unbound `RULES_EFFECTIVE_DATE` is a well-formed DMN model that answers null in every dated decision, and before this the report was silent about it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `D-RULEDATE-UNBOUND` | **New 2026-07-30 (Phase 3.5)**, `Blocking`, **one severity**. §15.5. One per decision that rebinds law time with `EVAL UNDER RULES EFFECTIVE AT`. A DRG has one global rule-date input and no scoped rebinding, so supplying that input does not make the decision answer. Fires 15× on the Reg CF corpus.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `D-DATEDCHAIN`       | **New 2026-07-30 (Phase 3.5)**, `Blocking`, **one severity**. §15.3, R10. One per chain of rule-date guards that could not be lowered to a date-interval table (mis-ordered or duplicate dates, an unfoldable date, or a mixed chain). The sound fallback still ships, and it is columns of raw L4 no engine can evaluate — which is what `Blocking` means here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ---
 
 ## 8. The markdown carrier
+
+### 8.0 `D-MD-NOCONTEXT`, and what R8-d′ did to `D-MD-NOLITERAL`
+
+**Added 2026-07-31.** A hydrator is a boxed **context**, and dmnmd has no boxed-context form — it
+can say a decision over cases and nothing else — so `renderDecision` returns `Nothing` for it and
+`D-MD-NOCONTEXT` (`Blocking`) discloses it. Its **own** code rather than a widening of
+`D-MD-NOLITERAL`, for the reason in §7's table: that note's message says "is a formula", which is
+false of a context, and it is a separately counted code in `FIDELITY-SEVERITY-AXIS-SPEC.md` §5.2.
+
+The cost it reports is larger than a literal's, and it says so: downstream tables read derived
+components **through** the omitted decision, so in the markdown those reads name a decision that is
+not there.
+
+**What R8-d′ did to `D-MD-NOLITERAL`, VERIFIED against the code rather than presumed.**
+`renderDecision` returns `Nothing` for **any** `LogicLiteral` and `decisionNotes` raises
+`D-MD-NOLITERAL` for **any** `LogicLiteral`; neither consults the `FeelFragment`
+(`jl4-core/src/L4/Dmn/Markdown.hs`). So the hypothesis worth checking — "a formula decision is still
+not a table, so it is still omitted and still disclosed" — **is confirmed**, and it is the right
+answer for the decisions that stayed formulas: both spellings of `grade is settled` remain
+`LogicLiteral` and remain `D-MD-NOLITERAL`, with the interpolated text changing from L4 source to
+real FEEL (`if p != null then true else false`).
+
+But the premise does not hold for `capped at ten`, and the golden is what settles it: under R8-d′
+that decision **becomes a table**, so it leaves `D-MD-NOLITERAL` altogether.
+
+**What it lands on took two attempts, and the first one was wrong — recorded rather than
+overwritten, because the wrong answer is the one a reader would reach on their own.**
+
+- _First attempt._ The table rendered, picking up `D-MD-NODEFAULT` (`Lossy`) — dmnmd has no
+  `<defaultOutputEntry>`, so the absent case becomes a final catch-all row and the hit policy
+  degrades U → F. That was recorded here as "a strict improvement in the markdown carrier". **It
+  was not one.** `expressible` checked the rules and not the default entry, and `defaultRows` fell
+  back to `fromMaybe "-"`; FEEL `null` is `FullFeel` by design and `mdOutput` refuses it, so the
+  catch-all printed `| 2 | - | - |`. In dmnmd `-` is the **input** column's "any" token, so the
+  markdown said "output unspecified" where the DMN said `null` — and the only disclosure beside it
+  was `D-MD-NODEFAULT`, whose message is about the hit-policy demotion and whose row in
+  `FIDELITY-SEVERITY-AXIS-SPEC.md` asserts "the answers are preserved". A **loud omission**
+  (`D-MD-NOLITERAL`, Blocking, decision absent) had been traded for a **quiet misstatement**.
+- _Landed._ `expressible` now also asks `mdOutput` of `ocDefault`, so such a table is **omitted**
+  and routed to `D-MD-CELLSYNTAX` (`Blocking`) — the same standard `mdConstant`'s own haddock
+  already sets for a date ("Returning `Nothing` routes the whole table to `D-MD-CELLSYNTAX`
+  Blocking and omits it honestly"). The note names the OTHERWISE text, `defaultRows` no longer
+  carries a `fromMaybe "-"` at all, and `D-MD-NODEFAULT` correctly does **not** fire, because the
+  table is not there to have had its hit policy demoted. Pinned by "omits a table whose OTHERWISE
+  dmnmd cannot say" in `jl4/tests/DmnExport.hs`.
+
+So R8-d′'s effect on the markdown carrier is: **no change** for the decisions that stayed formulas,
+and for a `MAYBE`-valued decision that now tabulates, a Blocking omission with a **different and
+more accurate** reason than before. Not an improvement — an equally loud loss, honestly named.
 
 **Under record threading the markdown emitter currently produces _nothing_** — not a degraded
 table, zero tables. Verified by running it: every table dies on `D-MD-NONIDENTCOLUMN` because
@@ -2672,16 +3171,18 @@ may be obsolete by the time either side ships.
 
 Each phase is independently shippable and independently useful.
 
-| Phase   | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Depends on |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| **0**   | Kill the dot passthrough in `feelIdentText` (§5.1-1). Fix `drgNamed`'s type-error hole (§9). Add the Xerces check. **+R5 (§6.4):** `checkDrg` + `D-CYCLE`; delete `freeRefs`' own-name binding and `classifyRef`'s self-edge filter. Independent of every other phase, ~40 lines, and the expected golden delta is zero — the tree has exactly one committed `.dmn` golden and it has no self-recursion (§6.4.8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —          |
-| **0.5** | Land PR #45's exhaustiveness oracle (`constructorsInScopeFromEntityInfo`, `@nonexhaustive`) on this line — `8a8b46bc` is not an ancestor. Hard prerequisite for §2.4's L1 and L2; without it the totality criterion is vacuous outside same-file top-level enums.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —          |
-| **1**   | Columns: `typeRef` + `<inputValues>` / `<outputValues>` from L4's known domains (§3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 0          |
-| **2**   | Naming policy: `feelBase` + `uniquifyIn`, `@label` everywhere, `feelTypeNameText` (§5.2). **+R3 (§5.3):** step 3 folds to ASCII; the element-`name`/`variable`-`name` invariant; `uniquifyIn`'s scope widened to projection paths, `decisionService` names and BKM `formalParameter` names. **`feelBase` and the invariant landed on PR #160** (R7); **the residue landed 2026-07-29 except NFC** — the reserved-word suffix, `feelTypeNameText`, `uniquifyIn` over the DRG variable namespace **and** the projection-path namespace, the resolved name carried on the IR rather than recomputed in `Emit`, and `D-RENAME`'s collision arm. The hard sequencing constraint (**`uniquifyIn` may not lag the fold**, §5.3.4) is therefore discharged. **Still open in this phase:** step 1 (NFC), deferred with its measurement in §5.3.3, and `uniquifyIn`'s two unemitted scopes — `decisionService` names and BKM `formalParameter` names — which arrive with their emitters in Phase 5. | 0          |
-| **3**   | **LANDED 2026-07-29.** `itemDefinition` emission and placement; records and enums at the data level (§4). **+R4 (§4.2.1):** R4-c, the constant-ref defect; `D-SUMTYPE`'s two arms; a golden pinning the `Lossy` nullary-only arm. **+R8: ANSWERED**, see §11-R8 — the leaning survives on the _type_ channel (R8-a/b) and dies on the _value_ channel (R8-c/d/e), and R8-f's `NOTHING`-as-`"NOTHING"` defect ships regardless. New goldens `sumtype.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`. Column-level `inputValues`/`outputValues` (§3.1, §3.2, nominally Phase 1) rode along, because the enriched classifier answers both questions in one walk.                                                                                                                                                                                                                                                                                                                                 | 2          |
-| **4**   | The un-lifting analysis and its totality side-condition; `D-SCOPE` repurposed; `D-PARAM-AS-INPUT`, `D-PARTIAL` (§2.1, §2.4, §7). **Two obligations §2.4 incurs on this phase:** a test that fails when `UserEvalException` grows a ninth constructor (§2.4.1's coverage map), and a re-run of §2.4.3's census against the _real_ structural-termination check rather than the flat recursion proxy. **+R6 (§2.5):** the population filter and `D-FIXTURE` / `D-INERT` / `D-REGULATIVE`, which key off the same call graph — and the census re-run **must use the post-filter population**, since dropping ~46% of decisions changes every denominator in §2.4.3's table. **+R4:** measure the transitive closure of `D-SUMTYPE`'s `Blocking` arm; add a synthetic test for L11's accepting branch, which no corpus exercises.                                                                                                                                                             | 3, 0.5     |
-| **5**   | BKM emission, `knowledgeRequirement`, the three refusals (§6). **+R5:** `checkDrg` extends to the `knowledgeRequirement` graph; `D-RECURSIVE` (§6.4.4-5), which discharges §6.3-1. **+R4-b (earliest slot):** the tagged-union encoding may ship as `Lossy` once L11 and the tag-guard invariant exist **and** the missing-payload-component obligation (§4.2.1-3) is discharged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 4          |
-| **6**   | Markdown carrier: flattening + `D-MD-FLATRECORD`; dmnmd addendum (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 3          |
+| Phase   | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Depends on |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **0**   | Kill the dot passthrough in `feelIdentText` (§5.1-1). Fix `drgNamed`'s type-error hole (§9). Add the Xerces check. **+R5 (§6.4):** `checkDrg` + `D-CYCLE`; delete `freeRefs`' own-name binding and `classifyRef`'s self-edge filter. Independent of every other phase, ~40 lines, and the expected golden delta is zero — the tree has exactly one committed `.dmn` golden and it has no self-recursion (§6.4.8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —          |
+| **0.5** | **LANDED on `unstable` 2026-07-31.** PR #45's exhaustiveness oracle (`constructorsInScopeFromEntityInfo`, `@nonexhaustive`) cherry-picked from `8a8b46bc`, which is an ancestor of neither `unstable` nor `main` — `main` reverted the whole PR in `9ec57df0` and re-landed only a narrow `builtinConstructorLookup` in `7531f1d9`, so a `main` merge would NOT have delivered the oracle. Hard prerequisite for §2.4's L1 and L2; without it the totality criterion is vacuous outside same-file top-level enums. **Known wart carried in:** unstable's multi-clause pattern-matching desugaring (`__pm_fallthrough_<k>`, `Parser.hs:949`) compiles its last clause without an `OTHERWISE`, so the oracle now warns on definitions that are total at source level (`ok/pattern-matching.l4`, `ok/pattern-matching-nullary.l4`, goldens pin it). Suppressing inside fall-through Decides would trade these false positives for false negatives on genuinely partial multi-clause definitions; not decided here. | —          |
+| **1**   | Columns: `typeRef` + `<inputValues>` / `<outputValues>` from L4's known domains (§3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | 0          |
+| **2**   | Naming policy: `feelBase` + `uniquifyIn`, `@label` everywhere, `feelTypeNameText` (§5.2). **+R3 (§5.3):** step 3 folds to ASCII; the element-`name`/`variable`-`name` invariant; `uniquifyIn`'s scope widened to projection paths, `decisionService` names and BKM `formalParameter` names. **`feelBase` and the invariant landed on PR #160** (R7); **the residue landed 2026-07-29 except NFC** — the reserved-word suffix, `feelTypeNameText`, `uniquifyIn` over the DRG variable namespace **and** the projection-path namespace, the resolved name carried on the IR rather than recomputed in `Emit`, and `D-RENAME`'s collision arm. The hard sequencing constraint (**`uniquifyIn` may not lag the fold**, §5.3.4) is therefore discharged. **Still open in this phase:** step 1 (NFC), deferred with its measurement in §5.3.3, and `uniquifyIn`'s two unemitted scopes — `decisionService` names and BKM `formalParameter` names — which arrive with their emitters in Phase 5.                       | 0          |
+| **3**   | **LANDED 2026-07-29.** `itemDefinition` emission and placement; records and enums at the data level (§4). **+R4 (§4.2.1):** R4-c, the constant-ref defect; `D-SUMTYPE`'s two arms; a golden pinning the `Lossy` nullary-only arm. **+R8: ANSWERED**, see §11-R8 — the leaning survives on the _type_ channel (R8-a/b) and dies on the _value_ channel (R8-c/d/e), and R8-f's `NOTHING`-as-`"NOTHING"` defect ships regardless. New goldens `sumtype.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`. Column-level `inputValues`/`outputValues` (§3.1, §3.2, nominally Phase 1) rode along, because the enriched classifier answers both questions in one walk.                                                                                                                                                                                                                                                                                                                                                       | 2          |
+| **3.5** | **LANDED 2026-07-30.** Law time: the rule-date `inputData` (D1), date-interval tables and the FEEL date literal (D2), and the `D-RULEDATE` / `D-RULEDATE-UNBOUND` / `D-DATEDCHAIN` codes (D3). **+R9** (§3.3's third spelling), **+R10**, **+R11** (§15). Independent of Phase 4 and Phase 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 3          |
+| **3.6** | **LANDED 2026-07-31.** Hydration (§4.4) and `MAYBE`→`null` (§11-R8-d′), in one change. Computed record fields lower as boxed-context entries computed from earlier siblings, downstream reads become path access, and the DRG rewires so the graph says what the expression says (R11 again). `NOTHING` → FEEL `null`, `JUST x` → `x`, `CONSIDER`-on-`MAYBE` → `if … != null then … else …`, `isJust`/`isNothing` recognised by prelude `Unique`. New codes `D-COMPUTEDFIELD` (Advisory) and `D-MD-NOCONTEXT` (Blocking). New golden subject `hydration`. **Prerequisite of its own engine legs, and it was built first:** both harnesses needed a null carve-out, because a decision answering `null` was scored a failure by construction on both — so before it, the only green cases would have been ones that avoided the absent branch. Independent of Phase 4 and Phase 5.                                                                                                                               | 3, 3.5     |
+| **4**   | The un-lifting analysis and its totality side-condition; `D-SCOPE` repurposed; `D-PARAM-AS-INPUT`, `D-PARTIAL` (§2.1, §2.4, §7). **Two obligations §2.4 incurs on this phase:** a test that fails when `UserEvalException` grows a ninth constructor (§2.4.1's coverage map), and a re-run of §2.4.3's census against the _real_ structural-termination check rather than the flat recursion proxy. **+R6 (§2.5):** the population filter and `D-FIXTURE` / `D-INERT` / `D-REGULATIVE`, which key off the same call graph — and the census re-run **must use the post-filter population**, since dropping ~46% of decisions changes every denominator in §2.4.3's table. **+R4:** measure the transitive closure of `D-SUMTYPE`'s `Blocking` arm; add a synthetic test for L11's accepting branch, which no corpus exercises.                                                                                                                                                                                   | 3, 0.5     |
+| **5**   | BKM emission, `knowledgeRequirement`, the three refusals (§6). **+R5:** `checkDrg` extends to the `knowledgeRequirement` graph; `D-RECURSIVE` (§6.4.4-5), which discharges §6.3-1. **+R4-b (earliest slot):** the tagged-union encoding may ship as `Lossy` once L11 and the tag-guard invariant exist **and** the missing-payload-component obligation (§4.2.1-3) is discharged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 4          |
+| **6**   | Markdown carrier: flattening + `D-MD-FLATRECORD`; dmnmd addendum (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 3          |
 
 Phase 1 alone makes the existing exhibit's analysability claim true, which is worth shipping on
 its own.
@@ -2692,6 +3193,12 @@ engine harnesses, and the `DmnFlavor` seam; Phase 2 loses its flavor branch, bec
 measured not to diverge; Phase 5 gains the one bit that does diverge and is where the goldens
 split. **Phase 0's naming item was a red gate — the shipped golden failed both engines — and it
 landed 2026-07-27; both harnesses are green on both flavors (§11-R7, §13.7).**
+
+**Amended 2026-07-30 by R9, R10 and R11 — see §15.** Phase 3.5 is independently shippable: it
+touches columns and cells (Phase 1's territory) but ships after Phase 3 because it emits
+`annotation` elements, whose XSD position is a sequence question of the same kind §4.3 settled for
+`itemDefinition` — and, as there, only Xerces is watching it, which is why
+`jl4/tests-cli/fixtures/dmn-date-probe/` is a permanent hand-written fixture rather than a golden.
 
 ---
 
@@ -2958,7 +3465,41 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     > an alias that adds nothing; this one subtracts something load-bearing). It exists for exactly
     > one reason: **R8-b's suppression was being defeated one `typeRef` hop away**, and that is an
     > answer change rather than a reporting gap. See R8-b for the measurement and the reversal.
+
+    **The alias is not merely retained under R8-d′ (2026-07-31) — it is STRENGTHENED, and the
+    reason is worth stating because it inverts.** Before R8-d′, **nothing this exporter emitted was
+    ever `null`**, so an enforcing engine's rejection of the absent case was hypothetical: the
+    argument for the alias rested entirely on §7.3.3's reading. After R8-d′ the exporter genuinely
+    emits `null` into positions typed `<τ>_optional`, so the rejection is **real**. Making `NOTHING`
+    lower to `null` gives `tItemDefinition` no nullability flag and makes `null` no more listable in
+    an `allowedValues` — rule 34 keeps it out of the endpoint grammar either way — so every word of
+    R8-a and R8-b stands, with live evidence behind it instead of a hypothetical.
+
+    > **[D] DEFECT, FOUND 2026-07-31 and NOT FIXED — the alias is emitted after the definitions
+    > that reference it, and KIE 8.44 resolves `itemDefinition` typeRefs in DOCUMENT ORDER.**
+    > Measured the first time any engine was pointed at `sumtype.dmn`, which is also the first time
+    > any engine was pointed at an artifact using this alias:
     >
+    > ```
+    > ERROR [TYPE_DEF_NOT_FOUND] DMN: Unable to resolve type reference '…}Grade_optional'
+    >   on node 'Claim' (DMN id: itemdef_claim_c2, The listed type definition was not found)
+    > ```
+    >
+    > `itemdef_claim` is emitted at document position 3 and `itemdef_grade_optional` at 5. The DMN
+    > XSD sequences `itemDefinition*` with no ordering constraint among them, so this is an engine
+    > behaviour rather than a schema violation — but "valid and unloadable" is exactly the class of
+    > outcome the engine harnesses exist to catch, and the fix is one line of emission order:
+    > **aliases before the base definitions**, not after.
+    >
+    > Not repaired in this change, and the reason is scope rather than difficulty: `sumtype.dmn` is
+    > the ONLY DMN golden that uses an `_optional` alias (`grep -c _optional` over the other four
+    > returns 0), and it is a `HarnessMustFail` exhibit for an unrelated reason, so no MustPass leg
+    > moves either way. Reordering would churn the golden and require re-measuring every artifact
+    > on both engines for a defect nothing currently exercises. It is **pinned** instead: the
+    > `sumtype` MustFail leg asserts `TYPE_DEF_NOT_FOUND` and `Grade_optional` by name, so the day
+    > it is fixed the leg goes red and this paragraph gets read. The carve-out's own text above
+    > ("emitted after the base definitions") is the sentence to change.
+
     > The residue is recorded on the note: at an aliased site an engine no longer validates the
     > values that _are_ present, so a string outside τ's constructors passes where at a non-`MAYBE`
     > site it would be rejected. That is the price of keeping the absent case admissible, and it is
@@ -3016,7 +3557,39 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     does not nest, so `JUST NOTHING` and `NOTHING` become one FEEL value and FEEL `=` answers `true`
     where L4 answers `false` — an **answer change**, which is §2.4's own severity line. Corpus cost:
     **1 decision**, `jl4/examples/ok/pattern-matching.l4:69-71`, not a golden subject.
-  - **R8-d — value emission is refused _in this change_.** A decision that constructs
+
+    **STILL REFUSED after R8-d′ (2026-07-31), and now pinned in two places.** Test anchors:
+    `jl4/tests/DmnExport.hs`, "refuses a NESTED MAYBE, because null does not nest (R8-c)" (the
+    boundary clause, via `sumtype.l4`'s `deep`) and "refuses a NESTED MAYBE used as a CONSIDER
+    SCRUTINEE (R8-c)" (the scrutinee clause). The second is new and is not redundant: `deep`'s body
+    is `TRUE`, so it only ever reached the boundary clause, and the scrutinee clause's guard is
+    `tfEither || tfNestedMaybe` — `classifyType` sets `tfMaybe` **as well as** `tfNestedMaybe` on a
+    nested `MAYBE`, so a narrowing to `tfEither` alone would have let a nested scrutinee through
+    silently.
+
+    **★ THE NOTE IS NOT THE REFUSAL — corrected 2026-07-31 in review, and this is the repair that
+    matters most in this change.** A `D-SUMTYPE` Blocking note does **not** stop the body being
+    rendered: `literalFallback` renders it with `renderFeelIn` and reports Blocking _beside_ it,
+    which is why `decision_deep` ships `<text>true</text>` under a Blocking note. R8-d′'s three new
+    render arms (`NOTHING → null`, `JUST x → x`, `CONSIDER`-over-`MAYBE`) had **no type guard**, so
+    a nested-`MAYBE` scrutinee rendered `if m != null then true else false` — engine-loadable FEEL
+    that answers `false` for `JUST NOTHING` where L4 answers `true`. Before R8-d′ the same decide
+    rendered `CONSIDER q WHEN JUST g THEN TRUE, WHEN NOTHING THEN FALSE`, L4 source no engine can
+    compile. **The refusal had been weakened from "cannot run" to "runs and answers wrongly"** —
+    the answer change this very paragraph forbids.
+
+    Every render arm that gives a `MAYBE` a FEEL image is now guarded on the expression's own
+    `TypeFlags` (`not (tfNestedMaybe || tfEither)`), including the `isJust`/`isNothing` combinator
+    table; a refused arm falls through to `verbatim` and the refusal stays loud. The guard is
+    separate from the note deliberately — the note describes the **decision** while the guard
+    describes one **sub-expression**, and `renderFeelIn` composes. The test now asserts the
+    RENDERING, not only the note; before that assertion existed it was green with the defect
+    present.
+
+  - **R8-d — value emission is refused _in this change_.** **OVERTURNED FOR THE VALUE CHANNEL
+    2026-07-31, on its own stated terms; see R8-d′.** The paragraph is retained unedited below
+    because R8-d′ discharges it reason by reason, and a deleted premise cannot be checked against
+    the conclusion drawn from it. A decision that constructs
     `JUST`/`NOTHING`/`LEFT`/`RIGHT`, or whose `CONSIDER` scrutinee is a `MAYBE`/`EITHER`, ⟹
     **`D-SUMTYPE`, `Blocking`**, reported before `D-LITERALEXPR`. Two independent reasons. (i) **Zero
     corpus exercise on the accepting branch**: all three `CONSIDER`-on-`MAYBE` decisions in the
@@ -3029,6 +3602,15 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     independent reason to leave S-FEEL on the cell side (Phase 5).
   - **R8-e — `EITHER` stays inside the `D-SUMTYPE` refusal**, at `Blocking`. Measured exposure: 0 in
     the DMN corpora; 8 in `jl4/examples/**`, all already refused by `PURE`.
+
+    **UNCHANGED in substance by R8-d′, and now COVERED.** Until 2026-07-31 this refusal had **zero
+    tests and zero corpus exposure** — `grep -n 'EITHER\|LEFT\|RIGHT' jl4/tests/DmnExport.hs`
+    returned nothing — which is exactly how a narrowing takes a refusal with it and nobody notices.
+    Three tests were written and watched go green on the **unmodified** tree before the narrowing
+    landed: "refuses a decision that CONSTRUCTS an EITHER", "refuses a CONSIDER over an EITHER" and
+    "refuses an EITHER at a decision BOUNDARY, even unread" (the last is the one the other two
+    cannot substitute for: it is the only clause a threaded-but-unread `EITHER` reaches).
+
   - **R8-f — the defect the census found ships regardless of the above.** **[D]** `isConstantRef`
     accepted anything the typechecker stamped `Constructor`, and it stamps the **builtin** `NOTHING`
     exactly that way, so `NOTHING` lowered to the S-FEEL **string constant** `"NOTHING"`. **[E]** Six
@@ -3040,6 +3622,117 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     still. So a reference to one of the four renders **verbatim** and R8-d routes the decision to a
     boxed literal expression. **[E]** After the fix, `regcf-wizard.dmn` and `part-6-use-of-terms.dmn`
     contain **zero** occurrences of `"NOTHING"`.
+
+    **The defect stays fixed; its MECHANISM now covers two of the four (2026-07-31).** `LEFT` and
+    `RIGHT` keep the verbatim rendering and the refusal. `JUST` and `NOTHING` have real FEEL
+    renderings under R8-d′ — `x` and `null` — so they no longer need to be kept out of the FEEL
+    text, only out of the _string_ channel, which is what the defect was about. The assertion that
+    pins it is **unchanged and still runs**: `jl4/tests/DmnExport.hs`, "never spells NOTHING as a
+    FEEL value", asserts `xml` contains neither `"NOTHING"` (the string constant) nor `>NOTHING<`
+    (a bare identifier or element text). `null` is a _literal_, and is neither.
+
+  - **R8-d′ — `null` IS the lowering of `MAYBE` on the value channel. RULED 2026-07-31.**
+
+    `null` is admitted **wherever DMN admits an arbitrary FEEL expression** — a `literalExpression`,
+    an output entry, a `defaultOutputEntry`, a context entry, an input _expression_ — and is
+    **refused as an input _entry_**, i.e. as a unary test or an endpoint. §2.2's grammar reading
+    stands unchanged: DMN 1.3 rule 34 makes `null` a _literal_ and rule 33's _simple literal_ is
+    numeric | string | boolean | date-time only.
+
+    **The guarantee is mechanical, not a convention an emitter must remember.** There is no `VNull`
+    constructor in `FeelValue` (`jl4-core/src/L4/Dmn/IR.hs`), which is the only type a `UnaryTest`
+    endpoint can hold; and `constantRefIn`'s `isBuiltinSumCon r -> Nothing` short-circuit stays
+    exactly as it is. So `null` cannot reach an `<inputEntry>` by any route, including a wrong
+    `FeelFragment` tag.
+
+    Four lowering rules:
+
+    | L4                                                    | FEEL                                 | fragment                              |
+    | ----------------------------------------------------- | ------------------------------------ | ------------------------------------- |
+    | `NOTHING`                                             | `null`                               | `FullFeel` — never `SFeel`, see above |
+    | `JUST x`                                              | `x`                                  | whatever `x` is                       |
+    | `CONSIDER m WHEN JUST g THEN a / WHEN NOTHING THEN b` | `if m != null then a[g := m] else b` | `FullFeel`                            |
+    | `isJust e` / `isNothing e`                            | `e != null` / `e = null`             | `FullFeel`                            |
+
+    **All four rows are GUARDED on the MAYBE being one level deep and carrying no `EITHER`**, and
+    the guard was added in review after the unguarded version shipped — see R8-c above for what it
+    cost. A refused arm falls through to `verbatim`, which is the refusal, not the note.
+
+    **`null` as an OUTPUT entry is a LITERAL, and `D-COMPUTEDOUTPUT` now says so.** Its generic
+    message ("is an expression, not a constant") contradicted `D-MAYBE-NULL` in the same report,
+    which cites rule 34 to call `null` a literal. Both cannot be right. The message branches on the
+    entry text: for `null` it says the entry is FEEL's null literal but denotes **no object in any
+    domain**, which is the real reason a decision-table analysis — which maps an output entry to an
+    object — still cannot place it. The severity and the `lost:` clause are unchanged, and
+    `constantRefIn`'s input-entry short-circuit is untouched, because that is the half R8-d′
+    actually needs.
+
+    The `CONSIDER` rule is a `renderFeelIn` **case**, not a source rewrite to `IfThenElse`. A case
+    composes — a `CONSIDER` nested inside a larger expression still renders — where a source rewrite
+    would only fire when the `CONSIDER` is the whole body. The scrutinee's text is emitted more than
+    once, so the rule is guarded on `not (hasEffectfulNode scrut)`.
+
+    The combinator row is checked **before** general compilation and matches on the **resolved
+    `Unique`** of the prelude definition, never on a name string — matching on a name is precisely
+    the class of defect R8-f was. Because `isJust`/`isNothing` are ordinary prelude L4 source rather
+    than builtins, their `Unique`s cannot be TH constants, so `DmnLowerOptions` gains one field and
+    `resolveMaybePredicates` resolves it once at the boundary under a **type** check (a
+    `KnownTerm … Computable` whose argument head is `maybeUnique` and whose result head is
+    `booleanUnique`, with exactly one survivor per name). Both call sites — the CLI exporter and the
+    golden harness — go through that one function, so they cannot drift.
+
+    **The type check alone was not enough, and "exactly one survivor" did not cover the case it
+    claimed to — corrected 2026-07-31 in review.** The `Unique` is _found by a name lookup_, so the
+    name is still what selects the entity; "exactly one survivor" only rejects a shadow that sits
+    **alongside** the prelude's. A module that defines its own `isJust :: MAYBE a -> BOOLEAN` and
+    does **not** import the prelude has exactly one shaped candidate, and the shape check cannot see
+    the body — so `` `isJust` x MEANS FALSE `` rendered `x != null`: a wrong answer with **no
+    fidelity note at all**, because a recognised combinator is clean FEEL. Two provenance conditions
+    now sit on top of the shape, and neither is a path test (`Unique` carries the URI of the module
+    that minted it, and comparing URIs for _equality_ is immune to the CLI-vs-VFS difference a path
+    test would trip on):
+
+    - both survivors must come from the **same** module — one prelude defines the pair;
+    - that module must **not** be the module being exported.
+
+    **What is still not established, stated rather than glossed:** that the defining module is the
+    L4 prelude and not some other imported library that defines both names at both types. Closing
+    that would need the **bodies**, and `EntityInfo` carries only types. A library imported
+    _instead_ of the prelude is recognised; one imported _alongside_ it is not. Pinned by "does not
+    recognise a LOCALLY defined isJust as the prelude's" in `jl4/tests/DmnExport.hs`.
+
+    **Discharging R8-d's two reasons, separately, because only one of them is answered:**
+
+    - Reason (i), _zero corpus exercise on the accepting branch_: **DISCHARGED.** `capped at ten`
+      (`jl4/examples/dmn/sumtype.l4`) now emits a real decision table, and the rephrased corpus plus
+      the new `jl4/examples/dmn/hydration.l4` exercise all four rules.
+    - Reason (ii), _`null` as an input cell_: **NOT overturned — RETIRED AS AN ASK.** The lowering
+      never requests a cell. §2.2's grammar reading and §3.1's thesis are untouched.
+
+    **[E] The evidence R8-d itself asked for, and it was gathered BEFORE the lowering was written.**
+    `jl4/tests-cli/fixtures/dmn-null-probe/` measures, on KIE 8.44.0.Final and zeebe-dmn 8.7.6:
+    comparison against `null` is a proper **boolean** (`n = null` is `false`, not `null`); the
+    composed `if q != null then … else …` takes the branch it looks like it takes; a decision may be
+    `null` outright; and **a table's `defaultOutputEntry` may be `null`** — which is the
+    `defaultOutputEntry` half of R8-d's own overturn condition, verbatim. 15/15 on both engines.
+
+    A fallback was **pre-declared before the probe ran**: had `=` against `null` answered non-boolean
+    on either engine, only the value channel would have shipped and the scrutinee refusal would have
+    stayed. It did not arise.
+
+    **One question the engines answer DIFFERENTLY**, split into `null-absent.dmn` and asserted in
+    both directions: an unbound name is `null` on zeebe-dmn and a **model error** on KIE (the
+    decision is `SKIPPED`). It is out of scope **by construction** rather than by luck — this
+    exporter never emits a reference to a name it has not declared, because every free term becomes
+    an `inputData` and a hydrator emits every entry of its record — and the fixture is what makes
+    that a measured statement instead of an assumption.
+
+  - **R8-d″ — tabulating a `CONSIDER`-on-`MAYBE`. DEFERRED, with its condition.** Rewriting the
+    `CONSIDER` to an `IfThenElse` at the AST level, so that a whole-body instance tabulates with a
+    boolean column instead of becoming a boxed literal, is **not built**. Re-open when a corpus
+    decision of that shape would otherwise be the _whole_ body of a decide **and** the resulting
+    table would carry more than one row — below that, the boxed literal says the same thing and the
+    rewrite only fires where the case already suffices.
 
   **Incremental refusal cost of R8-c/d/e on the corpora: 6 decision tables** — and **none of the 6
   works today**: each already carries a `Blocking` `D-NONFEELOUTPUT` on its `JUST` arm and the
@@ -3058,6 +3751,97 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
   gated on Phase 0.5.
 
 ---
+
+- **R9 — `OTHERWISE` on a rule-date interval table: a floor ROW, not a `defaultOutputEntry`.
+  ANSWERED 2026-07-30, see §15.3. Amends §3.3.**
+  §3.3 rules that `OTHERWISE` stays a default and forbids expanding it into explicit rules; §3.3.1
+  adds a `SHALL` — never emit a `defaultOutputEntry` on a table whose rules already cover the input
+  space. A rule-date interval table emits the `OTHERWISE` as one final rule `< date("<earliest>")`
+  and **no** `defaultOutputEntry`.
+  _Why this is not the expansion §3.3 rejects._ §3.3 forbids **enumerating a declared finite
+  domain** to turn "everything else" into _k_ rules, which consults `inputValues` and erases the
+  source's own statement of incompleteness. The floor row consults no domain, enumerates nothing,
+  and is **one** unary test that is the _exact_ complement of the arms — derived by the same
+  arithmetic that derives the intervals, from the same first-match reading. It is the `UNIQUE`
+  analogue of the final all-`-` row §3.3 already blesses under `FIRST`: under `FIRST` "everything
+  else" is spelled all-`-`; under `UNIQUE` an all-`-` row would overlap every other rule, so the
+  same statement must be spelled as its complement. **Same statement, different spelling, forced by
+  the hit policy** — §3.3's closing sentence ("No change to the two spellings, both already
+  correct") therefore gains a third.
+  _Why it is also the better artifact._ §3.3.1 consequence 1 observes that `FIRST` + all-`-` is a
+  **complete** table while `UNIQUE` + default is a declaredly **incomplete** one. These eight tables
+  are complete today. Emitting `UNIQUE` + default would trade order-dependence for declared
+  incompleteness — a sideways move. The floor row buys the order-free reading and keeps
+  completeness, and §3.3.1's `SHALL` then _requires_ omitting the default. The two are locked
+  together: one without the other is a spec violation.
+  _What review changed:_ the first draft used `UNIQUE` + `defaultOutputEntry` on the strength of
+  §3.3's headline, arguing that a gap report over the pre-commencement half-line honestly names the
+  corpus's curated refusal (`regcf.l4:126-133`). That reading was dropped once §3.3.1 consequence 1
+  was read: it would have made eight complete tables incomplete in order to state something the
+  `<description>` and the annotation column already state.
+
+- **R10 — the interval-table recogniser is a peephole over two idioms, and refuses loudly.
+  ANSWERED 2026-07-30, see §15.3.**
+  The recognised shapes are (a) an application of a one-parameter `DATE`-typed predicate whose body
+  is `RULES EFFECTIVE DATE AT LEAST <that parameter>`, applied to a nullary decide whose body folds
+  to a date; and (b) the same comparison written inline against a `Date d m y` literal. Everything
+  else — strict (`>`) guards, `DATE_SERIAL`-wrapped comparisons, `YMD`, nested chains, multi-conjunct
+  guards — is `NotDated` (existing path, unchanged findings); a chain that MIXES a rule-date arm with
+  an ordinary one, or whose date will not fold, or whose arms are not strictly descending, is a
+  **Blocking** `D-DATEDCHAIN`. **[E]** The severity follows the vocabulary in `Lower.hs`'s roster:
+  the fallback ships columns of raw L4 that no engine can evaluate, which is `Blocking`, and it is
+  what the sibling backend already does (`L4/OpenFisca/Lower.hs` returns `Left`). Duplicate dates are
+  refused by the same strictly-descending predicate rather than emitting an empty `[d..d)` interval:
+  the second arm is dead in L4 too, but a rule that can never fire is not an artifact worth shipping.
+  **[E]** `DATE_SERIAL`-wrapped comparisons are a real v1 gap and the tree's own temporal exemplar
+  hits it: `jl4/examples/ok/temporal-rule-version-spike.l4:23` writes
+  `(DATE_SERIAL RULES EFFECTIVE DATE) AT LEAST (DATE_SERIAL (Date 1 1 2024))`, which is a **NUMBER**
+  comparison and will not become an interval table. Unwrapping `DATE_SERIAL` on both sides is the
+  first v2 extension; it is out of v1 because nothing in the shipped exhibits would have tested it.
+
+  **Amended 2026-07-31 after adversarial review.** Four repairs, each with a witness:
+
+  - **The inline idiom takes a NAMED regime constant, not only a literal.** The inline form _is_ the
+    predicate form with the one-line helper elided, so
+    `` `RULES EFFECTIVE DATE` AT LEAST `the 2024 rate change` `` carries exactly the information the
+    predicate form does and folds the same way — through `constantDay`'s one hop, not the bare
+    literal fold. Before this, every such chain was refused while the refusal MESSAGE told the reader
+    that "a nullary decision whose body is one" **is** folded; a reader following that message would
+    have written the very thing that was refused. Witness: `gst-rate.l4`'s
+    `tourist refund minimum spend` now writes one arm each way, and the constant the arm names
+    reaches the annotation column instead of degrading to `from <day>`.
+  - **A REGULATIVE body, or an effectful guard, is `NotDated`.** `rowsToDmnWith'` refuses those two
+    shapes _before_ it builds anything, and the dated path does not go through `rowsToDmnWith'`, so
+    those refusals had silently stopped applying to any chain that happened to look dated. A
+    law-time-guarded obligation — "under the 2024 rules the issuer must file within 30 days, before
+    that within 45", the shape temporal rule-versioning most invites — would have become a `UNIQUE`
+    table of verbatim L4 obligations, and the reader would have been told "the output entry is L4
+    source, not FEEL" instead of "DMN has no notion of time or obligation". Witness:
+    `not-ok/dated-chain-regulative.l4`.
+  - **The `OTHERWISE` counts as an arm body for the nested-chain test.** On the ordinary path
+    `expandOtherwise` splices a nested catch-all chain's rows into the table and reports what it
+    declines to splice as `D-FLATTENCAP`; the dated path would have collapsed the whole nested chain
+    into one floor-row output entry with **no note at all**.
+  - **Every ordinal a refusal quotes is an index into the chain's own rows.** The ordering refusal
+    used to number only the _matched_ arms while the mixed refusal numbered all of them, so "arm 3"
+    meant two different source arms on one file.
+
+  The mixed-chain arm now has its own witness, `not-ok/dated-chain-mixed.l4`, and it needed one: the
+  corpus's `financial statements required` matches **zero** rule-date arms and is therefore
+  `NotDated`, which is a different code path with a different outcome, so the test named for the
+  mixed arm was exercising the opposite one.
+
+- **R11 — a dated table's `informationRequirement`s are computed from what survives into the
+  artifact. ANSWERED 2026-07-30, see §15.3.**
+  D2 inlines the guard predicate and the regime constants into interval endpoints, so a dated
+  decision's emitted expression no longer references them while its cells now reference the
+  rule-date input. Computing `dcnRequirements` from the source `freeRefs` would describe a graph the
+  expression contradicts, which is a DMN 6.2.2 problem and not a cosmetic one. Requirements are
+  therefore `RequiredInput <law time>` plus the requirements of the surviving **bodies** (arms +
+  `OTHERWISE`), guards excluded. Consequence, and it is intended: the four regime constants and the
+  guard predicate become DRG leaves with no dependents. They are **not** dropped (§2.5, and
+  `literalFallback`'s own comment), they became evaluable for the first time in the same change
+  (§15.4), and the annotation column carries their provenance back into the artifact.
 
 ## 12. Non-goals
 
@@ -3227,6 +4011,30 @@ to the next rule with a plausible wrong answer, and Camunda 7, which returns `nu
 **Consequence for §6.2:** build BKM once, for both flavors, unconditionally. The "gating" clause in
 §6.3-3 is hereby narrowed to a fidelity note, not a suppression.
 
+> **Measured 2026-07-31 — the two UNKNOWN cells are filled, and one row's reading was too weak.**
+> Probes `bkm-chain-nokr` and `bkm-name-mismatch`
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`), KIE 8.44.0.Final and zeebe-dmn 8.7.6:
+>
+> | Probe                                     | KIE 8.44                                      | Camunda 8.7.6                                               |
+> | ----------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+> | caller `knowledgeRequirement` **removed** | `ERROR [ERR_COMPILING_FEEL] Unknown variable` | **parses; the calling decision answers `null`, no message** |
+> | BKM `@name` ≠ `variable/@name`            | validator ERROR, build clean, runtime FAILS   | **silent, and answers correctly**                           |
+>
+> Both rows are now EXECUTED on both engines. Two consequences:
+>
+> 1. **The `knowledgeRequirement` edge is not an optional decoration KIE tolerates — it is what puts
+>    an invocable's name into a caller's FEEL scope on KIE**, uniformly for BKMs and for services
+>    (§13.4/§13.5's D3 probe gives the **byte-identical** diagnostic for a service). Remove it and
+>    KIE refuses at compile time.
+> 2. **Camunda has no compile-time backstop at all.** It degrades to `null` in silence for a missing
+>    edge, and it never reads `variable/@name`. So on the **default** flavor, both of §6.2's
+>    load-bearing structural invariants are checked by nobody but us, and a `checkDrg` assertion over
+>    `knowledgeRequirement` completeness is **mandatory rather than belt-and-braces**.
+>
+> Also measured, and it retires an assumption rather than a cell: the engines consume the
+> **direct-call** edge set, not its transitive closure (`bkm-chain` passes on both, `bkm-chain-flat`
+> fails on both, with byte-identical diagnostics to `bkm-chain-nokr`).
+
 ### 13.4 Axis 3 — `§`-as-`decisionService`. The one real bit.
 
 | Shape                                                                                   | KIE 8.44                                                                                                              | Camunda 7.23                                                                                               | Camunda 8.7.6                                                                                                                       |
@@ -3261,6 +4069,32 @@ export against.
 And it is the worst possible shape of divergence: **whole-file, at parse, before any decision runs**.
 There is no partial credit and no diagnostic pointing at the cause.
 
+> **Re-executed and sharpened 2026-07-31** on the Phase 5 fixtures `svc-invoked`,
+> `svc-invoked-minus-kr`, `svc-grouping`, `svc-plus-bkm`, `svc-no-output`
+> (`jl4/tests-cli/fixtures/dmn-bkm-probe/`). Rows 1 and 2 reproduce exactly, independently of the
+> 2026-07-27 probe. **Row 3 needed a qualification and now has one.** "Parses, 3/3 decisions
+> evaluate" is true of the parse and false of the answers: with the one `knowledgeRequirement`
+> deleted, Camunda parses and the **non-calling** decisions are correct, but the **calling** decision
+> answers `null` — `step` and `total` correct, `via_bundle = null` — **with no message at any
+> severity**. And KIE, on the same file, refuses at compile time:
+> `ERROR [ERR_COMPILING_FEEL] … 'bundle(n: n + 100)' … Unknown variable 'bundle'`, which is the
+> **byte-identical** diagnostic it gives for a BKM whose edge is missing (§13.3). So on KIE the edge
+> is **required** for invocables of both kinds, and on Camunda it is **fatal** for services — which
+> is a sharper statement of the flavor bit than "KIE additionally accepts".
+>
+> Two further measurements from the same run, both about what a harness may assume:
+>
+> - **Grouping-only services are portable, including over BKMs.** `svc-grouping` passes 4/4 on both
+>   engines; `svc-plus-bkm` — a grouping service whose encapsulated decisions reach BKMs, which is
+>   the shape every Phase 5 corpus file will have — passes 6/6 on both, with KIE's
+>   `evaluateDecisionService` resolving both BKMs from inside the service.
+> - **KIE's `evaluateDecisionService` return context includes the service's INPUTS**, not only its
+>   output decisions (`SVC bundle -> {n=4, total=9}`). Anyone writing an assertion against a
+>   service's return shape must expect that. And a service with **no** output decisions is Xerces
+>   **valid** (`DMN13.xsd:516`, `minOccurs="0"`), KIE-validator ERROR, **build clean**, then a
+>   runtime `IllegalArgumentException: … 'decisionIds' cannot be empty` — while Camunda is
+>   completely silent (`svc-no-output`).
+
 ### 13.5 The ruling, and the option
 
 **Two flavors. One bit. `camunda` is the default.**
@@ -3274,6 +4108,18 @@ There is no partial credit and no diagnostic pointing at the cause.
 | `knowledgeRequirement` → `decisionService`                | **never emitted**                                                                 | emitted                 |
 | FEEL invocation of a `§` (`Article 6(q)`)                 | **not available** — route to a BKM, else refuse with the existing `Blocking` note | available (§2.3)        |
 | `output/@name`, `output/@typeRef` on single-output tables | omitted                                                                           | omitted — **identical** |
+
+> **Sharpened 2026-07-31 (probes `svc-invoked-minus-kr`, `bkm-chain-nokr`).** Read the
+> `knowledgeRequirement` → `decisionService` row as **required on `kie`, fatal on `camunda`** — not
+> as "KIE additionally accepts it". Deleting that single element does not merely lose the invocation
+> on KIE; KIE refuses the model at **compile** time with the same diagnostic it gives a BKM missing
+> its edge. So the row is a genuine two-sided bit: emitting it breaks Camunda at parse, omitting it
+> breaks KIE at compile. There is no third spelling that satisfies both, which is why the flavor
+> exists at all.
+>
+> The single-output row extends unchanged to BKM tables: a `<output>` carrying a `typeRef` inside a
+> BKM's `encapsulatedLogic` table draws KIE `WARN [ILLEGAL_USE_OF_TYPEREF]` and changes no value on
+> either engine (probe `bkm-table-multiparam`).
 
 The camunda flavor pays a real price and the spec should say so rather than imply parity: a `§`
 with N `GIVEN p` decisions that must be applied per list element needs N BKMs with duplicated
@@ -3523,6 +4369,27 @@ Four deviations from the letter of §13.5/§13.6, all deliberate:
    `Blocking` rather than `Lossy` for that reason: nothing was approximated, an answer was changed.
    Detecting is not resolving; `uniquifyIn` is still the fix, and it is still Phase 2.
 
+   > **Extended 2026-07-31 to the two element kinds Phase 5 introduces** (probes
+   > `collide-bkm-decision`, `collide-svc-decision`, `collide-svc-svc`, and see §5.2). Two
+   > corrections to how the table above generalises:
+   >
+   > | Collision                         | KIE 8.44                                                                                            | Camunda 8.7.6                  |
+   > | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------ |
+   > | BKM × decision                    | `DUPLICATE_NAME` ×2, build clean, BKM wins, **decision NOT_EVALUATED**                              | silent, **both answers right** |
+   > | decisionService × decision        | `DUPLICATE_NAME` ×2, build clean, **no runtime effect at all**                                      | silent, all correct            |
+   > | decisionService × decisionService | `DUPLICATE_NAME` ×2, build clean, **second service unreachable, answers with the first's contents** | silent, correct                |
+   >
+   > First: "an element wins silently" understates KIE on BKM × decision. The colliding **decision**
+   > is removed from the result set entirely — NOT_EVALUATED with a null value — and everything
+   > requiring it goes SUCCEEDED-but-null, while the build stays clean. Second: Camunda is not
+   > "silent, wrong answer" here but **silent and right**, because zeebe-dmn keeps invocables and
+   > variables in disjoint namespaces. That is worse for us, not better: the engines now **disagree
+   > about what the document means**, so neither portability nor either engine is available as a
+   > backstop and the exporter must resolve the name itself. Third, and not a generalisation of this
+   > table at all: `DUPLICATE_NAME` is the same code across all three rows and means three different
+   > things in fact — harmless on the middle row, a silently substituted answer on the last.
+   > `D-FEELNAME`'s claimant set must gain BKM and service names or it sees none of this.
+
 2. **Spelling: `flavor`, not `flavour`** — §13.5 wrote the report target as
    `"DMN 1.3 (XML), camunda flavour"` once, against the American spelling used by `--flavor`
    and by every heading in this section. The code says `flavor` throughout.
@@ -3562,9 +4429,15 @@ Stated so nobody reads absence as evidence:
 - **`@camunda/linting`** is BPMN-only — there are no Camunda DMN lint rules on the npm side. So
   there is no JS-side Camunda check to add alongside `etc/validate-dmn.mjs`; the engine harness is
   the only Camunda opinion available.
-- **Camunda 8 behaviour on a malformed BKM** (missing `knowledgeRequirement`, `@name` ≠
-  `variable/@name`). KIE is loud on both; C8 is UNKNOWN. Worth a probe before Phase 5 ships BKM,
-  since a silent C8 would change §6.2's invariants from "checked by the engine" to "checked by us".
+- ~~**Camunda 8 behaviour on a malformed BKM** (missing `knowledgeRequirement`, `@name` ≠
+  `variable/@name`). KIE is loud on both; C8 is UNKNOWN.~~ **MEASURED 2026-07-31, and the
+  pessimistic branch is the one that happened.** Probes `bkm-chain-nokr` and `bkm-name-mismatch`
+  (`jl4/tests-cli/fixtures/dmn-bkm-probe/`): with the edge missing, Camunda **parses and answers
+  `null`, with no message at any severity**; with `@name` ≠ `variable/@name`, Camunda is silent and
+  **answers correctly**, binding by `@name` and never consulting `variable/@name`. This bullet's own
+  closing sentence is therefore now the ruling: **§6.2's invariants move from "checked by the engine"
+  to "checked by us"** on the default flavor, which makes a `checkDrg` assertion over
+  `knowledgeRequirement` completeness mandatory rather than defensive. Recorded at §6.2 and §13.3.
 
 ### 13.9 Review triage — what was rejected, and on what measurement
 
@@ -3722,3 +4595,384 @@ the same wall §6.4.2 hit at 120 s and is a finding in its own right: **a flagsh
 more than fifteen minutes to export.** Every zero reported from that run is therefore firm for Housing
 and Reg CF and **not established for most of Charities**. Nothing in these four rulings turns on a
 Charities zero; §2.5's Charities figures come from `l4 ast`, not from export.
+
+---
+
+## 15. Law time: binding, interval tables, and the `D-RULEDATE` family
+
+**Status: IMPLEMENTED 2026-07-30. Every number below was measured on this tree after the change;
+the before-column numbers are from the goldens as they stood at `8235b2e0`.**
+
+§2.4's clause **L10** is the only earlier mention of `RULES EFFECTIVE DATE` in this document, and it
+is a _totality_ clause for Phase 4's un-lifting analysis. **Lowering law time was greenfield: there
+was no prior ruling to reconcile or contradict.**
+
+### 15.1 The defect, measured
+
+**[E]** On the corpus golden as shipped at `8235b2e0`, `RULES_EFFECTIVE_DATE` occurred exactly once
+(`jl4/examples/dmn/expected/regcf-corpus.dmn:391`, inside `decision_the_rules_in_force_include`) and
+was bound by **nothing** — no `inputData`, no `variable`, no `itemDefinition`. A free FEEL name no
+engine can resolve. **[E]** `grep -c RULES regcf-corpus.fidelity.txt` was **0**: the fidelity report
+never mentioned it. A model whose every dated answer depended on an unsupplied input, and an
+artifact that said so nowhere.
+
+**[D]** The cause was one predicate. `decideFreeTerms` (`jl4-core/src/L4/Dmn/Lower.hs`) filtered
+free references on `u.moduleUri == uri`; builtin uniques carry
+`builtinUri = toNormalizedUri (Uri "jl4:builtin")`, so law time never became an `inputData`, never
+entered `inputByUnique`, and therefore never got an `informationRequirement` from `classifyRef`. It
+rendered through `feelIdentIn`'s _fallback_ and came out tagged `SFeel`, which is why no note fired.
+
+### 15.2 Binding (D1)
+
+Law time is an **ordinary free term**, not a special case in the emitter: `decideFreeTerms` admits
+`TC.rulesEffectiveDateUnique` alongside module-local uniques, `freeTermSrc` gives it
+`TC.rulesEffectiveDateBuiltin` (which **is** `date`), and the `inputData`, its `typeRef="date"`, its
+resolved FEEL name and every requirement edge fall out of existing machinery with no new emitter
+code.
+
+The FEEL name stays `RULES_EFFECTIVE_DATE` and the term is **appended** to `freeTerms` rather than
+interleaved in source order. A `GIVEN` is written at a source position and source order is the right
+key for it; a builtin is written at no source position, so its "first mention" is an accident of
+which decision happens to read law time first. Appending also keeps the existing `inputData` block
+byte-identical, which is what made the binding diff reviewable.
+
+Requirement edges are computed at IR level over `freeRefs`, never by scanning emitted FEEL. **[E]**
+That is not a style preference: `regcf.l4:479-481`'s COVID-window decision reads law time twice and,
+before §15.4's date-literal fold, its emitted text contained no `RULES_EFFECTIVE_DATE` token at all,
+so a text scan would have missed it.
+
+### 15.3 Interval tables (D2)
+
+A newest-first chain of rule-date guards becomes a single-column table over the rule-date input with
+half-open interval cells and `hitPolicy="UNIQUE"`. For arms dated `d₁ > d₂ > … > dₙ` the cells are
+`>= date(d₁)`, then `[date(dᵢ)..date(dᵢ₋₁))`, then a floor row `< date(dₙ)` carrying the `OTHERWISE`
+— which is exact, total over the date axis, and pairwise disjoint.
+
+**[D]** This is not merely an executability fix. DMN 1.3 grammar rule 18 makes a unary-test
+`endpoint` a `simple value`; rule 19 admits a `simple literal`; rule 33's `simple literal` includes a
+date-time literal, i.e. `date("YYYY-MM-DD")`. So the emitted cells are inside **S-FEEL**, which is
+the fragment DMN's own completeness/consistency analysis is defined over. The table moves _into_ the
+analysable fragment; it does not merely become runnable.
+
+**[D] The generic table path cannot produce this and was not asked to.** `policy` in
+`rowsToDmnWith'` requires `rows.grDisjoint`, which comes from `guardsDisjoint`
+(`L4/Viz/GuardedRows.hs`); its `exclusive` relation has no `(Geq, Geq)` case, so two `>=` guards are
+never exclusive there and every dated chain would stay `FIRST` no matter what the cells said. `D2`
+therefore constructs its own `DecisionTable` and _reuses_ `tableNotes` for the note families that
+still apply — so the output-side families (`D-NONFEELOUTPUT`, `D-COMPUTEDOUTPUT`) still see exactly
+the bodies they saw before.
+
+The recogniser is conservative and all-or-nothing, in the manner of `L4/OpenFisca/Lower.hs`'s
+`splitDated`: every arm must be a single-conjunct rule-date guard against a foldable date, no arm
+body may itself be a chain — **and the `OTHERWISE` counts as an arm body for that test**, because on
+the ordinary path `expandOtherwise` splices a nested catch-all's rows into the table — and the dates
+must be strictly descending. A chain that references law time and does **not** match takes the
+existing path unchanged and keeps its existing findings; §15.8 names the corpus witnesses. See
+**R9**, **R10** and **R11**.
+
+**[D] The three pre-tabulation refusals are restated on this path, because it does not go through
+`rowsToDmnWith'`.** `rowsToDmnWith'` rejects an effectful guard, a regulative body and an empty
+chain before it builds anything; `datedTable` is called directly, so `datedChain` answers `NotDated`
+for the first two and routes the decision back to the ordinary path and its existing
+`RegulativeBody` / `EffectfulGuard` fallback. (`NoRules` is unreachable: `Dated` means a non-empty
+`arms`.) This is not defensive: the corpus already writes `IF cond THEN <regulative> ELSE
+<regulative>` in three places, and one law-time guard away, a `UNIQUE` decision table of verbatim L4
+obligations would have shipped with `D-NONFEELOUTPUT` — a statement about _rendering_ standing in
+for the categorical fact that DMN cannot hold an obligation at all. Witness:
+`jl4/examples/dmn/not-ok/dated-chain-regulative.l4`.
+
+Every ordinal a `D-DATEDCHAIN` message quotes ("arm 3 of the chain") is an index into the chain's
+own rows, so the same number names the same source arm in all three refusal messages.
+
+### 15.4 FEEL dates
+
+`FeelValue` gains `VDate !Day`, rendered `date("YYYY-MM-DD")`. Two separate concerns, deliberately
+not conflated:
+
+- **in an expression**, only the _literal_ form folds: `Date d m y` over three integer literals
+  becomes `date("…")`, tagged `SFeel`. A **nullary reference to a named date constant keeps
+  rendering as its FEEL name** — it is a DMN decision variable, and inlining its value into an
+  expression would erase a reference the DRG records.
+- **in a table cell**, a nullary reference to a date constant _does_ fold to a `VDate` endpoint,
+  because inlining is what an endpoint means.
+
+`Date` is **lenient** (`daydate.l4:52-56` rolls `Date 32 1 2024` forward to 2024-02-01), so the fold
+**refuses** an out-of-range component rather than replicating the roll: putting a date in the
+artifact that the source does not obviously say would be worse than falling through. `YMD` is not
+folded at all — its body is an `IF … THEN candidate ELSE <ASSUME bottom>`, so a structural match
+would silently drop the refusal arm.
+
+Disjointness became **kind-aware** in the same change. `numberOf` was replaced by `ordKey`, which
+returns an _axis tag_ alongside the position, and `satisfies`/`cmpDisjoint` degrade to "assume they
+might overlap" across axes. Without that, a `VNum` cell and a `VDate` cell could have been declared
+disjoint on Modified-Julian-Day arithmetic that means nothing.
+
+**dmnmd refuses dates outright rather than rendering them.** `mdValue` became
+`mdConstant :: FeelValue -> Maybe Text`, returning `Nothing` for `VDate`, so every table carrying a
+date cell raises `D-MD-CELLSYNTAX` Blocking and is honestly omitted. dmnmd's cell grammar has no
+date datatype: `>= 1994-04-01` would have been emitted and then misread by dmnmd's numeric parser.
+That is not a workaround for the gap; it **is** the gap being reported.
+
+### 15.5 The three codes (D3)
+
+`D-RULEDATE` Advisory (one per DRG, when the input was bound), `D-RULEDATE-UNBOUND` Blocking (one
+per decision that _rebinds_ law time with `EVAL UNDER RULES EFFECTIVE AT`), `D-DATEDCHAIN` Blocking
+(one per chain that looked dated and could not be tabled). **Three codes and not one code with three
+severities**, because §7's own header defers the two-severities-on-one-code shape to a re-ruling
+against `FIDELITY-SEVERITY-AXIS-SPEC.md` §5, and because these are three different predicates rather
+than three intensities of one.
+
+**The invariant:** for every emitted `Drg`, if any decision reaches `RULES EFFECTIVE DATE` then
+either a bound `inputData` plus exactly one `D-RULEDATE` Advisory is present, or at least one
+`D-RULEDATE-UNBOUND` Blocking is. Asserted over every golden subject in `jl4/tests/DmnExport.hs`
+("never references law time without a binding or a Blocking note"), not left to the goldens.
+
+**[E] The Blocking arm is not defensive.** `regcf.l4:1143-1238` holds 15 `EVAL UNDER RULES EFFECTIVE
+AT` call sites, each inside its own top-level `DECIDE`, and the note fires **15 times** on the
+corpus. A DMN DRG has one global rule-date input and no scoped rebinding, so a module that both
+reads and rebinds law time cannot be modelled by that input, and the artifact must say so.
+
+**`D-RULEDATE-UNBOUND`'s claim is scoped to what was emitted.** `EVAL UNDER RULES EFFECTIVE AT` can
+sit inside an _arm body_ of a chain that still tabulates, and "no DMN engine can evaluate this
+decision" would then be false about the rest of a table an engine will happily run. The code
+therefore carries **two message forms**, chosen from the emitted `dcnLogic`: a boxed literal gets the
+whole-decision claim, and a decision that still ships a table gets "a sub-expression of `X` … even
+though the surrounding decision table is". On today's corpus all 15 take the first form — and that
+is now an assertion (`jl4/tests/DmnExport.hs`, "scopes `D-RULEDATE-UNBOUND`'s claim to what was
+emitted", an invariant over every subject) rather than a fact the note quietly depended on.
+
+**[U]** Six further builtins (`valueAt`, `evalUnderValidTime`, `everBetween`, `alwaysBetween`,
+`whenLast`, `whenNext`) were nominated as also stamping a temporal context. They belong to the
+valid-time / transaction-time axis, not the rule-version axis, and their behaviour was **not**
+verified. v1 matches `evalUnderRulesEffectiveAtUnique` only. Adding the others must be preceded by a
+measurement, because it would change counts with nothing behind it.
+
+### 15.6 Engine measurements
+
+**[E] Measured 2026-07-30** on `jl4/tests-cli/fixtures/dmn-date-probe/date-axis.dmn`, a hand-written
+fixture kept permanently for the same reason `dmn-xsd-order` is: the emitter cannot produce the
+questions, only the answers.
+
+| question                                                           | KIE 8.44.0.Final                                        | Camunda 8.7.6 (zeebe-dmn)                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------- |
+| `<annotation>` after `<output>`, `<annotationEntry>` with no `@id` | `XSD    valid` (Xerces), `VALID  clean`, `BUILD  clean` | parses (`1 parsed`)                                     |
+| `>= date("…")` / `[date("…")..date("…"))` / `< date("…")` cells    | evaluate; `6/6 value(s) as expected`                    | evaluate; `6/6 value(s) as expected`                    |
+| Java type for a `typeRef="date"` input                             | `java.time.LocalDate`                                   | `java.time.LocalDate`                                   |
+| what a **date-valued decision** returns                            | `java.time.LocalDate`                                   | an ISO-8601 **`String`** — MessagePack has no date type |
+
+The last row is the one asymmetry, and it is a measurement rather than a claim: before
+`CamundaDmnCheck.sameValue` gained a `LocalDate`-vs-`String` branch, the probe reported
+`3/6 value(s) as expected` on three **correct** answers. The fixture convention is the explicit tag
+`{"$date": "YYYY-MM-DD"}` rather than an ISO-shape sniff, because these harnesses convert by
+declared type and never by appearance (`etc/kie-dmn-check/src/main/java/KieDmnCheck.java`, the
+`BigDecimal` note on `jsonToFeel`).
+
+**A malformed `$date` is a FIXTURE error on both engines** — measured 2026-07-31 by feeding
+`{"$date": 20240101}`, which now prints
+`` `{"$date": ...}` wants an ISO-8601 YYYY-MM-DD string, got: 20240101 `` and exits 2 on each.
+The two predicates used to disagree: KIE accepted any non-null node and died with an uncaught
+`DateTimeParseException`, while Camunda tested `instanceof String` and silently degraded the same
+fixture to an ordinary map, reporting it as a value mismatch. One malformed fixture, two different
+wrong answers.
+
+**[E] The positive fixture is only half the measurement, and 2026-07-31 added the other half.**
+A valid file validating shows that a valid file validates; it is equally consistent with Xerces
+ignoring `<annotation>`/`<annotationEntry>` entirely, which is the failure the Q4 row claims to
+exclude. `date-axis-badannotation.dmn` is `date-axis.dmn` with an `@id` on each `<annotationEntry>`
+and **nothing else changed** — asserted line-by-line in `l4-cli-test`, so the pair cannot drift and
+leave a red negative failing for some other reason. Measured, verbatim:
+
+| engine                    | on the negative                                                                                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KIE 8.44.0.Final          | `XSD    INVALID`, ×3 `cvc-complex-type.3.2.2: Attribute 'id' is not allowed to appear in element 'annotationEntry'`; **`BUILD  clean`**, 6/6 as expected |
+| Camunda 8.7.6 (zeebe-dmn) | `PARSE  INVALID: DmnModelException: Unable to parse model`; `0 parsed, 1 error(s)`                                                                       |
+
+Note what Drools does **not** do: it builds the malformed file anyway and answers every case
+correctly. So "a malformed emitter would fail in the engine" is false of Drools, exactly as it is
+for the `dmn-xsd-order` pair, and the schema leg is the only thing between a malformed emitter and a
+shipped artifact.
+
+### 15.7 Measured before/after
+
+**[E]** `cd jl4/examples/dmn/expected && grep -o "\[D-[A-Z-]*\]" regcf-corpus.fidelity.txt | sort | uniq -c | sort -rn`
+
+| code                 | before  | after   | mechanism                                                                                      |
+| -------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `D-LITERALEXPR`      | 89      | **89**  | unchanged — the date constants and the predicate are still boxed literals, but now _evaluable_ |
+| `D-RENAME`           | 37      | **37**  | `RULES_EFFECTIVE_DATE` collides with nothing                                                   |
+| `D-NONFEELINPUT`     | 29      | **6**   | the 23 `` `the rules in force include` OF … `` columns became one FEEL `date` column each      |
+| `D-UNDECOMPOSABLE`   | 28      | **5**   | the same 23 guards no longer fall back to boolean columns                                      |
+| `D-SCOPE`            | 9       | **9**   | —                                                                                              |
+| `D-ORDERDEPENDENT`   | 9       | **1**   | 8 dated tables went `FIRST` → `UNIQUE`; only `financial statements required` remains           |
+| `D-COMPUTEDOUTPUT`   | 9       | **9**   | —                                                                                              |
+| `D-NONFEELOUTPUT`    | 4       | **4**   | `the applicable measure …`'s outputs are still verbatim L4 calls                               |
+| `D-INLINEDLOCAL`     | 2       | **2**   | —                                                                                              |
+| `D-RULEDATE-UNBOUND` | —       | **15**  | new, Blocking                                                                                  |
+| `D-RULEDATE`         | —       | **1**   | new, Advisory                                                                                  |
+| `D-DATEDCHAIN`       | —       | **0**   | the corpus is well-ordered                                                                     |
+| **blocking**         | **122** | **114** | 122 − 23 + 15                                                                                  |
+| **lossy**            | **46**  | **46**  |                                                                                                |
+| **advisory**         | **48**  | **18**  | 48 − 23 − 8 + 1                                                                                |
+
+> **The blocking total falls by only 8 net, because 15 new Blocking notes appear — and that is the
+> point.** The complaint this section answers is that the report was _silent_ about law time; making
+> it speak necessarily adds notes. A reader who scores this change by the blocking total will
+> misread it.
+
+**Structure.** `<inputData>` 67 → **68**; `<decision>` stays **102**; `<decisionTable>` stays **11**,
+of which `hitPolicy` is now **10 `UNIQUE` / 1 `FIRST`**. Each of the 8 dated decisions lost its
+`requiredDecision` edges to the guard predicate and the regime constants and gained
+`<requiredInput href="#input_rules_effective_date"/>` (R11), with `_ir<n>` renumbering inside them.
+Eight `<annotation name="regime"/>` elements are new.
+
+**Markdown carrier.** `D-MD-NONIDENTCOLUMN` 30 → **7** (−23, the backticked columns are gone);
+`D-MD-CELLSYNTAX` 4 → **33** (+29 — the note is **per rule**, and the 8 dated tables contribute 31
+rules, 2 of which already carried it for a parenthesised output). Markdown blocking 126 → **132**.
+`D-MD-NOLITERAL` (91) and `D-MD-NODRG` (1) are unchanged, and `D-MD-TYPE` does **not** appear for the
+date columns, because `expressible t` is false once the cells are refused.
+
+**`D-MD-CELLSYNTAX` names the cause it actually found (amended 2026-07-31).** It used to recite the
+whole enumeration — "a negation, a half-open or non-integer range, or an output with parentheses or
+a comma" — which became a **misdiagnosis** the moment dates existed: `>= date("2024-01-01")` is none
+of those, and on this corpus that wrong cause would have been the majority reading (31 of the 33
+instances name a date; only 4 name an output). `cellSyntaxReason` now reports the reasons it can
+demonstrate for the rule in hand, joined with `;` when a cell trips more than one — a half-open date
+range trips both, and both are true and independent obstacles.
+
+**[E] `sumtype.*` (4 files) is byte-identical, and so are `reg-cf.dmn`, `reg-cf.dmn.md` and
+`reg-cf.fidelity.txt`.** Neither module contains `RULES EFFECTIVE DATE`, so the date-literal fold
+and `constantOf`'s date arm reached nothing in them, which is what those unchanged goldens assert.
+`reg-cf.md.fidelity.txt` **did** move, by exactly one line, and only because of the message repair
+above: its one `D-MD-CELLSYNTAX` now says "an output dmnmd cannot read: parentheses, a comma, or an
+expression outside S-FEEL" instead of reciting all four causes. That is the repair working on a
+module with no dates in it at all.
+
+### 15.8 Chains that reference law time and are NOT dated chains
+
+They take the existing path and keep their existing findings. Named, so the claim is checkable:
+
+| decision                                             | why it is not a dated chain                      | what stayed                                         |
+| ---------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------- |
+| `financial statements required` (`regcf.l4:498-503`) | **zero** rows are law-time guards, so `NotDated` | `FIRST`, 5 `D-NONFEELINPUT`, its `D-ORDERDEPENDENT` |
+| `investment limit` (`regcf.l4:416`)                  | not a guarded chain at all                       | its 1 `D-NONFEELINPUT`                              |
+| the COVID-19 window (`regcf.l4:479-481`)             | a conjunction, not a chain                       | `D-LITERALEXPR`; its body is now evaluable FEEL     |
+| the 15 `EVAL UNDER RULES EFFECTIVE AT` decisions     | not chains                                       | `D-LITERALEXPR`, **plus** `D-RULEDATE-UNBOUND`      |
+
+**`NotDated` is not the same outcome as a refusal, and the difference matters for testing.**
+A chain that matches **zero** rule-date arms is an ordinary chain and gets no note; a chain that
+matches **some** rows and not others is a Blocking `D-DATEDCHAIN`, because mixing a law-time arm with
+an ordinary one is exactly how a temporal bug hides. `financial statements required` is the first
+kind. The second kind has **no witness in the corpus at all** — `D-DATEDCHAIN` is 0 here — which is
+why it has its own negative fixture, `jl4/examples/dmn/not-ok/dated-chain-mixed.l4`. Before
+2026-07-31 it had neither a fixture nor a test, and the test _named_ for it asserted the first kind.
+
+### 15.9 What the annotation column can carry
+
+`@ref` **is** machine-readable — `L4/Lexer.hs`, `Extension.ref` in `L4/Syntax.hs`, read with
+`annRef`/`getRef` — and every Reg CF regime constant carries one (`regcf.l4:102,106,110,114`). It
+attaches to the **`TopDecl`** (`L4/Parser/ResolveAnnotation.hs`), which `Lower.hs` used to discard at
+`decides = [d | Decide _ d <- decls]`.
+
+**[E] Measured, not assumed.** The exporter now binds that annotation and reads it joined with the
+inner `MkDecide`'s, and the emitted corpus golden shows the citation arriving:
+
+```xml
+<annotationEntry>
+  <text>the 2021 amendments — 86 FR 3496 (Rel. 33-10884), instr. 3 — the 2020 amendments, eff. 2021-03-15 (main.l4:111:1-112:43)</text>
+</annotationEntry>
+```
+
+So the `TopDecl` annotation is where the ref lives, and the `<|>`-style join is what made the
+question not block the build. The `@ref` keyword itself is stripped: it is L4 syntax, not part of
+the citation.
+
+Ordinary `--` comments are **not** available: they live in `CsnCluster` trailing tokens for
+exact-print (`L4/Annotation.hs`) and are not indexed by node, so a citation written as a comment
+cannot reach the column. That distinction matters, because "citations are/are not machine-readable"
+is exactly the kind of claim that gets copied and sharpened.
+
+The column carries, per row: the L4 regime-constant name; the `@ref` text when one is attached; and
+the constant's own `file:line`. An **inline**-idiom arm names no constant, so it carries only
+`from <day>` — and the exhibit's `tourist refund minimum spend` is there so that limit is visible in
+a golden rather than asserted here.
+
+**dmnmd ignores `dtAnnotations` and emits no new code.** That is defensible only because every dated
+table is already omitted from the markdown by `D-MD-CELLSYNTAX` (§15.4), so no table's annotation is
+actually being dropped. The day a dated table becomes dmnmd-expressible, the dropped annotation
+needs a `D-MD-NOANNOTATION`.
+
+### 15.10 The exhibit
+
+`jl4/examples/dmn/gst-rate.l4` (golden stem `gst-rate`, a fourth `goldenSubjects` row) is the
+smallest module that exercises law time end to end: two chains — one PREDICATE idiom, one INLINE —
+both lowering to single-column `UNIQUE` date-interval tables, plus one downstream arithmetic
+decision so a date is shown driving a number driving a number.
+
+The INLINE chain writes **one arm against a named regime constant and one against a bare
+`Date d m y`**, because those are the two things an inline right-hand side may be and they reach
+different code (`constantDay`'s one hop, then the literal fold). It is also where the annotation
+column's limit is visible in a golden: the named arm carries the constant and its `@ref`, the
+literal arm carries only `from 1994-04-01`.
+
+**[E] Amended 2026-07-31.** `jl4/examples/dmn/gst-rate.cases.json` drives it through **both** engines
+with **ten** rule dates: `70/70 value(s) as expected` on KIE 8.44.0.Final (0 errors, 0 warnings) and
+on Camunda 8.7.6 (1 parsed, 0 errors). `GST rate percent` lowers to four rules and therefore **three
+seams** — 2024-01-01, 2023-01-01, 1994-04-01 — and every one is straddled by a day-of/day-before
+pair, plus a case well before commencement for the floor row. The first version straddled only the
+newest seam, so an off-by-one on the middle interval's low end, or on the floor row's
+`< date("1994-04-01")`, would have passed `42/42` green while the cases file claimed to pin the
+convention. This is the OpenFisca parameter file re-expressed as engine-evaluable DMN.
+
+Six negative fixtures under `jl4/examples/dmn/not-ok/` are **not** golden subjects, so no `.dmn` is
+emitted for them and `etc/validate-dmn.mjs` is unaffected. All six are asserted from
+`jl4/tests/DmnExport.hs`, in the shape of `l4-cli-test`'s existing "rejects a mis-ordered dated
+BRANCH (ascending arms)". The first four are Blocking **refusals**; the last two are **declines**,
+which carry no note because nothing was lost:
+
+| fixture                           | the arm of R10 it witnesses                                                  | outcome    |
+| --------------------------------- | ---------------------------------------------------------------------------- | ---------- |
+| `dated-chain-misordered.l4`       | arms ascending, so the derived intervals would be empty                      | refusal    |
+| `dated-chain-duplicate-date.l4`   | two arms on one day, refused by the same strictly-descending predicate       | refusal    |
+| `dated-chain-rolling-date.l4`     | `Date 32 1 2024`, which L4 rolls to 2024-02-01 and the fold refuses (§15.4)  | refusal    |
+| `dated-chain-mixed.l4`            | some arms are rule-date guards and some are not: no single date axis         | refusal    |
+| `dated-chain-regulative.l4`       | a law-time-guarded OBLIGATION: `rowsToDmnWith'`'s `RegulativeBody` must win  | `NotDated` |
+| `dated-chain-nested-otherwise.l4` | the `OTHERWISE` is itself a chain, so `expandOtherwise` must still splice it | `NotDated` |
+
+### 15.11 What review changed
+
+- The mission asked for **one `D-RULEDATE` code with two severities**. It ships as **three codes,
+  one severity each** (§15.5), because §7's own header defers that shape to a re-ruling against
+  `FIDELITY-SEVERITY-AXIS-SPEC.md` §5, and because the two arms have different _predicates_, not
+  two intensities of one.
+- The mission asked for a **floor row**, which collides with §3.3's headline ruling. §3.3 was
+  **amended** rather than overridden — see **R9**, which admits the floor row as a third spelling on
+  §3.3's own logic, and explains why the first draft's `UNIQUE` + `defaultOutputEntry` was dropped
+  once §3.3.1 consequence 1 was read.
+- The annotation column's citation claim was **checked against `@ref`** rather than inferred from
+  comments (§15.9), and §15.9 records what the tree actually produced rather than what it should
+  have.
+- `numberOf` → `ordKey` was **not** in the mission. It is required: adding `VDate` to a bare
+  `Rational` key would have let a number cell and a date cell be declared disjoint (§15.4).
+- The **requirement rewrite (R11)** was not in the mission either, and without it the DRG would have
+  described a dependency graph the emitted expression contradicts — a DMN 6.2.2 problem, not a
+  cosmetic one.
+
+**Second review pass, 2026-07-31.** Seven further repairs, each recorded where it belongs so a later
+editor cannot silently un-change one:
+
+- The **inline idiom** folded only bare literals while its own refusal message said named constants
+  are folded (R10, §15.10). Fixed in `datedChain`; the exhibit now writes one arm each way.
+- A **regulative body** stopped being refused the moment a chain looked dated, because the dated path
+  bypasses `rowsToDmnWith'`'s three pre-tabulation refusals (§15.3, R10). Restated, with a fixture.
+- The **nested-chain test** skipped the `OTHERWISE`, so a nested catch-all collapsed into one output
+  entry with no `D-FLATTENCAP` (§15.3, R10).
+- **`D-DATEDCHAIN`'s ordinals** meant two different things in two messages (§15.3, R10).
+- **`D-RULEDATE-UNBOUND`** asserted "no DMN engine can evaluate this decision" unconditionally, which
+  is false of a decision that still ships a table. Two message forms, and an invariant test (§15.5).
+- **`D-MD-CELLSYNTAX`** recited an enumeration that misdiagnosed every date cell — the majority of
+  its instances on this corpus (§15.7).
+- The **date-axis probe had no negative control** while three places claimed it showed Xerces was
+  watching the annotation position. It has one now, measured on both engines (§15.6).
+
+Two harness repairs went with them: the `{"$date": …}` predicate disagreed between the two Java
+checkers (§15.6), and the exhibit's boundary coverage straddled one seam out of three (§15.10).

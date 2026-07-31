@@ -27,13 +27,14 @@ import qualified Base.Text as Text
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVFS)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle)
+import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
 import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (Severity (..))
 
+import Data.Time.Calendar (fromGregorian)
 import System.FilePath ((</>), takeBaseName)
 import Test.Hspec
 import Test.Hspec.Golden
@@ -787,6 +788,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral e -> e.feText `shouldBe` "max(a, b)"
         LogicTable _   -> expectationFailure "expected max(a, b), got a decision table"
 
+        LogicContext _ -> expectationFailure "unexpected boxed context"
     -- The SHAPE is not the whole idiom: L4's `<` / `<=` / `>` / `>=` are
     -- overloaded over NUMBER, STRING and BOOLEAN (and daydate.l4 adds DATE), so
     -- `IF s AT LEAST t THEN s ELSE t` is a well-typed program over any of them
@@ -807,6 +809,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case d.dcnLogic of
         LogicLiteral e -> e.feText `shouldBe` "max(s, t)"
         LogicTable _   -> expectationFailure "expected max(s, t), got a decision table"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       d.dcnType `shouldBe` DmnString
 
     it "fires over DATE, which Table 54 orders too (daydate's `the earlier of`)" $ do
@@ -814,6 +817,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case d.dcnLogic of
         LogicLiteral e -> e.feText `shouldBe` "min(start, end)"
         LogicTable _   -> expectationFailure "expected min(start, end), got a decision table"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       d.dcnType `shouldBe` DmnDate
 
     -- BOOLEAN is the one type L4 orders and FEEL does not, and the un-folded
@@ -917,6 +921,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case d.dcnLogic of
         LogicLiteral e -> e.feText `shouldBe` "a and b"
         LogicTable _   -> expectationFailure "expected a literal expression, got a decision table"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Blocking)]
       emitDrg drg `shouldSatisfy` Text.isInfixOf "<literalExpression"
 
@@ -944,6 +949,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case (decisionNamed "charitable" drg).dcnLogic of
         LogicLiteral _ -> pure ()
         LogicTable _   -> expectationFailure "emitted a table that answers null where the rule answers FALSE"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-SUMTYPE", Blocking)]
       [n.message | n <- drg.drgNotes]
         `shouldSatisfy` all (Text.isInfixOf "binds `other`'s payload")
@@ -955,6 +961,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case (decisionNamed "charitable" drg).dcnLogic of
         LogicLiteral _ -> pure ()
         LogicTable _   -> expectationFailure "expected a boxed literal expression (R4-a form 3)"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-SUMTYPE", Blocking)]
 
     it "U is claimed only when the CELLS witness it, not merely because the guards are exclusive" $ do
@@ -1034,6 +1041,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case (decisionNamed "greater" drg).dcnLogic of
         LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
         LogicTable _   -> expectationFailure "expected a boxed literal expression"
+        LogicContext _ -> expectationFailure "unexpected boxed context"
       [(n.code, n.severity) | n <- drg.drgNotes] `shouldContain` [("D-NONFEELOUTPUT", Blocking)]
 
     it "dmnmd will not print an L4 phrase as a column header, even when it spells like a name" $ do
@@ -1139,6 +1147,38 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     it "element ids derive from L4 names, so they survive a rebuild" $ do
       let drg = drgOf decisionChain
       map (.dcnId) (drgDecisions drg) `shouldBe` ["decision_is_holiday", "decision_fee"]
+
+    it "a NAMED-ARGUMENT call keeps its edge, because the emitted text names it" $ do
+      -- R11 runs both ways. 'survivingRefs' may drop an edge only where the
+      -- FOLD removed the name from the emitted text, and an @AppNamed@ is not
+      -- folded -- it renders VERBATIM, so the text names `sum of` in full. An
+      -- earlier 'survivingRefs' collected references from @App@ heads only,
+      -- which silently dropped this edge while the expression still spelled it
+      -- out: a DRG describing a different model from its own decisions.
+      let drg = drgOf $ Text.unlines
+            [ "GIVEN x IS A NUMBER"
+            , "      y IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`sum of` x y MEANS x PLUS y"
+            , ""
+            , "GIVETH A NUMBER"
+            , "`the base` MEANS 42"
+            , ""
+            , "GIVETH A NUMBER"
+            , "`total` MEANS `sum of` WITH x IS `the base`"
+            , "                            y IS 7"
+            ]
+          total = decisionNamed "total" drg
+      sort (map requirementTarget total.dcnRequirements)
+        `shouldSatisfy` elem "decision_sum_of"
+      -- `input_x`/`input_y` are also required, because an @AppNamed@'s argument
+      -- LABELS resolve to the callee's GIVEN binders and those binders are this
+      -- exporter's inputData. That is pre-existing and unchanged -- it is what
+      -- the total `toList` collection has always done -- and it is recorded
+      -- here rather than asserted away, so a later reader does not read the
+      -- edge as something hydration introduced.
+      sort (map requirementTarget total.dcnRequirements)
+        `shouldBe` ["decision_sum_of", "decision_the_base", "input_x", "input_y"]
 
   describe "emission" $ do
     it "is byte-identical across two independent lowerings of the same source" $ do
@@ -1549,18 +1589,58 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         -- arm WAS reported.
         xml `shouldNotSatisfy` Text.isInfixOf "\"NOTHING\""
         -- Nor as a bare FEEL identifier, which is what excluding it from
-        -- `isConstantRef` alone would have produced: the decision is refused
-        -- outright, and every occurrence of the token is inside text this
-        -- backend has declared to be L4 source rather than FEEL.
-        case (decisionNamed "capped at ten" drg).dcnLogic of
-          LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
-          LogicTable _   -> expectationFailure "expected a boxed literal expression"
+        -- `isConstantRef` alone would have produced.
+        --
+        -- The assertion above is UNCHANGED by R8-d′ and must stay: R8-f is
+        -- about the STRING CONSTANT, and `NOTHING` still has no spelling as
+        -- one. What changed underneath it is the rendering -- `NOTHING` is now
+        -- FEEL's `null`, a literal, not a name and not a string.
+        xml `shouldNotSatisfy` Text.isInfixOf ">NOTHING<"
 
-      it "refuses the builtin open sums at the value level, before D-LITERALEXPR (R8-d)" $ do
+      it "tabulates a MAYBE-valued decision with a null default output (R8-d′)" $ do
+        -- Was: "refuses the builtin open sums at the value level (R8-d)".
+        -- R8-d is OVERTURNED for the value channel as of 2026-07-31, on its own
+        -- stated terms, so `capped at ten` is now a real decision TABLE whose
+        -- absent case is the defaultOutputEntry.
         drg <- sumtypeDrg
+        case (decisionNamed "capped at ten" drg).dcnLogic of
+          LogicTable t -> do
+            t.dtHitPolicy `shouldBe` HitUnique
+            map cellTexts t.dtRules `shouldBe` [["<= 10"]]
+            -- The absent case. MEASURED on both engines before this lowering
+            -- was written (jl4/tests-cli/fixtures/dmn-null-probe): a table
+            -- whose defaultOutputEntry is `null` answers null past its rows on
+            -- KIE 8.44 and zeebe-dmn 8.7.6 alike.
+            fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "null"
+          LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+          LogicContext _ -> expectationFailure "unexpected boxed context"
+        -- D-SUMTYPE is GONE; D-MAYBE-NULL stays, because the variable's typeRef
+        -- is still `number` and the absent/undefined conflation is still real.
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_capped_at_ten"]
-          `shouldBe` [("D-SUMTYPE", Blocking), ("D-MAYBE-NULL", Lossy)]
+          `shouldSatisfy` notElem ("D-SUMTYPE", Blocking)
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_capped_at_ten"]
+          `shouldSatisfy` elem ("D-MAYBE-NULL", Lossy)
 
+      it "renders an absence test as a comparison against null, not verbatim (R8-d′)" $ do
+        drg <- sumtypeDrg
+        -- The LONGHAND spelling: a CONSIDER over a MAYBE, rendered by
+        -- renderFeelIn's own case rather than by a source rewrite.
+        case (decisionNamed "grade is settled, spelled longhand" drg).dcnLogic of
+          LogicLiteral e -> do
+            e.feText `shouldBe` "if p != null then true else false"
+            e.feFragment `shouldBe` FullFeel
+          LogicTable _ -> expectationFailure "expected a boxed literal expression"
+          LogicContext _ -> expectationFailure "unexpected boxed context"
+        -- The IDIOMATIC spelling, through the combinator table. Both must
+        -- render, because both appear in real L4 and recognising only one
+        -- would make the house style the worse artifact.
+        case (decisionNamed "grade is settled" drg).dcnLogic of
+          LogicLiteral e -> do
+            e.feText `shouldBe` "q != null"
+            e.feFragment `shouldBe` FullFeel
+          LogicTable _ -> expectationFailure "expected a boxed literal expression"
+
+          LogicContext _ -> expectationFailure "unexpected boxed context"
       it "refuses a NESTED MAYBE, because null does not nest (R8-c)" $ do
         drg <- sumtypeDrg
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_deep"]
@@ -1579,6 +1659,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             t.dtHitPolicy `shouldBe` HitUnique
             map (.icValues) t.dtInputs `shouldBe` [Just ["sell", "lease", "assign"]]
           LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+          LogicContext _ -> expectationFailure "unexpected boxed context"
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_is_a_sale"]
           `shouldBe` [("D-SUMTYPE", Lossy)]
         [n.message | n <- drgNotesAll drg, n.element == "decision_is_a_sale"]
@@ -1602,6 +1683,318 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           `shouldSatisfy` any (Text.isInfixOf "supporting notes")
         [n.severity | n <- drgNotesAll drg, n.code == "D-ITEMDEF"]
           `shouldSatisfy` all (== Lossy)
+
+    -- R8-e and R8-c, pinned as REFUSALS in their own right.
+    --
+    -- These were written BEFORE the R8-d′ narrowing that made JUST/NOTHING
+    -- lower to FEEL null, and were watched go green on the unmodified tree
+    -- first, because narrowing a refusal you have not pinned is exactly how a
+    -- refusal disappears without anyone noticing. EITHER in particular had ZERO
+    -- coverage in this file and zero corpus exposure before this change: the
+    -- only thing standing between it and a silent value lowering was a
+    -- disjunct in a list comprehension.
+    describe "what still refuses after MAYBE lowers to null (R8-c, R8-e)" $ do
+      let eitherSrc name body =
+            Text.unlines
+              [ "GIVEN e IS AN EITHER NUMBER STRING"
+              , "GIVETH A BOOLEAN"
+              , "`" <> name <> "` e MEANS"
+              , body
+              ]
+
+      it "refuses a decision that CONSTRUCTS an EITHER (R8-e)" $ do
+        let drg = drgOf $ Text.unlines
+              [ "GIVEN n IS A NUMBER"
+              , "GIVETH AN EITHER NUMBER STRING"
+              , "`tagged` n MEANS"
+              , "  IF n AT MOST 10 THEN LEFT n ELSE RIGHT \"big\""
+              ]
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_tagged"]
+          `shouldSatisfy` elem ("D-SUMTYPE", Blocking)
+        -- LEFT/RIGHT keep the R8-f treatment JUST/NOTHING lose: verbatim, so
+        -- the constructor name never reaches an engine as a FEEL string or as
+        -- a bare identifier.
+        emitDrg drg `shouldNotSatisfy` Text.isInfixOf "\"LEFT\""
+        emitDrg drg `shouldNotSatisfy` Text.isInfixOf "\"RIGHT\""
+
+      it "refuses a CONSIDER over an EITHER (R8-e)" $ do
+        let drg = drgOf $ eitherSrc "reads"
+              "  CONSIDER e\n  WHEN LEFT n  THEN TRUE\n  WHEN RIGHT s THEN FALSE"
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_reads"]
+          `shouldSatisfy` elem ("D-SUMTYPE", Blocking)
+
+      it "refuses an EITHER at a decision BOUNDARY, even unread (R8-e)" $ do
+        -- `e` is threaded and never matched, so neither the constructor clause
+        -- nor the CONSIDER clause fires. Only the boundary clause does, and
+        -- this is the test that pins it.
+        let drg = drgOf $ eitherSrc "threads" "  TRUE"
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_threads"]
+          `shouldSatisfy` elem ("D-SUMTYPE", Blocking)
+        [n.message | n <- drgNotesAll drg, n.element == "decision_threads"]
+          `shouldSatisfy` any (Text.isInfixOf "no EITHER")
+
+      it "refuses a NESTED MAYBE used as a CONSIDER SCRUTINEE (R8-c)" $ do
+        -- The disjunct that is easiest to drop. `classifyType` sets tfMaybe
+        -- TRUE as well as tfNestedMaybe on a nested MAYBE, so a scrutinee
+        -- clause narrowed to `tfEither` alone would let this through and
+        -- lower `JUST NOTHING` and `NOTHING` to one FEEL null -- an ANSWER
+        -- CHANGE, not a rendering one. `deep` in sumtype.l4 does NOT cover
+        -- this: its body is `TRUE` and it only reaches the boundary clause.
+        let drg = drgOf $ Text.unlines
+              [ "GIVEN m IS A MAYBE (MAYBE NUMBER)"
+              , "GIVETH A BOOLEAN"
+              , "`nested scrutinee` m MEANS"
+              , "  CONSIDER m"
+              , "  WHEN JUST inner THEN TRUE"
+              , "  WHEN NOTHING    THEN FALSE"
+              ]
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_nested_scrutinee"]
+          `shouldSatisfy` elem ("D-SUMTYPE", Blocking)
+        -- ★ The NOTE is not the refusal. `literalFallback` renders the body and
+        -- reports Blocking BESIDE it, so a note alone leaves open the one
+        -- outcome R8-c exists to prevent: `if m != null then true else false`
+        -- COMPILES, and answers `false` for `JUST NOTHING` where L4 answers
+        -- `true`. Pinning the rendering is what makes the refusal a refusal --
+        -- and before this assertion existed, the artifact shipped exactly that
+        -- executable wrong answer while this test stayed green.
+        case (decisionNamed "nested scrutinee" drg).dcnLogic of
+          LogicLiteral e -> do
+            e.feFragment `shouldBe` L4Verbatim
+            e.feText `shouldNotSatisfy` Text.isInfixOf "!= null"
+          LogicTable _   -> expectationFailure "expected a boxed literal expression"
+          LogicContext _ -> expectationFailure "unexpected boxed context"
+
+      it "refuses JUST and NOTHING at a NESTED MAYBE type (R8-c)" $ do
+        -- The other two arms of the same guard. `JUST NOTHING` and `NOTHING`
+        -- would both render `null`, so a decision returning the first would
+        -- become indistinguishable from one returning the second.
+        let drg = drgOf $ Text.unlines
+              [ "GIVEN n IS A NUMBER"
+              , "GIVETH A MAYBE (MAYBE NUMBER)"
+              , "`wrapped` n MEANS"
+              , "  IF n AT MOST 10 THEN JUST (JUST n) ELSE JUST NOTHING"
+              ]
+        emitDrg drg `shouldNotSatisfy` Text.isInfixOf "<text>null</text>"
+        [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_wrapped"]
+          `shouldSatisfy` elem ("D-SUMTYPE", Blocking)
+
+      it "does not recognise a LOCALLY defined isJust as the prelude's (R8-d′)" $ do
+        -- The combinator table is keyed on a resolved 'Unique', but the Unique
+        -- is FOUND by a name lookup, so the name alone cannot be what licenses
+        -- the `x != null` rendering: a module that defines its own
+        -- `isJust :: MAYBE a -> BOOLEAN` and does not import the prelude has
+        -- exactly one shaped candidate, and the shape check cannot see the
+        -- body. 'resolveMaybePredicates' therefore also requires the definition
+        -- to come from a DIFFERENT module. Without that, this body -- which
+        -- means the opposite of what its name says -- rendered `q != null`,
+        -- with no fidelity note at all because a recognised combinator is
+        -- clean FEEL.
+        let drg = drgOf $ Text.unlines
+              [ "GIVEN x IS A MAYBE NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`isJust` x MEANS FALSE"
+              , ""
+              , "GIVEN y IS A MAYBE NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`isNothing` y MEANS TRUE"
+              , ""
+              , "GIVEN q IS A MAYBE NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`asks` q MEANS isJust q"
+              ]
+        case (decisionNamed "asks" drg).dcnLogic of
+          LogicLiteral e -> e.feText `shouldNotSatisfy` Text.isInfixOf "!= null"
+          LogicTable _   -> expectationFailure "expected a boxed literal expression"
+          LogicContext _ -> expectationFailure "unexpected boxed context"
+
+  -- §4.4. Hydration ships four goldens and, until this block, no NAMED test.
+  -- A golden pins everything at once, which is also why it pins nothing in
+  -- particular: a hydrator that moved for the wrong reason reads as "the
+  -- hydrator moved" and gets blessed. Each of these was written against a
+  -- defect the goldens did not catch.
+  describe "hydration (§4.4)" $ do
+    let hydratedEntries name drg = case (decisionNamed name drg).dcnLogic of
+          LogicContext es -> map (.ceName) es
+          _               -> []
+
+    it "keeps INDEPENDENT computed fields in declaration order" $ do
+      -- The first implementation sorted with 'Data.Graph.stronglyConnComp',
+      -- which does put dependencies first but says nothing about independent
+      -- vertices -- and duly emitted Reg CF's `greater of …` and `lesser of …`
+      -- in the opposite order from the DECLARE, while the comment beside it
+      -- and the spec both asserted declaration order was preserved.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `x` IS A NUMBER"
+            , "    `y` IS A NUMBER"
+            , "    `first`  IS A NUMBER MEANS `x` PLUS 1"
+            , "    `second` IS A NUMBER MEANS `y` PLUS 1"
+            , ""
+            , "GIVEN p IS A P"
+            , "GIVETH A NUMBER"
+            , "`reads` p MEANS p's `first` PLUS p's `second`"
+            ]
+      hydratedEntries "p" drg `shouldBe` ["x", "y", "first", "second"]
+
+    it "emits a dependent field AFTER the sibling it reads" $ do
+      -- A boxed context's entries see only EARLIER siblings, so getting this
+      -- wrong is silent: the reference resolves to nothing and FEEL answers
+      -- null. Declared deliberately in the wrong order.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `x` IS A NUMBER"
+            , "    `y` IS A NUMBER"
+            , "    `doubled` IS A NUMBER MEANS `total` TIMES 2"
+            , "    `total`   IS A NUMBER MEANS `x` PLUS `y`"
+            , ""
+            , "GIVEN p IS A P"
+            , "GIVETH A NUMBER"
+            , "`reads` p MEANS p's `doubled`"
+            ]
+      hydratedEntries "p" drg `shouldBe` ["x", "y", "total", "doubled"]
+
+    it "keeps a STORED and a COMPUTED field apart when both fold to one name" $ do
+      -- §5.3.4's executed collision, at the seam hydration added. `total income`
+      -- and `total_income` both fold to `total_income` at stage 1, so unless the
+      -- computed selectors join the record's OWN `uniquifyIn` call they get
+      -- separate path steps that happen to be the same string: valid FEEL
+      -- computing a wrong number, with no note. Because one map then serves both
+      -- the context entry names and the downstream path steps, they agree by
+      -- construction rather than by two functions remembering to.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `total income` IS A NUMBER"
+            , "    `total_income` IS A NUMBER MEANS `total income` TIMES 2"
+            , ""
+            , "GIVEN p IS A P"
+            , "GIVETH A NUMBER"
+            , "`reads` p MEANS p's `total_income`"
+            ]
+          entries = hydratedEntries "p" drg
+      entries `shouldSatisfy` ((== 2) . length)
+      nubOrd entries `shouldBe` entries
+      -- and the downstream read names the SECOND one, not the stored one
+      case (decisionNamed "reads" drg).dcnLogic of
+        LogicLiteral e -> e.feText `shouldBe` ("p_hydrated." <> last entries)
+        _              -> expectationFailure "expected a boxed literal expression"
+
+    it "requires every DECISION a computed field's body names" $ do
+      -- 'Desugar.rewriteFieldRefs' rewrites only the record's OWN field names,
+      -- so a MEANS body may reference any module-level decision and the
+      -- context entry renders it by name. A hydrator whose only edge was its
+      -- source instance left that name unbound: KIE 8.44 reports "Required
+      -- dependency not found" and SKIPs (measured, dmn-null-probe/null-absent),
+      -- zeebe-dmn reads null and multiplies by it.
+      let drg = drgOf $ Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`vat rate` MEANS 7"
+            , ""
+            , "DECLARE R HAS"
+            , "    `a` IS A NUMBER"
+            , "    `b` IS A NUMBER MEANS `a` TIMES `vat rate`"
+            , ""
+            , "GIVEN r IS A R"
+            , "GIVETH A NUMBER"
+            , "`out` r MEANS r's `b`"
+            ]
+      sort (map requirementTarget (decisionNamed "r" drg).dcnRequirements)
+        `shouldBe` ["decision_vat_rate", "input_r"]
+
+    it "reports a computed field body it cannot render as FEEL, Blocking" $ do
+      -- Every OTHER rendering path in the lowerer asks `feFragment ==
+      -- L4Verbatim` before emitting; the hydrator is built outside the
+      -- per-decide note machinery, so for a while it did not. A computed field
+      -- whose body is a CONSIDER over a payload-carrying sum shipped raw L4
+      -- source inside a <literalExpression> with a CLEAN fidelity report.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE D IS ONE OF"
+            , "    sale"
+            , "    lease HAS `term` IS A NUMBER"
+            , ""
+            , "DECLARE R HAS"
+            , "    `a` IS A NUMBER"
+            , "    `d` IS A D"
+            , "    `b` IS A NUMBER MEANS CONSIDER `d`"
+            , "                          WHEN lease t THEN t"
+            , "                          WHEN sale    THEN `a`"
+            , ""
+            , "GIVEN r IS A R"
+            , "GIVETH A NUMBER"
+            , "`out` r MEANS r's `b`"
+            ]
+      [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "hydration_r"]
+        `shouldSatisfy` elem ("D-NONFEELOUTPUT", Blocking)
+
+    it "rewires a computed read to the hydrator and drops the direct edge (R11)" $ do
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `x` IS A NUMBER"
+            , "    `twice` IS A NUMBER MEANS `x` TIMES 2"
+            , ""
+            , "GIVEN p IS A P"
+            , "GIVETH A NUMBER"
+            , "`reads` p MEANS p's `twice`"
+            ]
+      -- The emitted FEEL no longer names `p`, so the graph must not claim it
+      -- does; and it DOES name the hydrator, so the graph must say so.
+      map requirementTarget (decisionNamed "reads" drg).dcnRequirements
+        `shouldBe` ["hydration_p"]
+      -- `p` is still an inputData: the hydrator requires it.
+      map (.idId) (drgInputData drg) `shouldBe` ["input_p"]
+      -- And no bogus inputData was minted for the computed selector itself.
+      map (.idId) (drgInputData drg) `shouldNotSatisfy` elem "input_twice"
+
+    it "leaves a computed read through a NON-NULLARY receiver verbatim (D12)" $ do
+      -- No hydrator names a record-valued EXPRESSION, so this cannot fold. It
+      -- must refuse GRACEFULLY -- the existing verbatim path and its existing
+      -- diagnosis -- and mint no new code. regcf-wizard.l4 carries the live
+      -- instance and is deliberately left carrying it.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `x` IS A NUMBER"
+            , "    `twice` IS A NUMBER MEANS `x` TIMES 2"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A P"
+            , "`make` n MEANS P WITH `x` IS n"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`reads` n MEANS (`make` n)'s `twice`"
+            ]
+      case (decisionNamed "reads" drg).dcnLogic of
+        LogicLiteral e -> e.feFragment `shouldBe` L4Verbatim
+        _              -> expectationFailure "expected a boxed literal expression"
+      [n.code | n <- drgNotesAll drg, n.element == "decision_reads"]
+        `shouldSatisfy` all (`elem` ["D-LITERALEXPR", "D-NONFEELOUTPUT", "D-SUMTYPE"])
+
+    it "does not fold the SELECT idiom inside a hydrator -- a stated boundary" $ do
+      -- A KNOWN divergence, pinned so the golden cannot move unexplained.
+      -- `IF a AT LEAST b THEN a ELSE b` folds to `max(a, b)` everywhere else,
+      -- including through a SOURCE-written projection (`max(p.x, p.y)`), but
+      -- not inside a hydrator: 'Desugar.rewriteFieldRefs' builds the sibling
+      -- read as `Proj emptyAnno (Var emptyAnno _self) n`, and a node with no
+      -- source range carries no inferred type, so 'feelOrderable' cannot
+      -- answer and 'selectIdiomIn' declines. Both forms are FullFeel and both
+      -- evaluate (33/33 on KIE 8.44 and zeebe-dmn 8.7.6), so the cost is
+      -- legibility, not fidelity -- which is why this is recorded rather than
+      -- repaired in L4.Desugar, whose output every computed-field module and
+      -- the exactprint goldens depend on.
+      let drg = drgOf $ Text.unlines
+            [ "DECLARE P HAS"
+            , "    `x` IS A NUMBER"
+            , "    `y` IS A NUMBER"
+            , "    `bigger` IS A NUMBER MEANS IF `x` AT LEAST `y` THEN `x` ELSE `y`"
+            , ""
+            , "GIVEN p IS A P"
+            , "GIVETH A NUMBER"
+            , "`reads` p MEANS p's `bigger`"
+            ]
+      case (decisionNamed "p" drg).dcnLogic of
+        LogicContext es ->
+          [e.ceExpr.feText | e <- es, e.ceName == "bigger"]
+            `shouldBe` ["(if x >= y then x else y)"]
+        _ -> expectationFailure "expected a boxed context"
 
   describe "engine flavors (R7)" $ do
     it "defaults to camunda" $ do
@@ -1645,6 +2038,41 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       let notes = [n | n <- (markdownReport drg).notes, n.code == "D-MD-NODEFAULT"]
       map (.severity) notes `shouldBe` [Lossy]
       map (.message) notes `shouldSatisfy` all (Text.isInfixOf "U down to F")
+
+    it "omits a table whose OTHERWISE dmnmd cannot say, and says so (R8-d′)" $ do
+      -- ★ 'expressible' checked the rules and not the <defaultOutputEntry>, so
+      -- when R8-d′ made a MAYBE-valued decision tabulate with a FEEL `null`
+      -- catch-all, 'defaultRows' fell back to `fromMaybe "-"` and printed
+      -- `| 2 | - | - |`. In dmnmd `-` is the INPUT column's "any" token, so a
+      -- reader read the catch-all as "output unspecified" rather than as "no
+      -- value" -- and the only note beside it was D-MD-NODEFAULT, whose
+      -- message is about the U-to-F demotion and whose own spec row says "the
+      -- answers are preserved". A loud omission is the correct trade against a
+      -- quiet misstatement, and it is the standard 'mdConstant' already sets
+      -- for a date.
+      let drg = drgOf $ Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A MAYBE NUMBER"
+            , "`capped` n MEANS"
+            , "  IF n AT MOST 10 THEN JUST n ELSE NOTHING"
+            ]
+      -- the DMN table itself is unaffected: this is a markdown-carrier loss
+      case (decisionNamed "capped" drg).dcnLogic of
+        LogicTable t -> fmap (.feText) t.dtOutput.ocDefault `shouldBe` Just "null"
+        _            -> expectationFailure "expected a decision table"
+      let md = emitMarkdown drg
+      md `shouldNotSatisfy` Text.isInfixOf "capped (out)"
+      md `shouldNotSatisfy` Text.isInfixOf "| - | - |"
+      let notes = [n | n <- (markdownReport drg).notes, n.element == "decision_capped"]
+      [(n.code, n.severity) | n <- notes] `shouldSatisfy` elem ("D-MD-CELLSYNTAX", Blocking)
+      map (.message) notes `shouldSatisfy` any (Text.isInfixOf "OTHERWISE is `null`")
+      -- and the DMN report keeps calling `null` a LITERAL, which is what the
+      -- D-COMPUTEDOUTPUT message used to contradict in the same file
+      [n.message | n <- (dmnReport drg).notes, n.code == "D-COMPUTEDOUTPUT"]
+        `shouldSatisfy` any (Text.isInfixOf "null LITERAL")
+      -- and D-MD-NODEFAULT must NOT also fire: the table is not there to have
+      -- had its hit policy demoted.
+      map (.code) notes `shouldNotSatisfy` elem "D-MD-NODEFAULT"
 
     it "renders a multi-value cell comma-separated, and a comparison literally" $ do
       emitMarkdown (drgOf orOverOneColumn) `shouldSatisfy` Text.isInfixOf "| 1 | red, green | 1 |"
@@ -1704,6 +2132,270 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     [n | n <- notes, n.code == "D-FEELNAME"] `shouldBe` []
     [n | n <- notes, n.code == "D-RENAME"] `shouldSatisfy` (not . null)
 
+  ----------------------------------------------------------------------
+  -- Law time (spec §15): binding, interval tables, the D-RULEDATE family
+  ----------------------------------------------------------------------
+  describe "law time" $ do
+    let gstDrg = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "gst-rate.l4")
+          pure (drgAsCli "gst-rate.l4" src)
+        corpusDrg = do
+          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          pure (drgAsCli "regcf.l4" src)
+        notOkDrg n = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> n)
+          pure (drgAsCli n src)
+
+    -- D1. Before this, `RULES_EFFECTIVE_DATE` occurred in the shipped corpus
+    -- golden exactly once and was bound by NOTHING -- a free FEEL name no
+    -- engine can resolve, with no note anywhere saying so.
+    it "binds the rule date as one date-typed inputData (D1)" $ do
+      drg <- gstDrg
+      let ins = [i | NodeInputData i <- drg.drgNodes, i.idFeelName == "RULES_EFFECTIVE_DATE"]
+      map (.idType) ins `shouldBe` [DmnDate]
+      map (.idName) ins `shouldBe` ["RULES EFFECTIVE DATE"]
+      map (.idId) ins `shouldBe` ["input_rules_effective_date"]
+
+    -- Edges are computed at IR level over `freeRefs`, never by scanning the
+    -- emitted FEEL: the corpus's COVID-window decision reads law time twice and
+    -- its emitted text used to contain no `RULES_EFFECTIVE_DATE` token at all.
+    it "gives every decision that mentions the rule date a requiredInput edge (D1)" $ do
+      drg <- gstDrg
+      let mentions d = case d.dcnLogic of
+            LogicLiteral e -> Text.isInfixOf "RULES_EFFECTIVE_DATE" e.feText
+            LogicTable t ->
+              any (Text.isInfixOf "RULES_EFFECTIVE_DATE" . (.feText) . (.icExpr)) t.dtInputs
+            LogicContext _ -> False
+      [ d.dcnName
+        | d <- drgDecisions drg
+        , mentions d
+        , RequiredInput "input_rules_effective_date" `notElem` d.dcnRequirements
+        ] `shouldBe` []
+
+    -- §15.5's invariant, asserted over EVERY golden subject rather than left to
+    -- the goldens: no emitted model may reference law time without either the
+    -- bound input plus its Advisory, or the Blocking finding.
+    it "never references law time without a binding or a Blocking note (§15.5)" $
+      forM_ goldenSubjects \(srcPath, stem, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let drg   = drgAsCli srcPath src
+            xml   = emitDrg drg
+            notes = (dmnReport drg).notes
+            bound = not (null [i | NodeInputData i <- drg.drgNodes
+                                 , i.idFeelName == "RULES_EFFECTIVE_DATE"])
+            ruleDate = [n | n <- notes, n.code == "D-RULEDATE"]
+            unbound  = [n | n <- notes, n.code == "D-RULEDATE-UNBOUND"]
+        when (Text.isInfixOf "RULES_EFFECTIVE_DATE" xml) $
+          unless ((bound && length ruleDate == 1) || not (null unbound)) $
+            expectationFailure
+              (stem <> " references law time with neither a bound input + one \
+                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Blocking")
+
+    -- D2, the PREDICATE idiom. The cells are asserted VERBATIM because the
+    -- closed-low/open-high convention is the whole content of the lowering.
+    it "lowers the predicate idiom to a UNIQUE date-interval table (D2)" $ do
+      drg <- gstDrg
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitUnique
+          map (.icType) t.dtInputs `shouldBe` [DmnDate]
+          map (.feText) (map (.icExpr) t.dtInputs) `shouldBe` ["RULES_EFFECTIVE_DATE"]
+          map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+            [ ">= date(\"2024-01-01\")"
+            , "[date(\"2023-01-01\")..date(\"2024-01-01\"))"
+            , "[date(\"1994-04-01\")..date(\"2023-01-01\"))"
+            , "< date(\"1994-04-01\")"
+            ]
+          -- R9: the OTHERWISE is a floor ROW, so §3.3.1's SHALL forbids a
+          -- defaultOutputEntry on what is now a complete table.
+          t.dtOutput.ocDefault `shouldBe` Nothing
+          t.dtAnnotations `shouldBe` ["regime"]
+          map (length . (.drAnnotations)) t.dtRules `shouldBe` [1, 1, 1, 1]
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- The inline idiom's right-hand side may be a NAMED regime constant or a
+    -- bare `Date d m y`, and the exhibit writes one of each: the inline form is
+    -- the predicate form with the helper elided, so it must fold the same way
+    -- and reach the same one-hop resolver. An earlier version called the bare
+    -- literal fold here, which refused every inline chain written against a
+    -- named constant while the refusal MESSAGE said such constants are folded.
+    it "lowers the inline idiom the same way, named constant or literal (D2)" $ do
+      drg <- gstDrg
+      case (decisionNamed "tourist refund minimum spend" drg).dcnLogic of
+        LogicLiteral e -> expectationFailure ("expected a table, got " <> show e.feText)
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitUnique
+          map (.icType) t.dtInputs `shouldBe` [DmnDate]
+          map (renderUnaryTest . headTest) t.dtRules `shouldBe`
+            [ ">= date(\"2024-01-01\")"
+            , "[date(\"1994-04-01\")..date(\"2024-01-01\"))"
+            , "< date(\"1994-04-01\")"
+            ]
+          t.dtOutput.ocDefault `shouldBe` Nothing
+          -- ...and the constant the arm NAMED reaches the annotation column,
+          -- while the arm written as a literal has nothing but its day.
+          concat (take 1 (map (.drAnnotations) t.dtRules))
+            `shouldSatisfy` any (Text.isInfixOf "the 2024 rate change")
+          concat (take 1 (drop 1 (map (.drAnnotations) t.dtRules)))
+            `shouldBe` ["from 1994-04-01"]
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- The refusals. Both must ALSO still ship the sound fallback, so the
+    -- artifact is not silently missing a decision.
+    it "refuses a mis-ordered dated BRANCH, loudly (R10)" $ do
+      drg <- notOkDrg "dated-chain-misordered.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "1994-04-01")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "2023-01-01")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not strictly earlier")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- §15.4's leniency ruling, end to end: `Date 32 1 2024` ROLLS in L4, and
+    -- the exporter refuses to fold it rather than putting a day nobody wrote
+    -- into an interval endpoint.
+    it "refuses an unfoldable (rolling) arm date, naming it (§15.4)" $ do
+      drg <- notOkDrg "dated-chain-rolling-date.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not a foldable date constant")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "the rolled change")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    it "refuses duplicate dates by the same predicate (R10)" $ do
+      drg <- notOkDrg "dated-chain-duplicate-date.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "not strictly earlier")
+
+    -- The ALL-OR-NOTHING arm, which nothing else reaches. This is NOT the same
+    -- code path as the corpus's `financial statements required` below: that
+    -- chain matches ZERO rows and is therefore `NotDated` (existing path,
+    -- existing findings, no note), whereas a chain that matches SOME rows and
+    -- not others is a Blocking refusal -- because mixing a law-time arm with an
+    -- ordinary one is exactly how a temporal bug hides.
+    it "refuses a chain that mixes rule-date arms with an ordinary one (R10)" $ do
+      drg <- notOkDrg "dated-chain-mixed.l4"
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"]
+      map (.severity) ns `shouldBe` [Blocking]
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "no single date axis")
+      -- The ordinal is an index into the CHAIN's rows, so it names the same arm
+      -- here as it would in an ordering refusal on the same file.
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "arm 2 of the chain")
+      map (.message) ns `shouldSatisfy` all (Text.isInfixOf "transitional relief")
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t   -> length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "the sound fallback table was not emitted"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- `rowsToDmnWith'` refuses a deontic body BEFORE it builds anything, and
+    -- the dated path does not go through `rowsToDmnWith'`. Without the matching
+    -- refusal in `datedChain`, a law-time-guarded obligation -- the shape
+    -- temporal rule-versioning most invites -- would become a UNIQUE table of
+    -- verbatim L4 obligations, and the reader would be told "the output entry
+    -- is L4 source, not FEEL" instead of "DMN cannot hold an obligation".
+    it "keeps a law-time-guarded OBLIGATION off the dated path (R10)" $ do
+      drg <- notOkDrg "dated-chain-regulative.l4"
+      let notes = (dmnReport drg).notes
+      [n | n <- notes, n.code == "D-DATEDCHAIN"] `shouldBe` []
+      case (decisionNamed "filing duty" drg).dcnLogic of
+        LogicTable _ ->
+          expectationFailure "a deontic body was tabulated; RegulativeBody stopped applying"
+        LogicLiteral _ ->
+          [n.message | n <- notes, n.code == "D-LITERALEXPR"]
+            `shouldSatisfy` any (Text.isInfixOf "deontic (regulative) body")
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- The nested-chain test counts the OTHERWISE as an arm body. Without that,
+    -- `flattenGuarded`'s `expandOtherwise` never runs on a dated chain and the
+    -- whole inner chain collapses into ONE floor-row output entry -- silently,
+    -- because `datedTable` passes no capped bodies so no D-FLATTENCAP can fire.
+    -- Two rules and UNIQUE would be the WRONG artifact here; three and FIRST is
+    -- what the source says.
+    it "declines a chain whose OTHERWISE is itself a chain (R10)" $ do
+      drg <- notOkDrg "dated-chain-nested-otherwise.l4"
+      [n | n <- (dmnReport drg).notes, n.code == "D-DATEDCHAIN"] `shouldBe` []
+      case (decisionNamed "GST rate percent" drg).dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          length t.dtRules `shouldSatisfy` (> 2)
+        LogicLiteral _ -> expectationFailure "expected the ordinary flattened table"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    -- The corpus's named witnesses that reference law time and are NOT dated
+    -- chains. §15.8 says they must not move. NB this decision matches zero
+    -- rule-date arms, so it is `NotDated` rather than a refusal -- the mixed
+    -- (partial-match) arm is covered by the not-ok fixture above.
+    it "leaves a chain with no rule-date guard on the ordinary path (§15.8)" $ do
+      drg <- corpusDrg
+      case (decisionNamed "financial statements required" drg).dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          length t.dtInputs `shouldSatisfy` (> 1)
+        LogicLiteral _ -> expectationFailure "expected the ordinary table"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    it "fires D-RULEDATE-UNBOUND on every EVAL UNDER RULES EFFECTIVE AT decision" $ do
+      drg <- corpusDrg
+      let ns = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+      ns `shouldSatisfy` (not . null)
+      map (.severity) ns `shouldSatisfy` all (== Blocking)
+
+    -- ...and the note's CLAIM is scoped to what was emitted. "No DMN engine can
+    -- evaluate this decision" is true of a boxed literal and false of a
+    -- decision that still ships a table (the rebinding can sit inside an arm
+    -- body). Asserted as an invariant over every subject rather than as a fact
+    -- about today's corpus, which is what the earlier version did.
+    it "scopes D-RULEDATE-UNBOUND's claim to what was emitted (§15.5)" $
+      forM_ goldenSubjects \(srcPath, stem, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let drg  = drgAsCli srcPath src
+            ns   = [n | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+            lits = [d.dcnId | d <- drgDecisions drg, LogicLiteral _ <- [d.dcnLogic]]
+        forM_ ns \n ->
+          unless (if n.element `elem` lits
+                    then Text.isInfixOf "no DMN engine can evaluate this decision" n.lost
+                    else Text.isInfixOf "a sub-expression of" n.message) $
+            expectationFailure
+              (stem <> ": D-RULEDATE-UNBOUND on " <> Text.unpack n.element
+                 <> " claims more than the emitted logic supports")
+
+    it "carries the @ref citation into the annotation column (§15.9)" $ do
+      drg <- corpusDrg
+      case (decisionNamed "offering maximum in a 12-month period" drg).dcnLogic of
+        LogicTable t ->
+          concatMap (.drAnnotations) t.dtRules `shouldSatisfy`
+            any (Text.isInfixOf "86 FR 3496")
+        LogicLiteral _ -> expectationFailure "expected the dated table"
+
+        LogicContext _ -> expectationFailure "unexpected boxed context"
+    ----------------------------------------------------------------------
+    -- units under the above
+    ----------------------------------------------------------------------
+    it "renders a FEEL date literal and a half-open date interval" $ do
+      renderFeelValue (VDate (fromGregorian 2024 1 1)) `shouldBe` "date(\"2024-01-01\")"
+      renderUnaryTest
+        (TestRange True (VDate (fromGregorian 1994 4 1)) (VDate (fromGregorian 2024 1 1)) False)
+        `shouldBe` "[date(\"1994-04-01\")..date(\"2024-01-01\"))"
+
+    -- dmnmd has no date datatype at all, so a date cell must be REFUSED rather
+    -- than emitted and then misread by dmnmd's numeric parser.
+    it "gives dmnmd no form for a date cell" $ do
+      drg <- gstDrg
+      let md = emitMarkdown drg
+      md `shouldSatisfy` (not . Text.isInfixOf "date(")
+      [ n.code
+        | n <- (markdownReport drg).notes
+        , n.code == "D-MD-CELLSYNTAX"
+        ] `shouldSatisfy` (not . null)
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -1731,13 +2423,22 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 -- the corpus, @Regulation Crowdfunding (17 CFR Part 227)@ in this table, and
 -- @regcf@ from the CLI.
 --
--- Two subjects, and the difference between them is the whole point:
+-- Four subjects, and the difference between them is the whole point:
 --
 -- * @dmn\/reg-cf.l4@ is the SHAPE exhibit — five decisions chosen so the
 --   goldens show every outcome the exporter has, written module-level-scalar
 --   (@ASSUME@) style because that is the program model DMN itself has. Its
 --   figures are illustrative and its own header says so.
--- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,268 lines and 102
+-- * @dmn\/gst-rate.l4@ is the DATED-REGIME exhibit — the smallest module that
+--   exercises law time end to end (spec §15): two rule-date chains, one in the
+--   PREDICATE idiom and one INLINE — and the inline one writes an arm against a
+--   NAMED regime constant and an arm against a bare @Date d m y@, because those
+--   are the two things an inline right-hand side may be and they reach different
+--   code. Both lower to a single-column @UNIQUE@ table over
+--   @RULES_EFFECTIVE_DATE@ with half-open date intervals, plus one downstream
+--   arithmetic decision so a date is shown driving a number driving a number.
+--   It is the only subject with an engine leg whose cases FEED DATES.
+-- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
 --   decisions since the rule-version axis landed — written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
 --   that costs: a DMN decision is a 0-ary variable, so every cross-decision
@@ -1752,6 +2453,10 @@ goldenSubjects =
     , "reg-cf"
     , "the Reg CF shape exhibit"
     )
+  , ( "dmn" </> "gst-rate.l4"
+    , "gst-rate"
+    , "the dated-regime exhibit"
+    )
   , ( "legal" </> "regcf" </> "regcf.l4"
     , "regcf-corpus"
     , "the Reg CF corpus"
@@ -1759,6 +2464,10 @@ goldenSubjects =
   , ( "dmn" </> "sumtype.l4"
     , "sumtype"
     , "the data-model exhibit"
+    )
+  , ( "dmn" </> "hydration.l4"
+    , "hydration"
+    , "the hydration exhibit"
     )
   ]
 
@@ -1796,6 +2505,7 @@ isUniqueTable = \case
   LogicTable t  -> t.dtHitPolicy == HitUnique
   LogicLiteral _ -> False
 
+  LogicContext _ -> False
 ------------------------------------------------------------------------
 -- helpers
 ------------------------------------------------------------------------
@@ -1841,6 +2551,11 @@ drgFlavoredWith flavor mkName src = case checkWithImports emptyVFS src of
             { dloModelName    = mkName tc.tcdModule
             , dloSubstitution = tc.tcdSubstitution
             , dloFlavor       = flavor
+            -- Resolved from the SAME check result, by the SAME function the
+            -- CLI uses (jl4/app/L4/Cli/Export.hs). If these two ever stopped
+            -- agreeing, a golden would move without any source moving.
+            , dloMaybePredicates =
+                resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
             }
           tc.tcdModule
 
@@ -1858,6 +2573,12 @@ itemDefNamed nm drg = case [i | i <- drg.drgItemDefs, i.idfName == nm] of
   (i : _) -> i
   []      -> error ("no itemDefinition named " <> show nm)
 
+-- | A rule's first (and, on a rule-date interval table, only) input cell.
+headTest :: DmnRule -> UnaryTest
+headTest r = case r.drInputs of
+  (t : _) -> t
+  []      -> error ("rule " <> show r.drId <> " has no input cell")
+
 decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of
   (d : _) -> d
@@ -1868,6 +2589,7 @@ tableOf nm src = case (decisionNamed nm (drgOf src)).dcnLogic of
   LogicTable t   -> t
   LogicLiteral e -> error ("expected a decision table for " <> show nm <> ", got: " <> show e.feText)
 
+  LogicContext _ -> error "expected a decision table, got a boxed context"
 -- | The decision must stay a table: the select-idiom peephole must not fire.
 mustNotBeSelect :: Text -> Text -> Expectation
 mustNotBeSelect nm src = do
@@ -1875,6 +2597,7 @@ mustNotBeSelect nm src = do
   case (decisionNamed nm drg).dcnLogic of
     LogicTable _   -> pure ()
     LogicLiteral e -> expectationFailure ("select idiom fired on " <> show nm <> ": " <> show e.feText)
+    LogicContext _ -> expectationFailure "unexpected boxed context"
   emitDrg drg `shouldSatisfy` (\x -> not (Text.isInfixOf "max(" x) && not (Text.isInfixOf "min(" x))
 
 cellTexts :: DmnRule -> [Text]

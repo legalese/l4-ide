@@ -421,24 +421,28 @@ Every DMN and BPMN golden reproduces byte for byte from a bare CLI invocation �
 `--model-name`, no flag but `--rule`. The `<definitions>` name comes from this file's own
 outermost `§` heading.
 
-### 6.1 DMN: 73 decisions, 3 tables, and a model no engine can bind
+### 6.1 DMN: 102 decisions, 11 tables, and a model no engine can bind
 
-`l4 export --to=dmn` on this file succeeds and the XML parses under `dmn-moddle`
-with **zero warnings**. It is also, as a program, nearly inert:
+**Measured 2026-07-31 on the shipped goldens.** `l4 export --to=dmn` on this file succeeds
+and the XML parses under `dmn-moddle` with **zero warnings**. It is also, as a program,
+nearly inert:
 
-- **73 `<decision>`** elements — every top-level `DECIDE`/`MEANS` including the nine
-  record fixtures and the five test scenarios — of which **3** are decision tables
-  and **70** are boxed literal expressions (`D-LITERALEXPR`, blocking, ×69).
-- **61 `<inputData>`** elements under **27 distinct names**. Nine are called `issuer`,
-  seven `status`, six `offering`, six `investor`. `assignIds` disambiguates the XML
-  `id` but the `name` is the L4 binder, so a FEEL expression cannot tell them apart
-  (`D-SCOPE`, lossy, ×9 — and the note now counts the collision, rather than saying
-  "two" for a nine-way one). Every one has `typeRef="Any"`: there is no
-  `<itemDefinition>` for a record, so `issuer.<field>` binds to nothing.
-- **84 blocking, 9 lossy, 9 advisory** notes in total. Nine of the blocking notes are
-  `D-FEELNAME`: the FEEL name that 9 `issuer` binders — and 7 `status`, 6 `offering`,
-  6 `investor` — all mangle down to is one name in a flat namespace, so no FEEL
-  reference can pick one of them.
+- **102 `<decision>`** elements — every top-level `DECIDE`/`MEANS` including the record
+  fixtures and the test scenarios — of which **11** are decision tables and **91** are
+  boxed literal expressions (`D-LITERALEXPR`, blocking, ×89). Eight of the eleven tables
+  are rule-date interval tables and carry `hitPolicy="UNIQUE"`.
+- **68 `<inputData>`** elements, one of which is the rule-date input
+  `RULES_EFFECTIVE_DATE` (`typeRef="date"`). The nine source terms named `issuer` — and
+  the `status`, `offering` and `investor` groups — are **renamed apart** (`issuer_2` …
+  `issuer_9`) rather than collapsed onto one FEEL name, which is what `D-RENAME` (lossy,
+  ×37) counts and why `D-FEELNAME` is now **zero**. `D-SCOPE` (lossy, ×9) still names the
+  underlying collision: L4 scopes a `GIVEN` to its own decision and DMN's `inputData` is
+  global, and renaming makes the artifact loadable rather than the scoping faithful.
+- **114 blocking, 46 lossy, 18 advisory** notes in total. Fifteen of the blocking notes
+  are `D-RULEDATE-UNBOUND`: those decisions rebind law time with `EVAL UNDER RULES
+  EFFECTIVE AT`, and a DMN DRG has one global rule-date input and no scoped rebinding.
+  The per-code table, and why the blocking total fell by only 8 net when the law-time
+  work landed, are in `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.7.
 
 The cause is one sentence: **a DMN decision is a 0-ary variable**, so every
 cross-decision call `f x` — which is every reference in this corpus, because the
@@ -446,8 +450,9 @@ house style threads a record through `GIVEN` — leaves the FEEL fragment and is
 emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter is
 right to refuse to invent a rendering; the report says so at each site.
 
-The `dmnmd` markdown leg makes the same point in one glance: 992 lines of law become
-**two tables**, plus 235 lines of loss report.
+The `dmnmd` markdown leg makes the same point in one glance: 1,241 lines of law become
+**one table**, plus 397 lines of loss report — and 31 of those notes are the date cells
+the rule-date interval tables introduced, which dmnmd's grammar cannot hold at all.
 
 An earlier revision of this section reported two further defects that the fidelity
 report did not catch — a section heading spliced into FEEL as a path step (22

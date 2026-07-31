@@ -1,0 +1,41 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.3, R10).
+--
+-- A law-time-guarded OBLIGATION. This is the shape temporal rule-versioning
+-- most invites -- "under the 2024 rules the issuer must file within 30 days,
+-- before that within 45" -- and it is exactly the shape DMN cannot model at
+-- all: a deontic body is a transition system, not a value, and DMN "has no
+-- notion of time" and cannot hold an obligation as a state.
+--
+-- `rowsToDmnWith'` refuses it with `RegulativeBody` BEFORE it builds anything,
+-- but the dated path does not go through `rowsToDmnWith'`. So `datedChain`
+-- restates that refusal by answering `NotDated`, which routes the decision back
+-- to the ordinary path and to its existing `RegulativeBody` fallback.
+--
+-- Expected: NO D-DATEDCHAIN, no decision table, and a D-LITERALEXPR whose
+-- reason is the deontic body -- not `D-NONFEELOUTPUT`, which would be a
+-- statement about RENDERING standing in for the categorical fact that DMN
+-- cannot hold an obligation.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `law-time guarded obligation`
+
+TIMEZONE IS "Asia/Singapore"
+
+DECLARE Actor IS ONE OF
+    Issuer
+
+DECLARE Action IS ONE OF
+    `file the annual report`
+
+GIVETH A DATE
+`the 2024 amendment` MEANS Date 1 1 2024
+
+GIVETH A DEONTIC Actor Action
+`filing duty` MEANS
+    IF   `RULES EFFECTIVE DATE` AT LEAST `the 2024 amendment`
+    THEN PARTY Issuer MUST `file the annual report` WITHIN 30
+    ELSE PARTY Issuer MUST `file the annual report` WITHIN 45

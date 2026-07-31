@@ -1,0 +1,274 @@
+{
+  "note": [
+    "Engine cases for the EMITTER'S OWN hydration output. The hand-written",
+    "probe at jl4/tests-cli/fixtures/dmn-hydration-probe/ pins that the boxed-",
+    "context idiom evaluates; this file pins that jl4-core/src/L4/Dmn/Lower.hs",
+    "emits that idiom correctly, which is the stronger claim and the one that",
+    "goes red if the LOWERING breaks rather than the engine.",
+    "",
+    "Read the hydrated records for the topological sort: `total_income` is the",
+    "SUM of the two stored entries and `band` is computed FROM `total_income`,",
+    "yet `band` is declared FIRST in hydration.l4. If the exporter emitted",
+    "entries in declaration order, `band` would read an unbound name, FEEL",
+    "would answer null, and `band` and `band_width` would both be null here",
+    "rather than wrong-but-present. That is the whole reason these cases assert",
+    "the hydrated records in full instead of only the decisions downstream.",
+    "",
+    "`capped_bonus` is null in case B: that is the CORRECT L4 answer (NOTHING),",
+    "licensed by the explicit null in `expect`. Cases that avoided the absent",
+    "branch would be green and would measure nothing.",
+    "",
+    "Case D supplies a NULL source record, and both engines agree exactly on what",
+    "that produces. It is a MEASURED BOUNDARY rather than a happy path: the stored",
+    "entries answer null, `total_income` (null + null) answers null, and then",
+    "`band` -- whose body is `if total_income >= 100000 then 3 else if ... then 2",
+    "else 1` -- takes the ELSE branch twice, because a non-boolean FEEL condition",
+    "yields null and null is not true. So `band` is 1 and `band_width` is 25000: a",
+    "PLAUSIBLE, NON-NULL derived component computed from an absent record. L4 has",
+    "no null record, so no L4 program can ask this question; the DMN model can be",
+    "asked it, and answers without complaint. Recorded here so the boundary is",
+    "visible rather than assumed away -- see DMN-EXPORT-PROGRAM-MODEL-SPEC.md",
+    "§4.4.6. Measured 2026-07-31: KIE 8.44.0.Final and zeebe-dmn 8.7.6 return",
+    "byte-identical values."
+  ],
+  "cases": [
+    {
+      "name": "A. band 2, bonus present",
+      "context": {
+        "applicant": {
+          "salary": 50000,
+          "other_income": 15000
+        },
+        "applicant_2": {
+          "salary": 50000,
+          "other_income": 15000
+        },
+        "the_submission": {
+          "primary": {
+            "salary": 90000,
+            "other_income": 20000
+          },
+          "secondary": {
+            "salary": 10000,
+            "other_income": 0
+          }
+        },
+        "n": 4000,
+        "b": 12,
+        "c": 12,
+        "m": 12
+      },
+      "expect": {
+        "applicant_hydrated": {
+          "salary": 50000,
+          "other_income": 15000,
+          "total_income": 65000,
+          "band": 2,
+          "band_width": 50000
+        },
+        "applicant_hydrated_2": {
+          "salary": 50000,
+          "other_income": 15000,
+          "total_income": 65000,
+          "band": 2,
+          "band_width": 50000
+        },
+        "the_leading_applicant_hydrated": {
+          "salary": 90000,
+          "other_income": 20000,
+          "total_income": 110000,
+          "band": 3,
+          "band_width": 75000
+        },
+        "the_leading_applicant": {
+          "salary": 90000,
+          "other_income": 20000
+        },
+        "applicant_score": 65,
+        "applicant_band_width": 50000,
+        "leading_total": 110000,
+        "capped_bonus": 4000,
+        "bonus_is_settled": true,
+        "bonus_is_unsettled": false,
+        "bonus_or_zero": 12
+      }
+    },
+    {
+      "name": "B. band 1, bonus ABSENT (null is the correct answer, and is licensed)",
+      "context": {
+        "applicant": {
+          "salary": 20000,
+          "other_income": 5000
+        },
+        "applicant_2": {
+          "salary": 20000,
+          "other_income": 5000
+        },
+        "the_submission": {
+          "primary": {
+            "salary": 30000,
+            "other_income": 0
+          },
+          "secondary": {
+            "salary": 1,
+            "other_income": 1
+          }
+        },
+        "n": 9000,
+        "b": null,
+        "c": null,
+        "m": null
+      },
+      "expect": {
+        "applicant_hydrated": {
+          "salary": 20000,
+          "other_income": 5000,
+          "total_income": 25000,
+          "band": 1,
+          "band_width": 25000
+        },
+        "applicant_hydrated_2": {
+          "salary": 20000,
+          "other_income": 5000,
+          "total_income": 25000,
+          "band": 1,
+          "band_width": 25000
+        },
+        "the_leading_applicant_hydrated": {
+          "salary": 30000,
+          "other_income": 0,
+          "total_income": 30000,
+          "band": 1,
+          "band_width": 25000
+        },
+        "the_leading_applicant": {
+          "salary": 30000,
+          "other_income": 0
+        },
+        "applicant_score": 25,
+        "applicant_band_width": 25000,
+        "leading_total": 30000,
+        "capped_bonus": null,
+        "bonus_is_settled": false,
+        "bonus_is_unsettled": true,
+        "bonus_or_zero": 0
+      }
+    },
+    {
+      "name": "C. band boundaries: exactly 100000 and exactly 50000 are both closed",
+      "context": {
+        "applicant": {
+          "salary": 100000,
+          "other_income": 0
+        },
+        "applicant_2": {
+          "salary": 50000,
+          "other_income": 0
+        },
+        "the_submission": {
+          "primary": {
+            "salary": 49999,
+            "other_income": 0
+          },
+          "secondary": {
+            "salary": 0,
+            "other_income": 0
+          }
+        },
+        "n": 5000,
+        "b": 0,
+        "c": 0,
+        "m": 0
+      },
+      "expect": {
+        "applicant_hydrated": {
+          "salary": 100000,
+          "other_income": 0,
+          "total_income": 100000,
+          "band": 3,
+          "band_width": 75000
+        },
+        "applicant_hydrated_2": {
+          "salary": 50000,
+          "other_income": 0,
+          "total_income": 50000,
+          "band": 2,
+          "band_width": 50000
+        },
+        "the_leading_applicant_hydrated": {
+          "salary": 49999,
+          "other_income": 0,
+          "total_income": 49999,
+          "band": 1,
+          "band_width": 25000
+        },
+        "the_leading_applicant": {
+          "salary": 49999,
+          "other_income": 0
+        },
+        "applicant_score": 100,
+        "applicant_band_width": 50000,
+        "leading_total": 49999,
+        "capped_bonus": 5000,
+        "bonus_is_settled": true,
+        "bonus_is_unsettled": false,
+        "bonus_or_zero": 0
+      }
+    },
+    {
+      "name": "D. the SOURCE RECORD is null: hydration propagates, and `band` is NOT null",
+      "context": {
+        "applicant": null,
+        "applicant_2": null,
+        "the_submission": {
+          "primary": {
+            "salary": 90000,
+            "other_income": 20000
+          },
+          "secondary": {
+            "salary": 10000,
+            "other_income": 0
+          }
+        },
+        "n": 4000,
+        "b": 12,
+        "c": 12,
+        "m": 12
+      },
+      "expect": {
+        "applicant_hydrated": {
+          "salary": null,
+          "other_income": null,
+          "total_income": null,
+          "band": 1,
+          "band_width": 25000
+        },
+        "applicant_hydrated_2": {
+          "salary": null,
+          "other_income": null,
+          "total_income": null,
+          "band": 1,
+          "band_width": 25000
+        },
+        "the_leading_applicant_hydrated": {
+          "salary": 90000,
+          "other_income": 20000,
+          "total_income": 110000,
+          "band": 3,
+          "band_width": 75000
+        },
+        "the_leading_applicant": {
+          "salary": 90000,
+          "other_income": 20000
+        },
+        "applicant_score": null,
+        "applicant_band_width": 25000,
+        "leading_total": 110000,
+        "capped_bonus": 4000,
+        "bonus_is_settled": true,
+        "bonus_is_unsettled": false,
+        "bonus_or_zero": 12
+      }
+    }
+  ]
+}

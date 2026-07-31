@@ -80,6 +80,7 @@ data TAnnotations
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
   | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
+  | TNonexhaustive      !Text -- ^ "@nonexhaustive"
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -439,6 +440,8 @@ fixityAnnotation =
       ((FixityLeft,)  . fst <$> lineAnno "@infixl")
   <|> ((FixityRight,) . fst <$> lineAnno "@infixr")
   <|> ((FixityNone,)  . fst <$> lineAnno "@infix")
+nonexhaustiveAnnotation :: Lexer Text
+nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 
 nlgString :: Lexer Text
 nlgString =
@@ -588,6 +591,7 @@ annotationsPayload = asum
   , TDesc         <$> descAnnotation
   , TExport       <$> exportAnnotation
   , uncurry TFixity <$> fixityAnnotation
+  , TNonexhaustive      <$> nonexhaustiveAnnotation
   , uncurry TNlg  <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -1081,6 +1085,7 @@ displayTokenType = \case
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
     TFixity dir t     -> fixityHerald dir <> t
+    TNonexhaustive t        -> "@nonexhaustive" <> t
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
     TIdentifier t     -> t

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  N2, the one null question the two engines ANSWER DIFFERENTLY, split out of
+  null-semantics.dmn so that its companion can be a clean MustPass on both.
+
+  One decision, `absent_is_not_null` = `r != null`, over an inputData `r` that
+  the cases never supply.
+
+  MEASURED 2026-07-31:
+
+    zeebe-dmn 8.7.6  an unbound name IS null. The decision evaluates and
+                     answers `false`. 1/1, verdict clean.
+    KIE 8.44.0.Final an unsupplied required input is a MODEL error, not a null.
+                     The DMNResult carries
+                       ERROR ... Required dependency 'r' not found on node
+                       'absent_is_not_null'
+                     and the decision is reported SKIPPED, so the verdict FAILS.
+
+  So this fixture is HarnessMustPass on Camunda and HarnessMustFail on KIE, and
+  both legs assert the engine's own words. That asymmetry is the point: a single
+  shared expectation would have had to pick one engine's answer and would then
+  have read as a bug in the other.
+
+  WHY THIS DOES NOT CONSTRAIN THE EXPORTER. jl4-core/src/L4/Dmn/Lower.hs never
+  emits a reference to a name it has not declared: every free term becomes an
+  inputData, and a hydrator emits every entry of its record whether or not a
+  computed field reads it (that is why hydration copies ALL stored fields, not
+  just the ones a formula needs). So the divergence above is out of scope BY
+  CONSTRUCTION rather than by luck — and this file is what makes that a measured
+  statement instead of an assumption.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_null_absent" name="null_absent" namespace="https://legalese.com/l4/dmn/null_absent" exporter="hand">
+  <inputData id="input_r" name="r">
+    <variable id="input_r_var" name="r" typeRef="string"/>
+  </inputData>
+  <decision id="decision_absent_is_not_null" name="absent_is_not_null">
+    <variable id="decision_absent_is_not_null_var" name="absent_is_not_null" typeRef="boolean"/>
+    <informationRequirement id="ir_ainn_r">
+      <requiredInput href="#input_r"/>
+    </informationRequirement>
+    <literalExpression id="decision_absent_is_not_null_lit">
+      <text>r != null</text>
+    </literalExpression>
+  </decision>
+</definitions>
