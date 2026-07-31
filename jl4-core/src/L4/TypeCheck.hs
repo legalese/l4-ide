@@ -669,10 +669,24 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- non-exhaustive-pattern error. Each such interior binding is therefore
     -- partial BY CONSTRUCTION, and warning on it would (a) mis-report a
     -- total clause group as incomplete and (b) name an invisible binder at
-    -- <no location>. A genuinely incomplete clause group still warns: its
-    -- final clause's CONSIDER sits directly in the user's Decide body, not
-    -- inside a fallthrough binding. The double-underscore prefix is the
-    -- desugarer's hygiene marker (see 'L4.Parser.fallthroughName').
+    -- <no location>. The double-underscore prefix is the desugarer's hygiene
+    -- marker (see 'L4.Parser.fallthroughName').
+    --
+    -- KNOWN LIMITATION, measured 2026-07-31, NOT a safe over-approximation.
+    -- This suppression exempts multi-clause groups from the exhaustiveness
+    -- oracle ENTIRELY, incomplete ones included. For a group of n >= 2
+    -- clauses 'matchClauses' emits the user's own Decide body as a CONSIDER
+    -- that always carries an OTHERWISE (the fall-through reference), and
+    -- pushes the un-defaulted final clause into the innermost
+    -- @__pm_fallthrough_@ binding — the one silenced here. So the arms that
+    -- are actually missing are never reported: over a three-constructor
+    -- enum, a two-clause group type-checks clean, and 'L4.Dmn.Analysis'
+    -- L1 (which keys off this oracle's warnings) then certifies it
+    -- DMN-SAFE and emits a decision table with a missing rule. An earlier
+    -- version of this note claimed such a group "still warns"; it does not.
+    -- The fix is to analyse the clause group as a unit before desugaring,
+    -- rather than to choose between this false negative and the false
+    -- positives it replaced. See DMN-EXPORT-PROGRAM-MODEL-SPEC §10 row 0.5.
     isSyntheticFallthrough :: Bool
     isSyntheticFallthrough = case appForm of
       MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t

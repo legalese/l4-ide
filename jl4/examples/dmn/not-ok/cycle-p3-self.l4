@@ -1,0 +1,40 @@
+-- NEGATIVE fixture for the future D-RECURSIVE check (spec §6.4.2, §6.3.9), and
+-- the ONE shape of the nine that a naive own-name-mention detector WOULD catch.
+--
+-- p3: direct self-recursion in a parameterised top-level DECIDE.
+--
+--     `countdown` n  reads  `countdown`
+--
+-- Under Phase 5 this is a BKM that requires ITSELF, which is the case §6.3.9
+-- names first.
+--
+-- THE CATCH, and the reason this fixture is worth more than it looks: on
+-- today's tree the self-edge is ERASED before any graph sees it. `freeRefs`
+-- binds the definition's own name (Lower.hs:4468) and `classifyRef` filters
+-- `target /= did` (Lower.hs:4372), so the emitted DRG has NO self-edge and the
+-- report is silent. Phase 5 builds knowledgeRequirement edges from the SAME
+-- `freeRefs`, so without the un-suppression (build-plan P5.0b) this stays
+-- invisible on the second graph too, and §6.3-1's discharge would be nominal.
+--
+-- Expected after Phase 5 AND the un-suppression: one D-RECURSIVE over an SCC of
+-- size 1 WITH a self-edge. Note the side condition, which must be carried into
+-- the check verbatim: |SCC| >= 2, OR |SCC| = 1 with a self-edge. "SCCs of size
+-- >= 2" alone would silently undo the un-suppression this very fixture needs.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `self recursion`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`countdown` n MEANS
+    IF n AT MOST 0 THEN 0 ELSE `countdown` (n MINUS 1)

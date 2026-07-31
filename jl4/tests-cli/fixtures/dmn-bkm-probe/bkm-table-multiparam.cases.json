@@ -1,0 +1,31 @@
+{
+  "note": [
+    "Cases for bkm-table-multiparam.dmn (probe A3). 4 cases x 3 decisions = 12",
+    "value checks per engine. The four cases walk all four rules of the UNIQUE",
+    "table, so a hit-policy or binding fault cannot hide in an untaken row.",
+    "band_of (positional) and band_named (named, reversed) must agree in every",
+    "case; a disagreement localises the fault to the call-site spelling."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 4, flag = true  (rule 1)",
+      "context": { "n": 4, "flag": true },
+      "expect": { "band_of": "low-flagged", "band_named": "low-flagged", "scaled": 8 }
+    },
+    {
+      "name": "B. n = 4, flag = false (rule 2)",
+      "context": { "n": 4, "flag": false },
+      "expect": { "band_of": "low-plain", "band_named": "low-plain", "scaled": 12 }
+    },
+    {
+      "name": "C. n = 10, flag = true (rule 3, boundary at 10)",
+      "context": { "n": 10, "flag": true },
+      "expect": { "band_of": "high-flagged", "band_named": "high-flagged", "scaled": 20 }
+    },
+    {
+      "name": "D. n = 99, flag = false (rule 4)",
+      "context": { "n": 99, "flag": false },
+      "expect": { "band_of": "high-plain", "band_named": "high-plain", "scaled": 297 }
+    }
+  ]
+}
