@@ -3222,6 +3222,14 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                         tc.tcdErrors
                     , Just r <- [rangeOf e]
                     ]
+                -- L1's Decide-level channel (clause matrices), extracted by
+                -- the same comprehension as the CLI (jl4/app/L4/Cli/Export.hs)
+                , dloClauseMatrixRanges =
+                    [ r
+                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <-
+                        tc.tcdErrors
+                    , Just r <- [rangeOf e]
+                    ]
                 , dloExternalRefNames = Just Set.empty
                 }
           )

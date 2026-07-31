@@ -435,6 +435,28 @@ runCheckUnique c e s =
     [(w, s')] -> (w, s')
     _ -> error "internal error: expected unique result, got several"
 
+-- | Run a sub-computation for its VALUE only: select one viable candidate
+-- (the first one free of 'SError'-severity diagnostics, the way 'prune'
+-- would), DISCARD every diagnostic it emitted along the way, and return
+-- 'Nothing' when no candidate is viable.
+--
+-- The caller's 'CheckState' is restored except for the unique 'supply',
+-- which advances to the chosen candidate's — fresh uniques minted inside
+-- (by 'def' \/ 'newUnique') may survive in the returned value and must not
+-- be re-minted. Everything else (substitution, 'infoMap' \/ 'nlgMap' \/
+-- 'scopeMap' \/ 'descMap' insertions) is dropped: 'checkClauseMatrix' uses
+-- this to RE-check patterns that were already checked inside the desugared
+-- tree, and re-emitting their diagnostics or map entries would duplicate
+-- every one of them.
+quietly :: Check a -> Check (Maybe a)
+quietly m = MkCheck $ \ e s ->
+  let candidates = runCheck m e s
+  in case filter (viableCandidate . fst) candidates of
+       ((w, s') : _) ->
+         let (_discardedDiags, a) = runWith w
+         in [(Plain (Just a), s { supply = s'.supply })]
+       [] -> [(Plain Nothing, s)]
+
 -- ------------------------------------
 -- Check Primitives
 -- ------------------------------------
@@ -639,6 +661,12 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     withNonexhaustiveFlag $ lookupFunTypeSigByAnno ann >>= \ dHead -> do
         decide <- extendKnownMany dHead.arguments $ do
           rexpr <- checkExpr (ExpectDecideSignatureContext (rangeOf dHead.resultType)) expr dHead.resultType
+          -- Clause-matrix exhaustiveness for multi-clause pattern-matching
+          -- groups (spec §14.7): runs AFTER the body is checked, so
+          -- 'applySubst' can resolve untyped-GIVEN inference variables, and
+          -- INSIDE 'extendKnownMany', so the GIVEN binders' entityInfo
+          -- entries (the column types) are in scope.
+          checkClauseMatrix dec dHead
           -- See Note [Adding type information to all binders]
           MkDecide dHead.anno
             <$> traverse resolvedType dHead.rtysig
@@ -672,25 +700,189 @@ inferDecide dec@(MkDecide ann _tysig appForm expr) = do
     -- <no location>. The double-underscore prefix is the desugarer's hygiene
     -- marker (see 'L4.Parser.fallthroughName').
     --
-    -- KNOWN LIMITATION, measured 2026-07-31, NOT a safe over-approximation.
-    -- This suppression exempts multi-clause groups from the exhaustiveness
-    -- oracle ENTIRELY, incomplete ones included. For a group of n >= 2
-    -- clauses 'matchClauses' emits the user's own Decide body as a CONSIDER
-    -- that always carries an OTHERWISE (the fall-through reference), and
-    -- pushes the un-defaulted final clause into the innermost
-    -- @__pm_fallthrough_@ binding — the one silenced here. So the arms that
-    -- are actually missing are never reported: over a three-constructor
-    -- enum, a two-clause group type-checks clean, and 'L4.Dmn.Analysis'
-    -- L1 (which keys off this oracle's warnings) then certifies it
-    -- DMN-SAFE and emits a decision table with a missing rule. An earlier
-    -- version of this note claimed such a group "still warns"; it does not.
-    -- The fix is to analyse the clause group as a unit before desugaring,
-    -- rather than to choose between this false negative and the false
-    -- positives it replaced. See DMN-EXPORT-PROGRAM-MODEL-SPEC §10 row 0.5.
+    -- The suppression is CORRECT (not a known limitation) because the clause
+    -- group is checked as a unit at the Decide level: 'checkClauseMatrix'
+    -- analyses the parser-attached source clause matrix
+    -- ('Extension.pmMatrix'), so a genuinely incomplete group warns there,
+    -- with real clause-head ranges (see DMN-EXPORT-PROGRAM-MODEL-SPEC
+    -- §14.7's resolution). The inner CONSIDERs silenced here are compilation
+    -- artifacts; checking them per-node would only reproduce the
+    -- pre-suppression false positives (<no location>, an invisible binder,
+    -- total groups reported incomplete).
+    --
+    -- Residual, stated honestly: a USER-written CONSIDER inside the body of
+    -- clause 2..n also lives inside a fall-through Decide, so its
+    -- missing-arm warning is still silenced — a pre-existing collateral
+    -- false negative this change does not restore. (Follow-up recorded in
+    -- the spec: split the env flag into decorator-suppression vs.
+    -- fallthrough-suppression and let the fallthrough variant suppress only
+    -- RANGELESS CONSIDERs — synthetic nodes are 'emptyAnno', user nodes
+    -- carry ranges.)
     isSyntheticFallthrough :: Bool
     isSyntheticFallthrough = case appForm of
       MkAppForm _ (MkName _ (NormalName t)) _ _ -> "__pm_fallthrough_" `Text.isPrefixOf` t
       _ -> False
+
+-- | Exhaustiveness for a multi-clause DECIDE\/MEANS pattern-matching group,
+-- run over the SOURCE clause matrix the parser attached to the fused
+-- Decide's annotation ('Extension.pmMatrix') — the desugared tree cannot be
+-- analysed instead: 'L4.Parser.matchClauses' gives every non-final clause
+-- an OTHERWISE (the fall-through reference) and buries the un-defaulted
+-- final clause inside a suppressed @__pm_fallthrough_@ binding, so per-node
+-- CONSIDER checking never sees the missing arms (spec §14.7).
+--
+-- Only n >= 2 groups are analysed here: for n = 1 the final clause's
+-- CONSIDER sits in the USER's own Decide (not a fall-through), is
+-- un-suppressed, and already warns via the ordinary 'checkConsider' path
+-- anchored at the head name — analysing it again at matrix level would
+-- double-warn.
+--
+-- Every bail below is FAIL-OPEN to no-warning, the same contract as
+-- 'analyzePatternMatch': no warning is better than a wrong one or a hang.
+checkClauseMatrix :: Decide Name -> FunTypeSig -> Check ()
+checkClauseMatrix dec dHead =
+  case view annPmMatrix (getAnno dec) of
+    Just matrix
+      | length matrix.clauses >= 2
+        -- @nonexhaustive: the author declares the group deliberately
+        -- partial; the missing-clause warning is silenced (redundancy is
+        -- not analysed on this path at all).
+      , not (Export.isNonexhaustiveDecide dec)
+      -> analyseMatrix matrix
+    _ -> pure ()
+  where
+    MkAppForm _ _ colScruts _ = dHead.rappForm
+
+    analyseMatrix :: PmMatrix -> Check ()
+    analyseMatrix matrix = do
+      ei <- asks (.entityInfo)
+      let clauseRows = matrix.clauses
+          -- Column-count mismatch with any clause bails (mirrors
+          -- 'L4.Parser.matchOne', which ignores extra patterns).
+          columnCountOk =
+            not (null colScruts)
+              && all (\ cl -> length cl.patterns == length colScruts) clauseRows
+          -- Opaque bail: any literal or expression pattern anywhere stands
+          -- the whole analysis down — same rule and rationale as
+          -- 'checkConsider' (the guard model would treat them as
+          -- irrefutable, which is wrong in both directions).
+          hasOpaque = any (any patternHasOpaque . (.patterns)) clauseRows
+          -- Column types, read off the GIVEN binders' entityInfo entries
+          -- (in scope: we are called inside @extendKnownMany
+          -- dHead.arguments@); NOT via 'getEntityInfo', which reports a
+          -- 'MissingEntityInfo' error on a miss.
+          mColTypes =
+            traverse
+              (\ r -> case Map.lookup (getUnique r) ei of
+                  Just (_, KnownTerm ty _) -> Just ty
+                  _ -> Nothing)
+              colScruts
+      case mColTypes of
+        Just colTypes0 | columnCountOk, not hasOpaque -> do
+          colTypes <- traverse applySubst colTypes0
+          -- Re-resolve each clause's patterns against the column types,
+          -- 'quietly': the same patterns were already checked inside the
+          -- desugared tree, so all diagnostics are discarded (re-emitting
+          -- would duplicate every error), and any pattern with no viable
+          -- (error-free) candidate bails the whole analysis.
+          rpatssM <-
+            forM clauseRows \ cl ->
+              forM (zip3 cl.patterns colTypes colScruts) \ (pat, ty, scrutR) ->
+                fmap fst <$> quietly (checkPattern (ExpectPatternScrutineeContext (Var emptyAnno scrutR)) pat ty)
+          case traverse sequence rpatssM of
+            Just rpatss
+              | all (all patternInfoComplete) rpatss ->
+                  analyseResolvedRows matrix ei rpatss
+            _ -> pure ()
+        _ -> pure ()
+
+    analyseResolvedRows :: PmMatrix -> EntityInfo -> [[Pattern Resolved]] -> Check ()
+    analyseResolvedRows matrix ei rpatss = do
+      -- ONE 'VarEnv' spans all rows and columns: the map is keyed by
+      -- (scrutinee, constructor), so cross-clause payload variables are
+      -- shared (which the nabla reasoning needs) and columns cannot
+      -- collide.
+      rows <- flip evalStateT Map.empty $
+        forM (zip matrix.clauses rpatss) \ (cl, rpats) -> do
+          gss <- sequence (zipWith desugarPat colScruts rpats)
+          pure (concat gss, rowLeaf cl)
+      let ctorSets = constructorsInScopeFromEntityInfo ei
+          tree = foldr1 PatOr [ foldr PatAnd (PatLeaf b) gs | (gs, b) <- rows ]
+          analysed = flattenPatTree (concretizeInfo ctorSets tree) >>= analyzeGuardRows
+      case analysed of
+        -- bail to no-warning — fail-open, same contract as
+        -- 'analyzePatternMatch': no warning is better than a wrong one or a
+        -- hang (the 'maxUncoveredNablas' cap).
+        Nothing -> pure ()
+        Just (uncovered, _redundant) -> do
+          let arity = constructorArity ei
+              missingRows =
+                nubOrdOn (map (fmap getUnique)) $
+                  concatMap
+                    (\ nabla ->
+                       -- per-column expansion, cartesian product across
+                       -- columns (the list monad's 'sequence')
+                       sequence
+                         [ map (renderColumnWildcard scrutR) (expandToPatterns arity scrutR nabla)
+                         | scrutR <- colScruts
+                         ])
+                    uncovered
+              capped =
+                length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
+          -- cap overflow suppresses the warning entirely, the existing
+          -- capped-to-suppress convention of 'analyzePatternMatch'
+          unless (capped || null missingRows) do
+            case hullRange matrix of
+              -- R2: the warning must anchor at a real source range; if none
+              -- can be produced at all, do not emit.
+              Nothing -> pure ()
+              Just hull ->
+                addWarning (PatternClausesMissing hull (getName dHead.rappForm) missingRows)
+
+    -- | A synthesized leaf whose only consumed parts are its identity and
+    -- its anno (the clause-head range).
+    rowLeaf :: PmMatrixClause -> Branch Resolved
+    rowLeaf cl =
+      MkBranch (mkAnno [mkHoleWithSrcRangeHint cl.headRange])
+        (Otherwise emptyAnno)
+        (Lit emptyAnno (NumericLit emptyAnno 0))
+
+    -- | The hull of the clause-head ranges: first head's start to last
+    -- head's end. If any head range is missing, fall back to the Decide's
+    -- own range (real: it spans sig + clause group, 'L4.Parser.decideAnno').
+    hullRange :: PmMatrix -> Maybe SrcRange
+    hullRange matrix = case traverse (.headRange) matrix.clauses of
+      Just rs@(r0 : _) ->
+        Just MkSrcRange
+          { start = r0.start
+          , end = (List.last rs).end
+          , length = sum (map (.length) rs)
+          , moduleUri = r0.moduleUri
+          }
+      _ -> rangeOf dec
+
+    -- | A column about which the uncovered nabla has no information renders
+    -- as the column's GIVEN name — the language's documented wildcard idiom
+    -- (the lexer rejects a bare @_@; a variable reusing the GIVEN name
+    -- desugars to nothing) — so the suggested clause is valid, pasteable
+    -- L4. Nested wildcards inside applied constructors stay @`_`@.
+    renderColumnWildcard :: Resolved -> Pattern Resolved -> Pattern Resolved
+    renderColumnWildcard scrutR = \ case
+      PatVar a v | v `sameResolved` underscoreRef -> PatVar a scrutR
+      p -> p
+
+    -- | Defensive: 'desugarPat' calls 'error' on a PatApp\/PatCons whose
+    -- anno lacks 'resolvedInfo' (possible only for a rangeless anno —
+    -- 'setAnnResolvedType' is a no-op without a range). Parser-built
+    -- patterns always carry ranges, but a crash here would take the IDE
+    -- down with it; bail to no-warning instead.
+    patternInfoComplete :: Pattern Resolved -> Bool
+    patternInfoComplete = \ case
+      PatApp a _ ps   -> isJust (view annInfo a) && all patternInfoComplete ps
+      PatCons a p1 p2 -> isJust (view annInfo a) && patternInfoComplete p1 && patternInfoComplete p2
+      PatVar {}       -> True
+      PatExpr {}      -> True -- unreachable: the opaque bail stood down first
+      PatLit {}       -> True
 
 -- | We allow the following cases:
 --
@@ -2322,14 +2514,18 @@ branchHasOpaquePattern :: Branch Resolved -> Bool
 branchHasOpaquePattern (MkBranch _ lhs _) = case lhs of
   When _ p     -> patternHasOpaque p
   Otherwise {} -> False
-  where
-    patternHasOpaque :: Pattern Resolved -> Bool
-    patternHasOpaque = \ case
-      PatLit {}       -> True
-      PatExpr {}      -> True
-      PatVar {}       -> False
-      PatApp _ _ ps   -> any patternHasOpaque ps
-      PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
+
+-- | Does this pattern contain a literal or expression pattern anywhere —
+-- i.e. a guard the residual-set model would (wrongly) treat as irrefutable?
+-- Pass-polymorphic so 'checkClauseMatrix' can apply it to the Name-pass
+-- patterns of a clause matrix before resolving them.
+patternHasOpaque :: Pattern n -> Bool
+patternHasOpaque = \ case
+  PatLit {}       -> True
+  PatExpr {}      -> True
+  PatVar {}       -> False
+  PatApp _ _ ps   -> any patternHasOpaque ps
+  PatCons _ p1 p2 -> patternHasOpaque p1 || patternHasOpaque p2
 
 inferExpr :: Expr Name -> Check (Expr Resolved, Type' Resolved)
 inferExpr g = softprune $ errorContext (WhileCheckingExpression g) do
@@ -2893,28 +3089,35 @@ desugarBranches scrut nebs = do
       foldr PatAnd (PatLeaf b) <$> desugarPat v p
     b@(MkBranch _ (Otherwise {}) _) -> pure (PatLeaf b)
 
-  newPatName = do
-    unq <- newUnique
-    let rn = NormalName "patvar"
-        n = MkName emptyAnno rn
-    pure $ Def unq n
-
   -- NOTE: if there's no scrutinee, we create a new variable that is then putas the scrutinee.
   -- So: WHEN Foo Bar THEN expr essentially becomes WHEN Foo bar THEN CONSIDER bar WHEN Bar THEN expr
 
-  -- NOTE: the 'VarEnv' recycles the fresh payload variables allocated for a
-  -- constructor occurrence, so that the SAME scrutinee position matched
-  -- against the same constructor in DIFFERENT branches shares variables —
-  -- 'uncoverRefinement' reasons across branches through that sharing. The
-  -- map must be keyed by (scrutinized variable, constructor), not by the
-  -- constructor alone: with constructor-only keying, a second occurrence of
-  -- the same constructor at a *sibling* position within one branch (e.g.
-  -- @WHEN W (JUST x) (JUST y)@) would reuse the first position's variables,
-  -- producing bogus cross-position equalities (false redundancy warnings)
-  -- and even self-referential constraints (@v = JUST v@) that send
-  -- 'expandToPattern' into an infinite loop.
-  desugarPat :: Resolved -> Pattern Resolved -> StateT VarEnv Check [Guard Info Resolved]
-  desugarPat scrut' = \ case
+newPatName :: Check Resolved
+newPatName = do
+  unq <- newUnique
+  let rn = NormalName "patvar"
+      n = MkName emptyAnno rn
+  pure $ Def unq n
+
+-- NOTE: the 'VarEnv' recycles the fresh payload variables allocated for a
+-- constructor occurrence, so that the SAME scrutinee position matched
+-- against the same constructor in DIFFERENT branches shares variables —
+-- 'uncoverRefinement' reasons across branches through that sharing. The
+-- map must be keyed by (scrutinized variable, constructor), not by the
+-- constructor alone: with constructor-only keying, a second occurrence of
+-- the same constructor at a *sibling* position within one branch (e.g.
+-- @WHEN W (JUST x) (JUST y)@) would reuse the first position's variables,
+-- producing bogus cross-position equalities (false redundancy warnings)
+-- and even self-referential constraints (@v = JUST v@) that send
+-- 'expandToPattern' into an infinite loop.
+--
+-- Lifted out of 'desugarBranches' so that the clause-matrix analysis
+-- ('checkClauseMatrix') can desugar per (scrutinee, pattern) pair, running
+-- ONE 'VarEnv' across all rows and columns of a clause matrix (cross-clause
+-- payload-variable sharing is what the nabla reasoning needs; the
+-- two-component key keeps columns from colliding).
+desugarPat :: Resolved -> Pattern Resolved -> StateT VarEnv Check [Guard Info Resolved]
+desugarPat scrut' = \ case
     PatApp ((.extra.resolvedInfo) -> Just info) c ps ->
       Map.lookup (getUnique scrut', getUnique c) <$> get >>= \ case
         Just existingVars -> do
@@ -2959,6 +3162,7 @@ desugarBranches scrut nebs = do
     -- user-writable pattern forms, T4). However, any future stage that
     -- synthesizes CONSIDER branches with 'emptyAnno' would land here — the
     -- root cause would be the missing range, not missing type information.
+    -- ('checkClauseMatrix' guards against it with 'patternInfoComplete'.)
     _ -> error "fatal internal error: expected type information but didn't get any"
 
 -- | Recycled payload variables, keyed by (scrutinized variable, constructor).
@@ -3085,15 +3289,29 @@ analyzePatternMatch
   -> Maybe PatternMatchAnalysis
 analyzePatternMatch ctorArity scrut tree = do
   branches <- flattenPatTree tree
-  (uncovered, redundant) <- foldM analyzeBranch ([Consistent Set.empty], []) branches
+  (uncovered, redundant) <- analyzeGuardRows branches
   let suggestions =
         nubOrdOn (fmap getUnique) $
           concatMap (expandToPattern ctorArity scrut) uncovered
       capped = length (take (maxMissingSuggestions + 1) suggestions) > maxMissingSuggestions
   pure MkPatternMatchAnalysis
     { missingArms   = if capped then [] else suggestions
-    , redundantArms = reverse redundant
+    , redundantArms = redundant
     }
+
+-- | The residual-set fold itself, factored out of 'analyzePatternMatch' so
+-- that the single-CONSIDER wrapper above and the clause-matrix path
+-- ('checkClauseMatrix') share 'analyzeBranch', 'splitByGuards' and the
+-- 'maxUncoveredNablas' cap. Returns the uncovered nablas and the redundant
+-- branches (in source order); 'Nothing' when the cap trips — bail to
+-- no-warning: fail-open, the same contract as 'analyzePatternMatch' (no
+-- warning is better than a wrong one or a hang).
+analyzeGuardRows
+  :: [([Guard [Resolved] Resolved], Branch Resolved)]
+  -> Maybe ([Nabla Resolved], [Branch Resolved])
+analyzeGuardRows branches = do
+  (uncovered, redundant) <- foldM analyzeBranch ([Consistent Set.empty], []) branches
+  pure (uncovered, reverse redundant)
   where
     analyzeBranch (uncovered, redundant) (guards, b) =
       let coversSomething =
@@ -3148,15 +3366,25 @@ data ConsistentSet n
   | NoInfo
 
 expandToPattern :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [BranchLhs Resolved]
-expandToPattern ctorArity scrut = \ case
-  Bottom -> []
-  n@Consistent {} -> map patternToBranch (go Set.empty scrut n)
+expandToPattern ctorArity scrut nabla =
+  map patternToBranch (expandToPatterns ctorArity scrut nabla)
  where
   patternToBranch pat
     | PatVar _ var <- pat, var `sameResolved` underscoreRef
     = Otherwise emptyAnno
     | otherwise = When emptyAnno pat
 
+-- | The pattern-level half of 'expandToPattern' (without the
+-- OTHERWISE-wrapping), shared with the clause-matrix path
+-- ('checkClauseMatrix'), which expands one uncovered nabla PER COLUMN
+-- scrutinee and takes the cartesian product across columns. A column about
+-- which the nabla has no information comes back as
+-- @'PatVar' _ 'underscoreRef'@; the caller decides how to render it.
+expandToPatterns :: (Resolved -> Int) -> Resolved -> Nabla Resolved -> [Pattern Resolved]
+expandToPatterns ctorArity scrut = \ case
+  Bottom -> []
+  n@Consistent {} -> go Set.empty scrut n
+ where
   -- An 'IsEq' PINS the variable: it dominates and subsumes any
   -- accompanying 'IsNotEq' constraints (a consistent set can hold e.g.
   -- {x = C1, x /= C2}; the inequality carries no extra information once
@@ -5060,6 +5288,12 @@ prettyCheckWarning = \ case
     <>
     map (("  " <>) . prettyMissingBranchLhs) b
     <> [ "" ]
+  PatternClausesMissing _ headName rows ->
+    [ "This multi-clause definition does not cover all cases. The following clauses are still needed:"
+    , "" ]
+    <>
+    map (("  " <>) . prettyMissingClauseLhs headName) rows
+    <> [ "" ]
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""
@@ -5071,15 +5305,34 @@ prettyCheckWarning = \ case
     , "where a and b are the GIVEN parameters."
     ]
 
--- | Render a synthesized missing branch as valid, pasteable L4. The generic
+-- | Render a synthesized missing branch as valid, pasteable L4 (the
+-- pattern rendering itself is 'prettyMissingPattern').
+prettyMissingBranchLhs :: BranchLhs Resolved -> Text
+prettyMissingBranchLhs = \ case
+  When _ p    -> "WHEN " <> prettyMissingPattern False p <> " THEN"
+  o@Otherwise {} -> prettyLayout o
+
+-- | Render a synthesized missing CLAUSE of a multi-clause pattern-matching
+-- group as valid, pasteable L4: a new DECIDE clause line ending at IS with
+-- no body — the clause-level analogue of 'prettyMissingBranchLhs''s
+-- @WHEN … THEN@. The DECIDE form is always valid to paste because a group
+-- accepts DECIDE-form and MEANS-form clauses interchangeably
+-- ('L4.Parser.pmClause'). Clause argument positions parse as
+-- 'L4.Parser.atomicPattern', so applied constructors must be parenthesised:
+-- every column is rendered with @nested=True@.
+prettyMissingClauseLhs :: Name -> [Pattern Resolved] -> Text
+prettyMissingClauseLhs headName row =
+  "DECIDE " <> quotedName headName
+    <> Text.concat (map ((" " <>) . prettyMissingPattern True) row)
+    <> " IS"
+
+-- | Render a synthesized pattern as valid, pasteable L4. The generic
 -- layout printer is not suitable here: it does not parenthesize nested
 -- non-nullary constructor patterns (@wa JUST `_`@ instead of
 -- @wa (JUST `_`)@), and it prints cons patterns by the internal constructor
 -- name instead of the FOLLOWED BY surface syntax.
-prettyMissingBranchLhs :: BranchLhs Resolved -> Text
-prettyMissingBranchLhs = \ case
-  When _ p    -> "WHEN " <> go False p <> " THEN"
-  o@Otherwise {} -> prettyLayout o
+prettyMissingPattern :: Bool -> Pattern Resolved -> Text
+prettyMissingPattern = go
   where
     go :: Bool -> Pattern Resolved -> Text
     go _ p@PatVar {} = prettyLayout p
