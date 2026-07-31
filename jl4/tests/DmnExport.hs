@@ -2472,6 +2472,39 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         map (.severity) ns `shouldBe` [Advisory]
         (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`p`"
 
+      -- the SINGLETON un-lift: no merge, but the call-site argument is
+      -- discarded all the same — `a MEANS net 100` renders as the bare name
+      -- `net` and the literal 100 vanishes, so gating D-PARAM-AS-INPUT on
+      -- merged groups turned a Blocking verbatim call into a silently wrong
+      -- number. One decision, one parameter, two identical applied sites.
+      let singletonUnlift =
+            "GIVEN amount IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \net amount MEANS amount TIMES 0.9\n\
+            \GIVETH A NUMBER\n\
+            \a MEANS net 100\n\
+            \GIVETH A NUMBER\n\
+            \b MEANS net 100\n"
+
+      it "notes the discarded argument on a singleton un-lift (no merge required)" $ do
+        let drg = drgOf singletonUnlift
+            ns  = notesOf "D-PARAM-AS-INPUT" drg
+        map (.severity) ns `shouldBe` [Advisory]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`amount`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "discarded"
+        -- the un-lift itself still happens; the note is the record of its cost
+        (decisionNamed "a" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feText == "net" && fe.feFragment == SFeel
+          _               -> False
+
+      it "stays silent on a vacuous singleton (zero applied call sites discard nothing)" $ do
+        let drg = drgOf
+              "GIVEN q IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \solo2 q MEANS q PLUS 1\n\
+              \#EVAL solo2 5\n"
+        notesOf "D-PARAM-AS-INPUT" drg `shouldBe` []
+
       -- fixture 2: ZERO non-directive call sites (27% of the measured
       -- population, §2.4.3) still un-lift, vacuously; the #EVAL is not a call
       -- site, and — being the directive's applied head — it also keeps the
@@ -2683,6 +2716,59 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n | n <- notesOf "D-PARTIAL" drg, Text.isInfixOf "TERMINATES" n.message]
           `shouldSatisfy` (not . null)
 
+      -- TOTAL's contagion must not depend on declaration order. Forward
+      -- references are legal L4 (`l4 check` accepts a caller defined before
+      -- its callee), so a source-order fold silently certified any caller
+      -- defined before its ¬DMN-SAFE callee — byte-identical logic, one
+      -- D-PARTIAL in one order and two in the other. Both orders, one test.
+      it "TOTAL: refuses a caller whichever side of its ¬DMN-SAFE callee it is defined on" $ do
+        let calleeLast =
+              "GIVEN x IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \caller x MEANS callee x\n\
+              \GIVEN y IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \callee y MEANS 100 DIVIDED BY y\n"
+            calleeFirst =
+              "GIVEN y IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \callee y MEANS 100 DIVIDED BY y\n\
+              \GIVEN x IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \caller x MEANS callee x\n"
+        forM_ [calleeLast, calleeFirst] \src -> do
+          let ns = notesOf "D-PARTIAL" (drgOf src)
+          map (.element) ns `shouldMatchList` ["decision_caller", "decision_callee"]
+          [n | n <- ns, n.element == "decision_caller"]
+            `shouldSatisfy` \case
+              [n] -> Text.isInfixOf "TOTAL" n.message
+                       && Text.isInfixOf "`callee`" n.message
+              _   -> False
+
+      -- Mutual recursion: a two-cycle escapes 'selfRecursionIssues' (which
+      -- only sees calls whose head is the decide's own Unique) and no fold
+      -- order can see it — only the condensation can. Un-lifting the pair
+      -- would emit mutually requiring <decision> elements (a DMN 1.3 §6.3.2
+      -- acyclicity violation) with bare-FEEL-name call sites, silently.
+      it "TERMINATES: rejects mutual recursion on every cycle member, and does not un-lift it" $ do
+        let drg = drgOf
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \ping n MEANS IF n LESS THAN 1 THEN 100 DIVIDED BY n ELSE pong (n MINUS 1)\n\
+              \GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \pong n MEANS ping (n MINUS 1)\n"
+            ns = notesOf "D-PARTIAL" drg
+        map (.element) ns `shouldMatchList` ["decision_ping", "decision_pong"]
+        forM_ ns \n -> do
+          n.message `shouldSatisfy` Text.isInfixOf "TERMINATES"
+          n.message `shouldSatisfy` Text.isInfixOf "mutually recursive"
+          n.message `shouldSatisfy` Text.isInfixOf "could not be certified"
+        -- the refusal keeps the call sites verbatim: no bare-name un-lift
+        (decisionNamed "pong" drg).dcnLogic `shouldSatisfy` \case
+          LogicLiteral fe -> fe.feFragment == L4Verbatim
+          _               -> False
+
       -- fixture 13's wording assertion rides on the L3 test above.
 
     describe "the type-conflict refusal (D-PARAMTYPE, OPEN-4)" $ do
@@ -2751,6 +2837,44 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         forM_ ["`first`", "`second`", "`third`", "`A1`", "`B1`"] \frag ->
           (firstNote ns).message `shouldSatisfy` Text.isInfixOf frag
         length (inputsNamed "s" drg) `shouldBe` 3
+
+      -- The untyped hole: an omitted GIVEN type is not a spelling, it is the
+      -- ABSENCE of evidence. Comparing the sentinel "<untyped>" made two
+      -- same-named untyped GIVENs of different INFERRED types (a NUMBER
+      -- comparison in one decision, a BOOLEAN conjunction in the other)
+      -- compare equal, merge into one typeRef=Any element, and silence both
+      -- D-PARAMTYPE and D-SCOPE — `q` then read a NUMBER as its BOOLEAN and
+      -- answered null/SUCCEEDED with zero notes on both engines.
+      it "refuses to merge same-named UNTYPED parameters: no declared type certifies no agreement" $ do
+        let drg = drgOf
+              "GIVEN x\n\
+              \GIVETH A BOOLEAN\n\
+              \p1 x MEANS x GREATER THAN 10\n\
+              \GIVEN x\n\
+              \GIVETH A BOOLEAN\n\
+              \q1 x MEANS x AND TRUE\n"
+            ns = notesOf "D-PARAMTYPE" drg
+        map (.severity) ns `shouldBe` [Blocking]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "no declared type"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "REFUSED"
+        length (inputsNamed "x" drg) `shouldBe` 2
+        -- and D-SCOPE keeps naming the two same-folded elements
+        notesOf "D-SCOPE" drg `shouldSatisfy` (not . null)
+
+      it "refuses a typed/untyped mix for the same reason" $ do
+        let drg = drgOf
+              "DECLARE A2 HAS v IS A NUMBER\n\
+              \GIVEN s IS AN A2\n\
+              \GIVETH A NUMBER\n\
+              \typed s MEANS s's v\n\
+              \GIVEN s\n\
+              \GIVETH A BOOLEAN\n\
+              \untyped s MEANS s AND TRUE\n"
+            ns = notesOf "D-PARAMTYPE" drg
+        map (.severity) ns `shouldBe` [Blocking]
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`A2`"
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "no declared type"
+        length (inputsNamed "s" drg) `shouldBe` 2
 
     describe "the population filter (§2.5.6, §2.5.7)" $ do
       -- fixture 18: FIXTURE positive, and --include-tests restores it.
@@ -2974,8 +3098,10 @@ goldenSubjects =
     -- (`scaled amount`, D-BKM), a type conflict (`s` at Article3Case vs
     -- Article7Case, D-PARAMTYPE, merge refused), a dropped test fixture
     -- (`sample claimant`, D-FIXTURE), an inert prose carrier
-    -- (`definition — benefit`, D-INERT), and an uncalled regulative body
-    -- (`payment duty`, D-REGULATIVE).
+    -- (`definition — benefit`, D-INERT), an uncalled regulative body
+    -- (`payment duty`, D-REGULATIVE), and a SINGLETON un-lift (`net payout`,
+    -- whose discarded literal argument D-PARAM-AS-INPUT must name even
+    -- though no merge happened).
   , ( "dmn" </> "unlift.l4"
     , "unlift"
     , "the Phase 4 un-lifting exhibit"

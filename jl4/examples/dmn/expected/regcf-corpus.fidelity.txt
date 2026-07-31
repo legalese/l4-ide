@@ -401,6 +401,18 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-PARAM-AS-INPUT] advisory — input_transfer
       the GIVEN parameter `transfer` of three decisions (`transfer is within the one-year restricted period`, `transfer falls within an exception in Rule 501(a)`, `transfer is permitted`) became the one shared model input `input_transfer`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
       lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_amount_to_be_sold_in_this_transaction
+      the GIVEN parameter `amount to be sold in this transaction` of `aggregate amount sold to this investor including this transaction` became the model input `input_amount_to_be_sold_in_this_transaction`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
+      lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_filing
+      the GIVEN parameter `filing` of `disclosure requirements are met` became the model input `input_filing`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
+      lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_notice
+      the GIVEN parameter `notice` of `notice complies with Rule 204(b)` became the model input `input_notice`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
+      lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_supplied
+      the GIVEN parameter `supplied` of `financial statement requirement is satisfied` became the model input `input_supplied`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
+      lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
   [D-PARTIAL] lossy — decision_ongoing_reporting_obligation  (main.l4:704:1-713:84)
       `ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:704:1-713:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null
       lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error

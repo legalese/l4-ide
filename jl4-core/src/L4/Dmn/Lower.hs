@@ -2974,16 +2974,23 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- GIVEN parameters of un-lifted decisions, grouped by VERBATIM L4 name
   -- (OPEN-2: two spellings that merely FOLD to one FEEL identifier are
   -- different parameters; 'uniquifyIn' renames them apart and @D-RENAME@
-  -- reports it). Each entry: binder unique, declared-type spelling, owner.
-  paramGroups :: Map Text [(Unique, Text, Text)]
+  -- reports it). Each entry: binder unique, declared-type spelling
+  -- ('Nothing' = the GIVEN carries no declared type), owner name, owner
+  -- unique.
+  paramGroups :: Map Text [(Unique, Maybe Text, Text, Unique)]
   paramGroups = Map.fromListWith (flip (<>))
-    [ (nameOf p, [(getUnique p, tySpelling mty, decideName d)])
+    [ ( nameOf p
+      , [ ( getUnique p
+          , oneLine . prettyLayout <$> mty
+          , decideName d
+          , getUnique (decideResolved d)
+          )
+        ]
+      )
     | d <- decides
     , Set.member (getUnique (decideResolved d)) unliftedSet
     , (p, mty) <- A.decideParams d
     ]
-   where
-    tySpelling = maybe "<untyped>" (oneLine . prettyLayout)
 
   -- The merge, refused per group on type conflict: the group map is built
   -- with 'Map.fromListWith' and consumed as a whole list — NEVER
@@ -2992,12 +2999,22 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- exactly what makes it live). On conflict nothing merges and
   -- 'paramTypeNotes' says so at Blocking; un-lifting of each individual
   -- decision still proceeds — what is refused is the MERGE.
-  mergedGroups, conflictGroups :: [(Text, [(Unique, Text, Text)])]
+  --
+  -- A merge needs POSITIVE evidence of agreement: every member DECLARES a
+  -- type, and all the spellings agree. An untyped GIVEN supplies no evidence
+  -- at all, so any group containing one is a conflict. This used to compare
+  -- the sentinel spelling @\"\<untyped\>\"@ instead, under which two untyped
+  -- same-named GIVENs of different INFERRED types compared equal, merged into
+  -- one @typeRef=Any@ element, and silenced both D-PARAMTYPE and D-SCOPE —
+  -- one decision then read the other's NUMBER as its BOOLEAN and answered
+  -- null\/SUCCEEDED with zero notes, the precise hazard the conflict test was
+  -- written to stop.
+  mergedGroups, conflictGroups :: [(Text, [(Unique, Maybe Text, Text, Unique)])]
   (mergedGroups, conflictGroups) =
     partitionEithers
-      [ if length (nubOrd [ty | (_, ty, _) <- members]) == 1
-          then Left (nm, members)
-          else Right (nm, members)
+      [ case traverse (\(_, mty, _, _) -> mty) members of
+          Just tys | length (nubOrd tys) == 1 -> Left (nm, members)
+          _                                   -> Right (nm, members)
       | (nm, members) <- Map.toAscList paramGroups
       , length members > 1
       ]
@@ -3006,8 +3023,8 @@ lowerModule opts modul@(MkModule _ uri _) =
   mergeMap :: Map Unique Unique
   mergeMap = Map.fromList
     [ (u, canonical)
-    | (_, members@((canonical, _, _) : _)) <- mergedGroups
-    , (u, _, _) <- members
+    | (_, members@((canonical, _, _, _) : _)) <- mergedGroups
+    , (u, _, _, _) <- members
     ]
 
   canonUnique :: Unique -> Unique
@@ -4116,9 +4133,18 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- moment the merge happens, so a silent refusal would be undetectable.
   paramTypeNotes =
     [ dmnNote "D-PARAMTYPE" Blocking (Text.intercalate ", " elemIds) Nothing
-        ("the GIVEN parameter `" <> nm <> "` is bound at "
-           <> englishCount (length distinctTys) <> " different declared types across \
-              \un-lifted decisions ("
+        ("the GIVEN parameter `" <> nm <> "` "
+           <> ( if hasUntyped
+                  -- an untyped GIVEN is not a type CLASH, it is a type
+                  -- UNKNOWN: nothing certifies agreement, so the refusal
+                  -- wording must say "could not be certified", not "differ"
+                  then
+                    "is not declared at one certifiable type across un-lifted \
+                    \decisions ("
+                  else
+                    "is bound at " <> englishCount (length distinctTys)
+                      <> " different declared types across un-lifted decisions ("
+              )
            <> Text.intercalate "; " claimantDescs
            <> "), so the Phase 4 merge is REFUSED and the parameters are emitted as the \
               \distinct elements "
@@ -4129,37 +4155,70 @@ lowerModule opts modul@(MkModule _ uri _) =
         "the one-input-per-name economy of the merge; every claimant keeps its own element, \
         \and a caller must bind each one"
     | (nm, members) <- conflictGroups
-    , let distinctTys = nubOrd [ty | (_, ty, _) <- members]
+    , let hasUntyped = any (\(_, mty, _, _) -> isNothing mty) members
+    , let distinctTys = nubOrd [ty | (_, Just ty, _, _) <- members]
     , let claimantDescs =
-            [ tick ty <> " in " <> tick owner | (_, ty, owner) <- members ]
+            [ maybe "no declared type" tick mty <> " in " <> tick owner
+            | (_, mty, owner, _) <- members
+            ]
     , let elemIds =
             [ Map.findWithDefault ("input_" <> sanitiseId nm) u inputByUnique
-            | (u, _, _) <- members
+            | (u, _, _, _) <- members
             ]
     , let feelsOf =
             [ feel
-            | (u, _, _) <- members
+            | (u, _, _, _) <- members
             , (feel, (fu, _)) <- zip inputFeelNames freeTerms
             , fu == u
             ]
     ]
 
-  -- D-PARAM-AS-INPUT (OPEN-3: one note per merged group of size >= 2 — a
-  -- singleton parameter was already a global inputData before Phase 4, so a
-  -- note on it would be pure noise).
+  -- D-PARAM-AS-INPUT (OPEN-3, amended): one note per merged group of size
+  -- >= 2, AND one per singleton group whose owner has an applied call site.
+  -- The original size >= 2 gate was justified on the inputData side only
+  -- ("a singleton parameter becomes a global input, which is unremarkable")
+  -- — but the un-lift render discards the call-site ARGUMENT expression for
+  -- a singleton exactly as for a merged group: `a MEANS net 100` renders as
+  -- the bare FEEL name `net`, the literal 100 vanishes, and `a` evaluates to
+  -- whatever the caller binds to the input — a Blocking verbatim note turned
+  -- into a silently wrong number. So the singleton case notes too. A vacuous
+  -- tier-1 decision (zero applied call sites) discards nothing and stays
+  -- silent — there the old justification really does hold.
   paramAsInputNotes =
-    [ dmnNote "D-PARAM-AS-INPUT" Advisory elemId Nothing
-        ("the GIVEN parameter `" <> nm <> "` of " <> englishCount (length members)
-           <> " decisions (" <> Text.intercalate ", " (map tick owners)
-           <> ") became the one shared model input " <> tick elemId
-           <> "; those decisions can no longer be applied twice to different subjects \
-              \within this model, and the argument expressions at their call sites are \
-              \discarded")
-        "per-call-site argument binding: L4 applied these decisions to expressions; the \
-        \DMN model reads one global value"
-    | (nm, members@((canonical, _, _) : _)) <- mergedGroups
-    , let owners = nubOrd [owner | (_, _, owner) <- members]
+    [ dmnNote "D-PARAM-AS-INPUT" Advisory elemId Nothing body lost
+    | (nm, members@((canonical, _, _, _) : _)) <- mergedGroups <> singletonArgGroups
+    , let owners = nubOrd [owner | (_, _, owner, _) <- members]
     , let elemId = Map.findWithDefault ("input_" <> sanitiseId nm) canonical inputByUnique
+    , let (body, lost) = case owners of
+            [owner] ->
+              ( "the GIVEN parameter `" <> nm <> "` of " <> tick owner
+                  <> " became the model input " <> tick elemId
+                  <> "; the decision can no longer be applied to different subjects \
+                     \within this model, and the argument expressions at its call sites \
+                     \are discarded — each call site now reads the one global value"
+              , "per-call-site argument binding: L4 applied this decision to an \
+                \expression; the DMN model reads one global value"
+              )
+            _ ->
+              ( "the GIVEN parameter `" <> nm <> "` of " <> englishCount (length members)
+                  <> " decisions (" <> Text.intercalate ", " (map tick owners)
+                  <> ") became the one shared model input " <> tick elemId
+                  <> "; those decisions can no longer be applied twice to different subjects \
+                     \within this model, and the argument expressions at their call sites are \
+                     \discarded"
+              , "per-call-site argument binding: L4 applied these decisions to expressions; \
+                \the DMN model reads one global value"
+              )
+    ]
+
+  -- Singleton parameter groups whose owning decision is actually APPLIED
+  -- somewhere: those call sites' argument expressions are what the un-lift
+  -- discards, so they join 'paramAsInputNotes' above.
+  singletonArgGroups :: [(Text, [(Unique, Maybe Text, Text, Unique)])]
+  singletonArgGroups =
+    [ (nm, members)
+    | (nm, members@[(_, _, _, ownerU)]) <- Map.toAscList paramGroups
+    , any (.csApplied) (Map.findWithDefault [] ownerU callGraph.cgCalls)
     ]
 
   -- D-PARTIAL (§2.4.2, OPEN-1): Phase 4 classifies and reports; it does not

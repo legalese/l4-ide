@@ -55,6 +55,7 @@ module L4.Dmn.Analysis
 
 import Base
 import qualified Base.Text as Text
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Optics (gplate, toListOf)
@@ -310,11 +311,19 @@ data SafetyIssue = MkSafetyIssue
 -- @TOTAL@ is the GREATEST fixed point over the call graph (§2.4.1: the least
 -- solution reads @T(sum) = True ∧ T(sum)@ and rejects @sum@, @map@, @filter@
 -- and every list-touching decision; the spec records that "least" was written
--- first and rejected the whole design). L4's one-pass scope checker admits no
--- forward references, so module-level SCCs are singletons: mutual recursion
--- cannot occur, self-recursion is discharged by the structural termination
--- check, and the fixpoint reduces to a fold in source order (callees are
--- always defined before their callers).
+-- first and rejected the whole design). It is computed over the call graph's
+-- CONDENSATION, callees before callers ('stronglyConnComp' emits SCCs reverse
+-- topologically sorted, so every component only calls into components already
+-- folded). Source order proves nothing here: forward references are legal L4
+-- (@l4 check@ accepts a caller defined before its callee), and an earlier
+-- source-order fold silently certified any caller defined before its
+-- ¬DMN-SAFE callee — the exact silent-null direction §2.4 exists to close.
+-- Within the condensation: a singleton component takes its local clauses plus
+-- one @TOTAL@ issue per uncertified callee; a self-loop is discharged (or
+-- refused) by the structural termination check; and a cyclic component of
+-- size > 1 is MUTUAL recursion, which @TERMINATES@ rejects in v1 on every
+-- member — a refusal to certify, not a proof of divergence — so no member
+-- un-lifts.
 --
 -- __Known gap, stated rather than glossed__: cross-module callees.
 -- 'L4.Dmn.Lower' drops names from other modules by design (that is what keeps
@@ -335,7 +344,7 @@ analyzeSafety
   -> [Decide Resolved]
   -> Map Unique [SafetyIssue]   -- ^ a decide absent from the map is certified safe
 analyzeSafety inp cg decides =
-  foldl' step Map.empty decides   -- source order: callees before callers
+  foldl' step Map.empty sccs   -- condensation order: callees before callers
  where
   byUnique = Map.fromList [(getUnique (decideResolvedA d), d) | d <- decides]
 
@@ -347,22 +356,75 @@ analyzeSafety inp cg decides =
     , any (\s -> s.csCaller == Just u) sites
     ]
 
-  step acc d =
-    let u  = getUnique (decideResolvedA d)
-        is =
-          decideIssues d
-            <> [ MkSafetyIssue
-                   { safClause = "TOTAL"
-                   , safRange  = Nothing
-                   , safDetail =
-                       "calls `" <> maybe "?" decideNameA (Map.lookup c byUnique)
-                         <> "`, which could not itself be certified total"
-                   }
-               | c <- calleesOf u
-               , c /= u
-               , Map.member c acc
-               ]
-    in if null is then acc else Map.insert u is acc
+  sccs :: [SCC (Decide Resolved)]
+  sccs = stronglyConnComp
+    [ (d, u, calleesOf u)
+    | d <- decides
+    , let u = getUnique (decideResolvedA d)
+    ]
+
+  step acc = \case
+    AcyclicSCC d  -> record acc d (singleIssues acc d)
+    -- a one-member cycle is SELF-recursion; 'selfRecursionIssues' (inside
+    -- 'decideIssues') discharges or refuses it structurally
+    CyclicSCC [d] -> record acc d (singleIssues acc d)
+    CyclicSCC ds  ->
+      let cycleUs = Set.fromList [getUnique (decideResolvedA d) | d <- ds]
+      in foldl'
+           ( \a d ->
+               record a d
+                 ( decideIssues d
+                     <> [mutualIssue cycleUs d]
+                     -- callees INSIDE the cycle are excluded: every member
+                     -- already carries the TERMINATES issue above, and at
+                     -- this point none of them is in @a@ yet
+                     <> calleeIssues a cycleUs d
+                 )
+           )
+           acc ds
+
+  record acc d is =
+    if null is then acc else Map.insert (getUnique (decideResolvedA d)) is acc
+
+  singleIssues acc d = decideIssues d <> calleeIssues acc Set.empty d
+
+  -- the TOTAL conjunct: @∀ c ∈ calls(d). TOTAL(c)@, read off the accumulator,
+  -- which the condensation order guarantees already holds every callee's
+  -- verdict (minus the exclusions the caller passes)
+  calleeIssues :: Map Unique [SafetyIssue] -> Set Unique -> Decide Resolved -> [SafetyIssue]
+  calleeIssues acc excluded d =
+    [ MkSafetyIssue
+        { safClause = "TOTAL"
+        , safRange  = Nothing
+        , safDetail =
+            "calls `" <> maybe "?" decideNameA (Map.lookup c byUnique)
+              <> "`, which could not itself be certified total"
+        }
+    | let u = getUnique (decideResolvedA d)
+    , c <- calleesOf u
+    , c /= u
+    , not (Set.member c excluded)
+    , Map.member c acc
+    ]
+
+  -- Mutual recursion rejects in v1 (the TERMINATES ruling): no structural
+  -- measure spans a cycle of decisions, and an un-lifted cycle would emit
+  -- mutually requiring <decision> elements — a DMN 1.3 §6.3.2 acyclicity
+  -- violation. Wording per §2.4.4: a refusal to certify, never a proof.
+  mutualIssue :: Set Unique -> Decide Resolved -> SafetyIssue
+  mutualIssue cycleUs d =
+    MkSafetyIssue
+      { safClause = "TERMINATES"
+      , safRange  = (getAnno d).range
+      , safDetail =
+          "mutually recursive with "
+            <> Text.intercalate ", "
+                 [ "`" <> maybe "?" decideNameA (Map.lookup u' byUnique) <> "`"
+                 | u' <- Set.toList (Set.delete (getUnique (decideResolvedA d)) cycleUs)
+                 ]
+            <> "; mutual recursion could not be certified terminating (v1 has no \
+               \structural measure that spans a cycle of decisions)"
+      }
 
   decideIssues :: Decide Resolved -> [SafetyIssue]
   decideIssues d@(MkDecide dAnn _ _ rawBody) =

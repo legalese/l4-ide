@@ -281,8 +281,17 @@ exportCmd opts = do
       exitFailure
 
 -- | @FIXTURE(d)@'s importer view (OPEN-5, option 1): glob @*.l4@ beside the
--- exported file, textually detect @IMPORT <basename>@, and report which of
--- this module's decide names occur anywhere in an importing sibling's text.
+-- exported file, textually detect @IMPORT <basename>@ — bare OR backticked —
+-- and report which of this module's decide names occur anywhere in an
+-- importing sibling's text.
+--
+-- The backticked spelling is load-bearing, not a nicety: a hyphenated module
+-- name can ONLY be imported backticked (@IMPORT `housing-act-common`@ is how
+-- the whole housing-act\/charities\/reg-cf corpus spells it), so a scan that
+-- only matched the bare form saw NO importer for any hyphenated basename,
+-- returned @Just Set.empty@ (\"verified clear\") instead of the fail-safe
+-- 'Nothing', and dropped externally-called fixture-shaped decisions — the
+-- \"delete a statute\" case §2.5.7 names, on the whole measured population.
 --
 -- Deliberately textual and conservative in the KEEP direction: a name
 -- occurring in a comment still counts as an external reference and the
@@ -311,10 +320,14 @@ siblingExternalRefs fp modul = do
           texts <- for siblings \f -> do
             et <- try (Text.readFile f) :: IO (Either SomeException Text)
             pure (either (const "") id et)
-          let importerTexts =
+          let importSpellings =
+                [ "IMPORT " <> baseName
+                , "IMPORT `" <> baseName <> "`"
+                ]
+              importerTexts =
                 [ t
                 | t <- texts
-                , ("IMPORT " <> baseName) `Text.isInfixOf` t
+                , any (`Text.isInfixOf` t) importSpellings
                 ]
           pure . Just $ Set.fromList
             [ n

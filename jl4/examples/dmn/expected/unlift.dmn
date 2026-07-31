@@ -42,6 +42,9 @@
   <inputData id="input_s_2" name="s_2" label="s">
     <variable id="input_s_2_var" name="s_2" label="s" typeRef="Article7Case"/>
   </inputData>
+  <inputData id="input_gross" name="gross">
+    <variable id="input_gross_var" name="gross" typeRef="number"/>
+  </inputData>
   <decision id="decision_basic_monthly_benefit" name="basic_monthly_benefit" label="basic monthly benefit">
     <variable id="decision_basic_monthly_benefit_var" name="basic_monthly_benefit" label="basic monthly benefit" typeRef="number"/>
     <informationRequirement id="decision_basic_monthly_benefit_ir1">
@@ -126,6 +129,33 @@
       <text>true and true</text>
     </literalExpression>
   </decision>
+  <decision id="decision_net_payout" name="net_payout" label="net payout">
+    <variable id="decision_net_payout_var" name="net_payout" label="net payout" typeRef="number"/>
+    <informationRequirement id="decision_net_payout_ir1">
+      <requiredInput href="#input_gross"/>
+    </informationRequirement>
+    <literalExpression id="decision_net_payout_literal">
+      <text>gross * 0.9</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_payout_a" name="payout_a" label="payout a">
+    <variable id="decision_payout_a_var" name="payout_a" label="payout a" typeRef="number"/>
+    <informationRequirement id="decision_payout_a_ir1">
+      <requiredDecision href="#decision_net_payout"/>
+    </informationRequirement>
+    <literalExpression id="decision_payout_a_literal">
+      <text>net_payout</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_payout_b" name="payout_b" label="payout b">
+    <variable id="decision_payout_b_var" name="payout_b" label="payout b" typeRef="number"/>
+    <informationRequirement id="decision_payout_b_ir1">
+      <requiredDecision href="#decision_net_payout"/>
+    </informationRequirement>
+    <literalExpression id="decision_payout_b_literal">
+      <text>net_payout</text>
+    </literalExpression>
+  </decision>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_phase_4_exhibit_un_lifting_tiering_and_the_population_filter_diagram" name="Phase 4 exhibit — un-lifting, tiering, and the population filter">
       <dmndi:DMNShape id="input_claimant_shape" dmnElementRef="input_claimant">
@@ -139,6 +169,9 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="input_s_2_shape" dmnElementRef="input_s_2">
         <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_gross_shape" dmnElementRef="input_gross">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_basic_monthly_benefit_shape" dmnElementRef="decision_basic_monthly_benefit">
         <dc:Bounds x="60" y="220" width="180" height="80"/>
@@ -158,6 +191,9 @@
       <dmndi:DMNShape id="decision_definition_benefit_shape" dmnElementRef="decision_definition_benefit">
         <dc:Bounds x="1160" y="220" width="180" height="80"/>
       </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_net_payout_shape" dmnElementRef="decision_net_payout">
+        <dc:Bounds x="1380" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_capped_benefit_shape" dmnElementRef="decision_capped_benefit">
         <dc:Bounds x="60" y="60" width="180" height="80"/>
       </dmndi:DMNShape>
@@ -166,6 +202,12 @@
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_high_estimate_shape" dmnElementRef="decision_high_estimate">
         <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_payout_a_shape" dmnElementRef="decision_payout_a">
+        <dc:Bounds x="720" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_payout_b_shape" dmnElementRef="decision_payout_b">
+        <dc:Bounds x="940" y="60" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="decision_basic_monthly_benefit_ir1_edge" dmnElementRef="decision_basic_monthly_benefit_ir1">
         <di:waypoint x="150" y="380"/>
@@ -206,6 +248,18 @@
       <dmndi:DMNEdge id="decision_art7_applies_ir1_edge" dmnElementRef="decision_art7_applies_ir1">
         <di:waypoint x="810" y="380"/>
         <di:waypoint x="1030" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_net_payout_ir1_edge" dmnElementRef="decision_net_payout_ir1">
+        <di:waypoint x="1030" y="380"/>
+        <di:waypoint x="1470" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_payout_a_ir1_edge" dmnElementRef="decision_payout_a_ir1">
+        <di:waypoint x="1470" y="220"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_payout_b_ir1_edge" dmnElementRef="decision_payout_b_ir1">
+        <di:waypoint x="1470" y="220"/>
+        <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

@@ -445,6 +445,12 @@ exportNothingFixture      = fixtureDir </> "export-nothing.l4"
 exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
+-- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
+-- that imports it backticked (the only legal spelling for a hyphenated name)
+-- and references `statute`.
+importViewFixture :: FilePath
+importViewFixture = fixtureDir </> "import-view" </> "interp-common.l4"
+
 bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
 bpmnOfferingSource   = "examples/bpmn/offering.l4"
 bpmnOfferingGolden   = "examples/bpmn/expected/offering.bpmn"
@@ -1266,6 +1272,22 @@ spec bin = do
       -- retired export-two-rules.l4 from the blocking-only role above.
       it "refuses an all-regulative module as DMN (empty model after the population filter)" $
         expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
+
+    -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
+    -- module name can only be imported as IMPORT `interp-common`, and the
+    -- textual sibling scan used to match only the bare spelling — so every
+    -- hyphenated module (the whole housing-act/charities/reg-cf population)
+    -- saw "no importers", returned Just Set.empty ("verified clear") instead
+    -- of the fail-safe Nothing, and dropped its externally-called
+    -- fixture-shaped decisions: the "delete a statute" case §2.5.7 names.
+    -- `local sample` is the in-fixture negative control: same module-local
+    -- shape, unreferenced by the importer, so it must still drop — proving
+    -- the scan discriminates by name rather than failing open.
+    it "keeps a fixture-shaped decision whose importer spells the IMPORT with backticks" $ do
+      Output code sout _ <- runL4 bin ["export", "--to=dmn", importViewFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("decision_statute" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("local sample" `isInfixOf`))
 
     it "still writes the document when --fail-on trips" $ do
       Output code sout _ <- runL4 bin

@@ -1,6 +1,6 @@
 § `Phase 4 exhibit — un-lifting, tiering, and the population filter`
 
--- One module, six shapes, each present to pin one Phase 4 behaviour:
+-- One module, seven shapes, each present to pin one Phase 4 behaviour:
 --
 --   1. `basic monthly benefit` / `benefit cap` / `capped benefit` — the
 --      TIER-1 UN-LIFT: three decisions bind `claimant` at one declared type,
@@ -20,6 +20,11 @@
 --      input; kept, flagged D-INERT.
 --   6. `payment duty` — an UNCALLED REGULATIVE body: routed to BPMN rather
 --      than emitted as a fake decision (D-REGULATIVE).
+--   7. `net payout` / `payout a` / `payout b` — the SINGLETON un-lift: ONE
+--      decision binds `gross`, applied twice to the same literal, so no
+--      merge happens — and the literal argument is discarded all the same.
+--      D-PARAM-AS-INPUT must fire here too; gating it on merged groups is
+--      how a Blocking verbatim call became a silently wrong number.
 
 DECLARE Claimant HAS
   income   IS A NUMBER
@@ -86,3 +91,14 @@ GIVETH A DEONTIC Payer Payment
   MUST Disburse
   WITHIN 30
   HENCE FULFILLED
+
+-- 7. the singleton un-lift
+GIVEN gross IS A NUMBER
+GIVETH A NUMBER
+`net payout` gross MEANS gross TIMES 0.9
+
+GIVETH A NUMBER
+`payout a` MEANS `net payout` 100
+
+GIVETH A NUMBER
+`payout b` MEANS `net payout` 100
