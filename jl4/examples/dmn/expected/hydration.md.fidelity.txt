@@ -1,12 +1,12 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_hydration
-      dmnmd is a table format, not a graph: the 11 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 10 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOLITERAL] blocking — decision_applicant_score
       `applicant score` is a formula (applicant_hydrated.total_income / 1000), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_applicant_band_width
-      `applicant band width` is a formula (applicant_hydrated_2.band_width), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `applicant band width` is a formula (applicant_hydrated.band_width), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_leading_applicant
       `the leading applicant` is a formula (the_submission.primary), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -27,9 +27,6 @@ fidelity report — dmnmd
       `bonus or zero` is a formula (if m != null then m else 0), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOCONTEXT] blocking — hydration_applicant
-      `applicant` is a boxed context: a record hydrated from its source with 5 component(s), of which the derived ones are computed from earlier siblings. dmnmd has no boxed-context form -- it can say a decision over cases and nothing else -- so this decision is omitted
-      lost: the decision itself, and with it every derived component the tables downstream read through: in the markdown those reads name a decision that is not there
-  [D-MD-NOCONTEXT] blocking — hydration_applicant_2
       `applicant` is a boxed context: a record hydrated from its source with 5 component(s), of which the derived ones are computed from earlier siblings. dmnmd has no boxed-context form -- it can say a decision over cases and nothing else -- so this decision is omitted
       lost: the decision itself, and with it every derived component the tables downstream read through: in the markdown those reads name a decision that is not there
   [D-MD-NOCONTEXT] blocking — hydration_the_leading_applicant

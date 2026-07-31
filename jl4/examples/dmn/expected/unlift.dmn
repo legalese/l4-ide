@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_phase_4_exhibit_un_lifting_tiering_and_the_population_filter" name="Phase 4 exhibit — un-lifting, tiering, and the population filter" namespace="https://legalese.com/l4/dmn/phase_4_exhibit_un_lifting_tiering_and_the_population_filter" exporter="jl4">
+  <itemDefinition id="itemdef_claimant" name="Claimant">
+    <itemComponent id="itemdef_claimant_c1" name="income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_claimant_c2" name="children">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_article3case" name="Article3Case">
+    <itemComponent id="itemdef_article3case_c1" name="reason">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_article7case" name="Article7Case">
+    <itemComponent id="itemdef_article7case_c1" name="reason">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_payer" name="Payer">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"Agency","Nobody"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_payment" name="Payment">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"Disburse","Withhold"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_claimant" name="claimant">
+    <variable id="input_claimant_var" name="claimant" typeRef="Claimant"/>
+  </inputData>
+  <inputData id="input_amount" name="amount">
+    <variable id="input_amount_var" name="amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_s" name="s">
+    <variable id="input_s_var" name="s" typeRef="Article3Case"/>
+  </inputData>
+  <inputData id="input_s_2" name="s_2" label="s">
+    <variable id="input_s_2_var" name="s_2" label="s" typeRef="Article7Case"/>
+  </inputData>
+  <decision id="decision_basic_monthly_benefit" name="basic_monthly_benefit" label="basic monthly benefit">
+    <variable id="decision_basic_monthly_benefit_var" name="basic_monthly_benefit" label="basic monthly benefit" typeRef="number"/>
+    <informationRequirement id="decision_basic_monthly_benefit_ir1">
+      <requiredInput href="#input_claimant"/>
+    </informationRequirement>
+    <literalExpression id="decision_basic_monthly_benefit_literal">
+      <text>claimant.income * 0.3 + claimant.children * 50</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_benefit_cap" name="benefit_cap" label="benefit cap">
+    <variable id="decision_benefit_cap_var" name="benefit_cap" label="benefit cap" typeRef="number"/>
+    <informationRequirement id="decision_benefit_cap_ir1">
+      <requiredInput href="#input_claimant"/>
+    </informationRequirement>
+    <literalExpression id="decision_benefit_cap_literal">
+      <text>claimant.income * 0.5</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_capped_benefit" name="capped_benefit" label="capped benefit">
+    <variable id="decision_capped_benefit_var" name="capped_benefit" label="capped benefit" typeRef="number"/>
+    <informationRequirement id="decision_capped_benefit_ir1">
+      <requiredDecision href="#decision_basic_monthly_benefit"/>
+    </informationRequirement>
+    <informationRequirement id="decision_capped_benefit_ir2">
+      <requiredDecision href="#decision_benefit_cap"/>
+    </informationRequirement>
+    <informationRequirement id="decision_capped_benefit_ir3">
+      <requiredInput href="#input_claimant"/>
+    </informationRequirement>
+    <literalExpression id="decision_capped_benefit_literal">
+      <text>min(basic_monthly_benefit, benefit_cap)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_scaled_amount" name="scaled_amount" label="scaled amount">
+    <variable id="decision_scaled_amount_var" name="scaled_amount" label="scaled amount" typeRef="number"/>
+    <informationRequirement id="decision_scaled_amount_ir1">
+      <requiredInput href="#input_amount"/>
+    </informationRequirement>
+    <literalExpression id="decision_scaled_amount_literal">
+      <text>amount * 1.07</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_low_estimate" name="low_estimate" label="low estimate">
+    <variable id="decision_low_estimate_var" name="low_estimate" label="low estimate" typeRef="number"/>
+    <informationRequirement id="decision_low_estimate_ir1">
+      <requiredDecision href="#decision_scaled_amount"/>
+    </informationRequirement>
+    <literalExpression id="decision_low_estimate_literal">
+      <text>`scaled amount` OF 100</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_high_estimate" name="high_estimate" label="high estimate">
+    <variable id="decision_high_estimate_var" name="high_estimate" label="high estimate" typeRef="number"/>
+    <informationRequirement id="decision_high_estimate_ir1">
+      <requiredDecision href="#decision_scaled_amount"/>
+    </informationRequirement>
+    <literalExpression id="decision_high_estimate_literal">
+      <text>`scaled amount` OF 900</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_art3_applies" name="art3_applies" label="art3 applies">
+    <variable id="decision_art3_applies_var" name="art3_applies" label="art3 applies" typeRef="boolean"/>
+    <informationRequirement id="decision_art3_applies_ir1">
+      <requiredInput href="#input_s"/>
+    </informationRequirement>
+    <literalExpression id="decision_art3_applies_literal">
+      <text>s.reason = "emergency"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_art7_applies" name="art7_applies" label="art7 applies">
+    <variable id="decision_art7_applies_var" name="art7_applies" label="art7 applies" typeRef="boolean"/>
+    <informationRequirement id="decision_art7_applies_ir1">
+      <requiredInput href="#input_s_2"/>
+    </informationRequirement>
+    <literalExpression id="decision_art7_applies_literal">
+      <text>s_2.reason = "gathering"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_definition_benefit" name="definition_benefit" label="definition — benefit">
+    <variable id="decision_definition_benefit_var" name="definition_benefit" label="definition — benefit" typeRef="boolean"/>
+    <literalExpression id="decision_definition_benefit_literal">
+      <text>true and true</text>
+    </literalExpression>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_phase_4_exhibit_un_lifting_tiering_and_the_population_filter_diagram" name="Phase 4 exhibit — un-lifting, tiering, and the population filter">
+      <dmndi:DMNShape id="input_claimant_shape" dmnElementRef="input_claimant">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_amount_shape" dmnElementRef="input_amount">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_s_shape" dmnElementRef="input_s">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_s_2_shape" dmnElementRef="input_s_2">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_basic_monthly_benefit_shape" dmnElementRef="decision_basic_monthly_benefit">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_benefit_cap_shape" dmnElementRef="decision_benefit_cap">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_scaled_amount_shape" dmnElementRef="decision_scaled_amount">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_art3_applies_shape" dmnElementRef="decision_art3_applies">
+        <dc:Bounds x="720" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_art7_applies_shape" dmnElementRef="decision_art7_applies">
+        <dc:Bounds x="940" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_definition_benefit_shape" dmnElementRef="decision_definition_benefit">
+        <dc:Bounds x="1160" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_capped_benefit_shape" dmnElementRef="decision_capped_benefit">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_low_estimate_shape" dmnElementRef="decision_low_estimate">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_high_estimate_shape" dmnElementRef="decision_high_estimate">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_basic_monthly_benefit_ir1_edge" dmnElementRef="decision_basic_monthly_benefit_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_benefit_cap_ir1_edge" dmnElementRef="decision_benefit_cap_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_benefit_ir1_edge" dmnElementRef="decision_capped_benefit_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_benefit_ir2_edge" dmnElementRef="decision_capped_benefit_ir2">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_benefit_ir3_edge" dmnElementRef="decision_capped_benefit_ir3">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_scaled_amount_ir1_edge" dmnElementRef="decision_scaled_amount_ir1">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_low_estimate_ir1_edge" dmnElementRef="decision_low_estimate_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_high_estimate_ir1_edge" dmnElementRef="decision_high_estimate_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_art3_applies_ir1_edge" dmnElementRef="decision_art3_applies_ir1">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="810" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_art7_applies_ir1_edge" dmnElementRef="decision_art7_applies_ir1">
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="1030" y="300"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

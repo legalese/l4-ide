@@ -60,9 +60,12 @@ module L4.Cli.Export
 
 import Base
 import qualified Base.Text as Text
+import Control.Exception (SomeException, try)
+import qualified Base.Set as Set
 import Options.Applicative
+import System.Directory (doesDirectoryExist, listDirectory)
 import System.Exit (exitFailure, exitSuccess)
-import System.FilePath (replaceExtension, takeBaseName)
+import System.FilePath (replaceExtension, takeBaseName, takeDirectory, takeExtension, (</>))
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
@@ -75,9 +78,12 @@ import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
+import L4.Annotation (rangeOf)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
 import L4.StateGraph (StateGraph (..), extractStateGraphs)
+import L4.Syntax
+import qualified L4.TypeCheck as TC
 
 import L4.Cli.Common
 
@@ -115,6 +121,7 @@ data ExportOptions = ExportOptions
   , exportFlavor       :: Maybe DmnFlavor
   , exportDeadlineUnit :: Maybe DeadlineUnitPolicy
   , exportFailOn       :: FidelityGate
+  , exportIncludeTests :: Bool
   }
 
 exportTargetReader :: ReadM ExportTarget
@@ -232,6 +239,14 @@ exportOptionsParser = ExportOptions
             \none|blocking|lossy|advisory. Default none, because Blocking describes the \
             \target notation's limits and fires on every realistic export."
         )
+  <*> switch
+        ( long "include-tests"
+       <> help
+            "DMN only: also emit decisions the population filter classifies as test \
+            \scaffolding (referenced only from directive argument positions, with no \
+            \callers). Default off: a fixture emitted as a <decision> misdescribes the \
+            \rule set."
+        )
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -265,6 +280,58 @@ exportCmd opts = do
       hPutStrLn stderr "Type checking failed — cannot export"
       exitFailure
 
+-- | @FIXTURE(d)@'s importer view (OPEN-5, option 1): glob @*.l4@ beside the
+-- exported file, textually detect @IMPORT <basename>@, and report which of
+-- this module's decide names occur anywhere in an importing sibling's text.
+--
+-- Deliberately textual and conservative in the KEEP direction: a name
+-- occurring in a comment still counts as an external reference and the
+-- decision is kept — a false keep costs one extra element, a false drop
+-- deletes a statute (§2.5.7's @`relevant date`@ is called from three sibling
+-- files). What this scan cannot see: importers outside the file's own
+-- directory. 'Nothing' (scan failed) makes the population filter fail safe.
+siblingExternalRefs :: FilePath -> Module Resolved -> IO (Maybe (Set Text))
+siblingExternalRefs fp modul = do
+  let dir = takeDirectory fp
+  ok <- doesDirectoryExist dir
+  if not ok
+    then pure Nothing
+    else do
+      efs <- try (listDirectory dir) :: IO (Either SomeException [FilePath])
+      case efs of
+        Left _ -> pure Nothing
+        Right fs -> do
+          let siblings =
+                [ dir </> f
+                | f <- fs
+                , takeExtension f == ".l4"
+                , takeBaseName f /= takeBaseName fp
+                ]
+              baseName = Text.pack (takeBaseName fp)
+          texts <- for siblings \f -> do
+            et <- try (Text.readFile f) :: IO (Either SomeException Text)
+            pure (either (const "") id et)
+          let importerTexts =
+                [ t
+                | t <- texts
+                , ("IMPORT " <> baseName) `Text.isInfixOf` t
+                ]
+          pure . Just $ Set.fromList
+            [ n
+            | n <- moduleDecideNames modul
+            , any (n `Text.isInfixOf`) importerTexts
+            ]
+
+moduleDecideNames :: Module Resolved -> [Text]
+moduleDecideNames (MkModule _ _ sec) = goSec sec
+ where
+  goSec (MkSection _ _ _ ds) = concatMap goDecl ds
+  goDecl = \case
+    Decide _ (MkDecide _ _ (MkAppForm _ n _ _) _) ->
+      [unqualifiedNameToText (getOriginal n)]
+    Section _ s -> goSec s
+    _ -> []
+
 -- | Four of the flags belong to some proper subset of the three targets.
 -- Silently ignoring one the caller took the trouble to type is a small lie of
 -- the same family the fidelity report exists to stop, so say so and stop.
@@ -295,6 +362,7 @@ checkTargetFlags opts = case misplaced of
     , ("--flavor",        isJust opts.exportFlavor,       [TargetDmn],                    "--to=dmn")
     , ("--rule",          isJust opts.exportRule,         [TargetBpmn],                   "--to=bpmn")
     , ("--deadline-unit", isJust opts.exportDeadlineUnit, [TargetBpmn],                   "--to=bpmn")
+    , ("--include-tests", opts.exportIncludeTests,        [TargetDmn, TargetDmnMarkdown], "--to=dmn / --to=dmn-md")
     ]
   misplaced =
     [ (f, owner)
@@ -315,6 +383,12 @@ targetFlagName = \case
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do
+  -- FIXTURE(d)'s importer view (§2.5.7, OPEN-5): a sibling-directory scan.
+  -- Textual and conservative-keep: an occurrence of a decide's name anywhere
+  -- in an importing sibling counts as an external reference, so over-matching
+  -- KEEPS a decision (safe); only a name that appears in no importer can be
+  -- dropped. When the scan cannot run, 'Nothing' makes the filter fail safe.
+  externalRefs <- siblingExternalRefs opts.exportFile tcRes.module'
   -- Precedence: what the caller asked for, else the module's own outermost @§@
   -- heading, else the file's base name. The middle step is what lets a corpus
   -- name its own model once, in the corpus, instead of having the title
@@ -338,6 +412,16 @@ exportDmn opts tcRes = do
             -- golden harness's cannot drift apart on how recognition is done.
             , dloMaybePredicates =
                 resolveMaybePredicates tcRes.module' tcRes.environment tcRes.entityInfo
+            , dloIncludeTests = opts.exportIncludeTests
+            -- DMN-SAFE's L1: the checker's own exhaustiveness warnings, from
+            -- the same check result the module came from (the golden harness
+            -- extracts them identically, so the two cannot drift).
+            , dloMissingMatchRanges =
+                [ r
+                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <- tcRes.infos
+                , Just r <- [rangeOf e]
+                ]
+            , dloExternalRefNames = externalRefs
             }
           tcRes.module'
   when (null (drgDecisions drg)) do

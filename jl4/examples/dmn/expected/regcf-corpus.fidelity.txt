@@ -3,130 +3,52 @@ fidelity report — DMN 1.3 (XML), camunda flavor
       two different terms fold to the FEEL name `amount_to_be_sold_in_this_transaction` (L4: `amount to be sold in this transaction`; used in aggregate amount sold to this investor including this transaction, investor is within the investment limit); they are emitted as the distinct globals `amount_to_be_sold_in_this_transaction`, `amount_to_be_sold_in_this_transaction_2`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_arrangement
-      five different terms fold to the FEEL name `arrangement` (L4: `arrangement`; used in (a)(3) — conducted through a single complying intermediary, the 21-day public availability period has run, the intermediary has discharged its investor-facing duties, intermediary obligations are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `arrangement`, `arrangement_2`, `arrangement_3`, `arrangement_4`, `arrangement_5`, because DMN's inputData is global and has no scope at all
+      two different terms fold to the FEEL name `arrangement` (L4: `arrangement`; used in (a)(3) — conducted through a single complying intermediary, the 21-day public availability period has run, the intermediary has discharged its investor-facing duties, intermediary obligations are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `arrangement`, `arrangement_2`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_filing
       two different terms fold to the FEEL name `filing` (L4: `filing`; used in disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `filing`, `filing_2`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_investor
-      seven different terms fold to the FEEL name `investor` (L4: `investor`; used in the applicable measure of annual income or net worth, either annual income or net worth is less than the cut point, investment limit, aggregate amount sold to this investor including this transaction, the accredited-investor carve-out applies to, investor is within the investment limit, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `investor`, `investor_2`, `investor_3`, `investor_4`, `investor_5`, `investor_6`, `investor_7`, because DMN's inputData is global and has no scope at all
+      four different terms fold to the FEEL name `investor` (L4: `investor`; used in the applicable measure of annual income or net worth, either annual income or net worth is less than the cut point, investment limit, aggregate amount sold to this investor including this transaction, the accredited-investor carve-out applies to, investor is within the investment limit, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `investor`, `investor_2`, `investor_3`, `investor_4`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_issuer
-      nine different terms fold to the FEEL name `issuer` (L4: `issuer`; used in (b)(1) — not organized under State or territorial law, (b)(2) — an Exchange Act reporting company, (b)(3) — an investment company, (b)(4) — subject to a bad-actor disqualification, (b)(5) — delinquent in ongoing annual reports, (b)(6) — no specific business plan, or a blank-check business plan, issuer is excluded by Rule 100(b), issuer is eligible, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `issuer`, `issuer_2`, `issuer_3`, `issuer_4`, `issuer_5`, `issuer_6`, `issuer_7`, `issuer_8`, `issuer_9`, because DMN's inputData is global and has no scope at all
-      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
-  [D-SCOPE] lossy — input_notice
-      two different terms fold to the FEEL name `notice` (L4: `notice`; used in notice complies with Rule 204(b), advertising restriction); they are emitted as the distinct globals `notice`, `notice_2`, because DMN's inputData is global and has no scope at all
+      two different terms fold to the FEEL name `issuer` (L4: `issuer`; used in (b)(1) — not organized under State or territorial law, (b)(2) — an Exchange Act reporting company, (b)(3) — an investment company, (b)(4) — subject to a bad-actor disqualification, (b)(5) — delinquent in ongoing annual reports, (b)(6) — no specific business plan, or a blank-check business plan, issuer is excluded by Rule 100(b), issuer is eligible, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `issuer`, `issuer_2`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_offering
-      six different terms fold to the FEEL name `offering` (L4: `offering`; used in aggregate offering amount, offering is within the offering limit, financial statements required, financial statement requirement is satisfied, disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `offering`, `offering_2`, `offering_3`, `offering_4`, `offering_5`, `offering_6`, because DMN's inputData is global and has no scope at all
+      four different terms fold to the FEEL name `offering` (L4: `offering`; used in aggregate offering amount, offering is within the offering limit, financial statements required, financial statement requirement is satisfied, disclosure requirements are met, the transaction qualifies for the section 4(a)(6) exemption); they are emitted as the distinct globals `offering`, `offering_2`, `offering_3`, `offering_4`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
   [D-SCOPE] lossy — input_status
-      seven different terms fold to the FEEL name `status` (L4: `status`; used in (b)(1) — became an Exchange Act reporting company, (b)(2) — one annual report filed and fewer than 300 holders of record, (b)(3) — three annual reports filed and total assets not exceeding $10,000,000, (b)(4) — all securities repurchased, (b)(5) — liquidated or dissolved, ongoing reporting obligation may terminate, ongoing reporting obligation); they are emitted as the distinct globals `status`, `status_2`, `status_3`, `status_4`, `status_5`, `status_6`, `status_7`, because DMN's inputData is global and has no scope at all
+      two different terms fold to the FEEL name `status` (L4: `status`; used in (b)(1) — became an Exchange Act reporting company, (b)(2) — one annual report filed and fewer than 300 holders of record, (b)(3) — three annual reports filed and total assets not exceeding $10,000,000, (b)(4) — all securities repurchased, (b)(5) — liquidated or dissolved, ongoing reporting obligation may terminate, ongoing reporting obligation); they are emitted as the distinct globals `status`, `status_2`, because DMN's inputData is global and has no scope at all
       lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
-  [D-SCOPE] lossy — input_transfer
-      four different terms fold to the FEEL name `transfer` (L4: `transfer`; used in transfer is within the one-year restricted period, transfer falls within an exception in Rule 501(a), transfer is permitted, resale restriction); they are emitted as the distinct globals `transfer`, `transfer_2`, `transfer_3`, `transfer_4`, because DMN's inputData is global and has no scope at all
-      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
-  [D-RENAME] lossy — input_issuer_2
-      `issuer` is emitted as the FEEL name `issuer_2`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_3
-      `issuer` is emitted as the FEEL name `issuer_3`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_4
-      `issuer` is emitted as the FEEL name `issuer_4`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_5
-      `issuer` is emitted as the FEEL name `issuer_5`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_6
-      `issuer` is emitted as the FEEL name `issuer_6`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_7
-      `issuer` is emitted as the FEEL name `issuer_7`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_8
-      `issuer` is emitted as the FEEL name `issuer_8`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_offering_2
-      `offering` is emitted as the FEEL name `offering_2`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
+      `offering` is emitted as the FEEL name `offering_2`, not `offering`: four elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_investor_2
-      `investor` is emitted as the FEEL name `investor_2`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      `investor` is emitted as the FEEL name `investor_2`, not `investor`: four elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_investor_3
-      `investor` is emitted as the FEEL name `investor_3`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_investor_4
-      `investor` is emitted as the FEEL name `investor_4`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_investor_5
-      `investor` is emitted as the FEEL name `investor_5`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_investor_6
-      `investor` is emitted as the FEEL name `investor_6`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
+      `investor` is emitted as the FEEL name `investor_3`, not `investor`: four elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_amount_to_be_sold_in_this_transaction_2
       `amount to be sold in this transaction` is emitted as the FEEL name `amount_to_be_sold_in_this_transaction_2`, not `amount_to_be_sold_in_this_transaction`: two elements of the DRG's flat variable namespace in this module fold to `amount_to_be_sold_in_this_transaction` (`amount to be sold in this transaction`, `amount to be sold in this transaction`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_offering_3
-      `offering` is emitted as the FEEL name `offering_3`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_offering_4
-      `offering` is emitted as the FEEL name `offering_4`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_offering_5
-      `offering` is emitted as the FEEL name `offering_5`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_arrangement_2
-      `arrangement` is emitted as the FEEL name `arrangement_2`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_arrangement_3
-      `arrangement` is emitted as the FEEL name `arrangement_3`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_arrangement_4
-      `arrangement` is emitted as the FEEL name `arrangement_4`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_notice_2
-      `notice` is emitted as the FEEL name `notice_2`, not `notice`: two elements of the DRG's flat variable namespace in this module fold to `notice` (`notice`, `notice`), and the first claimant in source order keeps the base name
+      `offering` is emitted as the FEEL name `offering_3`, not `offering`: four elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_status_2
-      `status` is emitted as the FEEL name `status_2`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+      `status` is emitted as the FEEL name `status_2`, not `status`: two elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_status_3
-      `status` is emitted as the FEEL name `status_3`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+  [D-RENAME] lossy — input_issuer_2
+      `issuer` is emitted as the FEEL name `issuer_2`, not `issuer`: two elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_status_4
-      `status` is emitted as the FEEL name `status_4`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+  [D-RENAME] lossy — input_offering_4
+      `offering` is emitted as the FEEL name `offering_4`, not `offering`: four elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_status_5
-      `status` is emitted as the FEEL name `status_5`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
+  [D-RENAME] lossy — input_investor_4
+      `investor` is emitted as the FEEL name `investor_4`, not `investor`: four elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_status_6
-      `status` is emitted as the FEEL name `status_6`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_status_7
-      `status` is emitted as the FEEL name `status_7`, not `status`: seven elements of the DRG's flat variable namespace in this module fold to `status` (`status`, `status`, `status`, `status`, `status`, `status`, `status`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_transfer_2
-      `transfer` is emitted as the FEEL name `transfer_2`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_transfer_3
-      `transfer` is emitted as the FEEL name `transfer_3`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_transfer_4
-      `transfer` is emitted as the FEEL name `transfer_4`, not `transfer`: four elements of the DRG's flat variable namespace in this module fold to `transfer` (`transfer`, `transfer`, `transfer`, `transfer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_issuer_9
-      `issuer` is emitted as the FEEL name `issuer_9`, not `issuer`: nine elements of the DRG's flat variable namespace in this module fold to `issuer` (`issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`, `issuer`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_offering_6
-      `offering` is emitted as the FEEL name `offering_6`, not `offering`: six elements of the DRG's flat variable namespace in this module fold to `offering` (`offering`, `offering`, `offering`, `offering`, `offering`, `offering`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_investor_7
-      `investor` is emitted as the FEEL name `investor_7`, not `investor`: seven elements of the DRG's flat variable namespace in this module fold to `investor` (`investor`, `investor`, `investor`, `investor`, `investor`, `investor`, `investor`), and the first claimant in source order keeps the base name
-      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
-  [D-RENAME] lossy — input_arrangement_5
-      `arrangement` is emitted as the FEEL name `arrangement_5`, not `arrangement`: five elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`, `arrangement`, `arrangement`, `arrangement`), and the first claimant in source order keeps the base name
+  [D-RENAME] lossy — input_arrangement_2
+      `arrangement` is emitted as the FEEL name `arrangement_2`, not `arrangement`: two elements of the DRG's flat variable namespace in this module fold to `arrangement` (`arrangement`, `arrangement`), and the first claimant in source order keeps the base name
       lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
   [D-RENAME] lossy — input_filing_2
       `filing` is emitted as the FEEL name `filing_2`, not `filing`: two elements of the DRG's flat variable namespace in this module fold to `filing` (`filing`, `filing`), and the first claimant in source order keeps the base name
@@ -242,9 +164,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_definition_terms_of_the_offering  (main.l4:614:9-615:13)
       `definition — terms of the offering` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_advertising_restriction  (main.l4:635:5-637:66)
-      `advertising restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_b_1_became_an_exchange_act_reporting_company  (main.l4:654:9-655:115)
       `(b)(1) — became an Exchange Act reporting company` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
@@ -275,23 +194,14 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_transfer_is_permitted  (main.l4:756:8-757:68)
       `transfer is permitted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_resale_restriction  (main.l4:763:5-765:103)
-      `resale restriction` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption  (main.l4:784:9-789:58)
       `the transaction qualifies for the section 4(a)(6) exemption` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_a_clean_issuer  (main.l4:795:24-802:168)
       `a clean issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_foreign_issuer  (main.l4:804:26-811:168)
-      `a foreign issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_a_delinquent_issuer  (main.l4:815:29-822:168)
       `a delinquent issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_blank_check_issuer  (main.l4:824:30-831:167)
-      `a blank-check issuer` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_an_offering_of  (main.l4:837:66-841:111)
       `an offering of` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
@@ -302,12 +212,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_an_arrangement_with  (main.l4:858:63-864:135)
       `an arrangement with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_reporting_status_with  (main.l4:870:69-876:112)
-      `a reporting status with` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_transfer_at  (main.l4:881:58-886:307)
-      `a transfer at` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_certified  (main.l4:953:19-115)
       `certified` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
@@ -316,15 +220,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_audited  (main.l4:959:17-83)
       `audited` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_conforming_notice  (main.l4:992:29-997:167)
-      `a conforming notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_an_overreaching_notice  (main.l4:999:32-1004:166)
-      `an overreaching notice` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_a_notice_with_no_platform_link  (main.l4:1006:40-1011:167)
-      `a notice with no platform link` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_a_conforming_filing  (main.l4:1077:29-1080:176)
       `a conforming filing` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
@@ -449,6 +344,96 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-RULEDATE-UNBOUND] blocking — decision_a_large_offering_inside_the_covid_window  (main.l4:1233:5-99)
       `a large offering inside the COVID window` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped rebinding, so this decision is not governed by it and cannot be
       lost: execution: no DMN engine can evaluate this decision, and -- the part a reader is most likely to get wrong -- supplying the model's rule-date input does not make it answer
+  [D-REGULATIVE] lossy — advertising restriction  (main.l4:632:1-637:66)
+      `advertising restriction` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
+      lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
+  [D-REGULATIVE] lossy — resale restriction  (main.l4:760:1-765:103)
+      `resale restriction` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
+      lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
+  [D-FIXTURE] advisory — a foreign issuer  (main.l4:804:1-811:168)
+      `a foreign issuer` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a blank-check issuer  (main.l4:824:1-831:167)
+      `a blank-check issuer` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a reporting status with  (main.l4:866:1-876:112)
+      `a reporting status with` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a transfer at  (main.l4:878:1-886:307)
+      `a transfer at` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a conforming notice  (main.l4:992:1-997:167)
+      `a conforming notice` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — an overreaching notice  (main.l4:999:1-1004:166)
+      `an overreaching notice` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-FIXTURE] advisory — a notice with no platform link  (main.l4:1006:1-1011:167)
+      `a notice with no platform link` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-INERT] advisory — decision_business_days_to_file_a_progress_update  (main.l4:230:1-231:50)
+      `business days to file a progress update` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_definition_terms_of_the_offering  (main.l4:612:1-615:13)
+      `definition — terms of the offering` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_certified  (main.l4:952:1-953:115)
+      `certified` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-INERT] advisory — decision_audited  (main.l4:958:1-959:83)
+      `audited` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-PARAM-AS-INPUT] advisory — input_arrangement
+      the GIVEN parameter `arrangement` of four decisions (`(a)(3) — conducted through a single complying intermediary`, `the 21-day public availability period has run`, `the intermediary has discharged its investor-facing duties`, `intermediary obligations are met`) became the one shared model input `input_arrangement`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_investor
+      the GIVEN parameter `investor` of four decisions (`the applicable measure of annual income or net worth`, `either annual income or net worth is less than the cut point`, `aggregate amount sold to this investor including this transaction`, `the accredited-investor carve-out applies to`) became the one shared model input `input_investor`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_issuer
+      the GIVEN parameter `issuer` of eight decisions (`(b)(1) — not organized under State or territorial law`, `(b)(2) — an Exchange Act reporting company`, `(b)(3) — an investment company`, `(b)(4) — subject to a bad-actor disqualification`, `(b)(5) — delinquent in ongoing annual reports`, `(b)(6) — no specific business plan, or a blank-check business plan`, `issuer is excluded by Rule 100(b)`, `issuer is eligible`) became the one shared model input `input_issuer`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_offering
+      the GIVEN parameter `offering` of three decisions (`aggregate offering amount`, `financial statement requirement is satisfied`, `disclosure requirements are met`) became the one shared model input `input_offering`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_status
+      the GIVEN parameter `status` of six decisions (`(b)(1) — became an Exchange Act reporting company`, `(b)(2) — one annual report filed and fewer than 300 holders of record`, `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000`, `(b)(4) — all securities repurchased`, `(b)(5) — liquidated or dissolved`, `ongoing reporting obligation may terminate`) became the one shared model input `input_status`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_transfer
+      the GIVEN parameter `transfer` of three decisions (`transfer is within the one-year restricted period`, `transfer falls within an exception in Rule 501(a)`, `transfer is permitted`) became the one shared model input `input_transfer`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARTIAL] lossy — decision_ongoing_reporting_obligation  (main.l4:704:1-713:84)
+      `ongoing reporting obligation` could not be certified total (TERMINATES at main.l4:704:1-713:84: self-recursion could not be certified structurally terminating (no parameter position decreases through a FOLLOWED BY pattern on every recursive call)), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null
+      lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
+  [D-BKM] advisory — decision_the_rules_in_force_include
+      `the rules in force include` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `offering maximum in a 12-month period`, `income or net worth cut point`, `minimum permitted investment`, `maximum amount sold to any one investor in a 12-month period`, `tier 1 ceiling`, `tier 2 ceiling`, `first-time issuer review ceiling`, `the applicable measure of annual income or net worth`, `the accredited-investor carve-out applies to`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_offering_is_within_the_offering_limit
+      `offering is within the offering limit` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the transaction qualifies for the section 4(a)(6) exemption`, `W within the limit in 2016`, `W within the limit in 2021 January`, `W within the limit in 2021 June`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_investment_limit
+      `investment limit` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `investor is within the investment limit`, `I-3 limit under the 2022 rules`, `I-3 limit under the 2023 rules`, `I-4 limit under the 2022 rules`, `the percentage case under the 2019 rules`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_investor_is_within_the_investment_limit
+      `investor is within the investment limit` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the transaction qualifies for the section 4(a)(6) exemption`, `A is within the limit under the 2021 rules`, `A is within the limit under the 2019 rules`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_financial_statements_required
+      `financial statements required` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `financial statement requirement is satisfied`, `F requirement under the 2019 rules`, `F requirement under the 2023 rules`, `a small offering inside the COVID window`, `a large offering inside the COVID window`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_assurance_level
+      `assurance level` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `financial statement requirement is satisfied`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_the_transaction_qualifies_for_the_section_4_a_6_exemption
+      `the transaction qualifies for the section 4(a)(6) exemption` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the base case qualifies`, `the delinquent-issuer case qualifies`, `the over-limit-investor case qualifies`, `the short-availability case qualifies`, `the under-assured-financials case qualifies`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_an_offering_of
+      `an offering of` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the base case qualifies`, `the delinquent-issuer case qualifies`, `the over-limit-investor case qualifies`, `the short-availability case qualifies`, `the under-assured-financials case qualifies`, `W offering`, `F offering`, `a small offering inside the COVID window`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_an_investor_with
+      `an investor with` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the base case qualifies`, `the delinquent-issuer case qualifies`, `the over-limit-investor case qualifies`, `the short-availability case qualifies`, `the under-assured-financials case qualifies`, `I-3 investor`, `I-4 investor`, `the percentage case under the 2019 rules`, `A investor`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — decision_an_arrangement_with
+      `an arrangement with` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the base case qualifies`, `the delinquent-issuer case qualifies`, `the over-limit-investor case qualifies`, `the short-availability case qualifies`, `the under-assured-financials case qualifies`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
   [D-COMPUTEDOUTPUT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:142:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
@@ -482,15 +467,12 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-UNDECOMPOSABLE] advisory — decision_investment_limit  (main.l4:411:10-81)
       the guard ``either annual income or net worth is less than the cut point` OF investor` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_investment_limit  (main.l4:411:10-81)
-      the input expression ``either annual income or net worth is less than the cut point` OF investor` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:412:10-414:44)
-      the output entry `IF (`minimum permitted investment` AT LEAST (0.05 TIMES (`the applicable measure of annual income or net worth` OF investor))) THEN `minimum permitted investment` ELSE (0.05 TIMES (`the applicable measure of annual income or net worth` OF investor))` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
-      lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
-  [D-NONFEELOUTPUT] blocking — decision_investment_limit  (main.l4:415:10-417:77)
-      the output entry `IF ((0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) AT MOST `maximum amount sold to any one investor in a 12-month period`) THEN (0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) ELSE `maximum amount sold to any one investor in a 12-month period`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate it
-      lost: execution: an engine fails to compile the entry -- loudly when the rule fires, but SILENTLY (a null result, reported as success) when it is the defaultOutputEntry
+  [D-COMPUTEDOUTPUT] advisory — decision_investment_limit  (main.l4:412:10-414:44)
+      the output entry `max(minimum_permitted_investment, 0.05 * the_applicable_measure_of_annual_income_or_net_worth)` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
+  [D-COMPUTEDOUTPUT] advisory — decision_investment_limit  (main.l4:415:10-417:77)
+      the output entry `min(0.1 * the_applicable_measure_of_annual_income_or_net_worth, maximum_amount_sold_to_any_one_investor_in_a_12_month_period)` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
   [D-INLINEDLOCAL] advisory — decision_investment_limit  (main.l4:411:10-81)
       the WHERE/LET local(s) `five percent of the measure`, `ten percent of the measure` were inlined into the cells that used them; DMN has no lexically scoped intermediate value
       lost: the name the drafter gave the intermediate quantity
@@ -506,21 +488,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-UNDECOMPOSABLE] advisory — decision_financial_statements_required  (main.l4:494:17-71)
       the guard `(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`` has no constant endpoint, so it became its own boolean column rather than an input expression tested by a unary test
       lost: interval gap and overlap analysis over this condition
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:497:17-498:16)
-      the input expression `(`aggregate offering amount` OF offering) GREATER THAN `tier 1 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:491:27-63)
-      the input expression ``aggregate offering amount` OF offering` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:486:15-51)
-      the input expression `(`aggregate offering amount` OF offering) AT MOST `tier 1 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:487:15-51)
-      the input expression `(`aggregate offering amount` OF offering) AT MOST `tier 2 ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
-  [D-NONFEELINPUT] blocking — decision_financial_statements_required  (main.l4:494:17-71)
-      the input expression `(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text was emitted verbatim and NO DMN engine can evaluate this column
-      lost: execution: the table is well-formed DMN but the engine fails to compile the column, and every rule that tests it is silently treated as non-matching
   [D-ORDERDEPENDENT] advisory — decision_financial_statements_required  (main.l4:496:17-498:43)
       hit policy First is order-dependent: DMN 8.2.10 says of such tables that "the table is hard to validate manually and therefore has to be used with care"
       lost: order-free reading; a rule cannot be checked without the rules above it

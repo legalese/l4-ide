@@ -1,0 +1,31 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_phase_4_exhibit_un_lifting_tiering_and_the_population_filter
+      dmnmd is a table format, not a graph: the 10 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NOLITERAL] blocking — decision_basic_monthly_benefit
+      `basic monthly benefit` is a formula (claimant.income * 0.3 + claimant.children * 50), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_benefit_cap
+      `benefit cap` is a formula (claimant.income * 0.5), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_capped_benefit
+      `capped benefit` is a formula (min(basic_monthly_benefit, benefit_cap)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_scaled_amount
+      `scaled amount` is a formula (amount * 1.07), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_low_estimate
+      `low estimate` is a formula (`scaled amount` OF 100), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_high_estimate
+      `high estimate` is a formula (`scaled amount` OF 900), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_art3_applies
+      `art3 applies` is a formula (s.reason = "emergency"), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_art7_applies
+      `art7 applies` is a formula (s_2.reason = "gathering"), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_definition_benefit
+      `definition — benefit` is a formula (true and true), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown

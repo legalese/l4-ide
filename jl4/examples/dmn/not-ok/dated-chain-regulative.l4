@@ -39,3 +39,11 @@ GIVETH A DEONTIC Actor Action
     IF   `RULES EFFECTIVE DATE` AT LEAST `the 2024 amendment`
     THEN PARTY Issuer MUST `file the annual report` WITHIN 30
     ELSE PARTY Issuer MUST `file the annual report` WITHIN 45
+
+-- Phase 4: an UNCALLED regulative body leaves the DRG altogether (§2.5.6
+-- rule 3, D-REGULATIVE), which would make this fixture assert nothing. The
+-- reference below keeps `filing duty` in the DRG — module-CALLED regulatives
+-- stay, still emitting raw L4 — so R10's refusal machinery remains the thing
+-- under test.
+GIVETH A DEONTIC Actor Action
+`invoked duty` MEANS `filing duty`

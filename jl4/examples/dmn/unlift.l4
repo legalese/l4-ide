@@ -1,0 +1,88 @@
+§ `Phase 4 exhibit — un-lifting, tiering, and the population filter`
+
+-- One module, six shapes, each present to pin one Phase 4 behaviour:
+--
+--   1. `basic monthly benefit` / `benefit cap` / `capped benefit` — the
+--      TIER-1 UN-LIFT: three decisions bind `claimant` at one declared type,
+--      and `capped benefit` applies both siblings to the same argument. The
+--      three parameters merge into ONE <inputData> and the call sites render
+--      as bare FEEL names (D-PARAM-AS-INPUT names the loss).
+--   2. `scaled amount` — the TIER-2 λ: applied to two DISTINCT argument
+--      expressions by `low estimate` and `high estimate`, so it is a real
+--      function. Classified D-BKM; behaviour unchanged until Phase 5.
+--   3. `art3 applies` / `art7 applies` — the TYPE CONFLICT: both bind `s`,
+--      at two different declared types. The merge is REFUSED (D-PARAMTYPE,
+--      Blocking) and two elements survive, with D-SCOPE still firing.
+--   4. `sample claimant` — a TEST FIXTURE: referenced only from the
+--      directive's argument position, so it is dropped (D-FIXTURE) unless
+--      --include-tests.
+--   5. `definition — benefit` — an INERT PROSE CARRIER: no reference, no
+--      input; kept, flagged D-INERT.
+--   6. `payment duty` — an UNCALLED REGULATIVE body: routed to BPMN rather
+--      than emitted as a fake decision (D-REGULATIVE).
+
+DECLARE Claimant HAS
+  income   IS A NUMBER
+  children IS A NUMBER
+
+DECLARE Article3Case HAS reason IS A STRING
+DECLARE Article7Case HAS reason IS A STRING
+
+-- 1. the tier-1 un-lift
+GIVEN claimant IS A Claimant
+GIVETH A NUMBER
+`basic monthly benefit` claimant MEANS
+  claimant's income TIMES 0.3 PLUS claimant's children TIMES 50
+
+GIVEN claimant IS A Claimant
+GIVETH A NUMBER
+`benefit cap` claimant MEANS claimant's income TIMES 0.5
+
+GIVEN claimant IS A Claimant
+GIVETH A NUMBER
+`capped benefit` claimant MEANS
+  IF `basic monthly benefit` claimant GREATER THAN `benefit cap` claimant
+    THEN `benefit cap` claimant
+    ELSE `basic monthly benefit` claimant
+
+-- 2. the tier-2 λ
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`scaled amount` amount MEANS amount TIMES 1.07
+
+GIVETH A NUMBER
+`low estimate` MEANS `scaled amount` 100
+
+GIVETH A NUMBER
+`high estimate` MEANS `scaled amount` 900
+
+-- 3. the type conflict
+GIVEN s IS AN Article3Case
+GIVETH A BOOLEAN
+`art3 applies` s MEANS s's reason EQUALS "emergency"
+
+GIVEN s IS AN Article7Case
+GIVETH A BOOLEAN
+`art7 applies` s MEANS s's reason EQUALS "gathering"
+
+-- 4. the test fixture
+GIVETH A Claimant
+`sample claimant` MEANS Claimant OF 1000, 2
+
+#ASSERT `capped benefit` `sample claimant` EQUALS 400
+
+-- 5. the inert prose carrier
+GIVETH A BOOLEAN
+`definition — benefit` MEANS
+  "a periodic payment made under this Part" AND TRUE
+
+-- 6. the uncalled regulative body
+DECLARE Payer IS ONE OF Agency, Nobody
+DECLARE Payment IS ONE OF Disburse, Withhold
+
+GIVETH A DEONTIC Payer Payment
+`payment duty` MEANS
+  PARTY Agency
+  MUST Disburse
+  WITHIN 30
+  HENCE FULFILLED
