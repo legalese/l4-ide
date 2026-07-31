@@ -1,0 +1,18 @@
+-- =============================================================================
+-- Clause-matrix exhaustiveness, @nonexhaustive (§14.7, R4): the same partial
+-- two-clause group as pattern-matching-partial-matrix.l4, but its author
+-- declares the partiality deliberate with the @nonexhaustive decorator — so
+-- the clause-matrix warning must be SILENT (the undecorated twin's golden
+-- pins that it warns). This also pins that the decorator, attached by
+-- ResolveAnnotation's desc pass, lands on the FUSED Decide's span (which
+-- covers the signature plus every clause of the group).
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@nonexhaustive
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `two clause partial` Red   IS 1
+DECIDE `two clause partial` Green IS 2
+
+#EVAL `two clause partial` Red    -- 1
+#EVAL `two clause partial` Green  -- 2
