@@ -1,0 +1,12 @@
+{
+  "note": [
+    "Cases for bkm-name-mismatch.dmn (probe C4, NEGATIVE CONTROL). 2 cases x 1",
+    "decision = 2 value checks. The expected values are what the model would",
+    "answer if @name and variable/@name AGREED, so a pass means the engine",
+    "tolerated the mismatch and a fail means it did not."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "result": 12 } },
+    { "name": "B. n = 0", "context": { "n": 0 }, "expect": { "result": 0 } }
+  ]
+}

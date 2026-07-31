@@ -1,0 +1,29 @@
+{
+  "note": [
+    "Cases for bkm-multiparam.dmn (probe A1). 2 cases x 4 decisions = 8 value",
+    "checks per engine. Every value is arithmetic on the body in the fixture",
+    "header; an argument-order bug in either engine moves at least one of them."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 40",
+      "context": { "n": 40 },
+      "expect": {
+        "pos_xtrue": 1,
+        "pos_xfalse": 98,
+        "pos_ytrue": -95,
+        "pos_from_input": 39
+      }
+    },
+    {
+      "name": "B. n = 0 (the from-input call is the only one that moves)",
+      "context": { "n": 0 },
+      "expect": {
+        "pos_xtrue": 1,
+        "pos_xfalse": 98,
+        "pos_ytrue": -95,
+        "pos_from_input": -1
+      }
+    }
+  ]
+}
