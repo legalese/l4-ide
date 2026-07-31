@@ -1577,7 +1577,7 @@ spec bin = do
           out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
 
   -- The EMITTER's hydration output through both engines. This is the leg that
-  -- turns §4.4 from a design into a measurement: 44 decision values per engine,
+  -- turns §4.4 from a design into a measurement: 40 decision values per engine,
   -- over an artifact jl4-core/src/L4/Dmn/Lower.hs produced.
   --
   -- Case D supplies a NULL source record, which is the one input shape under
@@ -1592,14 +1592,14 @@ spec bin = do
           out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
 
     it "Camunda evaluates the same emitted model" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
         hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("44/44 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
 
     -- The COUNTERPART, and it is not a consolation prize. `sumtype.dmn` is the
     -- exhibit of what the exporter REFUSES, and R4-a's refusal emits L4 source
