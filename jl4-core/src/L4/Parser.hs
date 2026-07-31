@@ -920,8 +920,30 @@ desugarPatternClauses sig rawToks firstC restCs =
     -- nothing and drop the clause bodies. The resulting annotation still spans
     -- the sig + all clauses, giving the Decide a real, distinct SrcRange for the
     -- type checker's per-function 'FunTypeSig' keying.
+    --
+    -- The source clause matrix is additionally recorded in the annotation's
+    -- 'Extension' ('setPmMatrix'), for the type checker's clause-matrix
+    -- exhaustiveness analysis: 'matchClauses' below destroys the per-clause
+    -- structure (its synthetic CONSIDERs are rangeless and OTHERWISE-total),
+    -- so the analysis must see the matrix as the drafter wrote it. We attach
+    -- it for EVERY fused group, n = 1 included — cheap and uniform; the
+    -- policy of which groups to analyse (only n >= 2: a single clause's
+    -- CONSIDER sits un-suppressed in the user's own Decide and already warns
+    -- via the ordinary path) lives in the checker, not here. Exactprint is
+    -- unaffected: it reads the 'payload' CSNs, never the 'extra' field, and
+    -- 'fixAnnoSrcRange' sets only the range.
     decideAnno =
-      fixAnnoSrcRange (mkHoleAnnoFor sig <> rawTokensAnno rawToks)
+      setPmMatrix matrix (fixAnnoSrcRange (mkHoleAnnoFor sig <> rawTokensAnno rawToks))
+    matrix = MkPmMatrix
+      { scrutinees = scrutinees
+      , clauses =
+          [ MkPmMatrixClause
+              { headRange = rangeOf (pmHead c)
+              , patterns  = pmPats c
+              }
+          | c <- clauses
+          ]
+      }
 
 -- | Build an annotation whose single visible concrete-syntax node holds the
 -- given tokens verbatim (no holes). Used to make a fused pattern-matching

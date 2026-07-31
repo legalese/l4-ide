@@ -9,12 +9,15 @@ module L4.Syntax where
 import Base
 import L4.Annotation
 import L4.Lexer (PosToken, FixityDirection)
+import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
 import L4.Instances.Serialise ()
-import Codec.Serialise (Serialise)
+import L4.Parser.SrcSpan (SrcPos)
+import Codec.Serialise (Serialise (..))
 #endif
 import Data.Default
+import Data.TreeDiff.Class (ToExpr (..))
 import qualified GHC.Generics as GHC
 import qualified Generics.SOP as SOP
 import Optics
@@ -512,22 +515,75 @@ moduleTopDecls = lens
 -- Source Annotations
 -- ----------------------------------------------------------------------------
 
+-- | One clause of a multi-clause pattern-matching group, as parsed: the
+-- clause head name's source range (the warning anchor) and the argument
+-- patterns, one per column.
+--
+-- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
+-- generic traversals): the stored patterns transitively contain @Expr Name@
+-- (via 'PatExpr'), so a Generic instance here would splice a Name-pass AST
+-- fragment into the generic-representation closure of EVERY annotated node —
+-- making polymorphic @gplate \@(Decide n)@ traversals ambiguous (overlapping
+-- instances) and monomorphic ones silently descend into annotation extras.
+-- Without 'GHC.Generic', optics' @GPlateInner@ treats the field as a leaf.
+-- 'NFData', 'ToExpr' and 'Serialise' are therefore written by hand below.
+data PmMatrixClause = MkPmMatrixClause
+  { headRange :: Maybe SrcRange
+  , patterns  :: [Pattern Name]
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrixClause where
+  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+
+instance ToExpr PmMatrixClause where
+  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+
+-- | The source clause matrix of a multi-clause pattern-matching group,
+-- attached by the parser to the fused Decide's annotation BEFORE
+-- 'L4.Parser.matchClauses' lowers the group to nested CONSIDERs (which have
+-- no per-clause structure and no source ranges). Consumed once, by the
+-- type checker's clause-matrix exhaustiveness analysis
+-- ('L4.TypeCheck.checkClauseMatrix'). Stored in the Name pass; the AST
+-- Functor does not map into annotation extras, so the Resolved tree still
+-- carries the Name-pass patterns — the checker re-resolves them itself
+-- (quietly) against the GIVEN column types. Not 'GHC.Generic' — see
+-- 'PmMatrixClause'.
+data PmMatrix = MkPmMatrix
+  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @_pm_arg_i@)
+  , clauses    :: [PmMatrixClause]
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrix where
+  rnf (MkPmMatrix s cs) = rnf s `seq` rnf cs
+
+instance ToExpr PmMatrix where
+  toExpr (MkPmMatrix s cs) = toExpr (s, cs)
+
+-- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
+-- 'Extension' — jl4-service's AST-cache blobs from before the change will
+-- fail to deserialise and the cache re-fills; that is the cache's normal
+-- versioning behaviour. If a @SERIALISE_ENABLED@ build breaks on a missing
+-- instance here, the fix is to add the instance (see the CPP block at the
+-- bottom of this module), not to remove the field.
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
   , desc         :: Maybe Desc
   , ref          :: Maybe Ref
   , fixityAnn    :: Maybe Fixity
+  , pmMatrix     :: Maybe PmMatrix
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc ref1 fix1 <> Extension i2 nlg2 desc' ref2 fix2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2)
+  Extension i1 nlg1 desc ref1 fix1 pm1 <> Extension i2 nlg2 desc' ref2 fix2 pm2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -537,7 +593,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -559,6 +615,9 @@ annRef = #extra % #ref
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
 
+annPmMatrix :: Lens' Anno (Maybe PmMatrix)
+annPmMatrix = #extra % #pmMatrix
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
@@ -570,6 +629,9 @@ setRef r a = a & annRef ?~ r
 
 setFixity :: Fixity -> Anno -> Anno
 setFixity f a = a & annFixity ?~ f
+
+setPmMatrix :: PmMatrix -> Anno -> Anno
+setPmMatrix m a = a & annPmMatrix ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -1021,6 +1083,16 @@ deriving anyclass instance Serialise n => Serialise (Module n)
 deriving anyclass instance Serialise n => Serialise (Section n)
 deriving anyclass instance Serialise n => Serialise (TopDecl n)
 deriving anyclass instance Serialise n => Serialise (LocalDecl n)
+deriving anyclass instance Serialise SrcPos
+deriving anyclass instance Serialise SrcRange
+-- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
+-- definitions), so their instances are written by hand, via tuples.
+instance Serialise PmMatrixClause where
+  encode (MkPmMatrixClause r ps) = encode (r, ps)
+  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+instance Serialise PmMatrix where
+  encode (MkPmMatrix s cs) = encode (s, cs)
+  decode = (\ (s, cs) -> MkPmMatrix s cs) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
