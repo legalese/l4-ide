@@ -1,84 +1,105 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_sec_regulation_crowdfunding_17_cfr_part_227
-      dmnmd is a table format, not a graph: the 223 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 199 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOLITERAL] blocking — decision_reg_cf_commenced
-      `Reg CF commenced` is a formula (Date OF 16, 5, 2016), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `Reg CF commenced` is a formula (date("2016-05-16")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_2017_inflation_adjustment
-      `the 2017 inflation adjustment` is a formula (Date OF 12, 4, 2017), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the 2017 inflation adjustment` is a formula (date("2017-04-12")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_2021_amendments
-      `the 2021 amendments` is a formula (Date OF 15, 3, 2021), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the 2021 amendments` is a formula (date("2021-03-15")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_2022_inflation_adjustment
-      `the 2022 inflation adjustment` is a formula (Date OF 20, 9, 2022), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the 2022 inflation adjustment` is a formula (date("2022-09-20")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_rules_in_force_include
       `the rules in force include` is a formula (RULES_EFFECTIVE_DATE >= amendment), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
-  [D-MD-NONIDENTCOLUMN] blocking — decision_offering_maximum_in_a_12_month_period
-      ``the rules in force include` OF `the 2021 amendments`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_offering_maximum_in_a_12_month_period
+      rule decision_offering_maximum_in_a_12_month_period_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_offering_maximum_in_a_12_month_period
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_offering_maximum_in_a_12_month_period
+      rule decision_offering_maximum_in_a_12_month_period_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_offering_maximum_in_a_12_month_period
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_offering_maximum_in_a_12_month_period
+      rule decision_offering_maximum_in_a_12_month_period_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_income_or_net_worth_cut_point
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_offering_maximum_in_a_12_month_period
+      rule decision_offering_maximum_in_a_12_month_period_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_income_or_net_worth_cut_point
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_income_or_net_worth_cut_point
+      rule decision_income_or_net_worth_cut_point_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_income_or_net_worth_cut_point
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_income_or_net_worth_cut_point
+      rule decision_income_or_net_worth_cut_point_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_minimum_permitted_investment
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_income_or_net_worth_cut_point
+      rule decision_income_or_net_worth_cut_point_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_minimum_permitted_investment
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_income_or_net_worth_cut_point
+      rule decision_income_or_net_worth_cut_point_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_minimum_permitted_investment
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_minimum_permitted_investment
+      rule decision_minimum_permitted_investment_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_minimum_permitted_investment
+      rule decision_minimum_permitted_investment_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_minimum_permitted_investment
+      rule decision_minimum_permitted_investment_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_minimum_permitted_investment
+      rule decision_minimum_permitted_investment_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_1_ceiling
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
+      rule decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_1_ceiling
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
+      rule decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_1_ceiling
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
+      rule decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_2_ceiling
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period
+      rule decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_2_ceiling
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_tier_1_ceiling
+      rule decision_tier_1_ceiling_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_tier_2_ceiling
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_tier_1_ceiling
+      rule decision_tier_1_ceiling_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_first_time_issuer_review_ceiling
-      ``the rules in force include` OF `the 2022 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_tier_1_ceiling
+      rule decision_tier_1_ceiling_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_first_time_issuer_review_ceiling
-      ``the rules in force include` OF `the 2017 inflation adjustment`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_tier_1_ceiling
+      rule decision_tier_1_ceiling_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_first_time_issuer_review_ceiling
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_tier_2_ceiling
+      rule decision_tier_2_ceiling_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_tier_2_ceiling
+      rule decision_tier_2_ceiling_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_tier_2_ceiling
+      rule decision_tier_2_ceiling_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_tier_2_ceiling
+      rule decision_tier_2_ceiling_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_first_time_issuer_review_ceiling
+      rule decision_first_time_issuer_review_ceiling_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_first_time_issuer_review_ceiling
+      rule decision_first_time_issuer_review_ceiling_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_first_time_issuer_review_ceiling
+      rule decision_first_time_issuer_review_ceiling_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_first_time_issuer_review_ceiling
+      rule decision_first_time_issuer_review_ceiling_r4 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
   [D-MD-NOLITERAL] blocking — decision_holders_of_record_threshold
       `holders of record threshold` is a formula (300), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -131,35 +152,29 @@ fidelity report — dmnmd
   [D-MD-NOLITERAL] blocking — decision_offering_is_within_the_offering_limit
       `offering is within the offering limit` is a formula (... "(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;" AND (`aggregate offering amount` OF offering) AT MOST `offering maximum in a 12-month period`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
-  [D-MD-NONIDENTCOLUMN] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth
-      ``the rules in force include` OF `the 2021 amendments`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
-      lost: the whole table
-  [D-MD-NONIDENTCOLUMN] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth
-      ``the rules in force include` OF `Reg CF commenced`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+  [D-MD-CELLSYNTAX] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth
+      rule decision_the_applicable_measure_of_annual_income_or_net_worth_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
   [D-MD-CELLSYNTAX] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth
-      rule decision_the_applicable_measure_of_annual_income_or_net_worth_r1 has a cell dmnmd cannot read (a negation, a half-open or non-integer range, or an output with parentheses or a comma), so this table is omitted
+      rule decision_the_applicable_measure_of_annual_income_or_net_worth_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
       lost: the whole table
   [D-MD-CELLSYNTAX] blocking — decision_the_applicable_measure_of_annual_income_or_net_worth
-      rule decision_the_applicable_measure_of_annual_income_or_net_worth_r2 has a cell dmnmd cannot read (a negation, a half-open or non-integer range, or an output with parentheses or a comma), so this table is omitted
+      rule decision_the_applicable_measure_of_annual_income_or_net_worth_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
       lost: the whole table
-  [D-MD-NOLITERAL] blocking — decision_greater_of_annual_income_or_net_worth
-      `greater of annual income or net worth` is a formula (max(investor_2.annual_income, investor_2.net_worth)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
-      lost: the decision itself; it is omitted from the markdown
-  [D-MD-NOLITERAL] blocking — decision_lesser_of_annual_income_or_net_worth
-      `lesser of annual income or net worth` is a formula (min(investor_3.annual_income, investor_3.net_worth)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
-      lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_either_annual_income_or_net_worth_is_less_than_the_cut_point
-      `either annual income or net worth is less than the cut point` is a formula (investor_4.annual_income < income_or_net_worth_cut_point or investor_4.net_worth < income_or_net_worth_cut_point), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `either annual income or net worth is less than the cut point` is a formula (investor_2.annual_income < income_or_net_worth_cut_point or investor_2.net_worth < income_or_net_worth_cut_point), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NONIDENTCOLUMN] blocking — decision_investment_limit
       ``either annual income or net worth is less than the cut point` OF investor` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
       lost: the whole table
   [D-MD-CELLSYNTAX] blocking — decision_investment_limit
-      rule decision_investment_limit_r1 has a cell dmnmd cannot read (a negation, a half-open or non-integer range, or an output with parentheses or a comma), so this table is omitted
+      rule decision_investment_limit_r1 has a cell dmnmd cannot read (an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_investment_limit
+      `investment limit`'s OTHERWISE is `IF ((0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) AT MOST `maximum amount sold to any one investor in a 12-month period`) THEN (0.1 TIMES (`the applicable measure of annual income or net worth` OF investor)) ELSE `maximum amount sold to any one investor in a 12-month period``, and dmnmd's cell grammar cannot say it (a cell is a number, an integer range, or a bare token), so this table is omitted
       lost: the whole table
   [D-MD-NOLITERAL] blocking — decision_aggregate_amount_sold_to_this_investor_including_this_transaction
-      `aggregate amount sold to this investor including this transaction` is a formula (investor_6.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `aggregate amount sold to this investor including this transaction` is a formula (investor_4.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_accredited_investor_carve_out_applies_to
       `the accredited-investor carve-out applies to` is a formula (`the rules in force include` OF `the 2021 amendments` AND investor's `is an accredited investor as defined in Rule 501`), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -168,7 +183,7 @@ fidelity report — dmnmd
       `investor is within the investment limit` is a formula (... "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:" OR `the accredited-investor carve-out applies to` OF investor OR (`aggregate amount sold to this investor including this transaction` OF investor, `amount to be sold in this transaction`) AT MOST (`investment limit` OF investor)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window
-      `the rule date is inside the COVID-19 temporary rules window` is a formula (`RULES EFFECTIVE DATE` AT LEAST (Date OF 4, 5, 2020) AND `RULES EFFECTIVE DATE` AT MOST (Date OF 28, 8, 2022)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      `the rule date is inside the COVID-19 temporary rules window` is a formula (RULES_EFFECTIVE_DATE >= date("2020-05-04") and RULES_EFFECTIVE_DATE <= date("2022-08-28")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NONIDENTCOLUMN] blocking — decision_financial_statements_required
       `(`aggregate offering amount` OF offering) GREATER THAN `tier 1 ceiling`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
@@ -189,7 +204,7 @@ fidelity report — dmnmd
       `(`aggregate offering amount` OF offering) AT MOST `first-time issuer review ceiling`` is L4 source, not FEEL; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
       lost: the whole table
   [D-MD-CELLSYNTAX] blocking — decision_financial_statements_required
-      rule decision_financial_statements_required_r2 has a cell dmnmd cannot read (a negation, a half-open or non-integer range, or an output with parentheses or a comma), so this table is omitted
+      rule decision_financial_statements_required_r2 has a cell dmnmd cannot read (an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL), so this table is omitted
       lost: the whole table
   [D-MD-NOLITERAL] blocking — decision_financial_statement_requirement_is_satisfied
       `financial statement requirement is satisfied` is a formula ((`assurance level` OF supplied) AT LEAST (`assurance level` OF (`financial statements required` OF offering))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
@@ -377,3 +392,6 @@ fidelity report — dmnmd
   [D-MD-NOLITERAL] blocking — decision_a_large_offering_inside_the_covid_window
       `a large offering inside the COVID window` is a formula (`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF `F offering`)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOCONTEXT] blocking — hydration_investor
+      `investor` is a boxed context: a record hydrated from its source with 7 component(s), of which the derived ones are computed from earlier siblings. dmnmd has no boxed-context form -- it can say a decision over cases and nothing else -- so this decision is omitted
+      lost: the decision itself, and with it every derived component the tables downstream read through: in the markdown those reads name a decision that is not there

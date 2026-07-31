@@ -1,0 +1,25 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-RULEDATE] advisory — input_rules_effective_date
+      this model is temporally parameterised: 3 decision(s) read the rule date, which is supplied as the DMN input `RULES_EFFECTIVE_DATE` (L4: `RULES EFFECTIVE DATE`) -- `the rules in force include`, `GST rate percent`, `tourist refund minimum spend`. Bind that input or every dated decision answers null
+      lost: the reader's ability to run this model without knowing it has a rule-date precondition: an unbound `RULES_EFFECTIVE_DATE` is a well-formed DMN model that silently answers null in every dated decision
+  [D-LITERALEXPR] blocking — decision_the_2024_rate_change  (main.l4:52:30-43)
+      `the 2024 rate change` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_the_2023_rate_change  (main.l4:56:30-43)
+      `the 2023 rate change` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_gst_commenced  (main.l4:60:23-36)
+      `GST commenced` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_the_rules_in_force_include  (main.l4:70:5-43)
+      `the rules in force include` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_gst_payable_on  (main.l4:97:5-59)
+      `GST payable on` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-COMPUTEDOUTPUT] advisory — decision_gst_rate_percent  (main.l4:79:22-76)
+      the output entry `no_GST_rate_exists_before_commencement_on_1994_04_01` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
+  [D-COMPUTEDOUTPUT] advisory — decision_tourist_refund_minimum_spend  (main.l4:92:22-76)
+      the output entry `no_GST_rate_exists_before_commencement_on_1994_04_01` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
+      lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

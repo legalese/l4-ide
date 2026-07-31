@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CONTROL: Route 2 as discussed — the per-spouse predicate written inline in
+  the `satisfies` clause of one literal expression. Should evaluate wherever
+  FEEL quantifiers work at all. The statute: "if either spouse earns less than
+  $100,000 or qualifies as a Qualifying Candidate, the children are eligible."
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_spouse_inline" name="spouse_inline" namespace="https://legalese.com/l4/dmn/spouse_inline" exporter="hand">
+  <itemDefinition id="itemdef_spouse" name="Spouse">
+    <itemComponent id="itemdef_spouse_c1" name="income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_spouse_c2" name="qualifying_candidate">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_spouses" name="Spouses" isCollection="true">
+    <typeRef>Spouse</typeRef>
+  </itemDefinition>
+  <inputData id="input_spouses" name="spouses">
+    <variable id="input_spouses_var" name="spouses" typeRef="Spouses"/>
+  </inputData>
+  <decision id="decision_children_eligible" name="children_eligible" label="children eligible">
+    <variable id="decision_children_eligible_var" name="children_eligible" typeRef="boolean"/>
+    <informationRequirement id="ir_spouses">
+      <requiredInput href="#input_spouses"/>
+    </informationRequirement>
+    <literalExpression id="decision_children_eligible_literal">
+      <text>some s in spouses satisfies s.income &lt; 100000 or s.qualifying_candidate</text>
+    </literalExpression>
+  </decision>
+</definitions>

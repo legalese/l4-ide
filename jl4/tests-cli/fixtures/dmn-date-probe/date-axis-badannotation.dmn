@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.6: the law-time probe's NEGATIVE CONTROL.
+
+  Byte-for-byte `date-axis.dmn` from <definitions> onward, except that each
+  <annotationEntry> carries an @id. That is the ONE difference, and it is
+  schema-INVALID: DMN13.xsd:352-356 makes tRuleAnnotation a bare
+  `sequence: text?` — it is NOT derived from tDMNElement, so unlike every other
+  entry element inside a <rule> it has no @id attribute at all.
+
+  WHY THIS FILE EXISTS. A positive fixture that validates shows only that a
+  valid file validates; it cannot show that the checker is looking. Xerces is
+  the only thing in the tree that reads the DMN XSD — libxml2 and dmn-moddle
+  both accept this file, and etc/validate-dmn.mjs's own header says it does not
+  check sequence order — so without a red case here, "Xerces is watching the
+  annotation elements" would be an unmeasured claim. Same rationale, and the
+  same construction, as fixtures/dmn-xsd-order/'s pair.
+
+  MEASURED 2026-07-31, both engines, verbatim:
+
+    KIE 8.44.0.Final   XSD    INVALID
+                       error cvc-complex-type.3.2.2: Attribute 'id' is not
+                       allowed to appear in element 'annotationEntry'.   (x3)
+                       BUILD  clean
+                       VERDICT: ... 2 error(s) ... 6/6 value(s) as expected
+                       exit 1
+
+    Camunda 8.7.6      PARSE  INVALID: DmnModelException: Unable to parse model
+                       VERDICT: ... 0 parsed, 1 error(s)
+
+  Note what KIE does NOT do: it BUILDS the model anyway and answers all three
+  cases correctly. So "a malformed emitter would fail in the engine" is false of
+  Drools, exactly as it is for the itemDefinition pair, and the schema leg is
+  the only thing between a malformed emitter and a shipped artifact.
+
+  NOT AN EMITTED GOLDEN. Never regenerate this from L4: the emitter cannot
+  produce an <annotationEntry> with an @id, which is precisely why the question
+  needs a hand-written file.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_date_axis_probe" name="date axis probe" namespace="https://legalese.com/l4/dmn/date_axis_probe">
+  <inputData id="input_rules_effective_date" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE">
+    <variable id="input_rules_effective_date_var" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE" typeRef="date"/>
+  </inputData>
+  <decision id="decision_change_date" name="change_date" label="change date">
+    <variable id="decision_change_date_var" name="change_date" label="change date" typeRef="date"/>
+    <literalExpression id="decision_change_date_literal">
+      <text>date("2024-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_regime" name="regime" label="regime">
+    <variable id="decision_regime_var" name="regime" label="regime" typeRef="number"/>
+    <informationRequirement id="decision_regime_ir1">
+      <requiredInput href="#input_rules_effective_date"/>
+    </informationRequirement>
+    <decisionTable id="decision_regime_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="regime">
+      <input id="decision_regime_i1" label="RULES EFFECTIVE DATE">
+        <inputExpression id="decision_regime_i1_expr" typeRef="date">
+          <text>RULES_EFFECTIVE_DATE</text>
+        </inputExpression>
+      </input>
+      <output id="decision_regime_o1"/>
+      <annotation name="regime"/>
+      <rule id="decision_regime_r1">
+        <description>from 2024-01-01</description>
+        <inputEntry id="decision_regime_r1_i1">
+          <text>&gt;= date("2024-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r1_o1">
+          <text>9</text>
+        </outputEntry>
+        <annotationEntry id="decision_regime_r1_a1">
+          <text>the 2024 rate change</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_regime_r2">
+        <description>from 1994-04-01 until 2024-01-01</description>
+        <inputEntry id="decision_regime_r2_i1">
+          <text>[date("1994-04-01")..date("2024-01-01"))</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r2_o1">
+          <text>3</text>
+        </outputEntry>
+        <annotationEntry id="decision_regime_r2_a1">
+          <text>GST commenced</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_regime_r3">
+        <description>before 1994-04-01</description>
+        <inputEntry id="decision_regime_r3_i1">
+          <text>&lt; date("1994-04-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r3_o1">
+          <text>-1</text>
+        </outputEntry>
+        <annotationEntry id="decision_regime_r3_a1">
+          <text>before 1994-04-01</text>
+        </annotationEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

@@ -79,16 +79,28 @@ ensureTrailingNewline t = Text.dropWhileEnd (== '\n') t <> "\n"
 renderDecision :: Decision -> Maybe Text
 renderDecision d = case d.dcnLogic of
   LogicLiteral _ -> Nothing
+  -- A boxed context has no dmnmd form at all: dmnmd can say a decision over
+  -- cases and nothing else. D-MD-NOCONTEXT below discloses it.
+  LogicContext _ -> Nothing
   LogicTable t
     | not (expressible t) -> Nothing
     | otherwise           -> Just (renderTable t)
 
 -- | Can this table be said in dmnmd's grammar at all?
+--
+-- ★ The @\<defaultOutputEntry\>@ is checked, not only the rules. R8-d′ made
+-- FEEL @null@ a default output entry this backend genuinely emits, and @null@
+-- is 'FullFeel' by design, so 'mdOutput' refuses it — at which point the
+-- catch-all row rendered as @-@, which is dmnmd's INPUT-column "any" token and
+-- reads back as "output unspecified" rather than "no value". A table that says
+-- something else is worse than a table that is honestly omitted, which is the
+-- standard 'mdConstant' already states for a date.
 expressible :: DecisionTable -> Bool
 expressible t =
   all columnHeaderOk t.dtInputs
     && isLegalVarname t.dtOutput.ocName
     && all ruleOk t.dtRules
+    && all (isJust . mdOutput t.dtOutput.ocType) t.dtOutput.ocDefault
  where
   ruleOk r = all (isJust . mdCell) r.drInputs && isJust (mdOutput t.dtOutput.ocType r.drOutput)
 
@@ -123,12 +135,16 @@ renderTable t =
 
   -- The <defaultOutputEntry>, as the catch-all row the downgrade above bought.
   -- It goes LAST, so First reaches it only when nothing above matched.
+  -- No `fromMaybe "-"` here, deliberately: 'expressible' has already
+  -- established that this is 'Just', and a dash in the OUTPUT column would be
+  -- read as dmnmd's "any" token and silently misstate the catch-all.
   defaultRows =
     [ row $
         textShowInt (length t.dtRules + 1)
           : map (const "-") cols
-            <> [fromMaybe "-" (mdOutput t.dtOutput.ocType d)]
-    | Just d <- [t.dtOutput.ocDefault]
+            <> [out]
+    | Just d   <- [t.dtOutput.ocDefault]
+    , Just out <- [mdOutput t.dtOutput.ocType d]
     ]
 
   row cells = "| " <> Text.intercalate " | " cells <> " |"
@@ -146,8 +162,8 @@ renderTable t =
 mdCell :: UnaryTest -> Maybe Text
 mdCell = \case
   TestAny      -> Just "-"
-  TestEq v     -> Just (mdValue v)
-  TestCmp op v -> Just (cmp op <> " " <> mdValue v)
+  TestEq v     -> mdConstant v
+  TestCmp op v -> (\t -> cmp op <> " " <> t) <$> mdConstant v
   TestOneOf ts -> Text.intercalate ", " <$> traverse mdCell ts
   -- `not(...)` has no dmnmd form.
   TestNot _    -> Nothing
@@ -180,14 +196,75 @@ mdOutput ty e
  where
   txt = e.feText
 
--- | Values, sharing 'renderNumber' with the XML emitter so the two cannot drift
--- apart on what a number looks like. Strings differ deliberately: dmnmd reads a
--- bare token as a string, and a quoted one would keep its quotes.
-mdValue :: FeelValue -> Text
-mdValue = \case
-  VNum r  -> renderNumber r
-  VStr t  -> t
-  VBool b -> if b then "true" else "false"
+-- | A cell CONSTANT, sharing 'renderNumber' with the XML emitter so the two
+-- cannot drift apart on what a number looks like. Strings differ deliberately:
+-- dmnmd reads a bare token as a string, and a quoted one would keep its quotes.
+--
+-- __A date has no dmnmd form and is refused, not rendered.__ dmnmd's cell
+-- grammar has no date datatype at all: @mkF@ reads a cell as a number, a range
+-- of integers, or a bare token, so @>= 1994-04-01@ would be /emitted/ and then
+-- misread by dmnmd's own numeric parser. Returning 'Nothing' routes the whole
+-- table to @D-MD-CELLSYNTAX@ Blocking and omits it honestly, which is what this
+-- module already does for a half-open range. That is not a workaround for the
+-- gap; it __is__ the gap being reported.
+mdConstant :: FeelValue -> Maybe Text
+mdConstant = \case
+  VNum r  -> Just (renderNumber r)
+  VStr t  -> Just t
+  VBool b -> Just (if b then "true" else "false")
+  VDate _ -> Nothing
+
+-- | Which of dmnmd's cell-grammar gaps this rule actually fell into.
+--
+-- __Naming the enumeration rather than the instance was wrong the moment dates
+-- existed.__ @>= date("2024-01-01")@ is not a negation, not a range and not an
+-- output with parentheses, so a reader told "a negation, a half-open or
+-- non-integer range, or an output with parentheses or a comma" would go looking
+-- for a defect that is not there — and on the Reg CF corpus that misdiagnosis
+-- would be the MAJORITY of the instances.
+cellSyntaxReason :: DmnType -> DmnRule -> Text
+cellSyntaxReason outTy r
+  | null reasons = "a cell outside dmnmd's grammar"
+  | otherwise    = Text.intercalate "; " reasons
+ where
+  reasons =
+    [ "a DATE cell -- dmnmd's cell grammar has no date datatype at all"
+    | any (anyTest isDateTest) r.drInputs
+    ]
+      <> [ "a `not(...)` cell, which dmnmd's grammar cannot spell"
+         | any (anyTest isNotTest) r.drInputs
+         ]
+      <> [ "a half-open or non-integer range"
+         | any (anyTest isBadRange) r.drInputs
+         ]
+      <> [ "an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL"
+         | isNothing (mdOutput outTy r.drOutput)
+         ]
+
+  -- 'TestOneOf' nests, so the search must too.
+  anyTest p u = p u || case u of
+    TestOneOf ts -> any (anyTest p) ts
+    TestNot t    -> anyTest p t
+    _            -> False
+
+  isDateTest = \case
+    TestEq v            -> isDate v
+    TestCmp _ v         -> isDate v
+    TestRange _ lo hi _ -> isDate lo || isDate hi
+    _                   -> False
+
+  isDate = \case
+    VDate _ -> True
+    _       -> False
+
+  isNotTest = \case
+    TestNot _ -> True
+    _         -> False
+
+  isBadRange = \case
+    TestRange lc lo hi hc ->
+      not (lc && hc) || isNothing (wholeNumber lo) || isNothing (wholeNumber hi)
+    _ -> False
 
 wholeNumber :: FeelValue -> Maybe Text
 wholeNumber = \case
@@ -270,6 +347,20 @@ markdownReport drg =
                 \expression, rather than a decision over cases, cannot be written as a table")
           "the decision itself; it is omitted from the markdown"
       ]
+    -- Its OWN code, not a widening of D-MD-NOLITERAL. That note's message says
+    -- "is a formula", which is false of a context, and its code is counted in
+    -- FIDELITY-SEVERITY-AXIS-SPEC.md -- so widening it would make one line of
+    -- that spec's table describe two different losses.
+    LogicContext es ->
+      [ note "D-MD-NOCONTEXT" Blocking d.dcnId
+          ("`" <> d.dcnName <> "` is a boxed context: a record hydrated from its source with "
+             <> textShowInt (length es)
+             <> " component(s), of which the derived ones are computed from earlier siblings. \
+                \dmnmd has no boxed-context form -- it can say a decision over cases and \
+                \nothing else -- so this decision is omitted")
+          "the decision itself, and with it every derived component the tables downstream read \
+          \through: in the markdown those reads name a decision that is not there"
+      ]
     LogicTable t -> tableNotes d t
 
   tableNotes d t =
@@ -284,11 +375,30 @@ markdownReport drg =
     , not (columnHeaderOk c)
     ]
       <> [ note "D-MD-CELLSYNTAX" Blocking d.dcnId
-             ("rule " <> r.drId <> " has a cell dmnmd cannot read (a negation, a half-open or \
-                \non-integer range, or an output with parentheses or a comma), so this table is omitted")
+             ("rule " <> r.drId <> " has a cell dmnmd cannot read ("
+                <> cellSyntaxReason t.dtOutput.ocType r <> "), so this table is omitted")
              "the whole table"
          | r <- t.dtRules
          , any (isNothing . mdCell) r.drInputs || isNothing (mdOutput t.dtOutput.ocType r.drOutput)
+         ]
+      -- The same loss at the <defaultOutputEntry>, which is not one of
+      -- 'dtRules' and so is not reached by the comprehension above. Reusing
+      -- D-MD-CELLSYNTAX rather than minting a code: the loss IS "a cell dmnmd's
+      -- grammar cannot say", and the code is already carried in
+      -- FIDELITY-SEVERITY-AXIS-SPEC.md §5.2 with that meaning.
+      --
+      -- R8-d′ is what made this reachable: a MAYBE-valued decision tabulates
+      -- with a FEEL `null` catch-all, `null` is FullFeel by design, and
+      -- 'mdOutput' refuses anything that is not S-FEEL. Without this note the
+      -- table would be omitted in silence, which is the one outcome worse than
+      -- omitting it loudly.
+      <> [ note "D-MD-CELLSYNTAX" Blocking d.dcnId
+             ("`" <> d.dcnName <> "`'s OTHERWISE is `" <> dflt.feText
+                <> "`, and dmnmd's cell grammar cannot say it (a cell is a number, an "
+                <> "integer range, or a bare token), so this table is omitted")
+             "the whole table"
+         | Just dflt <- [t.dtOutput.ocDefault]
+         , isNothing (mdOutput t.dtOutput.ocType dflt)
          ]
       <> [ note "D-MD-NODEFAULT" Lossy d.dcnId
              ("dmnmd has no <defaultOutputEntry>, so `" <> d.dcnName

@@ -1,0 +1,13 @@
+{
+  "note": [
+    "Cases for svc-grouping.dmn (probe D1). 2 cases x 2 decisions = 4 value",
+    "checks per engine. The service's own return value is NOT asserted, and",
+    "cannot be: `expect` keys on decision names only, on both harnesses. KIE",
+    "prints `SVC bundle -> {...}` for the eye; the machine assertion is the two",
+    "member decisions plus a 0-error verdict."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "step": 8, "total": 9 } },
+    { "name": "B. n = 0", "context": { "n": 0 }, "expect": { "step": 0, "total": 1 } }
+  ]
+}

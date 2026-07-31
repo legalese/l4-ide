@@ -230,9 +230,38 @@ nodeXml = \case
       ]
         <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
         <> [ case d.dcnLogic of
-               LogicTable t   -> decisionTableXml t
-               LogicLiteral e -> literalXml (d.dcnId <> "_literal") e
+               LogicTable t    -> decisionTableXml t
+               LogicLiteral e  -> literalXml (d.dcnId <> "_literal") e
+               LogicContext es -> contextXml (d.dcnId <> "_ctx") es
            ]
+
+-- | A boxed @\<context\>@ (DMN §7.3.6, @tContext@).
+--
+-- @tContext@ is a sequence of @contextEntry@, and @tContextEntry@ is an optional
+-- @variable@ followed by the expression — in that order, and it is not
+-- negotiable: this is the same Xerces class of constraint as the
+-- @\<annotation\>@ placement 'decisionTableXml' documents, and the same one the
+-- @dmn-xsd-order@ fixture pair exists to keep honest.
+--
+-- __No final result entry.__ An entry with no @\<variable\>@ is DMN's /final
+-- result entry/, and a context that has one evaluates to that entry ALONE. A
+-- hydrator's value is the whole record, so every entry is named and the context
+-- itself is the value. Measured on KIE 8.44.0.Final and zeebe-dmn 8.7.6 —
+-- @jl4\/tests-cli\/fixtures\/dmn-hydration-probe@ asserts the full hydrated
+-- record as a nested object on all three of its cases, so the return path is
+-- measured rather than inferred from a downstream decision agreeing.
+contextXml :: Text -> [ContextEntry] -> Xml
+contextXml cid entries =
+  Elem "context" [("id", cid)]
+    [ Elem "contextEntry" [("id", ce.ceId)]
+        [ Elem "variable"
+            (namedAttrs (ce.ceId <> "_var") ce.ceName ce.ceLabel
+               <> [("typeRef", dmnTypeAttr ce.ceType)])
+            []
+        , literalXml (ce.ceId <> "_lit") ce.ceExpr
+        ]
+    | ce <- entries
+    ]
 
 requirementXml :: Text -> Int -> Requirement -> Xml
 requirementXml owner i req =
@@ -256,7 +285,18 @@ decisionTableXml t =
     , ("preferredOrientation", "Rule-as-Row")
     , ("outputLabel", t.dtName)
     ]
-    (map inputXml t.dtInputs <> [outputXml t.dtOutput] <> map ruleXml t.dtRules)
+    -- tDecisionTable is an xsd:SEQUENCE -- input*, output+, annotation*, rule*.
+    -- Verified in DMN13.xsd:302-308 inside kie-dmn-validation-8.44.0.Final.jar,
+    -- which is the schema etc/kie-dmn-check validates against, and confirmed by
+    -- running jl4/tests-cli/fixtures/dmn-date-probe/date-axis.dmn through it
+    -- ("XSD valid"). Put <annotation> after <output> and before <rule>, or
+    -- Xerces rejects the file while libxml2 and dmn-moddle accept it -- the same
+    -- failure class fixtures/dmn-xsd-order/ exists to catch.
+    ( map inputXml t.dtInputs
+        <> [outputXml t.dtOutput]
+        <> [Elem "annotation" [("name", n)] [] | n <- t.dtAnnotations]
+        <> map ruleXml t.dtRules
+    )
 
 -- | One input clause. @tInputClause@ is @inputExpression@ then @inputValues?@.
 --
@@ -318,6 +358,14 @@ ruleXml r =
          ]
       <> [ Elem "outputEntry" [("id", r.drId <> "_o1")]
              [Elem "text" [] [Chars r.drOutput.feText]]
+         ]
+      -- tDecisionRule: inputEntry*, outputEntry+, annotationEntry*
+      -- (DMN13.xsd:344-348). tRuleAnnotation (DMN13.xsd:352-356) is NOT a
+      -- tDMNElement -- it has a <text> child and NO @id. Every other entry
+      -- element here carries an id; this one must not, and Xerces is the only
+      -- checker in the tree that would say so.
+      <> [ Elem "annotationEntry" [] [Elem "text" [] [Chars a]]
+         | a <- r.drAnnotations
          ]
 
 ------------------------------------------------------------------------

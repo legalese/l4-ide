@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+enum-named-number.l4:12:3-13:22:
+  I found a problem while checking the definition of `f`:
+    The following branches still need to be considered:
+    
+      WHEN two THEN
+    

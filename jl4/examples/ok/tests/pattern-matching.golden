@@ -1,6 +1,38 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+<no location>:
+  I found a problem while checking the definition of `__pm_fallthrough_0`:
+    I found a problem while checking the definition of `list length`:
+      The following branches still need to be considered:
+      
+        WHEN EMPTY THEN
+      
+<no location>:
+  I found a problem while checking the definition of `__pm_fallthrough_0`:
+    I found a problem while checking the definition of `from maybe`:
+      The following branches still need to be considered:
+      
+        WHEN NOTHING THEN
+      
+<no location>:
+  I found a problem while checking the definition of `__pm_fallthrough_2`:
+    I found a problem while checking the definition of `__pm_fallthrough_1`:
+      I found a problem while checking the definition of `__pm_fallthrough_0`:
+        I found a problem while checking the definition of `parking cost`:
+          The following branches still need to be considered:
+          
+            WHEN TRUE THEN
+          
+<no location>:
+  I found a problem while checking the definition of `__pm_fallthrough_1`:
+    I found a problem while checking the definition of `__pm_fallthrough_0`:
+      I found a problem while checking the definition of `deep unwrap`:
+        The following branches still need to be considered:
+        
+          WHEN NOTHING THEN
+          WHEN JUST NOTHING THEN
+        
 pattern-matching.l4:17:1-18:
   1
 pattern-matching.l4:18:1-18:

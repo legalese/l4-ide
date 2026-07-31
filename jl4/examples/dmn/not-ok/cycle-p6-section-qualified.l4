@@ -1,0 +1,50 @@
+-- NEGATIVE fixture for the future D-CYCLE check, and THE THREE-GRAPH WITNESS of
+-- the set (spec §6.4.2, §6.3.7, §6.3.10).
+--
+-- p6: mutual recursion between two nullary decides that live in DIFFERENT `§`
+-- sections.
+--
+--     § part one : `the part one figure` reads `the part two figure`
+--     § part two : `the part two figure` reads `the part one figure`
+--
+-- It is the only fixture in the set that lands in all three graphs at once:
+--   * the decision graph            -> §6.3.7 D-CYCLE, today;
+--   * the knowledgeRequirement graph -> §6.3.9, once the members un-lift;
+--   * the decisionService graph      -> §6.3.10, once a `§` becomes a service.
+--
+-- PAIR IT WITH THE RUNTIME PROBE. jl4/tests-cli/fixtures/dmn-bkm-probe/
+-- svc-cycle.dmn is the same hazard expressed directly in DMN, and its measured
+-- verdict is: Xerces VALID, KIE validator CLEAN, KIE runtime answers null while
+-- reporting the decisions SUCCEEDED (it does also emit runtime ERROR messages,
+-- which a design-time exporter cannot see). So no engine catches this at build
+-- time. The only detector that can is ours, which is why this fixture is not
+-- decorative.
+--
+-- On today's tree the emitted DRG IS cyclic here and the report is ADVISORY
+-- ONLY.
+--
+-- Expected after Phase 4: one D-CYCLE over an SCC of size 2 spanning two
+-- sections, at Blocking rather than advisory severity.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `part one`
+
+GIVETH A NUMBER
+`the part one figure` MEANS
+    `the part two figure` PLUS 1
+
+§ `part two`
+
+GIVETH A NUMBER
+`the part two figure` MEANS
+    `the part one figure` PLUS 1

@@ -31,6 +31,8 @@ import javax.xml.validation.Validator;
 import java.io.File;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -53,6 +55,19 @@ import java.util.Map;
  * Under --cases the check is symmetric: every decision the model evaluates must
  * be named in `expect`, and every name in `expect` must be a decision. Adding a
  * decision without an expectation is therefore a failure, not a silent gap.
+ *
+ * A decision answering null is a failure BY DEFAULT and stays one, for the
+ * reason below — but an EXPLICIT JSON null in `expect` licenses it, for that
+ * decision and that case only. Added 2026-07-31 with R8-d′ (MAYBE lowers to
+ * FEEL null), which made "answers null" a CORRECT answer for the first time:
+ * `capped at ten` at n = 20 is NOTHING, and a suite that could only score that
+ * as a failure would be answered by writing cases that avoid the absent branch,
+ * i.e. by a green test measuring nothing. `containsKey`, not `get(…) == null`,
+ * so "no expectation for this decision" keeps raising its own error.
+ *
+ * Kept SYMMETRIC with {@code CamundaDmnCheck} by the same house rule as
+ * {@code parseDateTag}: the fixture vocabulary means one thing on both engines,
+ * or a fixture measures two different things.
  *
  * Four legs, in the order a real deployment meets them:
  *
@@ -345,13 +360,29 @@ public final class KieDmnCheck {
           seen.add(dr.getDecisionName());
           Object val = dr.getResult();
           DMNDecisionResult.DecisionEvaluationStatus st = dr.getEvaluationStatus();
+          // An EXPLICIT JSON null in `expect` LICENSES a null answer for this
+          // decision, and only for this decision. See the class comment; kept
+          // symmetric with CamundaDmnCheck by the same rule as parseDateTag.
+          //
+          // containsKey, not get(...) == null: "no expectation for this
+          // decision" must stay distinguishable from "expected null", and it
+          // still raises its own error below.
+          boolean nullLicensed =
+              c.expect != null
+                  && c.expect.containsKey(dr.getDecisionName())
+                  && c.expect.get(dr.getDecisionName()) == null;
           String flag = "";
-          if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED && val == null) {
+          if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED
+              && val == null
+              && !nullLicensed) {
             flag = "   <<< SUCCEEDED-BUT-NULL";
           } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SKIPPED) {
             flag = "   <<< SKIPPED";
           } else if (st == DMNDecisionResult.DecisionEvaluationStatus.SUCCEEDED) {
             succeeded++;
+            if (val == null) {
+              flag = "   <<< NULL (licensed by expect)";
+            }
           } else {
             flag = "   <<< " + st;
           }
@@ -563,11 +594,47 @@ public final class KieDmnCheck {
       return l;
     }
     if (n.isObject()) {
+      // {"$date": "YYYY-MM-DD"} is the fixture vocabulary's only way to say
+      // "this is a FEEL date". Deliberately NOT an ISO-shape sniff on strings:
+      // this harness converts by DECLARED TYPE and never by appearance (see the
+      // BigDecimal note above), and a sniff would silently retype any genuine
+      // string that happened to look like a date.
+      //
+      // MEASURED: KIE's DMNContext accepts a java.time.LocalDate for a
+      // typeRef="date" input and returns one for a date-valued decision, so
+      // both the context side and the `expect` side go through this branch and
+      // sameValue's equals() fallthrough compares two LocalDates.
+      if (n.size() == 1 && n.has("$date")) {
+        return parseDateTag(n.get("$date"));
+      }
       Map<String, Object> m = new LinkedHashMap<>();
       n.fields().forEachRemaining(e -> m.put(e.getKey(), jsonToFeel(e.getValue())));
       return m;
     }
     return n.asText();
+  }
+
+  /**
+   * The {@code {"$date": ...}} tag's ONE reading, with a malformed tag treated as a fixture error.
+   *
+   * <p>A malformed tag is a defect in the fixture, not in the model under test, so it is named and
+   * exits 2 — the same convention as "case `X` has no `expect` block". It used to reach {@code
+   * LocalDate.parse} unguarded, so {@code {"$date": 20240101}} aborted this harness with a
+   * DateTimeParseException stack trace while the Camunda harness silently degraded the same fixture
+   * to an ordinary map and reported a value mismatch. One malformed fixture, two different wrong
+   * answers.
+   */
+  private static LocalDate parseDateTag(JsonNode v) {
+    if (v != null && v.isTextual()) {
+      try {
+        return LocalDate.parse(v.asText());
+      } catch (DateTimeParseException e) {
+        // fall through to the fixture-error path below
+      }
+    }
+    System.err.println("KieDmnCheck: `{\"$date\": ...}` wants an ISO-8601 YYYY-MM-DD string, got: " + v);
+    System.exit(2);
+    return null; // unreachable: System.exit does not return
   }
 
   private KieDmnCheck() {}

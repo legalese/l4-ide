@@ -12,5 +12,5 @@ fidelity report — dmnmd
       `annual limit basis` is a formula (min(annual_income, net_worth)), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-CELLSYNTAX] blocking — decision_investor_limit
-      rule decision_investor_limit_r2 has a cell dmnmd cannot read (a negation, a half-open or non-integer range, or an output with parentheses or a comma), so this table is omitted
+      rule decision_investor_limit_r2 has a cell dmnmd cannot read (an output dmnmd cannot read: parentheses, a comma, or an expression outside S-FEEL), so this table is omitted
       lost: the whole table
