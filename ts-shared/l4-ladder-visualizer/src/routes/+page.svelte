@@ -8,6 +8,8 @@
   import { LirContext, LirRegistry, type LirRootType } from '@repo/layout-ir'
   import { LadderEnv } from '$lib/ladder-env.js'
   import Flow from '$lib/displayers/flow/flow.svelte'
+  import LadderSvg from '$lib/displayers/svg/ladder-svg.svelte'
+  import { DARK_PALETTE } from '@repo/ladder-svg'
   import { mockLadderBackendApi } from 'jl4-client-rpc'
 
   // TODO: This stuff should just be replaced with the tailwind on hovered classes
@@ -230,6 +232,26 @@
   funDeclLirNode2Promise.then((funDeclLirNode2) => {
     lirRegistry.setRoot(context, LADDER_VIZ_ROOT_TYPE_2, funDeclLirNode2)
   })
+
+  /***************************
+      Example 3 — the E1 Step 4 displayer
+  ****************************/
+
+  // The SAME decoded FunDecl as Example 2, drawn through ladder-core + ladder-svg instead
+  // of Dagre + SvelteFlow. This dev route is the ONLY place the Svelte half of Step 4 is
+  // exercised live: neither IDE app is touched, because mounting the toggle there is
+  // Step 5 (E1-IDE-INTEGRATION.md:105) and §2 wants the old renderer intact until then.
+  // It costs nothing to run — no LSP, no VS Code.
+  const svgDeps = {
+    l4Connection: mockEnv2.getL4Connection(),
+    verDocId: mockVersionedDocId,
+  }
+
+  // Seam S8's proof, live: ticking this swaps the diagram's `Palette` AND darkens the card,
+  // so the two can be compared. It is a real test of the contract only because `LadderSvg`
+  // pushes the change through `LadderController.setTheme` — a palette read once at mount
+  // would leave a white diagram sitting on the dark card, which is S8's complaint verbatim.
+  let svgPalette = $state(false)
 </script>
 
 <h1 class="text-4xl font-bold text-center">Ladder Visualizer demo page</h1>
@@ -284,6 +306,30 @@
       </code>
     </pre>
   </section>
+</section>
+
+<section id="example 3" class="example w-3/4 mx-auto my-2 space-y-4">
+  <h3 class="text-lg font-semibold">
+    Example 2, drawn by <code>LadderSvg</code> (E1 Step 4)
+  </h3>
+  <p class="text-sm text-gray-600">
+    Same <code>FunDecl</code>, no Dagre and no SvelteFlow. The header shows a
+    <b>verdict</b>, not <code>evaluates to …</code>. Drag to pan; ⌘/ctrl-wheel
+    to zoom at the pointer; double-click or <b>fit</b> to re-frame.
+  </p>
+  <label class="text-sm inline-flex items-center gap-2">
+    <input type="checkbox" bind:checked={svgPalette} /> dark palette (seam S8)
+  </label>
+  <div
+    class="viz-container-with-height"
+    style={svgPalette ? 'background:#1e1f22; padding:0.5rem' : ''}
+  >
+    <LadderSvg
+      funDecl={funDecl2}
+      deps={svgDeps}
+      palette={svgPalette ? DARK_PALETTE : 'screen'}
+    />
+  </div>
 </section>
 
 <style>

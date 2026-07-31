@@ -104,10 +104,13 @@
         font-size: 12.5px;
         color: #444;
       }
+      /* A pan/zoom host clips rather than scrolls, and needs a definite height —
+         `flex: 1` + `min-height: 0` gives it one inside the column. */
       #ladder {
         padding: 22px 24px;
-        overflow: auto;
+        overflow: hidden;
         flex: 1;
+        min-height: 0;
       }
       #sentences-wrap {
         border-top: 1px solid #eee;
@@ -200,6 +203,10 @@
           <button id="collapse-all" type="button">collapse all</button>
           <button id="all-true" type="button">all true</button>
           <button id="reset" type="button">reset</button>
+          <span class="grp">view</span>
+          <button id="zoom-out" type="button">−</button>
+          <button id="zoom-in" type="button">+</button>
+          <button id="fit" type="button">fit</button>
         </div>
         <div id="ladder"></div>
         <div id="sentences-wrap">
