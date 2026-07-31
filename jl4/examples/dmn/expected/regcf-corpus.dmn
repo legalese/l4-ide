@@ -157,6 +157,29 @@
       <typeRef>boolean</typeRef>
     </itemComponent>
   </itemDefinition>
+  <itemDefinition id="itemdef_investorprofile_hydrated" name="InvestorProfile_hydrated" label="InvestorProfile">
+    <itemComponent id="itemdef_investorprofile_hydrated_c1" name="name">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c2" name="is_an_accredited_investor_as_defined_in_Rule_501" label="is an accredited investor as defined in Rule 501">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c3" name="annual_income" label="annual income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c4" name="net_worth" label="net worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c5" name="aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months" label="aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c6" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investorprofile_hydrated_c7" name="lesser_of_annual_income_or_net_worth" label="lesser of annual income or net worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
   <inputData id="input_amendment" name="amendment">
     <variable id="input_amendment_var" name="amendment" typeRef="date"/>
   </inputData>
@@ -205,20 +228,14 @@
   <inputData id="input_investor_4" name="investor_4" label="investor">
     <variable id="input_investor_4_var" name="investor_4" label="investor" typeRef="InvestorProfile"/>
   </inputData>
+  <inputData id="input_amount_to_be_sold_in_this_transaction" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
+    <variable id="input_amount_to_be_sold_in_this_transaction_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
+  </inputData>
   <inputData id="input_investor_5" name="investor_5" label="investor">
     <variable id="input_investor_5_var" name="investor_5" label="investor" typeRef="InvestorProfile"/>
   </inputData>
   <inputData id="input_investor_6" name="investor_6" label="investor">
     <variable id="input_investor_6_var" name="investor_6" label="investor" typeRef="InvestorProfile"/>
-  </inputData>
-  <inputData id="input_amount_to_be_sold_in_this_transaction" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction">
-    <variable id="input_amount_to_be_sold_in_this_transaction_var" name="amount_to_be_sold_in_this_transaction" label="amount to be sold in this transaction" typeRef="number"/>
-  </inputData>
-  <inputData id="input_investor_7" name="investor_7" label="investor">
-    <variable id="input_investor_7_var" name="investor_7" label="investor" typeRef="InvestorProfile"/>
-  </inputData>
-  <inputData id="input_investor_8" name="investor_8" label="investor">
-    <variable id="input_investor_8_var" name="investor_8" label="investor" typeRef="InvestorProfile"/>
   </inputData>
   <inputData id="input_amount_to_be_sold_in_this_transaction_2" name="amount_to_be_sold_in_this_transaction_2" label="amount to be sold in this transaction">
     <variable id="input_amount_to_be_sold_in_this_transaction_2_var" name="amount_to_be_sold_in_this_transaction_2" label="amount to be sold in this transaction" typeRef="number"/>
@@ -304,8 +321,8 @@
   <inputData id="input_offering_6" name="offering_6" label="offering">
     <variable id="input_offering_6_var" name="offering_6" label="offering" typeRef="Offering"/>
   </inputData>
-  <inputData id="input_investor_9" name="investor_9" label="investor">
-    <variable id="input_investor_9_var" name="investor_9" label="investor" typeRef="InvestorProfile"/>
+  <inputData id="input_investor_7" name="investor_7" label="investor">
+    <variable id="input_investor_7_var" name="investor_7" label="investor" typeRef="InvestorProfile"/>
   </inputData>
   <inputData id="input_amount" name="amount">
     <variable id="input_amount_var" name="amount" typeRef="number"/>
@@ -1021,18 +1038,12 @@
   <decision id="decision_the_applicable_measure_of_annual_income_or_net_worth" name="the_applicable_measure_of_annual_income_or_net_worth" label="the applicable measure of annual income or net worth">
     <variable id="decision_the_applicable_measure_of_annual_income_or_net_worth_var" name="the_applicable_measure_of_annual_income_or_net_worth" label="the applicable measure of annual income or net worth" typeRef="number"/>
     <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir1">
-      <requiredDecision href="#decision_greater_of_annual_income_or_net_worth"/>
+      <requiredDecision href="#hydration_investor"/>
     </informationRequirement>
     <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir2">
-      <requiredDecision href="#decision_lesser_of_annual_income_or_net_worth"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3">
-      <requiredInput href="#input_investor"/>
-    </informationRequirement>
-    <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir4">
       <requiredInput href="#input_no_regulation_crowdfunding_figure_exists_before_commencement_on_2016_05_16"/>
     </informationRequirement>
-    <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir5">
+    <informationRequirement id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3">
       <requiredInput href="#input_rules_effective_date"/>
     </informationRequirement>
     <decisionTable id="decision_the_applicable_measure_of_annual_income_or_net_worth_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="the applicable measure of annual income or net worth">
@@ -1049,7 +1060,7 @@
           <text>&gt;= date("2021-03-15")</text>
         </inputEntry>
         <outputEntry id="decision_the_applicable_measure_of_annual_income_or_net_worth_r1_o1">
-          <text>`greater of annual income or net worth` OF investor</text>
+          <text>investor_hydrated.greater_of_annual_income_or_net_worth</text>
         </outputEntry>
         <annotationEntry>
           <text>the 2021 amendments — 86 FR 3496 (Rel. 33-10884), instr. 3 — the 2020 amendments, eff. 2021-03-15 (main.l4:111:1-112:43)</text>
@@ -1061,7 +1072,7 @@
           <text>[date("2016-05-16")..date("2021-03-15"))</text>
         </inputEntry>
         <outputEntry id="decision_the_applicable_measure_of_annual_income_or_net_worth_r2_o1">
-          <text>`lesser of annual income or net worth` OF investor</text>
+          <text>investor_hydrated.lesser_of_annual_income_or_net_worth</text>
         </outputEntry>
         <annotationEntry>
           <text>Reg CF commenced — 80 FR 71388 (Rel. 33-9974), Part 227 text at 71537, instr. 4 — commencement (main.l4:103:1-104:40)</text>
@@ -1081,34 +1092,16 @@
       </rule>
     </decisionTable>
   </decision>
-  <decision id="decision_greater_of_annual_income_or_net_worth" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth">
-    <variable id="decision_greater_of_annual_income_or_net_worth_var" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth" typeRef="number"/>
-    <informationRequirement id="decision_greater_of_annual_income_or_net_worth_ir1">
-      <requiredInput href="#input_investor_2"/>
-    </informationRequirement>
-    <literalExpression id="decision_greater_of_annual_income_or_net_worth_literal">
-      <text>max(investor_2.annual_income, investor_2.net_worth)</text>
-    </literalExpression>
-  </decision>
-  <decision id="decision_lesser_of_annual_income_or_net_worth" name="lesser_of_annual_income_or_net_worth" label="lesser of annual income or net worth">
-    <variable id="decision_lesser_of_annual_income_or_net_worth_var" name="lesser_of_annual_income_or_net_worth" label="lesser of annual income or net worth" typeRef="number"/>
-    <informationRequirement id="decision_lesser_of_annual_income_or_net_worth_ir1">
-      <requiredInput href="#input_investor_3"/>
-    </informationRequirement>
-    <literalExpression id="decision_lesser_of_annual_income_or_net_worth_literal">
-      <text>min(investor_3.annual_income, investor_3.net_worth)</text>
-    </literalExpression>
-  </decision>
   <decision id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point">
     <variable id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_var" name="either_annual_income_or_net_worth_is_less_than_the_cut_point" label="either annual income or net worth is less than the cut point" typeRef="boolean"/>
     <informationRequirement id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1">
       <requiredDecision href="#decision_income_or_net_worth_cut_point"/>
     </informationRequirement>
     <informationRequirement id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2">
-      <requiredInput href="#input_investor_4"/>
+      <requiredInput href="#input_investor_2"/>
     </informationRequirement>
     <literalExpression id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_literal">
-      <text>investor_4.annual_income &lt; income_or_net_worth_cut_point or investor_4.net_worth &lt; income_or_net_worth_cut_point</text>
+      <text>investor_2.annual_income &lt; income_or_net_worth_cut_point or investor_2.net_worth &lt; income_or_net_worth_cut_point</text>
     </literalExpression>
   </decision>
   <decision id="decision_investment_limit" name="investment_limit" label="investment limit">
@@ -1126,7 +1119,7 @@
       <requiredDecision href="#decision_the_applicable_measure_of_annual_income_or_net_worth"/>
     </informationRequirement>
     <informationRequirement id="decision_investment_limit_ir5">
-      <requiredInput href="#input_investor_5"/>
+      <requiredInput href="#input_investor_3"/>
     </informationRequirement>
     <decisionTable id="decision_investment_limit_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="investment limit">
       <input id="decision_investment_limit_i1" label="`either annual income or net worth is less than the cut point` OF investor">
@@ -1156,10 +1149,10 @@
       <requiredInput href="#input_amount_to_be_sold_in_this_transaction"/>
     </informationRequirement>
     <informationRequirement id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2">
-      <requiredInput href="#input_investor_6"/>
+      <requiredInput href="#input_investor_4"/>
     </informationRequirement>
     <literalExpression id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_literal">
-      <text>investor_6.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction</text>
+      <text>investor_4.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months + amount_to_be_sold_in_this_transaction</text>
     </literalExpression>
   </decision>
   <decision id="decision_the_accredited_investor_carve_out_applies_to" name="the_accredited_investor_carve_out_applies_to" label="the accredited-investor carve-out applies to">
@@ -1171,7 +1164,7 @@
       <requiredDecision href="#decision_the_rules_in_force_include"/>
     </informationRequirement>
     <informationRequirement id="decision_the_accredited_investor_carve_out_applies_to_ir3">
-      <requiredInput href="#input_investor_7"/>
+      <requiredInput href="#input_investor_5"/>
     </informationRequirement>
     <literalExpression id="decision_the_accredited_investor_carve_out_applies_to_literal">
       <text>`the rules in force include` OF `the 2021 amendments` AND investor's `is an accredited investor as defined in Rule 501`</text>
@@ -1192,7 +1185,7 @@
       <requiredInput href="#input_amount_to_be_sold_in_this_transaction_2"/>
     </informationRequirement>
     <informationRequirement id="decision_investor_is_within_the_investment_limit_ir5">
-      <requiredInput href="#input_investor_8"/>
+      <requiredInput href="#input_investor_6"/>
     </informationRequirement>
     <literalExpression id="decision_investor_is_within_the_investment_limit_literal">
       <text>... "(2) Where the purchaser is not an accredited investor (as defined in Rule 501), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:" OR `the accredited-investor carve-out applies to` OF investor OR (`aggregate amount sold to this investor including this transaction` OF investor, `amount to be sold in this transaction`) AT MOST (`investment limit` OF investor)</text>
@@ -1734,7 +1727,7 @@
       <requiredInput href="#input_filing_2"/>
     </informationRequirement>
     <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9">
-      <requiredInput href="#input_investor_9"/>
+      <requiredInput href="#input_investor_7"/>
     </informationRequirement>
     <informationRequirement id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10">
       <requiredInput href="#input_issuer_9"/>
@@ -2226,6 +2219,56 @@
       <text>`EVAL UNDER RULES EFFECTIVE AT` OF (Date OF 1, 6, 2021), (`financial statements required` OF `F offering`)</text>
     </literalExpression>
   </decision>
+  <decision id="hydration_investor" name="investor_hydrated" label="investor">
+    <variable id="hydration_investor_var" name="investor_hydrated" label="investor" typeRef="InvestorProfile_hydrated"/>
+    <informationRequirement id="hydration_investor_ir1">
+      <requiredInput href="#input_investor"/>
+    </informationRequirement>
+    <context id="hydration_investor_ctx">
+      <contextEntry id="hydration_investor_ce1">
+        <variable id="hydration_investor_ce1_var" name="name" typeRef="string"/>
+        <literalExpression id="hydration_investor_ce1_lit">
+          <text>investor.name</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce2">
+        <variable id="hydration_investor_ce2_var" name="is_an_accredited_investor_as_defined_in_Rule_501" label="is an accredited investor as defined in Rule 501" typeRef="boolean"/>
+        <literalExpression id="hydration_investor_ce2_lit">
+          <text>investor.is_an_accredited_investor_as_defined_in_Rule_501</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce3">
+        <variable id="hydration_investor_ce3_var" name="annual_income" label="annual income" typeRef="number"/>
+        <literalExpression id="hydration_investor_ce3_lit">
+          <text>investor.annual_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce4">
+        <variable id="hydration_investor_ce4_var" name="net_worth" label="net worth" typeRef="number"/>
+        <literalExpression id="hydration_investor_ce4_lit">
+          <text>investor.net_worth</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce5">
+        <variable id="hydration_investor_ce5_var" name="aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months" label="aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months" typeRef="number"/>
+        <literalExpression id="hydration_investor_ce5_lit">
+          <text>investor.aggregate_amount_already_sold_to_this_investor_across_all_issuers_in_reliance_on_section_4_a_6_during_the_preceding_12_months</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce6">
+        <variable id="hydration_investor_ce6_var" name="greater_of_annual_income_or_net_worth" label="greater of annual income or net worth" typeRef="number"/>
+        <literalExpression id="hydration_investor_ce6_lit">
+          <text>(if annual_income &gt;= net_worth then annual_income else net_worth)</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_investor_ce7">
+        <variable id="hydration_investor_ce7_var" name="lesser_of_annual_income_or_net_worth" label="lesser of annual income or net worth" typeRef="number"/>
+        <literalExpression id="hydration_investor_ce7_lit">
+          <text>(if annual_income &lt;= net_worth then annual_income else net_worth)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="definitions_sec_regulation_crowdfunding_17_cfr_part_227_diagram" name="SEC Regulation Crowdfunding — 17 CFR Part 227">
       <dmndi:DMNShape id="input_amendment_shape" dmnElementRef="input_amendment">
@@ -2276,161 +2319,155 @@
       <dmndi:DMNShape id="input_investor_4_shape" dmnElementRef="input_investor_4">
         <dc:Bounds x="3360" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_investor_5_shape" dmnElementRef="input_investor_5">
+      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction">
         <dc:Bounds x="3580" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_investor_6_shape" dmnElementRef="input_investor_6">
+      <dmndi:DMNShape id="input_investor_5_shape" dmnElementRef="input_investor_5">
         <dc:Bounds x="3800" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction">
+      <dmndi:DMNShape id="input_investor_6_shape" dmnElementRef="input_investor_6">
         <dc:Bounds x="4020" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_investor_7_shape" dmnElementRef="input_investor_7">
+      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_2_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction_2">
         <dc:Bounds x="4240" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_investor_8_shape" dmnElementRef="input_investor_8">
+      <dmndi:DMNShape id="input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here_shape" dmnElementRef="input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here">
         <dc:Bounds x="4460" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_amount_to_be_sold_in_this_transaction_2_shape" dmnElementRef="input_amount_to_be_sold_in_this_transaction_2">
+      <dmndi:DMNShape id="input_offering_3_shape" dmnElementRef="input_offering_3">
         <dc:Bounds x="4680" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here_shape" dmnElementRef="input_the_covid_19_temporary_rules_rule_201_z_and_bb_are_not_modelled_here">
+      <dmndi:DMNShape id="input_required_shape" dmnElementRef="input_required">
         <dc:Bounds x="4900" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_offering_3_shape" dmnElementRef="input_offering_3">
+      <dmndi:DMNShape id="input_supplied_shape" dmnElementRef="input_supplied">
         <dc:Bounds x="5120" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_required_shape" dmnElementRef="input_required">
+      <dmndi:DMNShape id="input_offering_4_shape" dmnElementRef="input_offering_4">
         <dc:Bounds x="5340" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_supplied_shape" dmnElementRef="input_supplied">
+      <dmndi:DMNShape id="input_filing_shape" dmnElementRef="input_filing">
         <dc:Bounds x="5560" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_offering_4_shape" dmnElementRef="input_offering_4">
+      <dmndi:DMNShape id="input_offering_5_shape" dmnElementRef="input_offering_5">
         <dc:Bounds x="5780" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_filing_shape" dmnElementRef="input_filing">
+      <dmndi:DMNShape id="input_arrangement_shape" dmnElementRef="input_arrangement">
         <dc:Bounds x="6000" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_offering_5_shape" dmnElementRef="input_offering_5">
+      <dmndi:DMNShape id="input_arrangement_2_shape" dmnElementRef="input_arrangement_2">
         <dc:Bounds x="6220" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_arrangement_shape" dmnElementRef="input_arrangement">
+      <dmndi:DMNShape id="input_arrangement_3_shape" dmnElementRef="input_arrangement_3">
         <dc:Bounds x="6440" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_arrangement_2_shape" dmnElementRef="input_arrangement_2">
+      <dmndi:DMNShape id="input_arrangement_4_shape" dmnElementRef="input_arrangement_4">
         <dc:Bounds x="6660" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_arrangement_3_shape" dmnElementRef="input_arrangement_3">
+      <dmndi:DMNShape id="input_notice_shape" dmnElementRef="input_notice">
         <dc:Bounds x="6880" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_arrangement_4_shape" dmnElementRef="input_arrangement_4">
+      <dmndi:DMNShape id="input_notice_2_shape" dmnElementRef="input_notice_2">
         <dc:Bounds x="7100" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_notice_shape" dmnElementRef="input_notice">
+      <dmndi:DMNShape id="input_status_shape" dmnElementRef="input_status">
         <dc:Bounds x="7320" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_notice_2_shape" dmnElementRef="input_notice_2">
+      <dmndi:DMNShape id="input_status_2_shape" dmnElementRef="input_status_2">
         <dc:Bounds x="7540" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_shape" dmnElementRef="input_status">
+      <dmndi:DMNShape id="input_status_3_shape" dmnElementRef="input_status_3">
         <dc:Bounds x="7760" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_2_shape" dmnElementRef="input_status_2">
+      <dmndi:DMNShape id="input_status_4_shape" dmnElementRef="input_status_4">
         <dc:Bounds x="7980" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_3_shape" dmnElementRef="input_status_3">
+      <dmndi:DMNShape id="input_status_5_shape" dmnElementRef="input_status_5">
         <dc:Bounds x="8200" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_4_shape" dmnElementRef="input_status_4">
+      <dmndi:DMNShape id="input_status_6_shape" dmnElementRef="input_status_6">
         <dc:Bounds x="8420" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_5_shape" dmnElementRef="input_status_5">
+      <dmndi:DMNShape id="input_status_7_shape" dmnElementRef="input_status_7">
         <dc:Bounds x="8640" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_6_shape" dmnElementRef="input_status_6">
+      <dmndi:DMNShape id="input_annual_cycles_shape" dmnElementRef="input_annual_cycles">
         <dc:Bounds x="8860" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_status_7_shape" dmnElementRef="input_status_7">
+      <dmndi:DMNShape id="input_transfer_shape" dmnElementRef="input_transfer">
         <dc:Bounds x="9080" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_annual_cycles_shape" dmnElementRef="input_annual_cycles">
+      <dmndi:DMNShape id="input_transfer_2_shape" dmnElementRef="input_transfer_2">
         <dc:Bounds x="9300" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_transfer_shape" dmnElementRef="input_transfer">
+      <dmndi:DMNShape id="input_transfer_3_shape" dmnElementRef="input_transfer_3">
         <dc:Bounds x="9520" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_transfer_2_shape" dmnElementRef="input_transfer_2">
+      <dmndi:DMNShape id="input_transfer_4_shape" dmnElementRef="input_transfer_4">
         <dc:Bounds x="9740" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_transfer_3_shape" dmnElementRef="input_transfer_3">
+      <dmndi:DMNShape id="input_issuer_9_shape" dmnElementRef="input_issuer_9">
         <dc:Bounds x="9960" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_transfer_4_shape" dmnElementRef="input_transfer_4">
+      <dmndi:DMNShape id="input_offering_6_shape" dmnElementRef="input_offering_6">
         <dc:Bounds x="10180" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_issuer_9_shape" dmnElementRef="input_issuer_9">
+      <dmndi:DMNShape id="input_investor_7_shape" dmnElementRef="input_investor_7">
         <dc:Bounds x="10400" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_offering_6_shape" dmnElementRef="input_offering_6">
+      <dmndi:DMNShape id="input_amount_shape" dmnElementRef="input_amount">
         <dc:Bounds x="10620" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_investor_9_shape" dmnElementRef="input_investor_9">
+      <dmndi:DMNShape id="input_arrangement_5_shape" dmnElementRef="input_arrangement_5">
         <dc:Bounds x="10840" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_amount_shape" dmnElementRef="input_amount">
+      <dmndi:DMNShape id="input_filing_2_shape" dmnElementRef="input_filing_2">
         <dc:Bounds x="11060" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_arrangement_5_shape" dmnElementRef="input_arrangement_5">
+      <dmndi:DMNShape id="input_maximum_shape" dmnElementRef="input_maximum">
         <dc:Bounds x="11280" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_filing_2_shape" dmnElementRef="input_filing_2">
+      <dmndi:DMNShape id="input_prior_sales_shape" dmnElementRef="input_prior_sales">
         <dc:Bounds x="11500" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_maximum_shape" dmnElementRef="input_maximum">
+      <dmndi:DMNShape id="input_previously_sold_shape" dmnElementRef="input_previously_sold">
         <dc:Bounds x="11720" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_prior_sales_shape" dmnElementRef="input_prior_sales">
+      <dmndi:DMNShape id="input_accredited_shape" dmnElementRef="input_accredited">
         <dc:Bounds x="11940" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_previously_sold_shape" dmnElementRef="input_previously_sold">
+      <dmndi:DMNShape id="input_income_shape" dmnElementRef="input_income">
         <dc:Bounds x="12160" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_accredited_shape" dmnElementRef="input_accredited">
+      <dmndi:DMNShape id="input_worth_shape" dmnElementRef="input_worth">
         <dc:Bounds x="12380" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_income_shape" dmnElementRef="input_income">
+      <dmndi:DMNShape id="input_already_shape" dmnElementRef="input_already">
         <dc:Bounds x="12600" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_worth_shape" dmnElementRef="input_worth">
+      <dmndi:DMNShape id="input_intermediaries_shape" dmnElementRef="input_intermediaries">
         <dc:Bounds x="12820" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_already_shape" dmnElementRef="input_already">
+      <dmndi:DMNShape id="input_days_available_shape" dmnElementRef="input_days_available">
         <dc:Bounds x="13040" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_intermediaries_shape" dmnElementRef="input_intermediaries">
+      <dmndi:DMNShape id="input_annual_reports_shape" dmnElementRef="input_annual_reports">
         <dc:Bounds x="13260" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_days_available_shape" dmnElementRef="input_days_available">
+      <dmndi:DMNShape id="input_holders_shape" dmnElementRef="input_holders">
         <dc:Bounds x="13480" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_annual_reports_shape" dmnElementRef="input_annual_reports">
+      <dmndi:DMNShape id="input_assets_shape" dmnElementRef="input_assets">
         <dc:Bounds x="13700" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_holders_shape" dmnElementRef="input_holders">
+      <dmndi:DMNShape id="input_days_since_issue_shape" dmnElementRef="input_days_since_issue">
         <dc:Bounds x="13920" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_assets_shape" dmnElementRef="input_assets">
+      <dmndi:DMNShape id="input_to_accredited_shape" dmnElementRef="input_to_accredited">
         <dc:Bounds x="14140" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_days_since_issue_shape" dmnElementRef="input_days_since_issue">
-        <dc:Bounds x="14360" y="1020" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="input_to_accredited_shape" dmnElementRef="input_to_accredited">
-        <dc:Bounds x="14580" y="1020" width="180" height="80"/>
-      </dmndi:DMNShape>
       <dmndi:DMNShape id="input_rules_effective_date_shape" dmnElementRef="input_rules_effective_date">
-        <dc:Bounds x="14800" y="1020" width="180" height="80"/>
+        <dc:Bounds x="14360" y="1020" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_reg_cf_commenced_shape" dmnElementRef="decision_reg_cf_commenced">
         <dc:Bounds x="60" y="860" width="180" height="80"/>
@@ -2510,89 +2547,86 @@
       <dmndi:DMNShape id="decision_aggregate_offering_amount_shape" dmnElementRef="decision_aggregate_offering_amount">
         <dc:Bounds x="5560" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_greater_of_annual_income_or_net_worth_shape" dmnElementRef="decision_greater_of_annual_income_or_net_worth">
+      <dmndi:DMNShape id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_shape" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction">
         <dc:Bounds x="5780" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_lesser_of_annual_income_or_net_worth_shape" dmnElementRef="decision_lesser_of_annual_income_or_net_worth">
+      <dmndi:DMNShape id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_shape" dmnElementRef="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window">
         <dc:Bounds x="6000" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_shape" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction">
+      <dmndi:DMNShape id="decision_assurance_level_shape" dmnElementRef="decision_assurance_level">
         <dc:Bounds x="6220" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_shape" dmnElementRef="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window">
+      <dmndi:DMNShape id="decision_a_3_conducted_through_a_single_complying_intermediary_shape" dmnElementRef="decision_a_3_conducted_through_a_single_complying_intermediary">
         <dc:Bounds x="6440" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_assurance_level_shape" dmnElementRef="decision_assurance_level">
+      <dmndi:DMNShape id="decision_the_intermediary_has_discharged_its_investor_facing_duties_shape" dmnElementRef="decision_the_intermediary_has_discharged_its_investor_facing_duties">
         <dc:Bounds x="6660" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_3_conducted_through_a_single_complying_intermediary_shape" dmnElementRef="decision_a_3_conducted_through_a_single_complying_intermediary">
+      <dmndi:DMNShape id="decision_notice_complies_with_rule_204_b_shape" dmnElementRef="decision_notice_complies_with_rule_204_b">
         <dc:Bounds x="6880" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_the_intermediary_has_discharged_its_investor_facing_duties_shape" dmnElementRef="decision_the_intermediary_has_discharged_its_investor_facing_duties">
+      <dmndi:DMNShape id="decision_definition_terms_of_the_offering_shape" dmnElementRef="decision_definition_terms_of_the_offering">
         <dc:Bounds x="7100" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_notice_complies_with_rule_204_b_shape" dmnElementRef="decision_notice_complies_with_rule_204_b">
+      <dmndi:DMNShape id="decision_b_1_became_an_exchange_act_reporting_company_shape" dmnElementRef="decision_b_1_became_an_exchange_act_reporting_company">
         <dc:Bounds x="7320" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_definition_terms_of_the_offering_shape" dmnElementRef="decision_definition_terms_of_the_offering">
+      <dmndi:DMNShape id="decision_b_4_all_securities_repurchased_shape" dmnElementRef="decision_b_4_all_securities_repurchased">
         <dc:Bounds x="7540" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_b_1_became_an_exchange_act_reporting_company_shape" dmnElementRef="decision_b_1_became_an_exchange_act_reporting_company">
+      <dmndi:DMNShape id="decision_b_5_liquidated_or_dissolved_shape" dmnElementRef="decision_b_5_liquidated_or_dissolved">
         <dc:Bounds x="7760" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_b_4_all_securities_repurchased_shape" dmnElementRef="decision_b_4_all_securities_repurchased">
+      <dmndi:DMNShape id="decision_transfer_falls_within_an_exception_in_rule_501_a_shape" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a">
         <dc:Bounds x="7980" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_b_5_liquidated_or_dissolved_shape" dmnElementRef="decision_b_5_liquidated_or_dissolved">
+      <dmndi:DMNShape id="decision_a_clean_issuer_shape" dmnElementRef="decision_a_clean_issuer">
         <dc:Bounds x="8200" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_transfer_falls_within_an_exception_in_rule_501_a_shape" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a">
+      <dmndi:DMNShape id="decision_a_foreign_issuer_shape" dmnElementRef="decision_a_foreign_issuer">
         <dc:Bounds x="8420" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_clean_issuer_shape" dmnElementRef="decision_a_clean_issuer">
+      <dmndi:DMNShape id="decision_a_delinquent_issuer_shape" dmnElementRef="decision_a_delinquent_issuer">
         <dc:Bounds x="8640" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_foreign_issuer_shape" dmnElementRef="decision_a_foreign_issuer">
+      <dmndi:DMNShape id="decision_a_blank_check_issuer_shape" dmnElementRef="decision_a_blank_check_issuer">
         <dc:Bounds x="8860" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_delinquent_issuer_shape" dmnElementRef="decision_a_delinquent_issuer">
+      <dmndi:DMNShape id="decision_an_offering_of_shape" dmnElementRef="decision_an_offering_of">
         <dc:Bounds x="9080" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_blank_check_issuer_shape" dmnElementRef="decision_a_blank_check_issuer">
+      <dmndi:DMNShape id="decision_an_investor_with_shape" dmnElementRef="decision_an_investor_with">
         <dc:Bounds x="9300" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_an_offering_of_shape" dmnElementRef="decision_an_offering_of">
+      <dmndi:DMNShape id="decision_an_arrangement_with_shape" dmnElementRef="decision_an_arrangement_with">
         <dc:Bounds x="9520" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_an_investor_with_shape" dmnElementRef="decision_an_investor_with">
+      <dmndi:DMNShape id="decision_a_reporting_status_with_shape" dmnElementRef="decision_a_reporting_status_with">
         <dc:Bounds x="9740" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_an_arrangement_with_shape" dmnElementRef="decision_an_arrangement_with">
+      <dmndi:DMNShape id="decision_a_transfer_at_shape" dmnElementRef="decision_a_transfer_at">
         <dc:Bounds x="9960" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_reporting_status_with_shape" dmnElementRef="decision_a_reporting_status_with">
+      <dmndi:DMNShape id="decision_certified_shape" dmnElementRef="decision_certified">
         <dc:Bounds x="10180" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_transfer_at_shape" dmnElementRef="decision_a_transfer_at">
+      <dmndi:DMNShape id="decision_reviewed_shape" dmnElementRef="decision_reviewed">
         <dc:Bounds x="10400" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_certified_shape" dmnElementRef="decision_certified">
+      <dmndi:DMNShape id="decision_audited_shape" dmnElementRef="decision_audited">
         <dc:Bounds x="10620" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_reviewed_shape" dmnElementRef="decision_reviewed">
+      <dmndi:DMNShape id="decision_a_conforming_notice_shape" dmnElementRef="decision_a_conforming_notice">
         <dc:Bounds x="10840" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_audited_shape" dmnElementRef="decision_audited">
+      <dmndi:DMNShape id="decision_an_overreaching_notice_shape" dmnElementRef="decision_an_overreaching_notice">
         <dc:Bounds x="11060" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_conforming_notice_shape" dmnElementRef="decision_a_conforming_notice">
+      <dmndi:DMNShape id="decision_a_notice_with_no_platform_link_shape" dmnElementRef="decision_a_notice_with_no_platform_link">
         <dc:Bounds x="11280" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_an_overreaching_notice_shape" dmnElementRef="decision_an_overreaching_notice">
+      <dmndi:DMNShape id="hydration_investor_shape" dmnElementRef="hydration_investor">
         <dc:Bounds x="11500" y="860" width="180" height="80"/>
-      </dmndi:DMNShape>
-      <dmndi:DMNShape id="decision_a_notice_with_no_platform_link_shape" dmnElementRef="decision_a_notice_with_no_platform_link">
-        <dc:Bounds x="11720" y="860" width="180" height="80"/>
       </dmndi:DMNShape>
       <dmndi:DMNShape id="decision_issuer_is_excluded_by_rule_100_b_shape" dmnElementRef="decision_issuer_is_excluded_by_rule_100_b">
         <dc:Bounds x="60" y="700" width="180" height="80"/>
@@ -2743,7 +2777,7 @@
         <di:waypoint x="1030" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_rules_in_force_include_ir2_edge" dmnElementRef="decision_the_rules_in_force_include_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="1030" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_offering_maximum_in_a_12_month_period_ir1_edge" dmnElementRef="decision_offering_maximum_in_a_12_month_period_ir1">
@@ -2751,7 +2785,7 @@
         <di:waypoint x="1250" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_offering_maximum_in_a_12_month_period_ir2_edge" dmnElementRef="decision_offering_maximum_in_a_12_month_period_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="1250" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_income_or_net_worth_cut_point_ir1_edge" dmnElementRef="decision_income_or_net_worth_cut_point_ir1">
@@ -2759,7 +2793,7 @@
         <di:waypoint x="1470" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_income_or_net_worth_cut_point_ir2_edge" dmnElementRef="decision_income_or_net_worth_cut_point_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="1470" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_minimum_permitted_investment_ir1_edge" dmnElementRef="decision_minimum_permitted_investment_ir1">
@@ -2767,7 +2801,7 @@
         <di:waypoint x="1690" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_minimum_permitted_investment_ir2_edge" dmnElementRef="decision_minimum_permitted_investment_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="1690" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_ir1_edge" dmnElementRef="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_ir1">
@@ -2775,7 +2809,7 @@
         <di:waypoint x="1910" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_ir2_edge" dmnElementRef="decision_maximum_amount_sold_to_any_one_investor_in_a_12_month_period_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="1910" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tier_1_ceiling_ir1_edge" dmnElementRef="decision_tier_1_ceiling_ir1">
@@ -2783,7 +2817,7 @@
         <di:waypoint x="2130" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tier_1_ceiling_ir2_edge" dmnElementRef="decision_tier_1_ceiling_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="2130" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tier_2_ceiling_ir1_edge" dmnElementRef="decision_tier_2_ceiling_ir1">
@@ -2791,7 +2825,7 @@
         <di:waypoint x="2350" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_tier_2_ceiling_ir2_edge" dmnElementRef="decision_tier_2_ceiling_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="2350" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_first_time_issuer_review_ceiling_ir1_edge" dmnElementRef="decision_first_time_issuer_review_ceiling_ir1">
@@ -2799,7 +2833,7 @@
         <di:waypoint x="2570" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_first_time_issuer_review_ceiling_ir2_edge" dmnElementRef="decision_first_time_issuer_review_ceiling_ir2">
-        <di:waypoint x="14890" y="1020"/>
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="2570" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_1_not_organized_under_state_or_territorial_law_ir1_edge" dmnElementRef="decision_b_1_not_organized_under_state_or_territorial_law_ir1">
@@ -2879,39 +2913,23 @@
         <di:waypoint x="370" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir1_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir1">
-        <di:waypoint x="5870" y="860"/>
+        <di:waypoint x="11590" y="860"/>
         <di:waypoint x="590" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir2_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir2">
-        <di:waypoint x="6090" y="860"/>
-        <di:waypoint x="590" y="780"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3">
-        <di:waypoint x="2790" y="1020"/>
-        <di:waypoint x="590" y="780"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir4_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir4">
         <di:waypoint x="370" y="1020"/>
         <di:waypoint x="590" y="780"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir5_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir5">
-        <di:waypoint x="14890" y="1020"/>
+      <dmndi:DMNEdge id="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3_edge" dmnElementRef="decision_the_applicable_measure_of_annual_income_or_net_worth_ir3">
+        <di:waypoint x="14450" y="1020"/>
         <di:waypoint x="590" y="780"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_greater_of_annual_income_or_net_worth_ir1_edge" dmnElementRef="decision_greater_of_annual_income_or_net_worth_ir1">
-        <di:waypoint x="3010" y="1020"/>
-        <di:waypoint x="5870" y="940"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_lesser_of_annual_income_or_net_worth_ir1_edge" dmnElementRef="decision_lesser_of_annual_income_or_net_worth_ir1">
-        <di:waypoint x="3230" y="1020"/>
-        <di:waypoint x="6090" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1_edge" dmnElementRef="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir1">
         <di:waypoint x="1470" y="860"/>
         <di:waypoint x="810" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2_edge" dmnElementRef="decision_either_annual_income_or_net_worth_is_less_than_the_cut_point_ir2">
-        <di:waypoint x="3450" y="1020"/>
+        <di:waypoint x="3010" y="1020"/>
         <di:waypoint x="810" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investment_limit_ir1_edge" dmnElementRef="decision_investment_limit_ir1">
@@ -2931,16 +2949,16 @@
         <di:waypoint x="370" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investment_limit_ir5_edge" dmnElementRef="decision_investment_limit_ir5">
-        <di:waypoint x="3670" y="1020"/>
+        <di:waypoint x="3230" y="1020"/>
         <di:waypoint x="370" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1_edge" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir1">
-        <di:waypoint x="4110" y="1020"/>
-        <di:waypoint x="6310" y="940"/>
+        <di:waypoint x="3670" y="1020"/>
+        <di:waypoint x="5870" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2_edge" dmnElementRef="decision_aggregate_amount_sold_to_this_investor_including_this_transaction_ir2">
-        <di:waypoint x="3890" y="1020"/>
-        <di:waypoint x="6310" y="940"/>
+        <di:waypoint x="3450" y="1020"/>
+        <di:waypoint x="5870" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_accredited_investor_carve_out_applies_to_ir1_edge" dmnElementRef="decision_the_accredited_investor_carve_out_applies_to_ir1">
         <di:waypoint x="590" y="860"/>
@@ -2951,11 +2969,11 @@
         <di:waypoint x="1030" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_accredited_investor_carve_out_applies_to_ir3_edge" dmnElementRef="decision_the_accredited_investor_carve_out_applies_to_ir3">
-        <di:waypoint x="4330" y="1020"/>
+        <di:waypoint x="3890" y="1020"/>
         <di:waypoint x="1030" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir1_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir1">
-        <di:waypoint x="6310" y="860"/>
+        <di:waypoint x="5870" y="860"/>
         <di:waypoint x="150" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir2_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir2">
@@ -2967,16 +2985,16 @@
         <di:waypoint x="150" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir4_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir4">
-        <di:waypoint x="4770" y="1020"/>
+        <di:waypoint x="4330" y="1020"/>
         <di:waypoint x="150" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_investor_is_within_the_investment_limit_ir5_edge" dmnElementRef="decision_investor_is_within_the_investment_limit_ir5">
-        <di:waypoint x="4550" y="1020"/>
+        <di:waypoint x="4110" y="1020"/>
         <di:waypoint x="150" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_ir1_edge" dmnElementRef="decision_the_rule_date_is_inside_the_covid_19_temporary_rules_window_ir1">
-        <di:waypoint x="14890" y="1020"/>
-        <di:waypoint x="6530" y="940"/>
+        <di:waypoint x="14450" y="1020"/>
+        <di:waypoint x="6090" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statements_required_ir1_edge" dmnElementRef="decision_financial_statements_required_ir1">
         <di:waypoint x="5650" y="860"/>
@@ -2987,7 +3005,7 @@
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statements_required_ir3_edge" dmnElementRef="decision_financial_statements_required_ir3">
-        <di:waypoint x="6530" y="860"/>
+        <di:waypoint x="6090" y="860"/>
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statements_required_ir4_edge" dmnElementRef="decision_financial_statements_required_ir4">
@@ -2999,19 +3017,19 @@
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statements_required_ir6_edge" dmnElementRef="decision_financial_statements_required_ir6">
-        <di:waypoint x="5210" y="1020"/>
+        <di:waypoint x="4770" y="1020"/>
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statements_required_ir7_edge" dmnElementRef="decision_financial_statements_required_ir7">
-        <di:waypoint x="4990" y="1020"/>
+        <di:waypoint x="4550" y="1020"/>
         <di:waypoint x="1250" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_assurance_level_ir1_edge" dmnElementRef="decision_assurance_level_ir1">
-        <di:waypoint x="5430" y="1020"/>
-        <di:waypoint x="6750" y="940"/>
+        <di:waypoint x="4990" y="1020"/>
+        <di:waypoint x="6310" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir1_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir1">
-        <di:waypoint x="6750" y="860"/>
+        <di:waypoint x="6310" y="860"/>
         <di:waypoint x="590" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir2_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir2">
@@ -3019,11 +3037,11 @@
         <di:waypoint x="590" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir3_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir3">
-        <di:waypoint x="5870" y="1020"/>
+        <di:waypoint x="5430" y="1020"/>
         <di:waypoint x="590" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_financial_statement_requirement_is_satisfied_ir4_edge" dmnElementRef="decision_financial_statement_requirement_is_satisfied_ir4">
-        <di:waypoint x="5650" y="1020"/>
+        <di:waypoint x="5210" y="1020"/>
         <di:waypoint x="590" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir1_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir1">
@@ -3031,31 +3049,31 @@
         <di:waypoint x="370" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir2_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir2">
-        <di:waypoint x="6090" y="1020"/>
+        <di:waypoint x="5650" y="1020"/>
         <di:waypoint x="370" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_disclosure_requirements_are_met_ir3_edge" dmnElementRef="decision_disclosure_requirements_are_met_ir3">
-        <di:waypoint x="6310" y="1020"/>
+        <di:waypoint x="5870" y="1020"/>
         <di:waypoint x="370" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_3_conducted_through_a_single_complying_intermediary_ir1_edge" dmnElementRef="decision_a_3_conducted_through_a_single_complying_intermediary_ir1">
-        <di:waypoint x="6530" y="1020"/>
-        <di:waypoint x="6970" y="940"/>
+        <di:waypoint x="6090" y="1020"/>
+        <di:waypoint x="6530" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_21_day_public_availability_period_has_run_ir1_edge" dmnElementRef="decision_the_21_day_public_availability_period_has_run_ir1">
         <di:waypoint x="3230" y="860"/>
         <di:waypoint x="1470" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_21_day_public_availability_period_has_run_ir2_edge" dmnElementRef="decision_the_21_day_public_availability_period_has_run_ir2">
-        <di:waypoint x="6750" y="1020"/>
+        <di:waypoint x="6310" y="1020"/>
         <di:waypoint x="1470" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1_edge" dmnElementRef="decision_the_intermediary_has_discharged_its_investor_facing_duties_ir1">
-        <di:waypoint x="6970" y="1020"/>
-        <di:waypoint x="7190" y="940"/>
+        <di:waypoint x="6530" y="1020"/>
+        <di:waypoint x="6750" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir1_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir1">
-        <di:waypoint x="6970" y="860"/>
+        <di:waypoint x="6530" y="860"/>
         <di:waypoint x="810" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir2_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir2">
@@ -3063,35 +3081,35 @@
         <di:waypoint x="810" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir3_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir3">
-        <di:waypoint x="7190" y="860"/>
+        <di:waypoint x="6750" y="860"/>
         <di:waypoint x="810" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_intermediary_obligations_are_met_ir4_edge" dmnElementRef="decision_intermediary_obligations_are_met_ir4">
-        <di:waypoint x="7190" y="1020"/>
+        <di:waypoint x="6750" y="1020"/>
         <di:waypoint x="810" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_notice_complies_with_rule_204_b_ir1_edge" dmnElementRef="decision_notice_complies_with_rule_204_b_ir1">
-        <di:waypoint x="7410" y="1020"/>
-        <di:waypoint x="7410" y="940"/>
+        <di:waypoint x="6970" y="1020"/>
+        <di:waypoint x="6970" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_advertising_restriction_ir1_edge" dmnElementRef="decision_advertising_restriction_ir1">
-        <di:waypoint x="7410" y="860"/>
+        <di:waypoint x="6970" y="860"/>
         <di:waypoint x="1690" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_advertising_restriction_ir2_edge" dmnElementRef="decision_advertising_restriction_ir2">
-        <di:waypoint x="7630" y="1020"/>
+        <di:waypoint x="7190" y="1020"/>
         <di:waypoint x="1690" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_1_became_an_exchange_act_reporting_company_ir1_edge" dmnElementRef="decision_b_1_became_an_exchange_act_reporting_company_ir1">
-        <di:waypoint x="7850" y="1020"/>
-        <di:waypoint x="7850" y="940"/>
+        <di:waypoint x="7410" y="1020"/>
+        <di:waypoint x="7410" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1_edge" dmnElementRef="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir1">
         <di:waypoint x="2790" y="860"/>
         <di:waypoint x="1910" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir2_edge" dmnElementRef="decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record_ir2">
-        <di:waypoint x="8070" y="1020"/>
+        <di:waypoint x="7630" y="1020"/>
         <di:waypoint x="1910" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1_edge" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir1">
@@ -3099,19 +3117,19 @@
         <di:waypoint x="2130" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir2_edge" dmnElementRef="decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000_ir2">
-        <di:waypoint x="8290" y="1020"/>
+        <di:waypoint x="7850" y="1020"/>
         <di:waypoint x="2130" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_4_all_securities_repurchased_ir1_edge" dmnElementRef="decision_b_4_all_securities_repurchased_ir1">
-        <di:waypoint x="8510" y="1020"/>
-        <di:waypoint x="8070" y="940"/>
+        <di:waypoint x="8070" y="1020"/>
+        <di:waypoint x="7630" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_b_5_liquidated_or_dissolved_ir1_edge" dmnElementRef="decision_b_5_liquidated_or_dissolved_ir1">
-        <di:waypoint x="8730" y="1020"/>
-        <di:waypoint x="8290" y="940"/>
+        <di:waypoint x="8290" y="1020"/>
+        <di:waypoint x="7850" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir1_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir1">
-        <di:waypoint x="7850" y="860"/>
+        <di:waypoint x="7410" y="860"/>
         <di:waypoint x="1030" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir2_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir2">
@@ -3123,15 +3141,15 @@
         <di:waypoint x="1030" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir4">
-        <di:waypoint x="8070" y="860"/>
+        <di:waypoint x="7630" y="860"/>
         <di:waypoint x="1030" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir5">
-        <di:waypoint x="8290" y="860"/>
+        <di:waypoint x="7850" y="860"/>
         <di:waypoint x="1030" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_may_terminate_ir6_edge" dmnElementRef="decision_ongoing_reporting_obligation_may_terminate_ir6">
-        <di:waypoint x="8950" y="1020"/>
+        <di:waypoint x="8510" y="1020"/>
         <di:waypoint x="1030" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir1_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir1">
@@ -3147,11 +3165,11 @@
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
-        <di:waypoint x="9390" y="1020"/>
+        <di:waypoint x="8950" y="1020"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
-        <di:waypoint x="9170" y="1020"/>
+        <di:waypoint x="8730" y="1020"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir1_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir1">
@@ -3159,15 +3177,15 @@
         <di:waypoint x="2350" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir2_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir2">
-        <di:waypoint x="9610" y="1020"/>
+        <di:waypoint x="9170" y="1020"/>
         <di:waypoint x="2350" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1_edge" dmnElementRef="decision_transfer_falls_within_an_exception_in_rule_501_a_ir1">
-        <di:waypoint x="9830" y="1020"/>
-        <di:waypoint x="8510" y="940"/>
+        <di:waypoint x="9390" y="1020"/>
+        <di:waypoint x="8070" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_permitted_ir1_edge" dmnElementRef="decision_transfer_is_permitted_ir1">
-        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="8070" y="860"/>
         <di:waypoint x="1250" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_permitted_ir2_edge" dmnElementRef="decision_transfer_is_permitted_ir2">
@@ -3175,7 +3193,7 @@
         <di:waypoint x="1250" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_permitted_ir3_edge" dmnElementRef="decision_transfer_is_permitted_ir3">
-        <di:waypoint x="10050" y="1020"/>
+        <di:waypoint x="9610" y="1020"/>
         <di:waypoint x="1250" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_resale_restriction_ir1_edge" dmnElementRef="decision_resale_restriction_ir1">
@@ -3183,11 +3201,11 @@
         <di:waypoint x="2570" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_resale_restriction_ir2_edge" dmnElementRef="decision_resale_restriction_ir2">
-        <di:waypoint x="8510" y="860"/>
+        <di:waypoint x="8070" y="860"/>
         <di:waypoint x="2570" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_resale_restriction_ir3_edge" dmnElementRef="decision_resale_restriction_ir3">
-        <di:waypoint x="10270" y="1020"/>
+        <di:waypoint x="9830" y="1020"/>
         <di:waypoint x="2570" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir1">
@@ -3211,91 +3229,91 @@
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir6_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir6">
-        <di:waypoint x="11150" y="1020"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7">
-        <di:waypoint x="11370" y="1020"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8">
-        <di:waypoint x="11590" y="1020"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9">
-        <di:waypoint x="10930" y="1020"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10">
-        <di:waypoint x="10490" y="1020"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11">
         <di:waypoint x="10710" y="1020"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir7">
+        <di:waypoint x="10930" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir8">
+        <di:waypoint x="11150" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir9">
+        <di:waypoint x="10490" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir10">
+        <di:waypoint x="10050" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11_edge" dmnElementRef="decision_the_transaction_qualifies_for_the_section_4_a_6_exemption_ir11">
+        <di:waypoint x="10270" y="1020"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_offering_of_ir1_edge" dmnElementRef="decision_an_offering_of_ir1">
-        <di:waypoint x="11810" y="1020"/>
-        <di:waypoint x="9610" y="940"/>
+        <di:waypoint x="11370" y="1020"/>
+        <di:waypoint x="9170" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_offering_of_ir2_edge" dmnElementRef="decision_an_offering_of_ir2">
-        <di:waypoint x="12250" y="1020"/>
-        <di:waypoint x="9610" y="940"/>
+        <di:waypoint x="11810" y="1020"/>
+        <di:waypoint x="9170" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_offering_of_ir3_edge" dmnElementRef="decision_an_offering_of_ir3">
-        <di:waypoint x="12030" y="1020"/>
-        <di:waypoint x="9610" y="940"/>
+        <di:waypoint x="11590" y="1020"/>
+        <di:waypoint x="9170" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_investor_with_ir1_edge" dmnElementRef="decision_an_investor_with_ir1">
-        <di:waypoint x="12470" y="1020"/>
-        <di:waypoint x="9830" y="940"/>
+        <di:waypoint x="12030" y="1020"/>
+        <di:waypoint x="9390" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_investor_with_ir2_edge" dmnElementRef="decision_an_investor_with_ir2">
-        <di:waypoint x="13130" y="1020"/>
-        <di:waypoint x="9830" y="940"/>
+        <di:waypoint x="12690" y="1020"/>
+        <di:waypoint x="9390" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_investor_with_ir3_edge" dmnElementRef="decision_an_investor_with_ir3">
-        <di:waypoint x="12690" y="1020"/>
-        <di:waypoint x="9830" y="940"/>
+        <di:waypoint x="12250" y="1020"/>
+        <di:waypoint x="9390" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_investor_with_ir4_edge" dmnElementRef="decision_an_investor_with_ir4">
-        <di:waypoint x="12910" y="1020"/>
-        <di:waypoint x="9830" y="940"/>
+        <di:waypoint x="12470" y="1020"/>
+        <di:waypoint x="9390" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_arrangement_with_ir1_edge" dmnElementRef="decision_an_arrangement_with_ir1">
-        <di:waypoint x="13570" y="1020"/>
-        <di:waypoint x="10050" y="940"/>
+        <di:waypoint x="13130" y="1020"/>
+        <di:waypoint x="9610" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_an_arrangement_with_ir2_edge" dmnElementRef="decision_an_arrangement_with_ir2">
-        <di:waypoint x="13350" y="1020"/>
-        <di:waypoint x="10050" y="940"/>
+        <di:waypoint x="12910" y="1020"/>
+        <di:waypoint x="9610" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_reporting_status_with_ir1_edge" dmnElementRef="decision_a_reporting_status_with_ir1">
-        <di:waypoint x="13790" y="1020"/>
-        <di:waypoint x="10270" y="940"/>
+        <di:waypoint x="13350" y="1020"/>
+        <di:waypoint x="9830" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_reporting_status_with_ir2_edge" dmnElementRef="decision_a_reporting_status_with_ir2">
-        <di:waypoint x="14230" y="1020"/>
-        <di:waypoint x="10270" y="940"/>
+        <di:waypoint x="13790" y="1020"/>
+        <di:waypoint x="9830" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_reporting_status_with_ir3_edge" dmnElementRef="decision_a_reporting_status_with_ir3">
-        <di:waypoint x="14010" y="1020"/>
-        <di:waypoint x="10270" y="940"/>
+        <di:waypoint x="13570" y="1020"/>
+        <di:waypoint x="9830" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_transfer_at_ir1_edge" dmnElementRef="decision_a_transfer_at_ir1">
-        <di:waypoint x="14450" y="1020"/>
-        <di:waypoint x="10490" y="940"/>
+        <di:waypoint x="14010" y="1020"/>
+        <di:waypoint x="10050" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_transfer_at_ir2_edge" dmnElementRef="decision_a_transfer_at_ir2">
-        <di:waypoint x="14670" y="1020"/>
-        <di:waypoint x="10490" y="940"/>
+        <di:waypoint x="14230" y="1020"/>
+        <di:waypoint x="10050" y="940"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_conforming_filing_ir1_edge" dmnElementRef="decision_a_conforming_filing_ir1">
-        <di:waypoint x="10930" y="860"/>
+        <di:waypoint x="10490" y="860"/>
         <di:waypoint x="2790" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir1_edge" dmnElementRef="decision_the_base_case_qualifies_ir1">
-        <di:waypoint x="8730" y="860"/>
+        <di:waypoint x="8290" y="860"/>
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir2_edge" dmnElementRef="decision_the_base_case_qualifies_ir2">
@@ -3303,15 +3321,15 @@
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir3_edge" dmnElementRef="decision_the_base_case_qualifies_ir3">
-        <di:waypoint x="10050" y="860"/>
+        <di:waypoint x="9610" y="860"/>
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir4_edge" dmnElementRef="decision_the_base_case_qualifies_ir4">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir5_edge" dmnElementRef="decision_the_base_case_qualifies_ir5">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="150" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_base_case_qualifies_ir6_edge" dmnElementRef="decision_the_base_case_qualifies_ir6">
@@ -3323,19 +3341,19 @@
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir2_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir2">
-        <di:waypoint x="9170" y="860"/>
+        <di:waypoint x="8730" y="860"/>
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir3_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir3">
-        <di:waypoint x="10050" y="860"/>
+        <di:waypoint x="9610" y="860"/>
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir4_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir4">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir5_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir5">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_delinquent_issuer_case_qualifies_ir6_edge" dmnElementRef="decision_the_delinquent_issuer_case_qualifies_ir6">
@@ -3343,7 +3361,7 @@
         <di:waypoint x="370" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir1_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir1">
-        <di:waypoint x="8730" y="860"/>
+        <di:waypoint x="8290" y="860"/>
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir2_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir2">
@@ -3351,15 +3369,15 @@
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir3_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir3">
-        <di:waypoint x="10050" y="860"/>
+        <di:waypoint x="9610" y="860"/>
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir4_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir4">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir5_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir5">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_over_limit_investor_case_qualifies_ir6_edge" dmnElementRef="decision_the_over_limit_investor_case_qualifies_ir6">
@@ -3367,7 +3385,7 @@
         <di:waypoint x="590" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir1_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir1">
-        <di:waypoint x="8730" y="860"/>
+        <di:waypoint x="8290" y="860"/>
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir2_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir2">
@@ -3375,15 +3393,15 @@
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir3_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir3">
-        <di:waypoint x="10050" y="860"/>
+        <di:waypoint x="9610" y="860"/>
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir4_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir4">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir5_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir5">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_short_availability_case_qualifies_ir6_edge" dmnElementRef="decision_the_short_availability_case_qualifies_ir6">
@@ -3391,7 +3409,7 @@
         <di:waypoint x="810" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir1_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir1">
-        <di:waypoint x="8730" y="860"/>
+        <di:waypoint x="8290" y="860"/>
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir2_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir2">
@@ -3399,15 +3417,15 @@
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir3_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir3">
-        <di:waypoint x="10050" y="860"/>
+        <di:waypoint x="9610" y="860"/>
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir4_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir4">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir5_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir5">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_under_assured_financials_case_qualifies_ir6_edge" dmnElementRef="decision_the_under_assured_financials_case_qualifies_ir6">
@@ -3415,7 +3433,7 @@
         <di:waypoint x="1030" y="140"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_w_offering_ir1_edge" dmnElementRef="decision_w_offering_ir1">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="3010" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_w_within_the_limit_in_2016_ir1_edge" dmnElementRef="decision_w_within_the_limit_in_2016_ir1">
@@ -3451,7 +3469,7 @@
         <di:waypoint x="3450" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_3_investor_ir1_edge" dmnElementRef="decision_i_3_investor_ir1">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="3670" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_3_limit_under_the_2022_rules_ir1_edge" dmnElementRef="decision_i_3_limit_under_the_2022_rules_ir1">
@@ -3471,7 +3489,7 @@
         <di:waypoint x="1030" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_4_investor_ir1_edge" dmnElementRef="decision_i_4_investor_ir1">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="3890" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_i_4_limit_under_the_2022_rules_ir1_edge" dmnElementRef="decision_i_4_limit_under_the_2022_rules_ir1">
@@ -3483,7 +3501,7 @@
         <di:waypoint x="1250" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir1_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir1">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="1470" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_the_percentage_case_under_the_2019_rules_ir2_edge" dmnElementRef="decision_the_percentage_case_under_the_2019_rules_ir2">
@@ -3491,7 +3509,7 @@
         <di:waypoint x="1470" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_investor_ir1_edge" dmnElementRef="decision_a_investor_ir1">
-        <di:waypoint x="9830" y="860"/>
+        <di:waypoint x="9390" y="860"/>
         <di:waypoint x="4110" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_is_within_the_limit_under_the_2021_rules_ir1_edge" dmnElementRef="decision_a_is_within_the_limit_under_the_2021_rules_ir1">
@@ -3511,7 +3529,7 @@
         <di:waypoint x="590" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_f_offering_ir1_edge" dmnElementRef="decision_f_offering_ir1">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="4330" y="780"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_f_requirement_under_the_2019_rules_ir1_edge" dmnElementRef="decision_f_requirement_under_the_2019_rules_ir1">
@@ -3531,7 +3549,7 @@
         <di:waypoint x="2350" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir1_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir1">
-        <di:waypoint x="9610" y="860"/>
+        <di:waypoint x="9170" y="860"/>
         <di:waypoint x="2570" y="620"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_a_small_offering_inside_the_covid_window_ir2_edge" dmnElementRef="decision_a_small_offering_inside_the_covid_window_ir2">
@@ -3545,6 +3563,10 @@
       <dmndi:DMNEdge id="decision_a_large_offering_inside_the_covid_window_ir2_edge" dmnElementRef="decision_a_large_offering_inside_the_covid_window_ir2">
         <di:waypoint x="1250" y="700"/>
         <di:waypoint x="2790" y="620"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="hydration_investor_ir1_edge" dmnElementRef="hydration_investor_ir1">
+        <di:waypoint x="2790" y="1020"/>
+        <di:waypoint x="11590" y="940"/>
       </dmndi:DMNEdge>
     </dmndi:DMNDiagram>
   </dmndi:DMNDI>

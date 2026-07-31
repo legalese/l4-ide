@@ -73,7 +73,7 @@ import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle)
+import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
@@ -331,6 +331,13 @@ exportDmn opts tcRes = do
             { dloModelName    = modelName
             , dloSubstitution = tcRes.substitution
             , dloFlavor       = fromMaybe defaultDmnFlavor opts.exportFlavor
+            -- R8-d′'s combinator table. Resolved HERE, from the same check
+            -- result the module came from, so `isJust`/`isNothing` are matched
+            -- by Unique rather than by name. 'resolveMaybePredicates' lives in
+            -- L4.Dmn.Lower beside its only consumer, so this call site and the
+            -- golden harness's cannot drift apart on how recognition is done.
+            , dloMaybePredicates =
+                resolveMaybePredicates tcRes.module' tcRes.environment tcRes.entityInfo
             }
           tcRes.module'
   when (null (drgDecisions drg)) do

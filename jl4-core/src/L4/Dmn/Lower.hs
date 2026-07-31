@@ -84,6 +84,8 @@ module L4.Dmn.Lower
   , moduleTitle
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
+  , MaybePredicates (..)
+  , resolveMaybePredicates
     -- * Reusable pieces
   , renderFeel
   , renderFeelIn
@@ -109,6 +111,7 @@ import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
+import Data.Either (partitionEithers)
 import Data.Ratio (denominator, numerator)
 import Data.Time.Calendar (Day, fromGregorianValid, showGregorian, toModifiedJulianDay)
 import Optics
@@ -147,16 +150,47 @@ import L4.Dmn.IR
 --     covers every record at once, and the map is per-declaration internally:
 --     two records may each have a field that folds to @foo_bar@ without either
 --     being renamed.
+--
+-- Three further fields carry what 'renderFeelIn' cannot recompute from the
+-- expression in front of it: 'neMaybePreds' (R8-d′'s combinator table),
+-- 'neHydrated' and 'neBareProj' (H1's fold, §4.4).
 data NameEnv = MkNameEnv
-  { neVars   :: !(Map Unique Text)
-  , neFields :: !(Map Unique Text)
+  { neVars       :: !(Map Unique Text)
+  , neFields     :: !(Map Unique Text)
+  , neMaybePreds :: !(Maybe MaybePredicates)
+    -- ^ the prelude's @isJust@ \/ @isNothing@, when this module can see them.
+  , neHydrated   :: !(Map Unique Text)
+    -- ^ a hydrated instance's 'Unique' to its hydrator's FEEL name. A computed
+    -- read of such an instance folds to a path access on the hydrator (§4.4).
+  , neBareProj   :: !(Set Unique)
+    -- ^ receivers whose projections render BARE. Holds the @_self@ binder while
+    -- a computed field's own body is being rendered INSIDE the hydrator, where
+    -- a sibling entry is named by its bare entry name and not by a path.
   }
+
+-- | The resolved 'Unique's of the prelude's @isJust@ and @isNothing@.
+--
+-- Compared by 'Unique' and never by name: these are ordinary prelude L4 source
+-- rather than builtins, so their 'Unique's are minted when the prelude module is
+-- checked and cannot be TH-generated constants the way @maybeUnique@ is. See
+-- 'resolveMaybePredicates' for how they are found, once, under a type check.
+data MaybePredicates = MkMaybePredicates
+  { mpIsJust    :: !Unique
+  , mpIsNothing :: !Unique
+  }
+  deriving stock (Eq, Show)
 
 -- | Knows no names, so every reference falls back to the stage-1 fold. Right for
 -- 'renderFeel', which holds an expression and nothing else; wrong inside a
 -- module, where 'lowerModule' always supplies the resolved environment.
 emptyNameEnv :: NameEnv
-emptyNameEnv = MkNameEnv { neVars = Map.empty, neFields = Map.empty }
+emptyNameEnv = MkNameEnv
+  { neVars       = Map.empty
+  , neFields     = Map.empty
+  , neMaybePreds = Nothing
+  , neHydrated   = Map.empty
+  , neBareProj   = Set.empty
+  }
 
 -- | What a single table needs to know beyond its rows.
 data TableCtx = MkTableCtx
@@ -282,14 +316,113 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- validator, wrong in the engine" failure this whole exercise exists to
     -- close, one layer up; and Camunda 8 fails at @parse()@ whole-file, so "emit
     -- the rich form and strip later" has no safe intermediate.
+  , dloMaybePredicates :: !(Maybe MaybePredicates)
+    -- ^ the resolved 'Unique's of the prelude's @isJust@ \/ @isNothing@, when
+    -- this module can see them (R8-d′'s combinator table).
+    --
+    -- __Why this has to be plumbed at all.__ Both are ordinary prelude L4
+    -- source, not builtins: builtin 'Unique's are TH-generated constants in
+    -- "L4.TypeCheck.Environment", and there is no such constant for these
+    -- because their 'Unique's are minted when the prelude module is checked and
+    -- carry a machine-dependent module URI. 'lowerModule' sees one
+    -- @Module Resolved@ and this record — no 'TC.Environment', no
+    -- 'TC.EntityInfo' — so without this field @isJust q@ would render verbatim
+    -- and the idiomatic L4 spelling of an absence test would produce a WORSE
+    -- artifact than the longhand CONSIDER.
+    --
+    -- Resolved ONCE, at the lowering boundary, by 'resolveMaybePredicates', and
+    -- compared by 'Unique' thereafter: the name is read exactly once, under a
+    -- type check, and never again.
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
 defaultDmnLowerOptions = MkDmnLowerOptions
-  { dloModelName    = "L4"
-  , dloSubstitution = Map.empty
-  , dloFlavor       = defaultDmnFlavor
+  { dloModelName       = "L4"
+  , dloSubstitution    = Map.empty
+  , dloFlavor          = defaultDmnFlavor
+  , dloMaybePredicates = Nothing
   }
+
+-- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
+--
+-- Lives here, and is exported, so that the two call sites (the CLI's exporter
+-- and the golden harness) cannot drift apart on how recognition is done — the
+-- failure mode being that one of them recognises the combinators and the other
+-- silently does not, which shows up as a golden that changes when nothing did.
+--
+-- The check is a TYPE check, and each half is load-bearing:
+--
+--   * the entity is a @KnownTerm ty Computable@ — a term, not a constructor or
+--     a type;
+--   * stripping the @∀@, @ty@ is a one-value-argument function;
+--   * its ARGUMENT's type head is 'TC.maybeUnique';
+--   * its RESULT's type head is 'TC.booleanUnique'.
+--
+-- Requiring EXACTLY ONE survivor per name is what makes a user who shadows
+-- @isJust@ ALONGSIDE the prelude fall back to no recognition rather than to the
+-- wrong one: two candidates, so 'Nothing'.
+--
+-- __Two PROVENANCE conditions on top of the shape, and neither is a path
+-- test.__ 'Unique' carries the URI of the module that minted it, so:
+--
+--   * both survivors must come from the SAME module — one prelude defines the
+--     pair, and a mix-and-match of two unrelated definitions is not it;
+--   * that module must NOT be the module being exported.
+--
+-- The second is the one that matters. Without it a module that defines its own
+-- @isJust@ and does not import the prelude has exactly ONE shaped candidate,
+-- and the shape check cannot see the body: @\`isJust\` x MEANS FALSE@ has the
+-- right type and would have been rendered @x != null@ — a wrong answer with no
+-- fidelity note at all, because a recognised combinator renders as clean FEEL.
+-- The "exactly one survivor" sentence above USED to claim it covered that case;
+-- it did not, and the case it named was the one it missed.
+--
+-- __Still not filtered by the module's PATH.__ The prelude's URI differs between
+-- the CLI (a real file path, or @jl4-embedded:@, or an XDG store) and the VFS
+-- harness (@project:\/prelude.l4@), so a path test would recognise the
+-- combinators in one and not the other — the same drift this function exists to
+-- prevent, only harder to see. Comparing URIs for EQUALITY is immune to that,
+-- because both sides are minted by the same resolver in the same run.
+--
+-- __What is still not established, stated rather than glossed:__ that the
+-- defining module is the L4 prelude and not some other imported library that
+-- happens to define both names at both types. Closing that would need the
+-- BODIES, and 'TC.EntityInfo' carries only types. A library that reimplements
+-- @isJust@ and @isNothing@ at @MAYBE a -> BOOLEAN@ and is imported INSTEAD of
+-- the prelude will be recognised; a library imported ALONGSIDE it will not.
+resolveMaybePredicates
+  :: Module Resolved   -- ^ the module being exported; a definition from HERE is not the prelude's
+  -> TC.Environment
+  -> TC.EntityInfo
+  -> Maybe MaybePredicates
+resolveMaybePredicates (MkModule _ selfUri _) env info = do
+  j <- soleMatch "isJust"
+  n <- soleMatch "isNothing"
+  guard (j.moduleUri == n.moduleUri)
+  guard (j.moduleUri /= selfUri)
+  pure (MkMaybePredicates { mpIsJust = j, mpIsNothing = n })
+ where
+  soleMatch nm = case filter shaped (Map.findWithDefault [] (NormalName nm) env) of
+    [u] -> Just u
+    _   -> Nothing
+
+  shaped u = case Map.lookup u info of
+    Just (_, TC.KnownTerm ty Computable) -> isMaybePredicate ty
+    _                                    -> False
+
+  -- @MAYBE a -> BOOLEAN@, under any number of leading @∀@s.
+  isMaybePredicate = \case
+    Forall _ _ t -> isMaybePredicate t
+    Fun _ [arg] res ->
+      headIs TC.maybeUnique (argType arg) && headIs TC.booleanUnique res
+    _ -> False
+
+  argType = \case
+    MkOptionallyNamedType _ _ t -> t
+
+  headIs u = \case
+    TyApp _ n _ -> getUnique n == u
+    _           -> False
 
 ------------------------------------------------------------------------
 -- rowsToDmn
@@ -661,6 +794,81 @@ isConstructorKind r = case getActual r of
   MkName cAnn _ -> case cAnn.extra.resolvedInfo of
     Just (TypeInfo _ (Just Constructor)) -> True
     _                                    -> False
+
+-- | Is this the synthetic function "L4.Desugar" made out of a __computed record
+-- field__ (a @MEANS@ clause on a @DECLARE@)?
+--
+-- @desugarComputedFields@ runs BEFORE typechecking, so by the time this module
+-- sees a @DECLARE@ its computed fields are already gone: each is a top-level
+-- @DECIDE@ of the shape @GIVEN … _self IS A R / GIVETH τ / f _self MEANS …@.
+-- Recognising them is what lets §4.4 fold a computed read back into a hydrator
+-- instead of shipping an L4 call no engine can resolve.
+--
+-- The provenance is carried by the 'TermKind', not reconstructed: 'TypeCheck'
+-- stamps these 'ComputedSelector' rather than 'Computable', keyed off
+-- @CheckEnv.computedFields@ — and 'resolveTermFiltered' writes the kind onto
+-- every REFERENCE occurrence too, not only the definition, so no environment
+-- has to be threaded here.
+--
+-- Two independent witnesses are accepted because 'withRange' skips RANGELESS
+-- names, so a synthesised reference carries no stamp. Every reference this
+-- module cares about comes from source and has a range; the definition's own
+-- annotation is the second witness. Same construction 'isConstantRef' uses.
+--
+-- Deliberately NOT the test in "L4.Export.Document", which recognises the same
+-- thing by comparing the receiver's name to the string @"_self"@. A name test
+-- is what R8-f was.
+isComputedSelectorKind :: Resolved -> Bool
+isComputedSelectorKind r = case getActual r of
+  MkName cAnn _ -> case cAnn.extra.resolvedInfo of
+    Just (TypeInfo _ (Just ComputedSelector)) -> True
+    _                                         -> False
+
+-- | The record a 'ComputedSelector' decide belongs to, and its @_self@ binder.
+--
+-- @makeComputedDecide@ builds the signature as @typeParams ++ [selfParam]@ and
+-- the app form as @f _self@, so the owning record is __the head type of the last
+-- GIVEN parameter__ and the binder is the sole value parameter. The parameter
+-- being spelled @_self@ corroborates but is not the key: the TYPE is.
+computedSelectorOwner :: Decide Resolved -> Maybe (Unique, Resolved, Type' Resolved)
+computedSelectorOwner (MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) (MkAppForm _ _ [p] _) _) = do
+  MkOptionallyTypedName _ selfN (Just selfTy) _ <- lastMaybe gs
+  guard (getUnique selfN == getUnique p)
+  u <- typeHeadUnique selfTy
+  pure (u, p, selfTy)
+ where
+  lastMaybe xs = case reverse xs of
+    (x : _) -> Just x
+    []      -> Nothing
+computedSelectorOwner _ = Nothing
+
+-- | One computed record field, recovered from the synthetic @DECIDE@ the
+-- desugaring left behind.
+data ComputedField = MkComputedField
+  { cfSel  :: !Resolved          -- ^ the selector: the synthetic decide's own name
+  , cfSelf :: !Resolved          -- ^ its @_self@ binder
+  , cfBody :: !(Expr Resolved)   -- ^ the field's @MEANS@ body, with siblings
+                                 --   already rewritten to projections on @_self@
+  }
+
+-- | A __foldable computed read__ of a record instance: @x's f@ or @f x@, where
+-- @f@ is a computed selector and @x@ is a nullary reference.
+--
+-- Both spellings occur in real corpora and both must be recognised: L4 house
+-- style writes the projection, while @jl4\/examples\/legal\/regcf\/regcf-wizard.l4@
+-- writes the application.
+--
+-- The receiver must be NULLARY. @greater of … (`investor profile from` facts)@
+-- applies a computed selector to a record-valued EXPRESSION, which no hydrator
+-- names, so it is not foldable and falls through to the ordinary verbatim path
+-- with its existing @D-NONFEEL*@ diagnosis. That is a deliberate graceful
+-- refusal rather than an oversight, and regcf-wizard.l4 is left carrying it so
+-- the path stays exercised by a real file.
+foldableComputedRead :: Expr Resolved -> Maybe (Resolved, Resolved)
+foldableComputedRead = \case
+  Proj _ (App _ x []) f | isComputedSelectorKind f -> Just (x, f)
+  App _ f [App _ x []] | isComputedSelectorKind f  -> Just (x, f)
+  _                                                -> Nothing
 
 -- | The name of a binding, as DMN should spell it.
 --
@@ -1188,22 +1396,78 @@ datedTable ctx refs ranges rows arms oth lawRef inlined = table
     , dtNotes       = tableNotes ctx decomposed columnCells [column] HitUnique rows inlined []
     }
 
--- | 'freeRefs', over one expression rather than a whole @DECIDE@.
+-- | The references the EMITTED TEXT still names, plus the instances it reaches
+-- THROUGH a hydrator.
 --
--- Used by the requirement rewrite (R11): a dated table's cells reference the
--- rule-date input and its expression no longer references the guard predicate
--- or the regime constants, so its @informationRequirement@s must be computed
--- from the bodies that SURVIVE into the artifact rather than from the source.
-exprFreeRefs :: Expr Resolved -> [Resolved]
-exprFreeRefs body =
-  [r | r <- refs, not (Set.member (getUnique r) bound)]
+-- This is R11's function, and it now serves both rewrites:
+--
+--   * §15.3, law time. A dated table's cells reference the rule-date input and
+--     its expression no longer references the guard predicate or the regime
+--     constants, so its @informationRequirement@s are computed from the bodies
+--     that SURVIVE into the artifact rather than from the source.
+--   * §4.4, hydration. On a foldable computed read this records the INSTANCE
+--     and does NOT descend into the receiver or the selector, because after the
+--     fold neither appears in the emitted FEEL. The caller turns the recorded
+--     instance into an edge to its hydrator.
+--
+-- Fold-aware traversal rather than a filter over the free references, because
+-- a filter cannot tell a name that was folded away from one that is still
+-- there. A DRG whose edges named a variable its expression no longer mentions
+-- would be describing a different model.
+--
+-- It SUBSUMES the @exprFreeRefs@ it replaced and carries over both of that
+-- function's exclusions unchanged: a name bound inside the body (@Def@ covers
+-- lambda parameters, LET\/WHERE locals and pattern binders without enumerating
+-- them) and a projection's SELECTOR, which is a reference but not a term.
+--
+-- ★ The fold is expressed as a PRUNE of the tree followed by the SAME total
+-- @toList@ collection @exprFreeRefs@ used, and that shape is load-bearing. The
+-- first version of this function walked the tree with a per-node WHITELIST
+-- (@App@ contributes its head, @Proj@ contributes nothing, everything else
+-- contributes nothing), which silently dropped every name that is not an
+-- @App@ head: an 'AppNamed' head above all, but also the names inside
+-- 'Regulative', 'Event', 'Record' and — wherever @gplate@ does not descend —
+-- @WHERE@\/@LET@ local bodies and @CONSIDER@ arms. Because 'dcnRequirements'
+-- can only ever REMOVE edges relative to the source, the loss was invisible in
+-- the goldens and showed up only as a decision whose text named a decision its
+-- graph did not require. A prune cannot have that failure mode: what is not
+-- folded is collected exactly as before.
+survivingRefs :: [Expr Resolved] -> ([Resolved], [Unique])
+survivingRefs bodies =
+  ( nubOrdOn getUnique
+      [ r
+      | b <- pruned
+      , r@Ref {} <- toList b
+      , not (Set.member (getUnique r) bound)
+      , not (Set.member (getUnique r) projFields)
+      ]
+  , nubOrd touched
+  )
  where
-  allResolved = toList body
-  bound = Set.fromList [u | Def u _ <- allResolved]
+  -- The fold. Neither the receiver nor the selector survives into the emitted
+  -- text, so the whole read is replaced by a name-free placeholder; the
+  -- INSTANCE is recorded separately so the caller can add the hydrator edge
+  -- that replaces the direct one.
+  pruned = map (transformOf (gplate @(Expr Resolved)) prune) bodies
+
+  prune e = case foldableComputedRead e of
+    Just _  -> Lit (getAnno e) (NumericLit emptyAnno 0)
+    Nothing -> e
+
+  touched =
+    [ getUnique x
+    | b <- bodies
+    , e <- toListOf (cosmosOf (gplate @(Expr Resolved))) b
+    , Just (x, _) <- [foldableComputedRead e]
+    ]
+
+  bound = Set.fromList [u | b <- bodies, Def u _ <- toList b]
+
   projFields = Set.fromList
-    [getUnique n | Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) body]
-  refs = nubOrdOn getUnique
-    [r | r@Ref {} <- allResolved, not (Set.member (getUnique r) projFields)]
+    [ getUnique n
+    | b <- pruned
+    , Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) b
+    ]
 
 ------------------------------------------------------------------------
 -- L4 -> FEEL
@@ -1246,12 +1510,66 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
   go e = case e of
     Lit _ (NumericLit _ r) -> (atomPrec, renderNumber r, SFeel)
     Lit _ (StringLit _ s)  -> (atomPrec, quoteFeelString s, SFeel)
-    -- A builtin sum constructor is NOT a FEEL name and NOT a FEEL string; see
-    -- 'isBuiltinSumCon'. Verbatim is the only honest rendering, and it makes the
-    -- whole enclosing expression verbatim too, which is what stops `NOTHING`
-    -- from being spliced into an otherwise FEEL-looking cell.
-    App _ r [] | isBuiltinSumCon r -> verbatim e
-               | otherwise         -> (atomPrec, nullaryText r, SFeel)
+    -- R8-d′ (ruled 2026-07-31). NOTHING is FEEL's `null`.
+    --
+    -- The fragment is 'FullFeel' and never 'SFeel', deliberately: DMN 1.3
+    -- grammar rule 34 makes `null` a LITERAL, and rule 33's `simple literal` is
+    -- numeric | string | boolean | date-time only, so tagging it 'SFeel' would
+    -- admit it to a cell ENDPOINT, which R8-d′ refuses. The mechanical
+    -- guarantee is separate and stronger and does not depend on this tag being
+    -- right: there is no @VNull@ in 'FeelValue', and 'constantRefIn' still
+    -- short-circuits on 'isBuiltinSumCon', so `null` cannot reach an
+    -- @\<inputEntry\>@ by any route.
+    --
+    -- LEFT and RIGHT keep the old verbatim treatment unchanged (R8-e): EITHER
+    -- has no FEEL image at all, and R8-f's defect -- a constructor silently
+    -- becoming the S-FEEL string constant @"LEFT"@ -- is still fixed for them
+    -- by the same mechanism.
+    --
+    -- ★ Every arm below that gives a MAYBE a FEEL image is GUARDED on
+    -- 'flatMaybe', and the guard is what keeps R8-c a refusal rather than a
+    -- wrong answer. A @D-SUMTYPE@ note does NOT stop the body being rendered --
+    -- 'literalFallback' renders it and reports Blocking beside it -- so on a
+    -- @MAYBE (MAYBE τ)@ an unguarded arm would emit FEEL that COMPILES and
+    -- answers differently from L4 (`JUST NOTHING` and `NOTHING` both become
+    -- `null`, so an absence test says "absent" where L4 says "present"). That
+    -- is an ANSWER CHANGE, and it would be a strictly worse artifact than the
+    -- L4 source no engine can compile that this backend emitted before
+    -- R8-d′. Refused here, the expression falls through to 'verbatim' and the
+    -- refusal stays loud.
+    App _ r [] | getUnique r == TC.nothingUnique, flatMaybe e -> (atomPrec, "null", FullFeel)
+               | isBuiltinSumCon r                            -> verbatim e
+               | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
+    -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
+    -- image; the payload does. (R8-d′)
+    App _ r [x] | getUnique r == TC.justUnique, flatMaybe e -> go x
+    -- The combinator table, checked BEFORE the general App arms so that the
+    -- prelude's own CONSIDER -- which this exporter never sees -- is not what
+    -- decides the rendering. Recognised by the RESOLVED UNIQUE of the prelude
+    -- definition (see 'resolveMaybePredicates'), never by name string: matching
+    -- on a name is precisely the class of defect R8-f was.
+    App _ r [x]
+      | Just mp <- names.neMaybePreds, getUnique r == mp.mpIsJust, flatMaybe x ->
+          nullCompare e "!=" x
+      | Just mp <- names.neMaybePreds, getUnique r == mp.mpIsNothing, flatMaybe x ->
+          nullCompare e "="  x
+    -- §4.4. INSIDE a hydrator, rendering a computed field's own body, a
+    -- projection on the `_self` binder is the BARE sibling entry name: a boxed
+    -- context's entries see each other unqualified. This is what turns
+    -- `_self's amount TIMES 2` into `amount * 2`.
+    Proj _ (App _ r []) n
+      | Set.member (getUnique r) names.neBareProj ->
+          (atomPrec, feelFieldIn names n, SFeel)
+    -- §4.4, the DOWNSTREAM half. A computed read of a hydrated instance folds
+    -- to a path access on the HYDRATOR, and the receiver and the selector both
+    -- disappear from the emitted text -- which is why 'survivingRefs' must not
+    -- descend into them when it computes the DRG edges.
+    --
+    -- 'SFeel' is the right claim and the same one the ordinary Proj case makes:
+    -- a qualified name is FEEL grammar rule 20 and is inside S-FEEL.
+    _ | Just (x, f) <- foldableComputedRead e
+      , Just h <- Map.lookup (getUnique x) names.neHydrated ->
+          (atomPrec, h <> "." <> feelFieldIn names f, SFeel)
     -- A projection path is FEEL's `qualified name`, and its steps live in the
     -- FIELD namespace (§5.2 scope 2), not the DRG's variable namespace. That is
     -- where the one executed corpus collision lands (§5.3.4): two distinct
@@ -1362,9 +1680,91 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     App _ _ (_ : _) | Just d <- foldDateLiteral oracle e ->
       (atomPrec, renderFeelValue (VDate d), SFeel)
     App _ _ (_ : _) -> verbatim e
+    -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
+    -- with a comparison against null. Two arms, in either source order, one
+    -- binding and one not.
+    --
+    -- Rendered HERE rather than by rewriting the source to an 'IfThenElse',
+    -- which was the other design and is recorded deferred as R8-d″: a
+    -- 'renderFeelIn' case COMPOSES, so a CONSIDER nested inside a larger
+    -- expression is still rendered, where a source rewrite only fires when the
+    -- CONSIDER is the whole body. The cost is that the result is a boxed
+    -- literal rather than a two-row table; the benefit is that it is FEEL at
+    -- all, everywhere it appears.
+    --
+    -- MEASURED, not assumed, before this was written: `x != null` is a proper
+    -- BOOLEAN on KIE 8.44 and zeebe-dmn 8.7.6, so the composed `if` takes the
+    -- branch it looks like it takes. Had either engine answered null the
+    -- condition would have been non-boolean, the else branch would always have
+    -- been taken, and this would have been an ANSWER CHANGE rather than a
+    -- rendering change -- see jl4/tests-cli/fixtures/dmn-null-probe.
+    Consider _ scrut brs
+      | Just (g, a, b) <- maybeConsiderArms brs
+      -- R8-c. `null` does not nest, so on a MAYBE (MAYBE τ) scrutinee this
+      -- rendering would answer "absent" for `JUST NOTHING` where L4 answers
+      -- "present". Refused, not rendered -- see the note on 'flatMaybe'.
+      , flatMaybe scrut
+      -- The scrutinee's TEXT is emitted twice (once in the test, once for each
+      -- occurrence of the binder), so an effectful scrutinee would be run twice.
+      , not (hasEffectfulNode scrut)
+      ->
+        let (ps, ts, fs) = go scrut
+            (_, ta, fa)  = go (substLocals (Map.singleton (getUnique g) scrut) a)
+            (_, tb, fb)  = go b
+        in if L4Verbatim `elem` [fs, fa, fb]
+             then verbatim e
+             else ( 0
+                  , "if " <> parenIf (ps < 5) ts <> " != null then " <> ta <> " else " <> tb
+                  , maximum [FullFeel, fs, fa, fb]
+                  )
     _ -> verbatim e
    where
     atomPrec = 9 :: Int
+
+    -- @CONSIDER … WHEN JUST g THEN a / WHEN NOTHING THEN b@, in either source
+    -- order. Both shapes are the @PatApp cn ps@ form 'nullaryOnlyNotes' already
+    -- matches, so nothing new is being recognised here -- only re-read.
+    maybeConsiderArms brs = case brs of
+      [j, n] -> case pick j n of
+                  Just r  -> Just r
+                  Nothing -> pick n j
+      _      -> Nothing
+     where
+      pick jb nb = do
+        (g, a) <- justArm jb
+        b      <- nothingArm nb
+        pure (g, a, b)
+      justArm = \case
+        MkBranch _ (When _ (PatApp _ cn [PatVar _ g])) a
+          | getUnique cn == TC.justUnique -> Just (g, a)
+        _ -> Nothing
+      nothingArm = \case
+        MkBranch _ (When _ (PatApp _ cn [])) b
+          | getUnique cn == TC.nothingUnique -> Just b
+        _ -> Nothing
+
+    -- R8-c's guard, asked of the expression whose FEEL image would be `null`
+    -- or would test against it. TRUE means "this MAYBE is one level deep and
+    -- carries no EITHER", i.e. FEEL's single flat `null` is a faithful image of
+    -- its absent case. FALSE sends the caller to 'verbatim', which is the same
+    -- refusal 'sumTypeReasons' reports as @D-SUMTYPE@ Blocking -- the two are
+    -- deliberately separate, because the note describes the DECISION while this
+    -- guard describes one sub-expression, and 'renderFeelIn' composes.
+    --
+    -- An expression the oracle cannot type answers TRUE, which is the same
+    -- fail-open direction every other oracle question in this module takes: an
+    -- untyped MAYBE was rendered before R8-c had a guard at all.
+    flatMaybe x = let (_, _, fl) = oracleClassify oracle x
+                  in not (fl.tfNestedMaybe || fl.tfEither)
+
+    -- `x != null` / `x = null`, at FEEL's comparison precedence. FullFeel
+    -- because one operand is `null`, which rule 33 does not admit as a simple
+    -- literal.
+    nullCompare whole op x =
+      let (px, tx, fx) = go x
+      in if fx == L4Verbatim
+           then verbatim whole
+           else (5, parenIf (px < 5) tx <> " " <> op <> " null", max FullFeel fx)
 
     inertText = \case
       InertCtxAnd  -> "true"
@@ -1853,9 +2253,15 @@ data TypeFlags = MkTypeFlags
     -- whatever the @typeRef@ resolves to the __complete__ range of the element
     -- — so pointing a @MAYBE@ site at τ's own definition re-asserts, one hop
     -- on, exactly the range R8-b just refused to write, and it is a range with
-    -- no absent case in it. Nothing this exporter emits lowers to @null@, so
-    -- under an enforcing engine the absent case that is the whole content of
-    -- the @MAYBE@ is rejected: an answer change.
+    -- no absent case in it, so under an enforcing engine the absent case that
+    -- is the whole content of the @MAYBE@ is rejected: an answer change.
+    --
+    -- __CORRECTED 2026-07-31.__ This used to read "Nothing this exporter emits
+    -- lowers to @null@", which R8-d′ made false: @NOTHING@ now lowers to FEEL
+    -- @null@ on the value channel. The carve-out is UNCHANGED and is in fact
+    -- strengthened -- the rejection above used to be hypothetical and is now
+    -- real, because the exporter genuinely emits @null@ into positions typed
+    -- @\<τ\>_optional@.
     --
     -- Nothing but a 'DmnNamed' with a domain can reach this field, because
     -- 'classifyType' returns a domain only from the branch that mints a name.
@@ -2136,7 +2542,13 @@ maybeNullNote el rng what tyText optionalAlias =
         <> "`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the \
            \emitted typeRef is the payload type's own. FEEL has one `null` and it means both \
            \\"there is no value\" and \"the value could not be computed\", so NOTHING and an \
-           \undefined result can no longer be told apart in the artifact"
+           \undefined result can no longer be told apart in the artifact. ADOPTED 2026-07-31 \
+           \(R8-d'): NOTHING now lowers to FEEL `null` on the VALUE channel, so the conflation \
+           \this note reports is a price paid deliberately and not an accident of the encoding. \
+           \What buys it is that the artifact becomes EXECUTABLE where it was previously L4 \
+           \source no engine could compile. `null` is still refused as an input ENTRY -- DMN 1.3 \
+           \grammar rule 34 makes it a literal and rule 33's `simple literal` does not include \
+           \it -- so no cell in this model asks an engine to test against it"
         <> case optionalAlias of
              Just (alias, base) ->
                ". No allowedValues or inputValues is emitted AT THIS ELEMENT, because DMN 7.3.3 \
@@ -2257,11 +2669,26 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   -- CONSTRUCTION -- and our flagship exhibit, a MIN/MAX of computed quantities,
   -- is exactly such a table. Saying nothing here would let a reader assume the
   -- DMN tooling can check a table it cannot.
+  -- R8-d′ made `null` an output entry this backend genuinely emits, and the
+  -- generic message above would then say of it "is an expression, not a
+  -- constant" -- flatly contradicting @D-MAYBE-NULL@, in the same report, which
+  -- says DMN 1.3 grammar rule 34 makes `null` a LITERAL. Both cannot be right,
+  -- and the literal reading is the correct one. What survives is the
+  -- ANALYSABILITY claim, for a different reason: a decision-table analysis maps
+  -- an output entry to an OBJECT in a domain, and `null` denotes none.
+  computedOutputText fe
+    | fe.feText == "null" =
+        "the output entry `null` is FEEL's null LITERAL (DMN 1.3 grammar rule 34), not an \
+        \expression -- but it denotes no object in any domain, and every published \
+        \decision-table analysis maps an output entry to one"
+    | otherwise =
+        "the output entry `" <> fe.feText
+          <> "` is an expression, not a constant; DMN 8.2.9 permits that, but every published \
+             \decision-table analysis defines an output entry as a constant"
+
   outputNotes =
     [ dmnNote "D-COMPUTEDOUTPUT" Advisory here (bestRange body)
-        ("the output entry `" <> fe.feText
-           <> "` is an expression, not a constant; DMN 8.2.9 permits that, but every published \
-              \decision-table analysis defines an output entry as a constant")
+        (computedOutputText fe)
         "gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it"
     | body <- outputBodies
     , let fe = renderFeelIn ctx.tcNames ctx.tcConstructors (oracleOf ctx) body
@@ -2357,7 +2784,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , drgNodes     = nodes
     , drgNotes     = sharedInputNotes <> renameNotes <> feelNameCollisionNotes
                        <> itemDefNotes <> componentMaybeNotes <> inputMaybeNotes
-                       <> ruleDateNotes
+                       <> ruleDateNotes <> computedFieldNotes <> hydratorVerbatimNotes
                        <> concatMap snd lowered
     }
  where
@@ -2366,7 +2793,10 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Named rather than inlined into 'drgNodes' because the itemDefinition list
   -- reads the emitted types back off it, to decide which domain-free aliases
   -- are pointed at. Nothing flows the other way, so there is no knot.
-  nodes = map NodeInputData inputNodes <> map (NodeDecision . fst) lowered
+  nodes =
+    map NodeInputData inputNodes
+      <> map (NodeDecision . fst) lowered
+      <> map NodeDecision hydratorNodes
 
   decls   = topDecls modul
   -- The TopDecl's own annotation is kept, not discarded: `attachRef` claims an
@@ -2374,7 +2804,21 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- reading only the inner MkDecide's annotation loses every citation. Both are
   -- read, joined with `<|>`, so the annotation column does not depend on which
   -- node ends up holding it.
-  decidesAnn = [(ann, d) | Decide ann d <- decls]
+  -- §4.4. The synthetic functions "L4.Desugar" made out of computed record
+  -- fields LEAVE the decision list: they mint no id, no FEEL name and no node,
+  -- because a hydrator computes them inline from its sibling entries instead.
+  -- What replaces them is 'hydrators' below.
+  --
+  -- Their 'Unique's rejoin the story in two places, and BOTH are load-bearing:
+  -- 'selectors' (or a reference to `doubled amount` would mint a bogus
+  -- inputData named after the field) and 'fieldScopes' (or the hydrated
+  -- component would miss the record's own uniquifyIn scope and could collide
+  -- with a stored field's path step in silence).
+  (computedSelectorDecides, decidesAnn) =
+    partitionEithers
+      [ if isComputedSelectorKind (decideResolved d) then Left d else Right (ann, d)
+      | Decide ann d <- decls
+      ]
   decides = map snd decidesAnn
   assumes = [a | Assume _ a <- decls]
 
@@ -2404,8 +2848,15 @@ lowerModule opts modul@(MkModule _ uri _) =
 
   -- Field selectors are references in the AST but are not terms; a record
   -- projection must not conjure an inputData element for the field name.
-  selectors = Set.fromList
+  -- ...and the COMPUTED selectors join them (§4.4). This is not cosmetic:
+  -- 'decideFreeTerms' excludes a reference only if it is a known decide, a
+  -- constructor or a selector, so taking the computed-field decides out of
+  -- 'decides' without putting their Uniques here would turn every read of
+  -- `doubled amount` into an <inputData> named after the field -- a supplied
+  -- value where the model computes one. They ARE selectors; 'TermKind' says so.
+  selectors = Set.fromList $
     [ getUnique n | Declare _ (MkDeclare _ _ _ td) <- decls, n <- selectorNames td ]
+      <> map (getUnique . decideResolved) computedSelectorDecides
 
   selectorNames = \case
     EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
@@ -2420,14 +2871,110 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- fields of ONE record may not, and that case is the corpus's one executed
   -- collision, which used to emit `p.foo_bar + p.foo_bar` -- valid FEEL,
   -- computing a wrong number, with no note (§5.3.4).
+  -- COMPUTED selectors are appended to their record's stored ones, inside the
+  -- SAME 'uniquifyIn' call (§4.4). Two consequences, both wanted:
+  --
+  --   * a computed component and a stored one that fold to the same identifier
+  --     are separated here, once, rather than colliding as path steps later --
+  --     which is §5.3.4's executed collision, and it would otherwise be
+  --     reintroduced by hydration;
+  --   * 'neFields' then serves BOTH the context entry names and the downstream
+  --     `hydrated.entry` path steps, so those two agree by construction and not
+  --     because two functions happen to fold the same way.
+  --
+  -- Appended AFTER the stored ones so a record with no computed fields keeps
+  -- byte-identical component names.
   fieldScopes :: [(Text, [(Resolved, Text, Text)])]
   fieldScopes =
     [ (nameOf tn, zip3 ns (map (feelIdentText . nameOf) ns) (uniquifyIn foldedNs))
     | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) td) <- decls
-    , let ns     = selectorNames td
+    , let ns = selectorNames td <> computedSelectorsOf (getUnique tn)
     , let foldedNs = map (feelIdentText . nameOf) ns
     , not (null ns)
     ]
+
+  ------------------------------------------------------------------------
+  -- Computed fields, recovered from the desugaring (§4.4)
+  ------------------------------------------------------------------------
+
+  -- Every computed field, keyed by the Unique of the record that owns it, in
+  -- DECLARATION order. @desugarCFDeclare@ emits @newDeclare : syntheticDecides@
+  -- with the decides in field order, and 'decls' preserves that, so no sorting
+  -- is needed to recover the source order -- only the topological one below.
+  computedFieldsOf :: Map Unique [ComputedField]
+  computedFieldsOf = Map.fromListWith (flip (<>))
+    [ (owner, [MkComputedField { cfSel = decideResolved d, cfSelf = self, cfBody = body }])
+    | d@(MkDecide _ _ _ body) <- computedSelectorDecides
+    , Just (owner, self, _) <- [computedSelectorOwner d]
+    ]
+
+  computedSelectorsOf u = map (.cfSel) (Map.findWithDefault [] u computedFieldsOf)
+
+  -- Every synthetic `_self` binder in the module, so 'freeTerms' can exclude
+  -- them and 'hydratorNodes' can keep them out of the DRG.
+  computedSelfUniques :: Set Unique
+  computedSelfUniques = Set.fromList
+    [getUnique cf.cfSelf | cfs <- Map.elems computedFieldsOf, cf <- cfs]
+
+  -- The computed fields of one record, ordered so that every field comes AFTER
+  -- the siblings it reads.
+  --
+  -- ★ A boxed context's entries evaluate in order and only EARLIER siblings are
+  -- in scope, so getting this wrong is silently wrong rather than loudly:
+  -- the reference resolves to nothing and FEEL answers null.
+  -- @detectComputedFieldCycles@ guarantees ACYCLICITY only; declaration order is
+  -- not guaranteed topological, and jl4/examples/ok/computed-fields.l4 cannot
+  -- catch the omission because its declaration order already happens to be
+  -- topological. jl4/examples/dmn/hydration.l4 declares a dependent BEFORE its
+  -- dependency precisely so that it can.
+  --
+  -- A depth-first emit in DECLARATION order: walk the fields as declared, and
+  -- before emitting one, emit any sibling it reads that is not out yet. That
+  -- gives dependency order where there IS a dependency and declaration order
+  -- everywhere else — which is the property a reader diffing the base
+  -- itemDefinition against the hydrated one relies on, and which the
+  -- @D-COMPUTEDFIELD@ note asserts when it says the derived components are
+  -- computed "from the components declared before them".
+  --
+  -- ★ NOT 'Data.Graph.stronglyConnComp', which was the first implementation.
+  -- It does give dependencies first, but it gives no guarantee at all about
+  -- INDEPENDENT vertices, and it duly reversed Reg CF's `greater of …` and
+  -- `lesser of …` — two mutually independent fields — against their DECLARE.
+  -- Harmless to evaluate, wrong as a claim, and the comment that used to sit
+  -- here asserted the opposite.
+  --
+  -- Termination does not depend on acyclicity: a field is marked emitted BEFORE
+  -- its dependencies are walked, so a cycle stops rather than loops. Acyclicity
+  -- itself comes from @detectComputedFieldCycles@ (L4.Desugar), which runs long
+  -- before this.
+  computedFieldsSorted :: Unique -> [ComputedField]
+  computedFieldsSorted owner = snd (foldl' step (Set.empty, []) fields)
+   where
+    fields = Map.findWithDefault [] owner computedFieldsOf
+    byUniq = Map.fromList [(getUnique cf.cfSel, cf) | cf <- fields]
+
+    step (seen, acc) cf = let (seen', out) = emit seen cf in (seen', acc <> out)
+
+    emit seen cf
+      | Set.member u seen = (seen, [])
+      | otherwise         = let (seen', before) = foldl' pull (Set.insert u seen, []) (siblingDeps cf)
+                            in (seen', before <> [cf])
+     where
+      u = getUnique cf.cfSel
+
+    pull (seen, acc) d = case Map.lookup d byUniq of
+      Just dcf -> let (seen', out) = emit seen dcf in (seen', acc <> out)
+      Nothing  -> (seen, acc)
+
+    siblingDeps cf =
+      [ u
+      | n <- projSelectorsOf cf.cfBody
+      , let u = getUnique n
+      , Map.member u byUniq
+      ]
+
+  projSelectorsOf e =
+    [n | Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) e]
 
   fieldNames :: Map Unique Text
   fieldNames = Map.fromList
@@ -2472,6 +3019,15 @@ lowerModule opts modul@(MkModule _ uri _) =
         -- day the desugaring stops running before this pass, an input contract
         -- that silently gained a derived field is not a failure anyone would
         -- see.
+        --
+        -- __Do not confuse this with @D-COMPUTEDFIELD@ (§4.4, added
+        -- 2026-07-31), which is a different note about a different type.__ This
+        -- arm would say that the BASE definition dropped a derived field;
+        -- @D-COMPUTEDFIELD@ says that the HYDRATED definition CARRIES derived
+        -- components and that DMN cannot mark them as derived. Both remain
+        -- true simultaneously, and the base definition staying stored-only is
+        -- deliberate: it is the model's input contract, and a caller never
+        -- supplies a derived component.
         , itdFields   = [(fn, fty) | MkTypedName _ fn fty _ Nothing <- flds]
         , itdComputed = [nameOf fn | MkTypedName _ fn _ _ (Just _) <- flds]
         , itdPayload  = payload
@@ -2513,10 +3069,36 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- one 'uniquifyIn' over a concatenation and not two: two scopes could hand
   -- the same string to a type and to an alias, and the alias would then silently
   -- acquire the domain it exists to drop.
-  (itemDefNames, optionalNames) =
+  -- ...and the HYDRATED names are minted in the same scope, after the aliases,
+  -- for the same reason: a hand-written @DECLARE Claim_hydrated@ keeps its own
+  -- name and the generated one takes the suffix, rather than the other way
+  -- round.
+  (itemDefNames, aliasAndHydratedNames) =
     splitAt (length itemDecls) $ uniquifyIn $
       map (feelTypeNameText . (.itdName)) itemDecls
         <> [feelTypeNameText d.itdName <> "_optional" | d <- domainDecls]
+        <> [feelTypeNameText d.itdName <> "_hydrated" | d <- hydratedDecls]
+  (optionalNames, hydratedNames) =
+    splitAt (length domainDecls) aliasAndHydratedNames
+
+  -- One hydrated definition per hydrated TYPE, gated identically to the
+  -- hydrators that point at it -- same alias rationale as above.
+  hydratedDecls :: [ItemDecl]
+  hydratedDecls =
+    [d | d <- itemDecls, Set.member d.itdUnique hydratedRecordUniques]
+
+  hydratedRecordUniques :: Set Unique
+  hydratedRecordUniques = Set.fromList [owner | (_, _, owner) <- hydratedInstances]
+
+  hydratedNameOf :: Map Unique Text
+  hydratedNameOf = Map.fromList (zip (map (.itdUnique) hydratedDecls) hydratedNames)
+
+  hydratedIdOf :: Map Unique Text
+  hydratedIdOf = Map.fromList
+    [ (d.itdUnique, iid <> "_hydrated")
+    | (d, iid) <- zip itemDecls itemDefIds
+    , Set.member d.itdUnique hydratedRecordUniques
+    ]
 
   optionalNameOf :: Map Unique Text
   optionalNameOf = Map.fromList (zip (map (.itdUnique) domainDecls) optionalNames)
@@ -2542,7 +3124,220 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- every line in it means something. The gate is the emitted 'DmnType's, not
   -- the L4, so what is minted and what is pointed at cannot disagree.
   itemDefs :: [ItemDefinition]
-  itemDefs = baseItemDefs <> aliasItemDefs
+  itemDefs = baseItemDefs <> aliasItemDefs <> hydratedItemDefs
+
+  -- §4.4. The stored components verbatim -- same names, same typeRefs, so a
+  -- reader can diff the two definitions and see exactly what hydration added --
+  -- then the computed ones, in the same topological order the context entries
+  -- take.
+  --
+  -- __The computed components' types come from the synthetic decides' GIVETH,
+  -- not from the DECLARE__: 'itdComputed' is empty on this tree, because the
+  -- desugaring already ran and took the MEANS clauses with it.
+  hydratedItemDefs :: [ItemDefinition]
+  hydratedItemDefs =
+    [ MkItemDefinition
+        { idfId         = hid
+        , idfName       = hnm
+        , idfLabel      = d.itdName
+        , idfBase       = Nothing
+        , idfValues     = Nothing
+        , idfComponents =
+            zipWith (itemComponent hid) [1 :: Int ..] d.itdFields
+              <> [ MkItemComponent
+                     { icmId    = hid <> "_c" <> tshow i
+                     , icmName  = feelFieldIn nameEnv cf.cfSel
+                     , icmLabel = nameOf cf.cfSel
+                     , icmType  = computedFieldType cf
+                     }
+                 | (i, cf) <- zip [length d.itdFields + 1 ..]
+                                  (computedFieldsSorted d.itdUnique)
+                 ]
+        }
+    | d <- hydratedDecls
+    , Just hid <- [Map.lookup d.itdUnique hydratedIdOf]
+    , Just hnm <- [Map.lookup d.itdUnique hydratedNameOf]
+    ]
+
+  -- The GIVETH of the synthetic decide the field became.
+  computedFieldType cf =
+    case [ty | MkDecide _ (MkTypeSig _ _ (Just (MkGivethSig _ ty))) (MkAppForm _ n _ _) _
+                 <- computedSelectorDecides
+             , getUnique n == getUnique cf.cfSel] of
+      (ty : _) -> let (t, _, _) = classifyType typeEnv ty in t
+      []       -> DmnAny
+
+  -- D-COMPUTEDFIELD: ADVISORY, one per hydrated TYPE, raised on the hydrated
+  -- itemDefinition.
+  --
+  -- Advisory rather than Lossy, and it is not a fudge: nothing an ENGINE needs
+  -- is missing, because hydration means no caller ever supplies a derived
+  -- component. What a reader of the TYPE ALONE cannot do is tell which
+  -- components are the model's input contract and which the model computes for
+  -- itself -- and that is a note about legibility, not about correctness.
+  -- FIDELITY-SEVERITY-AXIS-SPEC.md §3.2 binds Advisory to the `Faithful`
+  -- effect, which is exactly the claim being made.
+  computedFieldNotes =
+    [ dmnNote "D-COMPUTEDFIELD" Advisory hid Nothing
+        ("`" <> d.itdName <> "` is hydrated as `" <> hnm <> "`, whose component(s) "
+           <> Text.intercalate ", " (map (tick . nameOf . (.cfSel)) cfs)
+           <> " are DERIVED: L4 defines each by a MEANS clause on the DECLARE, and this model \
+              \computes them in the boxed context of the hydrated decision from the components \
+              \declared before them. DMN cannot say so -- tItemDefinition has no derived flag, \
+              \and a contextEntry is indistinguishable from a supplied value -- so a reader of \
+              \the hydrated type alone cannot tell a derived component from a stored one")
+        "nothing an engine needs -- hydration means no caller ever supplies one. What is lost \
+        \is a reader's ability to tell, FROM THE TYPE, which components are the model's input \
+        \contract and which the model computes for itself"
+    | d <- hydratedDecls
+    , Just hid <- [Map.lookup d.itdUnique hydratedIdOf]
+    , Just hnm <- [Map.lookup d.itdUnique hydratedNameOf]
+    , let cfs = computedFieldsSorted d.itdUnique
+    , not (null cfs)
+    ]
+
+  -- ★ A hydrator's context entries go through the SAME verbatim gate every
+  -- other emitted expression does, and this note is what applies it.
+  --
+  -- Every other rendering path in this module asks @feFragment == L4Verbatim@
+  -- before it emits (that gate IS @D-NONFEELOUTPUT@). 'hydratorNodes' is built
+  -- outside 'lowered', so none of the per-decide note machinery ever looks at a
+  -- context entry — and a computed field whose body 'renderFeelIn' cannot
+  -- render (a record CONSTRUCTION, a CONSIDER over a user-declared payload sum,
+  -- a LIST comprehension) shipped raw L4 source inside a @\<literalExpression\>@
+  -- with no note at all, a clean fidelity report and exit 0. That is the exact
+  -- "green in the validator, wrong in the engine" failure the exporter exists to
+  -- close, so the code is @D-NONFEELOUTPUT@ and the severity is Blocking: the
+  -- loss is EXECUTABILITY, not analysability, and its message ("NO DMN engine
+  -- can evaluate it") is already exactly right.
+  --
+  -- The message is written for a CONTEXT ENTRY rather than reusing
+  -- 'nonFeelOutput' verbatim, whose words ("output entry", "defaultOutputEntry")
+  -- would be false here: a hydrator has neither.
+  hydratorVerbatimNotes =
+    [ dmnNote "D-NONFEELOUTPUT" Blocking h.dcnId Nothing
+        ("the context entry `" <> ce.ceLabel <> "` of `" <> h.dcnName
+           <> "` (hydrated) is L4 source, not FEEL (`" <> ce.ceExpr.feText
+           <> "`): it is a DERIVED field whose MEANS body this backend has no FEEL rendering \
+              \for, so the text was emitted verbatim and NO DMN engine can evaluate it")
+        "execution: an engine fails to compile the hydrated record, and with it every decision \
+        \that reads a component through it"
+    | h <- hydratorNodes
+    , LogicContext es <- [h.dcnLogic]
+    , ce <- es
+    , ce.ceExpr.feFragment == L4Verbatim
+    ]
+
+  -- The hydrator decisions themselves. Appended AFTER the ordinary decisions in
+  -- 'drgNodes': tDefinitions sequences drgElement*, and both <decision> and
+  -- <inputData> are in that substitution group, so intra-group order is free
+  -- and DMN resolves requirements by @href rather than by document order.
+  -- Appending keeps every existing decision id byte-stable.
+  hydratorNodes :: [Decision]
+  hydratorNodes =
+    [ MkDecision
+        { dcnId           = hid
+        , dcnName         = nm
+        , dcnFeelName     = feel
+        , dcnType         = DmnNamed hnm DmnAny
+        , dcnLogic        = LogicContext (storedEntries <> computedEntries)
+        -- ★ The source instance is NOT the only edge, and treating it as the
+        -- only one was a defect: a computed field's @MEANS@ body may reference
+        -- anything in scope at the DECLARE, and 'Desugar.rewriteFieldRefs'
+        -- rewrites only the names that are the record's OWN fields. So
+        -- @`b` IS A NUMBER MEANS `a` TIMES `vat rate`@ renders `a * vat_rate`
+        -- inside the context, and without an edge to `decision_vat_rate` that
+        -- name is not in the hydrator's evaluation scope: KIE 8.44 answers
+        -- "Required dependency not found" and SKIPs, zeebe-dmn silently reads
+        -- null and multiplies by it (both measured, jl4/tests-cli/fixtures/
+        -- dmn-null-probe/null-absent.dmn). Computing them from the RENDERED
+        -- bodies, through the same 'survivingRefs'/'classifyRef' pair every
+        -- other decision uses, is what discharges R11 here as well.
+        , dcnRequirements =
+            sort (nubOrd (maybeToList (classifyRef hid srcRef) <> bodyEdges))
+        }
+    | ((u, nm, owner), hid, feel) <- zip3 hydratedInstances hydratorIds hydratorFeelNames
+    , Just hnm <- [Map.lookup owner hydratedNameOf]
+    , Just d   <- [listToMaybe [i | i <- itemDecls, i.itdUnique == owner]]
+    , Just srcRef <- [Map.lookup u instanceRefOf]
+    , let src = sourceFeelNameOf u
+    , let cfs = computedFieldsSorted owner
+    , let storedEntries =
+            [ MkContextEntry
+                { ceId    = hid <> "_ce" <> tshow i
+                , ceName  = feelFieldIn nameEnv fn
+                , ceLabel = nameOf fn
+                , ceType  = let (t, _, _) = classifyType typeEnv fty in t
+                  -- A plain copy off the source instance. Every STORED field is
+                  -- copied, not only the ones a formula reads: the hydrated
+                  -- itemDefinition declares them all, and a partial record whose
+                  -- missing entries answer null is a trap. The cost is verbosity.
+                , ceExpr  = MkFeelExpr (src <> "." <> feelFieldIn nameEnv fn) SFeel
+                }
+            | (i, (fn, fty)) <- zip [1 :: Int ..] d.itdFields
+            ]
+    , let computedEntries =
+            [ MkContextEntry
+                { ceId    = hid <> "_ce" <> tshow i
+                , ceName  = feelFieldIn nameEnv cf.cfSel
+                , ceLabel = nameOf cf.cfSel
+                , ceType  = computedFieldType cf
+                  -- Rendered with the field's own body under 'neBareProj', so a
+                  -- projection on `_self` becomes the BARE sibling entry name --
+                  -- which is what turns `_self's amount TIMES 2` into
+                  -- `amount * 2`, the measured probe's shape exactly.
+                  --
+                  -- 'carameliseExpr' FIRST, and it is not optional: the
+                  -- typechecker desugars every binary operator into a function
+                  -- application, and an uncamelised body renders `amount * 2`
+                  -- as an unrecognisable @App@ and therefore verbatim. Every
+                  -- other rendering path in this module caramelises for the
+                  -- same reason; a hydrator that skipped it would ship L4
+                  -- source inside a context entry.
+                , ceExpr  = renderFeelIn (bareProjEnv cf.cfSelf) constructors
+                              moduleOracle (hydratorBody cf.cfBody)
+                }
+            | (i, cf) <- zip [length d.itdFields + 1 ..] cfs
+            ]
+      -- The `_self` binders are the desugaring's own synthetic parameter and
+      -- render BARE (a sibling entry name), so they must not become edges:
+      -- `_self` names nothing in the artifact.
+    , let (bodyRefs, bodyTouched) =
+            survivingRefs (map (hydratorBody . (.cfBody)) cfs)
+    , let bodyEdges =
+            mapMaybe (classifyRef hid)
+              [r | r <- bodyRefs, not (Set.member (getUnique r) computedSelfUniques)]
+              -- A computed field may itself read a COMPUTED field of some other
+              -- hydrated instance, in which case the fold points the entry at
+              -- that hydrator and the edge has to follow it.
+              <> [ RequiredDecision h
+                 | t <- bodyTouched
+                 , not (Set.member t computedSelfUniques)
+                 , Just h <- [Map.lookup t hydratorIdByInstance]
+                 , h /= hid
+                 ]
+    ]
+
+  bareProjEnv self = nameEnv { neBareProj = Set.singleton (getUnique self) }
+
+  -- The same two preparations every other body gets before rendering:
+  -- caramelise the typechecker's operator applications back into operators,
+  -- then inline WHERE/LET locals. A computed field may perfectly well be
+  -- written with a WHERE, and an unpeeled one would render verbatim.
+  hydratorBody raw =
+    let caramelised = carameliseExpr raw
+    in either (const caramelised) fst (peelLocals caramelised)
+
+  -- The defining 'Resolved' of each hydrated instance, so the hydrator's own
+  -- requirement can go through the same 'classifyRef' every other edge does.
+  instanceRefOf :: Map Unique Resolved
+  instanceRefOf = Map.fromList
+    ( [ (getUnique r, r)
+      | d <- decides
+      , r <- freeRefs d
+      ]
+        <> [(getUnique (decideResolved d), decideResolved d) | d <- decides]
+    )
 
   aliasItemDefs :: [ItemDefinition]
   aliasItemDefs =
@@ -2578,8 +3373,14 @@ lowerModule opts modul@(MkModule _ uri _) =
   nodeTypeRefs = \case
     NodeInputData i -> [i.idType]
     NodeDecision  d -> d.dcnType : case d.dcnLogic of
-      LogicTable t   -> map (.icType) t.dtInputs
-      LogicLiteral _ -> []
+      LogicTable t    -> map (.icType) t.dtInputs
+      LogicLiteral _  -> []
+      -- A hydrator's entry typeRefs are REFERENCES like any other, and this
+      -- arm is load-bearing rather than mechanical: it is what keeps a
+      -- `_optional` alias alive when the only element pointing at it is a
+      -- context entry of a hydrated record. Returning [] here would mint a
+      -- typeRef with no definition -- valid XML, unresolvable in an engine.
+      LogicContext es -> map (.ceType) es
 
   baseItemDefs :: [ItemDefinition]
   baseItemDefs =
@@ -2702,6 +3503,98 @@ lowerModule opts modul@(MkModule _ uri _) =
   decideByUnique = Map.fromList (zip (map (getUnique . decideResolved) decides) decideIds)
 
   ------------------------------------------------------------------------
+  -- Hydration (§4.4)
+  ------------------------------------------------------------------------
+
+  -- Which instances are hydrated, in a source-determined order.
+  --
+  -- An instance qualifies iff it is a free term or a surviving decide whose
+  -- type head is a record owning computed fields, AND some surviving decide
+  -- contains a foldable computed read OF THAT INSTANCE.
+  --
+  -- __The use gate is not an optimisation__, it is the same rule the
+  -- `_optional` aliases follow and for the same reason: a base itemDefinition
+  -- is inert and is therefore minted ungated, but a hydrator is a <decision>,
+  -- and one with no dependents is noise in an artifact whose whole claim is
+  -- that every line in it means something. It costs the Reg CF corpus eight
+  -- hydrators it would otherwise mint and never read.
+  --
+  -- No knot: the gate is a purely syntactic scan of decide bodies, computed
+  -- before 'lowered'.
+  hydratedInstances :: [(Unique, Text, Unique)]   -- (instance, L4 name, owning record)
+  hydratedInstances =
+    nubOrdOn (\(u, _, _) -> u)
+      [ (u, nm, owner)
+      | (u, nm) <- instanceCandidates
+      , Set.member u computedlyRead
+      , Just owner <- [Map.lookup u instanceRecordOf]
+      , not (null (Map.findWithDefault [] owner computedFieldsOf))
+      -- ★ The lookups 'hydratorNodes' needs are checked HERE, not there, so a
+      -- miss drops the instance from BOTH the graph and the FOLD. 'neHydrated'
+      -- is a projection of this list, so an instance that survived here and
+      -- then failed a lookup inside 'hydratorNodes' would leave downstream
+      -- reads folded to `<x>_hydrated.<field>` -- a path into a decision
+      -- variable nobody emitted, which FEEL answers null for. That is §4.4.5's
+      -- defect shape exactly, reintroduced one level up.
+      --
+      -- These two cannot be spelled as the lookups themselves without a knot:
+      -- 'hydratedNameOf' is derived from 'hydratedDecls', which is derived from
+      -- THIS list. They are the same conditions one step earlier -- a hydrated
+      -- record must have an itemDefinition, and a hydrated instance must have a
+      -- defining reference for its own edge.
+      , any ((== owner) . (.itdUnique)) itemDecls
+      , Map.member u instanceRefOf
+      ]
+
+  -- Every read of a computed field, by the instance it reads through.
+  computedlyRead :: Set Unique
+  computedlyRead = Set.fromList
+    [ getUnique x
+    | d <- decides
+    , e <- toListOf (cosmosOf (gplate @(Expr Resolved))) (view decideBody d)
+    , Just (x, _) <- [foldableComputedRead e]
+    ]
+
+  -- Free terms are candidates before ids exist, so this reads 'freeTerms'
+  -- rather than 'inputNodes'; a record-valued DECIDE is the other kind.
+  instanceCandidates :: [(Unique, Text)]
+  instanceCandidates =
+    freeTerms <> [(getUnique (decideResolved d), decideName d) | d <- decides]
+
+  instanceRecordOf :: Map Unique Unique
+  instanceRecordOf = Map.fromList
+    ( [ (u, hu)
+      | (u, _) <- freeTerms
+      , Just ty <- [Map.lookup u freeTermSrc]
+      , Just hu <- [typeHeadUnique ty]
+      ]
+        <> [ (getUnique (decideResolved d), hu)
+           | d@(MkDecide _ (MkTypeSig _ _ (Just (MkGivethSig _ ty))) _ _) <- decides
+           , Just hu <- [typeHeadUnique ty]
+           ]
+    )
+
+  hydratorIds = assignIds "hydration_" [nm | (_, nm, _) <- hydratedInstances]
+
+  hydratorIdByInstance :: Map Unique Text
+  hydratorIdByInstance =
+    Map.fromList (zip [u | (u, _, _) <- hydratedInstances] hydratorIds)
+
+  hydratorFeelNameByInstance :: Map Unique Text
+  hydratorFeelNameByInstance =
+    Map.fromList (zip [u | (u, _, _) <- hydratedInstances] hydratorFeelNames)
+
+  -- The FEEL name of the instance being hydrated -- an inputData's or a
+  -- decision's, whichever it is.
+  --
+  -- TOTAL by construction, and the default is unreachable rather than a
+  -- fallback: 'instanceCandidates' is exactly @freeTerms <> decides@, and
+  -- 'neVars' is built by zipping those same two lists with their FEEL names.
+  -- (An empty default would emit a context entry reading `.salary`, so if this
+  -- ever becomes reachable it wants a Blocking note, not a silent name.)
+  sourceFeelNameOf u = Map.findWithDefault "" u nameEnv.neVars
+
+  ------------------------------------------------------------------------
   -- Law time (§15.2, §15.3)
   ------------------------------------------------------------------------
 
@@ -2754,7 +3647,26 @@ lowerModule opts modul@(MkModule _ uri _) =
   freeTerms :: [(Unique, Text)]
   freeTerms = ordinaryTerms <> lawTimeTerms
    where
-    allTerms = nubOrdOn fst (concatMap decideFreeTerms decides)
+    allTerms = nubOrdOn fst (concatMap decideFreeTerms decides <> computedTerms)
+
+    -- §4.4. A computed field's @MEANS@ body may name a module-level term as
+    -- well as the record's own fields, and that term must still become an
+    -- inputData: before hydration the field WAS its own decision and did mint
+    -- one, and after hydration the context entry names it just the same.
+    -- APPENDED, so every pre-existing inputData keeps its id and FEEL name.
+    --
+    -- The synthetic `_self` parameter is excluded, and that exclusion is the
+    -- whole reason this is not simply @decides <> computedSelectorDecides@:
+    -- 'freeRefs' reads only a decide's BODY, so a @GIVEN@ parameter is a Ref
+    -- and not a Def, and letting `_self` through would put `input_self` -- the
+    -- desugaring's own scaffolding -- back into the model's input contract.
+    computedTerms =
+      [ t
+      | d <- computedSelectorDecides
+      , t <- decideFreeTerms d
+      , not (Set.member (fst t) computedSelfUniques)
+      ]
+
     isLawTime (u, _) = u == TC.rulesEffectiveDateUnique
     lawTimeTerms  = filter isLawTime allTerms
     ordinaryTerms = filter (not . isLawTime) allTerms
@@ -2801,9 +3713,16 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- here: `decisionService` names (§2.3) and BKM `formalParameter` names (§6.2),
   -- both Phase 5. Each is its own 'uniquifyIn' scope -- neither shares this one
   -- -- so extending this is adding a scope, not widening it.
-  varFolded = map (feelIdentText . snd) freeTerms <> map (feelIdentText . decideName) decides
+  -- Hydrator names are APPENDED, after the decisions, for the same reason law
+  -- time's inputData is (§15.2): appending keeps every existing FEEL name
+  -- byte-stable, so a hydration diff shows the hydrators and nothing else.
+  varFolded =
+    map (feelIdentText . snd) freeTerms
+      <> map (feelIdentText . decideName) decides
+      <> [feelIdentText (nm <> " hydrated") | (_, nm, _) <- hydratedInstances]
   varResolved = uniquifyIn varFolded
-  (inputFeelNames, decideFeelNames) = splitAt (length freeTerms) varResolved
+  (inputFeelNames, varRest) = splitAt (length freeTerms) varResolved
+  (decideFeelNames, hydratorFeelNames) = splitAt (length decides) varRest
 
   nameEnv = MkNameEnv
     { neVars   = Map.fromList
@@ -2811,6 +3730,9 @@ lowerModule opts modul@(MkModule _ uri _) =
             <> zip (map (getUnique . decideResolved) decides) decideFeelNames
         )
     , neFields = fieldNames
+    , neMaybePreds = opts.dloMaybePredicates
+    , neHydrated   = hydratorFeelNameByInstance
+    , neBareProj   = Set.empty
     }
 
   -- A GIVEN's declared type is the best evidence about a free term; an ASSUME's
@@ -3117,25 +4039,39 @@ lowerModule opts modul@(MkModule _ uri _) =
            , not (null ps)
            , Just owner <- [Map.lookup (getUnique cn) payloadOwner]
            ]
-        -- R8-d: value emission for the BUILTIN open sums is refused in this
-        -- change. A `CONSIDER`-on-`MAYBE` table would need `null` as an INPUT
-        -- CELL, and DMN 1.3's grammar rule 34 makes `null` a literal while rule
-        -- 33's `simple literal` is numeric | string | boolean | date-time only,
-        -- so it is not a legal S-FEEL endpoint at all. Leaving S-FEEL on the
-        -- cell side would forfeit §3.1's whole thesis on precisely the tables
-        -- the encoding was supposed to buy.
-        <> [ "a decision that constructs or matches L4's builtin open sums (it mentions `"
+        -- R8-e. NARROWED 2026-07-31 from all four builtin sum constructors to
+        -- LEFT/RIGHT alone: R8-d′ gives JUST and NOTHING real FEEL renderings
+        -- (`x` and `null`), so a decision that mentions them is no longer
+        -- refused. EITHER has no FEEL image at any tag arity, so its two
+        -- constructors keep the refusal AND keep the verbatim rendering that
+        -- fixed R8-f.
+        --
+        -- The narrowing is what the three EITHER tests in jl4/tests/DmnExport.hs
+        -- exist for. They were written and watched go green BEFORE this line
+        -- moved, because EITHER had zero coverage here and zero corpus exposure,
+        -- and a refusal nothing pins is a refusal a narrowing can take with it.
+        <> [ "a decision that constructs or matches EITHER (it mentions `"
                <> nameOf r <> "`), and FEEL has no way to spell a tagged value"
            | r <- toList d
-           , isBuiltinSumCon r
+           , getUnique r `elem` [TC.leftUnique, TC.rightUnique]
            ]
+        -- A CONSIDER over a MAYBE is no longer refused: R8-d′ renders it as
+        -- `if <scrut> != null then a else b`, which never asks for a cell at
+        -- all, so the endpoint-grammar objection does not arise.
+        --
+        -- `fl.tfEither || fl.tfNestedMaybe`, and the second disjunct is not
+        -- redundant: 'classifyType' sets tfMaybe TRUE as well as tfNestedMaybe
+        -- on a nested MAYBE, so narrowing to `tfEither` alone would let a
+        -- MAYBE (MAYBE τ) scrutinee through and collapse `JUST NOTHING` and
+        -- `NOTHING` onto one FEEL null -- an ANSWER CHANGE. Pinned by
+        -- "refuses a NESTED MAYBE used as a CONSIDER SCRUTINEE".
         <> [ "a CONSIDER over `" <> oneLine (prettyLayout sty)
-               <> "`, whose arms would need `null` as an input cell -- which S-FEEL's endpoint \
-                  \grammar does not admit"
+               <> "`, which has no faithful image: FEEL's `null` does not nest and FEEL has \
+                  \no EITHER"
            | Consider _ scrut _ <- subExprs
            , Just sty <- [annTypeSource oracle0 scrut]
            , let (_, _, fl) = classifyType typeEnv sty
-           , fl.tfMaybe || fl.tfEither
+           , fl.tfEither || fl.tfNestedMaybe
            ]
         -- R8-c and R8-e at the boundary. Nested MAYBE is refused because `null`
         -- does not nest: `JUST NOTHING` and `NOTHING` would become one FEEL
@@ -3242,15 +4178,15 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- assumed (jl4/tests/DmnExport.hs, "scopes D-RULEDATE-UNBOUND's claim") --
     -- but the note must not depend on that staying true.
     ruleDateUnboundText = case logic of
-      LogicLiteral _ ->
-        ( "`" <> decideName d
-            <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
-               \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
-               \rebinding, so this decision is not governed by it and cannot be"
-        , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
-          \most likely to get wrong -- supplying the model's rule-date input does not make \
-          \it answer"
-        )
+      -- A hydrator takes the same reading as a boxed literal: neither has any
+      -- row, so nothing about it is "still governed by the rule-date input".
+      -- It is also unreachable in practice -- hydrators are minted OUTSIDE
+      -- this per-decide computation, so 'logic' here is never a context -- but
+      -- the arm is written to the same standard rather than left as an error,
+      -- because an unreachable branch that becomes reachable is exactly how a
+      -- scoped claim silently stops being scoped.
+      LogicContext _ -> literalUnboundText
+      LogicLiteral _ -> literalUnboundText
       LogicTable _ ->
         ( "a sub-expression of `" <> decideName d
             <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
@@ -3260,6 +4196,16 @@ lowerModule opts modul@(MkModule _ uri _) =
         , "execution of the rebound sub-graph: supplying the model's rule-date input does \
           \not make it answer, and the table around it will answer as though it had"
         )
+
+    literalUnboundText =
+      ( "`" <> decideName d
+          <> "` evaluates a sub-graph under its OWN rule date (`EVAL UNDER RULES \
+             \EFFECTIVE AT`). A DMN DRG has one global rule-date input and no scoped \
+             \rebinding, so this decision is not governed by it and cannot be"
+      , "execution: no DMN engine can evaluate this decision, and -- the part a reader is \
+        \most likely to get wrong -- supplying the model's rule-date input does not make \
+        \it answer"
+      )
 
     isEvalUnderRules = \case
       App _ r _ -> getUnique r == TC.evalUnderRulesEffectiveAtUnique
@@ -3370,8 +4316,9 @@ lowerModule opts modul@(MkModule _ uri _) =
       , dcnName         = decideName d
       , dcnFeelName     = feelName
       , dcnType         = case logic of
-          LogicTable t -> t.dtOutput.ocType
-          LogicLiteral _ -> declaredType
+          LogicTable t    -> t.dtOutput.ocType
+          LogicLiteral _  -> declaredType
+          LogicContext _  -> declaredType
       , dcnLogic        = logic
       -- R11 (§15.3): a dated table's requirements are computed from what
       -- SURVIVES into the artifact -- the arm bodies and the OTHERWISE -- plus
@@ -3380,13 +4327,35 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- is intended: the regime constants and the guard predicate become DRG
       -- leaves with no dependents. They are NOT dropped (see 'literalFallback');
       -- the annotation column carries their provenance into the artifact.
+      --
+      -- §4.4 extends the same principle to hydration. Where a read of `x`'s
+      -- COMPUTED field has been folded, the emitted FEEL names the hydrator and
+      -- not `x`, so the direct edge must go and an edge to the hydrator must
+      -- appear. Consequence, and it is intended: a decide that reads ONLY
+      -- computed fields of `x` ends up `x -> hydration_x -> decide`, with no
+      -- direct edge at all. A decide that reads both raw and computed fields
+      -- keeps both edges, which is also correct.
       , dcnRequirements = case (datedSurvivors, lawTimeInputId) of
           (Just bodies, Just lawId) ->
-            sort . nubOrd $
-              RequiredInput lawId
-                : mapMaybe (classifyRef did) (concatMap exprFreeRefs bodies)
-          _ -> sort (nubOrd (mapMaybe (classifyRef did) (freeRefs d)))
+            let (survivors, touched) = survivingRefs bodies
+            in sort . nubOrd $
+                 RequiredInput lawId
+                   : mapMaybe (classifyRef did) survivors <> hydratorEdges touched
+          _ ->
+            let (survivors, touched) = survivingRefs [view decideBody d]
+                -- 'freeRefs' bounds the survivors to what this decide does not
+                -- itself bind, exactly as before; the fold only removes.
+                free = Set.fromList (map getUnique (freeRefs d))
+                kept = [r | r <- survivors, Set.member (getUnique r) free]
+            in sort . nubOrd $
+                 mapMaybe (classifyRef did) kept <> hydratorEdges touched
       }
+     where
+      hydratorEdges touched =
+        [ RequiredDecision hid
+        | u <- touched
+        , Just hid <- [Map.lookup u hydratorIdByInstance]
+        ]
 
   -- DMN 7.3.1: a Decision SHALL not require itself, "directly or indirectly".
   --

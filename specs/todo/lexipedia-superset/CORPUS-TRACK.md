@@ -261,9 +261,14 @@ file with two expected values is observationally a two-row table.
          THEN `ten percent of the greater`
          ELSE `maximum amount sold to any one investor in a 12-month period`
     WHERE
-        `five percent of the greater` MEANS 0.05 TIMES `greater of annual income or net worth` investor
-        `ten percent of the greater`  MEANS 0.10 TIMES `greater of annual income or net worth` investor
+        `five percent of the greater` MEANS 0.05 TIMES investor's `greater of annual income or net worth`
+        `ten percent of the greater`  MEANS 0.10 TIMES investor's `greater of annual income or net worth`
 ```
+
+> **Spelling updated 2026-07-31 to match the corpus.** `greater of annual income or net worth` is
+> now a **computed field** on `InvestorProfile` rather than a standalone unary decide, so the read
+> is a projection. See `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §4.4. The logic is unchanged; only the
+> spelling of the read is.
 
 **What it demonstrates — under §2.0's corrected standard.** Their page states the limit as
 two prose sentences with a number in each. Prose cannot be evaluated, so it cannot be
@@ -1136,6 +1141,16 @@ guard.** The corrected sizing is in §6.1.
 ### 5.3 The citation trail, for each answer
 
 Every step is `@ref`-backed today, and the wizard's "why" panel walks the same chain:
+
+> **Line numbers in this table, and in the two tables above it, are STALE as of 2026-07-31 and are
+> not being renumbered.** `greater of annual income or net worth` and its `lesser of` twin were
+> converted from standalone unary decides into **computed fields** on `DECLARE InvestorProfile`
+> (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §4.4), which moved them up the file and shifted everything
+> after them. The `@ref` citations are unaffected — the `@ref` above the `DECLARE` still carries
+> 17 CFR 227.100(a)(2), and the "greater of" reasoning is still where it was relative to its own
+> rule. Renumbering by hand would be a large diff whose correctness nobody can check at review
+> time, and re-deriving these tables is its own task; saying they are stale is the honest
+> intermediate. **Grep for the names, not the line numbers.**
 
 | Step                              | Source                                                                     | Citation                                             |
 | --------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
