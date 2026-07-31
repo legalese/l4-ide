@@ -431,12 +431,18 @@ embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
 -- are local.
 --
 -- The two --fail-on fixtures are a matched pair, and both are needed: the
--- `export-two-rules` DMN report is blocking-ONLY and the `export-advisory-only`
--- DMN report is advisory-ONLY, so between them every @FidelityGate@ value has
--- both a case that must trip and a case that must not.
-exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture :: FilePath
+-- `export-blocking-only` DMN report is blocking-ONLY and the
+-- `export-advisory-only` DMN report is advisory-ONLY, so between them every
+-- @FidelityGate@ value has both a case that must trip and a case that must
+-- not. (`export-two-rules` used to play the blocking-only role, until Phase
+-- 4's population filter correctly routed its two uncalled regulative bodies
+-- out of the DRG — it keeps its BPMN rule-selection role, and its DMN export
+-- now refuses with an EMPTY model, which its own test below pins.)
+exportTwoRulesFixture, exportNothingFixture :: FilePath
+exportBlockingOnlyFixture, exportAdvisoryOnlyFixture :: FilePath
 exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
 exportNothingFixture      = fixtureDir </> "export-nothing.l4"
+exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
@@ -628,7 +634,8 @@ main = do
        , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
        , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
        , shadowExtraEntry, shadowImporterEntry
-       , exportTwoRulesFixture, exportNothingFixture, exportAdvisoryOnlyFixture
+       , exportTwoRulesFixture, exportNothingFixture
+       , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
        , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
        , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
@@ -1222,16 +1229,16 @@ spec bin = do
             code `shouldBe` ExitSuccess
 
       it "a blocking-only report is caught by every threshold" $ do
-        -- `l4 export --to=dmn export-two-rules.l4` reports 2 blocking, 0 lossy,
-        -- 0 advisory: the pure-Blocking end of the lattice. Assert that first,
-        -- so the rows below cannot go green for the wrong reason if the
-        -- fixture's notes ever change severity.
-        Output tally _ serr <- dmnGate exportTwoRulesFixture []
+        -- `l4 export --to=dmn export-blocking-only.l4` reports 2 blocking,
+        -- 0 lossy, 0 advisory: the pure-Blocking end of the lattice. Assert
+        -- that first, so the rows below cannot go green for the wrong reason
+        -- if the fixture's notes ever change severity.
+        Output tally _ serr <- dmnGate exportBlockingOnlyFixture []
         tally `shouldBe` ExitSuccess
         serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
         serr `shouldSatisfy` (not . ("lossy" `isInfixOf`))
         serr `shouldSatisfy` (not . ("advisory" `isInfixOf`))
-        mapM_ (\g -> exitsNonZero exportTwoRulesFixture ["--fail-on=" ++ g])
+        mapM_ (\g -> exitsNonZero exportBlockingOnlyFixture ["--fail-on=" ++ g])
           ["blocking", "lossy", "advisory"]
 
       it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
@@ -1250,7 +1257,15 @@ spec bin = do
         mapM_ (\fixture -> do
                  exitsZero fixture ["--fail-on=none"]
                  exitsZero fixture [])
-          [exportTwoRulesFixture, exportAdvisoryOnlyFixture]
+          [exportBlockingOnlyFixture, exportAdvisoryOnlyFixture]
+
+      -- Phase 4's population filter (§2.5.6 rule 3) routes uncalled
+      -- regulative bodies out of the DRG; a module holding ONLY those now
+      -- exports an empty model, which the CLI refuses loudly rather than
+      -- writing a decision-free document. This is the behaviour change that
+      -- retired export-two-rules.l4 from the blocking-only role above.
+      it "refuses an all-regulative module as DMN (empty model after the population filter)" $
+        expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
 
     it "still writes the document when --fail-on trips" $ do
       Output code sout _ <- runL4 bin
