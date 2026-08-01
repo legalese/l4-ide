@@ -1030,9 +1030,10 @@ cyclicGroups nodes = [ns | Graph.CyclicSCC ns <- Graph.stronglyConnComp nodes]
 -- names alone are ambiguous under §5.2\'s uniquifier, which can emit two
 -- decisions both labelled @shared@.
 checkDrg :: Drg -> [FidelityNote]
-checkDrg drg = cycleNotes
+checkDrg drg = cycleNotes <> recursiveNotes <> knowledgeReqNotes
  where
   decisions = drgDecisions drg
+  bkms      = drgBkms drg
 
   -- §6.3.7: the informationRequirement graph. Only decision→decision edges can
   -- close a cycle (an inputData has no requirements), so the graph is over
@@ -1056,6 +1057,111 @@ checkDrg drg = cycleNotes
     , let memberList xs = [(x.dcnName, x.dcnId) | x <- xs]
     , let headId xs = case xs of (x : _) -> x.dcnId; [] -> ""
     ]
+
+  -- §6.3.9, the SAME SCC routine over the SECOND graph (§6.4.4-5): the
+  -- knowledgeRequirement edges, whose nodes are decisions AND BKMs (probe C1:
+  -- the BKM→BKM edge lives on the calling BKM). A different code because the
+  -- clause cited and the reader's remedy differ; one detector because two
+  -- detectors is how one of them gets skipped. The side condition is
+  -- 'cyclicGroups'' own (|SCC| ≥ 2, or a self-edge singleton — the second arm
+  -- is what the §6.4.4-2 un-suppression exists for). This discharges §6.3-1's
+  -- forward reference to R5.
+  recursiveNotes =
+    [ MkFidelityNote
+        { code     = "D-RECURSIVE"
+        , severity = Blocking
+        , element  = headId ds
+        , range    = Nothing
+        , message  = cycleMessage "knowledgeRequirement" "invocable" (memberList ds)
+        , lost     =
+            "well-formedness: DMN 1.3 §6.3.9 says a BusinessKnowledgeModel SHALL not \
+            \require itself, directly or indirectly; behaviour on a violating model is \
+            \explicitly vendor-dependent (KIE evaluates recursive BKMs but emits a \
+            \spurious eval-time ERROR)"
+        }
+    | ds <- cyclicGroups
+        ( [ (Left d, d.dcnId, map knowledgeRequirementTarget d.dcnKnowledgeReqs)
+          | d <- decisions
+          ]
+            <> [ (Right b, b.bkmId, map knowledgeRequirementTarget b.bkmKnowledgeReqs)
+               | b <- bkms
+               ]
+        )
+    , let memberList = map (either (\d -> (d.dcnName, d.dcnId)) (\b -> (b.bkmName, b.bkmId)))
+    , let headId xs = case xs of
+            (Left d : _)  -> d.dcnId
+            (Right b : _) -> b.bkmId
+            []            -> ""
+    ]
+
+  -- §6.2 / §13.3 consequence 2: knowledgeRequirement COMPLETENESS is asserted,
+  -- not assumed — mandatory rather than belt-and-braces, because on the
+  -- DEFAULT flavor nothing downstream would ever notice a missing edge: KIE
+  -- refuses at compile (probe C3), but Camunda parses and the calling decision
+  -- answers null with no message at any severity. The check is a
+  -- token-boundary scan of every non-verbatim FEEL text a node carries, for
+  -- each emitted invocable name followed by `(`; verbatim (raw-L4) texts are
+  -- skipped, since nothing in them is an invocation.
+  knowledgeReqNotes =
+    [ MkFidelityNote
+        { code     = "D-KNOWLEDGEREQ"
+        , severity = Blocking
+        , element  = ownerId
+        , range    = Nothing
+        , message  =
+            "`" <> ownerName <> "` invokes `" <> b.bkmFeelName
+              <> "` but carries no knowledgeRequirement edge to " <> b.bkmId
+              <> ": the edge is what puts an invocable's name into a caller's FEEL \
+                 \scope. KIE refuses the model at compile time; Camunda parses it and \
+                 \the calling decision answers null with NO message at any severity"
+        , lost     = "the invocation, silently, on the default flavor"
+        }
+    | not (null bkms)
+    , (ownerId, ownerName, edges, texts) <-
+        [ ( d.dcnId
+          , d.dcnName
+          , map knowledgeRequirementTarget d.dcnKnowledgeReqs
+          , logicFeelTexts d.dcnLogic
+          )
+        | d <- decisions
+        ]
+          <> [ ( b.bkmId
+               , b.bkmName
+               , map knowledgeRequirementTarget b.bkmKnowledgeReqs
+               , logicFeelTexts b.bkmLogic
+               )
+             | b <- bkms
+             ]
+    , b <- bkms
+    , b.bkmId `notElem` edges
+    , any (invokes b.bkmFeelName) texts
+    ]
+
+  -- Every FEEL text a node's logic evaluates, minus the verbatim ones.
+  logicFeelTexts = \case
+    LogicLiteral e  -> [e.feText | e.feFragment /= L4Verbatim]
+    LogicContext es -> [ce.ceExpr.feText | ce <- es, ce.ceExpr.feFragment /= L4Verbatim]
+    LogicTable t ->
+      [c.icExpr.feText | c <- t.dtInputs, c.icExpr.feFragment /= L4Verbatim]
+        <> [r.drOutput.feText | r <- t.dtRules, r.drOutput.feFragment /= L4Verbatim]
+        <> [d.feText | Just d <- [t.dtOutput.ocDefault], d.feFragment /= L4Verbatim]
+
+  -- Does the text contain `name(` at a token boundary? The name is a folded
+  -- FEEL identifier (no spaces), so a boundary check on the preceding
+  -- character is exact enough for text this exporter itself generated.
+  invokes nm txt = go txt
+   where
+    go t = case Text.breakOn nm t of
+      (_, "") -> False
+      (before, rest) ->
+        let after = Text.drop (Text.length nm) rest
+            openParen = Text.take 1 (Text.dropWhile (== ' ') after) == "("
+            boundary = case Text.unsnoc before of
+              Nothing     -> True
+              Just (_, c) -> not (isTokenChar c)
+        in (boundary && openParen)
+             || go (Text.drop 1 rest)
+    isTokenChar c = (isAscii c && isAlphaNum c) || c == '_'
 
 -- | The prose shared by the cycle findings: one member reads "requires itself",
 -- several read as a cycle listing every member by name and id.

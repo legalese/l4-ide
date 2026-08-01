@@ -4553,7 +4553,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   phase4Notes :: [FidelityNote]
   phase4Notes =
     populationNotes <> paramTypeNotes <> paramAsInputNotes
-      <> partialNotes <> bkmNotes
+      <> partialNotes <> bkmNotes <> bkmConsumerNotes
 
   allDecideByUnique :: Map Unique (Decide Resolved)
   allDecideByUnique =
@@ -4803,6 +4803,24 @@ lowerModule opts modul@(MkModule _ uri _) =
                 <> ") are λ-lifted into extra formal parameters, supplied at every call \
                    \site as `name: name` — a BKM body may read nothing beyond its \
                    \parameters (measured on both engines, §6.2)"
+    ]
+
+  -- §6.3-3, as narrowed by R7/§13.3: NOT a suppression and NOT a flavor gate —
+  -- one Advisory, module-level, naming the consumers we do NOT emit for that
+  -- cannot execute a BKM. Named because their failure modes are silent in
+  -- opposite ways, so a reader who ships this artifact to one of them would
+  -- learn nothing from the artifact itself.
+  bkmConsumerNotes =
+    [ dmnNote "D-BKM-CONSUMERS" Advisory "definitions" Nothing
+        (tshow (Set.size bkmCandidateSet)
+           <> " decision(s) are emitted as businessKnowledgeModels. Both target \
+              \flavors execute BKMs (KIE 8.44, Camunda 8; §13.3), but two known \
+              \NON-target consumers cannot: @hbtgmbh/dmn-eval-js has no BKM support \
+              \and falls through to the next rule on an unresolvable callee \
+              \(a plausible wrong answer), and Camunda 7 answers null, silently")
+        "nothing on the target engines; portability to BKM-less consumers, which fail \
+        \silently rather than loudly"
+    | not (Set.null bkmCandidateSet)
     ]
 
   -- D-RULEDATE (§15.5), Advisory, exactly ONE per DRG. Structural model:

@@ -3194,6 +3194,98 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           n.message `shouldSatisfy` Text.isInfixOf needle
         ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
 
+  -- §6.3.9 / §6.3-1: D-RECURSIVE, the SAME SCC routine over the SECOND graph
+  -- (the knowledgeRequirement edges), and D-KNOWLEDGEREQ, the completeness
+  -- assertion §13.3's consequence 2 makes mandatory (Camunda has no backstop:
+  -- a missing edge is a silent null on the default flavor).
+  --
+  -- Exercised at the IR level, and the reason is itself a measurement: no L4
+  -- source can currently reach a cyclic knowledgeRequirement graph, because a
+  -- recursive or mutually recursive decide is never certified total (Phase
+  -- 4's SCC-ordered TERMINATES pass), and §6.2's boundary keeps uncertified
+  -- tier-2 decides OUT of the emitted-BKM set — cycle-p2-mutual-parameterised
+  -- and cycle-p3 pin exactly that above (D-PARTIAL + D-CYCLE, no BKM). If a
+  -- future totality certificate learns to bless a recursive decide, these
+  -- tests are the contract its emission must meet.
+  describe "checkDrg / D-RECURSIVE + D-KNOWLEDGEREQ (§6.3.9, §6.2)" $ do
+    let testDrg ns = MkDrg
+          { drgId = "definitions_t", drgName = "t"
+          , drgNamespace = "ns", drgFlavor = FlavorCamunda
+          , drgItemDefs = [], drgNodes = ns, drgNotes = []
+          }
+        lit frag t = LogicLiteral (MkFeelExpr t frag)
+        bkmNode nm krs body = NodeBkm MkBkm
+          { bkmId = "bkm_" <> nm, bkmName = nm, bkmFeelName = nm
+          , bkmType = DmnNumber, bkmParams = [], bkmLogic = body
+          , bkmKnowledgeReqs = krs
+          }
+        decNode nm krs body = NodeDecision MkDecision
+          { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnType = DmnNumber, dcnLogic = body
+          , dcnRequirements = [], dcnKnowledgeReqs = krs
+          }
+        codesOf drg = [(n.code, n.element) | n <- checkDrg drg]
+
+    it "a BKM that requires ITSELF — the case §6.3.9 names first — is a one-member SCC" $ do
+      let drg = testDrg
+            [bkmNode "f" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 1)")]
+      case [n | n <- checkDrg drg, n.code == "D-RECURSIVE"] of
+        [n] -> do
+          n.severity `shouldBe` Blocking
+          n.message `shouldSatisfy` Text.isInfixOf "requires itself"
+          n.message `shouldSatisfy` Text.isInfixOf "`f` (bkm_f)"
+        ns  -> expectationFailure ("expected one D-RECURSIVE, got " <> show (length ns))
+
+    it "two BKMs requiring each other: one note, both members, decisions not implicated" $ do
+      let drg = testDrg
+            [ bkmNode "f" [RequiredBkm "bkm_g"] (lit FullFeel "g(p: 1)")
+            , bkmNode "g" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 1)")
+            , decNode "use" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 2)")
+            ]
+      case [n | n <- checkDrg drg, n.code == "D-RECURSIVE"] of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "`f` (bkm_f)"
+          n.message `shouldSatisfy` Text.isInfixOf "`g` (bkm_g)"
+          n.message `shouldNotSatisfy` Text.isInfixOf "use"
+        ns  -> expectationFailure ("expected one D-RECURSIVE, got " <> show (length ns))
+
+    it "an acyclic decision→BKM→BKM chain (probe C1's shape) raises nothing" $ do
+      let drg = testDrg
+            [ bkmNode "inner" [] (lit SFeel "v * 10")
+            , bkmNode "outer" [RequiredBkm "bkm_inner"] (lit FullFeel "inner(v: v)")
+            , decNode "use" [RequiredBkm "bkm_outer"] (lit FullFeel "outer(v: n)")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "a rendered invocation with NO edge on its owner is D-KNOWLEDGEREQ (probe C3's silent null)" $ do
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            , decNode "use" [] (lit FullFeel "f(p: 2)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "decision_use")]
+
+    it "the completeness scan is token-bounded and skips verbatim texts" $ do
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            -- `affine(2)` CONTAINS "f" twice, neither at a token boundary
+            -- with an open paren; the verbatim body spells a call-shaped
+            -- `f (x)` but raw L4 is not FEEL and is skipped.
+            , decNode "clean"    [] (lit FullFeel "affine(2)")
+            , decNode "verbatim" [] (lit L4Verbatim "f (x) PLUS 1")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "the edge must be on the INVOKING node, not somewhere in the file (C2/C3's lesson)" $ do
+      let drg = testDrg
+            [ bkmNode "inner" [] (lit SFeel "v * 10")
+            , bkmNode "outer" [] (lit FullFeel "inner(v: v)")
+            -- the top-level caller carries BOTH edges — the flat shape
+            -- bkm-chain-flat measured FAILING on both engines
+            , decNode "use" [RequiredBkm "bkm_outer", RequiredBkm "bkm_inner"]
+                (lit FullFeel "outer(v: n)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "bkm_outer")]
+
 ------------------------------------------------------------------------
 -- golden
 ------------------------------------------------------------------------
