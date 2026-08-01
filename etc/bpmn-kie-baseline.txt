@@ -13,6 +13,28 @@
 # executed; the errors= count is the size of that refusal. It is NOT a
 # liveness defect. See jl4/examples/bpmn/unsound/README.md for which axes
 # are flavor differences and which are real gaps.
+#
+# Per-file classes, measured 2026-08-01 (jbpm-bpmn2 7.74.1.Final, JDK 17.0.20);
+# the owning record is specs/todo/lexipedia-superset/PROCESS-TRACK.md 8.1.
+# HAND-MAINTAINED BLOCK: --update rewrites this file without it, so re-add it
+# (against the owning record) after regenerating.
+#
+#   consultation       clean COMPLETED.
+#   handover           class (b): jBPM compiles our deliberately opaque L4-text
+#                      expression bodies as Drools ("mismatched input 'period'");
+#                      the P-BRANCHGUARD fidelity stance, a documented engine
+#                      delta, not a defect.
+#   offering           ABORTED via error end event [Breach] — a modelled
+#                      terminal state, not a liveness defect; jBPM executed it
+#                      fine. The LEST arm doing its job.
+#   regcf-advertising  class (b), as handover ("mismatched input 'WITHIN'").
+#   regcf-reporting    class (a): "Unknown gateway direction: Mixed" — jBPM has
+#                      no node for a gateway that is both split and join. NOT
+#                      fixable by attribute choice: all four gatewayDirection
+#                      values measured rejected on this file's 2-in/3-out
+#                      gateway (see unsound/README.md, the four-direction
+#                      table). A documented engine delta on a legal shape.
+#   regcf-resale       class (b), as handover.
 
 consultation.bpmn       errors=0 warnings=0 verdict=COMPLETED
 handover.bpmn           errors=4 warnings=0 verdict=REJECTED
