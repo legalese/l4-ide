@@ -28,7 +28,7 @@ DECLARE NumPair HAS
         MEANS `left value` - `right value`
     `product`     IS A NUMBER
         MEANS `left value` * `right value`
-    `are equal`   IS A BOOLEAN
+    `equal`       IS A BOOLEAN
         MEANS `left value` = `right value`
     `left is bigger` IS A BOOLEAN
         MEANS `left value` >= `right value`
@@ -40,14 +40,14 @@ DECIDE `pair` IS NumPair WITH
 #EVAL `pair`'s `total`
 #EVAL `pair`'s `difference`
 #EVAL `pair`'s `product`
-#EVAL `pair`'s `are equal`
+#EVAL `pair`'s `equal`
 #EVAL `pair`'s `left is bigger`
 
 DECIDE `equal pair` IS NumPair WITH
     `left value` IS 5
     `right value` IS 5
 
-#EVAL `equal pair`'s `are equal`
+#EVAL `equal pair`'s `equal`
 
 -- Section 3: Cross-record non-cyclic access (computed field reads another record's computed field)
 § `Cross-record`

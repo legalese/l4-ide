@@ -80,7 +80,7 @@ IMPORT daydate
 -- definition carried as inert prose in `is a full-time student`.
 DECLARE TenantPerson HAS
   name                                                            IS A STRING
-  `is a full-time student at the material time`                   IS A BOOLEAN
+  `a full-time student at the material time`                      IS A BOOLEAN
   `landlord reasonably believes would become a full-time student during the tenancy`  IS A BOOLEAN
 
 -- The operative atoms of conditions (a)-(f). The tenant is modelled as a LIST of
@@ -106,7 +106,7 @@ DECLARE Ground4AClaim HAS
 §§ `Definition — "full-time student" (per person)`
 
 -- The defined term, carried as inert prose; the operative atom is the per-person
--- boolean flag `is a full-time student at the material time`.
+-- boolean flag `a full-time student at the material time`.
 GIVEN person IS A TenantPerson
 GIVETH A BOOLEAN
 `is a full-time student` person MEANS
@@ -114,7 +114,7 @@ GIVETH A BOOLEAN
     ... "(a) of any description mentioned in Schedule 6 to the Education Reform Act 1988 provided by an institution in England or Wales;"
     ... "(b) of any description mentioned in section 38(2) of the Further and Higher Education (Scotland) Act 1992 provided by an institution in Scotland;"
     ... "(c) of any description mentioned in Schedule 1 to the Further Education (Northern Ireland) Order 1997 (S.I. 1997/1772 (N.I. 15)) provided by an institution in Northern Ireland."
-    ... person's `is a full-time student at the material time`
+    ... person's `a full-time student at the material time`
 
 §§ `Definition — the student test (per person, then quantified over all persons)`
 
@@ -250,17 +250,17 @@ GIVETH A DEONTIC Actor Action
 
 `student now` MEANS TenantPerson WITH
   name IS "a full-time student"
-  `is a full-time student at the material time`                   IS TRUE
+  `a full-time student at the material time`                      IS TRUE
   `landlord reasonably believes would become a full-time student during the tenancy`  IS FALSE
 
 `future student (reasonable belief)` MEANS TenantPerson WITH
   name IS "a soon-to-be student"
-  `is a full-time student at the material time`                   IS FALSE
+  `a full-time student at the material time`                      IS FALSE
   `landlord reasonably believes would become a full-time student during the tenancy`  IS TRUE
 
 `non-student` MEANS TenantPerson WITH
   name IS "not a student"
-  `is a full-time student at the material time`                   IS FALSE
+  `a full-time student at the material time`                      IS FALSE
   `landlord reasonably believes would become a full-time student during the tenancy`  IS FALSE
 
 -- The per-person test bites; the full-time-student definition reads off its atom.

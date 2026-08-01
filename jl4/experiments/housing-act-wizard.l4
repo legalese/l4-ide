@@ -48,7 +48,7 @@ DECLARE Situation HAS
   `rent amount each time`              IS A NUMBER     @desc `How much rent do you pay each time it is due (in pounds)?`
   `arrears when the notice was served` IS A NUMBER     @desc `When your landlord served the formal Section 8 notice, how much unpaid rent had built up (in pounds)?`
   `arrears expected at the hearing`    IS A NUMBER     @desc `By the date of the court hearing, how much unpaid rent will there be (in pounds)?`
-  `has persistently paid rent late`    IS A BOOLEAN    @desc `Have you frequently paid your rent late — even if you are now up to date?`
+  `persistently paid rent late`        IS A BOOLEAN    @desc `Have you frequently paid your rent late — even if you are now up to date?`
 
 §§ `The citizen answer — one presentation-friendly record`
 
@@ -82,7 +82,7 @@ GIVEN s IS A Situation
 GIVETH A Ground11Claim
 `ground 11 claim from` s MEANS
   Ground11Claim WITH
-    `the tenant has persistently delayed paying rent which has become lawfully due` IS s's `has persistently paid rent late`
+    `the tenant has persistently delayed paying rent which has become lawfully due` IS s's `persistently paid rent late`
 
 §§ `Made-out — each ground's REAL predicate over the routed claim`
 
@@ -192,7 +192,7 @@ DECIDE `assess possession for rent arrears` IS
   `rent amount each time`              IS 100
   `arrears when the notice was served` IS 1300
   `arrears expected at the hearing`    IS 1400
-  `has persistently paid rent late`    IS FALSE
+  `persistently paid rent late`        IS FALSE
 
 -- CASE 2 — some arrears only: weekly rent 100, 3 weeks' (300) at notice, 5 weeks'
 -- (500) at the hearing — below Ground 8's 13-week threshold, so NOT mandatory; but
@@ -202,7 +202,7 @@ DECIDE `assess possession for rent arrears` IS
   `rent amount each time`              IS 100
   `arrears when the notice was served` IS 300
   `arrears expected at the hearing`    IS 500
-  `has persistently paid rent late`    IS FALSE
+  `persistently paid rent late`        IS FALSE
 
 -- CASE 3 — persistently late but caught up: no arrears at either date, but the
 -- tenant has persistently paid late. Only Ground 11 (discretionary) is made out.
@@ -211,7 +211,7 @@ DECIDE `assess possession for rent arrears` IS
   `rent amount each time`              IS 100
   `arrears when the notice was served` IS 0
   `arrears expected at the hearing`    IS 0
-  `has persistently paid rent late`    IS TRUE
+  `persistently paid rent late`        IS TRUE
 
 -- CASE 4 — all clear: no arrears, never late. No ground made out.
 `situation — all clear` MEANS Situation WITH
@@ -219,7 +219,7 @@ DECIDE `assess possession for rent arrears` IS
   `rent amount each time`              IS 100
   `arrears when the notice was served` IS 0
   `arrears expected at the hearing`    IS 0
-  `has persistently paid rent late`    IS FALSE
+  `persistently paid rent late`        IS FALSE
 
 §§ `#ASSERT — the tier roll-ups behave`
 

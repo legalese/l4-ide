@@ -28,14 +28,14 @@ DECLARE Gathering HAS
         MEANS NOT `takes place indoors`
     `venue kind`                                                               IS A VenueKind
         MEANS IF `takes place indoors` THEN Indoor ELSE Outdoor
-    `is a school group of pupils and staff at school premises`                 IS A BOOLEAN
-    `is a wedding, civil partnership ceremony or funeral`                      IS A BOOLEAN
+    `a school group of pupils and staff at school premises`                    IS A BOOLEAN
+    `a wedding, civil partnership ceremony or funeral`                         IS A BOOLEAN
     `ceremony officers role`                                                   IS A CeremonyOfficersRole
     `number of ceremony officers`                                              IS A NUMBER
     `number of guests`                                                         IS A NUMBER
     `total of officers and guests`                                             IS A NUMBER
         MEANS `number of ceremony officers` PLUS `number of guests`
-    `is for the purposes of work`                                              IS A BOOLEAN
+    `for the purposes of work`                                                 IS A BOOLEAN
 -- NB: as FIRST ENACTED, Art.3 was a flat 10-person cap at "any premises", with no
 -- indoor/outdoor distinction and no private-dwelling, open-air, workplace,
 -- construction-site, education, controlled-gathering or Christmas-period concepts.
@@ -87,7 +87,7 @@ DECIDE `Article 3 size limit is exceeded` g IF
 GIVEN g IS A Gathering
 GIVETH A BOOLEAN
 DECIDE `Article 4 school-group exception applies` g IF
-    g's `is a school group of pupils and staff at school premises`
+    g's `a school group of pupils and staff at school premises`
 
 §§ `5 Exception - wedding, civil partnership or funeral`
 -- As first enacted: the total of (a) constituting officers and (b) guests "must not exceed 20".
@@ -95,12 +95,12 @@ DECIDE `Article 4 school-group exception applies` g IF
 GIVEN g IS A Gathering
 GIVETH A BOOLEAN
 DECIDE `Article 5 wedding funeral exception is available` g IF
-    g's `is a wedding, civil partnership ceremony or funeral`
+    g's `a wedding, civil partnership ceremony or funeral`
 
 GIVEN g IS A Gathering
 GIVETH A BOOLEAN
 DECIDE `Article 5 size cap is respected` g IF
-        g's `is a wedding, civil partnership ceremony or funeral`
+        g's `a wedding, civil partnership ceremony or funeral`
     AND g's `total of officers and guests` AT MOST 20
 
 GIVEN g IS A Gathering
@@ -114,7 +114,7 @@ DECIDE `Article 5 wedding funeral exception applies` g IF
 GIVEN g IS A Gathering
 GIVETH A BOOLEAN
 DECIDE `Article 6 work exception applies` g IF
-    g's `is for the purposes of work`
+    g's `for the purposes of work`
 
 §§ `3 read with 4, 5 and 6 - restricted gathering`
 
@@ -191,62 +191,62 @@ DECIDE `a responsible person must not allow under Article 7` IF
 `ordinary indoor of 11` MEANS Gathering WITH
     `number of persons taking part`                            IS 11
     `takes place indoors`                                      IS TRUE
-    `is a school group of pupils and staff at school premises` IS FALSE
-    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `a school group of pupils and staff at school premises`    IS FALSE
+    `a wedding, civil partnership ceremony or funeral`         IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
     `number of ceremony officers`                              IS 0
     `number of guests`                                         IS 0
-    `is for the purposes of work`                              IS FALSE
+    `for the purposes of work`                                 IS FALSE
 
 `ordinary outdoor of 11` MEANS Gathering WITH
     `number of persons taking part`                            IS 11
     `takes place indoors`                                      IS FALSE
-    `is a school group of pupils and staff at school premises` IS FALSE
-    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `a school group of pupils and staff at school premises`    IS FALSE
+    `a wedding, civil partnership ceremony or funeral`         IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
     `number of ceremony officers`                              IS 0
     `number of guests`                                         IS 0
-    `is for the purposes of work`                              IS FALSE
+    `for the purposes of work`                                 IS FALSE
 
 `school of 30` MEANS Gathering WITH
     `number of persons taking part`                            IS 30
     `takes place indoors`                                      IS TRUE
-    `is a school group of pupils and staff at school premises` IS TRUE
-    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `a school group of pupils and staff at school premises`    IS TRUE
+    `a wedding, civil partnership ceremony or funeral`         IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
     `number of ceremony officers`                              IS 0
     `number of guests`                                         IS 0
-    `is for the purposes of work`                              IS FALSE
+    `for the purposes of work`                                 IS FALSE
 
 `wedding of 2 officers and 18 guests` MEANS Gathering WITH
     `number of persons taking part`                            IS 20
     `takes place indoors`                                      IS TRUE
-    `is a school group of pupils and staff at school premises` IS FALSE
-    `is a wedding, civil partnership ceremony or funeral`      IS TRUE
+    `a school group of pupils and staff at school premises`    IS FALSE
+    `a wedding, civil partnership ceremony or funeral`         IS TRUE
     `ceremony officers role`                                   IS `persons constituting the marriage`
     `number of ceremony officers`                              IS 2
     `number of guests`                                         IS 18
-    `is for the purposes of work`                              IS FALSE
+    `for the purposes of work`                                 IS FALSE
 
 `wedding of 2 officers and 19 guests over cap` MEANS Gathering WITH
     `number of persons taking part`                            IS 21
     `takes place indoors`                                      IS TRUE
-    `is a school group of pupils and staff at school premises` IS FALSE
-    `is a wedding, civil partnership ceremony or funeral`      IS TRUE
+    `a school group of pupils and staff at school premises`    IS FALSE
+    `a wedding, civil partnership ceremony or funeral`         IS TRUE
     `ceremony officers role`                                   IS `persons constituting the marriage`
     `number of ceremony officers`                              IS 2
     `number of guests`                                         IS 19
-    `is for the purposes of work`                              IS FALSE
+    `for the purposes of work`                                 IS FALSE
 
 `worksite of 25` MEANS Gathering WITH
     `number of persons taking part`                            IS 25
     `takes place indoors`                                      IS TRUE
-    `is a school group of pupils and staff at school premises` IS FALSE
-    `is a wedding, civil partnership ceremony or funeral`      IS FALSE
+    `a school group of pupils and staff at school premises`    IS FALSE
+    `a wedding, civil partnership ceremony or funeral`         IS FALSE
     `ceremony officers role`                                   IS `not a wedding civil partnership or funeral`
     `number of ceremony officers`                              IS 0
     `number of guests`                                         IS 0
-    `is for the purposes of work`                              IS TRUE
+    `for the purposes of work`                                 IS TRUE
 
 `pub indoor of 12` MEANS PubliclyAccessiblePremisesGathering WITH
     `number of persons gathering in the indoor areas` IS 12

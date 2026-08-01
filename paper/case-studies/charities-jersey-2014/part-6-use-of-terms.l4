@@ -69,7 +69,7 @@ IMPORT `part-1-interpretation`
 -- THE PAY-OFF. Articles 21 and 23 bite NEGATIVELY: on entities that are NOT
 -- registered charities, that do NOT meet the conditions. So the operative
 -- predicates are negations over facts imported from elsewhere in the corpus —
--- `is a Jersey entity` (Part 1, Art 2(3)) and an `is a registered charity` atom —
+-- `is a Jersey entity` (Part 1, Art 2(3)) and an `a registered charity` atom —
 -- plus `is an excepted foreign charity`, which Article 22 builds here, because
 -- 21(5) and 21(6) turn on it.
 --
@@ -136,7 +136,7 @@ DECLARE Part6Entity HAS
     entity                                                          IS AN Entity
 
     -- The pivot of the whole Part. See INTERPRETATION CALL 1.
-    `is a registered charity`                                       IS A BOOLEAN
+    `a registered charity`                                          IS A BOOLEAN
 
     -- Article 22(2) — the first condition (an excepted foreign charity).
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS A BOOLEAN
@@ -215,7 +215,7 @@ GIVETH A BOOLEAN
     ... "(a) is managed wholly or mainly from the jurisdiction under the law of which it is established; and"
     ... e's `(3)(a) is managed wholly or mainly from the jurisdiction under the law of which it is established`
     AND "(b) is not a registered charity."
-    ... NOT e's `is a registered charity`
+    ... NOT e's `a registered charity`
 
 -- 22(1) AND 22(4). The Minister's Order under 22(4) disapplies the FIRST condition
 -- ONLY ("despite sub-paragraphs (a) and (b) of paragraph (2)") — the SECOND
@@ -247,7 +247,7 @@ GIVEN e IS A Part6Entity
 GIVETH A BOOLEAN
 `Article 21(1) and (2) — the class: an entity that is not a registered charity` e MEANS
         "An entity that is not a registered charity -"
-    ... NOT e's `is a registered charity`
+    ... NOT e's `a registered charity`
 
 -- PAIR 2 (21(3), 21(4)) — narrower: a JERSEY entity off the register.
 GIVEN e IS A Part6Entity
@@ -255,7 +255,7 @@ GIVETH A BOOLEAN
 `Article 21(3) and (4) — the class: a Jersey entity that is not a registered charity` e MEANS
         "A Jersey entity that is not a registered charity -"
     ... `is a Jersey entity` (e's entity)                  -- Part 1, Article 2(3)
-    AND NOT e's `is a registered charity`
+    AND NOT e's `a registered charity`
 
 -- PAIR 3 (21(5), 21(6)) — narrower still: off the register, AND foreign, AND not
 -- even an excepted foreign charity. Three negations. This is the class that may
@@ -264,7 +264,7 @@ GIVEN e IS A Part6Entity
 GIVETH A BOOLEAN
 `Article 21(5) and (6) — the class: not a registered charity, and neither a Jersey entity nor an excepted foreign charity` e MEANS
         "An entity that is not a registered charity and is neither a Jersey entity nor an excepted foreign charity (within the meaning of Article 22) -"
-    ... NOT e's `is a registered charity`
+    ... NOT e's `a registered charity`
     AND NOT `is a Jersey entity` (e's entity)              -- Part 1, Article 2(3)
     AND NOT `is an excepted foreign charity` e             -- Article 22, above
 
@@ -386,7 +386,7 @@ GIVETH A BOOLEAN
 `Article 23(3) — the conditions` e MEANS
         "(3) The conditions are that the entity -"
     ... "(a) is a registered charity;"
-    ... e's `is a registered charity`
+    ... e's `a registered charity`
     AND "(b) is a Jersey entity; and"
     ... `is a Jersey entity` (e's entity)                  -- Part 1, Article 2(3)
     AND "(c) is wholly or mainly managed or controlled in or from within Jersey."
@@ -727,12 +727,12 @@ GIVETH A DEONTIC Actor Action
     `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
     `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
     `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS TRUE
-    `is a body corporate`                                           IS TRUE
+    `a body corporate`                                              IS TRUE
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
     `(ba)(ii) is established under the law of Jersey`                IS FALSE
     `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
     `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS FALSE
     `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
 
 #ASSERT `is an entity within Article 2(1)` `Oxfam GB (a UK company)`
@@ -742,7 +742,7 @@ GIVETH A DEONTIC Actor Action
 
 `Jersey Heritage, a registered charity` MEANS Part6Entity WITH
     entity                                                          IS `Jersey Heritage Ltd`
-    `is a registered charity`                                       IS TRUE
+    `a registered charity`                                          IS TRUE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
@@ -780,7 +780,7 @@ GIVETH A DEONTIC Actor Action
 
 `St Ouen Angling Club, not registered` MEANS Part6Entity WITH
     entity                                                          IS `St Ouen Angling Club`
-    `is a registered charity`                                       IS FALSE
+    `a registered charity`                                          IS FALSE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
@@ -815,7 +815,7 @@ GIVETH A DEONTIC Actor Action
 -- One field differs. The exception DEFEATS every one of the six prohibitions.
 `St Ouen Angling Club, within an Article 21(8) exception` MEANS Part6Entity WITH
     entity                                                          IS `St Ouen Angling Club`
-    `is a registered charity`                                       IS FALSE
+    `a registered charity`                                          IS FALSE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
@@ -843,7 +843,7 @@ GIVETH A DEONTIC Actor Action
 
 `Oxfam GB, an excepted foreign charity` MEANS Part6Entity WITH
     entity                                                          IS `Oxfam GB (a UK company)`
-    `is a registered charity`                                       IS FALSE   -- 22(3)(b): NOT on the Jersey register
+    `a registered charity`                                          IS FALSE   -- 22(3)(b): NOT on the Jersey register
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS TRUE   -- 22(2)(a)(i)
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE   -- 22(2)(b)
@@ -881,7 +881,7 @@ GIVETH A DEONTIC Actor Action
 -- limb (a), and the entity is not an excepted foreign charity.
 `Guernsey Trust Co, a non-excepted foreign entity` MEANS Part6Entity WITH
     entity                                                          IS `Guernsey Trust Co (a foreign entity)`
-    `is a registered charity`                                       IS FALSE
+    `a registered charity`                                          IS FALSE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE   -- Guernsey is not part of the UK
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE   -- and it has not been prescribed
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE   -- even though 22(2)(b) IS satisfied
@@ -915,7 +915,7 @@ GIVETH A DEONTIC Actor Action
 -- — and is. So it BECOMES an excepted foreign charity, and Pair 3 falls away.
 `Guernsey Trust Co, with an Article 22(4) Order` MEANS Part6Entity WITH
     entity                                                          IS `Guernsey Trust Co (a foreign entity)`
-    `is a registered charity`                                       IS FALSE
+    `a registered charity`                                          IS FALSE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE
@@ -1113,7 +1113,7 @@ GIVETH A DEONTIC Actor Action
 
 -- LIMB (a) FAILS — not a registered charity. (The Angling Club, above: Jersey
 -- entity, managed in Jersey, but off the register.)
-#ASSERT NOT (`St Ouen Angling Club, not registered`'s `is a registered charity`)
+#ASSERT NOT (`St Ouen Angling Club, not registered`'s `a registered charity`)
 #ASSERT `is a Jersey entity` (`St Ouen Angling Club, not registered`'s entity)
 #ASSERT `St Ouen Angling Club, not registered`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`
 #ASSERT NOT `Article 23(3) — the conditions` `St Ouen Angling Club, not registered`
@@ -1124,7 +1124,7 @@ GIVETH A DEONTIC Actor Action
 -- charity does.)
 `Oxfam GB, registered in Jersey but not a Jersey entity` MEANS Part6Entity WITH
     entity                                                          IS `Oxfam GB (a UK company)`
-    `is a registered charity`                                       IS TRUE    -- limb (a): MET
+    `a registered charity`                                          IS TRUE    -- limb (a): MET
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS TRUE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS TRUE
@@ -1134,7 +1134,7 @@ GIVETH A DEONTIC Actor Action
     `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
     `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
 
-#ASSERT `Oxfam GB, registered in Jersey but not a Jersey entity`'s `is a registered charity`
+#ASSERT `Oxfam GB, registered in Jersey but not a Jersey entity`'s `a registered charity`
 #ASSERT NOT `is a Jersey entity` (`Oxfam GB, registered in Jersey but not a Jersey entity`'s entity)   -- limb (b): FAILS
 #ASSERT `Oxfam GB, registered in Jersey but not a Jersey entity`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`
 #ASSERT NOT `Article 23(3) — the conditions` `Oxfam GB, registered in Jersey but not a Jersey entity`
@@ -1151,7 +1151,7 @@ GIVETH A DEONTIC Actor Action
 -- London. Registered: yes. Jersey entity: yes. Managed in or from Jersey: NO.
 `Jersey Heritage, registered but managed from London` MEANS Part6Entity WITH
     entity                                                          IS `Jersey Heritage Ltd`
-    `is a registered charity`                                       IS TRUE    -- limb (a): MET
+    `a registered charity`                                          IS TRUE    -- limb (a): MET
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE
@@ -1161,7 +1161,7 @@ GIVETH A DEONTIC Actor Action
     `an exception prescribed by the States by Regulations under Article 21(8) applies to this entity`  IS FALSE
     `an exception prescribed by the States by Regulations under Article 23(4) applies to this entity`  IS FALSE
 
-#ASSERT `Jersey Heritage, registered but managed from London`'s `is a registered charity`            -- limb (a): MET
+#ASSERT `Jersey Heritage, registered but managed from London`'s `a registered charity`               -- limb (a): MET
 #ASSERT `is a Jersey entity` (`Jersey Heritage, registered but managed from London`'s entity)         -- limb (b): MET
 #ASSERT NOT `Jersey Heritage, registered but managed from London`'s `(23)(3)(c) is wholly or mainly managed or controlled in or from within Jersey`   -- limb (c): FAILS
 #ASSERT NOT `Article 23(3) — the conditions` `Jersey Heritage, registered but managed from London`
@@ -1179,7 +1179,7 @@ GIVETH A DEONTIC Actor Action
 
 `Jersey Heritage, managed from London, within an Article 23(4) exception` MEANS Part6Entity WITH
     entity                                                          IS `Jersey Heritage Ltd`
-    `is a registered charity`                                       IS TRUE
+    `a registered charity`                                          IS TRUE
     `(2)(a)(i) established under the law of the United Kingdom, or of any jurisdiction that is part of the United Kingdom`  IS FALSE
     `(2)(a)(ii) established under the law of a jurisdiction (not being Jersey, the United Kingdom or a part of the United Kingdom) that is prescribed for this purpose by the Minister by Order`  IS FALSE
     `(2)(b) entitled, under the law of that jurisdiction, to refer to itself in that jurisdiction as a 'charity' (or by any equivalent term in a language other than English that is used in that jurisdiction)`  IS FALSE

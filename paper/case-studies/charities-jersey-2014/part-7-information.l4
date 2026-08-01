@@ -1237,18 +1237,18 @@ GIVETH A FalseInformation
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS FALSE
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
 
 -- The governor: a director of the (company) entity, so Art 2(7)(c) makes her a governor.
 `Mme Bisson, a governor` MEANS Officer WITH
     name                                                            IS "Mme Bisson"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS TRUE
-    `is a member of the management committee of the entity`         IS FALSE
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS FALSE
+    `a member of the council of the foundation`                     IS FALSE
+    `a director of the company`                                     IS TRUE
+    `a member of the management committee of the entity`            IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS FALSE
 
 `no misconduct alleged` MEANS MisconductAllegation WITH
     `the actor is the registered charity or one of its governors`   IS FALSE

@@ -111,13 +111,13 @@ GIVETH A NUMBER
 DECLARE RaisePlan HAS
     `organized in the United States`            IS A BOOLEAN @desc Is your company organized under, and subject to, the laws of a US State or territory, or the District of Columbia?
     `already files Exchange Act reports`        IS A BOOLEAN @desc Does your company already file reports with the SEC under section 13 or section 15(d) of the Securities Exchange Act of 1934?
-    `is an investment company`                  IS A BOOLEAN @desc Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?
-    `has a bad actor disqualification`          IS A BOOLEAN @desc Is your company, or anyone covered by the rule, subject to a bad-actor disqualification? Get advice before answering: this is a regime in its own right.
+    `an investment company`                     IS A BOOLEAN @desc Is your company an investment company, or excluded from that definition by section 3(b) or 3(c) of the Investment Company Act of 1940?
+    `a bad actor disqualification`              IS A BOOLEAN @desc Is your company, or anyone covered by the rule, subject to a bad-actor disqualification? Get advice before answering: this is a regime in its own right.
     `behind on past Reg CF annual reports`      IS A BOOLEAN @desc Have you raised under Regulation Crowdfunding before and missed an annual report in the two years since?
-    `has no specific business plan`             IS A BOOLEAN @desc Does your company lack a specific business plan, or is its plan to merge with or acquire a company it has not yet identified?
+    `no specific business plan`                 IS A BOOLEAN @desc Does your company lack a specific business plan, or is its plan to merge with or acquire a company it has not yet identified?
     `amount you want to raise`                  IS A NUMBER  @desc How much do you want to raise, in dollars? Use the largest amount you would accept, not your target.
     `raised under Reg CF in the last 12 months` IS A NUMBER  @desc How much have you already sold under Regulation Crowdfunding in the last 12 months, in dollars? Enter 0 if none.
-    `has raised under Reg CF before`            IS A BOOLEAN @desc Has your company ever sold securities under Regulation Crowdfunding before?
+    `raised under Reg CF before`                IS A BOOLEAN @desc Has your company ever sold securities under Regulation Crowdfunding before?
 
 DECLARE InvestorFacts HAS
     `is an accredited investor`                   IS A BOOLEAN @desc Are you an accredited investor, as Rule 501 of Regulation D defines that term?
@@ -183,12 +183,12 @@ GIVETH AN IssuerProfile
     IssuerProfile WITH
         -- No rule reads `name`; fixed rather than asked.
         name                                                                                                         IS "the company"
-        `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS plan's `organized in the United States`
-        `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`   IS plan's `already files Exchange Act reports`
-        `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `is an investment company`
-        `is subject to a disqualification as specified in section 227.503(a)`                                         IS plan's `has a bad actor disqualification`
-        `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
-        `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `has no specific business plan`
+        `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS plan's `organized in the United States`
+        `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`      IS plan's `already files Exchange Act reports`
+        `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS plan's `an investment company`
+        `subject to a disqualification as specified in section 227.503(a)`                                            IS plan's `a bad actor disqualification`
+        `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS plan's `behind on past Reg CF annual reports`
+        `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS plan's `no specific business plan`
 
 GIVEN plan IS A RaisePlan
 GIVETH AN Offering
@@ -200,14 +200,14 @@ GIVETH AN Offering
         `target offering amount`                                                              IS plan's `amount you want to raise`
         `maximum offering amount the issuer will accept`                                      IS plan's `amount you want to raise`
         `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months` IS plan's `raised under Reg CF in the last 12 months`
-        `the issuer has previously sold securities in reliance on section 4(a)(6)`            IS plan's `has raised under Reg CF before`
+        `the issuer has previously sold securities in reliance on section 4(a)(6)`            IS plan's `raised under Reg CF before`
 
 GIVEN facts IS AN InvestorFacts
 GIVETH AN InvestorProfile
 `investor profile from` facts MEANS
     InvestorProfile WITH
         name                                               IS "you"
-        `is an accredited investor as defined in Rule 501` IS facts's `is an accredited investor`
+        `an accredited investor as defined in Rule 501` IS facts's `is an accredited investor`
         `annual income`                                    IS facts's `your annual income`
         `net worth`                                        IS facts's `your net worth`
         `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS facts's `invested under Reg CF in the last 12 months`
@@ -217,10 +217,10 @@ GIVETH A Transfer
 `transfer from` holding MEANS
     Transfer WITH
         `days since the securities were issued`                    IS holding's `days since issue`
-        `is to the issuer of the securities`                       IS holding's `selling back to the issuer`
-        `is to an accredited investor`                             IS holding's `buyer is an accredited investor`
-        `is as part of an offering registered with the Commission` IS holding's `part of a registered offering`
-        `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
+        `to the issuer of the securities`                          IS holding's `selling back to the issuer`
+        `to an accredited investor`                                IS holding's `buyer is an accredited investor`
+        `as part of an offering registered with the Commission` IS holding's `part of a registered offering`
+        `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS holding's `family transfer death or divorce`
 
 GIVEN filer IS A ReportingFacts
 GIVETH A ReportingStatus
@@ -250,7 +250,7 @@ GIVETH AN InvestorProfile
 `an investor with income and net worth both` x MEANS
     InvestorProfile WITH
         name                                               IS "probe"
-        `is an accredited investor as defined in Rule 501` IS FALSE
+        `an accredited investor as defined in Rule 501`    IS FALSE
         `annual income`                                    IS x
         `net worth`                                        IS x
         `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS 0
@@ -629,39 +629,39 @@ DECIDE `can this company raise` IS
 `a clean plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
-    `has a bad actor disqualification`          IS FALSE
+    `an investment company`                     IS FALSE
+    `a bad actor disqualification`              IS FALSE
     `behind on past Reg CF annual reports`      IS FALSE
-    `has no specific business plan`             IS FALSE
+    `no specific business plan`                 IS FALSE
     `amount you want to raise`                  IS 500000
     `raised under Reg CF in the last 12 months` IS 0
-    `has raised under Reg CF before`            IS FALSE
+    `raised under Reg CF before`                IS FALSE
 
 -- The limb the mirrored page omits: everything else clean, but behind on the
 -- Reg CF annual reports.
 `a delinquent plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
-    `has a bad actor disqualification`          IS FALSE
+    `an investment company`                     IS FALSE
+    `a bad actor disqualification`              IS FALSE
     `behind on past Reg CF annual reports`      IS TRUE
-    `has no specific business plan`             IS FALSE
+    `no specific business plan`                 IS FALSE
     `amount you want to raise`                  IS 500000
     `raised under Reg CF in the last 12 months` IS 0
-    `has raised under Reg CF before`            IS TRUE
+    `raised under Reg CF before`                IS TRUE
 
 -- $4,000,000 already sold in the last 12 months, asking for $1,500,000 more:
 -- over the $5,000,000 cap by $500,000.
 `an over-limit plan` MEANS RaisePlan WITH
     `organized in the United States`            IS TRUE
     `already files Exchange Act reports`        IS FALSE
-    `is an investment company`                  IS FALSE
-    `has a bad actor disqualification`          IS FALSE
+    `an investment company`                     IS FALSE
+    `a bad actor disqualification`              IS FALSE
     `behind on past Reg CF annual reports`      IS FALSE
-    `has no specific business plan`             IS FALSE
+    `no specific business plan`                 IS FALSE
     `amount you want to raise`                  IS 1500000
     `raised under Reg CF in the last 12 months` IS 4000000
-    `has raised under Reg CF before`            IS TRUE
+    `raised under Reg CF before`                IS TRUE
 
 -- README §3.1's investor: $60,000 income, $200,000 net worth. Limit $10,000
 -- under the rule in force; $3,000 under the rule the mirrored page states.

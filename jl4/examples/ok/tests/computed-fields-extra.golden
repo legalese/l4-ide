@@ -9,11 +9,11 @@ computed-fields-extra.l4:41:1-28:
   7
 computed-fields-extra.l4:42:1-25:
   30
-computed-fields-extra.l4:43:1-27:
+computed-fields-extra.l4:43:1-23:
   FALSE
 computed-fields-extra.l4:44:1-32:
   TRUE
-computed-fields-extra.l4:50:1-33:
+computed-fields-extra.l4:50:1-29:
   TRUE
 computed-fields-extra.l4:71:1-33:
   15

@@ -16,8 +16,8 @@ DECLARE `Valuable Security` IS ONE OF
     `Other Valuable Security`
 
 DECLARE `Signed Sealed Thing` HAS
-    `is signed`        IS A BOOLEAN
-    `is sealed`        IS A BOOLEAN
+    `signed`           IS A BOOLEAN
+    `sealed`           IS A BOOLEAN
     `can be converted` IS A BOOLEAN   -- capable of being converted into valuable security
 
 DECLARE `Destruction Extent` IS ONE OF
@@ -75,7 +75,7 @@ DECIDE `cheating occurred` IF
 GIVEN thing IS A `Signed Sealed Thing`
 GIVETH A BOOLEAN
 `convertible to valuable security` thing MEANS
-    (thing's `is signed` OR thing's `is sealed`) AND thing's `can be converted`
+    (thing's `signed` OR thing's `sealed`) AND thing's `can be converted`
 
 -- Check if a Maybe Signed Sealed Thing is convertible
 GIVEN `maybe thing` IS A MAYBE `Signed Sealed Thing`
@@ -175,8 +175,8 @@ GIVETH A Punishment
 
 -- Scenario 3: Forging a signed document
 `signed doc` MEANS `Signed Sealed Thing` WITH
-    `is signed`        IS TRUE
-    `is sealed`        IS FALSE
+    `signed`           IS TRUE
+    `sealed`           IS FALSE
     `can be converted` IS TRUE
 
 `forgery scam` MEANS `Cheating Scenario` WITH

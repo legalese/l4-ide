@@ -160,8 +160,8 @@ DECLARE CommissionerProposedAct HAS
     description                                                     IS A STRING
 
     -- Article 4(2) — the chapeau test, and the parenthetical carve-out.
-    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS A BOOLEAN
-    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS A BOOLEAN
+    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`     IS A BOOLEAN
+    `the act of acting as a governor of a charity or of an entity with charitable purposes`     IS A BOOLEAN
 
     -- Article 4(3) — the three particular powers.
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS A BOOLEAN
@@ -176,9 +176,9 @@ GIVETH A BOOLEAN
 `Article 4(2) — the act is within the general incidental power` a MEANS
         "(2) The Commissioner may do anything"
     ... "that is calculated to facilitate, or is conducive or incidental to, the performance of any of his or her functions."
-    ... a's `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`
+    ... a's `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`
     AND "(other than acting as a governor of a charity or of an entity with charitable purposes)"
-    ... NOT a's `is the act of acting as a governor of a charity or of an entity with charitable purposes`
+    ... NOT a's `the act of acting as a governor of a charity or of an entity with charitable purposes`
 
 -- The 4(3) particular powers. "without prejudice to the generality of his or her
 -- powers" — so these are an INDEPENDENT route: they need not pass the 4(2) gate.
@@ -214,7 +214,7 @@ DECLARE CommissionerConduct HAS
     `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS A BOOLEAN
 
     -- Article 4(4)(b). See INTERPRETATION CALL (3): the elided shared object.
-    `is proportionate as to the burdens imposed on registered charities`  IS A BOOLEAN
+    `proportionate as to the burdens imposed on registered charities`     IS A BOOLEAN
     `supports the development of registered charities`               IS A BOOLEAN
 
 GIVEN c IS A CommissionerConduct
@@ -231,7 +231,7 @@ GIVEN c IS A CommissionerConduct
 GIVETH A BOOLEAN
 `Article 4(4)(b) — proportionate as to burdens, and supports development` c MEANS
         "(b) is proportionate as to the burdens imposed on, and supports the development of registered charities."
-    ... c's `is proportionate as to the burdens imposed on registered charities`
+    ... c's `proportionate as to the burdens imposed on registered charities`
     AND c's `supports the development of registered charities`
 
 -- The CONTENT of the duty: what "acting in a way that ..." actually requires.
@@ -391,8 +391,8 @@ GIVETH A DEONTIC Actor Part2Action
 -- functions; not the act of acting as a governor. Within the 4(2) general power.
 `renting an office` MEANS CommissionerProposedAct WITH
     description                                                     IS "taking a lease of premises at Union Street"
-    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
-    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`     IS TRUE
+    `the act of acting as a governor of a charity or of an entity with charitable purposes`     IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
     `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
@@ -406,8 +406,8 @@ GIVETH A DEONTIC Actor Part2Action
 --     Article 4(2) forbids. The chapeau limb is TRUE; the carve-out knocks it out.
 `accepting a trusteeship of a registered charity` MEANS CommissionerProposedAct WITH
     description                                                     IS "the Commissioner joins the board of a registered charity"
-    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS TRUE
-    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS TRUE
+    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`     IS TRUE
+    `the act of acting as a governor of a charity or of an entity with charitable purposes`     IS TRUE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
     `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
@@ -421,8 +421,8 @@ GIVETH A DEONTIC Actor Part2Action
 -- "without prejudice to the generality of his or her powers".
 `assisting the Guernsey Registrar of Charities` MEANS CommissionerProposedAct WITH
     description                                                     IS "helping an equivalent body in another jurisdiction"
-    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
-    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`     IS FALSE
+    `the act of acting as a governor of a charity or of an entity with charitable purposes`     IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
     `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS TRUE
@@ -434,8 +434,8 @@ GIVETH A DEONTIC Actor Part2Action
 -- An act that is neither conducive nor a named 4(3) power: no power to do it.
 `sponsoring a football team` MEANS CommissionerProposedAct WITH
     description                                                     IS "buying the shirts for St Helier FC"
-    `is calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`  IS FALSE
-    `is the act of acting as a governor of a charity or of an entity with charitable purposes`  IS FALSE
+    `calculated to facilitate, or is conducive or incidental to, the performance of any of the Commissioner's functions`     IS FALSE
+    `the act of acting as a governor of a charity or of an entity with charitable purposes`     IS FALSE
     `(3)(a) providing information to the public about the system of registration of charities, including information about the difference between charities and bodies with charitable purposes, about the advantages of donating to registered charities, and by way of model constitutions`  IS FALSE
     `(3)(b) advising the Minister as to the nature of charities in Jersey and as to the merits of any proposal for further regulation of charities`  IS FALSE
     `(3)(c) assisting a body in a jurisdiction other than Jersey, equivalent to the Commissioner or to the Attorney General, the court, the Comptroller or the JFSC, in the performance of that body's functions under the law of that jurisdiction`  IS FALSE
@@ -450,7 +450,7 @@ GIVETH A DEONTIC Actor Part2Action
     `protects public trust and confidence in registered charities`   IS TRUE
     `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
     `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
-    `is proportionate as to the burdens imposed on registered charities`  IS TRUE
+    `proportionate as to the burdens imposed on registered charities`     IS TRUE
     `supports the development of registered charities`               IS TRUE
 
 #ASSERT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a proportionate registration process`
@@ -468,7 +468,7 @@ GIVETH A DEONTIC Actor Part2Action
     `protects public trust and confidence in registered charities`   IS TRUE
     `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
     `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
-    `is proportionate as to the burdens imposed on registered charities`  IS FALSE
+    `proportionate as to the burdens imposed on registered charities`     IS FALSE
     `supports the development of registered charities`               IS FALSE
 
 #ASSERT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a crushing compliance regime`
@@ -487,7 +487,7 @@ GIVETH A DEONTIC Actor Part2Action
     `protects public trust and confidence in registered charities`   IS TRUE
     `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
     `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS TRUE
-    `is proportionate as to the burdens imposed on registered charities`  IS FALSE
+    `proportionate as to the burdens imposed on registered charities`     IS FALSE
     `supports the development of registered charities`               IS FALSE
 
 #ASSERT NOT `Article 4(4) — the conduct is of the required kind` `a crushing compliance regime, not reasonably practicable to soften`
@@ -501,7 +501,7 @@ GIVETH A DEONTIC Actor Part2Action
     `protects public trust and confidence in registered charities`   IS TRUE
     `(a)(i) is compatible with the encouragement of all forms of charitable giving`  IS TRUE
     `(a)(ii) is compatible with the encouragement of voluntary participation in the work of registered charities`  IS FALSE
-    `is proportionate as to the burdens imposed on registered charities`  IS TRUE
+    `proportionate as to the burdens imposed on registered charities`     IS TRUE
     `supports the development of registered charities`               IS TRUE
 
 #ASSERT NOT `Article 4(4)(a) — protects public trust, compatibly with encouraging giving and participation` `a naming-and-shaming regime`

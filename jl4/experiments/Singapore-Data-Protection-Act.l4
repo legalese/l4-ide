@@ -26,7 +26,7 @@ DECLARE `Applicable Act` IS ONE OF
     `Limited Partnerships Act (Cap. 163B)`
 
 DECLARE `Website` HAS
-    `is publicly accessible` IS A BOOLEAN
+    `publicly accessible`    IS A BOOLEAN
     `provides information about the organisation to the public` IS A BOOLEAN
 
 -- Individual responsible for data protection within an organisation.
@@ -208,7 +208,7 @@ GIVEN `The organisation` IS AN `Organisation`
     WHERE
         GIVEN `The website` IS A `Website`
         `is official website` MEANS
-            `The website`'s `is publicly accessible`
+            `The website`'s `publicly accessible`
             AND `The website`'s `provides information about the organisation to the public`
 
 
@@ -227,7 +227,7 @@ GIVEN `The organisation` IS AN `Organisation`
 #EVAL `Deemed to have satisfied section 11(5) of the Act` `Example Organisation Registered` TRUE FALSE
 
 `Example Website` MEANS `Website` WITH
-                            `is publicly accessible` IS TRUE
+                            `publicly accessible`    IS TRUE
                             `provides information about the organisation to the public` IS TRUE
 
 `Example Organisation With Website` MEANS `Organisation` WITH

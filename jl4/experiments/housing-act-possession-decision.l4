@@ -288,26 +288,26 @@ GIVETH A DEONTIC Actor Action
 -- tenancy well over a year before the relevant date.
 `g1 occupier — a sibling` MEANS Occupier WITH
   name IS "a sibling"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS TRUE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS TRUE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS FALSE
 
 `g1 occupier — a friend (off the list)` MEANS Occupier WITH
   name IS "a friend"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS FALSE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS FALSE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS TRUE
 
 `g1 tenancy began (well over 1yr)` MEANS June 1 2023

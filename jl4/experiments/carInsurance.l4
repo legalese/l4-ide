@@ -17,7 +17,7 @@ DECLARE Driver HAS
     -- computed fields (methods)
     `meets minimum age`          IS A BOOLEAN
         MEANS `age` >= 18
-    `has sufficient experience`  IS A BOOLEAN
+    `sufficient experience`      IS A BOOLEAN
         MEANS `years licensed` >= 2
     `risk category`              IS A `Risk Category`
         MEANS CONSIDER `accident count`
@@ -25,9 +25,9 @@ DECLARE Driver HAS
               WHEN 1 THEN `Medium Risk`
               WHEN 2 THEN `High Risk`
               OTHERWISE `Uninsurable`
-    `is eligible for insurance`  IS A BOOLEAN
+    `eligible for insurance`     IS A BOOLEAN
         MEANS `meets minimum age`
-          AND `has sufficient experience`
+          AND `sufficient experience`
           AND `accident count` <= 3
 
 DECLARE Policy HAS
@@ -72,15 +72,15 @@ alicePolicy MEANS Policy WITH
 
 -- Driver computed fields
 #EVAL alice's `meets minimum age`             -- TRUE
-#EVAL alice's `has sufficient experience`     -- TRUE
+#EVAL alice's `sufficient experience`         -- TRUE
 #EVAL alice's `risk category`                 -- Low Risk
-#EVAL alice's `is eligible for insurance`     -- TRUE
+#EVAL alice's `eligible for insurance`        -- TRUE
 
 #EVAL teen's `meets minimum age`              -- FALSE
-#EVAL teen's `is eligible for insurance`      -- FALSE
+#EVAL teen's `eligible for insurance`         -- FALSE
 
 #EVAL risky's `risk category`                 -- Uninsurable
-#EVAL risky's `is eligible for insurance`     -- FALSE
+#EVAL risky's `eligible for insurance`        -- FALSE
 
 -- Policy computed fields (nested record access)
 #EVAL alicePolicy's `base premium`            -- JUST 400.0

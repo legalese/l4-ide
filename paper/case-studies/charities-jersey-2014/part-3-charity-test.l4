@@ -110,7 +110,7 @@ DECLARE CharitablePurpose HAS
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS A BOOLEAN
 
     -- Article 5(1)(a)(ii)
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS A BOOLEAN
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS A BOOLEAN
 
     -- Article 6(5) — the political-purpose override.
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS A BOOLEAN
@@ -232,7 +232,7 @@ GIVEN p IS A CharitablePurpose
 GIVETH A BOOLEAN
 `is a purpose purely ancillary or incidental to a charitable purpose` p MEANS
         "(ii) purposes that are purely ancillary or incidental to any of its charitable purposes"
-    ... p's `is purely ancillary or incidental to any of the entity's charitable purposes`
+    ... p's `purely ancillary or incidental to any of the entity's charitable purposes`
     AND "(5) ... nor a purpose ancillary or incidental to a charitable purpose, irrespective of whether it would otherwise fall within ... Article 5(1)(a)(ii)."
     ... NOT p's `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`
 
@@ -425,7 +425,7 @@ GIVETH A BOOLEAN
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS FALSE
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
 
 #ASSERT `is a charitable purpose` `the advancement of education`
@@ -458,7 +458,7 @@ GIVETH A BOOLEAN
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS FALSE
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
 
 #ASSERT NOT `head (h) as gated by Article 6(2)(c)` `chess, as a sport`
@@ -493,7 +493,7 @@ GIVETH A BOOLEAN
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS TRUE   -- ...but DEEMED so by 6(2)(f)
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS FALSE
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS FALSE
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
 
 #ASSERT `head (p) as extended by Article 6(2)(f)` `the advancement of humanism`
@@ -527,7 +527,7 @@ GIVETH A BOOLEAN
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS TRUE   -- ...and it IS pleaded as incidental...
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS TRUE   -- ...and it IS pleaded as incidental...
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS TRUE   -- ...but 6(5) overrides both.
 
 -- It would otherwise fall within head (b) — 6(5) says "irrespective of" that.
@@ -566,7 +566,7 @@ GIVETH A BOOLEAN
     `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
     `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
     `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
-    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS TRUE
+    `purely ancillary or incidental to any of the entity's charitable purposes`     IS TRUE
     `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
 
 #ASSERT NOT `is a charitable purpose` `running a gift shop to fund the school`

@@ -112,9 +112,9 @@ corpus interleaves each paragraph's caption with its operative limb:
 ```
 "unless such securities are transferred:"
 "(1) To the issuer of the securities;"        <- caption
-transfer's `is to the issuer of the securities`
+transfer's `to the issuer of the securities`
 "(2) To an accredited investor;"              <- caption
-transfer's `is to an accredited investor`
+transfer's `to an accredited investor`
 …
 ```
 

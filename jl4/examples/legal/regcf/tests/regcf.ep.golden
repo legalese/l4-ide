@@ -246,40 +246,40 @@ GIVETH A NUMBER
 @ref 17 CFR 227.100(b) — applicability
 DECLARE IssuerProfile HAS
     name                                                                          IS A STRING
-    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS A BOOLEAN
-    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS A BOOLEAN
-    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS A BOOLEAN
-    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS A BOOLEAN
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS A BOOLEAN
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS A BOOLEAN
+    `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`    IS A BOOLEAN
+    `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`                IS A BOOLEAN
+    `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`       IS A BOOLEAN
+    `subject to a disqualification as specified in section 227.503(a)`                                                      IS A BOOLEAN
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`     IS A BOOLEAN
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`     IS A BOOLEAN
 
 @ref 17 CFR 227.100(b)(1)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(1) — not organized under State or territorial law` issuer MEANS
         "(1) Is not organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia;"
-    ... NOT issuer's `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
+    ... NOT issuer's `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`
 
 @ref 17 CFR 227.100(b)(2)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(2) — an Exchange Act reporting company` issuer MEANS
         "(2) Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934;"
-    ... issuer's `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
+    ... issuer's `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`
 
 @ref 17 CFR 227.100(b)(3)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(3) — an investment company` issuer MEANS
         "(3) Is an investment company, as defined in section 3 of the Investment Company Act of 1940, or is excluded from the definition of investment company by section 3(b) or section 3(c) of that Act;"
-    ... issuer's `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`
+    ... issuer's `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`
 
 @ref 17 CFR 227.100(b)(4)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(4) — subject to a bad-actor disqualification` issuer MEANS
         "(4) Is not eligible to offer or sell securities in reliance on section 4(a)(6) of the Securities Act as a result of a disqualification as specified in section 227.503(a);"
-    ... issuer's `is subject to a disqualification as specified in section 227.503(a)`
+    ... issuer's `subject to a disqualification as specified in section 227.503(a)`
 
 -- The limb the mirrored page omits entirely: an issuer delinquent in its Reg CF
 -- ongoing reports is disqualified from making a NEW offering.
@@ -288,14 +288,14 @@ GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(5) — delinquent in ongoing annual reports` issuer MEANS
         "(5) Has sold securities in reliance on section 4(a)(6) of the Securities Act and has not filed with the Commission and provided to investors, to the extent required, the ongoing annual reports required by this part during the two years immediately preceding the filing of the required offering statement; or"
-    ... issuer's `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
+    ... issuer's `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`
 
 @ref 17 CFR 227.100(b)(6)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
 `(b)(6) — no specific business plan, or a blank-check business plan` issuer MEANS
         "(6) Has no specific business plan or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies."
-    ... issuer's `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
+    ... issuer's `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`
 
 @ref 17 CFR 227.100(b) — the disjunction of exclusions
 GIVEN issuer IS AN IssuerProfile
@@ -352,7 +352,7 @@ DECIDE `offering is within the offering limit` offering IF
 @ref 17 CFR 227.100(a)(2)
 DECLARE InvestorProfile HAS
     name                                                     IS A STRING
-    `is an accredited investor as defined in Rule 501`       IS A BOOLEAN
+    `an accredited investor as defined in Rule 501`          IS A BOOLEAN
     `annual income`                                          IS A NUMBER
     `net worth`                                              IS A NUMBER
     `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS A NUMBER
@@ -437,7 +437,7 @@ GIVEN investor IS AN InvestorProfile
 GIVETH A BOOLEAN
 `the accredited-investor carve-out applies to` investor MEANS
         `the rules in force include` `the 2021 amendments`
-    AND investor's `is an accredited investor as defined in Rule 501`
+    AND investor's `an accredited investor as defined in Rule 501`
 
 @ref 17 CFR 227.100(a)(2)
 GIVEN investor IS AN InvestorProfile
@@ -717,10 +717,10 @@ GIVETH A DEONTIC Actor Action
 @ref 17 CFR 227.501(a)
 DECLARE Transfer HAS
     `days since the securities were issued`                       IS A NUMBER
-    `is to the issuer of the securities`                          IS A BOOLEAN
-    `is to an accredited investor`                                IS A BOOLEAN
-    `is as part of an offering registered with the Commission`    IS A BOOLEAN
-    `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS A BOOLEAN
+    `to the issuer of the securities`                             IS A BOOLEAN
+    `to an accredited investor`                                   IS A BOOLEAN
+    `as part of an offering registered with the Commission`       IS A BOOLEAN
+    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`    IS A BOOLEAN
 
 -- ENDPOINT NOTE. Rule 501(a) restricts transfer "during the one-year period
 -- beginning when the securities were issued". The rule does not say whether the
@@ -741,13 +741,13 @@ GIVETH A BOOLEAN
 `transfer falls within an exception in Rule 501(a)` transfer MEANS
         "unless such securities are transferred:"
     ..  "(1) To the issuer of the securities;"
-    ..  transfer's `is to the issuer of the securities`
+    ..  transfer's `to the issuer of the securities`
     ..  "(2) To an accredited investor;"
-    ..  transfer's `is to an accredited investor`
+    ..  transfer's `to an accredited investor`
     ..  "(3) As part of an offering registered with the Commission; or"
-    ..  transfer's `is as part of an offering registered with the Commission`
+    ..  transfer's `as part of an offering registered with the Commission`
     ..  "(4) To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance."
-    ..  transfer's `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
+    ..  transfer's `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`
 
 @ref 17 CFR 227.501(a)
 GIVEN transfer IS A Transfer
@@ -794,41 +794,41 @@ DECIDE `the transaction qualifies for the section 4(a)(6) exemption` issuer offe
 
 `a clean issuer` MEANS IssuerProfile WITH
     name IS "Clean Co"
-    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
-    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
-    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
-    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`    IS TRUE
+    `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`                IS FALSE
+    `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`       IS FALSE
+    `subject to a disqualification as specified in section 227.503(a)`                                                      IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`     IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`     IS FALSE
 
 `a foreign issuer` MEANS IssuerProfile WITH
     name IS "Ausland GmbH"
-    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS FALSE
-    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
-    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
-    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`    IS FALSE
+    `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`                IS FALSE
+    `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`       IS FALSE
+    `subject to a disqualification as specified in section 227.503(a)`                                                      IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`     IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`     IS FALSE
 
 -- The limb the mirrored page omits: everything else is clean, but the issuer is
 -- behind on its Reg CF annual reports.
 `a delinquent issuer` MEANS IssuerProfile WITH
     name IS "Late Filer Inc"
-    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
-    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
-    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
-    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE
+    `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`    IS TRUE
+    `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`                IS FALSE
+    `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`       IS FALSE
+    `subject to a disqualification as specified in section 227.503(a)`                                                      IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`     IS TRUE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`     IS FALSE
 
 `a blank-check issuer` MEANS IssuerProfile WITH
     name IS "SPAC-ish LLC"
-    `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE
-    `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`             IS FALSE
-    `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`    IS FALSE
-    `is subject to a disqualification as specified in section 227.503(a)`                                                   IS FALSE
-    `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE
-    `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS TRUE
+    `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia`    IS TRUE
+    `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act`                IS FALSE
+    `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)`       IS FALSE
+    `subject to a disqualification as specified in section 227.503(a)`                                                      IS FALSE
+    `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement`     IS FALSE
+    `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies`     IS TRUE
 
 GIVEN `prior sales`   IS A NUMBER
       `maximum`       IS A NUMBER
@@ -847,7 +847,7 @@ GIVEN `accredited` IS A BOOLEAN
 GIVETH AN InvestorProfile
 `an investor with` `accredited` `income` `worth` `already` MEANS InvestorProfile WITH
     name                                               IS "Test Investor"
-    `is an accredited investor as defined in Rule 501` IS `accredited`
+    `an accredited investor as defined in Rule 501` IS `accredited`
     `annual income`                                    IS `income`
     `net worth`                                        IS `worth`
     `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS `already`
@@ -880,10 +880,10 @@ GIVEN `days since issue` IS A NUMBER
 GIVETH A Transfer
 `a transfer at` `days since issue` `to accredited` MEANS Transfer WITH
     `days since the securities were issued`                    IS `days since issue`
-    `is to the issuer of the securities`                       IS FALSE
-    `is to an accredited investor`                             IS `to accredited`
-    `is as part of an offering registered with the Commission` IS FALSE
-    `is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance` IS FALSE
+    `to the issuer of the securities`                          IS FALSE
+    `to an accredited investor`                                IS `to accredited`
+    `as part of an offering registered with the Commission`    IS FALSE
+    `to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance`    IS FALSE
 
 §§ `Group 1 — issuer eligibility (Rule 100(b))`
 

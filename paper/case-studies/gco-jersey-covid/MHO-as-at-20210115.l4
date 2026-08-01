@@ -21,11 +21,11 @@ DECLARE ApplicationKind IS ONE OF
 
 DECLARE MentalHealthEpisode HAS
     `application kind`                                                             IS A ApplicationKind
-    `is an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A` IS A BOOLEAN
+    `an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A`    IS A BOOLEAN
         MEANS `application kind` EQUALS `Minister application under Article 9 or 10 of the Mental Health Law for admission under Article 6, 7 or 7A`
-    `is an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14` IS A BOOLEAN
+    `an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14`    IS A BOOLEAN
         MEANS `application kind` EQUALS `approved social worker application under Article 15 of the Mental Health Law for admission under Article 6, 7 or 7A as applied by Article 14`
-    `is an application by an approved social worker under Article 24 for emergency treatment under Part 4` IS A BOOLEAN
+    `an application by an approved social worker under Article 24 for emergency treatment under Part 4`    IS A BOOLEAN
         MEANS `application kind` EQUALS `approved social worker application under Article 24 of the Mental Health Law for emergency treatment under Part 4`
     `patient is received into long-term care under Article 15 of the Mental Health Law` IS A BOOLEAN
     `concerns a report of an approved social worker or the discharge of a patient from long-term care under Article 18 of the Mental Health Law` IS A BOOLEAN
@@ -51,9 +51,9 @@ DECIDE `the Order remains in force as of` asOf IF
 GIVEN e IS A MentalHealthEpisode
 GIVETH A BOOLEAN
 DECIDE `Article 2(1) application attracts the extended period` e IF
-        e's `is an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A`
-    OR  e's `is an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14`
-    OR  e's `is an application by an approved social worker under Article 24 for emergency treatment under Part 4`
+        e's `an application by the Minister under Article 9 or 10 for admission under Article 6, 7 or 7A`
+    OR  e's `an application by an approved social worker under Article 15 for admission under Article 6, 7 or 7A as applied by Article 14`
+    OR  e's `an application by an approved social worker under Article 24 for emergency treatment under Part 4`
 
 GIVEN e IS A MentalHealthEpisode
 GIVETH A BOOLEAN

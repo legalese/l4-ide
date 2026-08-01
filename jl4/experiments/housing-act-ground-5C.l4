@@ -116,7 +116,7 @@ DECLARE Ground5CClaim HAS
   `that early-period purpose has been fulfilled`                                                      IS A BOOLEAN
   `landlord seeking possession intends to let to another current or future employee of the employer` IS A BOOLEAN
   -- constable variant
-  `is a letting in consequence of service in the office of constable`                                IS A BOOLEAN
+  `a letting in consequence of service in the office of constable`                                   IS A BOOLEAN
   -- second paragraph (b) — substituted constable reading
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS A BOOLEAN
   `that constable purpose has been fulfilled`                                                         IS A BOOLEAN
@@ -188,7 +188,7 @@ GIVETH A BOOLEAN
 GIVEN claim IS A Ground5CClaim
 GIVETH A BOOLEAN
 `second paragraph (b) — selected reading` claim MEANS
-    IF   claim's `is a letting in consequence of service in the office of constable`
+    IF   claim's `a letting in consequence of service in the office of constable`
     THEN `second paragraph (b) — constable purpose limb` claim
     ELSE `second paragraph (b) — early-period purpose fulfilled and landlord intends to relet` claim
 
@@ -233,7 +233,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -250,7 +250,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -272,7 +272,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE
   `that early-period purpose has been fulfilled`                                                      IS TRUE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -295,7 +295,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -315,7 +315,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS TRUE   -- constable reading on
+  `a letting in consequence of service in the office of constable`                                   IS TRUE   -- constable reading on
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS TRUE
   `that constable purpose has been fulfilled`                                                         IS TRUE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -337,7 +337,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS TRUE
+  `a letting in consequence of service in the office of constable`                                   IS TRUE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS TRUE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS TRUE
@@ -360,7 +360,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE   -- ordinary (b) ticked
   `that early-period purpose has been fulfilled`                                                      IS TRUE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
-  `is a letting in consequence of service in the office of constable`                                IS TRUE   -- but constable reading on
+  `a letting in consequence of service in the office of constable`                                   IS TRUE   -- but constable reading on
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -380,7 +380,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS FALSE
   `that early-period purpose has been fulfilled`                                                      IS FALSE
   `landlord seeking possession intends to let to another current or future employee of the employer` IS FALSE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE
@@ -402,7 +402,7 @@ GIVETH A DEONTIC Actor Action
   `tenancy granted to accommodate the tenant during the early period of their employment`            IS TRUE
   `that early-period purpose has been fulfilled`                                                      IS FALSE  -- purpose NOT fulfilled
   `landlord seeking possession intends to let to another current or future employee of the employer` IS TRUE
-  `is a letting in consequence of service in the office of constable`                                IS FALSE
+  `a letting in consequence of service in the office of constable`                                   IS FALSE
   `tenancy granted for a particular purpose relating to the tenant's service as a constable`         IS FALSE
   `that constable purpose has been fulfilled`                                                         IS FALSE
   `tenancy is no longer required for that constable purpose`                                          IS FALSE

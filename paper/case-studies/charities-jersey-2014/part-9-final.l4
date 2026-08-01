@@ -140,17 +140,17 @@ DECLARE AccusedOfficer HAS
     `the offence is proved to have been committed with that person's consent or connivance`  IS A BOOLEAN
 
     -- Article 37(1)(a). See INTERPRETATION CALL (2) on the definite articles.
-    `is a partner of the partnership`                                IS A BOOLEAN
-    `is a director of the body corporate`                            IS A BOOLEAN
-    `is a governor of the body corporate`                            IS A BOOLEAN
-    `is a secretary of the body corporate`                           IS A BOOLEAN
-    `is another similar officer of the body corporate`               IS A BOOLEAN
+    `a partner of the partnership`                                   IS A BOOLEAN
+    `a director of the body corporate`                               IS A BOOLEAN
+    `a governor of the body corporate`                               IS A BOOLEAN
+    `a secretary of the body corporate`                              IS A BOOLEAN
+    `another similar officer of the body corporate`                  IS A BOOLEAN
 
     -- Article 37(1)(b)
     `purports to act in any such capacity`                           IS A BOOLEAN
 
     -- Article 37(2) — the two facts about the PERSON that complete the deeming.
-    `is a member of the body corporate`                              IS A BOOLEAN
+    `a member of the body corporate`                                 IS A BOOLEAN
     `the act or default was in connection with the member's functions of management`  IS A BOOLEAN
 
 §§ `Article 37(2) — the member-manager, deemed a director`
@@ -167,7 +167,7 @@ GIVETH A BOOLEAN
     ... a's `the offender is a body corporate`
     AND a's `the affairs of the body corporate are managed by its members`
     AND "paragraph (1) applies in relation to acts and defaults of a member in connection with the member's functions of management"
-    ... o's `is a member of the body corporate`
+    ... o's `a member of the body corporate`
     AND o's `the act or default was in connection with the member's functions of management`
     AND "as if the member were a director of the body corporate."
 
@@ -178,11 +178,11 @@ GIVEN o IS AN AccusedOfficer
 GIVETH A BOOLEAN
 `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` o a MEANS
         "(a) a person who is a partner of the partnership, or director, governor, secretary or other similar officer of the body corporate; or"
-    ..  o's `is a partner of the partnership`
-    ..  o's `is a director of the body corporate`
-    ..  o's `is a governor of the body corporate`
-    ..  o's `is a secretary of the body corporate`
-    ..  o's `is another similar officer of the body corporate`
+    ..  o's `a partner of the partnership`
+    ..  o's `a director of the body corporate`
+    ..  o's `a governor of the body corporate`
+    ..  o's `a secretary of the body corporate`
+    ..  o's `another similar officer of the body corporate`
     ..  `Article 37(2) — a member of a member-managed body corporate, deemed a director` o a
     -- The last disjunct IS Article 37(2): the deemed director enters limb (a) here,
     -- and nowhere else.
@@ -419,13 +419,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Mr de Gruchy, a consenting director` MEANS AccusedOfficer WITH
     name                                                            IS "Mr de Gruchy"
     `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
-    `is a partner of the partnership`                                IS FALSE
-    `is a director of the body corporate`                            IS TRUE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS FALSE
+    `a director of the body corporate`                               IS TRUE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS FALSE
-    `is a member of the body corporate`                              IS FALSE
+    `a member of the body corporate`                                 IS FALSE
     `the act or default was in connection with the member's functions of management`  IS FALSE
 
 #ASSERT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mr de Gruchy, a consenting director` `the company's Article 21 offence`
@@ -438,13 +438,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Ms Bisson, a director, no consent proved` MEANS AccusedOfficer WITH
     name                                                            IS "Ms Bisson"
     `the offence is proved to have been committed with that person's consent or connivance`  IS FALSE
-    `is a partner of the partnership`                                IS FALSE
-    `is a director of the body corporate`                            IS TRUE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS FALSE
+    `a director of the body corporate`                               IS TRUE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS FALSE
-    `is a member of the body corporate`                              IS FALSE
+    `a member of the body corporate`                                 IS FALSE
     `the act or default was in connection with the member's functions of management`  IS FALSE
 
 #ASSERT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Ms Bisson, a director, no consent proved` `the company's Article 21 offence`
@@ -455,13 +455,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Mr Machon, a consenting partner` MEANS AccusedOfficer WITH
     name                                                            IS "Mr Machon"
     `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
-    `is a partner of the partnership`                                IS TRUE
-    `is a director of the body corporate`                            IS FALSE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS TRUE
+    `a director of the body corporate`                               IS FALSE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS FALSE
-    `is a member of the body corporate`                              IS FALSE
+    `a member of the body corporate`                                 IS FALSE
     `the act or default was in connection with the member's functions of management`  IS FALSE
 
 #ASSERT `Article 37(1) — the officer is also guilty of the offence` `Mr Machon, a consenting partner` `the LLP's Article 21 offence`
@@ -479,13 +479,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Mr Le Cornu, a purported director` MEANS AccusedOfficer WITH
     name                                                            IS "Mr Le Cornu"
     `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
-    `is a partner of the partnership`                                IS FALSE
-    `is a director of the body corporate`                            IS FALSE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS FALSE
+    `a director of the body corporate`                               IS FALSE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS TRUE
-    `is a member of the body corporate`                              IS FALSE
+    `a member of the body corporate`                                 IS FALSE
     `the act or default was in connection with the member's functions of management`  IS FALSE
 
 #ASSERT NOT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mr Le Cornu, a purported director` `the company's Article 21 offence`
@@ -501,13 +501,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Mr Pallot, a managing member` MEANS AccusedOfficer WITH
     name                                                            IS "Mr Pallot"
     `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
-    `is a partner of the partnership`                                IS FALSE
-    `is a director of the body corporate`                            IS FALSE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS FALSE
+    `a director of the body corporate`                               IS FALSE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS FALSE
-    `is a member of the body corporate`                              IS TRUE
+    `a member of the body corporate`                                 IS TRUE
     `the act or default was in connection with the member's functions of management`  IS TRUE
 
 #ASSERT `Article 37(2) — a member of a member-managed body corporate, deemed a director` `Mr Pallot, a managing member` `the member-managed body's Article 21 offence`
@@ -531,13 +531,13 @@ GIVETH A DEONTIC Actor Part9Action
 `Mrs Vibert, a member acting in a personal capacity` MEANS AccusedOfficer WITH
     name                                                            IS "Mrs Vibert"
     `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
-    `is a partner of the partnership`                                IS FALSE
-    `is a director of the body corporate`                            IS FALSE
-    `is a governor of the body corporate`                            IS FALSE
-    `is a secretary of the body corporate`                           IS FALSE
-    `is another similar officer of the body corporate`               IS FALSE
+    `a partner of the partnership`                                   IS FALSE
+    `a director of the body corporate`                               IS FALSE
+    `a governor of the body corporate`                               IS FALSE
+    `a secretary of the body corporate`                              IS FALSE
+    `another similar officer of the body corporate`                  IS FALSE
     `purports to act in any such capacity`                           IS FALSE
-    `is a member of the body corporate`                              IS TRUE
+    `a member of the body corporate`                                 IS TRUE
     `the act or default was in connection with the member's functions of management`  IS FALSE
 
 #ASSERT NOT `Article 37(2) — a member of a member-managed body corporate, deemed a director` `Mrs Vibert, a member acting in a personal capacity` `the member-managed body's Article 21 offence`

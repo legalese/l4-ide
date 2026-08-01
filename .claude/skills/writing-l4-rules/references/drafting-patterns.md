@@ -127,19 +127,19 @@ FALSE.
 ```l4
 DECLARE Occupier HAS
     name                                                  IS A STRING
-    `is the landlord`                                     IS A BOOLEAN   -- (a)
-    `is the landlord's spouse, civil partner or cohabitant`  IS A BOOLEAN -- (b)
-    `is the landlord's parent`                            IS A BOOLEAN   -- (c)(i)
+    `the landlord`                                        IS A BOOLEAN   -- (a)
+    `the landlord's spouse, civil partner or cohabitant`     IS A BOOLEAN -- (b)
+    `the landlord's parent`                               IS A BOOLEAN   -- (c)(i)
     -- ... grandparent / sibling / child / grandchild ...
-    `is a child or grandchild of the landlord's partner`  IS A BOOLEAN   -- (d)
+    `a child or grandchild of the landlord's partner`     IS A BOOLEAN   -- (d)
     `is other`                                            IS A BOOLEAN   -- none of (a)-(d); NOT in the disjunction
 
 `is a qualifying occupier` occupier MEANS
-        "(a) the landlord;"                  ... occupier's `is the landlord`
-    ..  "(b) the landlord's spouse ..."      ... occupier's `is the landlord's spouse, civil partner or cohabitant`
-    ..  "(c) the landlord's— (i) parent;"    ... occupier's `is the landlord's parent`
+        "(a) the landlord;"                  ... occupier's `the landlord`
+    ..  "(b) the landlord's spouse ..."      ... occupier's `the landlord's spouse, civil partner or cohabitant`
+    ..  "(c) the landlord's— (i) parent;"    ... occupier's `the landlord's parent`
     ..  -- ... limbs (ii)-(v) ...
-    ..  "(d) a child or grandchild ..."      ... occupier's `is a child or grandchild of the landlord's partner`
+    ..  "(d) a child or grandchild ..."      ... occupier's `a child or grandchild of the landlord's partner`
     -- `is other` is deliberately NOT a disjunct: an off-list occupier is FALSE.
 ```
 

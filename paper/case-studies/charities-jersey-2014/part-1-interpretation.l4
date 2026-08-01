@@ -66,7 +66,7 @@ DECLARE Entity HAS
 
     -- Article 2(1)(ba) — the three conjuncts of the inserted limb. Note that
     -- (ba)(iii) is DERIVED, not asked: it is `NOT (falls within (c) to (h))`.
-    `is a body corporate`                                           IS A BOOLEAN
+    `a body corporate`                                              IS A BOOLEAN
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS A BOOLEAN
     `(ba)(ii) is established under the law of Jersey`                IS A BOOLEAN
 
@@ -76,7 +76,7 @@ DECLARE Entity HAS
 
     -- Article 2(8) — the extra facts that make a (1)(i) body a "relevant
     -- unincorporated entity", which in turn drives the Art 2(7)(d) governor test.
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS A BOOLEAN
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS A BOOLEAN
 
     -- Article 2(1) is itself extensible: "(2) The Minister may by Order add
     -- sub-paragraphs to paragraph (1)." A catch-all, DELIBERATELY NOT a disjunct
@@ -108,7 +108,7 @@ GIVEN e IS AN Entity
 GIVETH A BOOLEAN
 `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` e MEANS
         "(ba) a body corporate that -"
-    ... e's `is a body corporate`
+    ... e's `a body corporate`
     AND "(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008;"
     ... e's `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`
     AND "(ii) is established under the law of Jersey; and"
@@ -177,24 +177,24 @@ GIVETH A BOOLEAN
     ... "(a) falls within paragraph (1)(i); and"
     ... e's `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`
     AND "(b) has a constitution that conforms to a model that - (i) is published for the purpose by the Commissioner, and (ii) provides for the entity to have a management committee."
-    ... e's `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`
+    ... e's `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`
 
 §§ `Article 2(7) — "governor"`
 
 DECLARE Officer HAS
     name                                                            IS A STRING
     -- (7)(a)
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS A BOOLEAN
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS A BOOLEAN
     -- (7)(b)
-    `is a member of the council of the foundation`                  IS A BOOLEAN
+    `a member of the council of the foundation`                     IS A BOOLEAN
     -- (7)(c)
-    `is a director of the company`                                  IS A BOOLEAN
+    `a director of the company`                                     IS A BOOLEAN
     -- (7)(d)
-    `is a member of the management committee of the entity`         IS A BOOLEAN
+    `a member of the management committee of the entity`            IS A BOOLEAN
     -- (7)(e)
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS A BOOLEAN
     -- (9)(a) — the "merely on behalf of another" carve-out
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS A BOOLEAN
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS A BOOLEAN
 
 -- The (7)(a) case: "in the case of a trust or fideicommis". An entity is a trust
 -- or fideicommis if it falls within (1)(a) or (1)(b).
@@ -222,21 +222,21 @@ GIVETH A BOOLEAN
         "In this Law, unless the context otherwise requires, 'governor' in relation to an entity means -"
     ..      "(a) in the case of a trust or fideicommis, a trustee or fideicommissaire of the trust or fideicommis;"
         ... `entity is a trust or fideicommis` e
-        AND p's `is a trustee or fideicommissaire of the trust or fideicommis`
+        AND p's `a trustee or fideicommissaire of the trust or fideicommis`
     ..      "(b) in the case of a foundation, a member of the council of the foundation;"
         ... e's `(d) a foundation`
-        AND p's `is a member of the council of the foundation`
+        AND p's `a member of the council of the foundation`
     ..      "(c) in the case of a company, a director of the company;"
         ... e's `(f) a company`
-        AND p's `is a director of the company`
+        AND p's `a director of the company`
     ..      "(d) in the case of a relevant unincorporated entity, a person who is a member of the management committee of the entity; or"
         ... `is a relevant unincorporated entity` e
-        AND p's `is a member of the management committee of the entity`
+        AND p's `a member of the management committee of the entity`
     ..      "(e) in any other case, a person who, under the constitution of the entity, has the general control and management of the administration of the entity."
         ... NOT `entity falls within one of the cases in Article 2(7)(a) to (d)` e
         AND p's `under the constitution of the entity, has the general control and management of the administration of the entity`
         AND "(9)(a) a person is not a governor merely by virtue of exercising general control and management on behalf of another person who has the general control and management in that other person's own right under the constitution of the entity; and"
-        ... NOT p's `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`
+        ... NOT p's `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`
         -- "(9)(b) a person is a governor whether that person has that general control
         --  and management alone or as one of a number of governors." — carried inert:
         --  it adds no condition, it removes one (no exclusivity requirement).
@@ -317,12 +317,12 @@ GIVETH A BOOLEAN
     `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
     `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
     `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
-    `is a body corporate`                                           IS TRUE
+    `a body corporate`                                              IS TRUE
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
     `(ba)(ii) is established under the law of Jersey`                IS TRUE
     `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
     `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS FALSE
     `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
 
 #ASSERT `is an entity within Article 2(1)` `Jersey Heritage Ltd`
@@ -333,12 +333,12 @@ GIVETH A BOOLEAN
 
 `Ms Le Brun, a director` MEANS Officer WITH
     name                                                            IS "Ms Le Brun"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS TRUE
-    `is a member of the management committee of the entity`         IS FALSE
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS FALSE
+    `a member of the council of the foundation`                     IS FALSE
+    `a director of the company`                                     IS TRUE
+    `a member of the management committee of the entity`            IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS FALSE
 
 #ASSERT `is a governor of` `Ms Le Brun, a director` `Jersey Heritage Ltd`
 
@@ -356,12 +356,12 @@ GIVETH A BOOLEAN
     `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
     `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
     `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
-    `is a body corporate`                                           IS TRUE
+    `a body corporate`                                              IS TRUE
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS TRUE
     `(ba)(ii) is established under the law of Jersey`                IS TRUE
     `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
     `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS FALSE
     `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
 
 #ASSERT `(ba) — a body corporate that is a Jersey NPO outside (c) to (h)` `Grands Vaux Mutual, a Jersey NPO body corporate`
@@ -386,12 +386,12 @@ GIVETH A BOOLEAN
     `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
     `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS TRUE
     `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS FALSE
-    `is a body corporate`                                           IS FALSE
+    `a body corporate`                                              IS FALSE
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
     `(ba)(ii) is established under the law of Jersey`                IS FALSE
     `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS TRUE
     `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS TRUE
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS TRUE
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS TRUE
     `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
 
 #ASSERT `is an entity within Article 2(1)` `St Ouen Angling Club`
@@ -404,12 +404,12 @@ GIVETH A BOOLEAN
 -- Art 2(7)(d) — management committee — and NOT through the residual (7)(e) case.
 `Mr Renouf, on the management committee` MEANS Officer WITH
     name                                                            IS "Mr Renouf"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS FALSE
-    `is a member of the management committee of the entity`         IS TRUE
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS FALSE
+    `a member of the council of the foundation`                     IS FALSE
+    `a director of the company`                                     IS FALSE
+    `a member of the management committee of the entity`            IS TRUE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS FALSE
 
 #ASSERT `is a governor of` `Mr Renouf, on the management committee` `St Ouen Angling Club`
 
@@ -430,12 +430,12 @@ GIVETH A BOOLEAN
     `(h) a body incorporated under, but not by, an Act of the United Kingdom Parliament or Order in Council, as extended to or applicable in Jersey`  IS FALSE
     `(i) an unincorporated body or association of persons, other than a partnership and other than the trustees of a trust`  IS FALSE
     `(j) an entity substantially similar to one mentioned in (a) to (h), but established under the law of a jurisdiction other than Jersey`  IS TRUE
-    `is a body corporate`                                           IS TRUE
+    `a body corporate`                                              IS TRUE
     `(ba)(i) is an NPO, as defined by the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
     `(ba)(ii) is established under the law of Jersey`                IS FALSE
     `the law governing the relationship between the persons constituting the body or association, in that capacity, is the law of Jersey`  IS FALSE
     `at least one governor is a natural person resident in Jersey, or is itself a Jersey entity by virtue of sub-paragraph (a)`  IS FALSE
-    `has a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`  IS FALSE
+    `a constitution conforming to a model published for the purpose by the Commissioner that provides for the entity to have a management committee`      IS FALSE
     `falls within a sub-paragraph added to Article 2(1) by Order under Article 2(2)`  IS FALSE
 
 #ASSERT `is an entity within Article 2(1)` `Guernsey Trust Co (a foreign entity)`
@@ -445,21 +445,21 @@ GIVETH A BOOLEAN
 
 `Mr Ozouf, who holds control in his own right` MEANS Officer WITH
     name                                                            IS "Mr Ozouf"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS FALSE
-    `is a member of the management committee of the entity`         IS FALSE
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS FALSE
+    `a member of the council of the foundation`                     IS FALSE
+    `a director of the company`                                     IS FALSE
+    `a member of the management committee of the entity`            IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS FALSE
 
 `Ms Perchard, his delegate` MEANS Officer WITH
     name                                                            IS "Ms Perchard"
-    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
-    `is a member of the council of the foundation`                  IS FALSE
-    `is a director of the company`                                  IS FALSE
-    `is a member of the management committee of the entity`         IS FALSE
+    `a trustee or fideicommissaire of the trust or fideicommis`     IS FALSE
+    `a member of the council of the foundation`                     IS FALSE
+    `a director of the company`                                     IS FALSE
+    `a member of the management committee of the entity`            IS FALSE
     `under the constitution of the entity, has the general control and management of the administration of the entity`  IS TRUE
-    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS TRUE
+    `that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`      IS TRUE
 
 #ASSERT `is a governor of` `Mr Ozouf, who holds control in his own right` `Guernsey Trust Co (a foreign entity)`
 -- Article 2(9)(a) bites: the delegate is NOT a governor.

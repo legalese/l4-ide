@@ -16,22 +16,22 @@
     <itemComponent id="itemdef_issuerprofile_c1" name="name">
       <typeRef>string</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c2" name="is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia" label="is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia">
+    <itemComponent id="itemdef_issuerprofile_c2" name="organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia" label="organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c3" name="is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act" label="is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act">
+    <itemComponent id="itemdef_issuerprofile_c3" name="subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act" label="subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c4" name="is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c" label="is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)">
+    <itemComponent id="itemdef_issuerprofile_c4" name="an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c" label="an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c5" name="is_subject_to_a_disqualification_as_specified_in_section_227_503_a" label="is subject to a disqualification as specified in section 227.503(a)">
+    <itemComponent id="itemdef_issuerprofile_c5" name="subject_to_a_disqualification_as_specified_in_section_227_503_a" label="subject to a disqualification as specified in section 227.503(a)">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c6" name="has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement" label="has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement">
+    <itemComponent id="itemdef_issuerprofile_c6" name="sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement" label="sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_issuerprofile_c7" name="has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies" label="has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies">
+    <itemComponent id="itemdef_issuerprofile_c7" name="no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies" label="no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies">
       <typeRef>boolean</typeRef>
     </itemComponent>
   </itemDefinition>
@@ -53,7 +53,7 @@
     <itemComponent id="itemdef_investorprofile_c1" name="name">
       <typeRef>string</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_investorprofile_c2" name="is_an_accredited_investor_as_defined_in_Rule_501" label="is an accredited investor as defined in Rule 501">
+    <itemComponent id="itemdef_investorprofile_c2" name="an_accredited_investor_as_defined_in_Rule_501" label="an accredited investor as defined in Rule 501">
       <typeRef>boolean</typeRef>
     </itemComponent>
     <itemComponent id="itemdef_investorprofile_c3" name="annual_income" label="annual income">
@@ -144,16 +144,16 @@
     <itemComponent id="itemdef_transfer_c1" name="days_since_the_securities_were_issued" label="days since the securities were issued">
       <typeRef>number</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c2" name="is_to_the_issuer_of_the_securities" label="is to the issuer of the securities">
+    <itemComponent id="itemdef_transfer_c2" name="to_the_issuer_of_the_securities" label="to the issuer of the securities">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c3" name="is_to_an_accredited_investor" label="is to an accredited investor">
+    <itemComponent id="itemdef_transfer_c3" name="to_an_accredited_investor" label="to an accredited investor">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c4" name="is_as_part_of_an_offering_registered_with_the_Commission" label="is as part of an offering registered with the Commission">
+    <itemComponent id="itemdef_transfer_c4" name="as_part_of_an_offering_registered_with_the_Commission" label="as part of an offering registered with the Commission">
       <typeRef>boolean</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_transfer_c5" name="is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance" label="is to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance">
+    <itemComponent id="itemdef_transfer_c5" name="to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance" label="to a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance">
       <typeRef>boolean</typeRef>
     </itemComponent>
   </itemDefinition>
@@ -161,7 +161,7 @@
     <itemComponent id="itemdef_investorprofile_hydrated_c1" name="name">
       <typeRef>string</typeRef>
     </itemComponent>
-    <itemComponent id="itemdef_investorprofile_hydrated_c2" name="is_an_accredited_investor_as_defined_in_Rule_501" label="is an accredited investor as defined in Rule 501">
+    <itemComponent id="itemdef_investorprofile_hydrated_c2" name="an_accredited_investor_as_defined_in_Rule_501" label="an accredited investor as defined in Rule 501">
       <typeRef>boolean</typeRef>
     </itemComponent>
     <itemComponent id="itemdef_investorprofile_hydrated_c3" name="annual_income" label="annual income">
@@ -837,7 +837,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_1_not_organized_under_state_or_territorial_law_literal">
-      <text>true and not(issuer.is_organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia)</text>
+      <text>true and not(issuer.organized_under_and_subject_to_the_laws_of_a_State_or_territory_of_the_United_States_or_the_District_of_Columbia)</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_2_an_exchange_act_reporting_company" name="b_2_an_Exchange_Act_reporting_company" label="(b)(2) — an Exchange Act reporting company">
@@ -846,7 +846,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_2_an_exchange_act_reporting_company_literal">
-      <text>true and issuer.is_subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act</text>
+      <text>true and issuer.subject_to_the_requirement_to_file_reports_pursuant_to_section_13_or_section_15_d_of_the_Exchange_Act</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_3_an_investment_company" name="b_3_an_investment_company" label="(b)(3) — an investment company">
@@ -855,7 +855,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_3_an_investment_company_literal">
-      <text>true and issuer.is_an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c</text>
+      <text>true and issuer.an_investment_company_or_is_excluded_from_the_definition_of_investment_company_by_section_3_b_or_section_3_c</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_4_subject_to_a_bad_actor_disqualification" name="b_4_subject_to_a_bad_actor_disqualification" label="(b)(4) — subject to a bad-actor disqualification">
@@ -864,7 +864,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_4_subject_to_a_bad_actor_disqualification_literal">
-      <text>true and issuer.is_subject_to_a_disqualification_as_specified_in_section_227_503_a</text>
+      <text>true and issuer.subject_to_a_disqualification_as_specified_in_section_227_503_a</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_5_delinquent_in_ongoing_annual_reports" name="b_5_delinquent_in_ongoing_annual_reports" label="(b)(5) — delinquent in ongoing annual reports">
@@ -873,7 +873,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_5_delinquent_in_ongoing_annual_reports_literal">
-      <text>true and issuer.has_sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement</text>
+      <text>true and issuer.sold_securities_in_reliance_on_section_4_a_6_and_has_not_filed_the_ongoing_annual_reports_required_during_the_two_years_immediately_preceding_the_filing_of_the_offering_statement</text>
     </literalExpression>
   </decision>
   <decision id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan" name="b_6_no_specific_business_plan_or_a_blank_check_business_plan" label="(b)(6) — no specific business plan, or a blank-check business plan">
@@ -882,7 +882,7 @@
       <requiredInput href="#input_issuer"/>
     </informationRequirement>
     <literalExpression id="decision_b_6_no_specific_business_plan_or_a_blank_check_business_plan_literal">
-      <text>true and issuer.has_no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies</text>
+      <text>true and issuer.no_specific_business_plan_or_has_indicated_that_its_business_plan_is_to_engage_in_a_merger_or_acquisition_with_an_unidentified_company_or_companies</text>
     </literalExpression>
   </decision>
   <decision id="decision_issuer_is_excluded_by_rule_100_b" name="issuer_is_excluded_by_Rule_100_b" label="issuer is excluded by Rule 100(b)">
@@ -1080,7 +1080,7 @@
       <requiredInput href="#input_investor"/>
     </informationRequirement>
     <literalExpression id="decision_the_accredited_investor_carve_out_applies_to_literal">
-      <text>`the rules in force include` OF `the 2021 amendments` AND investor's `is an accredited investor as defined in Rule 501`</text>
+      <text>`the rules in force include` OF `the 2021 amendments` AND investor's `an accredited investor as defined in Rule 501`</text>
     </literalExpression>
   </decision>
   <decision id="decision_investor_is_within_the_investment_limit" name="investor_is_within_the_investment_limit" label="investor is within the investment limit">
@@ -1568,7 +1568,7 @@
       <requiredInput href="#input_transfer"/>
     </informationRequirement>
     <literalExpression id="decision_transfer_falls_within_an_exception_in_rule_501_a_literal">
-      <text>false or (false or (transfer.is_to_the_issuer_of_the_securities or (false or (transfer.is_to_an_accredited_investor or (false or (transfer.is_as_part_of_an_offering_registered_with_the_Commission or (false or transfer.is_to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))))))</text>
+      <text>false or (false or (transfer.to_the_issuer_of_the_securities or (false or (transfer.to_an_accredited_investor or (false or (transfer.as_part_of_an_offering_registered_with_the_Commission or (false or transfer.to_a_member_of_the_family_of_the_purchaser_or_the_equivalent_to_a_trust_controlled_by_the_purchaser_to_a_trust_created_for_the_benefit_of_a_member_of_the_family_of_the_purchaser_or_the_equivalent_or_in_connection_with_the_death_or_divorce_of_the_purchaser_or_other_similar_circumstance)))))))</text>
     </literalExpression>
   </decision>
   <decision id="decision_transfer_is_permitted" name="transfer_is_permitted" label="transfer is permitted">
@@ -1628,13 +1628,13 @@
   <decision id="decision_a_clean_issuer" name="a_clean_issuer" label="a clean issuer">
     <variable id="decision_a_clean_issuer_var" name="a_clean_issuer" label="a clean issuer" typeRef="IssuerProfile"/>
     <literalExpression id="decision_a_clean_issuer_literal">
-      <text>IssuerProfile WITH name IS "Clean Co" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
+      <text>IssuerProfile WITH name IS "Clean Co" `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `subject to a disqualification as specified in section 227.503(a)` IS FALSE `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS FALSE `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
     </literalExpression>
   </decision>
   <decision id="decision_a_delinquent_issuer" name="a_delinquent_issuer" label="a delinquent issuer">
     <variable id="decision_a_delinquent_issuer_var" name="a_delinquent_issuer" label="a delinquent issuer" typeRef="IssuerProfile"/>
     <literalExpression id="decision_a_delinquent_issuer_literal">
-      <text>IssuerProfile WITH name IS "Late Filer Inc" `is organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `is an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `is subject to a disqualification as specified in section 227.503(a)` IS FALSE `has sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE `has no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
+      <text>IssuerProfile WITH name IS "Late Filer Inc" `organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia` IS TRUE `subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Exchange Act` IS FALSE `an investment company, or is excluded from the definition of investment company by section 3(b) or section 3(c)` IS FALSE `subject to a disqualification as specified in section 227.503(a)` IS FALSE `sold securities in reliance on section 4(a)(6) and has not filed the ongoing annual reports required during the two years immediately preceding the filing of the offering statement` IS TRUE `no specific business plan, or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies` IS FALSE</text>
     </literalExpression>
   </decision>
   <decision id="decision_an_offering_of" name="an_offering_of" label="an offering of">
@@ -1667,7 +1667,7 @@
       <requiredInput href="#input_worth"/>
     </informationRequirement>
     <literalExpression id="decision_an_investor_with_literal">
-      <text>InvestorProfile WITH name IS "Test Investor" `is an accredited investor as defined in Rule 501` IS accredited `annual income` IS income `net worth` IS worth `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS already</text>
+      <text>InvestorProfile WITH name IS "Test Investor" `an accredited investor as defined in Rule 501` IS accredited `annual income` IS income `net worth` IS worth `aggregate amount already sold to this investor across all issuers in reliance on section 4(a)(6) during the preceding 12 months` IS already</text>
     </literalExpression>
   </decision>
   <decision id="decision_an_arrangement_with" name="an_arrangement_with" label="an arrangement with">
@@ -2061,9 +2061,9 @@
         </literalExpression>
       </contextEntry>
       <contextEntry id="hydration_investor_ce2">
-        <variable id="hydration_investor_ce2_var" name="is_an_accredited_investor_as_defined_in_Rule_501" label="is an accredited investor as defined in Rule 501" typeRef="boolean"/>
+        <variable id="hydration_investor_ce2_var" name="an_accredited_investor_as_defined_in_Rule_501" label="an accredited investor as defined in Rule 501" typeRef="boolean"/>
         <literalExpression id="hydration_investor_ce2_lit">
-          <text>investor.is_an_accredited_investor_as_defined_in_Rule_501</text>
+          <text>investor.an_accredited_investor_as_defined_in_Rule_501</text>
         </literalExpression>
       </contextEntry>
       <contextEntry id="hydration_investor_ce3">

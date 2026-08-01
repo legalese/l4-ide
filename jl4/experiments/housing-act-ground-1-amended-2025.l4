@@ -41,14 +41,14 @@ IMPORT daydate
 -- who is none of the (a)-(d) list ticks `is other` (and does not qualify).
 DECLARE Occupier HAS
     name                                                  IS A STRING
-    `is the landlord`                                     IS A BOOLEAN   -- (a)
-    `is the landlord's spouse, civil partner or cohabitant`  IS A BOOLEAN   -- (b)
-    `is the landlord's parent`                            IS A BOOLEAN   -- (c)(i)
-    `is the landlord's grandparent`                       IS A BOOLEAN   -- (c)(ii)
-    `is the landlord's sibling`                           IS A BOOLEAN   -- (c)(iii)
-    `is the landlord's child`                             IS A BOOLEAN   -- (c)(iv)
-    `is the landlord's grandchild`                        IS A BOOLEAN   -- (c)(v)
-    `is a child or grandchild of the landlord's partner`  IS A BOOLEAN   -- (d)
+    `the landlord`                                        IS A BOOLEAN   -- (a)
+    `the landlord's spouse, civil partner or cohabitant`     IS A BOOLEAN   -- (b)
+    `the landlord's parent`                               IS A BOOLEAN   -- (c)(i)
+    `the landlord's grandparent`                          IS A BOOLEAN   -- (c)(ii)
+    `the landlord's sibling`                              IS A BOOLEAN   -- (c)(iii)
+    `the landlord's child`                                IS A BOOLEAN   -- (c)(iv)
+    `the landlord's grandchild`                           IS A BOOLEAN   -- (c)(v)
+    `a child or grandchild of the landlord's partner`     IS A BOOLEAN   -- (d)
     `is other`                                            IS A BOOLEAN   -- none of the (a)-(d) list
 
 DECLARE Claim HAS
@@ -65,15 +65,15 @@ DECLARE Claim HAS
 GIVEN occupier IS AN Occupier
 GIVETH A BOOLEAN
 `is a qualifying occupier` occupier MEANS
-        "(a) the landlord;"                                                              ... occupier's `is the landlord`
+        "(a) the landlord;"                                                              ... occupier's `the landlord`
     ..  "(b) the landlord's spouse or civil partner or a person with whom the landlord lives as if they were married or in a civil partnership;"
-                                                                                         ... occupier's `is the landlord's spouse, civil partner or cohabitant`
-    ..  "(c) the landlord's— (i) parent;"                                                ... occupier's `is the landlord's parent`
-    ..  "(ii) grandparent;"                                                              ... occupier's `is the landlord's grandparent`
-    ..  "(iii) sibling;"                                                                 ... occupier's `is the landlord's sibling`
-    ..  "(iv) child;"                                                                    ... occupier's `is the landlord's child`
-    ..  "(v) grandchild;"                                                                ... occupier's `is the landlord's grandchild`
-    ..  "(d) a child or grandchild of a person mentioned in paragraph (b)."             ... occupier's `is a child or grandchild of the landlord's partner`
+                                                                                         ... occupier's `the landlord's spouse, civil partner or cohabitant`
+    ..  "(c) the landlord's— (i) parent;"                                                ... occupier's `the landlord's parent`
+    ..  "(ii) grandparent;"                                                              ... occupier's `the landlord's grandparent`
+    ..  "(iii) sibling;"                                                                 ... occupier's `the landlord's sibling`
+    ..  "(iv) child;"                                                                    ... occupier's `the landlord's child`
+    ..  "(v) grandchild;"                                                                ... occupier's `the landlord's grandchild`
+    ..  "(d) a child or grandchild of a person mentioned in paragraph (b)."             ... occupier's `a child or grandchild of the landlord's partner`
 
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
@@ -141,62 +141,62 @@ GIVETH A DEONTIC Actor Action
 -- exactly one. (Record literals must give every field, so we spell them out.)
 `occupier — the landlord` MEANS Occupier WITH
   name IS "the landlord"
-  `is the landlord`                                     IS TRUE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS FALSE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS TRUE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS FALSE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS FALSE
 
 `occupier — the partner` MEANS Occupier WITH
   name IS "the partner"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS TRUE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS FALSE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS TRUE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS FALSE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS FALSE
 
 `occupier — a sibling` MEANS Occupier WITH
   name IS "a sibling"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS TRUE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS TRUE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS FALSE
 
 `occupier — partner's grandchild` MEANS Occupier WITH
   name IS "partner's grandchild"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS FALSE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS TRUE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS FALSE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS TRUE
   `is other`                                            IS FALSE
 
 `occupier — other` MEANS Occupier WITH
   name IS "a friend"
-  `is the landlord`                                     IS FALSE
-  `is the landlord's spouse, civil partner or cohabitant`  IS FALSE
-  `is the landlord's parent`                            IS FALSE
-  `is the landlord's grandparent`                       IS FALSE
-  `is the landlord's sibling`                           IS FALSE
-  `is the landlord's child`                             IS FALSE
-  `is the landlord's grandchild`                        IS FALSE
-  `is a child or grandchild of the landlord's partner`  IS FALSE
+  `the landlord`                                        IS FALSE
+  `the landlord's spouse, civil partner or cohabitant`     IS FALSE
+  `the landlord's parent`                               IS FALSE
+  `the landlord's grandparent`                          IS FALSE
+  `the landlord's sibling`                              IS FALSE
+  `the landlord's child`                                IS FALSE
+  `the landlord's grandchild`                           IS FALSE
+  `a child or grandchild of the landlord's partner`     IS FALSE
   `is other`                                            IS TRUE
 
 -- The (a)-(d) list bites: qualifying occupiers qualify; "other" does not.
