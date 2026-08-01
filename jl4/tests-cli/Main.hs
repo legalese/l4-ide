@@ -538,6 +538,14 @@ dateProbeModel    = dmnDateProbeDir </> "date-axis.dmn"
 dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
 dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
 
+-- The Reg CF CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
+-- the 1,236-line statute corpus, 67 decisions, evaluated end to end. The cases
+-- file's own header records how each pin was anchored (L4 + the documented
+-- transform, never the engine's own output).
+corpusGolden, corpusEngineCases :: FilePath
+corpusGolden      = "examples/dmn/expected/regcf-corpus.dmn"
+corpusEngineCases = "examples/dmn/regcf-corpus.cases.json"
+
 dmnDateProbeDir :: FilePath
 dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
 
@@ -1559,6 +1567,29 @@ spec bin = do
         out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
         out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
         out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
+
+    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 67-decision Reg CF
+    -- corpus builds and answers on both engines. All counts below are MEASURED
+    -- (2026-08-02, this machine, both harnesses), not aspirational: before
+    -- R12/R13 KIE refused with 16 build errors and Camunda refused the file at
+    -- parse() on the raw-L4 deontic body.
+    it "KIE builds and answers the whole Reg CF corpus (R12/R13)" $
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
+          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("67/67 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("67/67 value(s) as expected" `isInfixOf`)
+
+    it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
+          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("67/67 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("67/67 value(s) as expected" `isInfixOf`)
 
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
