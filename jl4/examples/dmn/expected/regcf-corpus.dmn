@@ -1538,12 +1538,15 @@
       <requiredDecision href="#decision_days_to_file_the_annual_report_after_fiscal_year_end"/>
     </informationRequirement>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir3">
-      <requiredDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
+      <requiredDecision href="#decision_ongoing_reporting_obligation"/>
     </informationRequirement>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir4">
-      <requiredInput href="#input_annual_cycles"/>
+      <requiredDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
     </informationRequirement>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir5">
+      <requiredInput href="#input_annual_cycles"/>
+    </informationRequirement>
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir6">
       <requiredInput href="#input_status_2"/>
     </informationRequirement>
     <literalExpression id="decision_ongoing_reporting_obligation_literal">
@@ -2868,14 +2871,18 @@
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir3_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir3">
-        <di:waypoint x="1030" y="540"/>
+        <di:waypoint x="590" y="380"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
-        <di:waypoint x="4330" y="1020"/>
+        <di:waypoint x="1030" y="540"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
+        <di:waypoint x="4330" y="1020"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir6_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir6">
         <di:waypoint x="4110" y="1020"/>
         <di:waypoint x="590" y="460"/>
       </dmndi:DMNEdge>

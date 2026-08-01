@@ -440,8 +440,10 @@ dmndiXml drg =
   waypoint x y = Elem "di:waypoint" [("x", tshowInt x), ("y", tshowInt y)] []
 
 -- | Longest path to an input, so an edge always points from a lower row to a
--- higher one. The fold is bounded by the number of decisions, which terminates
--- even if a cycle sneaks past the self-reference filter in "L4.Dmn.Lower".
+-- higher one. The fold is bounded by the number of decisions, so it terminates
+-- on a cyclic requirement graph — which CAN occur, deliberately: §6.4.4-2/-4
+-- emit a source-level cycle as it is (with a Blocking @D-CYCLE@ note from
+-- 'L4.Dmn.IR.checkDrg') rather than repairing it into a different model.
 decisionLevels :: Drg -> Map Text Int
 decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (length ds)
  where
@@ -450,7 +452,17 @@ decisionLevels drg = go (Map.fromList [(i.idId, 0) | i <- drgInputData drg]) (le
   go acc n = let acc' = step acc in if acc' == acc then acc else go acc' (n - 1 :: Int)
   step acc = foldl' bump acc ds
   bump acc d =
-    let deps = [Map.findWithDefault 0 (requirementTarget r) acc | r <- d.dcnRequirements]
+    -- A SELF-edge is excluded from the layout only, not from the model: with it
+    -- included, `1 + max(deps)` re-raises the node's own level on every
+    -- relaxation pass until the fuel runs out, which stretched a 96-decision
+    -- corpus diagram to y ≈ 15000 for one self-recursive decision. The edge
+    -- stays in the emitted requirements (§6.4.4-2); the diagram simply does not
+    -- let it define "one row above itself".
+    let deps = [ Map.findWithDefault 0 t acc
+               | r <- d.dcnRequirements
+               , let t = requirementTarget r
+               , t /= d.dcnId
+               ]
     in Map.insert d.dcnId (1 + maximum (0 : deps)) acc
 
 tshowInt :: Int -> Text

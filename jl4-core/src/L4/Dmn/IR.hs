@@ -81,16 +81,21 @@ module L4.Dmn.IR
   , fidelityLossCode
   , drgNotesAll
   , dmnReport
+    -- * Well-formedness (R5)
+  , checkDrg
+  , cyclicGroups
   ) where
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.Graph as Graph
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
 import Data.Time.Calendar (Day, showGregorian)
 
-import L4.Interchange.Fidelity (FidelityNote (..), FidelityReport, addNote, emptyReport)
+import L4.Interchange.Fidelity
+  (FidelityNote (..), FidelityReport, FidelitySeverity (..), addNote, emptyReport)
 
 ------------------------------------------------------------------------
 -- Cells
@@ -896,16 +901,92 @@ renderFidelityLoss = \case
     "a WHERE/LET local could not be inlined (parameterised, or effectful)"
   SumTypeRead what -> what
 
--- | Every note in a 'Drg': the module-level ones, then each table\'s own, in
--- decision order.
+-- | Every note in a 'Drg': the module-level ones, then 'checkDrg'\'s
+-- well-formedness findings, then each table\'s own, in decision order. The
+-- ordering is fixed (§6.4.4-1) so that adding a well-formedness check does not
+-- churn every golden that carries module notes.
 drgNotesAll :: Drg -> [FidelityNote]
 drgNotesAll drg =
   drg.drgNotes
+    <> checkDrg drg
     <> [ note
        | NodeDecision d <- drg.drgNodes
        , LogicTable t <- [d.dcnLogic]
        , note <- t.dtNotes
        ]
+
+------------------------------------------------------------------------
+-- Well-formedness (R5, §6.4)
+------------------------------------------------------------------------
+
+-- | The cyclic strongly connected components of a keyed edge list, in the
+-- traversal order 'Graph.stronglyConnComp' gives (reverse topological, which is
+-- deterministic in the input order).
+--
+-- __One detector, three graphs__ (§6.4.4): DMN 1.3 states the same acyclicity
+-- @SHALL@ three times — §6.3.7 for a Decision\'s @informationRequirement@
+-- subgraph, §6.3.9 for a BusinessKnowledgeModel\'s @knowledgeRequirement@
+-- subgraph, §6.3.10 for a DecisionService\'s. 'checkDrg' runs this routine over
+-- the first two; "L4.Dmn.Lower"\'s §2.3.2 service splitter runs it over the
+-- third, mid-lowering — which is why it is exported rather than inlined.
+--
+-- The §6.4.4-3 side condition — @|SCC| ≥ 2@, __or__ @|SCC| = 1@ with a
+-- self-edge — is exactly 'Graph.CyclicSCC': a vertex with a self-loop is
+-- cyclic, a vertex merely on no cycle is 'Graph.AcyclicSCC'. Both obvious
+-- defaults are wrong (literal "one per SCC" notes every acyclic node; "size
+-- ≥ 2" silently undoes the §6.4.4-2 self-edge un-suppression).
+cyclicGroups :: Ord k => [(n, k, [k])] -> [[n]]
+cyclicGroups nodes = [ns | Graph.CyclicSCC ns <- Graph.stronglyConnComp nodes]
+
+-- | Well-formedness of the finished IR (§6.4.4-1): a plain function over 'Drg',
+-- folded into 'drgNotesAll', and __also callable from "L4.Dmn.Lower"
+-- mid-lowering__ (§6.4.4-6, the §2.3.2 splitter fixpoint).
+--
+-- One note per offending SCC, @range = Nothing@ (a cycle is not at a point;
+-- same ruling as BPMN\'s @P-CYCLE@), naming every member by __name and id__ —
+-- names alone are ambiguous under §5.2\'s uniquifier, which can emit two
+-- decisions both labelled @shared@.
+checkDrg :: Drg -> [FidelityNote]
+checkDrg drg = cycleNotes
+ where
+  decisions = drgDecisions drg
+
+  -- §6.3.7: the informationRequirement graph. Only decision→decision edges can
+  -- close a cycle (an inputData has no requirements), so the graph is over
+  -- decisions with their RequiredDecision edges.
+  cycleNotes =
+    [ MkFidelityNote
+        { code     = "D-CYCLE"
+        , severity = Blocking
+        , element  = headId ds
+        , range    = Nothing
+        , message  = cycleMessage "informationRequirement" "decision" (memberList ds)
+        , lost     =
+            "loadability: DMN 1.3 §6.3.7 requires a Decision's requirement subgraph to \
+            \be acyclic. KIE 8.44 reports `Cyclic dependency detected` and skips the \
+            \node; Camunda 8 rejects the whole file at parse"
+        }
+    | ds <- cyclicGroups
+        [ (d, d.dcnId, [t | RequiredDecision t <- d.dcnRequirements])
+        | d <- decisions
+        ]
+    , let memberList xs = [(x.dcnName, x.dcnId) | x <- xs]
+    , let headId xs = case xs of (x : _) -> x.dcnId; [] -> ""
+    ]
+
+-- | The prose shared by the cycle findings: one member reads "requires itself",
+-- several read as a cycle listing every member by name and id.
+cycleMessage :: Text -> Text -> [(Text, Text)] -> Text
+cycleMessage graphName kind members = case members of
+  [(nm, eid)] ->
+    kind <> " `" <> nm <> "` (" <> eid <> ") requires itself: its "
+      <> graphName <> " subgraph has a self-edge"
+  _ ->
+    tshowLen (length members) <> " " <> kind <> "s form a cycle in the "
+      <> graphName <> " graph: "
+      <> Text.intercalate ", " ["`" <> nm <> "` (" <> eid <> ")" | (nm, eid) <- members]
+ where
+  tshowLen = Text.pack . show
 
 -- | The XML backend\'s report.
 --

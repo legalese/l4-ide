@@ -446,6 +446,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-BKM] advisory — decision_an_arrangement_with
       `an arrangement with` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `the base case qualifies`, `the delinquent-issuer case qualifies`, `the over-limit-investor case qualifies`, `the short-availability case qualifies`, `the under-assured-financials case qualifies`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
       lost: nothing yet: this is a classification, not a change of behaviour
+  [D-CYCLE] blocking — decision_ongoing_reporting_obligation
+      decision `ongoing reporting obligation` (decision_ongoing_reporting_obligation) requires itself: its informationRequirement subgraph has a self-edge
+      lost: loadability: DMN 1.3 §6.3.7 requires a Decision's requirement subgraph to be acyclic. KIE 8.44 reports `Cyclic dependency detected` and skips the node; Camunda 8 rejects the whole file at parse
   [D-COMPUTEDOUTPUT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:142:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

@@ -1,6 +1,6 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_sec_regulation_crowdfunding_17_cfr_part_227
-      dmnmd is a table format, not a graph: the 189 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 190 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOLITERAL] blocking — decision_reg_cf_commenced
       `Reg CF commenced` is a formula (date("2016-05-16")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

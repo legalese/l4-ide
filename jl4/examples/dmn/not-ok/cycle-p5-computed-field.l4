@@ -18,11 +18,15 @@
 -- rewires `dcnRequirements` around computed fields (§4.4.4, R11): a hydrated
 -- record's computed field becomes a context ENTRY, and the enclosing decision
 -- acquires the entry's dependencies. That is precisely the mechanism that could
--- turn the missing edge into a present one. Phase 5 inherits the instruction;
--- whoever wires this fixture must RE-MEASURE rather than copy this paragraph.
+-- turn the missing edge into a present one.
 --
--- Expected: UNKNOWN, on purpose. Record the measurement here when it is taken,
--- with the date and the tree state, and say which of the two edges emitted.
+-- RE-MEASURED 2026-08-01 (tree: mengwong/dmn-phase5-bkm, checkDrg landed): the
+-- hydrator CLOSES the cycle. `the assessed total` requires
+-- `hydration_the_case_file` (the computed read folds onto the hydrator) and the
+-- hydrator requires `decision_the_assessed_total` back (its `grossed` entry
+-- reads it), so BOTH directions now emit and checkDrg reports one D-CYCLE whose
+-- members are the decision AND the hydrator. Pinned in jl4/tests/DmnExport.hs
+-- ("checkDrg / D-CYCLE"), which is the measurement of record.
 --
 --
 -- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)

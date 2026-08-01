@@ -3031,6 +3031,116 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       goldenOf examplesRoot srcPath (stem <> ".md.fidelity.txt")
         (renderReport . markdownReport)
 
+  -- R5 (§6.4): checkDrg + D-CYCLE over the informationRequirement graph, and
+  -- the §6.4.4-2 self-edge un-suppression. Every expectation below was
+  -- MEASURED on 2026-08-01 against this tree (the fixtures' own headers say
+  -- their stated expectations were transcribed without a build and must be
+  -- measured, not copied — this block is that measurement).
+  describe "checkDrg / D-CYCLE (R5, §6.4)" $ do
+    it "counts a one-member SCC only when it has a self-edge (§6.4.4-3)" $ do
+      -- Both obvious defaults are wrong: literal "one per SCC" notes every
+      -- acyclic node; "size >= 2" silently undoes the self-edge fix.
+      let groups :: [(Text, Text, [Text])] -> [[Text]]
+          groups = cyclicGroups
+      groups [("a", "a", ["a"])] `shouldBe` [["a"]]
+      groups [("a", "a", []), ("b", "b", ["a"])] `shouldBe` []
+
+    let cycleNotesOf drg = [n | n <- drgNotesAll drg, n.code == "D-CYCLE"]
+        notOkDrg fp = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> fp)
+          pure (drgAsCli fp src)
+
+    it "p1 (forward reference): genuinely acyclic, no D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p1-forward.l4"
+      cycleNotesOf drg `shouldBe` []
+
+    it "p2 (mutual recursion, nullary): one Blocking note naming both members by name AND id" $ do
+      drg <- notOkDrg "cycle-p2-mutual-nullary.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.severity `shouldBe` Blocking
+          n.range `shouldBe` Nothing
+          for_ [ "`the left total`", "decision_the_left_total"
+               , "`the right total`", "decision_the_right_total" ] \needle ->
+            n.message `shouldSatisfy` Text.isInfixOf needle
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
+    it "p2 (mutual recursion, parameterised): D-CYCLE now, and stays the §6.3.9 arm's corpus for Phase 5" $ do
+      -- MEASURED: the combined report carries one D-CYCLE (the requirement
+      -- graph records the cycle) AND two Lossy D-PARTIAL ("mutually recursive
+      -- with", every call site lazy) from Phase 4's SCC-ordered TOTAL pass —
+      -- so neither decide is certified total, neither can become a BKM, and
+      -- the knowledgeRequirement graph never carries this cycle. D-RECURSIVE
+      -- (§6.3.9) therefore has no reachable L4 source shape today; it is
+      -- exercised at the IR level instead (see the D-RECURSIVE block below).
+      drg <- notOkDrg "cycle-p2-mutual-parameterised.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+      [n.severity | n <- drgNotesAll drg, n.code == "D-PARTIAL"]
+        `shouldBe` [Lossy, Lossy]
+
+    it "p3 (self-recursion): the un-suppressed self-edge is a one-member SCC, said as 'requires itself'" $ do
+      -- Before §6.4.4-2 this exported with NO self-edge and advisory-only
+      -- fidelity: freeRefs bound the decide's own name and classifyRef
+      -- filtered target /= did, so the case §6.3.7 names FIRST was erased
+      -- before any graph saw it.
+      drg <- notOkDrg "cycle-p3-self.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "requires itself"
+          n.message `shouldSatisfy` Text.isInfixOf "`countdown` (decision_countdown)"
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+      -- and the emitted artifact carries the edge it reports
+      emitDrg drg `shouldSatisfy`
+        Text.isInfixOf "<requiredDecision href=\"#decision_countdown\"/>"
+
+    it "p4 (cycle through a WHERE-local, two decisions): D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p4-where-local.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p4-self (WHERE-local recursing on itself): NO cycle finding, by concession §6.4.5" $ do
+      -- The only cycle is INSIDE one node; no SCC over the DRG can see it.
+      -- This fixture is the concession's witness: it is caught today by
+      -- D-PARTIAL (TERMINATES) and D-LITERALEXPR, which is luck, not a graph
+      -- check. If a cycle finding ever appears here, the graph grew nodes it
+      -- did not have — reread §6.4.5 before touching this test.
+      drg <- notOkDrg "cycle-p4-where-local-self.l4"
+      cycleNotesOf drg `shouldBe` []
+      [n.code | n <- drgNotesAll drg, n.code `elem` ["D-PARTIAL", "D-LITERALEXPR"]]
+        `shouldSatisfy` (not . null)
+
+    it "p5 (cycle through a record computed field): the §6.4.5 obligation, re-measured — the hydrator closes it" $ do
+      -- §6.4.2's table (measured pre-Phase-3) said "no — one direction only,
+      -- Proj filtered". RE-MEASURED 2026-08-01 as §6.4.5 instructed: Phase
+      -- 3.6's hydration rewiring (R11) turned the missing edge into a present
+      -- one — the computed read folds onto the hydrator, the reading decision
+      -- requires the hydrator, and the hydrator requires its source decision —
+      -- so the cycle IS now in the DRG, with the hydrator as a member.
+      drg <- notOkDrg "cycle-p5-computed-field.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "decision_the_assessed_total"
+          n.message `shouldSatisfy` Text.isInfixOf "hydration_the_case_file"
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
+    it "p6 (section-qualified mutual recursion): D-CYCLE, no longer advisory-only" $ do
+      drg <- notOkDrg "cycle-p6-section-qualified.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p7 (nullary MEANS cycle): D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p7-means.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p8 (cycle through a guard): D-CYCLE, no longer '(nothing lost)'" $ do
+      drg <- notOkDrg "cycle-p8-guard.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p9 (3-cycle among nullary decisions): one note, three members" $ do
+      drg <- notOkDrg "cycle-p9-triangle.l4"
+      case cycleNotesOf drg of
+        [n] -> for_ ["`stage one`", "`stage two`", "`stage three`"] \needle ->
+          n.message `shouldSatisfy` Text.isInfixOf needle
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
 ------------------------------------------------------------------------
 -- golden
 ------------------------------------------------------------------------

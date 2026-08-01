@@ -28,11 +28,14 @@ module L4.TypeCheck
 -- as being a multi-definition with several different valid
 -- instantiations.]
 --
--- As of now, scope and type-checking is essentially still a
--- one-pass process. We traverse the AST and resolve all information
--- as we go. This means that currently, forward references are not
--- possible. We are planning to change this by making two passes
--- and some dependency analysis. (TODO)
+-- Scope and type-checking runs as a three-phase pipeline that scans
+-- all top-level declarations before inferring bodies, so forward
+-- references among top-level definitions ARE possible (see
+-- specs/done/SECTION-LEXICAL-SCOPING-SPEC.md). An earlier version of
+-- this comment said the opposite ("forward references are not
+-- possible"), and that stale sentence was reasoned from downstream:
+-- it is what produced R5's false premise that no L4 module can spell
+-- a requirement cycle (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6.4).
 --
 -- The result of scope- and type checking is a new program with
 -- resolved names everywhere. So after this phase, the unique

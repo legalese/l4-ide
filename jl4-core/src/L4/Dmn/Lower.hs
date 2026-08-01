@@ -4837,20 +4837,25 @@ lowerModule opts modul@(MkModule _ uri _) =
         , Just hid <- [Map.lookup u hydratorIdByInstance]
         ]
 
-  -- DMN 7.3.1: a Decision SHALL not require itself, "directly or indirectly".
+  -- DMN 1.3 §6.3.7: a Decision SHALL not require itself, "directly or
+  -- indirectly". Both cases are DETECTED, not suppressed (§6.4.4-2):
   --
-  -- The direct case is already handled upstream -- 'freeRefs' treats a
-  -- decision's own name as bound -- and the guard below is belt-and-braces
-  -- behind that.
-  --
-  -- The INDIRECT case is not detected, and deliberately so: a cycle among top-
-  -- level DECIDEs would need a forward reference, which L4's one-pass scope
-  -- checker does not currently admit, so no L4 module can produce one. If
-  -- forward references land, this becomes a real gap and wants a cycle check
-  -- with its own fidelity note.
-  classifyRef did r = case Map.lookup u decideByUnique of
-    Just target | target /= did -> Just (RequiredDecision target)
-                | otherwise     -> Nothing
+  --   * the direct case used to be erased here (a `target /= did` arm) and in
+  --     'freeRefs' (which bound the decide's own name), so a self-requiring
+  --     decision exported with advisory-only fidelity, KIE compiled it, and
+  --     `x=false` answered a silent null [SUCCEEDED]. The filter was what
+  --     converted a violation three engines catch loudly into a silent one.
+  --     Deleted; a self-edge now reaches 'dcnRequirements' and 'checkDrg'
+  --     reports it as a one-member SCC (`D-CYCLE`).
+  --   * the indirect case exists — L4 DOES admit forward references among
+  --     top-level DECIDEs (the three-phase pipeline scans declarations before
+  --     inferring bodies; an earlier version of this comment asserted the
+  --     opposite, reasoned from a stale TypeCheck.hs header) — and is the same
+  --     SCC check's ≥ 2 arm.
+  -- The first parameter (the owner's id) is retained so every call site reads
+  -- unchanged; nothing branches on it any more.
+  classifyRef _did r = case Map.lookup u decideByUnique of
+    Just target -> Just (RequiredDecision target)
     Nothing -> RequiredInput <$> Map.lookup u inputByUnique
    where
     u = getUnique r
@@ -4941,11 +4946,18 @@ decideName = nameOf . decideResolved
 -- term); constructors and names from other modules are dropped by the caller,
 -- which is what keeps every prelude function and builtin out of the DRG.
 freeRefs :: Decide Resolved -> [Resolved]
-freeRefs d@(MkDecide _ _ _ body) =
+freeRefs (MkDecide _ _ _ body) =
   [r | r <- refs, not (Set.member (getUnique r) bound)]
  where
   allResolved = toList body
-  bound = Set.fromList ([u | Def u _ <- allResolved] <> [getUnique (decideResolved d)])
+  -- The decide's OWN name is deliberately NOT in `bound` (§6.4.4-2): treating a
+  -- self-reference as bound erased the self-edge before any graph could see it,
+  -- which is how a decision that requires itself — the case DMN 1.3 §6.3.7
+  -- names first — exported with advisory-only fidelity. Downstream consumers
+  -- are unaffected: 'decideFreeTerms' filters `decideByUnique` membership, so
+  -- the own name cannot mint an inputData; what it now CAN do is reach
+  -- 'classifyRef' and appear in 'dcnRequirements' as the self-edge it is.
+  bound = Set.fromList [u | Def u _ <- allResolved]
   projFields = Set.fromList
     [getUnique n | Proj _ _ n <- toListOf (cosmosOf (gplate @(Expr Resolved))) body]
   refs = nubOrdOn getUnique
