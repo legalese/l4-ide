@@ -280,6 +280,17 @@ data SafetyInput = MkSafetyInput
     -- sound for imported enums, @WHERE@-scoped @CONSIDER@s, @MAYBE@,
     -- @BOOLEAN@ and @LIST@ — Phase 0.5, vendored onto this line before
     -- Phase 4 was built.
+  , siClauseMatrixRanges :: ![SrcRange]
+    -- ^ source ranges (clause-head hulls) of the checker's
+    -- @PatternClausesMissing@ warnings — L1's THIRD channel, at Decide
+    -- level, for multi-clause pattern-matching groups (§14.7). Kept
+    -- separate from 'siMissingRanges': 'considerIssues' matches those
+    -- against CONSIDER ranges, which a clause-head hull would never sit
+    -- inside (the desugarer's CONSIDERs are rangeless) — so reuse would
+    -- silently not fire; and a Decide-level check over the SHARED list
+    -- would double-report every ordinary partial CONSIDER (whose warning
+    -- range also sits inside its Decide). Two constructors, two lists, one
+    -- check each.
   , siNonexhaustive  :: !(Set Unique)
     -- ^ decides carrying @\@nonexhaustive@ — the author's own declaration that
     -- the match is incomplete (L2). A REJECT signal, never a remedy.
@@ -434,6 +445,14 @@ analyzeSafety inp cg decides =
            "the definition is decorated @nonexhaustive: its author declares the match incomplete"
        | Set.member u inp.siNonexhaustive
        ]
+         -- L1, Decide-level channel: the checker's clause-matrix warning
+         -- for a multi-clause pattern-matching group (§14.7). Wording per
+         -- §2.4.4: the run-time consequence, never @nonexhaustive as remedy.
+         <> [ MkSafetyIssue "L1" dAnn.range
+                "the checker reports this multi-clause definition non-exhaustive \
+                \(a clause is missing; NonExhaustivePatterns at run time; null in FEEL)"
+            | maybe False (\dr -> any (rangeWithin dr) inp.siClauseMatrixRanges) dAnn.range
+            ]
          <> selfRecursionIssues d body
          <> walkIssues StrictPos body
 
