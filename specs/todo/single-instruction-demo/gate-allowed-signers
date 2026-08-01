@@ -1,0 +1,36 @@
+# ssh allowed_signers — the humans who may grant HG1 and HG2.
+#
+# SPEC.md §7.3 defines exactly two human gates in the "SEC Regulation
+# Crowdfunding: go" pipeline:
+#
+#   HG1  after P5, before P6's tests are treated as specifications
+#        — domain-expert review of the inert-style L4
+#   HG2  anything outward-facing — creating the corpus repo, publishing the
+#        report, ANY lexipedia contact (including after R2's read-only probe)
+#
+# etc/go/gate-verify.sh is the only reader of this file. It runs:
+#
+#   ssh-keygen -Y verify -f <this file> -I <identity> \
+#              -n l4-go-gate|l4-go-gate-hg2 -s <sig> < <payload>
+#
+# THIS FILE SHIPS EMPTY OF KEYS, DELIBERATELY. No signer is enrolled, so every
+# gated stage refuses with exit 3 and says why. The orchestrator does not
+# invent an approver, and it does not carry a key it was not given.
+#
+# To enrol, append one line in ssh allowed_signers format:
+#
+#   mengwong@gmail.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… comment
+#
+# and grant a gate by signing the requested payload out of band, with a private
+# key that never enters this worktree:
+#
+#   etc/go/gate-request.sh HG1 --run <rundir>
+#   ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n l4-go-gate <rundir>/HG1.payload.txt
+#
+# Agents can verify and cannot sign. Until a key is enrolled here, the only way
+# past a gate is an explicit, recorded waiver:
+#
+#   etc/go/go.sh run … --waive HG1="reason this run may proceed unsigned"
+#
+# which lands on the journal as a gate record with state=waived and prints in
+# the report's Gates section. A waiver that is not in the report is impossible.

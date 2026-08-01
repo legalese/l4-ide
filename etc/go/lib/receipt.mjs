@@ -22,7 +22,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { append, sha256File } from "./ledger.mjs";
+import { append, read, sha256File } from "./ledger.mjs";
 import { checkReceipt, EXIT } from "./verdict.mjs";
 
 function parseArgs(argv) {
@@ -85,6 +85,11 @@ switch (kind) {
       fixed_now: args.fixed_now ?? null,
       l4_binary: args.l4_binary ?? null,
       declared_stages: (args.declared ?? "").split(",").filter(Boolean),
+      // Which stages each gate gates, recorded at run_begin so a later
+      // `verify --gates` can check the ORDERING — that a granted gate was
+      // recorded before the first stage it gates began — without trusting the
+      // driver that wrote the journal.
+      gated_stages: args.gated_stages ?? null,
     });
     break;
   }
@@ -93,20 +98,39 @@ switch (kind) {
     append(journal, {
       kind: "stage_begin",
       stage: args.stage,
-      inputs_digest: args.inputs_digest ?? null,
+      inputs_digest: args.inputs_digest || null,
       attempt: Number(args.attempt ?? 1),
     });
     break;
   }
 
   case "stage_end": {
+    // On a replay, the artifact records are copied VERBATIM from the receipt
+    // being replayed, not re-hashed from disk. Re-hashing would launder a file
+    // that changed after the original receipt was written; copying keeps the
+    // original sha256 so `go.sh verify` still compares it against what is on
+    // disk now and reports CHANGED.
+    let artifacts;
+    if (args.artifacts_from) {
+      const prior = read(journal).find((r) => r.hash === args.artifacts_from);
+      if (!prior) {
+        process.stderr.write(
+          `receipt.mjs: --artifacts-from ${args.artifacts_from} names no record in this journal\n`,
+        );
+        process.exit(EXIT.BROKEN);
+      }
+      artifacts = prior.artifacts ?? [];
+    } else {
+      artifacts = args.artifact.map(artifactRecord);
+    }
+
     const receipt = {
       kind: "stage_end",
       stage: args.stage,
       status: args.status,
       reason: args.reason ?? null,
       blocker: args.blocker ?? null,
-      artifacts: args.artifact.map(artifactRecord),
+      artifacts,
       oracle: args.oracle_cmd
         ? {
             cmd: args.oracle_cmd,
@@ -121,7 +145,7 @@ switch (kind) {
         author: args.author ?? "phase-script",
         verified: false,
       })),
-      inputs_digest: args.inputs_digest ?? null,
+      inputs_digest: args.inputs_digest || null,
       attempt: Number(args.attempt ?? 1),
       replayed_from: args.replayed_from ?? null,
       label: args.label ?? null,

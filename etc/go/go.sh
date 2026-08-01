@@ -1,0 +1,485 @@
+#!/usr/bin/env bash
+# go.sh — the only entry point of the "SEC Regulation Crowdfunding: go" pipeline.
+#
+# Phase dispatch, gate enforcement, resumability. Everything with an exit code
+# lives under etc/go/; everything that is a judgement lives in the skill at
+# .claude/skills/running-the-l4-pipeline/. This script never calls a model, and
+# the skill never writes a status.
+#
+# Scope today: MILESTONE G1 — the replay run. It drives the EXISTING corpus
+# through every currently-reachable projection and emits conversion report v0.
+# No de novo encoding. G2's stages exist as entry points that refuse with a
+# named blocker; see `go.sh plan --milestone g2`.
+#
+# This script NEVER runs cabal, never commits, and never pushes.
+#
+#   Usage:  etc/go/go.sh <command> [options]
+#
+#     run     --milestone g1 --subject regcf [--run-id ID] [--through STAGE]
+#             [--only STAGE] [--waive GATE=REASON] [--fixed-now ISO8601]
+#     plan    [--milestone g1|g2]
+#     status  [--run-id ID]
+#     verify  [--run-id ID] [--gates]
+#     gc      [--keep N]
+#     help
+#
+#   Exit codes (extending etc/check-bpmn-kie.sh's 0/1/2/3/4):
+#     0 clean   1 finding   2 usage   3 gate   4 broken   5 skipped-while-required
+#
+#   Environment:
+#     L4                   path to a prebuilt `l4`. REQUIRED — this script does
+#                          not build. Same escape hatch as JL4_LSP_CMD=/DMNMD=.
+#     JL4_LSP_CMD          prebuilt jl4-lsp, for the ladder leg
+#     JL4_GO_SERVICE_URL   a LOOPBACK jl4-service for the MCP leg; non-loopback
+#                          is refused (an outward-facing write is HG2's)
+#     L4_GO_RUNDIR         where runs live (default $TMPDIR/l4-go)
+#     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI wants
+#     L4_GO_FIXED_NOW      pin the clock (default 2025-01-31T00:00:00Z)
+
+set -euo pipefail
+
+GO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PHASES="$GO_ROOT/etc/go/phases"
+LIB="$GO_ROOT/etc/go/lib"
+
+# --- the stage table --------------------------------------------------------
+# G1's declared stages, in order. `p9-report` is last: the report reads the
+# journal, so it must run after everything that writes to it.
+G1_STAGES=(
+  p0-preflight
+  p3-check
+  p6-tests
+  p7-dmn
+  p7-dmn-md
+  p7-bpmn
+  p7-ladder
+  p7-lts
+  p7-mcp
+  p7-tnr
+  p7-wizard
+  p7-akn
+  p9-report
+)
+
+# Stages that exist as entry points and cannot run. Each refuses with exit 3 and
+# names its blocker. They are NOT declared members of any milestone, so they
+# cannot make a milestone INCOMPLETE by their absence.
+UNIMPLEMENTED_STAGES=(p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p10-publish)
+
+# SPEC.md §7.3: exactly two human gates. HG1 blocks P6 onward; HG2 blocks
+# anything outward-facing, which at G1 means the MCP deployment leg and P10.
+gated_by_HG1="p6-tests p7-dmn p7-dmn-md p7-bpmn p7-ladder p7-lts p7-mcp p7-tnr p7-wizard p7-akn p9-report"
+gated_by_HG2="p10-publish"
+
+usage() {
+  sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+die_usage() {
+  echo "go.sh: $1" >&2
+  echo "run 'etc/go/go.sh help' for usage" >&2
+  exit 2
+}
+
+# --- argument parsing -------------------------------------------------------
+CMD="${1:-help}"
+shift || true
+
+MILESTONE="g1"
+SUBJECT="regcf"
+RUN_ID=""
+THROUGH=""
+ONLY=""
+KEEP=5
+WANT_GATES=0
+declare -a WAIVERS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --milestone)
+      MILESTONE="$2"
+      shift 2
+      ;;
+    --subject)
+      SUBJECT="$2"
+      shift 2
+      ;;
+    --run-id)
+      RUN_ID="$2"
+      shift 2
+      ;;
+    --through)
+      THROUGH="$2"
+      shift 2
+      ;;
+    --only)
+      ONLY="$2"
+      shift 2
+      ;;
+    --waive)
+      WAIVERS+=("$2")
+      shift 2
+      ;;
+    --fixed-now)
+      L4_GO_FIXED_NOW="$2"
+      shift 2
+      ;;
+    --keep)
+      KEEP="$2"
+      shift 2
+      ;;
+    --gates)
+      WANT_GATES=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *) die_usage "unknown option $1" ;;
+  esac
+done
+
+RUNDIR_BASE="${L4_GO_RUNDIR:-${TMPDIR:-/tmp}/l4-go}"
+FIXED_NOW="${L4_GO_FIXED_NOW:-2025-01-31T00:00:00Z}"
+
+# --- subject resolution -----------------------------------------------------
+case "$SUBJECT" in
+  regcf)
+    GO_CORPUS="$GO_ROOT/jl4/examples/legal/regcf/regcf.l4"
+    GO_WIZARD="$GO_ROOT/jl4/examples/legal/regcf/regcf-wizard.l4"
+    ;;
+  *)
+    echo "go.sh: subject '$SUBJECT' is not implemented." >&2
+    echo "  SPEC.md scopes the demo to 17 CFR Part 227 (Reg CF) only; the subject is a" >&2
+    echo "  parameter but nothing beyond Reg CF gates acceptance. Only 'regcf' resolves." >&2
+    exit 2
+    ;;
+esac
+
+stages_for() {
+  case "$1" in
+    g1) printf '%s\n' "${G1_STAGES[@]}" ;;
+    g2)
+      echo "go.sh: milestone g2 is UNBUILT." >&2
+      echo "  SPEC.md §6 gates G2 entry on ruling R4 (ambiguity-fork representation), which" >&2
+      echo "  is OPEN. The de novo stages p1-ingest, p2-sweep, p3-encode, p4-forks, p5-gate" >&2
+      echo "  and the §8 diff oracle exist as entry points that refuse; run one directly to" >&2
+      echo "  see its blocker. Building fork tooling against an unruled representation is" >&2
+      echo "  building to be rewritten." >&2
+      return 3
+      ;;
+    *)
+      echo "go.sh: unknown milestone '$1'; SPEC.md §6 defines G0-G4 and this driver implements G1." >&2
+      return 2
+      ;;
+  esac
+}
+
+# --- commands ---------------------------------------------------------------
+
+cmd_plan() {
+  local rc=0
+  local stages
+  stages=$(stages_for "$MILESTONE") || rc=$?
+  [[ $rc -eq 0 ]] || exit $rc
+  echo "milestone $MILESTONE, subject $SUBJECT — declared stages, in order:"
+  local s
+  while read -r s; do
+    local gate="-"
+    [[ " $gated_by_HG1 " == *" $s "* ]] && gate="HG1"
+    [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
+    printf '  %-14s gate=%-4s %s\n' "$s" "$gate" "$PHASES/$s.sh"
+  done <<<"$stages"
+  echo
+  echo "entry points that exist and refuse, each with a named blocker:"
+  for s in "${UNIMPLEMENTED_STAGES[@]}"; do printf '  %-14s %s\n' "$s" "$PHASES/$s.sh"; done
+  echo
+  echo "the milestone rule: $MILESTONE is COMPLETE when every declared stage has a"
+  echo "receipt, no receipt is BROKEN, every non-PASS receipt carries a reason that"
+  echo "appears in the report, and every gate is satisfied or explicitly waived."
+  echo "That is completeness of accounting, not greenness — SPEC.md §6 permits a"
+  echo "non-executable DMN at G1 provided the report says so in Blocking terms."
+}
+
+latest_run() {
+  ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sort | tail -1 | sed 's:/$::'
+}
+
+resolve_run() {
+  if [[ -n "$RUN_ID" ]]; then
+    echo "$RUNDIR_BASE/$RUN_ID"
+  else
+    local l
+    l=$(latest_run || true)
+    [[ -n "$l" ]] || {
+      echo "go.sh: no runs under $RUNDIR_BASE" >&2
+      exit 2
+    }
+    echo "$l"
+  fi
+}
+
+cmd_status() {
+  node "$LIB/verify-run.mjs" "$(resolve_run)"
+}
+
+cmd_verify() {
+  local extra=()
+  [[ $WANT_GATES -eq 1 ]] && extra+=(--gates)
+  node "$LIB/verify-run.mjs" "$(resolve_run)" "${extra[@]}"
+}
+
+cmd_gc() {
+  # Retention: keep the latest run per subject, AND any run holding a granted
+  # gate verdict — a signature is expensive to obtain and must not be collected.
+  local keep_ids=()
+  local d
+  for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
+    if grep -q '"kind":"gate"' "$d/journal.ndjson" 2>/dev/null && grep -q '"state":"satisfied"' "$d/journal.ndjson" 2>/dev/null; then
+      keep_ids+=("$d")
+    fi
+  done
+  for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::' | sort | tail -"$KEEP"); do keep_ids+=("$d"); done
+  local removed=0
+  for d in $(ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sed 's:/$::'); do
+    local k
+    local keep=0
+    for k in "${keep_ids[@]}"; do [[ "$k" == "$d" ]] && keep=1; done
+    if [[ $keep -eq 0 ]]; then
+      rm -rf "$d"
+      removed=$((removed + 1))
+      echo "gc: removed $d"
+    fi
+  done
+  echo "gc: kept ${#keep_ids[@]} run dir(s) (latest $KEEP, plus every run holding a granted gate); removed $removed"
+}
+
+cmd_run() {
+  local stages rc=0
+  stages=$(stages_for "$MILESTONE") || rc=$?
+  [[ $rc -eq 0 ]] || exit $rc
+
+  # --- the one hard prerequisite: a prebuilt l4 ------------------------------
+  if [[ -z "${L4:-}" ]]; then
+    cat >&2 <<EOF
+go.sh: L4 is unset.
+
+This orchestrator never runs cabal — the build lock is a shared resource and
+concurrent invocations in one worktree corrupt each other (CLAUDE.md §2.1).
+Point L4 at a prebuilt binary, the same escape hatch as JL4_LSP_CMD= and DMNMD=:
+
+  export L4=/path/to/dist-newstyle/build/<arch>/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4
+EOF
+    exit 2
+  fi
+  if [[ ! -x "$L4" ]] && ! command -v "$L4" >/dev/null 2>&1; then
+    echo "go.sh: L4=$L4 is not executable and not on PATH" >&2
+    exit 2
+  fi
+
+  export JL4_LIBRARY_PATH="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
+
+  # --- run id + run dir ------------------------------------------------------
+  local corpus_sha8
+  corpus_sha8=$(node "$LIB/digest.mjs" "$GO_CORPUS" "$GO_WIZARD" | sed 's/^sha256://' | cut -c1-8)
+  local RUN
+  if [[ -n "$RUN_ID" ]]; then
+    RUN="$RUNDIR_BASE/$RUN_ID"
+    [[ -d "$RUN" ]] || {
+      echo "go.sh: --run-id $RUN_ID has no directory at $RUN" >&2
+      exit 2
+    }
+  else
+    local day seq
+    day=$(date -u +%Y-%m-%d)
+    seq=1
+    while [[ -d "$RUNDIR_BASE/$day-$corpus_sha8-$(printf '%03d' $seq)" ]]; do seq=$((seq + 1)); done
+    RUN_ID="$day-$corpus_sha8-$(printf '%03d' $seq)"
+    RUN="$RUNDIR_BASE/$RUN_ID"
+    mkdir -p "$RUN/artifacts"
+  fi
+
+  local head tree_state
+  head=$(git -C "$GO_ROOT" rev-parse HEAD 2>/dev/null || echo "(not a git tree)")
+  if [[ -n "$(git -C "$GO_ROOT" status --porcelain 2>/dev/null)" ]]; then tree_state="dirty"; else tree_state="clean"; fi
+
+  export GO_ROOT GO_CORPUS GO_WIZARD
+  export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT" GO_MILESTONE="$MILESTONE"
+  export GO_FIXED_NOW="$FIXED_NOW"
+
+  # run_begin is written once per run dir, not once per invocation: a resumed
+  # run is the same run.
+  if [[ ! -f "$RUN/journal.ndjson" ]]; then
+    node "$LIB/receipt.mjs" run-begin --run "$RUN" \
+      --run-id "$RUN_ID" --milestone "$MILESTONE" --subject "$SUBJECT" \
+      --repo-head "$head" --tree-state "$tree_state" --fixed-now "$FIXED_NOW" \
+      --l4-binary "$L4" --declared "$(echo "$stages" | tr '\n' ',')" \
+      --gated-stages "{\"HG1\":[$(for x in $gated_by_HG1; do printf '"%s",' "$x"; done | sed 's/,$//')],\"HG2\":[$(for x in $gated_by_HG2; do printf '"%s",' "$x"; done | sed 's/,$//')]}"
+  fi
+
+  echo "go: run $RUN_ID  (milestone $MILESTONE, subject $SUBJECT)"
+  echo "go: tree $head [$tree_state]   fixed-now $FIXED_NOW"
+  echo "go: run dir $RUN"
+  [[ "$tree_state" == "dirty" ]] && echo "go: NOTE — the working tree is dirty. That is a fact, not a failure; it is stamped on the report."
+
+  # --- waivers, recorded as verdicts, never as absences ----------------------
+  local w
+  for w in "${WAIVERS[@]:-}"; do
+    [[ -n "$w" ]] || continue
+    local gname="${w%%=*}"
+    local greason="${w#*=}"
+    [[ "$gname" == "HG1" || "$gname" == "HG2" ]] || die_usage "--waive: unknown gate '$gname'; SPEC.md §7.3 defines HG1 and HG2"
+    [[ -n "$greason" && "$greason" != "$gname" ]] || die_usage "--waive $gname= needs a reason; a waiver with no reason cannot be printed in the report"
+    node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state waived --reason "$greason"
+    echo "go: gate $gname WAIVED — $greason"
+  done
+
+  # --- dispatch --------------------------------------------------------------
+  local overall=0
+  local s
+  while read -r s; do
+    [[ -n "$s" ]] || continue
+    if [[ -n "$ONLY" && "$s" != "$ONLY" ]]; then continue; fi
+
+    # gate check, default-deny
+    local gate=""
+    [[ " $gated_by_HG1 " == *" $s "* ]] && gate="HG1"
+    [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
+    if [[ -n "$gate" ]]; then
+      if ! grep -q "\"gate\":\"$gate\",\"state\":\"waived\"" "$RUN/journal.ndjson" 2>/dev/null &&
+        ! grep -q "\"gate\":\"$gate\",\"state\":\"satisfied\"" "$RUN/journal.ndjson" 2>/dev/null; then
+        if bash "$GO_ROOT/etc/go/gate-verify.sh" "$gate" --run "$RUN"; then
+          node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state satisfied \
+            --namespace "$([[ $gate == HG1 ]] && echo l4-go-gate || echo l4-go-gate-hg2)" \
+            --signature-file "$RUN/$gate.payload.txt.sig"
+        else
+          node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state refused \
+            --reason "no verifying signature; see etc/go/gate-request.sh $gate --run $RUN"
+          echo "go: $gate is not satisfied — refusing $s and every stage after it." >&2
+          echo "go: VERDICT: GATE" >&2
+          node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict GATE --exit 3
+          exit 3
+        fi
+      fi
+    fi
+
+    local script="$PHASES/$s.sh"
+    [[ -f "$script" ]] || {
+      echo "go.sh: BROKEN — declared stage $s has no script at $script" >&2
+      exit 4
+    }
+
+    export GO_STAGE="$s"
+
+    # inputs digest: the stage declares its own inputs, the driver digests them.
+    local inputs digest
+    inputs=$(GO_STAGE="$s" bash "$script" --inputs 2>/dev/null || true)
+    if [[ -n "$inputs" ]]; then
+      digest=$(printf '%s\n' "$inputs" | node "$LIB/digest.mjs" --stdin)
+    else
+      digest=""
+    fi
+    export GO_INPUTS_DIGEST="$digest"
+
+    # resumability: a completed stage with an unchanged inputs digest is replayed.
+    local prior=""
+    if [[ -n "$digest" ]]; then
+      prior=$(node -e '
+        import("'"$LIB"'/ledger.mjs").then(m => {
+          const r = m.findReplayable(process.argv[1], process.argv[2], process.argv[3]);
+          if (r) process.stdout.write(JSON.stringify({hash: r.hash, status: r.status, reason: r.reason ?? "", blocker: r.blocker ?? ""}));
+        });
+      ' "$RUN/journal.ndjson" "$s" "$digest")
+    fi
+
+    if [[ -n "$prior" ]]; then
+      local phash pstatus preason pblocker
+      phash=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).hash))')
+      pstatus=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).status))')
+      preason=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).reason))')
+      pblocker=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).blocker))')
+      # A replayed receipt KEEPS its verdict and names the receipt that earned
+      # it. It carries no oracle of its own, and it should not: the oracle ran,
+      # on inputs whose digest is byte-identical, and its row is in the same
+      # hash-chained journal. Demoting a replayed PASS would make the milestone
+      # verdict change when the same milestone is run twice, which is exactly
+      # the property resumability needs to preserve.
+      local extra=()
+      [[ -n "$preason" ]] && extra+=(--reason "$preason")
+      [[ -n "$pblocker" ]] && extra+=(--blocker "$pblocker")
+      node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
+        --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
+      echo "go: $s replayed (inputs unchanged)"
+      [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
+      continue
+    fi
+
+    node "$LIB/receipt.mjs" stage-begin --run "$RUN" --stage "$s" --inputs-digest "$digest"
+
+    set +e
+    bash "$script"
+    local prc=$?
+    set -e
+    case $prc in
+      0) ;;
+      1) overall=1 ;;
+      3)
+        echo "go: $s refused (gate). VERDICT: GATE" >&2
+        node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict GATE --exit 3
+        exit 3
+        ;;
+      4)
+        echo "go: $s BROKEN. VERDICT: BROKEN" >&2
+        node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict BROKEN --exit 4
+        exit 4
+        ;;
+      5)
+        echo "go: $s SKIPPED while L4_GO_REQUIRED=1." >&2
+        node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict INCOMPLETE --exit 5
+        exit 5
+        ;;
+      *) overall=1 ;;
+    esac
+
+    [[ -n "$THROUGH" && "$s" == "$THROUGH" ]] && break
+  done <<<"$stages"
+
+  # --- milestone verdict, recomputed from the journal ------------------------
+  local vjson verdict vexit
+  vjson=$(node "$LIB/verify-run.mjs" "$RUN" --json || true)
+  verdict=$(printf '%s' "$vjson" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).verdict))')
+  case "$verdict" in
+    COMPLETE) vexit=0 ;;
+    GATE) vexit=3 ;;
+    BROKEN) vexit=4 ;;
+    *) vexit=1 ;;
+  esac
+  [[ $overall -eq 1 && $vexit -eq 0 ]] && vexit=0 # a leg finding is accounted for, not a milestone failure
+
+  node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict "$verdict" --exit "$vexit"
+
+  # The FINAL report, rendered after run_end so it carries the run's own
+  # verdict. It is derived, not attested: no receipt hashes it, because anyone
+  # can re-run render-report.mjs over the journal and get the same bytes. The
+  # hashed, preliminary render p9-report produced lives in artifacts/.
+  if [[ -f "$RUN/journal.ndjson" ]]; then
+    node "$GO_ROOT/etc/go/report/render-report.mjs" "$RUN" --format md,html >/dev/null 2>&1 || true
+  fi
+
+  echo
+  echo "go: VERDICT: $MILESTONE $verdict"
+  echo "go: journal  $RUN/journal.ndjson"
+  [[ -f "$RUN/report.md" ]] && echo "go: report   $RUN/report.md"
+  exit "$vexit"
+}
+
+case "$CMD" in
+  run) cmd_run ;;
+  plan) cmd_plan ;;
+  status) cmd_status ;;
+  verify) cmd_verify ;;
+  gc) cmd_gc ;;
+  help | -h | --help) usage ;;
+  *) die_usage "unknown command '$CMD'" ;;
+esac

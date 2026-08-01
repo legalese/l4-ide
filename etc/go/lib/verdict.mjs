@@ -92,7 +92,23 @@ export function checkReceipt(r) {
       );
   }
 
-  if (r.status === "PASS") {
+  // A REPLAYED receipt carries no oracle of its own, and that is correct: the
+  // oracle ran, on inputs whose digest is identical, and its receipt is named
+  // by `replayed_from` in the same hash-chained journal. The evidence for a
+  // replayed PASS is that earlier row, which `go.sh verify` re-checks.
+  //
+  // The alternative — demoting a replayed PASS to UNVERIFIED — was tried and is
+  // wrong: it makes the milestone verdict change when you run the same
+  // milestone twice, which destroys the idempotence property that makes
+  // resumability meaningful.
+  const replayed = !!(r.replayed_from && String(r.replayed_from).trim());
+
+  if (r.status === "PASS" && replayed) {
+    if (artifacts.length === 0 && !r.replayed_from)
+      push(
+        "replayed PASS naming neither an artifact nor the receipt it replays",
+      );
+  } else if (r.status === "PASS") {
     // Rule 1 — PASS requires an oracle that ran and returned 0.
     if (!r.oracle)
       push("PASS with no oracle: a status may not be asserted, only measured");

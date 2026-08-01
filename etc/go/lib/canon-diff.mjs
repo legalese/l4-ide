@@ -38,9 +38,18 @@ export const CANONICALISATIONS = [
     // Applied to the EXPECTED side only: we rewrite the golden's placeholder to
     // the basename the CLI would have used, never the other way round, so a
     // genuine CLI regression that emitted `main.l4` would still be caught.
+    //
+    // Anchored to `main.l4:<digit>`, i.e. the placeholder immediately followed
+    // by a source position. That is narrow enough not to touch prose that
+    // happens to mention main.l4, and wide enough to catch both renderings the
+    // exporter uses — `(main.l4:1:1-2:3)` in @ref provenance and `at
+    // main.l4:704:1-713:84` in a fidelity finding. An earlier version matched
+    // only the parenthesised form and left one fidelity line differing, which
+    // is precisely the half-applied canonicalisation this table exists to make
+    // visible.
     side: "expected",
     apply: (text, { actualBasename }) =>
-      text.split("(main.l4:").join(`(${actualBasename}:`),
+      text.replace(/\bmain\.l4:(?=\d)/g, `${actualBasename}:`),
   },
 ];
 
