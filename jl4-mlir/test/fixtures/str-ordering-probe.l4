@@ -1,0 +1,37 @@
+-- Probe fixture for the string-ordering runtime builtin (__l4_str_cmp).
+--
+-- jl4-service (the REFERENCE) evaluates STRING GREATER THAN via
+-- Data.Text's Ord. This fixture pins the observable ordering semantics
+-- so the differential parity gate — not just unit tests — catches any
+-- code-point-vs-code-unit divergence in the WASM runtime's __l4_str_cmp.
+--
+-- The curated cases in str-ordering-probe.cases.json include the astral
+-- vs high-BMP trap: "😀" (U+1F600) vs "". JavaScript's native `<`
+-- compares UTF-16 code UNITS (😀 -> 0xD83D 0xDE00, whose high surrogate
+-- 0xD83D < 0xE000) and would answer FALSE; Unicode code-POINT order
+-- (U+1F600 > U+E000) answers TRUE. __l4_str_cmp must match whatever the
+-- reference does.
+
+@export gt
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+DECIDE gt IF a GREATER THAN b
+
+@export ge
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+DECIDE ge IF a AT LEAST b
+
+@export lt
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+DECIDE lt IF a LESS THAN b
+
+@export le
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+DECIDE le IF a AT MOST b

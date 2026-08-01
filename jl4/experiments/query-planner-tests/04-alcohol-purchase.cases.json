@@ -1,0 +1,52 @@
+{
+  "may-purchase-alcohol": [
+    {
+      "age_21_plus": false,
+      "married": false,
+      "spousal_approval": false,
+      "beer_only": false,
+      "parental_approval": false,
+      "legally_emancipated": false
+    },
+    {
+      "age_21_plus": true,
+      "married": true,
+      "spousal_approval": false,
+      "beer_only": false,
+      "parental_approval": false,
+      "legally_emancipated": false
+    },
+    {
+      "age_21_plus": true,
+      "married": false,
+      "spousal_approval": false,
+      "beer_only": false,
+      "parental_approval": false,
+      "legally_emancipated": false
+    },
+    {
+      "age_21_plus": true,
+      "married": true,
+      "spousal_approval": false,
+      "beer_only": true,
+      "parental_approval": false,
+      "legally_emancipated": false
+    },
+    {
+      "age_21_plus": false,
+      "married": false,
+      "spousal_approval": false,
+      "beer_only": false,
+      "parental_approval": true,
+      "legally_emancipated": false
+    },
+    {
+      "age_21_plus": false,
+      "married": false,
+      "spousal_approval": false,
+      "beer_only": false,
+      "parental_approval": false,
+      "legally_emancipated": true
+    }
+  ]
+}

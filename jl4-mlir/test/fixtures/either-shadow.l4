@@ -1,0 +1,21 @@
+-- Adversarial: a user enum whose constructors are named RIGHT/LEFT must
+-- NOT be intercepted by the builtin-EITHER CONSIDER lowering. jl4-service
+-- (reference) evaluates this via the user enum, giving rev-dispatch(5)=1005.
+IMPORT prelude
+
+DECLARE Rev IS ONE OF
+  RIGHT HAS rv IS A NUMBER
+  LEFT  HAS lv IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A Rev
+`mk rev` MEANS
+  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n
+
+@export rev dispatch over a user LEFT/RIGHT enum
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`rev dispatch` MEANS
+  CONSIDER `mk rev` n
+    WHEN LEFT  a THEN a MINUS 1000
+    WHEN RIGHT b THEN b PLUS 1000

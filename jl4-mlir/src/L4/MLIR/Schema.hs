@@ -48,7 +48,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -71,7 +71,7 @@ import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, enrichParamTypes)
 import qualified L4.Print as Print
 import L4.StateGraph
   ( extractStateGraphs, stateGraphToDot, defaultStateGraphOptions
@@ -392,7 +392,14 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   -- module's declares take precedence on key collision.
   let declares = Map.unions (declaresFromModule resolvedModule
                             : map declaresFromModule depModules)
-      exports  = enrichReturnTypes entInfo (getExportedFunctions resolvedModule)
+      -- 'enrichParamTypes' fills bare-head params (@DECIDE factorial x IS@,
+      -- no GIVEN) from the typechecker's inferred Fun type. Without it the
+      -- param schema defaults to {"type":"object"}, marshalArg turns the
+      -- JSON number into a struct pointer of 0.0, and 0.0 as a rational-pool
+      -- handle aliases the interned literal 0 — so factorial returned 1 for
+      -- EVERY input, silently.
+      exports  = enrichParamTypes entInfo
+                   (enrichReturnTypes entInfo (getExportedFunctions resolvedModule))
       stateGraphs =
         [ StateGraphExport sg.sgName (stateGraphToDot defaultStateGraphOptions sg)
         | sg <- extractStateGraphs resolvedModule
@@ -754,6 +761,88 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- to 'Nothing' for shapes we can't recover, in which case the runtime
       -- uses the display 'returnType' string for primitive unmarshaling.
       returnSchema_ = ef.exportReturnType >>= typeToRetSchema declares Set.empty
+      -- A DEONTIC function whose body we could NOT reduce to a
+      -- 'DeonticContract' tree has no interpretable representation on the
+      -- WASM side: the compiled wasm body is only a @0.0@ placeholder (the
+      -- real evaluation is the JS interpreter walking @deonticContract@),
+      -- so a null tree would make the runtime's null-contract guard throw
+      -- at evaluate time rather than at schema-build time. Worse, if the
+      -- (unrelated) lowering diagnostic that currently downgrades such a
+      -- function were ever fixed, 'applyDiagnostics' would leave it at
+      -- @supported: true@ with a null contract — a silent landmine. Refuse
+      -- loudly and structurally here instead, so the caller is routed to
+      -- the jl4-service fallback (the reference) rather than a wasm module
+      -- that cannot evaluate the contract. Extraction ('extractDeonticContract'
+      -- / 'deontonToContract') returns 'Nothing' — fail-closed — for any
+      -- construct that would otherwise be lost in translation and produce a
+      -- silent wrong answer: an IF guard that is a helper-call application
+      -- ('exprToGuard' only handles operators/projections/nullary vars); an
+      -- action carrying a PROVIDED guard (which the runtime never evaluates);
+      -- a non-literal deadline (only a numeric literal survives the runtime's
+      -- @Number(deadline)@ — a computed one becomes NaN and never lapses); or a
+      -- present-but-unextractable HENCE/LEST continuation. Refusing is the
+      -- correct (right-answer-preserving) outcome, per the refuse-vs-silent-wrong
+      -- bias.
+      deonticExtractionFailed = isDeonticFn && isNothing deonticContract_
+
+      -- Fail-closed ABI guard (the enum-with-data refusal, raised to the
+      -- altitude where it is actually decidable). The JS runtime unmarshals a
+      -- WASM return one of two ways: from 'returnSchema' (records / enums /
+      -- lists / optionals whose parts are all decodable), or — for a plain
+      -- scalar — from the display 'returnType' string. A return type that is
+      -- NEITHER has no faithful decoding: e.g. an enum-with-data
+      -- (@ONE OF … HAS …@), or any record / list / optional that transitively
+      -- contains one, for which 'typeToRetSchema' returns 'Nothing'. The WASM
+      -- side lowers such constructors to a bare tag / pointer f64, so serving
+      -- the raw return at @supported:true@ silently drops the payload (Iron
+      -- Rule 2 — the cardinal sin). Refuse instead, so the export ships
+      -- @supported:false@ and routes to the reference evaluator. This subsumes
+      -- the older syntactic-GIVETH guard, which keyed on the written return
+      -- type and thus missed inferred returns (no GIVETH) and enum-with-data
+      -- nested inside a record / list / optional head. Peeling Forall / Fun
+      -- mirrors 'returnTypeDisplay', so an inferred scalar return arriving
+      -- Fun-wrapped is still recognised as a scalar and stays supported.
+      -- Exemptions: deontic returns (decoded via 'deonticContract' — and
+      -- guarded separately by 'deonticExtractionFailed' above) and an
+      -- unknown return type (@exportReturnType = Nothing@ — behaviour
+      -- unchanged; we cannot decide what we cannot see).
+      -- A return whose schema the production decoder cannot walk is
+      -- unmarshallable. 'typeToRetSchema = Nothing' covers enum-with-data
+      -- and anything transitively containing it. An 'RSList' anywhere in an
+      -- OTHERWISE-decodable schema is ALSO unmarshallable: the production
+      -- decoder 'unmarshalWithSchema' (jl4-runtime.mjs) has no list case —
+      -- it returns @undefined@ for @kind:"list"@, so a LIST-OF-scalar return
+      -- falls through to a raw-scalar decode (ships the f64 pointer bits) and
+      -- a record's list field decodes to @null@, silently dropping the list
+      -- (Iron Rule 2 — the cardinal sin). Refuse both so they route to the
+      -- reference evaluator. (The trace walker 'walkWasmValue' DOES decode
+      -- lists, so we leave 'typeToRetSchema'/'returnSchema' list-aware for
+      -- trace purposes and gate only here, at the serving-decodability
+      -- altitude.)
+      unmarshallableReturn = case peelReturnType <$> ef.exportReturnType of
+        Just ty
+          | not isDeonticFn
+          , retUndecodable (typeToRetSchema declares Set.empty ty)
+          -> Just (unmarshallableReturnReason (returnTypeDisplay (Just ty)))
+        _ -> Nothing
+
+      -- The two schema-build refusal guards compose disjointly: the
+      -- deontic-extraction guard fires only when 'isDeonticFn', the
+      -- unmarshallable-return guard only when not.
+      (supported_, unsupportedReason_)
+        | deonticExtractionFailed =
+            ( False
+            , Just "DEONTIC contract could not be extracted to a schema tree the \
+                   \runtime interpreter can walk: the regulative body uses a \
+                   \construct the extractor does not represent (e.g. an IF guard \
+                   \that is a helper-call application, an action carrying a \
+                   \PROVIDED guard, a non-literal deadline that would evaluate to \
+                   \NaN in the runtime, or an unextractable HENCE/LEST branch). \
+                   \Interpreting it would risk a wrong answer, so the WASM backend \
+                   \refuses and routes to the jl4-service fallback."
+            )
+        | Just reason <- unmarshallableReturn = (False, Just reason)
+        | otherwise = (True, Nothing)
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -763,10 +852,13 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable; 'applyDiagnostics' downgrades functions the
-       -- lowering flagged as unsupported.
-       , supported   = True
-       , unsupportedReason = Nothing
+       -- Assume compilable unless a schema-build guard above already
+       -- refused (DEONTIC extraction failure, or an unmarshallable ABI
+       -- return); 'applyDiagnostics' additionally downgrades functions
+       -- the lowering flagged as unsupported (that pass only ever
+       -- downgrades, never re-upgrades).
+       , supported   = supported_
+       , unsupportedReason = unsupportedReason_
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
@@ -782,9 +874,9 @@ extractDeonticContract (MkDecide _ _ _ body) = exprToContract body
 
 exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
-  Regulative _ deonton -> Just (deontonToContract deonton)
+  Regulative _ deonton -> deontonToContract deonton
   Breach _ mBy mBec ->
-    Just (DCBreach (Print.prettyLayout <$> mBy) (Print.prettyLayout <$> mBec))
+    Just (DCBreach (partyLiteralText <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
     | rawNameToText (rawName (getActual headRes)) `elem` ["Fulfilled", "FULFILLED"] ->
         Just DCFulfilled
@@ -797,29 +889,84 @@ exprToContract = \case
     Just (DCIfThenElse cond' then' else')
   _ -> Nothing
 
-deontonToContract :: Deonton Resolved -> DeonticContract
-deontonToContract deonton =
-  DCObligation
-    { dcParty    = exprToDeonticExpr (deonton.party)
+-- | Reduce a 'Deonton' to a 'DCObligation', or 'Nothing' when the
+-- obligation carries structure the WASM runtime cannot faithfully
+-- interpret. Each of these would otherwise ship @supported: true@ and
+-- produce a silent wrong answer, so we fail closed here; the
+-- schema-level 'deonticExtractionFailed' guard then refuses the whole
+-- export and routes the caller to the jl4-service fallback (the
+-- reference). The lossy cases:
+--
+--   * a PROVIDED guard on the action. The runtime never evaluates it
+--     (jl4-core gates the action on @fromMaybe trueExpr act.provided@),
+--     so silently dropping it would flip obligations that the guard
+--     should have made inert.
+--   * a deadline that is not a numeric literal. 'dcDeadline' is only a
+--     pretty-printed string and the runtime does @Number(deadline)@,
+--     which is NaN for any computed/aliased deadline (e.g.
+--     @WITHIN \`Deadline Days\`@). NaN makes every @at > deadline@ test
+--     false, so no obligation ever lapses — a FULFILLED where the
+--     reference says BREACH.
+--   * a HENCE / LEST continuation that is present but itself
+--     unextractable. Binding with '>>=' would silently drop such a
+--     branch; 'traverse' instead fails the whole obligation, so a
+--     continuation we cannot represent refuses rather than vanishes.
+deontonToContract :: Deonton Resolved -> Maybe DeonticContract
+deontonToContract deonton = do
+  -- Refuse actions carrying a PROVIDED guard (would be dropped).
+  case deonton.action.provided of
+    Just _  -> Nothing
+    Nothing -> Just ()
+  -- Only a literal numeric deadline round-trips through Number();
+  -- anything computed pretty-prints to a non-numeric string → NaN.
+  dcDeadline_ <- case deonton.due of
+    Nothing                       -> Just Nothing
+    Just e@(Lit _ (NumericLit{})) -> Just (Just (Print.prettyLayout e))
+    Just _                        -> Nothing
+  -- Fail closed on a present-but-unextractable HENCE / LEST branch.
+  dcHence_ <- traverse exprToContract deonton.hence
+  dcLest_  <- traverse exprToContract deonton.lest
+  Just DCObligation
+    { dcParty    = exprToDeonticParty (deonton.party)
     , dcAction   = patternToDeonticExpr (deonton.action.action)
     , dcModal    = modalToText deonton.action.modal
-    , dcDeadline = Print.prettyLayout <$> deonton.due
-    , dcHence    = deonton.hence >>= exprToContract
-    , dcLest     = deonton.lest >>= exprToContract
+    , dcDeadline = dcDeadline_
+    , dcHence    = dcHence_
+    , dcLest     = dcLest_
     }
 
--- | Classify the party/action expression as either a parameter
--- reference (so the runtime can resolve it against the request's
--- @arguments@ bag) or a literal text (party / action names that
--- pre-render via 'L4.Print.prettyLayout' to a stable string).
-exprToDeonticExpr :: Expr Resolved -> DeonticExpr
-exprToDeonticExpr e = case e of
-  -- Bare Var: pretty-print as the param name without backticks so
-  -- 'DEParam' lookups land in the request's @arguments@ bag.
+-- | Classify a party expression as either a parameter reference (so the
+-- runtime can resolve it against the request's @arguments@ bag) or a literal
+-- name.
+--
+-- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
+-- prettyLayout emits L4 /source/, so a multi-word party comes back
+-- backtick-quoted; jl4-service evaluates the party to a constructor VALUE and
+-- renders it through @Backend.Jl4.constructorText@
+-- (@rawNameToText . rawName . getActual@), which carries no backticks. Emitting
+-- @\`the seller\`@ where the reference says @the seller@ is a wrong answer at
+-- @supported: true@, and it is the shape a caller compares against the
+-- @enum@ the service declares in its own @returnSchema@.
+--
+-- The ACTION is deliberately NOT treated this way: the reference prints it
+-- with 'Print.prettyLayout' of an unevaluated Name (@ValueLazyJSON@'s
+-- @obligationAction .= prettyLayout action@), backticks included. Party and
+-- action genuinely disagree on the wire, and this asymmetry is measured:
+-- deontic-sale's residual OBLIGATION is @{"party":"the seller",
+-- "action":"\`deliver the goods\`"}@ on both sides.
+exprToDeonticParty :: Expr Resolved -> DeonticExpr
+exprToDeonticParty e = case e of
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral (Print.prettyLayout e)
+    in if isLikelyParam nm then DEParam nm else DELiteral nm
   _ -> DELiteral (Print.prettyLayout e)
+
+-- | The plain-name rendering of a party expression. See 'exprToDeonticParty'
+-- for why this is not 'Print.prettyLayout'.
+partyLiteralText :: Expr Resolved -> Text
+partyLiteralText e = case e of
+  App _ headRes [] -> rawNameToText (rawName (getActual headRes))
+  _                -> Print.prettyLayout e
 
 -- | Pattern variant: 'PatVar' is the param-ref shape; everything
 -- else collapses to its pretty-printed form.
@@ -1662,7 +1809,12 @@ applyDiagnostics diags wb =
       Nothing      -> fe
       Just reasons -> fe
         { supported = False
-        , unsupportedReason = Just (Text.intercalate "; " (uniq reasons))
+        -- Preserve any refusal reason already set at schema-build time
+        -- (e.g. the DEONTIC-extraction guard in 'mkFunctionExport'); the
+        -- lowering diagnostics are additional, not a replacement, so the
+        -- caller sees the full picture rather than only the last cause.
+        , unsupportedReason =
+            Just (Text.intercalate "; " (uniq (maybeToList fe.unsupportedReason ++ reasons)))
         }
     -- De-duplicate while preserving first-seen order.
     uniq = go Set.empty
@@ -1689,11 +1841,45 @@ paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares p =
   let base = case p.paramType of
         Nothing -> emptyParam "object"
-        Just ty -> typeToParameter declares Set.empty ty
+        Just ty -> typeToParameter declares Set.empty (unfoldSynonymType declares ty)
   in base
        { parameterAlias       = Nothing
        , parameterDescription = maybe "" Text.strip p.paramDescription
        }
+
+-- | Resolve a userland type SYNONYM to its underlying type before handing
+-- it to jl4-core's 'typeToParameter'.
+--
+-- 'typeToParameter' matches primitive type NAMES (@date@, @time@,
+-- @number@, …) /before/ consulting the declares table, so a userland
+-- @DECLARE Date IS A STRING@ — whose name collides with the builtin DATE —
+-- is schema'd as @{"type":"string","format":"date"}@ and the runtime's
+-- @marshalArg@ then parses the input into a DATE serial. But jl4-core
+-- evaluates that value as a plain STRING (the synonym is transparent), and
+-- the reference service compares it lexicographically. Before ledger #7
+-- this only manifested as a refusal (ordered STRING comparison was
+-- unsupported); now that such comparisons lower through @__l4_str_cmp@, the
+-- serial-vs-string mismatch would be a silent WRONG answer
+-- (@britishcitizen5@ stores dates as @DECLARE Date IS A STRING@).
+--
+-- Unfolding the synonym here yields the true underlying type (@Date@ →
+-- STRING), so the WASM schema, its @marshalArg@, and the @__l4_str_cmp@
+-- lowering all agree with the reference. The genuine builtin DATE is /not/
+-- a 'SynonymDecl' in the declares map, so it is left untouched and keeps
+-- its @format:date@ serial marshalling. Non-colliding synonyms already
+-- resolve identically through 'typeToParameter''s own 'declareToParameter'
+-- recursion, so this only changes the primitive-name-colliding cases.
+-- Cycle-guarded via a visited set.
+unfoldSynonymType :: Map Text (Declare Resolved) -> Type' Resolved -> Type' Resolved
+unfoldSynonymType declares = go Set.empty
+  where
+    go visited ty = case ty of
+      TyApp _ name []
+        | let nm = rawNameToText (rawName (getActual name))
+        , not (Set.member nm visited)
+        , Just (MkDeclare _ _ _ (SynonymDecl _ inner)) <- Map.lookup nm declares
+        -> go (Set.insert nm visited) inner
+      _ -> ty
 
 emptyParam :: Text -> Parameter
 emptyParam t = Parameter
@@ -1772,6 +1958,50 @@ genericDeonticParam desc = (emptyParam "object") { parameterDescription = desc }
 -- ---------------------------------------------------------------------------
 -- Return-type display
 -- ---------------------------------------------------------------------------
+
+-- | Peel the wrappers an inferred return type arrives in — a 'Forall'
+-- (typechecker generalisation) or a residual 'Fun' return (partial
+-- application) — down to the underlying return type. Mirrors the peeling
+-- in 'returnTypeDisplay' so the fail-closed ABI guard in 'buildExport'
+-- sees the same core type the display string does (e.g. a scalar hidden
+-- under a 'Fun' stays recognised as a scalar and is not refused).
+peelReturnType :: Type' Resolved -> Type' Resolved
+peelReturnType (Forall _ _ inner) = peelReturnType inner
+peelReturnType (Fun _ _ ret)      = peelReturnType ret
+peelReturnType ty                 = ty
+
+-- | Whether a return schema is UNdecodable by the production runtime
+-- decoder ('unmarshalWithSchema' in jl4-runtime.mjs), used by the
+-- fail-closed ABI guard in 'buildExport'. 'Nothing' (enum-with-data and
+-- anything transitively containing it) is undecodable; so is any schema
+-- with an 'RSList' anywhere, because that decoder has no list case and
+-- silently drops the list (returns raw pointer bits / @null@). Keep this in
+-- lockstep with the runtime's decode capabilities.
+retUndecodable :: Maybe RetSchema -> Bool
+retUndecodable Nothing  = True
+retUndecodable (Just s) = retSchemaHasList s
+
+-- | Does a return schema contain an 'RSList' at any depth (top level, inside
+-- a MAYBE, or in a record field)? The production return decoder cannot walk
+-- lists, so such a return must not ship @supported:true@.
+retSchemaHasList :: RetSchema -> Bool
+retSchemaHasList = \case
+  RSList _         -> True
+  RSMaybe inner    -> retSchemaHasList inner
+  RSRecord _ _ fs  -> any retSchemaHasList (Map.elems fs)
+  RSEnum _ _       -> False
+  RSScalar _       -> False
+
+-- | Diagnostic for an @\@export@ whose return type cannot be marshalled
+-- across the WASM ABI (see the guard in 'buildExport').
+unmarshallableReturnReason :: Text -> Text
+unmarshallableReturnReason disp =
+  "export return type " <> disp <> " cannot be marshalled across the WASM "
+    <> "ABI: it is a list, or an enum-with-data, or a record / list / "
+    <> "optional transitively containing one — shapes the production runtime "
+    <> "decoder cannot walk (an enum-with-data lowers to a bare tag / "
+    <> "pointer; a list has no decoder case), so the WASM return would "
+    <> "silently lose the payload"
 
 returnTypeDisplay :: Maybe (Type' Resolved) -> Text
 returnTypeDisplay Nothing = "unknown"
