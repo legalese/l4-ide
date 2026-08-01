@@ -64,7 +64,8 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 > on KIE 8.44 and Camunda 8.7.6 inside our emitted contexts — unmeasured, and nothing emits a FEEL
 > `for` today. Also unmeasured: whether any definition other than the one motivating instance
 > satisfies the rule (Q4) — if the answer is "one", schedule it as a one-instance feature.
-> Interim decision already shipped: erase the self-edge, keep the `D-CYCLE` note (spec §7).
+> Interim decision shipped 2026-08-02 as `ba841f8f`: erase the self-edge at emission, keep the
+> `D-CYCLE` note (spec §7; ruled and measured at `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §6.4.4-4a).
 > Spec: `specs/todo/DMN-RECURSION-FLATTENING-SPEC.md`.
 
 ## Live lanes in ../l4wt/ (do NOT duplicate)

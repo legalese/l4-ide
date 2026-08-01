@@ -244,6 +244,17 @@ metamodel parser says:
 >   obligation` self-edge, honestly emitted, refused loudly; behind it zeebe
 >   also rejects raw-L4 literal expressions at parse.
 >
+> **Both verdicts above were superseded on 2026-08-02**, when the self-edge went
+> back to being erased at emission because DMN §7.3.1 forbids an element from
+> requiring itself and the file therefore would not load — ruled and measured at
+> `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §6.4.4-4a; the `D-CYCLE` note is
+> unchanged and still fires. Re-measured on KIE: `XSD valid`,
+> `VALID 16 error(s), 0 warning(s)`, `BUILD 16 error(s)`, verdict `32 error(s)`
+> (was 34) — the whole delta is the cyclic-dependency echo, once per leg, and the
+> reporting spine still carries its own raw-L4 FEEL error. **The Camunda line has
+> NOT been re-measured** (that leg is CI-only here); its stated cause is gone and
+> what it refuses on now is unknown, so do not quote it.
+>
 > `regcf-corpus.cases.json` now EXISTS — the `f(x)` problem that blocked it
 > (`../legal/regcf/PROJECTIONS.md` §1) is what Phase 5 solved — and pins all 82
 > decisions symmetrically, with its own header recording why it is not yet

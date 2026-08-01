@@ -1,9 +1,12 @@
 # Flattening Simple Recursions for DMN Export
 
-_Status: **proposed, not implemented.** Written 2026-08-02 on branch `mengwong/dmn-phase5-bkm`,
-against `0253c21a`. Nothing in `jl4-core/src/L4/Dmn/` implements any part of this document, and the
-recognition rule in [§4](#4-the-recognition-rule) has never been run over the corpus — every count
-below that is not attributed to a committed artifact is an estimate and is labelled as one._
+_Status: **the flattening is proposed, not implemented; the interim decision in
+[§7](#7-the-interim-decision-and-what-it-costs) has shipped.** Written 2026-08-02 on branch
+`mengwong/dmn-phase5-bkm`, against `0253c21a`; §7 amended the same day, against `ba841f8f`. Nothing
+in `jl4-core/src/L4/Dmn/` implements §§1–6 — the recognition rule in
+[§4](#4-the-recognition-rule) has never been run over the corpus, and every count below that is not
+attributed to a committed artifact is an estimate and is labelled as one. §7 is the exception and
+says so in its own text._
 
 > **Why this exists.** Phase 5's `regcf-corpus.dmn` failed the `dmn-moddle` metamodel gate on a
 > decision that requires itself, which DMN 7.3.1 forbids. The immediate fix — recorded in
@@ -123,6 +126,16 @@ what tells the truth about it, and an artifact no engine will load is not an exh
 what R0 ("the execution is the exhibit") requires. The reversal is recorded in that spec, in the
 same PR that makes the code change.
 
+**Built and landed 2026-08-02 as `ba841f8f`**, and the owning ruling is
+`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` **§6.4.4-4a**, which carries the measurements — read that, not
+this paragraph, for the numbers. In outline: the `Drg` keeps the self-edge (so `checkDrg` still
+fires `D-CYCLE`, count 1 before and 1 after, and `regcf-corpus.fidelity.txt` did not move) and
+`L4.Dmn.Emit` drops it via the new `L4.Dmn.IR.emittedRequirements` / `emittedKnowledgeReqs`. Scope
+is `|SCC| = 1` **only** — a two-member cycle still emits every edge, pinned by
+`cycle-p2-mutual-nullary` in `jl4/tests/DmnExport.hs`. `etc/validate-dmn.mjs` exits 0; KIE 8.44's
+verdict on `regcf-corpus.dmn` goes from 34 errors to 32, the whole delta being the
+cyclic-dependency error, once per leg.
+
 The cost is that the emitted DRG no longer records that the recursion exists; only the finding
 does. Anyone reading the `.dmn` alone sees a decision with one fewer requirement and no hint that
 something was dropped. That is the gap this document closes when it is built.
@@ -144,7 +157,8 @@ something was dropped. That is the gap this document closes when it is built.
 ## 9. Relationship to other documents
 
 - `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §6.3-1, §6.3.9, §763, §2928, §5230 — the refusal this narrows,
-  and the note §7 reverses. **That spec owns the refusal; this one may not change it unilaterally.**
+  and the note §7 reverses. **§6.4.4-4a is where that reversal is owned and measured**; §7 here is
+  its other side. **That spec owns the refusal; this one may not change it unilaterally.**
 - `DMN-PHASE5-BUILD-PLAN.md` §P5.0a — `checkDrg` and the SCC routine the recognition rule would run
   beside.
 - `FIDELITY-SEVERITY-AXIS-SPEC.md` — Q5.
