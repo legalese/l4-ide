@@ -159,7 +159,7 @@ Shared surfaces, agreed in advance so they do not collide:
 
 The one soft coupling worth stating: **F4 is where the two tracks meet.** When both exist, a
 guard exported to BPMN can reference a decision exported to DMN. Wiring that association is
-post-M4 work and belongs to neither track alone.
+post-M4 work and belongs to neither track alone. (Since ruled **mandatory** — see §8.3.)
 
 ---
 
@@ -174,3 +174,86 @@ BPMN cannot make.
 
 It depends on P0 (it wants the same junction concept) and on nothing else here. It must not
 gate M4.
+
+---
+
+## 8. The acceptance bar — ruled 2026-08-01
+
+Meng, 2026-08-01, verbatim: _"Let me rule roughly that, with the modification that the emitted
+BPMN should wire together with the emitted DMN. We started by looking at the Lexipedia BPMN
+and commenting that the sorrow is obvious. We have to show the better way: BPMN delegating
+decisions to DMN."_
+
+As adopted:
+
+- **The exhibit is the diagram and its soundness.** The bar is **acceptance**: the emitted
+  file renders in Camunda Modeler / bpmn-js (`etc/validate-bpmn.mjs`) and passes the
+  exhaustive soundness gate (`etc/check-bpmn-soundness.mjs`). jBPM (`etc/check-bpmn-kie.sh`)
+  corroborates where its dialect allows; it is evidence, not a gate, and §8.1 decomposes
+  exactly where its dialect does not allow.
+- **Engine execution is a NON-GOAL**, because process execution runs on the parties. A BPMN
+  process here describes work that people and firms do; nothing in the demo asks an engine to
+  do it for them.
+- **Guard executability, when it is wanted, arrives via BPMN→DMN linkage** — a
+  `businessRuleTask` invoking an emitted decision, with gateway guards reduced to trivial
+  tests over that decision's output — **never** by lowering law text into an engine's
+  expression dialect. Declining to lower is the `P-BRANCHGUARD` fidelity stance working as
+  designed (§8.1 class (b) is that stance, measured).
+- **The emitted BPMN MUST wire to the emitted DMN.** That is the demo's better-way exhibit:
+  lexipedia advertises BPMN _and_ DMN, ships no DMN, and draws its decisions as gateways
+  (see [SPEC.md](./SPEC.md)); we show BPMN delegating decisions to DMN. §8.3 sketches the
+  design; it is not built.
+
+### 8.1 The two classes of jBPM REJECTED — measured 2026-08-01
+
+Every `REJECTED` verdict in `etc/bpmn-kie-baseline.txt` decomposes into exactly two classes.
+Re-measured 2026-08-01 by running `etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn`
+(jbpm-bpmn2 7.74.1.Final, JDK 17.0.20):
+
+| class | files (errors)                                        | what jBPM says                                                                             | what it is                                                                                                                                                                                                                                                                       |
+| ----- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a)   | regcf-reporting (1)                                   | `Unknown gateway direction: Mixed`                                                         | `Mixed` is legal BPMN 2.0 (§10.5.2); jBPM does not implement it. A defect **against this bar** (it blocks corroboration for no fidelity gain); the ruled remedy is to emit `Unspecified` — the XSD default, which constrains nothing — where `Mixed` would be computed.          |
+| (b)   | regcf-advertising (4), regcf-resale (6), handover (4) | `mismatched input 'WITHIN'`, `Unable to Analyse Expression …`, `mismatched input 'period'` | jBPM compiling our **deliberately opaque** L4-text expression bodies (sequence-flow `conditionExpression`s and conditional boundary-event conditions) as Drools rule expressions. The `P-BRANCHGUARD` fidelity stance working as designed — not a defect, and not to be "fixed". |
+
+The two non-REJECTED verdicts are worth naming too:
+
+- **offering.bpmn `ABORTED`** — "via error end event [Breach] — a modelled terminal state,
+  not a liveness defect". jBPM executed it fine and reached the modelled `Breach` terminal:
+  the `LEST` arm doing its job. An exhibit, not a failure.
+- **consultation.bpmn `COMPLETED`** clean.
+
+### 8.2 What the bar means operationally
+
+`validate-bpmn.mjs` + `check-bpmn-soundness.mjs` green on every emitted golden = the bar is
+met. The jBPM baseline (`etc/bpmn-kie-baseline.txt`) records corroboration standing,
+measured-not-intended; class (b) reds stay red there **by design** until §8.3 exists, and
+regenerating that file to green by weakening the opaque guards would be lowering law text
+into engine dialect — refused above.
+
+### 8.3 The DMN wiring — mandated 2026-08-01, design sketched here, NOT BUILT
+
+**Status: mandated 2026-08-01; what follows is a design sketch, not a description of the
+tree. Nothing below is built.** Build is gated on DMN Phase 5 BKM emission landing (branch
+`mengwong/dmn-phase5-bkm`, in flight): a `businessRuleTask` needs a decision to call before
+wiring one is meaningful.
+
+The sketch:
+
+- one `businessRuleTask` **preceding each guarded exclusive gateway**, invoking the DMN
+  exporter's decision for the guard's predicate, referenced by its **emitted** id/name. That
+  makes coordination with the DMN side's `uniquifyIn` naming
+  (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §5.2) a design constraint recorded now: the BPMN side
+  must consume the names the DMN exporter emitted, not re-derive them from the L4 source;
+- each outgoing flow's guard becomes a **trivial test over the decision's declared output**
+  (compare-to-output-value, no L4 text), replacing the opaque `conditionExpression` for
+  engines while the L4 text stays available as documentation;
+- **open probe — the flavor question.** How the `businessRuleTask` names its decision is
+  engine-flavored: Camunda 7 `camunda:decisionRef`, Camunda 8 `zeebe:calledDecision`, or the
+  pure BPMN 2.0 `implementation` attribute. Recorded as an open probe, to be measured rather
+  than presumed, with the DMN flavor split (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §13.7) as
+  precedent;
+- **`P-BRANCHGUARD`'s endgame.** The linkage partially discharges `P-BRANCHGUARD`'s fidelity
+  note: exhaustiveness and mutual exclusion of a gateway's arms live in the DMN table's
+  `UNIQUE` hit policy, where they belong. That is the **intended endgame, not current
+  behaviour** — today the finding still reports the loss, and must keep doing so until the
+  wiring exists.

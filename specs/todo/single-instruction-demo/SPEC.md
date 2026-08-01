@@ -29,7 +29,11 @@ obligation:
 
 1. **Soup-to-nuts.** The demo shows the whole pipeline landing as a new lexipedia-grade entry
    with **working** BPMN and DMN embedded, commentary and ladder diagrams alongside. Lexipedia
-   chose the OMG standards; we respect that choice and cooperate with it.
+   chose the OMG standards; we respect that choice and cooperate with it. For the BPMN leg,
+   "working" is defined by the acceptance-bar ruling of 2026-08-01
+   (`lexipedia-superset/PROCESS-TRACK.md` §8): the diagram renders and is sound, and it wires
+   to the emitted DMN — engine execution of the _process_ is a non-goal there, because process
+   execution runs on the parties.
 2. **The good-faith bypass.** Some scenarios rightly skip the BPMN/DMN lowering: the MCP
    projection serving AI consumers directly, a web-app projection deployed straight from L4, a
    legal engineer reviewing and signing off on the L4 itself. That argument is credible only
@@ -139,18 +143,20 @@ style before committing to one.
 
 All of the following, from the same reviewed encoding:
 
-| leg             | artifact                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| ladder diagrams | interactive AND/OR ladders for the Boolean decision structure                                                      |
-| DMN             | XML and dmnmd markdown, executable on KIE and Camunda                                                              |
-| BPMN            | process views of the regulative rules                                                                              |
-| LTS visualizer  | our own LTS view (the superset spec's P2 visualiser — unbuilt, see §5; interim: `l4 state-graph` DOT via graphviz) |
-| MCP             | the module served as tools via jl4-service                                                                         |
-| TNR round-trip  | Times-New-Roman prose regeneration; each run is NLG training data                                                  |
-| web wizard      | query-planner-driven interview app                                                                                 |
+| leg             | artifact                                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| ladder diagrams | interactive AND/OR ladders for the Boolean decision structure                                                              |
+| DMN             | XML and dmnmd markdown, executable on KIE and Camunda                                                                      |
+| BPMN            | process views of the regulative rules (bar: acceptance + soundness + DMN wiring, `lexipedia-superset/PROCESS-TRACK.md` §8) |
+| LTS visualizer  | our own LTS view (the superset spec's P2 visualiser — unbuilt, see §5; interim: `l4 state-graph` DOT via graphviz)         |
+| MCP             | the module served as tools via jl4-service                                                                                 |
+| TNR round-trip  | Times-New-Roman prose regeneration; each run is NLG training data                                                          |
+| web wizard      | query-planner-driven interview app                                                                                         |
 
 Every leg ships with its fidelity/conversion notes; per R0, "it renders but cannot execute" is
-a defect in the demo, not a caveat.
+a defect in the demo, not a caveat. (For the BPMN leg, "execute" is read per the 2026-08-01
+acceptance-bar ruling — `lexipedia-superset/PROCESS-TRACK.md` §8: acceptance + soundness + the
+DMN wiring, not engine execution of the process, which runs on the parties.)
 
 ### P8 — Formal verification (stretch)
 
@@ -211,7 +217,9 @@ unstable now.
   diff oracle. Entry: fork representation ruled (R4).
 - **G3 — execution parity.** Every P7 leg executes: BKM emission (DMN spec Phase 5, with
   whatever of Phase 4 it needs — the owning spec sequences them) landed and the corpus DMN
-  runs on both engines; wizard deployed; ladders embedded in the entry (the framework-free
+  runs on both engines; the BPMN leg meets its acceptance bar and wires to the emitted DMN
+  (`lexipedia-superset/PROCESS-TRACK.md` §8 — engine execution of the process is a non-goal
+  there); wizard deployed; ladders embedded in the entry (the framework-free
   ladder-svg controller from PR #177 suffices — the IDE toggle/flip, E1 Steps 5→6a→7, is not
   on this path); the LTS leg per its §5 row (the superset spec's P2 visualiser, or the declared
   graphviz interim); TNR leg producing prose. This is R0 discharged.
