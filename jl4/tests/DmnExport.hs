@@ -3316,6 +3316,28 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             ]
       checkDrg drg `shouldBe` []
 
+    it "a `name(` inside a FEEL string literal is prose, not an invocation" $ do
+      -- The false-positive shape found by review: the exporter generates
+      -- string literals too (an L4 STRING constant renders as one), and this
+      -- exact model runs green on BOTH engine harnesses — KIE 8.44.0.Final
+      -- 0 errors 0 warnings, Camunda 8.7.6 parsed — so a Blocking note here
+      -- fails `--fail-on blocking` on a fully valid artifact.
+      let drg = testDrg
+            [ bkmNode "half" [] (lit SFeel "p + 1")
+            , decNode "note" [] (lit FullFeel "\"please call half(now) about this\"")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "blanking a string literal (escapes included) does not blind the scan beside it" $ do
+      -- One text, three lessons: the quoted decoy is skipped, the \" escape
+      -- does not end the literal early, and the REAL invocation after the
+      -- closing quote is still caught.
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            , decNode "use" [] (lit FullFeel "\"f(decoy) \\\" still inside\" + f(p: 2)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "decision_use")]
+
     it "the edge must be on the INVOKING node, not somewhere in the file (C2/C3's lesson)" $ do
       let drg = testDrg
             [ bkmNode "inner" [] (lit SFeel "v * 10")
