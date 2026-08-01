@@ -268,6 +268,34 @@ metamodel parser says:
 > engine-exercisable and what must retire first. So `25/25 value(s) as expected`
 > below is still a statement about the five-decision shape exhibit only; the
 > corpus verdicts are the two quoted lines above, no more.
+>
+> **Superseded again on 2026-08-02, and this time the corpus EXECUTES.** R12
+> (spec §15.12) removed the 15 `EVAL UNDER RULES EFFECTIVE AT` decisions from
+> the artifact, and R13 (spec §16) lowered the deontic reporting spine to a
+> verdict decision table — the two verbatim families named above, retired.
+> Measured on the shipped `expected/regcf-corpus.dmn` with
+> `regcf-corpus.cases.json` (67 decisions, 67 pins), verbatim:
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`;
+>   `KIE 8.44.0.Final VERDICT: 1 file(s), 1 case(s), 0 error(s), 0 warning(s),
+>   67/67 decision(s) SUCCEEDED, 67/67 value(s) as expected` — and the
+>   decision-service sweep evaluates all seven emitted services (including
+>   `_7_Ongoing_reporting_Rules_202_203_b`, which only became emittable when
+>   the verdict table gave the § an output decision) with zero engine ERRORs.
+> - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
+>   (67 decision(s))`; `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),
+>   1 case(s), 1 parsed, 0 error(s), 67/67 decision(s) evaluated, 67/67
+>   value(s) as expected`.
+>
+> One pin moved under measurement, and it is a finding, not noise:
+> `the_over_limit_investor_case_qualifies` had been pinned `false` on the
+> unmeasured claim that the investor limb varies per call through BKM
+> parameters. Both engines answer `true`: the investment-limit limb's figures
+> enter the BKM through its λ-LIFTED closure parameters, bound `name: name` to
+> the GLOBAL decisions (spec §6.2), so the per-call over-limit investor never
+> reaches the limit check. The pin now records the model truth with that
+> derivation — the fourth member of the deliberately-pinned-'wrong' quartet,
+> which is now four for four.
 
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json

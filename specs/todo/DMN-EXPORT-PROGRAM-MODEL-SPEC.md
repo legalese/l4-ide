@@ -3147,6 +3147,26 @@ load-bearing question is _which graph_, and there are three.
    advanced rather than satisfied. The remaining refusal belongs to the deontic-lowering work, not
    here.
 
+   > **DISCHARGED 2026-08-02 (R12 + R13), measured [E] on both engines the same day.** "The
+   > remaining refusal belongs to the deontic-lowering work" — that work is §16, and it landed,
+   > together with §15.12's rebind drops. Re-measured on the shipped `regcf-corpus.dmn` +
+   > `regcf-corpus.cases.json` (67 decisions / 67 pins), verdict banners verbatim:
+   >
+   > - KIE 8.44.0.Final: `XSD valid`; `VALID clean`; `BUILD clean`; `KIE 8.44.0.Final VERDICT:
+1 file(s), 1 case(s), 0 error(s), 0 warning(s), 67/67 decision(s) SUCCEEDED, 67/67 value(s)
+as expected` — the service sweep also evaluates all seven emitted decisionServices with
+   >   zero ERROR messages. (Immediately before this change, same harness, the 2026-08-02 golden:
+   >   `VALID 16 error(s)`, `BUILD 16 error(s)`, `VERDICT … 32 error(s) … 0/0`.)
+   > - Camunda 8.7.6: `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227 (67 decision(s))`;
+   >   `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 1 case(s), 1 parsed, 0 error(s), 67/67
+decision(s) evaluated, 67/67 value(s) as expected`. (Before: `PARSE INVALID` on the raw-L4
+   >   deontic body, `0 parsed, 1 error(s)`.)
+   >
+   > On this corpus a self-edge no longer reaches even the `Drg` (§16.3: the verdict table's
+   > requirements are its guards), so this section's eraser is exercised by the `cycle-p3-self`
+   > fixture rather than by the corpus. R0 — "the execution is the exhibit" — is satisfied for the
+   > DMN leg: the corpus artifact loads, builds and answers on both target engines.
+
    **What this costs, stated plainly:** the emitted DRG no longer records that the recursion
    exists; only the report does. A reader with the `.dmn` alone sees a decision with one fewer
    requirement and no hint that anything was dropped. Closing that gap means emitting a DMN that
@@ -5410,10 +5430,34 @@ status) THEN (PARTY Issuer MUST …': Expected (binaryComparison | between | ins
 > openjdk@17 keg, Camunda on the unversioned Homebrew `openjdk` (26.0.1), which satisfies the
 > harness's `21+` floor.
 
+> **DISCHARGED 2026-08-02 by R12 (§15.12) + R13 (§16), measured [E] the same day, same harnesses,
+> same machine.** The 15 `EVAL UNDER` decisions left the artifact and the deontic spine became a
+> verdict decision table, so the will-not-execute population above is empty. Census on the shipped
+> golden (`grep -o "\[D-[A-Z-]*\]" regcf-corpus.fidelity.txt`): **0 Blocking / 21 Lossy / 124
+> Advisory** — the 15 `D-RULEDATE-UNBOUND` moved to Lossy population notes, `D-CYCLE` is gone by
+> construction (§16.3), `D-VERDICT` (1) and `D-SVCEMPTY` (7) are new, `D-FLAVOR-NOSERVICE` is 7
+> again (§7's service became emittable when the verdict decision gave it an output). Engine
+> verdicts on the shipped bytes + `regcf-corpus.cases.json` (67 decisions / 67 pins), verbatim:
+>
+> - KIE 8.44.0.Final: `XSD valid`, `VALID clean`, `BUILD clean`, `KIE 8.44.0.Final VERDICT:
+1 file(s), 1 case(s), 0 error(s), 0 warning(s), 67/67 decision(s) SUCCEEDED, 67/67 value(s)
+as expected`.
+> - Camunda 8.7.6 (zeebe-dmn): `PARSE ok: SEC Regulation Crowdfunding — 17 CFR Part 227
+(67 decision(s))`, `Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 1 case(s), 1 parsed,
+0 error(s), 67/67 decision(s) evaluated, 67/67 value(s) as expected`.
+>
+> One pin moved UNDER measurement (`the_over_limit_investor_case_qualifies`, false → true): its
+> "agrees with L4" claim was an unmeasured prediction that both engines refuted — the λ-lifted
+> closure parameters bind the GLOBAL decisions (§6.2's `name: name`), so the per-call investor
+> never reaches the limit check. The cases file records the corrected derivation; the quartet of
+> deliberately-pinned-'wrong' values is now four for four.
+
 > **The blocking total falls by only 8 net, because 15 new Blocking notes appear — and that is the
 > point.** The complaint this section answers is that the report was _silent_ about law time; making
 > it speak necessarily adds notes. A reader who scores this change by the blocking total will
-> misread it.
+> misread it. (**R12 note, 2026-08-02:** the 15 law-time Blocking notes this paragraph defends are
+> now 15 Lossy population notes on decisions the artifact no longer contains; the report still
+> speaks, one severity down and one element gone.)
 
 **Structure.** `<inputData>` 67 → **68**; `<decision>` stays **102**; `<decisionTable>` stays **11**,
 of which `hitPolicy` is now **10 `UNIQUE` / 1 `FIRST`**. Each of the 8 dated decisions lost its
@@ -5731,3 +5775,9 @@ corpus artifact is expected to hold zero raw-L4 text and no cycle, so KIE should
 error(s)` (from 16) and Camunda should parse. The measured verdicts land in §15.7's discharge
 block and `jl4/examples/dmn/README.md` when the harnesses run — a number in this subsection that
 is not marked measured is a prediction, not evidence.
+
+**[E] MEASURED 2026-08-02, later the same day** — see §15.7's discharge block for the verbatim
+banners: KIE `VALID clean` / `BUILD clean` / `67/67 decision(s) SUCCEEDED, 67/67 value(s) as
+expected`; Camunda `1 parsed` / `67/67 decision(s) evaluated, 67/67 value(s) as expected`. The
+prediction above held, with one pin corrected under measurement (`the_over_limit_investor_case_
+qualifies` — the λ-lift closure binding, recorded in the cases file and §15.7).
