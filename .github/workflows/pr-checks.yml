@@ -32,6 +32,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       dmn: ${{ steps.filter.outputs.dmn }}
       bpmn: ${{ steps.filter.outputs.bpmn }}
+      go: ${{ steps.filter.outputs.go }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -86,6 +87,16 @@ jobs:
             docs:
               - 'doc/**'
               - 'specs/**'
+            # The `go` orchestrator, and the skill that is its entry point.
+            # `.claude/**` matches NO other filter — not 'typescript' (which does
+            # carry etc/**) and not 'docs' (doc/** + specs/**) — so before this
+            # entry a skill-only PR ran ZERO jobs: unformatted, with its command
+            # table free to drift away from etc/go/go.sh unnoticed. The skill and
+            # the driver are one unit and are gated as one.
+            go:
+              - 'etc/go/**'
+              - '.claude/skills/running-the-l4-pipeline/**'
+              - 'specs/todo/single-instruction-demo/**'
             # The DMN artifacts and the two engine harnesses that read them. A
             # change to the emitter shows up under 'haskell' as well, but the
             # goldens themselves are .dmn/.json and the harnesses are Java and
@@ -127,6 +138,83 @@ jobs:
   # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
   # which is precisely what we want to hear about. Exit 4 is unsilenceable by
   # design and stays that way.
+  go:
+    name: Go Orchestrator
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+
+      # Proves the status lattice can still say no: every status producible, PASS
+      # rejected with a null, failing, or WEAK oracle, a BROKEN receipt unable to
+      # yield a COMPLETE milestone, and every way of editing the journal caught by
+      # the chain. Without this the lattice is one small edit from collapsing to
+      # PASS/FAIL, and nothing would notice. --with-driver is deliberately NOT
+      # passed: it needs a prebuilt `l4`, which this job does not build.
+      - name: Self-test (the lattice must still be able to refuse)
+        run: node etc/go/selftest.mjs
+
+      # The `l4 run` workaround exists only because a failed #ASSERT exits 0.
+      # This mutates a real captured envelope ten ways to prove the checker can
+      # be red — a checker whose only observed behaviour is OK is
+      # indistinguishable from one that has been quietly broken.
+      - name: Self-test (the assertion checker must still be able to fail)
+        run: node etc/go/lib/assert-report.selftest.mjs
+
+      # A skill that documents a command the driver does not dispatch is worse
+      # than no skill, because the reader believes it. Compared in BOTH
+      # directions, plus the one-file discipline that stops references/ growing a
+      # second, staler copy of the usage.
+      - name: The skill and the driver must agree
+        run: node etc/go/check-skill-drift.mjs
+
+      # Every phase script must be syntactically valid and must answer --inputs
+      # without side effects. A phase script that cannot be parsed fails the run
+      # at dispatch time with a shell error rather than a receipt.
+      - name: Every phase script parses
+        run: |
+          for f in etc/go/*.sh etc/go/phases/*.sh etc/go/lib/*.sh; do
+            bash -n "$f" || { echo "::error::$f does not parse"; exit 1; }
+          done
+
+      # The driver must be able to describe itself without a binary, a run
+      # directory, or a network. If `plan` needs any of those, resumability and
+      # dry-running are both broken.
+      - name: The driver can describe itself with no L4 and no run dir
+        run: |
+          etc/go/go.sh help > /dev/null
+          etc/go/go.sh plan --milestone g1 | tee /tmp/plan.txt
+          grep -q 'p0-preflight' /tmp/plan.txt
+          grep -q 'entry points that exist and refuse' /tmp/plan.txt
+
+      # Every scaffolded stage must refuse with exit 3 and name its blocker.
+      # A stage that exits 0 while doing nothing is the failure this whole
+      # design exists to prevent.
+      - name: Every scaffolded stage refuses loudly
+        run: |
+          for s in p1-ingest p2-sweep p3-encode p4-forks p5-gate p8-verify p10-publish; do
+            out=$(bash "etc/go/phases/$s.sh" 2>&1) && { echo "::error::$s exited 0; a scaffolded stage must refuse"; exit 1; }
+            rc=$?
+            [ "$rc" = "3" ] || { echo "::error::$s exited $rc, expected 3"; exit 1; }
+            echo "$out" | grep -q 'BLOCKER' || { echo "::error::$s refused without naming a blocker"; exit 1; }
+            echo "ok $s refuses with exit 3 and names its blocker"
+          done
+
+      # The report template may not carry a typed number. This is the mechanical
+      # form of the drift that put "114 blocking, 46 lossy, 18 advisory" into
+      # PROJECTIONS.md against an exporter that emits different figures.
+      - name: The report template carries no transcribed measurement
+        run: |
+          mkdir -p /tmp/empty-run
+          printf '' > /tmp/empty-run/journal.ndjson
+          out=$(node etc/go/report/render-report.mjs /tmp/empty-run 2>&1) || true
+          echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
+          echo "ok the template contains no literal measurement"
+
   bpmn:
     name: BPMN Soundness
     needs: changes
