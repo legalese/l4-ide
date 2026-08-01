@@ -2670,13 +2670,12 @@ builtinType u
 -- [@D-DATEDCHAIN@ (Blocking)] the decision is a chain of rule-date guards that
 --   could not be lowered to a date-interval table, so it shipped as boolean
 --   columns over raw L4 that no engine can evaluate (spec §15.3, R10).
--- [@D-RULEDATE-UNBOUND@ (Blocking)] the decision rebinds law time with
+-- [@D-RULEDATE-UNBOUND@ (Lossy)] the decide rebinds law time with
 --   @EVAL UNDER RULES EFFECTIVE AT@; a DRG has one global rule-date input and no
---   scoped rebinding, so supplying that input does not make it answer. The
---   message has TWO forms, chosen from the emitted logic: a boxed literal gets
---   the whole-decision claim, and a decision that still ships a table gets the
---   sub-expression claim, because "no engine can evaluate this decision" would
---   be false of a table an engine will run (spec §15.5).
+--   scoped rebinding, so no faithful @<decision>@ exists and the decide is
+--   dropped at population time and not emitted at all (R12, spec §15.12).
+--   ONE message form; re-severed Blocking → Lossy 2026-08-02 when R12 removed
+--   the emission (and with it the thing that was broken).
 -- [@D-SCOPE@ (Lossy)] two differently-scoped L4 terms collide on one DMN
 --   @inputData@ name.
 -- [@D-RULEDATE@ (Advisory)] the model is temporally parameterised: the rule-date
@@ -4547,16 +4546,63 @@ lowerModule opts modul@(MkModule _ uri _) =
     | (i, nm) <- sectionNames
     ]
 
-  -- Aligned with 'sectionTable': the same §s, membership = rebind-dropped.
-  sectionRebindDropped :: [(Text, [Unique])]
-  sectionRebindDropped =
-    [ (nm, [u | (c, u) <- sectionAssigns, c == i, Set.member u rebindDroppedSet])
+  -- Aligned with 'sectionTable': the same §s, membership = population-dropped
+  -- member decides with their reasons — ALL of 'pvDropped', not only the
+  -- rebind set. (It was rebind-only at first, which left a § of all-fixture
+  -- decides — the corpus's `Group 6 — advertising (Rule 204)` — exactly as
+  -- silent as the silence D-SVCEMPTY exists to end; widened 2026-08-02.)
+  sectionDropped :: [(Text, [(Unique, A.DropReason)])]
+  sectionDropped =
+    [ ( nm
+      , [ (u, r)
+        | (c, u) <- sectionAssigns
+        , c == i
+        , Just r <- [Map.lookup u popVerdict.pvDropped]
+        ]
+      )
     | (i, nm) <- sectionNames
     ]
 
-  rebindDroppedSet :: Set Unique
-  rebindDroppedSet = Set.fromList
-    [u | (u, A.DroppedRuleDateRebind) <- Map.toList popVerdict.pvDropped]
+  -- Arm (ii)'s lost-line reads this: a § that ALSO had population-dropped
+  -- members must not claim its member decisions are "all emitted".
+  sectionDroppedByName :: Map Text [(Unique, A.DropReason)]
+  sectionDroppedByName = Map.fromListWith (<>) sectionDropped
+
+  -- Aligned with 'sectionTable': BKM-candidate members, which 'sectionTable'
+  -- excludes. A § whose only members are BKMs is NOT a candidate for arm (i):
+  -- its decides ARE emitted, as businessKnowledgeModels.
+  sectionBkmMembers :: [(Text, [Unique])]
+  sectionBkmMembers =
+    [ (nm, [u | (c, u) <- sectionAssigns, c == i, Set.member u bkmCandidateSet])
+    | (i, nm) <- sectionNames
+    ]
+
+  -- One phrase per 'A.DropReason', naming the note code that carries the
+  -- member's own loss. Keep "rule-date-rebinding" verbatim: a test pins it.
+  dropReasonPhrase :: A.DropReason -> Text
+  dropReasonPhrase = \case
+    A.DroppedRuleDateRebind -> "rule-date-rebinding (D-RULEDATE-UNBOUND, §15.12)"
+    A.DroppedFixture        -> "test fixtures (D-FIXTURE, §2.5.6-2)"
+    A.DroppedFixtureHelper  -> "fixture-side helpers (D-FIXTURE, §2.5.6-2)"
+    A.DroppedRegulative     -> "uncalled regulative bodies (D-REGULATIVE, §2.5.6-3)"
+
+  dropNoteCode :: A.DropReason -> Text
+  dropNoteCode = \case
+    A.DroppedRuleDateRebind -> "D-RULEDATE-UNBOUND"
+    A.DroppedFixture        -> "D-FIXTURE"
+    A.DroppedFixtureHelper  -> "D-FIXTURE"
+    A.DroppedRegulative     -> "D-REGULATIVE"
+
+  -- "2 as rule-date-rebinding (…); 1 as test fixtures (…)" — counts grouped
+  -- by reason, in the fixed constructor order, so the text is deterministic.
+  dropReasonSummary :: [A.DropReason] -> Text
+  dropReasonSummary rs = Text.intercalate "; "
+    [ tshow n <> " as " <> dropReasonPhrase r
+    | r <- [ A.DroppedRuleDateRebind, A.DroppedFixture
+           , A.DroppedFixtureHelper, A.DroppedRegulative ]
+    , let n = length (filter (== r) rs)
+    , n > 0
+    ]
 
   sectionAssigns :: [(Int, Unique)]
   sectionNames   :: [(Int, Text)]
@@ -4871,38 +4917,62 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- grouping-arm precedent). Elements are named by the §'s FEEL-folded
       -- name, never by a service id the artifact does not contain.
       --
-      -- Arm (i): a § whose ENTIRE decide membership was rebind-dropped. The
-      -- kept-only section table renders such a § indistinguishable from one
-      -- that never held a decide, which is exactly the silence this arm ends.
+      -- Arm (i): a § whose ENTIRE decide membership was population-dropped —
+      -- for ANY 'A.DropReason', not only the rebind one. The kept-only
+      -- section table renders such a § indistinguishable from one that never
+      -- held a decide, which is exactly the silence this arm ends. (BKM-only
+      -- §s are excluded: their decides ARE emitted, as BKMs.)
       <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
              ("the section `" <> nm <> "` has no emitted member decisions: its "
-                <> englishCount (length droppedUs) <> " member decide(s) "
-                <> Text.intercalate ", " (map (tick . droppedNameOf) droppedUs)
-                <> " were all dropped as rule-date-rebinding (D-RULEDATE-UNBOUND, \
-                   \§15.12), so no decisionService is emitted for it")
-             "nothing an engine needs: the grouping shell had no members left to group; \
-             \the members' own loss is carried by their D-RULEDATE-UNBOUND notes"
-         | ((nm, kept), (_, droppedUs)) <- zip sectionTable sectionRebindDropped
+                <> englishCount (length droppedMembers) <> " member decide(s) "
+                <> Text.intercalate ", " (map (tick . droppedNameOf . fst) droppedMembers)
+                <> " were all dropped at population time ("
+                <> dropReasonSummary (map snd droppedMembers)
+                <> "), so no decisionService is emitted for it")
+             ("nothing an engine needs: the grouping shell had no members left to \
+              \group; the members' own loss is carried by their "
+                <> Text.intercalate " / "
+                     (nubOrd (map (dropNoteCode . snd) droppedMembers))
+                <> " notes")
+         | ((nm, kept), (_, droppedMembers), (_, bkms)) <-
+             zip3 sectionTable sectionDropped sectionBkmMembers
          , null kept
-         , not (null droppedUs)
+         , null bkms
+         , not (null droppedMembers)
          ]
       -- Arm (ii): a struct with kept members that cannot satisfy §6.3.10's
       -- decisionService shape. This skip existed before and was silent; the
-      -- note is new, the behaviour is not.
+      -- note is new, the behaviour is not. The lost-line is CONDITIONED on
+      -- whether the § also had population-dropped members: the unconditional
+      -- "its member decisions are all emitted" was false on every mixed §
+      -- (three of seven corpus instances), repaired 2026-08-02.
       <> [ dmnNote "D-SVCEMPTY" Advisory (feelIdentText nm) Nothing
              ("the section `" <> nm <> "` cannot satisfy DMN 1.3 §6.3.10's \
               \decisionService shape — at least one output decision, and at least one \
               \encapsulated member or input decision; this one has " <> shapeText
                 <> " — so no decisionService is emitted for it (probe D5: a service \
                    \with no outputDecision is a KIE runtime throw and a Camunda silence)")
-             "the § as a grouping unit: its member decisions are all emitted; only the \
-             \service shell is not"
-         | (nm, nOut, _nEnc, _nInp) <- svcEmptySkips
+             lostText
+         | (nm, nOut, nEnc, _nInp) <- svcEmptySkips
          , let shapeText
                  | nOut == 0 = "no output decision"
                  | otherwise =
                      tshow nOut <> " output(s) but no encapsulated member and no \
                      \input decision"
+         , let droppedHere = Map.findWithDefault [] nm sectionDroppedByName
+         , let lostText
+                 | null droppedHere =
+                     "the § as a grouping unit: its member decisions are all emitted; \
+                     \only the service shell is not"
+                 | otherwise =
+                     "the § as a grouping unit: its " <> tshow (nOut + nEnc)
+                       <> " emitted member decision(s) are in the artifact, "
+                       <> englishCount (length droppedHere)
+                       <> " member decide(s) were separately dropped at population \
+                          \time (each carries its own "
+                       <> Text.intercalate " / "
+                            (nubOrd (map (dropNoteCode . snd) droppedHere))
+                       <> " note), and the service shell is not emitted"
          ]
 
   emittedServiceIds :: Set Text

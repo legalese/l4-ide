@@ -2267,8 +2267,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     -- §15.5's invariant, asserted over EVERY golden subject rather than left to
     -- the goldens: no emitted model may reference law time without either the
-    -- bound input plus its Advisory, or the Blocking finding.
-    it "never references law time without a binding or a Blocking note (§15.5)" $
+    -- bound input plus its Advisory, or the Lossy population finding (R12
+    -- re-severed D-RULEDATE-UNBOUND Blocking → Lossy, spec §15.12).
+    it "never references law time without a binding or a Lossy note (§15.5)" $
       forM_ goldenSubjects \(srcPath, stem, _) -> do
         src <- Text.readFile (examplesRoot </> srcPath)
         let drg   = drgAsCli srcPath src
@@ -2282,7 +2283,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           unless ((bound && length ruleDate == 1) || not (null unbound)) $
             expectationFailure
               (stem <> " references law time with neither a bound input + one \
-                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Blocking")
+                        \D-RULEDATE Advisory nor a D-RULEDATE-UNBOUND Lossy")
 
     -- D2, the PREDICATE idiom. The cells are asserted VERBATIM because the
     -- closed-low/open-high convention is the whole content of the lowering.
@@ -2546,6 +2547,50 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       it "never lets D-FLAVOR-NOSERVICE name a service the artifact does not contain" $ do
         drg <- svcEmptyDrg
         [n | n <- (dmnReport drg).notes, n.code == "D-FLAVOR-NOSERVICE"] `shouldBe` []
+
+      -- The 2026-08-02 widening, pinned on the corpus because the corpus is
+      -- where both halves were measured false: arm (i) was rebind-only, which
+      -- left the all-fixture `Group 6 — advertising (Rule 204)` exactly as
+      -- silent as the silence the note exists to end; and arm (ii)'s
+      -- unconditional lost-line claimed "its member decisions are all
+      -- emitted" of three §s whose members the SAME report records as
+      -- dropped (15 rebinds in the rule-version §, 4 fixtures in `Fixtures`,
+      -- 1 uncalled regulative in §6).
+      it "names the corpus's all-fixture § (Group 6) via arm (i)" $ do
+        drg <- corpusDrg
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+        [n | n <- ns, Text.isInfixOf "Group 6" n.message] `shouldSatisfy` \arm ->
+          length arm == 1
+            && all (Text.isInfixOf "test fixtures (D-FIXTURE" . (.message)) arm
+            && all (Text.isInfixOf "no emitted member decisions" . (.message)) arm
+
+      it "claims 'all emitted' ONLY of §s with no dropped members (the mixed lost-line)" $ do
+        drg <- corpusDrg
+        let ns = [n | n <- (dmnReport drg).notes, n.code == "D-SVCEMPTY"]
+            claimsAll n = Text.isInfixOf "all emitted" n.lost
+        -- the pure arm-(ii) §s keep the strong claim …
+        sort [n.element | n <- ns, claimsAll n]
+          `shouldBe` [ "Group_4_disclosure_Rule_201_t_boundaries_at_124_000_618_000_1_235_000"
+                     , "Periods_every_deadline_bound_once"
+                     , "Thresholds_every_dollar_figure_bound_once_dated_per_regime"
+                     , "_2_Offering_limit_Rule_100_a_1"
+                     ]
+        -- … and every mixed § says instead how many decides were dropped,
+        -- naming the note code that carries each member's own loss
+        let mixed = [n | n <- ns, Text.isInfixOf "separately dropped" n.lost]
+        sort [n.element | n <- mixed]
+          `shouldBe` [ "Fixtures"
+                     , "The_rule_version_axis_the_same_question_under_four_regimes"
+                     , "_6_Advertising_restrictions_Rule_204"
+                     ]
+        [n.lost | n <- mixed, n.element == "Fixtures"]
+          `shouldSatisfy` all (Text.isInfixOf "D-FIXTURE")
+        [ n.lost
+          | n <- mixed
+          , n.element == "The_rule_version_axis_the_same_question_under_four_regimes"
+          ] `shouldSatisfy` all (Text.isInfixOf "D-RULEDATE-UNBOUND")
+        [n.lost | n <- mixed, n.element == "_6_Advertising_restrictions_Rule_204"]
+          `shouldSatisfy` all (Text.isInfixOf "D-REGULATIVE")
 
     it "carries the @ref citation into the annotation column (§15.9)" $ do
       drg <- corpusDrg

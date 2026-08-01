@@ -1581,6 +1581,10 @@ spec bin = do
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
           out `shouldSatisfy` ("67/67 decision(s) SUCCEEDED" `isInfixOf`)
           out `shouldSatisfy` ("67/67 value(s) as expected" `isInfixOf`)
+          -- the SVC leg is a value check since 2026-08-02 (each service fed
+          -- its inputDecisions' computed values, each outputDecision compared
+          -- against the same expect entry): 7 services, 14 declared outputs
+          out `shouldSatisfy` ("14/14 service output value(s) as expected" `isInfixOf`)
 
     it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass

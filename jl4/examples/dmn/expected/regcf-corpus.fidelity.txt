@@ -377,6 +377,9 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-FLAVOR-NOSERVICE] advisory — service_top_level_the_whole_exemption
       the decisionService `Top_level_the_whole_exemption` (§ `Top level — the whole exemption`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
+  [D-SVCEMPTY] advisory — Group_6_advertising_Rule_204
+      the section `Group 6 — advertising (Rule 204)` has no emitted member decisions: its three member decide(s) `a conforming notice`, `an overreaching notice`, `a notice with no platform link` were all dropped at population time (3 as test fixtures (D-FIXTURE, §2.5.6-2)), so no decisionService is emitted for it
+      lost: nothing an engine needs: the grouping shell had no members left to group; the members' own loss is carried by their D-FIXTURE notes
   [D-SVCEMPTY] advisory — Thresholds_every_dollar_figure_bound_once_dated_per_regime
       the section `Thresholds — every dollar figure, bound once, dated per regime` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 13 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
       lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
@@ -388,16 +391,16 @@ fidelity report — DMN 1.3 (XML), camunda flavor
       lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
   [D-SVCEMPTY] advisory — _6_Advertising_restrictions_Rule_204
       the section `6. Advertising restrictions — Rule 204` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 2 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
-      lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
+      lost: the § as a grouping unit: its 2 emitted member decision(s) are in the artifact, 1 member decide(s) were separately dropped at population time (each carries its own D-REGULATIVE note), and the service shell is not emitted
   [D-SVCEMPTY] advisory — Fixtures
       the section `Fixtures` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 2 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
-      lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
+      lost: the § as a grouping unit: its 2 emitted member decision(s) are in the artifact, four member decide(s) were separately dropped at population time (each carries its own D-FIXTURE note), and the service shell is not emitted
   [D-SVCEMPTY] advisory — Group_4_disclosure_Rule_201_t_boundaries_at_124_000_618_000_1_235_000
       the section `Group 4 — disclosure (Rule 201(t)), boundaries at $124,000 / $618,000 / $1,235,000` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 3 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
       lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
   [D-SVCEMPTY] advisory — The_rule_version_axis_the_same_question_under_four_regimes
       the section `The rule-version axis — the same question under four regimes` cannot satisfy DMN 1.3 §6.3.10's decisionService shape — at least one output decision, and at least one encapsulated member or input decision; this one has 5 output(s) but no encapsulated member and no input decision — so no decisionService is emitted for it (probe D5: a service with no outputDecision is a KIE runtime throw and a Camunda silence)
-      lost: the § as a grouping unit: its member decisions are all emitted; only the service shell is not
+      lost: the § as a grouping unit: its 5 emitted member decision(s) are in the artifact, 15 member decide(s) were separately dropped at population time (each carries its own D-RULEDATE-UNBOUND note), and the service shell is not emitted
   [D-COMPUTEDOUTPUT] advisory — decision_offering_maximum_in_a_12_month_period  (main.l4:142:22-98)
       the output entry `no_Regulation_Crowdfunding_figure_exists_before_commencement_on_2016_05_16` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it
