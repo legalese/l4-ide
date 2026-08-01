@@ -1,0 +1,21 @@
+{
+  "root-of": [{ "x": 1 }, { "x": 2 }, { "x": 4 }, { "x": 16 }, { "x": 0.25 }],
+  "ln-of": [{ "x": 1 }, { "x": 2 }, { "x": 10 }, { "x": 0.5 }],
+  "shouting": [{ "s": "hello world" }, { "s": "Mixed Case 123" }, { "s": "" }],
+  "has-substring": [
+    { "haystack": "hello world", "needle": "ell" },
+    { "haystack": "hello world", "needle": "xyz" },
+    { "haystack": "hello", "needle": "" }
+  ],
+  "size-of": [
+    { "s": "hello" },
+    { "s": "" },
+    { "s": "héllo" },
+    { "s": "日本語" }
+  ],
+  "substitute": [
+    { "s": "hello world", "a": "o", "b": "0" },
+    { "s": "aaa", "a": "a", "b": "bb" }
+  ],
+  "whole-number": [{ "n": 2.5 }, { "n": 3 }, { "n": -4 }, { "n": 0 }]
+}

@@ -1,0 +1,19 @@
+-- Same shadow, LEFT declared first (reversed tag order).
+IMPORT prelude
+
+DECLARE Thing IS ONE OF
+  LEFT  HAS lv IS A NUMBER
+  RIGHT HAS rv IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A Thing
+`mk thing` MEANS
+  IF n GREATER THAN 0 THEN RIGHT n ELSE LEFT n
+
+@export thing dispatch over a user LEFT/RIGHT enum (LEFT first)
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`thing dispatch` MEANS
+  CONSIDER `mk thing` n
+    WHEN LEFT  a THEN a MINUS 1000
+    WHEN RIGHT b THEN b PLUS 1000

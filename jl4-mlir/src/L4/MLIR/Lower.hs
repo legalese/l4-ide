@@ -38,10 +38,11 @@ import L4.Syntax
   , NamedExpr(..), InertContext(..), OptionallyNamedType(..)
   , Info(..)
   , rawName, rawNameToText, getActual
+  , Unique, getUnique
   )
 import L4.Annotation (HasSrcRange, emptyAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
-import L4.TypeCheck.Types (InfoMap)
+import L4.TypeCheck.Types (InfoMap, EntityInfo, CheckEntity(..))
 import qualified L4.Utils.IntervalMap as IV
 
 import Control.Monad (forM_, forM, unless, when)
@@ -80,6 +81,34 @@ data LowerState = LowerState
   , nextString :: !Int              -- Counter for string global names
   , funcSigs   :: Map Text ([MLIRType], MLIRType)  -- Known function signatures
   , funcListElems :: Map Text [Maybe MLIRType]  -- Known list element types per arg
+    -- | The bundle-wide L4 type map: the typechecker's checked type for
+    -- every known term — top-level and local DECIDE heads, ASSUMEs — keyed
+    -- by 'Unique', across the main module AND every dependency. 'funcSigs'
+    -- records only MLIR-level types, and under the uniform ABI those are
+    -- all @f64@ — so a comparison whose operand is a helper's CALL RESULT
+    -- used to be unclassifiable and 'lowerCmp' refused (daydate's
+    -- @is weekend@ compares the helper result @`Weekday of` d@ against the
+    -- constant @Saturday@, which is why @is-a-weekday@ routed to the
+    -- fallback). 'classifyOperand' uses this map to recover the callee's
+    -- L4-level result type at any 'App' operand. Derived from the
+    -- typechecker's 'EntityInfo' (must be the SUBSTITUTED one — see
+    -- 'applyFinalSubstitution' in the LSP rules; an un-substituted map is
+    -- full of 'InfVar's for MEANS bindings). Empty when the caller has no
+    -- typecheck result (the plain 'lowerProgram' entry point).
+  , funcL4Types :: !(Map Unique (Type' Resolved))
+    -- | User-declared type SYNONYMS (@DECLARE Foo IS A STRING@), keyed by
+    -- the synonym's name, mapping to its underlying 'Type''. The lowering
+    -- otherwise ERASES synonym decls (see 'lowerModuleDecls'), so a
+    -- comparison operand typed @Foo@ (recovered from 'bindingL4Types' when
+    -- the 'InfoMap' misses) would reach 'classifyL4Type' as an opaque
+    -- 'TyApp' head and be mis-read as 'CmpOther' — a raw @arith.cmpf@ on
+    -- what is actually a string /pointer/. 'classifyOperand' unfolds
+    -- through this map so @Foo@ resolves to STRING → 'CmpString' →
+    -- @__l4_str_eq@/@__l4_str_cmp@. Genuine builtin DATE\/TIME are NOT
+    -- synonyms, so they are absent here and keep their 'CmpOther' serial
+    -- semantics. (@britishcitizen5@: @DECLARE Date IS A STRING@,
+    -- @DECLARE Place IS A STRING@.)
+  , typeSynonyms :: !(Map Text (Type' Resolved))
     -- | Ground-truth type info from the jl4-core typechecker. Every
     -- expression's inferred 'Type'' Resolved' is stored here, keyed by
     -- source range. Use 'typeOfExpr' to look up the type of any
@@ -146,6 +175,64 @@ data LowerState = LowerState
     -- set is potentially mutually recursive — eager evaluation would
     -- loop, so 'lowerLocalDecl' lambda-lifts it instead.
   , pendingDecide :: !(Set.Set Text)
+    -- | Mangled symbols already claimed by an emitted @func.func@ body,
+    -- keyed by @(sanitizedName, arity)@ — the exact tuple
+    -- 'dedupAndSynthExterns' mangles to a single WASM symbol
+    -- (@name__$arity@). L4 allows ad-hoc overloading, so two genuinely
+    -- different top-level definitions can share a name AND an arity
+    -- (e.g. @daydate@'s four arity-1 @Date@ overloads, distinguished
+    -- only by their parameter *type*). The dedup post-pass keeps just
+    -- the FIRST body per mangled symbol and silently drops the rest, so
+    -- calls that meant a later overload would dispatch to the wrong
+    -- body. We can't disambiguate by type at the f64 ABI, so when a
+    -- second body collides on this key we 'markUnsupported' both the
+    -- prior and the current definition (keyed by their shared
+    -- 'Schema.wasmSymbol') — fail loud instead of silently wrong.
+    --
+    -- The value records WHICH definition claimed the symbol (its
+    -- 'Unique'), because a repeat is only a collision if it comes from a
+    -- *different* definition. The same DECIDE legitimately reaches
+    -- 'lowerDecide' twice — a lambda-lifted WHERE/LET helper is lowered
+    -- once for its parent's untraced body and again for the parent's
+    -- @$trace@ clone — and keying on the symbol alone reported that
+    -- benign re-emission as an overload collision against itself.
+  , emittedBodies :: !(Map (Text, Int) Unique)
+    -- Disambiguated WASM symbols for same-arity overload sets. The
+    -- arity-only mangle ('dedupAndSynthExterns') cannot separate two
+    -- overloads with the SAME name AND arity but different argument types
+    -- (e.g. @daydate@'s @Weekday of@ on NUMBER vs DATE), so they'd collapse
+    -- to one symbol and dispatch to whichever body won the dedup. The
+    -- typechecker already gives each overload a distinct 'getUnique', so we
+    -- map that unique to a per-group-indexed symbol (@name__ovN@) and use it
+    -- at BOTH the definition and every call site (which carries the same
+    -- unique — name resolution links a 'Ref' to its 'Def's unique). Computed
+    -- once by 'computeOverloadSymbols'; only populated for groups with no
+    -- @\@export@ member (an exported same-arity collision is API-ambiguous
+    -- and stays 'markUnsupported'). Names absent here use their plain symbol.
+  , overloadSymbols :: !(Map Unique Text)
+    -- | Static call graph over L4-level functions: caller's WASM symbol ⟶
+    -- the symbols it calls directly. Recorded by 'callL4' / 'callL4Direct'
+    -- (the two choke points for an L4→L4 @func.call@; runtime intrinsics
+    -- are excluded — they can't carry diagnostics). Used by
+    -- 'propagateDiagnostics' to lift a helper's unsupported-construct
+    -- diagnostic up to every exported function that transitively calls it:
+    -- 'markUnsupported' keys a diagnostic on the *enclosing* function, but
+    -- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@,
+    -- so an unsupported HELPER would be silently invoked by a still-
+    -- @supported: true@ export. Fail loud instead: the export inherits the
+    -- diagnostic and routes to the fallback evaluator.
+  , callGraph :: !(Map Text (Set.Set Text))
+    -- | Counter feeding 'localSymbolFor', which hands each lambda-lifted
+    -- WHERE/LET helper its own WASM symbol. Local helper names are not
+    -- globally unique — @prelude@ alone defines ten different recursive
+    -- @go@ helpers (inside @sum@, @product@, @count@, @reverse@,
+    -- @groupPairs@, …). They all sanitized to the bare symbol @go@ and, at
+    -- the same arity, collapsed to ONE body under the arity-only mangle:
+    -- @count@'s @go@ won, so @sum@ returned the list LENGTH and @product@
+    -- returned length+1. Numbering each lifted helper keeps the bodies
+    -- distinct. (The unique is memoized in 'overloadSymbols' so the
+    -- untraced and @$trace@ lowerings of one helper agree on its symbol.)
+  , nextLocalSym :: !Int
   }
 
 type LowerM a = State LowerState a
@@ -166,6 +253,8 @@ initState info = LowerState
   , nextString = 0
   , funcSigs = Map.empty
   , funcListElems = Map.empty
+  , funcL4Types = Map.empty
+  , typeSynonyms = Map.empty
   , sourceTypeMap = info
   , localCaptures = Map.empty
   , exportAssumeArgs = Map.empty
@@ -176,6 +265,10 @@ initState info = LowerState
   , openTraceNode = Nothing
   , funcParams = Map.empty
   , pendingDecide = Set.empty
+  , emittedBodies = Map.empty
+  , overloadSymbols = Map.empty
+  , callGraph = Map.empty
+  , nextLocalSym = 0
   }
 
 -- | Look up the ground-truth type for an expression using the typechecker's
@@ -255,8 +348,21 @@ callPreludeL4 funcN args = do
     pure (v, ty)
   callL4 funcN argPairs retTy
 
+-- | Record a @caller ⟶ callee@ edge in the static 'callGraph', so
+-- 'propagateDiagnostics' can lift an unsupported helper's diagnostic up to
+-- the exports that reach it. No-op outside a function body (no caller to
+-- attribute the edge to). The *untraced* symbol is recorded: @fn@ and
+-- @fn$trace@ are the same L4 function and share its diagnostics.
+recordCallEdge :: Text -> LowerM ()
+recordCallEdge callee = do
+  mfn <- gets (.currentFunction)
+  forM_ mfn $ \caller ->
+    modify' $ \s ->
+      s { callGraph = Map.insertWith Set.union caller (Set.singleton callee) s.callGraph }
+
 callL4 :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4 callee args retTy = do
+  recordCallEdge callee
   -- Internal callers of @export functions don't supply the ASSUME-derived
   -- args themselves; synthesise each by calling the ASSUME's own extern,
   -- preserving the pre-@export behaviour (the wasm host satisfies the
@@ -287,6 +393,7 @@ callL4 callee args retTy = do
 -- calling the regular function inside).
 callL4Direct :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4Direct callee args retTy = do
+  recordCallEdge callee
   fullArgs <- appendAssumeExternArgs callee args
   boxed <- forM fullArgs $ \(v, t) -> boxABI t v
   let nArgs = length fullArgs
@@ -437,15 +544,17 @@ markUnsupported reason = do
 -- the same name (common in files that shadow prelude helpers) doesn't
 -- produce a duplicate symbol.
 lowerProgram :: Module Resolved -> [Module Resolved] -> MLIRModule
-lowerProgram = lowerProgramWithInfo IV.empty
+lowerProgram = lowerProgramWithInfo IV.empty Map.empty
 
--- | Like 'lowerProgram' but threads the typechecker's 'InfoMap' through
--- so the lowering can query ground-truth types for every expression.
+-- | Like 'lowerProgram' but threads the typechecker's 'InfoMap' and
+-- (substituted) 'EntityInfo' through so the lowering can query
+-- ground-truth types for every expression and every known term.
 -- This is the preferred entry point — callers that already have a
--- 'TypeCheckResult' should pass its @infoMap@ field here.
-lowerProgramWithInfo :: InfoMap -> Module Resolved -> [Module Resolved] -> MLIRModule
-lowerProgramWithInfo info mainMod deps =
-  fst (lowerProgramWithDiagnostics info mainMod deps)
+-- 'TypeCheckResult' should pass its @infoMap@ and @entityInfo@ fields
+-- here.
+lowerProgramWithInfo :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> MLIRModule
+lowerProgramWithInfo info entInfo mainMod deps =
+  fst (lowerProgramWithDiagnostics info entInfo mainMod deps)
 
 -- | Like 'lowerProgramWithInfo' but also returns the per-function
 -- lowering diagnostics — a map from sanitized WASM symbol name to the
@@ -456,17 +565,106 @@ lowerProgramWithInfo info mainMod deps =
 -- fallback evaluator instead of trusting a WASM module that would
 -- silently return FALSE.
 lowerProgramWithDiagnostics
-  :: InfoMap -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
-lowerProgramWithDiagnostics info mainMod deps =
+  :: InfoMap -> EntityInfo -> Module Resolved -> [Module Resolved] -> (MLIRModule, Map Text [Text])
+lowerProgramWithDiagnostics info entInfo mainMod deps =
   let mainNames = collectLocalNames mainMod
       exportArgs = collectExportAssumeArgs mainMod
-      initial = (initState info) { exportAssumeArgs = exportArgs }
+      initial = (initState info)
+        { exportAssumeArgs = exportArgs
+        , overloadSymbols  = computeOverloadSymbols (mainMod : deps)
+        , funcL4Types      = knownTermTypes entInfo
+        , typeSynonyms     = Map.unions (map collectTypeSynonyms (mainMod : deps))
+        }
       finalState = execState (do
         forM_ deps (registerDependencyModule mainNames)
         lowerModuleDecls mainMod
         ) initial
       rawOps = reverse finalState.globals ++ reverse finalState.functions
-  in (MLIRModule { moduleOps = rawOps }, finalState.diagnostics)
+      diags = propagateDiagnostics finalState.callGraph finalState.diagnostics
+  in (MLIRModule { moduleOps = rawOps }, diags)
+
+-- | Project the typechecker's 'EntityInfo' down to the 'funcL4Types' map:
+-- every 'KnownTerm' entity's checked type, keyed by its 'Unique'. This is
+-- ground truth for the L4-level type of any resolved reference — a 'Ref'
+-- shares its 'Def's unique, so a call site's head 'Resolved' looks up the
+-- callee's own checked type, across module boundaries and irrespective of
+-- the f64 ABI erasure in 'funcSigs'.
+knownTermTypes :: EntityInfo -> Map Unique (Type' Resolved)
+knownTermTypes = Map.mapMaybe $ \(_, entity) -> case entity of
+  KnownTerm ty _ -> Just ty
+  _              -> Nothing
+
+-- | Collect user-declared type SYNONYMS (@DECLARE Foo IS A STRING@) from a
+-- module, keyed by the synonym's name. Populates 'LowerState.typeSynonyms'
+-- so 'classifyOperand' can unfold a synonym-typed comparison operand to its
+-- underlying scalar (STRING\/NUMBER\/…) rather than mis-classifying the
+-- opaque 'TyApp' head as 'CmpOther'. Record\/enum declares are not
+-- synonyms and are skipped; genuine builtin DATE\/TIME are not declares at
+-- all, so they never appear here and keep their serial semantics.
+collectTypeSynonyms :: Module Resolved -> Map Text (Type' Resolved)
+collectTypeSynonyms (MkModule _ _ section) = Map.fromList (goSection section)
+  where
+    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goDecl = \case
+      Declare _ (MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ inner)) ->
+        [(resolvedName name, inner)]
+      Section _ sub -> goSection sub
+      _ -> []
+
+-- | Lift each unsupported-construct diagnostic to every function that
+-- transitively calls the function it was raised in.
+--
+-- 'markUnsupported' attributes a diagnostic to the *enclosing* function, but
+-- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@. A
+-- helper is not an export, so without this pass an exported function whose
+-- helper contains an unsupported construct stays @supported: true@ and the
+-- proxy happily runs a WASM module that cannot evaluate it — the helper's
+-- fail-closed 0.0/FALSE surfaces as a silently wrong ANSWER rather than a
+-- refusal. (Concretely: @daydate@'s @is weekend@ compares a helper-result
+-- NUMBER that 'lowerCmp' can't classify, so it raises a diagnostic — but the
+-- exported @is a weekday@ that calls it did not inherit it.)
+--
+-- Fail loud instead: an export that reaches an unsupported helper is itself
+-- unsupported, and routes to the fallback evaluator. The reason names the
+-- helper so the refusal is diagnosable.
+--
+-- Cycles (self- and mutual recursion) are fine — reachability is computed
+-- with a visited set. A function that is its own ancestor doesn't get a
+-- propagated copy of its own reason; its direct one already says it.
+propagateDiagnostics :: Map Text (Set.Set Text) -> Map Text [Text] -> Map Text [Text]
+propagateDiagnostics cg direct = Map.unionWith (++) direct propagated
+  where
+    -- Reverse the call graph: callee ⟶ its direct callers.
+    callers :: Map Text (Set.Set Text)
+    callers = Map.fromListWith Set.union
+      [ (callee, Set.singleton caller)
+      | (caller, callees) <- Map.toList cg
+      , callee <- Set.toList callees
+      ]
+
+    -- Every function that transitively calls @fn@ (BFS over the reverse
+    -- edges; @seen@ terminates on recursion).
+    ancestorsOf :: Text -> Set.Set Text
+    ancestorsOf fn = go Set.empty [fn]
+      where
+        go seen [] = seen
+        go seen (f : rest)
+          | f `Set.member` seen = go seen rest
+          | otherwise =
+              let ups = Map.findWithDefault Set.empty f callers
+              in go (Set.insert f seen) (Set.toList ups ++ rest)
+
+    propagated :: Map Text [Text]
+    propagated = Map.fromListWith (++)
+      [ (caller, [reasonFor helper reasons])
+      | (helper, reasons) <- Map.toList direct
+      , caller <- Set.toList (ancestorsOf helper)
+      , caller /= helper
+      ]
+
+    reasonFor helper reasons =
+      "depends on '" <> helper <> "', which the WASM backend cannot compile: "
+        <> Text.intercalate "; " reasons
 
 -- | For every @\@export@-decorated DECIDE in the main module, collect the
 -- ASSUME declarations it references. These get promoted to function-level
@@ -487,6 +685,91 @@ collectExportAssumeArgs mod' = Map.fromList
     Decide _ d | Export.isExportedDecide d -> [d]
     Section _ s -> goSection s
     _ -> []
+
+-- | Every DECIDE in a module, descending into nested sections.
+allModuleDecides :: Module Resolved -> [Decide Resolved]
+allModuleDecides (MkModule _ _ sect) = goSection sect
+  where
+    goSection (MkSection _ _ _ decls) = concatMap goDecl decls
+    goDecl (Decide _ d)  = [d]
+    goDecl (Section _ s) = goSection s
+    goDecl _             = []
+
+-- | Compute the disambiguated WASM symbol for every same-arity overload that
+-- needs one. Two DECIDEs sharing a sanitized name AND arity (but differing in
+-- argument type — which the f64 ABI erases) would collapse to one symbol under
+-- the arity-only mangle; here we give each a distinct @name__ovN@ keyed on its
+-- 'getUnique'. Call sites carry the same unique (a 'Ref' shares its 'Def's
+-- unique), so definition and call agree. Groups that contain an @\@export@
+-- member are left out: an exported same-arity collision is ambiguous at the
+-- JSON API and stays 'markUnsupported' (routed to fallback), and skipping them
+-- also avoids desyncing 'Schema.wasmSymbol' for exports. See 'overloadSymbols'.
+computeOverloadSymbols :: [Module Resolved] -> Map Unique Text
+computeOverloadSymbols mods =
+  let decides = concatMap allModuleDecides mods
+      entries =
+        [ ((sanitizeName (resolvedName h), arity), (getUnique h, Export.isExportedDecide d))
+        | d@(MkDecide _ _ af _) <- decides
+        , let h = appFormHead' af
+              arity = length (appFormParams af)
+        ]
+      byKey = Map.fromListWith (flip (++)) [ (k, [v]) | (k, v) <- entries ]
+  in Map.fromList
+       [ (u, base <> "__ov" <> Text.pack (show idx))
+       | ((base, _arity), members) <- Map.toList byKey
+       , let distinct = dedupByUnique members
+       , length distinct > 1          -- a genuine same-arity overload set
+       , not (any snd distinct)        -- and none of them is @export'd
+       , (idx, (u, _)) <- zip [(0 :: Int) ..] distinct
+       ]
+  where
+    -- Distinct by unique, first occurrence wins, source order preserved.
+    dedupByUnique = go Set.empty
+      where
+        go _ [] = []
+        go seen ((u, ex) : rest)
+          | Set.member u seen = go seen rest
+          | otherwise         = (u, ex) : go (Set.insert u seen) rest
+
+-- | The WASM symbol for a resolved function reference\/definition: the
+-- per-overload disambiguated name when it belongs to a same-arity overload
+-- set ('overloadSymbols'), otherwise the plain sanitized name. Use this
+-- everywhere a function symbol is derived from a 'Resolved' so a definition
+-- and its call sites agree.
+symbolFor :: Resolved -> LowerM Text
+symbolFor r = do
+  ov <- gets (.overloadSymbols)
+  pure (Map.findWithDefault (sanitizeName (resolvedName r)) (getUnique r) ov)
+
+-- | The WASM symbol for a lambda-lifted WHERE/LET helper, allocating a fresh
+-- numbered one on first sight and memoizing it under the helper's 'Unique'.
+--
+-- Local helper names are scoped in L4 but FLAT once lifted to a top-level
+-- @func.func@, and they are anything but unique: @prelude@ defines ten
+-- separate recursive @go@ helpers. Lifting them all to the bare symbol @go@
+-- made the arity-only mangle collapse every arity-2 @go@ into one body —
+-- silently giving @sum@, @product@, @reverse@, @dictSize@, @dictDelete@ and
+-- @groupPairs@ whichever body happened to win (@count@'s), so @sum@ returned
+-- the list length. Numbering them keeps each body its own symbol.
+--
+-- Memoizing on the 'Unique' (rather than allocating per call) is what makes
+-- the untraced and @$trace@ lowerings of the same helper — and every call
+-- site, which reaches this through 'symbolFor' because a 'Ref' shares its
+-- 'Def's unique — all agree on one symbol.
+localSymbolFor :: Resolved -> LowerM Text
+localSymbolFor r = do
+  ov <- gets (.overloadSymbols)
+  let u = getUnique r
+  case Map.lookup u ov of
+    Just sym -> pure sym
+    Nothing  -> do
+      n <- gets (.nextLocalSym)
+      let sym = sanitizeName (resolvedName r) <> "__loc" <> Text.pack (show n)
+      modify' $ \s -> s
+        { overloadSymbols = Map.insert u sym s.overloadSymbols
+        , nextLocalSym    = n + 1
+        }
+      pure sym
 
 -- | Final pass run by 'L4.MLIR.Pipeline' once all operations — including
 -- runtime builtins — have been assembled. It handles three consumers
@@ -700,7 +983,7 @@ registerDependencyModule skipLocal (MkModule _ _ section) = go section
     -- break the module for unrelated calls.
     processDepDecide :: Decide Resolved -> LowerM ()
     processDepDecide decide@(MkDecide _ typeSig appForm _) = do
-      let name = sanitizeName (resolvedName (appFormHead' appForm))
+      name <- symbolFor (appFormHead' appForm)
       skip <- shouldSkip name
       unless skip $
         if sigHasFunctionParam typeSig
@@ -710,8 +993,8 @@ registerDependencyModule skipLocal (MkModule _ _ section) = go section
     registerExternDecide :: Decide Resolved -> LowerM ()
     registerExternDecide (MkDecide _ typeSig appForm _body) = do
       env <- gets (.typeEnv)
-      let name = sanitizeName (resolvedName (appFormHead' appForm))
-          (argTypes, sigRetType) = sigToTypesEnv env typeSig
+      name <- symbolFor (appFormHead' appForm)
+      let (argTypes, sigRetType) = sigToTypesEnv env typeSig
           retType = if hasGiveth typeSig then sigRetType else l4NumberType
           argListElems = listElementsFromSig env typeSig
           declOp = mkExternFunc name argTypes retType
@@ -787,8 +1070,8 @@ registerTypeDecl _ = pure ()
 registerFuncSig :: TopDecl Resolved -> LowerM ()
 registerFuncSig (Decide _ (MkDecide _ typeSig appForm body)) = do
   env <- gets (.typeEnv)
-  let name = sanitizeName (resolvedName (appFormHead' appForm))
-      (argTypes, sigRetType) = sigToTypesEnv env typeSig
+  name <- symbolFor (appFormHead' appForm)
+  let (argTypes, sigRetType) = sigToTypesEnv env typeSig
       argListElems = listElementsFromSig env typeSig
   -- Exported DECIDEs that reference module-level ASSUMEs get those ASSUMEs
   -- appended as extra arguments in the ABI.
@@ -977,8 +1260,8 @@ _emitTracePopArgPaths =
 lowerDecide :: Decide Resolved -> LowerM ()
 lowerDecide (MkDecide _ typeSig appForm body) = do
   env <- gets (.typeEnv)
-  let funcName = sanitizeName (resolvedName (appFormHead' appForm))
-      givenParams = appFormParams appForm
+  funcName <- symbolFor (appFormHead' appForm)
+  let givenParams = appFormParams appForm
       (givenArgTypes, sigRetType) = sigToTypesEnv env typeSig
       listElemTys = listElementsFromSig env typeSig
       -- M5 slice 2B: kind byte we'll pass to `__l4_trace_exit` in the
@@ -1001,6 +1284,13 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
     { currentFunction = Just funcName
     , pendingDecide = Set.insert rawDecideName oldPending
     }
+  -- Fail-closed at the ABI boundary for a return value the WASM side cannot
+  -- marshal (an enum-with-data lowered as a bare tag, or a record/list/
+  -- optional transitively containing one) is enforced in 'buildExport'
+  -- (see 'unmarshallableReturn'): it keys on the ENRICHED return type via
+  -- 'typeToRetSchema', so it also catches inferred returns (no GIVETH) and
+  -- nested enum-with-data that a syntactic-GIVETH check here would miss.
+  --
   -- If this DECIDE is @export-decorated and references ASSUMEs, those
   -- ASSUMEs become additional ABI parameters (see 'collectExportAssumeArgs').
   -- They're appended after the GIVEN params so existing call sites for
@@ -1084,6 +1374,35 @@ lowerDecide (MkDecide _ typeSig appForm body) = do
           region
 
     modify' $ \s -> s { functions = funcOp : s.functions }
+
+  -- Same-arity overload collision: 'dedupAndSynthExterns' mangles a
+  -- function symbol to @name__$arity@ when (and only when) the name is
+  -- used at more than one arity, then keeps just the FIRST body per
+  -- mangled symbol. If a *second* genuinely-different top-level body
+  -- shares this name AND arity (ad-hoc overloads distinguished only by
+  -- parameter type — e.g. @daydate@'s four arity-1 @Date@ overloads),
+  -- the dedup silently drops it, so a call meaning the later overload
+  -- dispatches to the wrong body. We can't disambiguate by type across
+  -- the f64 ABI, so fail loud: flag the export @supported: false@
+  -- (keyed by 'Schema.wasmSymbol', which equals @funcName@) and let the
+  -- proxy route it to a fallback evaluator. This runs *outside* the
+  -- @withScope@ body block so 'markUnsupported' still attributes to
+  -- @currentFunction@ (= @Just funcName@).
+  let bodyArity = length params
+      bodyUnique = getUnique (appFormHead' appForm)
+  -- A symbol already claimed by THIS definition is a benign re-emission
+  -- (the untraced pass and the @$trace@ clone both run 'lowerDecide' for a
+  -- lifted local helper); only a *different* definition is a real collision.
+  claimedBy <- gets (Map.lookup (funcName, bodyArity) . (.emittedBodies))
+  let seenBefore = maybe False (/= bodyUnique) claimedBy
+  modify' $ \s -> s
+    { emittedBodies = Map.insert (funcName, bodyArity) bodyUnique s.emittedBodies }
+  when seenBefore $ do
+    _ <- markUnsupported $
+      "ad-hoc overload collision: multiple definitions of " <> funcName
+        <> " at arity " <> Text.pack (show bodyArity)
+        <> " share one WASM symbol and cannot be disambiguated by the WASM backend"
+    pure ()
 
   -- M5 slice 2C — emit `<funcName>$trace`, a structurally identical clone
   -- with per-subexpression trace instrumentation. Each traceable
@@ -1472,7 +1791,7 @@ lowerExprCases expr expectedTy = case expr of
   -- Variable reference
   App _ n [] -> do
     let name = resolvedName n
-        funcN = sanitizeName name
+    funcN <- symbolFor n
     mVal <- lookupVar name
     case mVal of
       Just val -> pure val
@@ -1537,7 +1856,7 @@ lowerExprCases expr expectedTy = case expr of
   -- Function application
   App _ n args -> do
     let rawName_ = resolvedName n
-        funcN = sanitizeName rawName_
+    funcN <- symbolFor n
     env <- gets (.typeEnv)
     -- Closure conversion for @WHERE@ / @LET IN@ helpers: when the
     -- callee was lambda-lifted with captured outer-scope variables,
@@ -1634,6 +1953,32 @@ lowerExprCases expr expectedTy = case expr of
               storeSlot mb 0 one
               storeSlot mb 1 innerVal
               pure mb
+            -- EITHER's LEFT / RIGHT — a payload-carrying builtin ADT
+            -- (prelude: @x IS AN EITHER a b@) represented exactly like
+            -- MAYBE: a 2-slot record [tag, payload]. LEFT is tagged 0.0,
+            -- RIGHT 1.0 — mirroring NOTHING/JUST's false/true tag — so the
+            -- CONSIDER lowering ('testPatternTy'/'bindPatternTy') can
+            -- dispatch on the tag and read the payload from slot 1. These
+            -- fire only for the builtin: a user-declared constructor named
+            -- LEFT/RIGHT is caught above by 'lookupRecordFields' /
+            -- 'lookupEnumTag' HERE, and — crucially — the matching side
+            -- ('testPatternTy'/'bindPatternTy') applies the SAME lookup-
+            -- first ordering via 'isUserConstructor', so construction and
+            -- matching agree on the representation.
+            ("LEFT", [inner]) -> do
+              innerVal <- lowerExpr inner l4NumberType
+              e <- allocSlots 2
+              zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+              storeSlot e 0 zero
+              storeSlot e 1 innerVal
+              pure e
+            ("RIGHT", [inner]) -> do
+              innerVal <- lowerExpr inner l4NumberType
+              e <- allocSlots 2
+              one <- emitVal $ \vid -> arithConstantFloat vid 1.0
+              storeSlot e 0 one
+              storeSlot e 1 innerVal
+              pure e
             -- DATE / TIME / DATETIME primitives. These don't need a fresh
             -- extern synthesized (we declare them in Runtime.Builtins); we
             -- just route the call directly so the f64 ABI is bypassed
@@ -1876,17 +2221,84 @@ emitRatBinop fn a b =
   emitVal $ \vid -> funcCall [vid] fn [a, b]
     [l4NumberType, l4NumberType] [l4NumberType]
 
--- | Lower a binary arithmetic op on NUMBER. Both subexpressions are NUMBERs,
--- so they resolve to rational handles, and the result is also a handle.
+-- | The DATE\/TIME serial kind of an arithmetic operand, if any.
+data SerialKind = SKDate | SKTime
+
+-- | Resolve whether an operand is DATE- or TIME-typed, reusing the same
+-- evidence ladder as 'classifyOperand': the typechecker's 'InfoMap'
+-- ('typeOfExpr'), then the recorded source type of a bare @Var@
+-- ('bindingL4Types'). Returns 'Nothing' for NUMBER (the overwhelmingly common
+-- operand) and anything that isn't a date\/time — those need no bridging.
+operandDateTimeKind :: Expr Resolved -> LowerM (Maybe SerialKind)
+operandDateTimeKind e = do
+  mt <- typeOfExpr e
+  case mt >>= serialKind of
+    Just k  -> pure (Just k)
+    Nothing -> case e of
+      App _ n [] -> do
+        mL4 <- gets (Map.lookup (resolvedName n) . (.bindingL4Types))
+        pure (mL4 >>= serialKind)
+      _ -> pure Nothing
+  where
+    serialKind t
+      | isDateType t = Just SKDate
+      | isTimeType t = Just SKTime
+      | otherwise    = Nothing
+
+-- | serial (raw f64) → rational handle, via the runtime's own bridge
+-- (@__l4_date_serial@ / @__l4_time_serial@ each do @ratFromInt(Number(d))@).
+serialToHandle :: SerialKind -> Value -> LowerM Value
+serialToHandle k v = emitVal $ \vid ->
+  funcCall [vid] (serialBuiltin k) [v] [l4NumberType] [l4NumberType]
+  where serialBuiltin SKDate = "__l4_date_serial"
+        serialBuiltin SKTime = "__l4_time_serial"
+
+-- | rational handle → serial (raw f64), the inverse bridge
+-- (@__l4_date_from_serial@ / @__l4_time_from_serial@).
+handleToSerial :: SerialKind -> Value -> LowerM Value
+handleToSerial k v = emitVal $ \vid ->
+  funcCall [vid] (fromSerialBuiltin k) [v] [l4NumberType] [l4NumberType]
+  where fromSerialBuiltin SKDate = "__l4_date_from_serial"
+        fromSerialBuiltin SKTime = "__l4_time_from_serial"
+
+boxIfSerial :: Maybe SerialKind -> Value -> LowerM Value
+boxIfSerial Nothing  v = pure v
+boxIfSerial (Just k) v = serialToHandle k v
+
+-- | Lower @PLUS@\/@MINUS@\/@TIMES@\/@DIVIDE@\/@MODULO@ through the exact-rational
+-- runtime. DATE\/TIME operands arrive as raw f64 serials but @__l4_rat_*@
+-- expects rational-pool handles, so any dated operand is boxed serial→handle
+-- first (otherwise the rat op @ratUnbox@es the serial as a bogus pool index →
+-- the @reading 'num' of undefined@ crash). The result of an /additive/ op with
+-- exactly one dated operand is itself a DATE\/TIME (@date + n@, @date - n@), so
+-- it is unboxed handle→serial; @date - date@ (both dated) is a day-count and
+-- stays a NUMBER handle; non-additive ops never yield a date.
 lowerRatBinop :: Text -> Expr Resolved -> Expr Resolved -> LowerM Value
 lowerRatBinop fn lhs rhs = do
-  lhsVal <- lowerExpr lhs l4NumberType
-  rhsVal <- lowerExpr rhs l4NumberType
-  emitRatBinop fn lhsVal rhsVal
+  lhsK <- operandDateTimeKind lhs
+  rhsK <- operandDateTimeKind rhs
+  lhsVal <- lowerExpr lhs l4NumberType >>= boxIfSerial lhsK
+  rhsVal <- lowerExpr rhs l4NumberType >>= boxIfSerial rhsK
+  result <- emitRatBinop fn lhsVal rhsVal
+  case (fn `elem` ["__l4_rat_add", "__l4_rat_sub"], lhsK, rhsK) of
+    (True, Just k,  Nothing) -> handleToSerial k result
+    (True, Nothing, Just k)  -> handleToSerial k result
+    _                        -> pure result
 
 -- | Lower a literal.
 lowerLit :: Lit -> MLIRType -> LowerM Value
 lowerLit (NumericLit _ r) _ = emitNumberLiteral r
+lowerLit (StringLit _ s) _
+  -- A string literal containing an embedded NUL (U+0000) would be emitted
+  -- as a NUL-terminated global and truncated at the embedded NUL by the
+  -- host's C-string reader — a silent wrong answer vs. jl4-service's
+  -- Data.Text. Runtime-produced strings recover their true length from a
+  -- side table, but a compiler global has no such record, so refuse the
+  -- enclosing function instead (routes to the fallback evaluator).
+  | Text.elem '\0' s =
+      markUnsupported
+        "STRING literal contains an embedded NUL (U+0000), which the WASM \
+        \backend's C-string ABI cannot represent faithfully"
 lowerLit (StringLit _ s) _ = do
   -- Intern the string, take its address (@!llvm.ptr@), then box to f64
   -- so it can live as a uniform-ABI SSA value.
@@ -1895,33 +2307,6 @@ lowerLit (StringLit _ s) _ = do
     [NamedAttribute "global_name" (FlatSymbolRefAttr globalName)]
     [PointerType] []
   ptrToF64 ptr
-
--- | Test whether an expression's L4 type is @NUMBER@ — i.e. its SSA value is
--- a rational handle. Uses the typechecker's 'InfoMap' first; falls back to
--- syntactic shape recognition (arithmetic ops, numeric literals, percent)
--- so the dispatch still works even if 'typeOfExpr' can't find an exact
--- range match for the node (which happens for some compound expressions).
-isNumberExpr :: Expr Resolved -> LowerM Bool
-isNumberExpr e = do
-  mt <- typeOfExpr e
-  case mt of
-    Just t  -> pure $ isNumberType t
-    Nothing -> case e of
-      -- A bare @Var@ reference (App with no args) — look the name up
-      -- in 'bindingL4Types' to get its source-level type. This matters
-      -- inside prelude bodies (max/min/count/…), where the param's
-      -- type is absent from the main module's 'InfoMap'. Without it,
-      -- 'isNumberExprShape' returns False for Var and 'lowerCmp'
-      -- falls through to direct @arith.cmpf@ on the f64 bit-pattern
-      -- — almost always producing the wrong truth value when the
-      -- operands are rational-pool handles.
-      App _ n [] -> do
-        let name = resolvedName n
-        mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
-        case mL4Ty of
-          Just t  -> pure $ isNumberType t
-          Nothing -> pure $ isNumberExprShape e
-      _ -> pure $ isNumberExprShape e
 
 -- | Syntactic-shape NUMBER recognition. Conservative — only returns True
 -- when the shape /must/ produce a NUMBER. Used as a fallback when the
@@ -1944,17 +2329,192 @@ isNumberExprShape = \case
     _             -> False
   _ -> False
 
--- | Test whether an expression's L4 type is @STRING@. Used to dispatch
--- @EQUALS@ on strings through @__l4_str_eq@ (content equality) instead of
--- the legacy 'arith.cmpf' on the pointer bit-pattern (which only happened to
--- agree for string-pool-interned-equal literals — see jl4-core's
--- 'BinOpEquals' on @ValString@).
-isStringExpr :: Expr Resolved -> LowerM Bool
-isStringExpr e = do
+-- | The comparison-relevant class of an operand's L4 type. Drives the
+-- 'lowerCmp' / 'dispatchEqualsByType' dispatch:
+--
+--   * 'CmpNumber' — a rational-pool /handle/. Ordered and equality
+--     comparisons MUST go through @__l4_rat_cmp@; the raw f64 is a pool
+--     index, so 'arith.cmpf' on it compares handle bit-patterns.
+--   * 'CmpString' — a string-pool /pointer/. Equality MUST go through
+--     @__l4_str_eq@ (content equality) and ordering through
+--     @__l4_str_cmp@ (code-point lexicographic); the raw f64 is a
+--     pointer, so 'arith.cmpf' compares addresses, not contents.
+--   * 'CmpOther' — a value whose raw f64 /is/ its comparison key:
+--     BOOLEAN (0.0\/1.0), enum tag (small int), DATE\/TIME serial. For
+--     these the legacy 'arith.cmpf' on the f64 is correct.
+data CmpClass = CmpNumber | CmpString | CmpOther
+  deriving (Eq)
+
+-- | Resolve an operand's 'CmpClass' as reliably as possible. Combines, in
+-- order of confidence:
+--
+--   1. the typechecker's 'InfoMap' (exact-range match via 'typeOfExpr');
+--   2. the recorded source-level type of a bare @Var@ reference
+--      ('bindingL4Types' — populated for GIVEN params and WHERE\/LET
+--      locals), which covers the very common case where the 'InfoMap'
+--      has no exact-range entry for a leaf @Var@;
+--   3. the callee's checked type from the bundle-wide 'funcL4Types' map,
+--      for any 'App' operand — a helper CALL RESULT, or a bare reference
+--      to a zero-arg definition ('entityResultClass'); and
+--   4. structural shape inference ('structuralClass') for literals and
+--      builtins whose result type is fixed by their shape.
+--
+-- Returns 'Nothing' only when the type genuinely cannot be determined by
+-- any of these — the residual case 'lowerCmp' refuses to compile rather
+-- than emit an unsound 'arith.cmpf' on a possible handle\/pointer.
+-- | Unfold a user-declared type SYNONYM chain to its underlying 'Type''.
+-- @DECLARE Date IS A STRING@ resolves @Date@ → STRING so the classifiers
+-- (which match builtin scalar names) see through the alias. Cycle-guarded.
+-- Builtin DATE\/TIME are not in the map, so they are returned unchanged.
+unfoldSynT :: Map Text (Type' Resolved) -> Type' Resolved -> Type' Resolved
+unfoldSynT syns = go Set.empty
+  where
+    go visited ty = case ty of
+      TyApp _ name []
+        | let nm = resolvedName name
+        , not (Set.member nm visited)
+        , Just inner <- Map.lookup nm syns
+        -> go (Set.insert nm visited) inner
+      _ -> ty
+
+classifyOperand :: Expr Resolved -> LowerM (Maybe CmpClass)
+classifyOperand e = do
+  syns <- gets (.typeSynonyms)
+  let classify = classifyL4Type . unfoldSynT syns
   mt <- typeOfExpr e
-  pure $ case mt of
-    Just t -> isStringType t
-    Nothing -> False
+  -- IMPORTANT: the 'InfoMap' we read is *not* run through the final
+  -- substitution (unlike the LSP path), so 'typeOfExpr' frequently
+  -- returns @Just (InfVar …)@ — an un-resolved inference variable — for
+  -- leaf @Var@s. An 'InfVar' carries no usable class, so we must NOT let
+  -- it short-circuit the 'bindingL4Types' / structural fallbacks (doing
+  -- so was the original STRING-equality bug: the @Just InfVar@ was read
+  -- as "not a string" and fell through to a raw 'arith.cmpf' on the
+  -- string pointer). 'classifyL4Type' returns 'Nothing' for any
+  -- non-concrete type, so only a fully-resolved @TyApp@ head is trusted
+  -- here; everything else falls through.
+  case mt >>= classify of
+    Just cls -> pure (Just cls)
+    Nothing  -> case e of
+      -- A bare @Var@ reference (App with no args): the 'InfoMap' often
+      -- lacks an exact-range entry — or carries only an 'InfVar' — for
+      -- the leaf, but 'bindingL4Types' records the param's\/local's
+      -- resolved source type. If that misses too (e.g. a reference to a
+      -- zero-arg top-level MEANS constant like daydate's @Saturday@),
+      -- fall through to the entity map.
+      App _ n [] -> do
+        let name = resolvedName n
+        mL4Ty <- gets (Map.lookup name . (.bindingL4Types))
+        case mL4Ty >>= classify of
+          Just cls -> pure (Just cls)
+          Nothing  -> entityOrStructural n 0
+      -- A call: the operand's type is the callee's RESULT type, which
+      -- the f64 'funcSigs' erase but 'funcL4Types' preserves.
+      App _ n args -> entityOrStructural n (length args)
+      _ -> pure (structuralClass e)
+  where
+    entityOrStructural n nargs = do
+      mCls <- entityResultClass n nargs
+      case mCls of
+        Just cls -> pure (Just cls)
+        Nothing  -> pure (structuralClass e)
+
+-- | Classify an 'App' operand by the callee's typechecker-recorded type
+-- from the bundle-wide 'funcL4Types' map: look up the head's 'Unique',
+-- reduce the recorded type to the RESULT type at this application's arity,
+-- and classify it — conservatively, via 'classifyGroundType'.
+entityResultClass :: Resolved -> Int -> LowerM (Maybe CmpClass)
+entityResultClass n nargs = do
+  types <- gets (.funcL4Types)
+  syns  <- gets (.typeSynonyms)
+  pure $ Map.lookup (getUnique n) types
+           >>= resultTypeAtArity nargs
+           >>= classifyGroundType . unfoldSynT syns
+
+-- | The type an application results in, given the callee's recorded type
+-- and the number of arguments applied. Conservative: only a SATURATED
+-- application of a 'Fun' reduces to its return type; a partial (or over-)
+-- application yields 'Nothing' rather than a guess. A 'Forall' wrapper is
+-- stripped first (prelude helpers like @count@ are polymorphic — their
+-- 'Fun' body may still name type variables, which 'classifyGroundType'
+-- refuses downstream).
+resultTypeAtArity :: Int -> Type' Resolved -> Maybe (Type' Resolved)
+resultTypeAtArity nargs (Forall _ _ ty) = resultTypeAtArity nargs ty
+resultTypeAtArity 0 ty = Just ty
+resultTypeAtArity nargs (Fun _ args ret)
+  | nargs == length args = Just ret
+resultTypeAtArity _ _ = Nothing
+
+-- | Conservative classifier for entity-derived types. Unlike
+-- 'classifyL4Type' — which may trust any resolved 'TyApp' head as
+-- 'CmpOther' — this accepts only the closed set of builtin scalar heads.
+-- An entity's recorded type is the DEFINITION's generic type, and a type
+-- VARIABLE reference is syntactically indistinguishable from a nullary
+-- type constructor ('TyApp' with no args): trusting one as 'CmpOther'
+-- would emit a raw @arith.cmpf@ on what is a rational-pool handle at the
+-- instantiated type (e.g. a @LIST OF a -> a@ helper used on NUMBERs) — a
+-- silent wrong answer, the exact bug class this branch exists to kill.
+-- Enum\/record\/type-variable results therefore refuse here: a routed
+-- fallback beats a misclassified comparison.
+classifyGroundType :: Type' Resolved -> Maybe CmpClass
+classifyGroundType t
+  | isNumberType t  = Just CmpNumber
+  | isStringType t  = Just CmpString
+  | isBooleanType t = Just CmpOther
+  | isDateType t    = Just CmpOther
+  | isTimeType t    = Just CmpOther
+  | otherwise       = Nothing
+
+-- | Classify a resolved L4 type into a 'CmpClass'. NUMBER and STRING are
+-- the handle\/pointer ABIs that need a runtime call. Returns 'Nothing'
+-- for any /non-concrete/ type — an inference variable ('InfVar'), a
+-- function type, a @Forall@, or the kind @Type@ — so the caller falls
+-- through to a more reliable source rather than mis-reading an
+-- un-substituted 'InfVar' as @CmpOther@.
+classifyL4Type :: Type' Resolved -> Maybe CmpClass
+classifyL4Type t
+  | isNumberType t = Just CmpNumber
+  | isStringType t = Just CmpString
+  | isConcreteType t = Just CmpOther
+  | otherwise      = Nothing
+
+-- | A type is "concrete" for comparison purposes when it is a fully
+-- applied type constructor (a @TyApp@ with a resolved head) — i.e. a
+-- BOOLEAN, an enum, a DATE\/TIME, a record, etc. whose raw f64 /is/ its
+-- comparison key. Inference variables and arrow\/forall types are not
+-- concrete and must not be trusted as @CmpOther@.
+isConcreteType :: Type' Resolved -> Bool
+isConcreteType TyApp{} = True
+isConcreteType _       = False
+
+-- | Structural inference, used only when neither the 'InfoMap' nor
+-- 'bindingL4Types' resolved the operand. Conservative: returns 'Just'
+-- only when the shape /must/ produce a NUMBER or STRING. Never claims
+-- 'CmpOther' — an unrecognised shape stays 'Nothing' so the caller can
+-- fail loud rather than guess.
+structuralClass :: Expr Resolved -> Maybe CmpClass
+structuralClass e
+  | isNumberExprShape e = Just CmpNumber
+  | otherwise = case e of
+      Lit _ (StringLit _ _) -> Just CmpString
+      Concat{}              -> Just CmpString
+      AsString{}            -> Just CmpString
+      App _ n _ -> case resolvedName n of
+        "__l4_str_concat" -> Just CmpString
+        "__l4_to_string"  -> Just CmpString
+        _                 -> Nothing
+      _ -> Nothing
+
+-- | Combine the two operands' resolved 'CmpClass'es into the comparison's
+-- class. A concrete NUMBER\/STRING on /either/ side fixes the comparison
+-- (the two operands must share a type to have type-checked), so a known
+-- side rescues an unresolved one. 'Nothing' (both unresolved) is the only
+-- case the caller must refuse.
+combineCmpClass :: Maybe CmpClass -> Maybe CmpClass -> Maybe CmpClass
+combineCmpClass a b
+  | Just CmpNumber `elem` [a, b] = Just CmpNumber
+  | Just CmpString `elem` [a, b] = Just CmpString
+  | Just CmpOther  `elem` [a, b] = Just CmpOther
+  | otherwise                    = Nothing
 
 isNumberType :: Type' Resolved -> Bool
 isNumberType t = case t of
@@ -1966,27 +2526,70 @@ isStringType t = case t of
   TyApp _ n _ -> nameMatches n ["STRING", "string"]
   _ -> False
 
+isBooleanType :: Type' Resolved -> Bool
+isBooleanType t = case t of
+  TyApp _ n _ -> nameMatches n ["BOOLEAN", "boolean"]
+  _ -> False
+
+-- | DATE\/TIME are NUMBER-compatible in jl4-core (a date /is/ its day-serial,
+-- a time /is/ its second-serial — see @libraries/daydate.l4@, which does
+-- @DATE PLUS NUMBER@ etc. directly). But in this backend a DATE\/TIME value
+-- flows as a /raw f64 serial/ (the date intrinsics — @__l4_date_serial@,
+-- @make-date@, weekday — all read\/write the bare serial), whereas the generic
+-- rational ops @__l4_rat_*@ operate on rational-pool /handles/. So a DATE\/TIME
+-- operand of @MINUS@\/@PLUS@\/… must be boxed serial→handle before the op (and
+-- a DATE\/TIME /result/ unboxed handle→serial after). 'lowerRatBinop' does this
+-- bridging; these predicates and 'operandDateTimeKind' detect when to.
+-- Case-insensitive, mirroring the schema emitter's @Text.toLower@ name match.
+isDateType :: Type' Resolved -> Bool
+isDateType t = case t of
+  TyApp _ n _ -> Text.toLower (resolvedName n) == "date"
+  _ -> False
+
+isTimeType :: Type' Resolved -> Bool
+isTimeType t = case t of
+  TyApp _ n _ -> Text.toLower (resolvedName n) == "time"
+  _ -> False
+
 nameMatches :: Resolved -> [Text] -> Bool
 nameMatches r names = resolvedName r `elem` names
 
--- | Lower a comparison. Dispatches on the operand's L4 type:
+-- | Lower a comparison. Dispatches on the operand's resolved 'CmpClass'
+-- ('classifyOperand' + 'combineCmpClass'):
 --
 --   * NUMBER → @__l4_rat_cmp@ returning -1.0\/0.0\/1.0 (f64-ABI); compare
 --     against 0.0 with @arith.cmpf@ to get the @i1@ truth value with the
---     same predicate the source used.
+--     same predicate the source used. Works for both ordered and equality
+--     comparisons.
 --   * STRING ==\/!= → @__l4_str_eq@ returning 0.0\/1.0 (f64-ABI); compare
 --     against 1.0 (or 0.0, for !=) to get @i1@.
---   * Everything else (BOOLEAN, enum tag, DATE\/TIME serial, pointers) →
---     legacy @arith.cmpf@ on the raw f64 bit-pattern (same as before).
+--   * STRING ordered (\<, \<=, \>, \>=) → @__l4_str_cmp@ returning
+--     -1.0\/0.0\/1.0 (f64-ABI); compare against 0.0 with the source
+--     predicate. Comparison is lexicographic by Unicode code point,
+--     matching jl4-core's Data.Text Ord — the raw f64 is a string-pool
+--     /pointer/, so a direct 'arith.cmpf' would order addresses, not
+--     contents; the runtime call reads the pooled contents instead.
+--   * 'CmpOther' (BOOLEAN, enum tag, DATE\/TIME serial) → legacy
+--     @arith.cmpf@ on the raw f64, which /is/ the correct comparison key
+--     for these.
+--   * Unresolvable (neither side's type could be determined) → /fail
+--     loud/. The raw f64 might be a rational handle or a string pointer;
+--     an 'arith.cmpf' on it would compare handle\/pointer bit-patterns and
+--     "almost always" yield the wrong boolean. A refused compile is
+--     acceptable; a silent wrong boolean on a legal\/financial rule is
+--     not.
 --
 -- The native @i1@ result is then lifted to the uniform-ABI f64 truth value
 -- (0.0 = false, 1.0 = true) via 'boxBoolI1'.
 lowerCmp :: CmpfPredicate -> Expr Resolved -> Expr Resolved -> LowerM Value
 lowerCmp pred_ lhs rhs = do
-  numLhs <- isNumberExpr lhs
-  numRhs <- isNumberExpr rhs
-  if numLhs || numRhs
-    then do
+  clsLhs <- classifyOperand lhs
+  clsRhs <- classifyOperand rhs
+  case combineCmpClass clsLhs clsRhs of
+    Just CmpNumber -> do
+      -- A NUMBER is a rational-pool handle: never compare the handles
+      -- directly. @__l4_rat_cmp@ returns -1.0\/0.0\/1.0; re-applying the
+      -- source predicate against 0.0 recovers the intended truth value.
       lhsVal <- lowerExpr lhs l4NumberType
       rhsVal <- lowerExpr rhs l4NumberType
       cmpF <- emitVal $ \vid -> funcCall [vid] "__l4_rat_cmp"
@@ -1994,40 +2597,50 @@ lowerCmp pred_ lhs rhs = do
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       i1Val <- emitVal $ \vid -> arithCmpf vid pred_ cmpF zero
       boxBoolI1 i1Val
-    else case pred_ of
-      OEQ -> dispatchEqualsByType lhs rhs False
-      ONE -> dispatchEqualsByType lhs rhs True
+    Just CmpString -> case pred_ of
+      OEQ -> lowerStringEq lhs rhs False
+      ONE -> lowerStringEq lhs rhs True
       _   -> do
+        -- Ordered STRING comparison (<, <=, >, >=). A STRING is a
+        -- string-pool /pointer/: never compare the pointers directly.
+        -- @__l4_str_cmp@ returns -1.0\/0.0\/1.0 (lexicographic by
+        -- Unicode code point, matching jl4-core's Data.Text Ord);
+        -- re-applying the source predicate against 0.0 recovers the
+        -- intended truth value — exactly like the CmpNumber arm does
+        -- with @__l4_rat_cmp@.
         lhsVal <- lowerExpr lhs l4NumberType
         rhsVal <- lowerExpr rhs l4NumberType
-        i1Val <- emitVal $ \vid -> arithCmpf vid pred_ lhsVal rhsVal
+        cmpF <- emitVal $ \vid -> funcCall [vid] "__l4_str_cmp"
+          [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
+        zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+        i1Val <- emitVal $ \vid -> arithCmpf vid pred_ cmpF zero
         boxBoolI1 i1Val
+    Just CmpOther -> do
+      -- BOOLEAN / enum tag / DATE / TIME serial: the raw f64 is the
+      -- comparison key, so the direct arith.cmpf is correct.
+      lhsVal <- lowerExpr lhs l4NumberType
+      rhsVal <- lowerExpr rhs l4NumberType
+      i1Val <- emitVal $ \vid -> arithCmpf vid pred_ lhsVal rhsVal
+      boxBoolI1 i1Val
+    Nothing -> markUnsupported
+      "comparison on a value whose type could not be resolved; emitting a \
+      \raw arith.cmpf would be unsound on the rational-handle / \
+      \string-pointer ABI (the f64 may be a pool handle or pointer, not a \
+      \comparable numeric value)"
 
--- | EQUALS \/ NOT EQUALS dispatch when neither side is NUMBER. STRING goes
--- through @__l4_str_eq@ (content equality); everything else falls back to
--- bit-pattern equality on the raw f64 (correct for BOOLEAN\/enum\/DATE\/TIME,
--- approximate for pointer-typed values — a long-standing limitation
--- inherited from the pre-2b lowering).
-dispatchEqualsByType :: Expr Resolved -> Expr Resolved -> Bool -> LowerM Value
-dispatchEqualsByType lhs rhs invert = do
-  strLhs <- isStringExpr lhs
-  strRhs <- isStringExpr rhs
-  if strLhs || strRhs
-    then do
-      lhsVal <- lowerExpr lhs l4NumberType
-      rhsVal <- lowerExpr rhs l4NumberType
-      eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
-        [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
-      -- Compare the 0.0\/1.0 truth against 1.0 (for ==) or 0.0 (for !=).
-      cmpAgainst <- emitVal $ \vid ->
-        arithConstantFloat vid (if invert then 0.0 else 1.0)
-      i1Val <- emitVal $ \vid -> arithCmpf vid OEQ eqF cmpAgainst
-      boxBoolI1 i1Val
-    else do
-      lhsVal <- lowerExpr lhs l4NumberType
-      rhsVal <- lowerExpr rhs l4NumberType
-      i1Val <- emitVal $ \vid -> arithCmpf vid (if invert then ONE else OEQ) lhsVal rhsVal
-      boxBoolI1 i1Val
+-- | Lower STRING equality (==) or inequality (!=) through @__l4_str_eq@
+-- (content equality). The runtime returns 0.0\/1.0; we compare that
+-- against 1.0 (for ==) or 0.0 (for !=) to get the @i1@ truth value.
+lowerStringEq :: Expr Resolved -> Expr Resolved -> Bool -> LowerM Value
+lowerStringEq lhs rhs invert = do
+  lhsVal <- lowerExpr lhs l4NumberType
+  rhsVal <- lowerExpr rhs l4NumberType
+  eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
+    [lhsVal, rhsVal] [l4NumberType, l4NumberType] [l4NumberType]
+  cmpAgainst <- emitVal $ \vid ->
+    arithConstantFloat vid (if invert then 0.0 else 1.0)
+  i1Val <- emitVal $ \vid -> arithCmpf vid OEQ eqF cmpAgainst
+  boxBoolI1 i1Val
 
 -- | Lower a boolean binary operation. Operands arrive as f64 (encoded
 -- as 0.0 / 1.0). We unbox each to @i1@, run the native op, then box
@@ -2106,12 +2719,16 @@ lowerConsider scrutinee branches _expectedTy = do
 -- instead, so the value is safe to consume as a NUMBER. The cost is one
 -- @__l4_rat_parse \"0\/1\"@ per branch-exhausted CONSIDER, which is
 -- unreachable in well-typed L4 anyway.
+--
+-- Only a *bare* @OTHERWISE@ branch is executed unconditionally. A
+-- guarded @WHEN p@ branch — even the LAST one — is always tested via
+-- 'testPatternTy' (its else arm is the branch-exhausted fallthrough).
+-- An earlier version short-circuited a trailing single @WHEN@ branch
+-- as an unconditional fallthrough, which skipped its guard entirely
+-- and could match values the pattern rejects.
 lowerBranches :: Value -> [Branch Resolved] -> LowerM Value
 lowerBranches _ [] = emitNumberLiteral 0
 lowerBranches _scrutVal [MkBranch _ (Otherwise _) body] =
-  lowerExpr body l4NumberType
-lowerBranches scrutVal [MkBranch _ (When _ pat) body] = withScope $ do
-  bindPatternTy scrutVal l4NumberType l4NumberType pat
   lowerExpr body l4NumberType
 lowerBranches scrutVal (MkBranch _ branchLhs body : rest) = do
   case branchLhs of
@@ -2144,8 +2761,11 @@ lowerBranches scrutVal (MkBranch _ branchLhs body : rest) = do
 --   * PatApp con args       — enum-with-data constructor: match the tag.
 --                             Args bind to slots starting at 1 (slot 0 = tag).
 --   * PatLit (Numeric n)    — match if scrutinee == n.
---   * PatLit (String _)     — deferred (needs __l4_str_eq call).
+--   * PatLit (String s)     — match if @__l4_str_eq scrut s == 1.0@.
 --   * PatVar _              — always matches, binds the scrutinee as-is.
+--   * PatExpr _             — markUnsupported (the WASM backend can't
+--                             evaluate an arbitrary computed-expression
+--                             pattern as a guard).
 
 testPatternTy :: Value -> MLIRType -> Pattern Resolved -> LowerM Value
 testPatternTy = go
@@ -2153,36 +2773,76 @@ testPatternTy = go
     go _ _ (PatVar _ _) = trueI1
     go scrutF64 _ (PatApp _ con []) = do
       let name = resolvedName con
-      case name of
-        "NOTHING" -> do
-          tag <- loadSlot scrutF64 0
-          tagI1 <- unboxBoolI1 tag
-          trueI1v <- trueI1
-          emitVal $ \vid -> arithXori vid tagI1 trueI1v
-        "EMPTY" -> do
-          zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
-          emitVal $ \vid -> arithCmpf vid OEQ scrutF64 zero
-        _ -> do
-          env <- gets (.typeEnv)
-          case lookupEnumTag name env of
-            Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> trueI1
+      env <- gets (.typeEnv)
+      -- User-declared constructors win over the builtin string cases.
+      -- The CONSTRUCTION path ('lowerExpr' App) resolves a constructor by
+      -- consulting 'lookupRecordFields' / 'lookupEnumTag' BEFORE the
+      -- prelude string intrinsics, so a user enum/record whose constructor
+      -- happens to be named NOTHING/EMPTY is built with the user layout.
+      -- We must mirror that ordering here or construction and matching
+      -- would use different representations (see the LEFT/RIGHT shadow
+      -- regression). Only a name that is NOT a user constructor can be the
+      -- prelude builtin, so the string cases are then safe.
+      if isUserConstructor name env
+        then case lookupEnumTag name env of
+          Just tag -> enumTagCmpF64 scrutF64 tag
+          -- A user record constructor (nullary in a CONSIDER position) has
+          -- no enum tag; fail closed rather than guess a tag.
+          Nothing  -> unsupportedMatch (unresolvedEnumReason name)
+        else case name of
+          "NOTHING" -> do
+            tag <- loadSlot scrutF64 0
+            tagI1 <- unboxBoolI1 tag
+            trueI1v <- trueI1
+            emitVal $ \vid -> arithXori vid tagI1 trueI1v
+          "EMPTY" -> do
+            zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
+            emitVal $ \vid -> arithCmpf vid OEQ scrutF64 zero
+          _ -> unsupportedMatch (unresolvedEnumReason name)
     go scrutF64 _ (PatApp _ con [_]) = do
       let name = resolvedName con
-      case name of
-        "JUST" -> do
-          tag <- loadSlot scrutF64 0
-          unboxBoolI1 tag
-        _ -> do
-          env <- gets (.typeEnv)
-          case lookupEnumTag name env of
-            Just tag -> enumTagCmpF64 scrutF64 tag
-            Nothing  -> trueI1
-    go scrutF64 _ (PatApp _ con _) = do
       env <- gets (.typeEnv)
-      case lookupEnumTag (resolvedName con) env of
-        Just tag -> enumTagCmpF64 scrutF64 tag
-        Nothing  -> trueI1
+      -- User-declared constructors win over the builtin JUST/LEFT/RIGHT
+      -- string cases, mirroring the CONSTRUCTION path's lookup-first
+      -- ordering (see the arity-0 arm and 'lowerExpr'). Only a name absent
+      -- from the user's records/enums can be the prelude builtin, so the
+      -- string cases are safe.
+      --
+      -- A user constructor reaching THIS arm binds a payload (arity 1): it
+      -- is either a record constructor or an @ONE OF … HAS …@ enum-with-
+      -- data variant. The construction path lowers such a constructor to a
+      -- BARE enum tag (see 'lowerExpr': the 'lookupEnumTag' arm discards the
+      -- argument), so there is no payload slot to bind — reading one yields
+      -- a tag-as-handle (garbage / runtime trap). We therefore REFUSE
+      -- (fail-closed → the export is 'supported:false' and the caller routes
+      -- to the reference evaluator) rather than emit a silent wrong answer.
+      if isUserConstructor name env
+        then unsupportedMatch (payloadCtorReason name)
+        else case name of
+          "JUST" -> do
+            tag <- loadSlot scrutF64 0
+            unboxBoolI1 tag
+          -- EITHER RIGHT — matches when the tag slot is 1.0 (see the LEFT/
+          -- RIGHT construction in 'lowerExpr'); binds the payload in
+          -- 'bindPatternTy'. Same [tag, payload] layout as MAYBE's JUST.
+          "RIGHT" -> do
+            tag <- loadSlot scrutF64 0
+            unboxBoolI1 tag
+          -- EITHER LEFT — matches when the tag slot is 0.0 (NOT the tag),
+          -- mirroring the NOTHING test.
+          "LEFT" -> do
+            tag <- loadSlot scrutF64 0
+            tagI1 <- unboxBoolI1 tag
+            trueBit <- trueI1
+            emitVal $ \vid -> arithXori vid tagI1 trueBit
+          _ -> unsupportedMatch (unresolvedEnumReason name)
+    go _ _ (PatApp _ con _) = do
+      -- Arity ≥ 2: necessarily a user constructor carrying multiple fields
+      -- (no builtin has this shape). As in the arity-1 case, the payload is
+      -- lowered as a bare tag with no slots, so destructuring it is unsound
+      -- — refuse rather than compute a silent wrong.
+      let name = resolvedName con
+      unsupportedMatch (payloadCtorReason name)
     go scrutF64 _ (PatLit _ (NumericLit _ r)) = do
       -- The scrutinee is a NUMBER handle; compare for equality via
       -- @__l4_rat_cmp@ against the literal's handle.
@@ -2191,13 +2851,67 @@ testPatternTy = go
         [scrutF64, lit] [l4NumberType, l4NumberType] [l4NumberType]
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       emitVal $ \vid -> arithCmpf vid OEQ cmpF zero
-    go _ _ (PatLit _ (StringLit _ _)) = trueI1
+    go _ _ (PatLit _ (StringLit _ s)) | Text.elem '\0' s =
+      -- A NUL-containing literal pattern would truncate at the embedded
+      -- NUL in the compiler global and mis-match; refuse instead.
+      unsupportedMatch
+        "CONSIDER STRING pattern contains an embedded NUL (U+0000), which \
+        \the WASM backend's C-string ABI cannot represent faithfully"
+    go scrutF64 _ (PatLit _ (StringLit _ s)) = do
+      -- The scrutinee is a STRING handle (boxed @!llvm.ptr@). Intern the
+      -- literal, box its address the same way 'lowerLit' does, then ask
+      -- the runtime for content equality via @__l4_str_eq@ (the same
+      -- idiom 'dispatchEqualsByType' uses for @EQUALS@ on strings). The
+      -- call returns 1.0 for equal / 0.0 for unequal; match iff == 1.0.
+      globalName <- internString s
+      ptr <- emitVal $ \vid -> mkOp [vid] "llvm.mlir.addressof" []
+        [NamedAttribute "global_name" (FlatSymbolRefAttr globalName)]
+        [PointerType] []
+      litF64 <- ptrToF64 ptr
+      eqF <- emitVal $ \vid -> funcCall [vid] "__l4_str_eq"
+        [scrutF64, litF64] [l4NumberType, l4NumberType] [l4NumberType]
+      one <- emitVal $ \vid -> arithConstantFloat vid 1.0
+      emitVal $ \vid -> arithCmpf vid OEQ eqF one
     go scrutF64 _ (PatCons _ _ _) = do
       -- List is non-null: scrutinee != 0.0
       zero <- emitVal $ \vid -> arithConstantFloat vid 0.0
       emitVal $ \vid -> arithCmpf vid ONE scrutF64 zero
-    go _ _ (PatExpr _ _) = trueI1
+    go _ _ (PatExpr _ _) =
+      unsupportedMatch
+        "CONSIDER with a computed-expression pattern is not supported by the WASM backend"
 
+    -- | Reason string for a constructor tag that the lowering can't
+    -- resolve to a concrete enum index. Such a pattern used to always
+    -- match (returning @trueI1@), which silently mis-evaluated the
+    -- CONSIDER; now we flag the enclosing function unsupported instead.
+    unresolvedEnumReason name =
+      "CONSIDER pattern constructor " <> name
+        <> " could not be resolved to an enum tag by the WASM backend"
+
+    -- | Reason for refusing a CONSIDER that destructures a user-declared
+    -- constructor which carries a payload (a record constructor, or an
+    -- @ONE OF … HAS …@ enum-with-data variant). The construction path
+    -- lowers such a constructor to a bare enum tag with no payload slots,
+    -- so binding the payload here would read garbage. Fail closed.
+    payloadCtorReason name =
+      "CONSIDER destructuring the payload-carrying user constructor "
+        <> name
+        <> " is not supported by the WASM backend (enum-with-data / record "
+        <> "constructors are lowered as a bare tag, so the payload cannot be "
+        <> "bound)"
+
+
+-- | Record an unsupported-pattern diagnostic against the enclosing
+-- function (via 'markUnsupported'), then return a FALSE @i1@ so the
+-- synthesised @scf.if@ stays well-typed (its condition must be @i1@,
+-- not the @f64@ 0.0 'markUnsupported' yields). Fail-closed: the branch
+-- never matches, and the export is flagged @supported: false@ so the
+-- proxy routes the call to a fallback evaluator rather than trusting a
+-- WASM module that can't evaluate this pattern.
+unsupportedMatch :: Text -> LowerM Value
+unsupportedMatch reason = do
+  _ <- markUnsupported reason
+  falseI1
 
 -- | Compare an f64-scrutinee against an enum tag (as f64).
 enumTagCmpF64 :: Value -> Integer -> LowerM Value
@@ -2207,6 +2921,9 @@ enumTagCmpF64 scrutF64 tag = do
 
 trueI1 :: LowerM Value
 trueI1 = emitVal $ \vid -> arithConstantBool vid True
+
+falseI1 :: LowerM Value
+falseI1 = emitVal $ \vid -> arithConstantBool vid False
 
 -- | Bind pattern variables under the uniform f64 ABI. The scrutinee and
 -- all bound values are f64 — enum-tag / maybe / list destructuring is
@@ -2220,11 +2937,26 @@ bindPatternTy val _ _ (PatCons _ hd tl) = do
   bindPatternTy tlVal l4NumberType l4NumberType tl
 bindPatternTy val _ _ (PatApp _ con [innerPat]) = do
   let name = resolvedName con
-  case name of
-    "JUST" -> do
-      innerVal <- loadSlot val 1
-      bindPatternTy innerVal l4NumberType l4NumberType innerPat
-    _ -> bindPatternTy val l4NumberType l4NumberType innerPat
+  env <- gets (.typeEnv)
+  -- Mirror the CONSTRUCTION path and 'testPatternTy': a user-declared
+  -- constructor (record/enum) named JUST/LEFT/RIGHT must NOT read slot 1
+  -- of the builtin [tag, payload] layout — its value uses the user layout.
+  -- Fall through to the generic binder, exactly as before ledger #10.
+  if isUserConstructor name env
+    then bindPatternTy val l4NumberType l4NumberType innerPat
+    else case name of
+      "JUST" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      -- EITHER LEFT / RIGHT both carry their payload in slot 1 of the
+      -- 2-slot [tag, payload] record (see 'lowerExpr' construction).
+      "LEFT" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      "RIGHT" -> do
+        innerVal <- loadSlot val 1
+        bindPatternTy innerVal l4NumberType l4NumberType innerPat
+      _ -> bindPatternTy val l4NumberType l4NumberType innerPat
 bindPatternTy val _ _ (PatApp _ _ pats) =
   -- Enum-with-data constructor: slot 0 is the tag, bind args at 1..n.
   forM_ (zip [1..] pats) $ \(i, p) -> do
@@ -2442,7 +3174,7 @@ lowerLocalDecl _scope (LocalDecide _anno decide@(MkDecide dAnno ts appForm body)
       shouldLift = isSelfRef || isMutualRec
   case params of
     [] | shouldLift -> do
-      let funcN = sanitizeName name
+      funcN <- localSymbolFor (appFormHead' appForm)
       knownTopLevels <- gets (Set.fromList . Map.keys . (.funcSigs))
       currentBindings <- gets (Map.keysSet . (.bindings))
       l4TyMap <- gets (.bindingL4Types)
@@ -2494,8 +3226,8 @@ lowerLocalDecl _scope (LocalDecide _anno decide@(MkDecide dAnno ts appForm body)
           val <- lowerExpr body bodyTy
           bindTy name val bodyTy
     _ -> do
-      let funcN = sanitizeName name
-          paramSet = Set.fromList (map resolvedName params)
+      funcN <- localSymbolFor (appFormHead' appForm)
+      let paramSet = Set.fromList (map resolvedName params)
       knownTopLevels <- gets (Set.fromList . Map.keys . (.funcSigs))
       currentBindings <- gets (Map.keysSet . (.bindings))
       let freeInBody = freeVarsOfExpr body
@@ -2681,6 +3413,23 @@ appFormParams (MkAppForm _ _ ps _) = ps
 -- full discussion of the two-layer sanitization (API name vs symbol).
 sanitizeName :: Text -> Text
 sanitizeName = Schema.sanitizeWasmSymbol
+
+-- | True iff @name@ is a constructor the user DECLAREd in this bundle —
+-- either a record constructor (@lookupRecordFields@) or an @ONE OF@ enum
+-- variant (@lookupEnumTag@). The prelude builtins (JUST/NOTHING/LEFT/RIGHT/
+-- EMPTY) are never registered in the 'TypeEnv', so this is False for them.
+-- The CONSIDER lowering uses this to give user constructors priority over
+-- the builtin string cases, matching the construction path's ordering and
+-- so keeping construction and pattern-matching on the SAME representation
+-- (a user @LEFT/RIGHT@ enum must not be read as the builtin EITHER's
+-- [tag, payload] slot record — that was the ledger #10 shadow regression).
+isUserConstructor :: Text -> TypeEnv -> Bool
+isUserConstructor name env =
+  case lookupRecordFields name env of
+    Just _  -> True
+    Nothing -> case lookupEnumTag name env of
+      Just _  -> True
+      Nothing -> False
 
 lookupEnumTag :: Text -> TypeEnv -> Maybe Integer
 lookupEnumTag name env =
