@@ -1,8 +1,8 @@
 # Sets
 
-Set-theoretic collections: `SET OF a` with union, intersection, difference, membership, and subset — plus operator overloads that make L4's `AND`, `OR`, `PLUS`, and `MINUS` do the right thing when their operands are sets. Part of the prelude; available after `IMPORT prelude`.
+Set-theoretic collections: `SET OF a` with union, intersection, difference, membership, and subset — plus operator overloads that make L4's `PLUS` and `MINUS` do the right thing when their operands are sets. Part of the prelude; available after `IMPORT prelude`.
 
-Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story (its [Sets in one minute](../../tutorials/set-operators/sets-and-the-two-ands.md#sets-in-one-minute) section is a from-scratch primer if union/intersection/subset are unfamiliar).
+Sets exist in L4 because legal drafting needs them: "residents of New York **and** New Jersey may apply" builds a _union of people_, while "cruel **and** unusual" conjoins two _conditions_. Same word, two operations — and the type system tells them apart: on sets the union operation is spelled `UNION`, while `AND` stays sentence-level conjunction. See the [tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the full story (its [Sets in one minute](../../tutorials/set-operators/sets-and-the-two-ands.md#sets-in-one-minute) section is a from-scratch primer if union/intersection/subset are unfamiliar).
 
 ### Location
 
@@ -43,11 +43,13 @@ These word operators have **no precedence**: parenthesize compounds, e.g. `A UNI
 | ------------ | -------------- | ------------------------------------------------------------------- |
 | `p PLUS q`   | `UNION`        | Bare **and precedence-correct**: `a PLUS b MINUS c` needs no parens |
 | `p MINUS q`  | `` `LESS` ``   | Ditto (Oracle SQL's `MINUS` is the precedent)                       |
-| `p AND q`    | `UNION`        | Term-level "and" — see the two-ANDs discussion in the tutorial      |
-| `p OR q`     | `UNION`        | Union too: "NY and NJ residents" = "NY or NJ residents"             |
+| `p AND q`    | _error_        | The set overload was **removed 2026-07-28** — write `UNION`         |
+| `p OR q`     | _error_        | Ditto — write `UNION`                                               |
 | `p EQUALS q` | _error_        | Deliberately ambiguous — write `` `set equals` `` (see below)       |
 
 **Caution — sets are not arithmetic.** Union is idempotent (`A PLUS A` is `A`) and has no inverse: `(A PLUS B) MINUS B` is **not** `A` in general.
+
+**Why `AND`/`OR` on sets no longer resolve to union:** the overloads existed (the two-ANDs design of the spec's §D4) but a second candidate for `__AND__`/`__OR__` made typechecking **exponential — base 3 in the depth of `AND`/`OR` chains**: a flat 15-operand boolean conjunction took 71.75s, 16+ operands never finished, and a real 27-operand statutory disjunction extrapolated to about a year ([smucclaw/l4-ide#929](https://github.com/smucclaw/l4-ide/issues/929)). Term-level union is now written `UNION` explicitly. A typechecker fix (an overload pre-filter, [legalese/l4-ide#169](https://github.com/legalese/l4-ide/pull/169)) has since removed the blow-up for such chains, so reinstating the overloads is now a semantic question, not a performance one — see SET-OPERATORS-SPEC §16.3 for the recorded ruling and its conditions.
 
 ### Equality: use `set equals`, not `EQUALS`
 
@@ -79,4 +81,4 @@ Two boundary cases to know:
 
 [sets-example.l4](sets-example.l4)
 
-**See the [Sets tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the legal-drafting motivation, and [SET-OPERATORS-SPEC](https://github.com/legalese/l4-ide/blob/docs/set-operators-spec/specs/todo/SET-OPERATORS-SPEC.md) for the design record, including the case law.**
+**See the [Sets tutorial](../../tutorials/set-operators/sets-and-the-two-ands.md) for the legal-drafting motivation, and [SET-OPERATORS-SPEC](../../../specs/todo/SET-OPERATORS-SPEC.md) for the design record, including the case law.**

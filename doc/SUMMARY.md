@@ -14,6 +14,7 @@
 - [Regulative](reference/regulative/README.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
+- [Library Resolution (dev vs prod)](reference/libraries/resolution.md)
 
 ## Courses
 

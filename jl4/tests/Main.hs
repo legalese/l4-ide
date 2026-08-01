@@ -40,10 +40,13 @@ import qualified Data.CharSet as CharSet
 import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
+import qualified BpmnExport
 import qualified Hover
 import qualified SemanticTokens
 import qualified VizAutoRefresh
 import qualified VizImplies
+import qualified VizGuardedRows
+import qualified DmnExport
 
 main :: IO ()
 main = do
@@ -111,6 +114,9 @@ main = do
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     describe "viz" VizAutoRefresh.spec
     describe "viz implies" VizImplies.spec
+    describe "viz guarded rows" VizGuardedRows.spec
+    DmnExport.spec examplesRoot
+    describe "bpmn export" BpmnExport.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

@@ -1,0 +1,169 @@
+-- The HYDRATION exhibit for the DMN exporter (§4.4 of
+-- `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`), and the one DMN golden that is
+-- driven through BOTH engines as a MustPass.
+--
+-- `sumtype.l4` cannot be that file and never will be: it exists to exhibit what
+-- the exporter REFUSES, and `stated term` -- a payload projection on a
+-- user-declared union -- is D-SUMTYPE Blocking by R4-a, which stays. KIE cannot
+-- compile the L4 text that refusal emits, so sumtype.dmn can only ever be a
+-- MustFail. This file carries the measurement instead, on EMITTER-PRODUCED XML,
+-- which is strictly stronger than the hand-written probe in
+-- jl4/tests-cli/fixtures/dmn-hydration-probe/: that one pins the IDIOM, this one
+-- pins that we emit it.
+--
+-- Everything here must stay engine-clean. Nothing in this file may be D-SUMTYPE
+-- Blocking, because a single unloadable decision takes the whole verdict with
+-- it.
+--
+-- What each part is for:
+--
+--   * `Applicant`               a record with THREE computed fields, and they
+--                               are declared in an order that is NOT
+--                               topological: `band` is declared BEFORE
+--                               `total income`, which it reads. A boxed
+--                               context's entries evaluate in order and only
+--                               EARLIER siblings are in scope, so an exporter
+--                               that emitted them in declaration order would
+--                               emit `band` reading a name that is not yet
+--                               bound -- and FEEL answers null rather than
+--                               failing. jl4/examples/ok/computed-fields.l4
+--                               cannot catch that, because ITS declaration
+--                               order already happens to be topological. This
+--                               one is the test.
+--   * `applicant score`         reads a computed field by PROJECTION (`x's f`),
+--                               which is L4 house style;
+--   * `applicant band width`    reads one by APPLICATION (`f x`), which is what
+--                               jl4/examples/legal/regcf/regcf-wizard.l4
+--                               writes. Both spellings fold, because both occur
+--                               in real corpora and recognising only one would
+--                               make the other silently worse.
+--                               ITS BINDER IS ALSO SPELLED `applicant`, AND
+--                               THAT IS DELIBERATE, not the oversight
+--                               sumtype.l4:161-163 warns against. Since Phase 4
+--                               (§2.1 un-lifting) two same-named, same-typed
+--                               GIVENs MERGE into ONE `input_applicant` feeding
+--                               ONE hydrator, and D-PARAM-AS-INPUT names the
+--                               price: the two decisions read one shared
+--                               subject and can no longer be applied to
+--                               different applicants in this model. (Before
+--                               Phase 4 this pair minted `input_applicant_2`
+--                               and a second hydrator, and the report opened
+--                               with D-SCOPE and D-RENAME; the cases file
+--                               changed in the same commit, and its git history
+--                               holds the two-subject shape.)
+--   * `the leading applicant`   a record-valued DECISION, read through a
+--                               computed field by `leading total`. That is the
+--                               RequiredDecision branch of hydration: a
+--                               hydrator's source need not be an inputData, and
+--                               without this the branch would be dead code. It
+--                               PROJECTS an applicant rather than constructing
+--                               one, for the reason given at its definition;
+--   * `capped bonus`            GIVETH A MAYBE NUMBER. Since R8-d' this
+--                               tabulates, with the absent case as the
+--                               <defaultOutputEntry>, which is FEEL `null`.
+--                               MEASURED on both engines before the lowering
+--                               was written -- see
+--                               jl4/tests-cli/fixtures/dmn-null-probe/;
+--   * `bonus is settled`        `isJust`, recognised by the PRELUDE's own
+--     `bonus is unsettled`      Unique, and `isNothing` likewise. Rendered
+--                               `!= null` and `= null`;
+--   * `bonus or zero`           a CONSIDER over a MAYBE, rendered
+--                               `if .. != null then .. else ..`. The third
+--                               absence-testing route, and the only one that
+--                               composes inside a larger expression.
+--
+-- Read the emitted DRG for the shape H1 buys: `applicant score` has NO direct
+-- edge to `applicant`, only one to the hydrator, because the emitted FEEL no
+-- longer names `applicant` at all. That is R11 -- the graph says what the
+-- expression says -- and it is a consequence of the fold rather than a
+-- decoration on top of it.
+--
+-- Figures are illustrative; the point is the LOWERING, not the policy.
+
+IMPORT prelude
+
+§ `Hydration`
+
+-- The computed fields are declared in the order `band`, `total income`,
+-- `band width` ON PURPOSE. `band` reads `total income`, so declaration order is
+-- NOT a legal context-entry order and the exporter must sort.
+DECLARE Applicant
+  HAS `salary`        IS A NUMBER
+      `other income`  IS A NUMBER
+      `band`          IS A NUMBER
+        MEANS IF   `total income` AT LEAST 100000
+              THEN 3
+              ELSE IF   `total income` AT LEAST 50000
+                   THEN 2
+                   ELSE 1
+      `total income`  IS A NUMBER
+        MEANS `salary` PLUS `other income`
+      `band width`    IS A NUMBER
+        MEANS `band` TIMES 25000
+
+-- The PROJECTION spelling of a computed read.
+GIVEN applicant IS AN Applicant
+GIVETH A NUMBER
+`applicant score` applicant MEANS
+  applicant's `total income` DIVIDED BY 1000
+
+-- The APPLICATION spelling of the same thing. Both fold to a path access on the
+-- hydrator; neither leaves an L4 call in the artifact.
+GIVEN applicant IS AN Applicant
+GIVETH A NUMBER
+`applicant band width` applicant MEANS
+  `band width` applicant
+
+-- A record-valued DECISION, so that a hydrator's source is not always an
+-- inputData and the RequiredDecision branch is not dead code.
+--
+-- It reads the applicant out of an enclosing record rather than CONSTRUCTING
+-- one, and that is forced rather than stylistic: `Applicant WITH salary IS ..`
+-- is an L4 named-argument application, which renderFeelIn refuses verbatim on
+-- purpose (a FEEL context literal drops the constructor tag, skips reserved-word
+-- checking, and -- the reason that matters here -- omits computed fields while
+-- Proj still reads them). One verbatim decision would make this whole file
+-- unloadable, which is exactly the trap this exhibit exists to stay out of.
+--
+-- It is also NULLARY, which is what makes it an instance at all: hydration keys
+-- on a nullary reference, because that is the only thing whose FEEL name a
+-- context entry can read. A unary `f submission` is a call, and a computed read
+-- through one falls to the graceful refusal below.
+DECLARE Submission
+  HAS `primary`   IS AN Applicant
+      `secondary` IS AN Applicant
+
+ASSUME `the submission` IS A Submission
+
+GIVETH AN Applicant
+`the leading applicant` MEANS
+  `the submission`'s `primary`
+
+GIVETH A NUMBER
+`leading total` MEANS
+  `the leading applicant`'s `total income`
+
+-- R8-d'. The value channel: a table whose absent case is a null default output.
+GIVEN n IS A NUMBER
+GIVETH A MAYBE NUMBER
+`capped bonus` n MEANS
+  IF n AT MOST 5000 THEN JUST n ELSE NOTHING
+
+-- R8-d'. The combinator table, both halves.
+GIVEN b IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+`bonus is settled` b MEANS
+  isJust b
+
+GIVEN c IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+`bonus is unsettled` c MEANS
+  isNothing c
+
+-- R8-d'. The CONSIDER route, which is the one that composes.
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+`bonus or zero` m MEANS
+  CONSIDER m
+  WHEN JUST x  THEN x
+  WHEN NOTHING THEN 0

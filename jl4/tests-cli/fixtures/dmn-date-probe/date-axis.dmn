@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.6: the LAW-TIME PROBE.
+
+  A hand-written DMN 1.3 file that asks the two engines four questions the
+  emitter cannot ask on its own, because the emitter is what the answers are
+  supposed to constrain:
+
+    Q1  is `date("YYYY-MM-DD")` accepted as a unary-test ENDPOINT, i.e. does a
+        single-input UNIQUE table over a `date` column with half-open interval
+        cells load and evaluate?
+    Q2  what Java type does each engine want for a `typeRef="date"` input?
+        (The fixture supplies java.time.LocalDate via the `{"$date": ...}` tag;
+        if that were wrong, `decision_regime` would answer null.)
+    Q3  what does each engine RETURN for a date-valued decision? KIE hands back
+        java.time.LocalDate; zeebe-dmn serialises through MessagePack, which has
+        no date type. `decision_change_date` is the probe for that.
+    Q4  are <annotation>/<annotationEntry> ACCEPTED by Xerces in the position
+        DMN13.xsd's tDecisionTable/tDecisionRule sequences put them (after
+        <output>, before <rule>; and after <outputEntry> inside a rule), and
+        with NO @id on the annotationEntry (tRuleAnnotation is not a
+        tDMNElement)?
+
+  Q4 is only half a question on its own: a valid file validating shows that a
+  valid file validates, not that anything is looking. The other half is the
+  NEGATIVE CONTROL, `date-axis-badannotation.dmn` in this directory, which is
+  this file with an @id on each <annotationEntry> and nothing else changed,
+  and which both engines reject. Neither file is evidence without the other.
+
+  (An XML comment may not contain a double hyphen, which is why the prose here
+  and in the sibling avoids one. Camunda's parser refuses such a file outright;
+  Xerces, measured, does not.)
+
+  NOT AN EMITTED GOLDEN. Never regenerate this from L4: the emitter cannot
+  produce the questions, only the answers. Same rationale as
+  fixtures/dmn-xsd-order/, and the same permanence.
+
+  Driven from jl4/tests-cli/Main.hs ("the law-time date axis"), with
+  date-axis.cases.json as the context, through BOTH etc/kie-dmn-check/run.sh
+  (Xerces + Drools) and etc/camunda-dmn-check/run.sh (zeebe-dmn / feel-scala).
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_date_axis_probe" name="date axis probe" namespace="https://legalese.com/l4/dmn/date_axis_probe">
+  <inputData id="input_rules_effective_date" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE">
+    <variable id="input_rules_effective_date_var" name="RULES_EFFECTIVE_DATE" label="RULES EFFECTIVE DATE" typeRef="date"/>
+  </inputData>
+  <decision id="decision_change_date" name="change_date" label="change date">
+    <variable id="decision_change_date_var" name="change_date" label="change date" typeRef="date"/>
+    <literalExpression id="decision_change_date_literal">
+      <text>date("2024-01-01")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_regime" name="regime" label="regime">
+    <variable id="decision_regime_var" name="regime" label="regime" typeRef="number"/>
+    <informationRequirement id="decision_regime_ir1">
+      <requiredInput href="#input_rules_effective_date"/>
+    </informationRequirement>
+    <decisionTable id="decision_regime_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="regime">
+      <input id="decision_regime_i1" label="RULES EFFECTIVE DATE">
+        <inputExpression id="decision_regime_i1_expr" typeRef="date">
+          <text>RULES_EFFECTIVE_DATE</text>
+        </inputExpression>
+      </input>
+      <output id="decision_regime_o1"/>
+      <annotation name="regime"/>
+      <rule id="decision_regime_r1">
+        <description>from 2024-01-01</description>
+        <inputEntry id="decision_regime_r1_i1">
+          <text>&gt;= date("2024-01-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r1_o1">
+          <text>9</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>the 2024 rate change</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_regime_r2">
+        <description>from 1994-04-01 until 2024-01-01</description>
+        <inputEntry id="decision_regime_r2_i1">
+          <text>[date("1994-04-01")..date("2024-01-01"))</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r2_o1">
+          <text>3</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>GST commenced</text>
+        </annotationEntry>
+      </rule>
+      <rule id="decision_regime_r3">
+        <description>before 1994-04-01</description>
+        <inputEntry id="decision_regime_r3_i1">
+          <text>&lt; date("1994-04-01")</text>
+        </inputEntry>
+        <outputEntry id="decision_regime_r3_o1">
+          <text>-1</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>before 1994-04-01</text>
+        </annotationEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

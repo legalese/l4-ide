@@ -3,7 +3,7 @@
     "description": "Calculate the square of a number",
     "properties": {
         "x": {
-            "description": " The input number",
+            "description": "The input number",
             "type": "number"
         }
     },

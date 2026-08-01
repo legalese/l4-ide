@@ -20,14 +20,36 @@ Audited all 31 todo specs + roadmap. 9 resolved specs moved to `specs/done/`; 18
 
 ## Tier-2
 
-| Spec                              | Verdict               | Branch                   | Status                                    | PR                                                |
-| --------------------------------- | --------------------- | ------------------------ | ----------------------------------------- | ------------------------------------------------- |
-| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                        | ⏭️ archived→done                          | —                                                 |
-| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`   | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
-| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing` | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
-| L4-VERSIONING                     | ⚠️ premise superseded | —                        | ⏸️ HELD — awaiting scope decision         | —                                                 |
-| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                        | ⏭️ not implementable                      | —                                                 |
+| Spec                              | Verdict               | Branch                           | Status                                    | PR                                                |
+| --------------------------------- | --------------------- | -------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| MULTILINE-MIXFIX                  | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| LIST-SYNTAX-RELAXATION            | ✅ RESOLVED           | —                                | ⏭️ archived→done                          | —                                                 |
+| REF-ANNOTATION                    | 🟢 OPEN               | `tier2/ref-annotation`           | ✅ hardened (3 fixes, f2acf556) — PR open | [#48](https://github.com/legalese/l4-ide/pull/48) |
+| BATCH-PROCESSING (finish partial) | 🟡 PARTIAL            | `tier2/batch-processing`         | ✅ hardened (3 fixes, 291cd005) — PR open | [#47](https://github.com/legalese/l4-ide/pull/47) |
+| L4-VERSIONING                     | ⚠️ premise superseded | —                                | ⏸️ HELD — awaiting scope decision         | —                                                 |
+| PRODUCT-STRATEGY-2025-01          | roadmap doc           | —                                | ⏭️ not implementable                      | —                                                 |
+| LIBRARY-RESOLUTION-SHADOW         | 🟢 OPEN (DX/infra)    | `docs/library-resolution-shadow` | ⬜ todo — spec only, no PR                | —                                                 |
+| FIDELITY-SEVERITY-AXIS            | 🟢 OPEN (interchange) | `docs/fidelity-severity-axis`    | ⬜ todo — ruling only, no impl            | —                                                 |
+
+> **FIDELITY-SEVERITY-AXIS** (classified Tier-2: interchange/DX). Answers smucclaw/l4-ide#928:
+> `FidelitySeverity`'s `Blocking` conflates "the target cannot express this" with "we emitted
+> something no engine can run", so it fires on 98.6% of DMN exports and cannot drive a gate. Ruling:
+> add an orthogonal `FidelityEffect = Faithful | Unevaluable | Malformed | Incomplete | Misstated`
+> (no `Ord`), leave severity untouched, and add `--fail-on-effect=broken`. **Start with W3** — three
+> lines at `Dmn/Lower.hs:1681-1692` that raise the existing `D-NONFEELOUTPUT` on the boxed-literal
+> path; it ships alone and is the only work item that moves a number (measured recall ceiling 97.6%
+> against a real FEEL engine). Spec: `specs/todo/FIDELITY-SEVERITY-AXIS-SPEC.md`.
+
+> **LIBRARY-RESOLUTION-SHADOW** (classified Tier-2: DX/infra, low-risk, high-annoyance).
+> `IMPORT` resolution searches ambient/global filesystem locations (XDG data dir, VSCode
+> bundle) **above** the binary's own hermetic embedded stdlib, so during multi-worktree dev
+> an XDG symlink into one checkout silently shadows edits made in another — with no
+> diagnostic (the `@infixl` prelude incident; second occurrence of "XDG library shadow").
+> Spec: `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`. Recommended path: Stage 1 = visible
+> canonicalized logging + de-dup the two resolvers (`GetMixfixRegistry` vs `GetImports`);
+> Stage 2 = surgical precedence flip (embedded above the two ambient locations, project-scoped
+> overrides still above embedded) + ambiguity warning. Design sketch only — implementer
+> should build against the spec's §8 acceptance criteria; anchors at `jl4-lsp/src/LSP/L4/Rules.hs:252-478`.
 
 ## Live lanes in ../l4wt/ (do NOT duplicate)
 
@@ -52,6 +74,35 @@ Home for the ladder rework: **`specs/todo/ladder-diagrams-2026/DESIGN.md` on bra
 
 - Once the 4 implementers push, run an **ultracode hardening workflow** (adversarial review) across all ready branches, apply fixes, open + PR each to `unstable`.
 - Resolve L4-VERSIONING scope (see decision below).
+
+## ⬜ ASSUME → GIVEN migration (docs + example code) — NOT STARTED, parked 2026-07-26
+
+**Scope:** sweep the repo for top-level `ASSUME` and replace it with idiomatic record-threaded `GIVEN` style, in **documentation and example/corpus code**. Compiler test fixtures under `jl4/examples/ok`, `jl4/examples/not-ok/tc` and `jl4/examples/lsp` are **out of scope** — they exercise `ASSUME` deliberately and must keep doing so.
+
+**Why.** `ASSUME` is an uninterpreted constant: the evaluator binds it to `ValAssumed` (`jl4-core/src/L4/EvaluateLazy/Machine.hs:3328`) and forcing it raises `Stuck` (`Machine.hs:449`). So an `ASSUME`-style module **typechecks but cannot be evaluated** — `l4 check` reports success and `l4 run` dies with _"I needed to know the value of `X` but it is an assumed term"_. The identical logic in `GIVEN` style runs. Every doc page or example that teaches `ASSUME` therefore teaches a shape that does not execute.
+
+**What idiomatic style actually is** (this is the part that is easy to get wrong): _not_ `GIVEN x IS A NUMBER` re-declared on each decision, but a **record declared once and threaded as one parameter** through every decision that needs it, with decisions calling each other by juxtaposition and passing the same record variable. Cross-module sharing nests one record inside another and projects through it. There is no `GIVEN`-on-a-section; genuine constants stay bare nullary `MEANS`.
+
+Reference encodings, all zero-`ASSUME`:
+
+- `../l4wt/regcf-corpus/jl4/examples/legal/regcf/regcf.l4` — 981 lines, 42 top-level `GIVEN`, 11 record `DECLARE`s, roll-up decision over 6 parameters (branch `mengwong/regcf-corpus`)
+- `paper/case-studies/charities-jersey-2014/` — 12 files, 12,762 lines
+- `jl4/experiments/housing-act-possession-decision.l4:83-161` — composite `CaseFile` threaded as `cf`
+
+**The decisive precedent:** the same statute encoded twice. `jl4/experiments/jerseyCharities.l4` has **102** top-level `ASSUME`s; its 2026 re-encoding under `paper/case-studies/charities-jersey-2014/` has **zero**. The migration has already been done once, by hand, and never written down.
+
+**Measured starting state** (625 `.l4` files, excluding `dist-newstyle`/`node_modules`): **79 files / 669 lines** with top-level `ASSUME` vs **356 files / 2495 lines** with top-level `GIVEN`. Of the 48 `ASSUME` files under `jl4/examples`, **41 are compiler tests** (out of scope) — so the real corpus surface is small: 7 legacy legal models, plus `doc/` (17 files) and `jl4/experiments` (13).
+
+**Work items:**
+
+1. **Docs.** `doc/reference/types/ASSUME.md` currently teaches `ASSUME` un-caveated as _"declare input variables for decision logic"_ (`:14-18`) with no mention that such modules don't evaluate. Either add the caveat + point at record threading, or demote the page to a reference for the legacy construct. Repo-wide `grep -rni deprecat --include=*.md` returns 21 hits, **none** about `ASSUME` — the deprecation is real in practice and entirely undocumented. The only codification is the `l4` authoring skill (0 mentions of `ASSUME` against 33 of `GIVEN`).
+2. **Example/corpus code.** Migrate the ~7 legacy legal models + `doc/` examples + `jl4/experiments` non-fixtures. Mechanical: one `DECLARE Facts HAS` + `GIVEN f IS A Facts` per decision + `f's` projections + an explicit argument at each internal call site.
+3. **Decide the fate of `extractImplicitAssumeParams`** (`jl4-core/src/L4/Export.hs:426-439`, tolerated at `jl4-service/src/Compiler.hs:147`). Its own doc comment says it exists so programs can _omit_ explicit `ASSUME`s, by repurposing typechecker `OutOfScopeError`s as parameters. If `ASSUME` is going away, this crutch wants a decision rather than inheritance.
+4. **Guard the regression.** A lint or corpus check that a non-fixture `.l4` has no top-level `ASSUME`.
+
+**Blocker to fix first (or at least to know about):** `l4 batch` breaks on any module where one top-level `GIVEN` decision calls another — i.e. on the target style. `jl4/app/L4/Cli/Batch.hs:206` round-trips the module through `prettyLayout` and the reprinted source re-parses with the wrong application/`AND` precedence (`__AND__` gets a NUMBER where it wants a BOOLEAN, and vice-versa at the call). Parens and `OF` do not help. `l4 check` passes throughout. `jl4-service` deliberately avoids the round-trip and is unaffected — so this is confined to the CLI, but it means the migration makes `l4 batch` worse before it gets better.
+
+**Known downstream consumer that assumes the `ASSUME` shape:** the DMN exporter (`jl4-core/src/L4/Dmn/Lower.hs`) models a module as global scalars + decisions over them. Under record-threaded `GIVEN` it emits duplicate-named `<inputData>`, unevaluable `f(x)` FEEL invocations, and erases record types to `Any`. Tracked separately on `mengwong/dmn-export`; the exporter's own exhibit `jl4/examples/dmn/reg-cf.l4` is itself `ASSUME`-style and wants re-cutting from the real Reg CF corpus.
 
 ## Infra loose ends
 

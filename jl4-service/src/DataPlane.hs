@@ -15,11 +15,12 @@ import OpenApiDoc (buildOpenApiDoc)
 import FileBrowser (ShortFileBrowseApi, shortFileBrowseHandler)
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import Servant.Multipart
-import Backend.DecisionQueryPlan (CachedDecisionQuery, buildDecisionQueryCacheFromCompiled, queryPlan, QueryPlanResponse)
+import Backend.DecisionQueryPlan (CachedDecisionQuery (ladderInfo), buildDecisionQueryCacheFromCompiled, queryPlan, QueryPlanResponse)
 import L4.FunctionSchema (Parameter, Parameters(..))
 import Shared (AnnotatedFunctionSummary (..), buildPropertyReverseMap, remapArguments, sanitizePropertyName)
 import Backend.Jl4 (CompiledModule (..), evaluateWithCompiledDeontic)
 import qualified L4.StateGraph as StateGraph
+import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Compiler (toDecl)
 import Logging (logInfo)
 import Options (Options (..))
@@ -32,7 +33,7 @@ import qualified Data.ByteString.Char8 as BS8
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch)
+import Control.Exception (catch, evaluate)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
@@ -90,6 +91,9 @@ type FunctionRoutes =
   :<|> "evaluation" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] FnArguments :> Post '[JSON] (EvalResponse SimpleResponse)
   :<|> "evaluation" :> "batch" :> Header "X-L4-Trace" Text :> QueryParam "trace" TraceLevel :> QueryParam "graphviz" Bool :> ReqBody '[JSON] BatchRequest :> Post '[JSON] (EvalResponse BatchResponse)
   :<|> "query-plan" :> ReqBody '[JSON] FnArguments :> Post '[JSON] QueryPlanResponse
+       -- GET .../ladder → the same RenderAsLadderInfo that query-plan already
+       -- returns in its "ladder" field, on its own, without posting arguments.
+  :<|> "ladder" :> Get '[JSON] VizExpr.RenderAsLadderInfo
   :<|> "state-graphs" :> Get '[JSON] StateGraphListResponse
   :<|> "state-graphs" :> Capture "graphName" Text :> Get '[PlainText] Text
 
@@ -121,6 +125,7 @@ functionRoutesHandler deployId fnName =
   :<|> evalFunctionHandler deployId fnName
   :<|> batchFunctionHandler deployId fnName
   :<|> queryPlanHandler' deployId fnName
+  :<|> ladderHandler deployId fnName
   :<|> listStateGraphsHandler deployId fnName
   :<|> getStateGraphDotHandler deployId fnName
 
@@ -356,18 +361,110 @@ queryPlanHandler' deployId fnName fnArgs = do
     ]
   (fns, _meta) <- requireDeploymentReady deployId
   vf <- requireFunction fns fnName
+  cached <- requireDecisionQueryCache deployId fnName vf
+  pure $ queryPlan fnName cached fnArgs
 
-  cached <- case vf.fnDecisionQueryCache of
+-- | GET /deployments/{id}/functions/{fn}/ladder
+--
+-- Returns the ladder-diagram IR for a boolean @DECIDE@.
+--
+-- This is deliberately NOT a new information surface: the byte-identical value
+-- is already returned in the @ladder@ field of every 200 from
+-- @POST .../query-plan@ (see 'Backend.DecisionQueryPlan.queryPlan', which sets
+-- @ladder = Just cached.ladderInfo@ unconditionally). The GET exists so a
+-- client that wants only the decision structure can fetch it without posting an
+-- argument set and discarding the plan — and so that structure is cacheable and
+-- linkable. Both handlers read the same memoised 'CachedDecisionQuery', so
+-- there is exactly one ladder per function however it is reached.
+--
+-- Inherited limits, same as query-plan: only @\@export@ed functions are in the
+-- registry, and only boolean-returning DECIDEs visualize (anything else is the
+-- 400 raised by 'buildDecisionQueryCacheFromCompiled').
+--
+-- KNOWN GAP, inherited and deliberately not changed here: the @atomId@ carried
+-- on each ladder leaf is NOT in the same namespace as the keys of
+-- @QueryPlanResponse.impactByAtomId@, so a client cannot join the two. Both are
+-- UUID5 over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ renders
+-- each ref as its numeric @rootUnique@ over the atom's /direct/ ref set, while
+-- @L4.Decision.QueryPlan.atomIdByUnique@ renders it as the ref's /label/ over
+-- the /transitive closure/. They therefore differ for every atom with a
+-- non-empty ref set — which is every ordinary leaf. @jl4-lsp@ reconciles them
+-- by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@ before serving
+-- the ladder (see @LSP.L4.Actions@); jl4-service never has. Fixing it is a
+-- one-line change in 'buildDecisionQueryCacheFromCompiled' that would also
+-- change the existing @query-plan@ payload, so it is left as a separate
+-- decision. 'IntegrationSpec' pins the current behaviour.
+ladderHandler :: DeploymentId -> Text -> AppM VizExpr.RenderAsLadderInfo
+ladderHandler deployId fnName = do
+  logger <- asks (.logger)
+  liftIO $ logInfo logger "Ladder retrieved"
+    [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
+    , ("functionName", Aeson.toJSON fnName)
+    ]
+  (fns, _meta) <- requireDeploymentReady deployId
+  vf <- requireFunction fns fnName
+  cached <- requireDecisionQueryCache deployId fnName vf
+  pure cached.ladderInfo
+
+-- | Fetch a function's memoised decision-query cache, building and storing it
+-- on first use. Shared by 'queryPlanHandler'' and 'ladderHandler' so that the
+-- ladder a client sees is the same object either way, and so that whichever
+-- endpoint is hit first pays the (one-time) visualization + BDD cost.
+--
+-- Two different things need bounding here, and they need two different bounds:
+--
+--   * the SIZE of what gets serialized, by 'Options.Options.maxLadderNodes'.
+--     A ladder is drawn in AND\/OR normal form, and reaching that form
+--     distributes OR over AND, so @(a AND b) OR (c AND d) OR …@ over 2n
+--     variables becomes 2^n clauses. Sixteen variables serialize to 366 KB,
+--     thirty-two to tens of megabytes streamed over minutes. No timeout bounds
+--     that: the cost is in writing the answer out, and it is paid on every
+--     request, not just the first.
+--
+--   * the TIME to build it, by @evalTimeout@. The node budget cannot do this
+--     job, because by the time it can be consulted the structure it is
+--     measuring already exists: 'LadderViz.doVisualize' materialises the whole
+--     normal form eagerly. Measured, 32 variables take ~0.5s to build and 64
+--     do not finish at all — so on an unauthenticated GET, without this, a
+--     four-line L4 file pins a request thread and one of the
+--     'Options.Options.maxConcurrentRequests' slots indefinitely.
+--
+-- The 'evaluate' is what makes the timeout bite: 'buildDecisionQueryCacheFromCompiled'
+-- is pure, so without forcing it the timeout would wrap a thunk and expire
+-- around nothing. WHNF is enough here only because of what is strict downstream:
+-- 'LadderViz.doVisualize' is matched on (which is the expensive part, and is
+-- eager — this is what the 64-variable case in 'IntegrationSpec' actually trips
+-- on), 'exceedsNodeBudget' is a 'when' guard, and every field of
+-- 'CachedDecisionQuery' — including @core@, hence the BDD — carries a bang, so
+-- the constructor cannot be returned without entering each.
+--
+-- What that does NOT cover is serialization: Servant encodes the response after
+-- this returns, outside the timeout. That is not an oversight, it is why the
+-- node budget exists and why it is a separate limit. Removing the budget and
+-- leaving only this timeout was measured: the 32-variable case then passes the
+-- timeout in well under a second and the request still does not complete.
+requireDecisionQueryCache :: DeploymentId -> Text -> ValidatedFunction -> AppM CachedDecisionQuery
+requireDecisionQueryCache deployId fnName vf =
+  case vf.fnDecisionQueryCache of
     Just c -> pure c
     Nothing -> do
       compiled <- case vf.fnCompiled of
         Nothing -> throwError err500 { errBody = jsonError "No compiled module available for query-plan" }
         Just c -> pure c
-      c <- buildDecisionQueryCacheFromCompiled fnName compiled vf.fnSourceText
+      opts <- asks (.options)
+      let attempt :: Either ServerError CachedDecisionQuery
+          attempt =
+            buildDecisionQueryCacheFromCompiled
+              opts.maxLadderNodes fnName compiled vf.fnSourceText
+      settled <- liftIO $ timeout (opts.evalTimeout * 1_000_000) (evaluate attempt)
+      c <- case settled of
+        Nothing -> throwError err500
+          { errBody = jsonError
+              "Building the decision structure for this function exceeded the evaluation timeout" }
+        Just (Left e) -> throwError e
+        Just (Right c) -> pure c
       storeDecisionQueryCache deployId fnName c
       pure c
-
-  pure $ queryPlan fnName cached fnArgs
 
 -- | Persist a freshly-built decision query cache back into the deployment registry
 -- so subsequent requests can reuse it without rebuilding.

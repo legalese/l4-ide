@@ -17,15 +17,20 @@
  * We do this CLIENT-SIDE from the bodies /render already returned (the LSP marks
  * applied refs canInline:false — an open TODO there), so it needs no backend.
  * No framework.
+ *
+ * E1 Step 4: the DOM half is gone from this file. Its `flipIndex` was a near-verbatim
+ * copy of app.ts's (its own section header said so), and both are now the one definition
+ * in `src/flip.ts`. The two behaviours that are genuinely this demo's — routing a click
+ * to hydrate/collapse instead of cycle/fold, and dotting the hydratable refs after the
+ * draw — survive as `onAct` and `onRender`, which is exactly the split the controller
+ * exists to draw. Pan/zoom (seam S6) comes along for free.
  */
 import {
-  layout,
-  estimateMetrics,
   defaultViewSpec,
   fromVizFunDecl,
   expandSentences,
 } from "@repo/ladder-core";
-import { sceneToSvg } from "../src/index.js";
+import { LadderController } from "../src/index.js";
 import type {
   FunDecl,
   IRExpr,
@@ -34,7 +39,6 @@ import type {
   UBoolValue,
   Provenance,
   ConnectiveStyle,
-  Scene,
 } from "@repo/ladder-core";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -54,8 +58,6 @@ const nameMap = new Map<string, Decoded>(); // cleaned DECIDE name -> its tree
 const foldSet = new Set<NodeId>();
 const valuation = new Map<NodeId, UBoolValue>();
 let connective: ConnectiveStyle = "straddle-wire";
-let lastScene: Scene | null = null;
-const tm = estimateMetrics;
 
 /* hydration: display ids currently expanded, and a stable id-remap for the
  * subtrees we splice in (so ids survive re-render for FLIP + click + fold). */
@@ -133,17 +135,43 @@ function walk(e: IRExpr, leaves: NodeId[], groups: NodeId[]): void {
   else if (e.$type !== "InertE") leaves.push(e.id);
 }
 
-/* --------------------------------------------------------------- FLIP (app.ts) */
-type Pos = { x: number; y: number };
-function flipIndex(scene: Scene): Map<string, Pos> {
-  const m = new Map<string, Pos>();
-  for (const p of scene.prims) {
-    if (p.kind === "box") m.set(`box:${p.id}`, { x: p.rect.x, y: p.rect.y });
-    else if (p.kind === "text" && p.id != null)
-      m.set(`label:${p.id}`, { x: p.at.x, y: p.at.y });
-  }
-  return m;
-}
+/* ------------------------------------------------------------------ the controller */
+/** Nothing is rendered until a module comes back from the LSP, so the controller starts on
+ *  an empty tree and `render()` swaps in the real one via `setFunDecl`. */
+const EMPTY_FN: FunDecl = {
+  id: 0,
+  name: "",
+  params: [],
+  body: { $type: "InertE", id: 0, text: "", context: "InertAnd" },
+};
+
+/** Routing is conditional on this demo's own hydration state, and the controller never
+ *  sees it: it reports an act, the host decides what the act MEANS. */
+const controller = new LadderController(container, EMPTY_FN, {
+  onAct: (act) => {
+    if (act.t === "value")
+      collapsedRefs.has(act.id) ? hydrate(act.id) : cycleValue(act.id);
+    else
+      wrappers.has(act.id)
+        ? dehydrate(wrappers.get(act.id)!)
+        : toggleFold(act.id);
+  },
+  /** Post-draw decoration the ViewSpec cannot express: which leaves are hydratable refs
+   *  and which headings stand for a hydrated limb. `playground.html:144-160` styles both
+   *  classes and is unchanged. This hook is why `onRender` exists. */
+  onRender: (svg) => {
+    svg.querySelectorAll<SVGElement>("[data-value]").forEach((el) => {
+      if (collapsedRefs.has(Number(el.getAttribute("data-value")))) {
+        el.classList.add("lad-ref");
+        el.setAttribute("data-ref", "1");
+      }
+    });
+    svg.querySelectorAll<SVGElement>("[data-fold]").forEach((el) => {
+      if (wrappers.has(Number(el.getAttribute("data-fold"))))
+        el.classList.add("lad-hydrated");
+    });
+  },
+});
 
 function render(animate: boolean) {
   if (!cur) return;
@@ -155,81 +183,19 @@ function render(animate: boolean) {
   const fn: FunDecl = { ...cur.fn, body };
   lastDisplayFn = fn;
 
-  const vs = defaultViewSpec({
-    valuation,
-    foldSet,
-    provenance: activeProv,
-    connectiveStyle: connective,
-    showCurrent: true,
-  });
-  const scene = layout(fn, vs, tm);
-  const old = lastScene && animate ? flipIndex(lastScene) : null;
-  container.innerHTML = sceneToSvg(scene);
-  const svg = container.querySelector("svg") as SVGSVGElement;
-  svg.style.maxWidth = "100%";
-  svg.style.height = "auto";
-
-  if (old) {
-    const next = flipIndex(scene);
-    const play: SVGElement[] = [];
-    svg.querySelectorAll<SVGElement>("[data-fnid]").forEach((el) => {
-      const nid = el.getAttribute("data-fnid")!;
-      const key = `${el.tagName.toLowerCase() === "rect" ? "box" : "label"}:${nid}`;
-      const o = old.get(key);
-      const n = next.get(key);
-      if (o && n && (o.x !== n.x || o.y !== n.y)) {
-        el.style.transition = "none";
-        el.style.transform = `translate(${o.x - n.x}px, ${o.y - n.y}px)`;
-        play.push(el);
-      } else if (!o && n) {
-        el.style.transition = "none";
-        el.style.opacity = "0";
-        play.push(el);
-      }
-    });
-    const wires = Array.from(svg.querySelectorAll<SVGElement>(".lad-wire"));
-    wires.forEach(
-      (el) => ((el.style.transition = "none"), (el.style.opacity = "0")),
-    );
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        play.forEach((el) => {
-          el.style.transition =
-            "transform 300ms cubic-bezier(.2,.7,.2,1), opacity 300ms ease";
-          el.style.transform = "";
-          el.style.opacity = "";
-        });
-        wires.forEach(
-          (el) => (
-            (el.style.transition = "opacity 320ms ease"),
-            (el.style.opacity = "")
-          ),
-        );
-      }),
-    );
-  }
-  lastScene = scene;
-
-  // wire clicks: refs hydrate, hydrated headings collapse, else cycle / fold
-  svg.querySelectorAll<SVGElement>("[data-value]").forEach((el) => {
-    const nid = Number(el.getAttribute("data-value"));
-    if (collapsedRefs.has(nid)) {
-      el.classList.add("lad-ref");
-      el.setAttribute("data-ref", "1");
-      el.addEventListener("click", () => hydrate(nid));
-    } else {
-      el.addEventListener("click", () => cycleValue(nid));
-    }
-  });
-  svg.querySelectorAll<SVGElement>("[data-fold]").forEach((el) => {
-    const nid = Number(el.getAttribute("data-fold"));
-    if (wrappers.has(nid)) {
-      el.classList.add("lad-hydrated");
-      el.addEventListener("click", () => dehydrate(wrappers.get(nid)!));
-    } else {
-      el.addEventListener("click", () => toggleFold(nid));
-    }
-  });
+  // The display tree is rebuilt every frame, so the controller's `fn` is swapped every
+  // frame too — but `keepBaseline` when animating, because a hydration IS the thing the
+  // FLIP is there to show. `animate: false` (a fresh decision) drops the baseline.
+  controller.setFunDecl(fn, animate);
+  controller.render(
+    defaultViewSpec({
+      valuation,
+      foldSet,
+      provenance: activeProv,
+      connectiveStyle: connective,
+      showCurrent: true,
+    }),
+  );
   renderSentences();
 }
 
@@ -278,7 +244,8 @@ function selectDecision(i: number) {
   valuation.clear();
   hydrated.clear();
   remapCache.clear();
-  lastScene = null;
+  // render(false) drops the FLIP baseline and refits — a different decision has no
+  // correspondence with the one before it.
   render(false);
 }
 
@@ -348,6 +315,10 @@ $("reset").addEventListener("click", () => {
   valuation.clear();
   render(true);
 });
+/* view controls — the controller draws no chrome of its own */
+$("zoom-in").addEventListener("click", () => controller.zoom(1.25));
+$("zoom-out").addEventListener("click", () => controller.zoom(1 / 1.25));
+$("fit").addEventListener("click", () => controller.fit());
 
 async function loadExample(id: string) {
   const t = await (await fetch("/example?id=" + encodeURIComponent(id))).text();

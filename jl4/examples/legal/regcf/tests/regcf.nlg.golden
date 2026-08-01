@@ -1,0 +1,78 @@
+`issuer is eligible` with `a clean issuer`
+not `issuer is eligible` with `a foreign issuer`
+not `issuer is eligible` with `a delinquent issuer`
+not `issuer is eligible` with `a blank-check issuer`
+`(b)(1) — not organized under State or territorial law` with `a foreign issuer`
+`(b)(5) — delinquent in ongoing annual reports` with `a delinquent issuer`
+`(b)(6) — no specific business plan, or a blank-check business plan` with `a blank-check issuer`
+`offering is within the offering limit` with `an offering of` with 0, 5000000 and `FALSE`
+not `offering is within the offering limit` with `an offering of` with 0, 5000001 and `FALSE`
+`offering is within the offering limit` with `an offering of` with 4000000, 1000000 and `TRUE`
+not `offering is within the offering limit` with `an offering of` with 4000000, 1000001 and `TRUE`
+`investment limit` with `an investor with` with `FALSE`, 40000, 40000 and 0
+`investment limit` with `an investor with` with `FALSE`, 40000, 40000 and 0 is equal to 2500
+`investment limit` with `an investor with` with `FALSE`, 50000, 50000 and 0 is equal to 2500
+`investment limit` with `an investor with` with `FALSE`, 60000, 200000 and 0 is equal to 10000
+`either annual income or net worth is less than the cut point` with `an investor with` with `FALSE`, 123999, 124000 and 0
+not `either annual income or net worth is less than the cut point` with `an investor with` with `FALSE`, 124000, 124000 and 0
+`investment limit` with `an investor with` with `FALSE`, 124000, 124000 and 0 is equal to 12400
+`investment limit` with `an investor with` with `FALSE`, 1240000, 1240000 and 0 is equal to 124000
+`investment limit` with `an investor with` with `FALSE`, 3000000, 3000000 and 0 is equal to 124000
+`investor is within the investment limit` with `an investor with` with `FALSE`, 60000, 200000 and 9000 and 1000
+not `investor is within the investment limit` with `an investor with` with `FALSE`, 60000, 200000 and 9000 and 1001
+`investor is within the investment limit` with `an investor with` with `TRUE`, 60000, 200000 and 9000 and 5000000
+`financial statements required` with `an offering of` with 0, 124000 and `FALSE` is equal to `certified`
+`financial statements required` with `an offering of` with 0, 124001 and `FALSE` is equal to `reviewed`
+`financial statements required` with `an offering of` with 0, 618000 and `FALSE` is equal to `reviewed`
+`financial statements required` with `an offering of` with 0, 618001 and `TRUE` is equal to `audited`
+`financial statements required` with `an offering of` with 0, 618001 and `FALSE` is equal to `reviewed`
+`financial statements required` with `an offering of` with 0, 1235000 and `FALSE` is equal to `reviewed`
+`financial statements required` with `an offering of` with 0, 1235001 and `FALSE` is equal to `audited`
+`financial statement requirement is satisfied` with `an offering of` with 0, 124000 and `FALSE` and `audited`
+not `financial statement requirement is satisfied` with `an offering of` with 0, 618001 and `TRUE` and `reviewed`
+`the 21-day public availability period has run` with `an arrangement with` with 21 and 1
+not `the 21-day public availability period has run` with `an arrangement with` with 20 and 1
+`intermediary obligations are met` with `an arrangement with` with 21 and 1
+not `intermediary obligations are met` with `an arrangement with` with 21 and 2
+not `(a)(3) — conducted through a single complying intermediary` with `an arrangement with` with 21 and 2
+`notice complies with Rule 204(b)` with `a conforming notice`
+not `notice complies with Rule 204(b)` with `an overreaching notice`
+not `notice complies with Rule 204(b)` with `a notice with no platform link`
+executing contract `advertising restriction` with `a conforming notice` at 0 with the following events:  party `Issuer` did `advertise the terms of the offering` at 10
+executing contract `advertising restriction` with `an overreaching notice` at 0 with the following events:  party `Issuer` did `advertise the terms of the offering` at 10
+`ongoing reporting obligation may terminate` with `a reporting status with` with 1, 299 and 50000000
+not `ongoing reporting obligation may terminate` with `a reporting status with` with 1, 300 and 50000000
+not `(b)(2) — one annual report filed and fewer than 300 holders of record` with `a reporting status with` with 0, 299 and 50000000
+`(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 3, 400 and 10000000
+not `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 3, 400 and 10000001
+not `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 2, 400 and 10000000
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 5000 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-AR annual report` at 100
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-TR termination of reporting` at 3
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-TR termination of reporting` at 30
+not `transfer is permitted` with `a transfer at` with 364 and `FALSE`
+`transfer is permitted` with `a transfer at` with 365 and `FALSE`
+`transfer is permitted` with `a transfer at` with 364 and `TRUE`
+`transfer is within the one-year restricted period` with `a transfer at` with 364 and `FALSE`
+not `transfer is within the one-year restricted period` with `a transfer at` with 365 and `FALSE`
+executing contract `resale restriction` with `a transfer at` with 364 and `TRUE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 100
+executing contract `resale restriction` with `a transfer at` with 100 and `FALSE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 200
+`the base case qualifies`
+not `the delinquent-issuer case qualifies`
+not `the over-limit-investor case qualifies`
+not `the short-availability case qualifies`
+not `the under-assured-financials case qualifies`
+not `W within the limit in 2016`
+not `W within the limit in 2021 January`
+`W within the limit in 2021 June`
+`the cut point the day before the 2017 adjustment` is equal to 100000
+`the cut point on the day of the 2017 adjustment` is equal to 107000
+`I-3 limit under the 2022 rules` is equal to 11500
+`I-3 limit under the 2023 rules` is equal to 5750
+`I-4 limit under the 2022 rules` is equal to 107000
+`the percentage case under the 2019 rules` is equal to 3000
+`A is within the limit under the 2021 rules`
+not `A is within the limit under the 2019 rules`
+`F requirement under the 2019 rules` is equal to `audited`
+`F requirement under the 2023 rules` is equal to `reviewed`
+`a small offering inside the COVID window` is equal to `certified`
+`a large offering inside the COVID window` is equal to `audited`

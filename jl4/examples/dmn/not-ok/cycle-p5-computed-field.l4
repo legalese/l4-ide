@@ -1,0 +1,49 @@
+-- NEGATIVE fixture, and AN UNPAID OBLIGATION rather than merely a fixture
+-- (spec §6.4.5: "re-measure p5 after Phase 3").
+--
+-- p5: the cycle runs through a RECORD COMPUTED FIELD.
+--
+--     DECLARE Assessment
+--       HAS `declared`  IS A NUMBER
+--           `grossed`   IS A NUMBER  MEANS `the assessed total` PLUS `declared`
+--     `the assessed total` MEANS `the case file`'s `grossed`
+--
+-- On the tree as of Phase 3, only ONE of the two edges emitted: `freeRefs`
+-- filters projection FIELD names (Lower.hs:4469-4471), so the read of `grossed`
+-- out of the record does not produce an edge back to whatever computes it, and
+-- the DRG is acyclic even though the definitions are not.
+--
+-- WHY THE OBLIGATION IS NOW DUE. §6.4.5's instruction was to re-measure this
+-- after Phase 3. Phase 3 landed 2026-07-29, AND Phase 3.6's hydration actively
+-- rewires `dcnRequirements` around computed fields (§4.4.4, R11): a hydrated
+-- record's computed field becomes a context ENTRY, and the enclosing decision
+-- acquires the entry's dependencies. That is precisely the mechanism that could
+-- turn the missing edge into a present one. Phase 5 inherits the instruction;
+-- whoever wires this fixture must RE-MEASURE rather than copy this paragraph.
+--
+-- Expected: UNKNOWN, on purpose. Record the measurement here when it is taken,
+-- with the date and the tree state, and say which of the two edges emitted.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `cycle through a computed field`
+
+DECLARE Assessment
+  HAS `declared`  IS A NUMBER
+      `grossed`   IS A NUMBER
+        MEANS `the assessed total` PLUS `declared`
+
+ASSUME `the case file` IS AN Assessment
+
+GIVETH A NUMBER
+`the assessed total` MEANS
+    `the case file`'s `grossed`

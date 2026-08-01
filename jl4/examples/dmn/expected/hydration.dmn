@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_hydration" name="Hydration" namespace="https://legalese.com/l4/dmn/hydration" exporter="jl4">
+  <itemDefinition id="itemdef_applicant" name="Applicant">
+    <itemComponent id="itemdef_applicant_c1" name="salary">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_applicant_c2" name="other_income" label="other income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_submission" name="Submission">
+    <itemComponent id="itemdef_submission_c1" name="primary">
+      <typeRef>Applicant</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_submission_c2" name="secondary">
+      <typeRef>Applicant</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_applicant_hydrated" name="Applicant_hydrated" label="Applicant">
+    <itemComponent id="itemdef_applicant_hydrated_c1" name="salary">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_applicant_hydrated_c2" name="other_income" label="other income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_applicant_hydrated_c3" name="total_income" label="total income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_applicant_hydrated_c4" name="band">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_applicant_hydrated_c5" name="band_width" label="band width">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_applicant" name="applicant">
+    <variable id="input_applicant_var" name="applicant" typeRef="Applicant"/>
+  </inputData>
+  <inputData id="input_the_submission" name="the_submission" label="the submission">
+    <variable id="input_the_submission_var" name="the_submission" label="the submission" typeRef="Submission"/>
+  </inputData>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <inputData id="input_b" name="b">
+    <variable id="input_b_var" name="b" typeRef="number"/>
+  </inputData>
+  <inputData id="input_c" name="c">
+    <variable id="input_c_var" name="c" typeRef="number"/>
+  </inputData>
+  <inputData id="input_m" name="m">
+    <variable id="input_m_var" name="m" typeRef="number"/>
+  </inputData>
+  <decision id="decision_applicant_score" name="applicant_score" label="applicant score">
+    <variable id="decision_applicant_score_var" name="applicant_score" label="applicant score" typeRef="number"/>
+    <informationRequirement id="decision_applicant_score_ir1">
+      <requiredDecision href="#hydration_applicant"/>
+    </informationRequirement>
+    <literalExpression id="decision_applicant_score_literal">
+      <text>applicant_hydrated.total_income / 1000</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_applicant_band_width" name="applicant_band_width" label="applicant band width">
+    <variable id="decision_applicant_band_width_var" name="applicant_band_width" label="applicant band width" typeRef="number"/>
+    <informationRequirement id="decision_applicant_band_width_ir1">
+      <requiredDecision href="#hydration_applicant"/>
+    </informationRequirement>
+    <literalExpression id="decision_applicant_band_width_literal">
+      <text>applicant_hydrated.band_width</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_the_leading_applicant" name="the_leading_applicant" label="the leading applicant">
+    <variable id="decision_the_leading_applicant_var" name="the_leading_applicant" label="the leading applicant" typeRef="Applicant"/>
+    <informationRequirement id="decision_the_leading_applicant_ir1">
+      <requiredInput href="#input_the_submission"/>
+    </informationRequirement>
+    <literalExpression id="decision_the_leading_applicant_literal">
+      <text>the_submission.primary</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_leading_total" name="leading_total" label="leading total">
+    <variable id="decision_leading_total_var" name="leading_total" label="leading total" typeRef="number"/>
+    <informationRequirement id="decision_leading_total_ir1">
+      <requiredDecision href="#hydration_the_leading_applicant"/>
+    </informationRequirement>
+    <literalExpression id="decision_leading_total_literal">
+      <text>the_leading_applicant_hydrated.total_income</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_capped_bonus" name="capped_bonus" label="capped bonus">
+    <variable id="decision_capped_bonus_var" name="capped_bonus" label="capped bonus" typeRef="number"/>
+    <informationRequirement id="decision_capped_bonus_ir1">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <decisionTable id="decision_capped_bonus_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="capped bonus">
+      <input id="decision_capped_bonus_i1" label="n">
+        <inputExpression id="decision_capped_bonus_i1_expr" typeRef="number">
+          <text>n</text>
+        </inputExpression>
+      </input>
+      <output id="decision_capped_bonus_o1">
+        <defaultOutputEntry id="decision_capped_bonus_o1_default">
+          <text>null</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_capped_bonus_r1">
+        <description>n AT MOST 5000</description>
+        <inputEntry id="decision_capped_bonus_r1_i1">
+          <text>&lt;= 5000</text>
+        </inputEntry>
+        <outputEntry id="decision_capped_bonus_r1_o1">
+          <text>n</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_bonus_is_settled" name="bonus_is_settled" label="bonus is settled">
+    <variable id="decision_bonus_is_settled_var" name="bonus_is_settled" label="bonus is settled" typeRef="boolean"/>
+    <informationRequirement id="decision_bonus_is_settled_ir1">
+      <requiredInput href="#input_b"/>
+    </informationRequirement>
+    <literalExpression id="decision_bonus_is_settled_literal">
+      <text>b != null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_bonus_is_unsettled" name="bonus_is_unsettled" label="bonus is unsettled">
+    <variable id="decision_bonus_is_unsettled_var" name="bonus_is_unsettled" label="bonus is unsettled" typeRef="boolean"/>
+    <informationRequirement id="decision_bonus_is_unsettled_ir1">
+      <requiredInput href="#input_c"/>
+    </informationRequirement>
+    <literalExpression id="decision_bonus_is_unsettled_literal">
+      <text>c = null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_bonus_or_zero" name="bonus_or_zero" label="bonus or zero">
+    <variable id="decision_bonus_or_zero_var" name="bonus_or_zero" label="bonus or zero" typeRef="number"/>
+    <informationRequirement id="decision_bonus_or_zero_ir1">
+      <requiredInput href="#input_m"/>
+    </informationRequirement>
+    <literalExpression id="decision_bonus_or_zero_literal">
+      <text>if m != null then m else 0</text>
+    </literalExpression>
+  </decision>
+  <decision id="hydration_applicant" name="applicant_hydrated" label="applicant">
+    <variable id="hydration_applicant_var" name="applicant_hydrated" label="applicant" typeRef="Applicant_hydrated"/>
+    <informationRequirement id="hydration_applicant_ir1">
+      <requiredInput href="#input_applicant"/>
+    </informationRequirement>
+    <context id="hydration_applicant_ctx">
+      <contextEntry id="hydration_applicant_ce1">
+        <variable id="hydration_applicant_ce1_var" name="salary" typeRef="number"/>
+        <literalExpression id="hydration_applicant_ce1_lit">
+          <text>applicant.salary</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_applicant_ce2">
+        <variable id="hydration_applicant_ce2_var" name="other_income" label="other income" typeRef="number"/>
+        <literalExpression id="hydration_applicant_ce2_lit">
+          <text>applicant.other_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_applicant_ce3">
+        <variable id="hydration_applicant_ce3_var" name="total_income" label="total income" typeRef="number"/>
+        <literalExpression id="hydration_applicant_ce3_lit">
+          <text>salary + other_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_applicant_ce4">
+        <variable id="hydration_applicant_ce4_var" name="band" typeRef="number"/>
+        <literalExpression id="hydration_applicant_ce4_lit">
+          <text>(if total_income &gt;= 100000 then 3 else (if total_income &gt;= 50000 then 2 else 1))</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_applicant_ce5">
+        <variable id="hydration_applicant_ce5_var" name="band_width" label="band width" typeRef="number"/>
+        <literalExpression id="hydration_applicant_ce5_lit">
+          <text>band * 25000</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <decision id="hydration_the_leading_applicant" name="the_leading_applicant_hydrated" label="the leading applicant">
+    <variable id="hydration_the_leading_applicant_var" name="the_leading_applicant_hydrated" label="the leading applicant" typeRef="Applicant_hydrated"/>
+    <informationRequirement id="hydration_the_leading_applicant_ir1">
+      <requiredDecision href="#decision_the_leading_applicant"/>
+    </informationRequirement>
+    <context id="hydration_the_leading_applicant_ctx">
+      <contextEntry id="hydration_the_leading_applicant_ce1">
+        <variable id="hydration_the_leading_applicant_ce1_var" name="salary" typeRef="number"/>
+        <literalExpression id="hydration_the_leading_applicant_ce1_lit">
+          <text>the_leading_applicant.salary</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_the_leading_applicant_ce2">
+        <variable id="hydration_the_leading_applicant_ce2_var" name="other_income" label="other income" typeRef="number"/>
+        <literalExpression id="hydration_the_leading_applicant_ce2_lit">
+          <text>the_leading_applicant.other_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_the_leading_applicant_ce3">
+        <variable id="hydration_the_leading_applicant_ce3_var" name="total_income" label="total income" typeRef="number"/>
+        <literalExpression id="hydration_the_leading_applicant_ce3_lit">
+          <text>salary + other_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_the_leading_applicant_ce4">
+        <variable id="hydration_the_leading_applicant_ce4_var" name="band" typeRef="number"/>
+        <literalExpression id="hydration_the_leading_applicant_ce4_lit">
+          <text>(if total_income &gt;= 100000 then 3 else (if total_income &gt;= 50000 then 2 else 1))</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_the_leading_applicant_ce5">
+        <variable id="hydration_the_leading_applicant_ce5_var" name="band_width" label="band width" typeRef="number"/>
+        <literalExpression id="hydration_the_leading_applicant_ce5_lit">
+          <text>band * 25000</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_hydration_diagram" name="Hydration">
+      <dmndi:DMNShape id="input_applicant_shape" dmnElementRef="input_applicant">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_the_submission_shape" dmnElementRef="input_the_submission">
+        <dc:Bounds x="280" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_n_shape" dmnElementRef="input_n">
+        <dc:Bounds x="500" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_b_shape" dmnElementRef="input_b">
+        <dc:Bounds x="720" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
+        <dc:Bounds x="940" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_m_shape" dmnElementRef="input_m">
+        <dc:Bounds x="1160" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_the_leading_applicant_shape" dmnElementRef="decision_the_leading_applicant">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_capped_bonus_shape" dmnElementRef="decision_capped_bonus">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_bonus_is_settled_shape" dmnElementRef="decision_bonus_is_settled">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_bonus_is_unsettled_shape" dmnElementRef="decision_bonus_is_unsettled">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_bonus_or_zero_shape" dmnElementRef="decision_bonus_or_zero">
+        <dc:Bounds x="940" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="hydration_applicant_shape" dmnElementRef="hydration_applicant">
+        <dc:Bounds x="1160" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_applicant_score_shape" dmnElementRef="decision_applicant_score">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_applicant_band_width_shape" dmnElementRef="decision_applicant_band_width">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="hydration_the_leading_applicant_shape" dmnElementRef="hydration_the_leading_applicant">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_leading_total_shape" dmnElementRef="decision_leading_total">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_applicant_score_ir1_edge" dmnElementRef="decision_applicant_score_ir1">
+        <di:waypoint x="1250" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_applicant_band_width_ir1_edge" dmnElementRef="decision_applicant_band_width_ir1">
+        <di:waypoint x="1250" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_the_leading_applicant_ir1_edge" dmnElementRef="decision_the_leading_applicant_ir1">
+        <di:waypoint x="370" y="540"/>
+        <di:waypoint x="150" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_leading_total_ir1_edge" dmnElementRef="decision_leading_total_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_bonus_ir1_edge" dmnElementRef="decision_capped_bonus_ir1">
+        <di:waypoint x="590" y="540"/>
+        <di:waypoint x="370" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_bonus_is_settled_ir1_edge" dmnElementRef="decision_bonus_is_settled_ir1">
+        <di:waypoint x="810" y="540"/>
+        <di:waypoint x="590" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_bonus_is_unsettled_ir1_edge" dmnElementRef="decision_bonus_is_unsettled_ir1">
+        <di:waypoint x="1030" y="540"/>
+        <di:waypoint x="810" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_bonus_or_zero_ir1_edge" dmnElementRef="decision_bonus_or_zero_ir1">
+        <di:waypoint x="1250" y="540"/>
+        <di:waypoint x="1030" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="hydration_applicant_ir1_edge" dmnElementRef="hydration_applicant_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="1250" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="hydration_the_leading_applicant_ir1_edge" dmnElementRef="hydration_the_leading_applicant_ir1">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

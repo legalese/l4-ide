@@ -1,0 +1,21 @@
+`YMD` with 2026, 7 and 28
+`YMD` with 2026, 7 and 28 is equal to `Date` with 28, 7 and 2026
+`Year month day` with 2026, 7 and 28 is equal to `YMD` with 2026, 7 and 28
+`DATE_SERIAL` with `YMD` with 2026, 7 and 28
+`Date` with `DATE_SERIAL` with `YMD` with 2026, 7 and 28
+`Date` with `DATE_SERIAL` with `YMD` with 2026, 7 and 28 is equal to `YMD` with 2026, 7 and 28
+`YMD` with 2026, 7 and 28
+`Date` with 7, 28 and 2026
+`Date` with 7, 28 and 2026 is equal to `YMD` with 2026, 7 and 28
+`DATE_SERIAL` with `Date` with 7, 28 and 2026
+`YMD` with 2026, 28 and 7
+`YMD` with 2026, 12 and 31
+`YMD` with 2024, 2 and 29
+`YMD` with 2023, 2 and 29
+`Date` with 29, 2 and 2023
+`YMD` with 2026, 0 and 15
+`YMD` with 2026, 1 and 32
+`DATE_SERIAL` with `YMD` with 2023, 2 and 29
+`EVAL UNDER RULES EFFECTIVE AT` with `YMD` with 2023, 6 and 1 and `GST rate`
+`EVAL UNDER RULES EFFECTIVE AT` with `YMD` with 2024, 7 and 1 and `GST rate`
+`GST rate`

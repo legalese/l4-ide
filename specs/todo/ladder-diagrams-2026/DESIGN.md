@@ -458,10 +458,15 @@ Two latent bugs surfaced the moment `ladder-svg` became the **first cross-packag
 
 ## 14. Status board (where are we)
 
-_As of 2026-07-08. Branch `mengwong/ladder-diagrams-3`, 22 commits; merged
-`origin/unstable` on 2026-07-08 (conflict-free — all work is in new paths), so
-**caught up with unstable**. **Pushed + PR'd → [#96](https://github.com/legalese/l4-ide/pull/96)**
-into `unstable` (purely additive; ladder-core is standalone, not in the root workspace)._
+_As of 2026-07-21. **PR [#116](https://github.com/legalese/l4-ide/pull/116) MERGED into
+`unstable`** (2026-07-18, `5bde53da`) — it carried the whole branch: the viz-expr adapter,
+the IMPLIES seam (§25), the `ladder-svg` split, the R1 spike, and **E1 Steps 1 / 2-metrics
+/ 3** (identity + `verdictFor`, `canvasMetrics`, the LIR-free `LadderModel`). PR
+[#96](https://github.com/legalese/l4-ide/pull/96) merged earlier. The
+`mengwong/ladder-diagrams-3` worktree is now merged + stale (0-ahead / 55-behind unstable);
+**E1 Step 4+ resume on a fresh branch off `origin/unstable`.** The one uncrossed seam: the
+production IDE still renders Dagre, so a user still sees the bare-TRUE §25f bug — that is
+the gap between built and shipped, and it is exactly E1 Step 4→8._
 
 **✅ P0 — Kernel (DONE).** Pure `IRExpr × TextMetrics × ViewSpec → Scene IR → SVG`,
 no DOM (`ts-shared/ladder-core/`, `7136ec92`). Centering thesis proven on the s415
@@ -493,8 +498,11 @@ ladder-core `IRExpr` + lifts `valuation` and `provenance` side-channels. ☐ Rem
 the live LSP transport (A2 — `l4/evalApp` · `l4/inlineExprs` · `l4/queryPlan`) and real
 browser `measureText` metrics (A4).
 
-**☐ P3 — IDE integration.** Replace the Dagre path in `l4-ladder-visualizer`;
-restore eval/inline interactivity; ship to jl4-web + VS Code. Not started.
+**◐ P3 — IDE integration (E1).** Replace the Dagre path in `l4-ladder-visualizer`; restore
+eval/inline interactivity; ship to jl4-web + VS Code. **Steps 1 / 2-metrics / 3 done + merged**
+(identity + `verdictFor`, `canvasMetrics`, the LIR-free `LadderModel` that keeps the §25f seam
+alive with no `expandImplies`). **☐ Step 4** — the `LadderSvg` Svelte displayer — is next and
+is the first browser-dependent step. Full plan: `E1-IDE-INTEGRATION.md`.
 
 **☐ P4 — Print pipeline.** `ladder-print` Node CLI; A3+ PDF; a poster. The
 `ViewSpec`→SVG-string seam exists; no CLI/PDF yet. Not started.

@@ -4,7 +4,8 @@ Hard-won idioms from formalizing 43 statutory grounds for possession (UK Housing
 as amended by the Renters' Rights Act 2025). Each pattern is **"when the statute says…" → the L4 shape →
 a real example file**. Pair with [regulative.md](regulative.md) (the deontic outcome) and
 [state-ledger.md](state-ledger.md) (recording facts over the trace). Cited example paths are basenames under
-the housing-act corpus (`…/jl4/experiments/housing-act-<name>.l4`).
+the housing-act corpus (`…/jl4/experiments/housing-act-<name>.l4`); where a pattern is drawn from another
+corpus, the path is given in full from the repo root.
 
 A cross-cutting surface note: across the constitutive limbs below, **`...` is AND-sugar and `..` is OR-sugar**
 (asyndetic con/disjunction; see the "Asyndetic operators `...` and `..`" section of
@@ -167,6 +168,239 @@ DECLARE TableRow HAS
 
 ---
 
+## Decision results (the return type)
+
+### Total enum over `MAYBE` — where the source names the absent case
+
+**Statute:** a provision whose outcomes include a named "nothing follows" case — "no issuance", "no
+liability", "the application is refused".
+**Shape:** one nullary `IS ONE OF` covering _every_ outcome, the absent one included, returned as
+`GIVETH A <Enum>` — **not** `GIVETH A MAYBE <Enum>` with the absent case folded into `NOTHING`.
+
+`jl4/examples/legal/ny-environmental-7.3.l4` (6 NYCRR 624 §7.3(b)(2), issuance of the final EIS)
+already does this, and does it while keeping `MAYBE` exactly where `MAYBE` belongs:
+
+```l4
+DECLARE `Final EIS Issuance` IS ONE OF
+    `No issuance`                                           -- the absent case, NAMED
+    `Issued within 45 days of the close of the record`
+    `Issued extended beyond 45 days of the close of the record`
+
+GIVEN `The decision`        IS A `Tentative or recommended decision`
+      `Cause for extension` IS A MAYBE `Final EIS Issuance Extension Cause`   -- input: stays MAYBE
+GIVETH A `Final EIS Issuance`                                                 -- result: total
+`Determining issuance for final EIS` MEANS
+    IF    NOT `Tentative or recommended decision will contain a final EIS` `The decision`
+    THEN  `No issuance`
+    ELSE  CONSIDER `Cause for extension`
+              WHEN NOTHING    THEN `Issued within 45 days of the close of the record`
+              WHEN JUST cause THEN `Issued extended beyond 45 days of the close of the record`
+```
+
+The asymmetry _is_ the rule, and it fits in one function: **`MAYBE` inbound for a fact you may not
+have been given; a total enum outbound for a result you always have.** The surviving `MAYBE` on
+`Cause for extension` is correct and must not be swept up.
+
+> **Read this example for reasons 1 and 2 only.** Reason 3 does not fire on it, in either form, and
+> saying otherwise would be a wrong claim about a real corpus file. `WHEN JUST cause` is a
+> **binding** pattern, and a binding arm has no guard the exporter can write down; the whole
+> `CONSIDER` therefore collapses to a single verbatim default entry (`Blocking`, and `null` under
+> `SUCCEEDED`) whether the arms return `` `Issued extended…` `` or `` JUST `Issued extended…` ``.
+> The MAYBE-first counterfactual below collapses identically. There is a second-order drafting
+> lesson in that — **a `CONSIDER` arm that binds a payload is itself a DMN-hostile shape**, for the
+> same reason `JUST x` is — but it is not the lesson this section is about, and folding the return
+> type does not fix it.
+
+The same provision written the other way — the shape to avoid:
+
+```l4
+-- NOT the corpus code. The same rule, drafted MAYBE-first, for contrast.
+DECLARE `Final EIS Issuance` IS ONE OF
+    `Issued within 45 days of the close of the record`
+    `Issued extended beyond 45 days of the close of the record`
+    -- "no issuance" has no name here; it lives in the wrapper
+
+GIVETH A MAYBE `Final EIS Issuance`
+`Determining issuance for final EIS` MEANS
+    IF    NOT `Tentative or recommended decision will contain a final EIS` `The decision`
+    THEN  NOTHING
+    ELSE  CONSIDER `Cause for extension`
+              WHEN NOTHING    THEN JUST `Issued within 45 days of the close of the record`
+              WHEN JUST cause THEN JUST `Issued extended beyond 45 days of the close of the record`
+```
+
+Three reasons to prefer the first:
+
+1. **Fidelity to the source.** Legislation usually _names_ the null outcome rather than leaving a
+   gap, and the name carries the citation. `NOTHING` cannot hold `"No issuance"`; an enum member
+   can, and it reads back in the statute's own words. Under `MAYBE` the domain also silently
+   shrinks — the declared enum above goes from three outcomes to two.
+2. **A finite declared domain, which is what static analysis needs.** A nullary `IS ONE OF` is the
+   one L4 type with a faithful image in FEEL/DMN, because its values serialise as strings; it
+   lowers to `typeRef="string"`. `MAYBE T` is a type _applied to an argument_, so it does not match
+   the exporter's nullary-enum test and the output column erases to `Any` — the exporter's type
+   lowering maps a **nullary** type constructor to a FEEL type and everything else to `Any`, so
+   `GIVETH A MAYBE T` contributes no declared type at all. (Do not over-generalise this to
+   "`GIVETH` is authoritative". It is authoritative only when it lowers to something other than
+   `Any`; when it lowers to `Any` — which is exactly the `MAYBE` case — the exporter falls back to
+   inferring the type from the cells, and the column ends up `Any` because the `JUST x` cells are
+   unrenderable, not because the declared `MAYBE` won.) Emitting the domain itself as DMN
+   `<outputValues>` — the precondition for the `P` and `O` hit policies — is pending
+   (smucclaw/l4-ide#923); the `typeRef` difference is present behaviour.
+3. **No null wrapper in the export target.** `NOTHING` is nullary and survives as the string
+   `"NOTHING"`, but `JUST x` is an _applied_ constructor, which the DMN exporter cannot render as
+   executable FEEL: it emits it verbatim and reports **Blocking**, because a real engine
+   (Drools/KIE 8.44) answers `Unknown variable 'JUST'` and the whole decision evaluates to **null**
+   — reported as `SUCCEEDED`.
+
+   **And FEEL's null is not a failure signal — it reads as `FALSE`.** This is the opposite of what
+   you would expect from an undefined value, and it is why the failure is silent. Verified in
+   `feelin` 7.0.1: `1 / 0`, `{a: 1}.b` and friends all yield `null`; `null` then _propagates_
+   through arithmetic and comparison (`100 / 0 > 10` → `null`) but is **coerced to `false` at the
+   first boolean consumer** — `if null then 1 else 2` → `2`, a unary test against a `null` input
+   silently does not match, `every p in [2, null] satisfies p > 1` → `false`. Nothing downstream
+   ever sees an error. A silent `false` under `SUCCEEDED` is the worst available failure mode for a
+   legal reasoner.
+
+   **Where this bites is a flat guarded chain**, where the `JUST x` sits in a cell the exporter
+   renders — `IF … THEN JUST X ELSE NOTHING`, which
+   `paper/case-studies/charities-jersey-2014/part-6-use-of-terms.l4` emits four times. It does
+   **not** bite on the worked example above; see the note under it.
+
+> **PROVENANCE — reasons 2 and 3 describe a backend you cannot run from this checkout.** Reason 1
+> stands on the L4 source alone. Reasons 2 and 3 rest on the DMN/FEEL exporter, which lives on the
+> `mengwong/dmn-export` line and is **not** on `unstable`: there is no `jl4-core/src/L4/Dmn/`, no
+> `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, and `l4 --help` has no `dmn` subcommand here. So
+> take them as reported behaviour of another branch, not as something to verify in situ, and
+> **re-check them against `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §2.4 and §3 once that line
+> merges** — two earlier versions of this section stated the FEEL null semantics backwards and
+> over-generalised the `GIVETH` rule, and both survived review precisely because nothing here could
+> falsify them. Independently of the exporter, reason 1 and the `MAYBE`-is-usually-right section
+> below are the load-bearing guidance.
+
+> **SCOPE — this is a drafting default, not a sweep.** Across the repo there are 62
+> `GIVETH … MAYBE` signatures in 17 files, and **only 4 of them are in a real legal corpus**. The
+> rest are standard-library partiality (`minimum`, `lookup`, `ln`, date parsing), JSON-decode and
+> MLIR fixtures, and teaching examples — all of which are _correct_ and none of which this rule
+> touches. Apply the rule when drafting a new decision; do not go hunting.
+
+**And the fold is not always a rename.** The four real-corpus occurrences —
+`the entity's/person's liability under Article 21/23` in
+`paper/case-studies/charities-jersey-2014/part-6-use-of-terms.l4` — return
+`MAYBE Part6Penalty`, and `Part6Penalty` is a four-field **RECORD**, not a nullary enum. Its fields
+are load-bearing: `is the same penalty as` and `is a heavier penalty than` read them, and they feed
+the file's flagship assertion,
+`` #ASSERT `the penalty tracks the mens rea, not the paragraph number` ``.
+Flattening the penalties into nullary enum members would delete that assertion's subject matter.
+The available fold is a **sentinel record** — add a fifth constant (`the absence of a penalty`,
+imprisonment `0`, `liable to a fine IS FALSE`) and return `GIVETH A Part6Penalty` — which costs 4
+signatures, 4 `ELSE` arms and 12 `#ASSERT` edits (9 lose a `JUST`, 3 lose a `NOTHING`). Note what
+it does and does not buy: it clears the four Blocking `JUST` sites (reason 3), but the column stays
+`Any`, because reason 2 is gated on nullary-enum-ness and the payload is a record. It is also a
+_modelling_ claim — it makes "no offence" and "an offence with a nil penalty" the same value.
+**Do not present a fold like that as cosmetic.** Retrofitting a total enum onto a record-valued
+result is a modelling decision and belongs in review, not in a tidy-up. This is bucket 5 of the next
+section, and it is the case the "does the source name this outcome?" test gets wrong on its own: the
+statute plainly names the absence, so that question says fold, and it is still not a tidy-up.
+
+Related: a non-nullary `IS ONE OF` (a tagged union, e.g.
+`` `no liability` | `liable` HAS `the penalty` IS A Part6Penalty ``) buys nothing **downstream in
+DMN** — FEEL has no sum type, so it lowers to `Any` too. That is an export-fidelity fact and not a
+drafting verdict: upstream, in L4 itself, the tagged union is the only shape that both names the
+absent outcome and keeps the payload typed, which is what bucket 5 below is about. Do not read this
+line as a reason to prefer `MAYBE`.
+
+### Where `MAYBE` is right — and it usually is
+
+Guidance that only says "prefer the enum" gets over-applied. The test is **two** questions, asked in
+this order:
+
+1. **Does the source name this outcome?** If the absence is _your_ bookkeeping, a fact you were not
+   given, or a proof you do not have, it is a `MAYBE` and folding it is a category error.
+2. **If the source does name it: does the _present_ outcome carry a payload?** If it does not, fold
+   to a nullary `IS ONE OF` — that is the rule at the top of this section. If it does, a nullary
+   enum is simply unavailable (there is nowhere to put the `NUMBER`, the `Money`, the `DATE`), and
+   the choice is between a sentinel value in the payload type and a tagged union. Both are
+   **modelling** decisions; see bucket 5.
+
+Question 1 alone gives the wrong answer for payload-carrying results — it says "fold" for the
+Charities penalties, whose absence the statute plainly names, while the paragraph above correctly
+says that fold "belongs in review, not in a tidy-up". Five buckets, all with real examples:
+
+Note before the list which of them are even in scope. This section is titled "decision results (the
+return type)", and **only buckets 2 and 5 are return positions.** Buckets 1, 3 and 4 are parameters
+and record fields — they are here because they are what the rule gets mistakenly applied to, not
+because they are cases it decides.
+
+**1. An input you may not have been given** — parameter position. `Cause for extension` in the
+worked example above. This is by far the biggest population: 119 `IS A[N] MAYBE` occurrences in
+field/parameter position repo-wide, against 62 in return position. The rule does not touch any of
+them.
+
+**2. A lookup or a parse that can genuinely miss** — return position, and the one bucket in this
+list that is a genuine counter-case to the rule at the top. `lookup` / `dictLookup`
+(`jl4-core/libraries/prelude.l4`) is the canonical case — a key that is not there is not an
+_outcome_. Likewise `Date` from a `STRING` (`jl4-core/libraries/daydate.l4`), `minimum`/`maximum`
+over a possibly-empty list, and the domain-restricted `ln`/`sqrt`/`asin` in
+`jl4-core/libraries/math.l4`.
+
+**3. An optional record field** — field position, not a return type.
+`jl4/examples/legal/ceo-performance-award.l4`:
+
+```l4
+DECLARE `Tranche Status` HAS
+    `Tranche Number`        IS A NUMBER
+    `Is Earned`             IS A BOOLEAN
+    `Earn Date`             IS A MAYBE DATE                 -- unearned tranche has no earn date
+    `Vesting Category`      IS A MAYBE `Vesting Category`   -- ... and no category yet
+```
+
+`Vesting Category` is a genuine two-member legal taxonomy
+(`Seven And Half Year Earned Shares` / `Ten Year Earned Shares`). Inventing a third member
+`` `not yet earned` `` to make the field total would pollute the statute's classification with a
+bookkeeping state the source never contemplated — the opposite of fidelity.
+
+**4. `MAYBE BOOLEAN` as _undecided_** — the epistemic third state, not an outcome. Note that here
+too the `MAYBE` is in **parameter** position; every function in the library returns
+`GIVETH A BOOLEAN`. `jl4-core/libraries/negation-as-failure.l4` is built on it:
+
+```l4
+-- JUST TRUE   proven true
+-- JUST FALSE  proven false
+-- NOTHING     no proof either way (the open question / the default)
+GIVEN p IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+holds p MEANS fromMaybe FALSE p      -- closed-world: absence of proof is FALSE
+```
+
+Here `NOTHING` means "not yet settled", and the closed- vs open-world default (`holds` vs
+`presumed`) is the whole point of the library. Folding it into an enum would collapse the
+distinction the library exists to draw.
+
+**5. The source names the absent outcome _and_ the present outcome carries a payload** — return
+position, and the case question 1 alone gets wrong. `MAYBE Part6Penalty`, `MAYBE Money`,
+`MAYBE DATE`: the statute names "no offence" / "no award" / "no deadline", so question 1 says fold,
+but a nullary `IS ONE OF` has nowhere to put the penalty, the amount or the date. Three shapes, none
+of them a tidy-up:
+
+- **Leave the `MAYBE`.** Honest, costs nothing today, and is what all four Charities occurrences do.
+  The default when nobody is asking for the export.
+- **A sentinel value in the payload type** — `` `the absence of a penalty` `` with imprisonment `0`.
+  Cheapest to write, but it asserts that "no offence" and "an offence with a nil penalty" are the
+  same value, which is a claim about the statute. Costed in detail above for Part 6.
+- **A tagged union** — `` `no liability` | `liable` HAS `the penalty` IS A Part6Penalty ``. The only
+  shape that both names the absence and keeps the payload typed, and the one to reach for when the
+  distinction matters. It does not improve the DMN export (FEEL has no sum type), so choose it for
+  the L4-side modelling, not for the exporter.
+
+Whichever you pick, it is a **modelling** decision and goes through review.
+
+One more that looks like a decision result but is not: `MAYBE` as a **selection** predicate feeding
+`mapMaybe` — `IF pg's snd THEN JUST (pg's fst) ELSE NOTHING`, the `satisfied grounds` idiom under
+"Provenance, repeal, aggregation" below. That is a filter, not an outcome.
+
+---
+
 ## Dates
 
 ### Leap-safe date windows — build from the actual dates, never hardcode 365
@@ -195,6 +429,8 @@ calendar handles leap years; a magic `365` does not.
 >
 > - **ADD** N months to the _earlier_ date (`DATE_MONTH earlier PLUS N`) and compare, or
 > - go back a whole year via `DATE_YEAR … MINUS 1` (which can never produce `month ≤ 0`, so the clamp never fires).
+>
+> **`YMD year month day` does NOT inherit this — it refuses instead.** `YMD 2025 (3 MINUS 6) 1` stops on the refusal binding rather than clamping. So this footgun, and the ADD-to-the-earlier-date workaround below, are about `Date` — which remains the right constructor when you _want_ rolling month arithmetic. Use `YMD` for literals.
 >
 > (Same footgun is catalogued in [gotchas.md](gotchas.md) under "The `daydate` month-subtraction footgun".)
 

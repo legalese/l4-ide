@@ -8,8 +8,8 @@
 
 Every atomic ingredient of the §6 construction is established prior art and must be
 **conceded by name**. The defensible novelty is the **composition** + the
-**jurisprudential reading**. The recommended posture — *concede generously, claim
-narrowly, unify* — is itself the strongest defense against a hostile JURIX reviewer.
+**jurisprudential reading**. The recommended posture — _concede generously, claim
+narrowly, unify_ — is itself the strongest defense against a hostile JURIX reviewer.
 Calibration: **no claim is clean-novel**; every one is "partially-anticipated-at-risk."
 C1 and C6-mechanism are near-EXACT anticipations.
 
@@ -19,7 +19,7 @@ C1 and C6-mechanism are near-EXACT anticipations.
   **planning landmark** (Hoffmann, Porteous & Sebastia 2004; landmark = fact/action on
   every solution plan; the PSPACE proof = "remove all achievers ⇒ goal unreachable" =
   minimal cut/dominator) and **LM-cut** (Helmert & Domshlak 2009), over **Lengauer–
-  Tarjan 1979** dominators. *Closeness 5/5.* Keep only: reading this party-neutral
+  Tarjan 1979** dominators. _Closeness 5/5._ Keep only: reading this party-neutral
   necessity as deontic MUST (MAY=EF, MUST=AG-domination). DISAMBIGUATE from Horty's
   decision-theoretic "dominance" (homonym) and from LAMA "reasonable orderings."
 - **C2 (party-indexed ordering ∘ dominator).** CONCEDE both halves: party-indexed
@@ -32,8 +32,8 @@ C1 and C6-mechanism are near-EXACT anticipations.
   ⇒ weight shifts to C3.)
 - **C3 (⪯_law vs ⪯_p divergence = Holmes/Hart). STRONGEST SURVIVOR.** CONCEDE the
   Hart-half formal precedent: **Silk 2019** already renders Hart's internal/external
-  (and Raz's committed/detached) as *which ordering-source variable the modal reads
-  against*, with divergence carrying the load and internal-POV = adopting the law's
+  (and Raz's committed/detached) as _which ordering-source variable the modal reads
+  against_, with divergence carrying the load and internal-POV = adopting the law's
   variable. Keep (claim this): (1) ⪯_p as a **descriptive behaviour-PREDICTOR**
   (Holmes's bad man), not an endorsement set; (2) **ONE divergence being BOTH** Holmes
   (diverge) and Hart (collapse); (3) composition with the dominator-necessity;
@@ -86,8 +86,8 @@ C1 and C6-mechanism are near-EXACT anticipations.
   full text, Bénabou–Tirole body, Broersen DEON 2006 reduction, von Fintel–Iatridou via
   Condoravdi–Lauer). Verify before relying on fine distinctions.
 - **INTEGRITY — RESOLVED (2026-06-25):** "Superintelligence and Law" is REAL and now a
-  CITED neighbour. Correct attribution: **Noam Kolt** (sole author), *Harvard J. of Law
-  & Technology* (forthcoming), draft 25 Feb 2026 — NOT "Kolt et al.", NOT Anthropic.
+  CITED neighbour. Correct attribution: **Noam Kolt** (sole author), _Harvard J. of Law
+  & Technology_ (forthcoming), draft 25 Feb 2026 — NOT "Kolt et al.", NOT Anthropic.
   Its Part III.A pairs Austin/Holmes(bad-man, instrumental) vs Hart(internal point of
   view, normative) and ties the internal POV to letter-vs-**spirit** — a C3/§1 framing
   neighbour (not a formal anticipation). See `notes/kolt-2026-superintelligence-and-law.md`.

@@ -18,10 +18,15 @@
  * (`elicitationOverrideFromQueryPlan`) and App evaluation via `evalApp` ride on later steps; the
  * hooks (`l4Connection`, `verDocId`) are already threaded so they can land without a reshape.
  */
-import type { FunDecl as VizFunDecl, VersionedDocId } from '@repo/viz-expr'
+import type {
+  FunDecl as VizFunDecl,
+  Unique,
+  VersionedDocId,
+} from '@repo/viz-expr'
 import { fromVizFunDecl, verdictFor, defaultViewSpec } from '@repo/ladder-core'
 import type {
   DecodedViz,
+  IRExpr,
   NodeId,
   UBoolValue,
   Verdict,
@@ -63,6 +68,8 @@ export class LadderModel {
   #foldSet = new Set<NodeId>()
   #evalResult: EvalResult | null = null
   #analysis: PartialEvalAnalysis | null = null
+  /** Built once, lazily, by `getLabelForUnique`. */
+  #labelByUnique: Map<Unique, string> | null = null
 
   constructor(funDecl: VizFunDecl, deps: LadderModelDeps) {
     this.decoded = fromVizFunDecl(funDecl)
@@ -101,12 +108,74 @@ export class LadderModel {
     return true
   }
 
-  /** Set a leaf to an explicit value (used by the sidebar's bindings). */
+  /** Set a leaf to an explicit value, addressed POSITIONALLY — this is the direction a
+   *  click on the picture arrives in, and the node→Unique lookup is what fans one binding
+   *  out to every drawn position of a repeated atom (R2). */
   setValue(nodeId: NodeId, value: UBoolValue): boolean {
     const unique = this.decoded.uniqueByNode.get(nodeId)
     if (unique === undefined) return false
     this.#assignment.set(unique, toUBoolVal(value))
     return true
+  }
+
+  /**
+   * Set an atom by `Unique` — the space the sidebar assigns in.
+   *
+   * NOTE this is deliberately NOT an R2 fan-out over `nodesByUnique`. The assignment is
+   * ALREADY Unique-keyed (see `cycleValue` / `setValue` above, which exist precisely to
+   * translate the other way), and the evaluator spreads one binding to every drawn position
+   * by itself. Writing the same key once per node would be harmless and would tell the next
+   * reader something false about how `#assignment` is keyed.
+   *
+   * An unknown `Unique` is accepted rather than rejected: the assignment is dense over the
+   * atoms that exist, and a stray key simply never gets read.
+   */
+  setValueForUnique(unique: Unique, value: UBoolValue): void {
+    this.#assignment.set(unique, toUBoolVal(value))
+  }
+
+  /**
+   * The label to show for an atom, for the sidebar's buckets.
+   *
+   * The LIR had `#uniqueToLabel` built during graph construction; the decoded tree has no
+   * label index — `DecodedViz` carries uniqueByNode / nodesByUnique / atomIdByNode /
+   * nodesByAtomId and no labels — so build one lazily off `decoded.fn` and keep it. First
+   * drawn position wins, which is not a coin-flip: a repeated proposition has ONE Unique,
+   * and the wire gives every occurrence of it the same label.
+   *
+   * Falls back to `#<unique>` rather than throwing: a Unique can reach here from the
+   * analysis for an atom the drawn tree does not contain (an `App`'s arguments, say), and a
+   * sidebar row with an ugly name beats a crash.
+   */
+  getLabelForUnique(unique: Unique): string {
+    if (!this.#labelByUnique) {
+      const m = new Map<Unique, string>()
+      const walk = (e: IRExpr): void => {
+        switch (e.$type) {
+          case 'And':
+          case 'Or':
+            e.args.forEach(walk)
+            return
+          case 'Not':
+            walk(e.negand)
+            return
+          case 'Implies':
+            walk(e.scope)
+            walk(e.requirement)
+            return
+          case 'InertE':
+            return
+          default:
+            // `leaf.unique !== undefined ⟺ leaf ∈ nodesByUnique` (ladder-core types.ts) —
+            // set for UBoolVar only, which is exactly the set the sidebar can bind.
+            if (e.unique !== undefined && !m.has(e.unique))
+              m.set(e.unique, e.label)
+        }
+      }
+      walk(this.decoded.fn.body)
+      this.#labelByUnique = m
+    }
+    return this.#labelByUnique.get(unique) ?? `#${unique}`
   }
 
   toggleFold(nodeId: NodeId): void {

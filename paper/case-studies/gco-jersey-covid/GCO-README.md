@@ -3,22 +3,22 @@
 **Audience:** Matthew Waddington (primary), and anyone who shared his concerns about
 encoding legislation and subordinate instruments as executable rules.
 
-**Subject matter:** *Covid-19 (Gathering Control) (Jersey) Order 2020* (R&O.166/2020
+**Subject matter:** _Covid-19 (Gathering Control) (Jersey) Order 2020_ (R&O.166/2020
 as amended; last in force before repeal), encoded in L4 next to parallel files for
 the first enacted text and a mid-chain consolidation.
 
 **Companion sources (this workspace):**
 
-| File | Scope |
-| --- | --- |
-| `GCO-first-version.l4` | First enacted text (flat 10-person cap) |
-| `GCO-as-at-20210115.l4` | Mid-chain consolidation (indoor/outdoor split; pre–last amendment tail) |
-| `GCO-as-repealed.l4` | As last in force before repeal (indoor 10 / outdoor 20; Art.5 wedding/funeral caps) |
+| File                    | Scope                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `GCO-first-version.l4`  | First enacted text (flat 10-person cap)                                             |
+| `GCO-as-at-20210115.l4` | Mid-chain consolidation (indoor/outdoor split; pre–last amendment tail)             |
+| `GCO-as-repealed.l4`    | As last in force before repeal (indoor 10 / outdoor 20; Art.5 wedding/funeral caps) |
 
 Official page (historical): <https://www.jerseylaw.je/laws/current/ro_166_2020>
 
 **Status of this report:** frank after-action note, not a prospectus. Where the
-stack helps, we say so. Where the problem is hard because *any* formalisation of
+stack helps, we say so. Where the problem is hard because _any_ formalisation of
 law is hard, we say so too.
 
 ---
@@ -29,12 +29,12 @@ The Gathering Control Order (GCO) is a small, self-contained subordinate
 instrument with:
 
 - a short interpretation / ontology (gatherings, premises, classes of person);
-- numerical thresholds that *changed under amendment*;
+- numerical thresholds that _changed under amendment_;
 - defeasible exceptions (school groups; weddings / civil partnerships / funerals;
   work);
 - pure prohibitions (`must not take part` / `must not allow`);
 - criminal offences with a fixed maximum fine;
-- two named *force majeure*-style residual defences that deliberately ship open
+- two named _force majeure_-style residual defences that deliberately ship open
   texture out to external guidance (critical workers) or a very concrete factual
   class (Visit Jersey industrial tour escorts).
 
@@ -44,17 +44,17 @@ from "rules as code":
 1. **Isomorphism** — can a lawyer audit the encoding against the statute clause by
    clause, rather than reverse-engineering a black-box spreadsheet?
 2. **Amendment honesty** — when the 10-person cap became 20 outdoors and stayed 10
-   indoors, does the formalisation show the *diff*, not just a rewritten monolith?
+   indoors, does the formalisation show the _diff_, not just a rewritten monolith?
 3. **Open texture** — do we pretend critical-worker status is computeable from first
    principles, or do we leave a typed hole that evaluation must fill?
-4. **Constitutive vs regulative weight** — "must not" here is mostly *conduct that
-   is an offence if*…, not a multi-stage commercial duty with successive HENCE
+4. **Constitutive vs regulative weight** — "must not" here is mostly _conduct that
+   is an offence if_…, not a multi-stage commercial duty with successive HENCE
    branches. Does the tool force the wrong model, or allow the light one?
-5. **Drafter authority** — can people who write Orders of this kind *own* the
+5. **Drafter authority** — can people who write Orders of this kind _own_ the
    model eventually, or only receive it as a gift from programmers?
-6. **Explainability** — when a case is evaluated, can you see *why* Art.3 fired?
+6. **Explainability** — when a case is evaluated, can you see _why_ Art.3 fired?
 
-What this Order does *not* ask us to do is also informative: there is little
+What this Order does _not_ ask us to do is also informative: there is little
 temporal process (no "within 14 days deliver…"), almost no multi-party choreography,
 and no secondary legislation tables deep enough to need a full decision-table
 notation. So the GCO is a **level-1** (ontology + boolean decisions + numeric
@@ -75,7 +75,7 @@ From the text we extracted three layers:
    outdoor; school-group flag; wedding/funeral ceremony roles and guest counts;
    public accessibility of premises; who is "responsible"; the two residual
    status flags.
-2. **Constitutive regimes** (Arts.3–7): when a gathering *is* restricted; when a
+2. **Constitutive regimes** (Arts.3–7): when a gathering _is_ restricted; when a
    responsible person is under a must-not-allow duty.
 3. **Offence and penalty** (Art.9): taking part / allowing when the duty bites,
    subject to the named defences; level-2 fine (= £1,000 under the standard scale
@@ -90,13 +90,13 @@ not a software invention; it is the Interpretation article made tabular.
 We declared:
 
 - `Gathering` — Art.3 world (headcount + indoor/outdoor + exception flags
-  + ceremony officer/guest split for Art.5).
+  - ceremony officer/guest split for Art.5).
 - `PubliclyAccessiblePremisesGathering` — Art.7 world (indoor headcount on public
   premises + responsibility + allow/support fact).
 - `Participant` / `ResponsiblePerson` — carry the residual force-majeure leaves.
 - Situation records that pair a gathering with an actor for the offence questions.
 
-**Finding:** keeping Art.3 and Art.7 as *different* records (rather than one giant
+**Finding:** keeping Art.3 and Art.7 as _different_ records (rather than one giant
 "Event" type with many optional fields) mirrors the Order's own split. Optional
 soup is how encodings become unreadable.
 
@@ -127,7 +127,7 @@ fail Matthew's review test the first time a reader tries to line-match the Order
 
 Critical-worker force majeure and the Visit Jersey industrial tour defence are
 boolean inputs, with `@desc` prose quoting (or paraphrasing) the Order's own
-reference to external guidance / factual class. Evaluation never *guesses* them.
+reference to external guidance / factual class. Evaluation never _guesses_ them.
 
 **Finding:** this is the honest answer to "how do you encode open texture?". You
 don't. You type the residual and force every caller — human form, test case, or
@@ -141,7 +141,7 @@ majeure leaf. Art.7 offence: must-not-allow duty, person allowed it, not under t
 tour-guide leaf. Art.9 fine is a trivial level-2 constant once an offence bit is
 true.
 
-**Finding:** criminal "commits if" is a *constitutive* pattern on top of a
+**Finding:** criminal "commits if" is a _constitutive_ pattern on top of a
 prohibitive fact pattern. We did **not** force a full `PARTY … MUST … WITHIN …
 HENCE … LEST …` process model. Light encodings should stay light; L4 allows both
 weights (see §5.2).
@@ -151,11 +151,11 @@ weights (see §5.2).
 Rather than one "always current" file with comments narrating history, we kept
 **three isomorphic skeletons** (first enacted, mid-chain, last-in-force) with
 `-- DIFF:` markers where numeric roofs and Art.5 structure moved. Tests include
-the cases that *switch outcome* under amendment (e.g. outdoor gathering of 11:
+the cases that _switch outcome_ under amendment (e.g. outdoor gathering of 11:
 prohibited first-enacted; lawful under the last outdoor-20 rule).
 
 **Finding:** git history alone is not a legislation story. Drafters review by
-comparing *versions of the regime*, not commits. Parallel files plus DIFF markers
+comparing _versions of the regime_, not commits. Parallel files plus DIFF markers
 are the lowest ceremony way to honour that without building a consolidator.
 
 ### Step 7 — Golden cases before cleverness
@@ -163,7 +163,7 @@ are the lowest ceremony way to honour that without building a consolidator.
 Each file ends with concrete gatherings and paired `#ASSERT` / `#EVAL` style checks:
 
 - indoor 11 ordinary → restricted / offence liable (absent defence);
-- outdoor 11 ordinary → outcome *depends on version*;
+- outdoor 11 ordinary → outcome _depends on version_;
 - outdoor 21 ordinary → restricted under last-in-force;
 - school group over size → exception saves;
 - wedding respecting officer+guest roof → exception saves; exceeding roof does not;
@@ -171,7 +171,7 @@ Each file ends with concrete gatherings and paired `#ASSERT` / `#EVAL` style che
 - Art.7 public premises indoor 11 allowed by responsible person → offence unless
   tour-guide leaf.
 
-**Finding:** the tests are the *specificity of the encoding's claim*. Without them,
+**Finding:** the tests are the _specificity of the encoding's claim_. Without them,
 "we encoded Art.3" is marketing.
 
 ### Step 8 — Export the questions a non-author would ask
@@ -194,7 +194,7 @@ a form or an agent remains a research artefact.
 
 ## 3. Interesting findings along the way
 
-### 3.1 The Order's english already nearly *is* a decision procedure
+### 3.1 The Order's english already nearly _is_ a decision procedure
 
 Read Art.3 with Arts.4–6: size exceedance, then carve-outs. There is almost no
 hidden control flow. Once thresholds and exception predicates are named, the L4
@@ -203,8 +203,8 @@ hypothesis that **good legislative structure is half the formalisation**.
 
 ### 3.2 The costly part is ontology, not connectives
 
-"Indoor more than 10" is trivial boolean arithmetic. Getting *wedding pot
-officers vs guests vs total* right so that Art.5's later roof (officers + guests
+"Indoor more than 10" is trivial boolean arithmetic. Getting _wedding pot
+officers vs guests vs total_ right so that Art.5's later roof (officers + guests
 ≤ 20 both indoors and out in the last text) attaches to the right numbers is where
 time went. Same story as every RaC pilot: **types and facts beat logic**.
 
@@ -218,7 +218,7 @@ booleans would have been a silent bug farm.
 ### 3.4 Parallel versions beat "one file with comments"
 
 The outdoor-11 case is the existence proof. First-enacted and last-in-force
-*disagree*. Keeping both as living files makes the disagreement executable rather
+_disagree_. Keeping both as living files makes the disagreement executable rather
 than narrative. A consolidating engine can come later; isomorphism and tests come
 first.
 
@@ -226,7 +226,7 @@ first.
 
 L4 can express stateful obligations with event traces. The GCO's "must not take
 part" is better as a boolean duty-fact. Ramming it into a process model would have
-been tool-worship. Matching *weight of formal machinery to weight of the source*
+been tool-worship. Matching _weight of formal machinery to weight of the source_
 is itself a modelling skill — and a place Matthew's critique of over-engineered
 RaC tools remains fair when ignored.
 
@@ -240,16 +240,16 @@ without a legend. That is L4-surface design, not "we have VS Code".
 
 The critical-worker defence cites guidance published by the Minister. The Visit
 Jersey tour-guide defence is almost a joke-length factual class. Both belong in
-the model as *booleans*. Neither is deduced from the rest of the Order by pure
+the model as _booleans_. Neither is deduced from the rest of the Order by pure
 logic. Any claim that an encoding
 "decides GCO compliance end-to-end without human residual input" is false for this
 Order — and should be said out loud.
 
-### 3.8 Visualiser-level propositional form is a strict *projection* of this model
+### 3.8 Visualiser-level propositional form is a strict _projection_ of this model
 
 Strip the record fields to already-filled booleans and the offence tree collapses
 purely into the L4 Visualiser / VizExpr propositional fragment Matthew asked for as
-an interchange IR. The full encoding is the same logic with *arguments* restored:
+an interchange IR. The full encoding is the same logic with _arguments_ restored:
 the "(g)" after each predicate. That ladder is the pedagogy (§7).
 
 ---
@@ -258,31 +258,31 @@ the "(g)" after each predicate. That ladder is the pedagogy (§7).
 
 Three columns, kept honest:
 
-| Concern | Mostly any formal language + IDE | Distinctively L4 / legal CNL design | Still open |
-| --- | --- | --- | --- |
-| Machine-check that the encoding is well-formed | **Yes** (parse, typecheck, run asserts) | Prose-shaped errors help a little | — |
-| Diffable history of the encoding under amendment | **Yes** (git + parallel files) | § skeleton matching statute numbering | Automatic consolidation from gazette events |
-| Search / rename of a defined notion everywhere | **Yes** (LSP go-to-def, rename) | Backtick multi-word names match legislative labels | — |
-| Golden cases re-run on every change | **Yes** | — | Choosing *legally* interesting golden cases is craft |
-| Side-by-side statute PDF and rule | **Yes** (split editor) | — | Automatic pin of clause → § still manual |
-| Audit "line X of encoding = Art.N of Order" | Partial (comments, names) | **Yes** — §, mixfix names, operator vocabulary | Automatic line-level backlinks |
-| Ontology = interpretation section | Partial (any records) | **Yes** — `DECLARE`/`MEANS` reading order, computed defined terms | Teaching drafters *to* write it (§7) |
-| Open texture as residual | Possible in any language | **Yes** — typed params + `@desc` as schema | Capturing real guidance corpora |
-| Decide vs simulate over time | N/A for GCO | Full deontic process available when source needs it | Choosing the right weight every time |
-| Explain a yes/no answer | Partial (`#EVALTRACE`) | Ladder / VizExpr propositional projection | Automatic NL judgements a Court would accept |
-| Deployable form / agent API | Any web wrapper | **Yes** — `@export` → OpenAPI/MCP in the same file | Auth, operational governance |
-| Non-programmer *authors* the rule | **No** (IDE alone is not enough) | CNL surface reduces friction | **The hard open problem** (§6) |
-| Portable mon language across tools | No single tool attribution | VizExpr / "L4-lite" propositional IR aimed at this | Community adoption |
-| The law is complete "on the chip" without residual judgement | **No** | **No** | Unsolvable in the general open-texture case |
+| Concern                                                      | Mostly any formal language + IDE        | Distinctively L4 / legal CNL design                               | Still open                                           |
+| ------------------------------------------------------------ | --------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| Machine-check that the encoding is well-formed               | **Yes** (parse, typecheck, run asserts) | Prose-shaped errors help a little                                 | —                                                    |
+| Diffable history of the encoding under amendment             | **Yes** (git + parallel files)          | § skeleton matching statute numbering                             | Automatic consolidation from gazette events          |
+| Search / rename of a defined notion everywhere               | **Yes** (LSP go-to-def, rename)         | Backtick multi-word names match legislative labels                | —                                                    |
+| Golden cases re-run on every change                          | **Yes**                                 | —                                                                 | Choosing _legally_ interesting golden cases is craft |
+| Side-by-side statute PDF and rule                            | **Yes** (split editor)                  | —                                                                 | Automatic pin of clause → § still manual             |
+| Audit "line X of encoding = Art.N of Order"                  | Partial (comments, names)               | **Yes** — §, mixfix names, operator vocabulary                    | Automatic line-level backlinks                       |
+| Ontology = interpretation section                            | Partial (any records)                   | **Yes** — `DECLARE`/`MEANS` reading order, computed defined terms | Teaching drafters _to_ write it (§7)                 |
+| Open texture as residual                                     | Possible in any language                | **Yes** — typed params + `@desc` as schema                        | Capturing real guidance corpora                      |
+| Decide vs simulate over time                                 | N/A for GCO                             | Full deontic process available when source needs it               | Choosing the right weight every time                 |
+| Explain a yes/no answer                                      | Partial (`#EVALTRACE`)                  | Ladder / VizExpr propositional projection                         | Automatic NL judgements a Court would accept         |
+| Deployable form / agent API                                  | Any web wrapper                         | **Yes** — `@export` → OpenAPI/MCP in the same file                | Auth, operational governance                         |
+| Non-programmer _authors_ the rule                            | **No** (IDE alone is not enough)        | CNL surface reduces friction                                      | **The hard open problem** (§6)                       |
+| Portable mon language across tools                           | No single tool attribution              | VizExpr / "L4-lite" propositional IR aimed at this                | Community adoption                                   |
+| The law is complete "on the chip" without residual judgement | **No**                                  | **No**                                                            | Unsolvable in the general open-texture case          |
 
 ### Bottom line of the scorecard
 
-- **About half** of the *engineering* difficulties dissolve once you accept *any*
+- **About half** of the _engineering_ difficulties dissolve once you accept _any_
   formal language with a real editor, type checker, tests, and version control.
 - **About a quarter** are improved specifically by L4's legal surface (statute
   isomorphism, ontology syntax, deontic option when wanted, export annotations).
 - **About a quarter** remain open because they are not tooling problems: open
-  texture residual to non-formal sources; *authorship* by people who rightly
+  texture residual to non-formal sources; _authorship_ by people who rightly
   refuse to become programmers; institutional process around amendment
   consolidations; and the general truth that mapping English law into crystalline
   logic is a modelling craft, not a button.
@@ -311,7 +311,7 @@ not "we discovered version control".
 
 ## 6. What L4 (or a peer legal CNL) still buys you
 
-These are *not* free with "Python in VS Code" or "Prolog with a bare editor":
+These are _not_ free with "Python in VS Code" or "Prolog with a bare editor":
 
 1. **Statute-isomorphic surface.** Section markers, multi-word identifiers, legal
    operators, exception-shaped boolean definitions. A reviewer can walk Art.3 in the
@@ -320,7 +320,7 @@ These are *not* free with "Python in VS Code" or "Prolog with a bare editor":
    the same intellectual objects as defined terms and exclusive enumerations, voiced
    for legal writers rather than PL academics.
 3. **Two regulatory weights, one language.** Light constitutive "must-not / if" (GCO)
-   *and* process standards with deadlines/traces when the source reaches for them
+   _and_ process standards with deadlines/traces when the source reaches for them
    (leases, SAFEs, delivery clauses). The GCO encoding deliberately stayed light;
    the heavier machinery was not deleted from the language to make the light path work—
    both exist.
@@ -329,13 +329,13 @@ These are *not* free with "Python in VS Code" or "Prolog with a bare editor":
    file is both the auditable artefact and the service contract. That bridging is
    where many RaC tools force a second disconnected layer.
 5. **A propositional intermediate aimed at portability.** The L4 Visualiser /
-   VizExpr layer is intentionally *not* "full L4 syntax". It is close to the
+   VizExpr layer is intentionally _not_ "full L4 syntax". It is close to the
    L4-lite propositional IR Matthew has asked for so that other legal DSLs can
    target shared visual and evaluation tools. That is product architecture, not
    language fandom.
 
-None of this makes *programming easy for non-programmers*. It makes formalisation
-*less insulting* to legal readers, which is a different and smaller claim.
+None of this makes _programming easy for non-programmers_. It makes formalisation
+_less insulting_ to legal readers, which is a different and smaller claim.
 
 ---
 
@@ -345,19 +345,19 @@ None of this makes *programming easy for non-programmers*. It makes formalisatio
 
 "Making programming easy for people who are not programmers" is not literally
 NP-complete in the Cook–Levin sense. It is, however, a problem whose difficulty
-has the same *shape* as intractable problems that people casually call NP-complete
+has the same _shape_ as intractable problems that people casually call NP-complete
 when they mean "we will not find a general cheap solution":
 
-- the target users are domain *experts* — they *should* resist false simplification;
+- the target users are domain _experts_ — they _should_ resist false simplification;
 - every layer of sugar that hides structure also hides mistakes;
 - every layer of exposure of structure reintroduces "this looks like code";
 - human language and judgement occupy residual cells no type system erases;
-- the skill of choosing *what* to free-parameterise is the skill of legal
+- the skill of choosing _what_ to free-parameterise is the skill of legal
   analysis itself.
 
 So: **we will not "solve" non-programmer programming by inventing one more surface
-syntax.** We can *lower the rung of the first ladder* and *rename the rungs into
-vocabulary drafters already trust*. That is the only defensible promise.
+syntax.** We can _lower the rung of the first ladder_ and _rename the rungs into
+vocabulary drafters already trust_. That is the only defensible promise.
 
 ### 7.2 The Pedagogy we believe matches Matthew's review criteria
 
@@ -367,28 +367,28 @@ Closed atomic claims connected by AND / OR / NOT / IF. No variables. This is
 already within reach of careful policy readers after a short demo.
 
 **Level 1 — The next baby step (types as defined terms; predicates as completable
-sentences).** *This is the GCO encoding's native level.*
+sentences).** _This is the GCO encoding's native level._
 
 Build only from what drafters already master:
 
-| They already know | Bridge phrase | Formal object |
-| --- | --- | --- |
-| Defined terms | "write the interpretation schedule as a *form*" | type / record |
-| Repeated nouns used consistently | "every slot on the form must be filled when the rule applies" | fields |
-| *a* then *the* | "open a form instance; then refer back to it" | binding / parameter |
-| Persons vs premises vs officers | "different kinds of card; you cannot put a venue where a person goes" | distinct types |
-| Exclusive classifications (indoor/outdoor) | "choose one of these labels" | sum types |
-| Counts-as | "when these facts hold, the law *treats it as* a restricted gathering" | constitutive predicate |
-| Act / omission | "someone *did* X / *failed to* Y" | fact predicates |
-| Must / must not / may | "what the rule requires of a person *given* the form is filled" | deontic / duty-fact predicates |
-| Validity / availability of a defence or exception | a separate job-application form, not a special magic bit | boolean residual + named gate |
+| They already know                                 | Bridge phrase                                                          | Formal object                  |
+| ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------ |
+| Defined terms                                     | "write the interpretation schedule as a _form_"                        | type / record                  |
+| Repeated nouns used consistently                  | "every slot on the form must be filled when the rule applies"          | fields                         |
+| _a_ then _the_                                    | "open a form instance; then refer back to it"                          | binding / parameter            |
+| Persons vs premises vs officers                   | "different kinds of card; you cannot put a venue where a person goes"  | distinct types                 |
+| Exclusive classifications (indoor/outdoor)        | "choose one of these labels"                                           | sum types                      |
+| Counts-as                                         | "when these facts hold, the law _treats it as_ a restricted gathering" | constitutive predicate         |
+| Act / omission                                    | "someone _did_ X / _failed to_ Y"                                      | fact predicates                |
+| Must / must not / may                             | "what the rule requires of a person _given_ the form is filled"        | deontic / duty-fact predicates |
+| Validity / availability of a defence or exception | a separate job-application form, not a special magic bit               | boolean residual + named gate  |
 
 Teaching line we are willing to stand behind:
 
-> You are not inventing *variables*. You are writing the *interpretation schedule
-> as the form the paper rule already implies*. *A gathering* opens a form.
-> *The gathering* points back at that form. A predicate is a *completeable
-> sentence* — Level 0 boxes were *closed* sentences; Level 1 opens the slots.
+> You are not inventing _variables_. You are writing the _interpretation schedule
+> as the form the paper rule already implies_. _A gathering_ opens a form.
+> _The gathering_ points back at that form. A predicate is a _completeable
+> sentence_ — Level 0 boxes were _closed_ sentences; Level 1 opens the slots.
 
 **Level 2 — Relations across multiple forms.** Person servee × gathering. Still
 first-order, still contiguous with draftsmanship of multi-party provisions.
@@ -402,7 +402,7 @@ that residual ministerial guidance will be auto-resolved by the language.
 
 ### 7.3 Institutional / product openings still on the table
 
-- Guided *form builders* that emit Level-1 L4 (or VisExpr-plus-arguments) without
+- Guided _form builders_ that emit Level-1 L4 (or VisExpr-plus-arguments) without
   showing source until the author opts in.
 - Automatic "this test case flipped under the outdoor-20 amendment" reports when
   two version files share the same golden suite.
@@ -421,12 +421,12 @@ Yes. It has been. The encoding type-checks, evaluates, and carries golden cases
 that document amendment deltas.
 
 **Does that prove L4 is necessary?**  
-No. Any careful formal language could encode the *decision procedure*. L4 (or a peer
-legal CNL) is what makes the encoding *reviewable as something that still looks
-like the Order*.
+No. Any careful formal language could encode the _decision procedure_. L4 (or a peer
+legal CNL) is what makes the encoding _reviewable as something that still looks
+like the Order_.
 
 **Does VS Code solve non-programmer authorship?**  
-No. It solves *manufacture, checking, search, and evaluation*. Authorship remains
+No. It solves _manufacture, checking, search, and evaluation_. Authorship remains
 a craft plus a pedagogy. Telling people otherwise is how RaC pilots lose trust.
 
 **Did you fully automate compliance decisions for Jersey at the material time?**  
@@ -444,7 +444,7 @@ No — and treating it as a language-syntax contest will keep failing. The
 defensible path is Level-0 propositional boxes → Level-1 forms and completeable
 sentences named in legislative English → optional Level-3 processes. L4 already
 sits comfortably under Levels 1 and 3; Level 0 is the Visualiser / VizExpr
-projection. The remaining work is *bridges and vocabulary*, not more operators.
+projection. The remaining work is _bridges and vocabulary_, not more operators.
 
 **So what was won?**  
 An auditable, versioned, residual-honest, test-backed model of a real Jersey
@@ -486,6 +486,5 @@ programming easy", it fails for the reason every careful formaliser already know
 
 ---
 
-*L4 encoding and report prepared in the Legalese / L4 workspace. Not legal
-advice; encoding for analytical illustration of a repealed subordinate instrument.*
-
+_L4 encoding and report prepared in the Legalese / L4 workspace. Not legal
+advice; encoding for analytical illustration of a repealed subordinate instrument._

@@ -74,6 +74,8 @@
     "@dagrejs/dagre": "^1.1.4",
     "jl4-client-rpc": "*",
     "@repo/boolean-analysis": "*",
+    "@repo/ladder-core": "*",
+    "@repo/ladder-svg": "*",
     "@repo/layout-ir": "*",
     "@repo/type-utils": "*",
     "@repo/viz-expr": "*",

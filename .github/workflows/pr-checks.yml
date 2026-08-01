@@ -31,6 +31,8 @@ jobs:
       typescript: ${{ steps.filter.outputs.typescript }}
       docs: ${{ steps.filter.outputs.docs }}
       mlir: ${{ steps.filter.outputs.mlir }}
+      dmn: ${{ steps.filter.outputs.dmn }}
+      bpmn: ${{ steps.filter.outputs.bpmn }}
     steps:
       # For merge_group AND push, paths-filter diffs base_sha..head_sha via git,
       # so the repo must be checked out with history. Without this, push events
@@ -56,11 +58,29 @@ jobs:
               - '**/*.ts'
               - '**/*.tsx'
               - '**/*.js'
+              # '**/*.js' does NOT match '.mjs'. etc/ is full of .mjs checkers
+              # and, before this entry, a PR touching only them ran ZERO jobs —
+              # including the typescript job that hosts `prettier --check .`,
+              # so even the format gate on those files was unreachable and an
+              # unformatted file would merge here and break the next PR that
+              # happened to touch a .ts file.
+              - '**/*.mjs'
+              - 'etc/**'
               - '**/*.svelte'
               - 'package.json'
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+            # The BPMN interchange checkers and their fixtures. Kept as its own
+            # filter so the (zero-dependency, node-only) soundness gate runs
+            # when a fixture changes, which no other filter would catch:
+            # prettier's .prettierignore excludes jl4/ entirely.
+            bpmn:
+              - 'etc/check-bpmn-*'
+              - 'etc/validate-bpmn.mjs'
+              - 'etc/kie/**'
+              - 'jl4/examples/bpmn/**'
+              - 'jl4-core/src/L4/Bpmn/**'
             # specs/** must trigger doc checks too: a spec-only PR that skips
             # both this filter and 'haskell' never runs test-docs.sh or
             # prettier, so a broken link or unformatted file merges silently.
@@ -73,6 +93,188 @@ jobs:
               # tuning these steps, or flipping jl4-mlir-parity-full's
               # continue-on-error) so a workflow-only PR can self-validate.
               - '.github/workflows/pr-checks.yml'
+            # The DMN artifacts and the two engine harnesses that read them. A
+            # change to the emitter shows up under 'haskell' as well, but the
+            # goldens themselves are .dmn/.json and the harnesses are Java and
+            # shell, none of which any other filter matches — and it is exactly
+            # a hand-edited golden that most needs an engine to look at it.
+            dmn:
+              - 'jl4-core/src/L4/Dmn/**'
+              - 'jl4/examples/dmn/**'
+              - 'etc/kie-dmn-check/**'
+              - 'etc/camunda-dmn-check/**'
+              - 'etc/validate-dmn.mjs'
+              # The XSD sequence-order pair and the law-time date probe:
+              # hand-written fixtures, not goldens, so nothing else here matches
+              # them.
+              - 'jl4/tests-cli/fixtures/dmn-xsd-order/**'
+              - 'jl4/tests-cli/fixtures/dmn-date-probe/**'
+              # The engine-intersection triple: likewise hand-written.
+              - 'jl4/tests-cli/fixtures/dmn-engine-intersection/**'
+
+  # ============================================
+  # BPMN interchange: soundness gate over the emitted fixtures
+  # ============================================
+  # Deliberately its own job, and deliberately tiny. `etc/check-bpmn-soundness*`
+  # is pure Node with no dependencies and no network, so this needs neither
+  # `npm ci` nor a Haskell toolchain and cannot be blocked by lockfile drift.
+  #
+  # `etc/check-bpmn-kie.sh` (the jBPM second opinion) IS run here now. It was
+  # held back on cost — ~44 MB of jars from Maven Central — which the cache
+  # below reduces to a one-off per pom change. The artifacts are the community
+  # jBPM/Drools releases on **Maven Central** (`repo.maven.apache.org`); the pom
+  # declares no `<repositories>`, so nothing is fetched from Red Hat's own
+  # repository or from a GitHub URL, and every version is hard-pinned
+  # (`jbpm.version`, and the dependency *plugin* too, so `dependency:*` cannot
+  # resolve "whatever is newest today"). That pinning is what makes the cache
+  # key stable.
+  #
+  # NO `--allow-skip` HERE, deliberately. The script exits 3 for SKIPPED and 4
+  # for BROKEN, and `--allow-skip` turns 3 into 0. On a developer's laptop an
+  # absent JDK is a fine reason to skip; in CI it means *this setup* regressed,
+  # which is precisely what we want to hear about. Exit 4 is unsilenceable by
+  # design and stays that way.
+  bpmn:
+    name: BPMN Soundness
+    needs: changes
+    if: needs.changes.outputs.bpmn == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+
+      # Proves the gate can still FAIL, by asserting every fixture in
+      # jl4/examples/bpmn/unsound/ is caught on the specific property it exists
+      # to exercise — and that every fixture in sound/ is NOT flagged, because a
+      # gate that invents defects is as broken as one that misses them. A checker
+      # whose only observed behaviour is "PASS" is indistinguishable from one
+      # that has been quietly broken.
+      - name: Self-test (the gate must still be able to fail, and to pass)
+        run: node etc/check-bpmn-soundness.selftest.mjs
+
+      # Same argument, one level up. The jBPM baseline comparator below is the
+      # only thing standing between "expected/ has four known findings" and
+      # "expected/ has any number of findings and nobody notices", so it gets
+      # the same treatment: mutate a real transcript eight ways and assert it
+      # objects, then two ways and assert it does NOT.
+      - name: Self-test the jBPM baseline comparator
+        run: node etc/check-bpmn-kie-baseline.selftest.mjs
+
+      # The gate itself, over the emitted goldens.
+      - name: Soundness-check the emitted BPMN
+        run: node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
+
+      # K4: will Camunda Modeler open these? bpmn-moddle is what bpmn-js parses
+      # with. Pinned, and never added to package.json or the lockfile.
+      - name: Validate against bpmn-moddle (the K4 acceptance signal)
+        run: npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/expected/*.bpmn jl4/examples/bpmn/sound/*.bpmn
+
+      # The independent second opinion. jBPM shares no code with bpmn-js, so its
+      # agreement that a diagram deadlocks is evidence our own token semantics
+      # are right rather than merely self-consistent.
+      #
+      # JDK 17: the harness accepts 11+, but the pinned stack is not happy on the
+      # newest JDKs, and an unpinned `java` has already once produced a stale
+      # JDK 14 that failed in a way which read as a diagram defect.
+      #
+      # That stack is jbpm-bpmn2 / jbpm-flow-builder / drools-compiler, ALL at
+      # 7.74.1.Final (etc/kie/pom.xml). It is NOT the 8.44.0.Final used by the
+      # DMN harnesses below: 8.44.0.Final is real for kie-dmn and does not exist
+      # for org.jbpm:jbpm-bpmn2. Different product lines; do not harmonise them.
+      # The harness prints the version it observed off its own classpath, so the
+      # banner in the log is the authority, not this comment.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Keyed on every pom under etc/, so the DMN engine harnesses share this
+      # cache the moment they land rather than needing their own entry.
+      - name: Cache the pinned engine jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/l4-engines/repo
+          key: l4-engines-m2-${{ runner.os }}-${{ hashFiles('etc/**/pom.xml') }}
+
+      # `$HOME`, not `~`: an `env:` value is not shell-expanded, so `~` would
+      # reach Maven literally as `-Dmaven.repo.local=~/...` and create a
+      # directory called `~` in the checkout — while `actions/cache` above DOES
+      # expand `~`. The two would silently point at different places and the
+      # cache would miss on every run while appearing to work.
+      # Split deliberately, because the two fixture sets have different contracts
+      # and collapsing them would either block the repo or hide a regression.
+      #
+      #   sound/     MUST be clean. Measured exit 0 today. A finding here is a
+      #              regression and fails the build.
+      #   expected/  is real exporter output, and the harness reports
+      #              `RESULT: 4 file(s) with findings.` today — measured exit 1.
+      #              All four are jBPM COMPILE rejections, not liveness defects:
+      #
+      #                handover.bpmn           axis A4: an L4 name inside a
+      #                                        <bpmn:condition> on a CONDITIONAL
+      #                                        BOUNDARY EVENT (`grace period`,
+      #                                        line 44) declared as a formal
+      #                                        expression; Drools parses it as
+      #                                        DRL and refuses. NOT a
+      #                                        conditionExpression — this file
+      #                                        has zero of those, as the element
+      #                                        table in bpmn/README.md says; an
+      #                                        earlier version of this comment
+      #                                        named the wrong element
+      #                regcf-advertising.bpmn  A4's defect class, on a gateway guard
+      #                regcf-resale.bpmn       A4's defect class, on a gateway guard
+      #                regcf-reporting.bpmn    `Unknown gateway direction: Mixed` —
+      #                                        the renewal loop makes that gateway
+      #                                        genuinely mixed (2 in, 3 out), which
+      #                                        BPMN 2.0 §10.5.2 permits and jBPM
+      #                                        does not implement
+      #
+      #              offering.bpmn is NOT among them: it logs an ABORTED-via-
+      #              error-end, which the harness annotates "a modelled terminal
+      #              state, not a liveness defect" and does not count. An earlier
+      #              version of this comment said expected/ reported ONE finding
+      #              and named offering.bpmn — wrong on both halves.
+      #
+      #              Exit 1 is therefore EXPECTED on expected/ and cannot itself
+      #              be the gate. What gates it is etc/bpmn-kie-baseline.txt,
+      #              compared below.
+      #
+      # The list above is a summary for a human reader. It is NOT the assertion —
+      # etc/bpmn-kie-baseline.txt is, and it is machine-compared every run. Until
+      # 2026-07-28 there was no such file, exit 1 was tolerated unconditionally,
+      # and a fifth rejected golden (or a regression turning a clean golden into
+      # a rejected one) would have landed green. The comparator closes both that
+      # and the coverage half: a file the baseline names but the run never
+      # reached now fails, so a narrowed glob can no longer pass by doing less.
+      - name: Second opinion — does an independent engine agree? (jBPM/KIE)
+        run: |
+          export L4_KIE_CACHE="$HOME/.cache/l4-engines"
+
+          echo "::group::sound/ — must be clean"
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/sound/*.bpmn
+          echo "::endgroup::"
+
+          echo "::group::expected/ — real exporter output"
+          set +e
+          etc/check-bpmn-kie.sh jl4/examples/bpmn/expected/*.bpmn | tee kie-expected.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "::endgroup::"
+
+          # 0 and 1 are both verdicts, and which one it is carries no information
+          # the baseline does not carry better: the comparator reads the
+          # transcript. 2/3/4 mean no verdict was reached, so there is nothing to
+          # compare and the baseline must not be consulted — a SKIPPED run whose
+          # empty transcript "matched" would be the original bug wearing a hat.
+          case "$rc" in
+            0 | 1) ;;
+            *) echo "::error::jBPM check exited $rc — 2=usage, 3=SKIPPED (nothing was checked), 4=BROKEN (toolchain present, harness failed)."
+               exit "$rc" ;;
+          esac
+
+          node etc/check-bpmn-kie-baseline.mjs kie-expected.log
 
   # ============================================
   # TypeScript: Lint, Format, Build & Test (combined)
@@ -205,6 +407,38 @@ jobs:
           cabal configure --enable-tests --disable-documentation
           cabal build all --dry-run
 
+      # Guards the defect where `data-files` in jl4-core.cabal was silently
+      # disabled by a `flag` stanza inserted above it. Cabal ignores
+      # package-level fields that appear after the first section, warns ONCE,
+      # and then caches the parse -- so the warning vanished and nobody saw it
+      # for months. The consequence was invisible in CI and fatal downstream:
+      # the sdist shipped no .l4 files, so every `cabal install` produced an
+      # `l4` with an EMPTY embedded stdlib, answering "Module not found:
+      # prelude" for every IMPORT.
+      #
+      # Nothing else here can catch it. `cabal build`/`cabal test` build
+      # jl4-core INPLACE, where the TH splice's cwd fallback finds libraries/
+      # anyway, and the test step additionally sets JL4_LIBRARY_PATH, which
+      # disables the embedded tier outright. The isolation needed is along the
+      # BUILD axis; the sdist shows it cheaply, without building anything.
+      - name: The sdist must carry the standard library
+        run: |
+          ( cd jl4-core && cabal check ) 2>&1 | tee /tmp/cabal-check.txt || true
+          if grep -q 'parser-warning' /tmp/cabal-check.txt; then
+            echo "::error::cabal check reported a parser warning for jl4-core. A package-level"
+            echo "::error::field is probably being ignored because a section was inserted above it."
+            exit 1
+          fi
+          cabal sdist jl4-core --list-only > /tmp/sdist.txt
+          if ! grep -q 'libraries/prelude\.l4' /tmp/sdist.txt; then
+            echo "::error::jl4-core's sdist contains no libraries/prelude.l4, so cabal install"
+            echo "::error::would produce an l4 binary with an empty embedded stdlib."
+            echo "::error::Check that data-files in jl4-core.cabal precedes every section."
+            sed -n '1,40p' /tmp/sdist.txt
+            exit 1
+          fi
+          echo "sdist carries $(grep -c '\.l4$' /tmp/sdist.txt) .l4 files"
+
       - name: Install dependencies
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
@@ -284,6 +518,293 @@ jobs:
         with:
           path: dist-newstyle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+  # ============================================
+  # DMN: both engines, over the committed goldens
+  # ============================================
+  #
+  # THE POINT OF THIS JOB IS THAT IT CANNOT SKIP. Both harnesses skip loudly and
+  # exit 0 when the toolchain is missing, which is right on a laptop and wrong in
+  # CI; KIE_CHECK_REQUIRED / CAMUNDA_CHECK_REQUIRED turn every one of those paths
+  # into exit 1. If the JDKs or Maven are not there, this job fails rather than
+  # quietly reporting green.
+  #
+  # It runs the scripts DIRECTLY rather than through `cabal test l4-cli-test`
+  # with L4_DMN_ENGINE_CHECK=1. The two do the same check on the same file, but
+  # the script route needs no GHC, so this stays a small Java job instead of a
+  # second full Haskell build. The hspec leg in jl4/tests-cli/Main.hs remains the
+  # developer-facing entry point (one command, same harnesses); neither pretends
+  # to be the other.
+  #
+  # Two JDKs, on purpose: KIE/Drools 8.x is measured on 17, and zeebe-dmn 8.7.x
+  # is compiled to class file 65 and needs 21+. They also must not share a
+  # classpath — feel-engine 1.19.x-scala-shaded (Camunda 7) and 1.18.3 (Camunda
+  # 8) collide — which is why there are two directories under etc/.
+  dmn-engines:
+    name: DMN Engine Checks (KIE + Camunda)
+    needs: changes
+    if: needs.changes.outputs.dmn == 'true' || needs.changes.outputs.haskell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17 (KIE/Drools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up JDK 21 (Camunda 8 / zeebe-dmn)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache the Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: dmn-engines-m2-${{ hashFiles('etc/kie-dmn-check/pom.xml', 'etc/camunda-dmn-check/pom.xml') }}
+          restore-keys: |
+            dmn-engines-m2-
+
+      - name: Drools/KIE 8.44.0.Final
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --cases jl4/examples/dmn/reg-cf.cases.json | tee kie.log
+          # The harness prints VERDICT only when it actually ran, so grepping for
+          # it is what stops "exited 0 and did nothing" reading as a pass.
+          #
+          # The VERSION is part of the pattern on purpose. The banner reports the
+          # version it OBSERVED off the classpath, so pinning it here is what
+          # makes the log evidence about which engine looked at the file.
+          #
+          # `value(s) as expected` is the part that is not a liveness claim.
+          # `25/25 SUCCEEDED` says every decision ran; only this says each one
+          # answered what jl4/examples/dmn/reg-cf.cases.json says it must.
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 25/25 decision(s) SUCCEEDED, 25/25 value(s) as expected' kie.log
+
+      - name: Camunda 8.7.6 (zeebe-dmn)
+        env:
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/reg-cf.dmn \
+            --cases jl4/examples/dmn/reg-cf.cases.json | tee camunda.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 25/25 decision(s) evaluated, 25/25 value(s) as expected' camunda.log
+
+      # The LAW-TIME legs (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
+      #
+      # What these add that the reg-cf steps above cannot: the SAME model
+      # answering DIFFERENTLY for different rule dates, driven only by half-open
+      # date intervals on a UNIQUE decision table. Ten rule dates x seven
+      # decisions = 70, and seven of the ten exist purely to pin the
+      # closed-low/open-high convention: a day-of/day-before pair on EACH of the
+      # table's three seams, plus a date well before commencement. Straddling
+      # only the newest seam (which an earlier version did) would have let an
+      # off-by-one on the middle interval or on the floor row pass green.
+      - name: Law time -- the dated-regime exhibit (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          ./etc/kie-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 70/70 decision(s) SUCCEEDED, 70/70 value(s) as expected' kie-gst.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            jl4/examples/dmn/expected/gst-rate.dmn \
+            --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 70/70 decision(s) evaluated, 70/70 value(s) as expected' camunda-gst.log
+
+      # The hand-written probe PAIR (spec §15.6). Not redundant with the step
+      # above: the emitter cannot produce an <annotationEntry> carrying an @id,
+      # so only a fixture can ask whether Xerces objects to one.
+      #
+      # And the POSITIVE ALONE IS NOT EVIDENCE. A valid file validating is
+      # equally consistent with Xerces ignoring <annotation>/<annotationEntry>
+      # entirely, which is exactly the failure this step claims to exclude. So
+      # the negative sibling runs here too, with `!` on both engines. Same
+      # rationale, and the same construction, as the xsd-order pair below.
+      - name: Law time -- the hand-written date-axis probe (KIE + Camunda)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          probe=jl4/tests-cli/fixtures/dmn-date-probe
+
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee kie-date-probe.log
+          grep -q 'XSD    valid' kie-date-probe.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected' kie-date-probe.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis.dmn" --cases "$probe/date-axis.cases.json" | tee camunda-date-probe.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected' camunda-date-probe.log
+
+          # The NEGATIVE control: the same model with an @id on each
+          # <annotationEntry>. tRuleAnnotation is not a tDMNElement, so the
+          # attribute is schema-invalid and both harnesses must come back red.
+          # `&& rc=0 || rc=$?` is what keeps `set -e` from ending the step on the
+          # very exit code being asserted (same device as the xsd-order pair).
+          ./etc/kie-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > kie-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat kie-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the schema gate ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running also
+          # exits non-zero. The banner says it ran; the schema rule says it
+          # failed for the reason this fixture exists.
+          grep -q 'KIE 8.44.0.Final VERDICT' kie-date-negative.log
+          grep -q 'XSD    INVALID' kie-date-negative.log
+          grep -q "cvc-complex-type.3.2.2: Attribute 'id' is not allowed to appear in element 'annotationEntry'" kie-date-negative.log
+          # MEASURED, and the reason the negative earns its keep: Drools BUILDS
+          # the file anyway and answers every case correctly, so the schema leg
+          # is the only thing objecting.
+          grep -q 'BUILD  clean' kie-date-negative.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$probe/date-axis-badannotation.dmn" \
+            --cases "$probe/date-axis.cases.json" > camunda-date-negative.log 2>&1 && rc=0 || rc=$?
+          cat camunda-date-negative.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Camunda ACCEPTED an <annotationEntry> carrying an @id"
+            exit 1
+          fi
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' camunda-date-negative.log
+          grep -q 'PARSE  INVALID' camunda-date-negative.log
+
+      # The negative control for the placement rule (DMN-EXPORT-PROGRAM-MODEL-SPEC.md
+      # §4.3, §9). Every other step above asserts that a gate stays GREEN, which
+      # on its own is not evidence that the gate is wired to anything: an
+      # emitter that misordered <itemDefinition> would have sailed through all
+      # of them. The two fixtures hold the same lines and differ only in where
+      # that block sits.
+      #
+      # It is a KIE step because KIE's leg 1 is the Xerces one; the pair is also
+      # measured on Camunda from jl4/tests-cli, which rejects it at parse.
+      - name: XSD sequence-order gate (positive + negative control)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          set -euo pipefail
+          fixtures=jl4/tests-cli/fixtures/dmn-xsd-order
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/M1-itemdef-before-inputdata.dmn" \
+            --cases "$fixtures/M1-itemdef.cases.json" | tee xsd-order-ok.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 2/2 decision(s) SUCCEEDED, 2/2 value(s) as expected' xsd-order-ok.log
+
+          # The negative golden MUST come back red. `&& rc=0 || rc=$?` is what
+          # keeps `set -e` from ending the step on the very exit code being
+          # asserted.
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/M1-itemdef-after-inputdata.dmn" \
+            --cases "$fixtures/M1-itemdef.cases.json" > xsd-order-bad.log 2>&1 && rc=0 || rc=$?
+          cat xsd-order-bad.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the schema gate ACCEPTED a DMN file whose <itemDefinition> follows its <inputData>"
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running also
+          # exits non-zero. The banner is what says it ran, and the schema rule
+          # is what says it failed for the reason this fixture exists.
+          grep -q 'KIE 8.44.0.Final VERDICT' xsd-order-bad.log
+          grep -q 'cvc-complex-type.2.4.a' xsd-order-bad.log
+
+      # The engine-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
+      # measured 2026-07-30). One per-element predicate spelled three ways:
+      # inline in a FEEL quantifier, as a decision table in a boxed-context
+      # entry, and as the same table in a BKM. The measured fact this step
+      # keeps true: KIE takes all three; zeebe-dmn takes the inline and BKM
+      # forms and CANNOT PARSE the boxed-context one, although it is
+      # schema-valid DMN 1.3 — so the only two-engine spelling of an
+      # ANALYZABLE (tabular) per-element predicate is the BKM.
+      #
+      # The negative leg is a deliberate tripwire for engine upgrades: the day
+      # a zeebe-dmn bump learns to parse the boxed-context file, this step
+      # goes red HERE, with the message below. That red is good news — the
+      # engine intersection has widened. Flip the leg to a positive control,
+      # update the fixture's own header and the §6 measured note, and
+      # reconsider whether BKM emission is still the only portable route.
+      - name: Engine-intersection triple (BKM portable; boxed-context pinned unparseable)
+        env:
+          KIE_CHECK_REQUIRED: "1"
+          KIE_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          CAMUNDA_CHECK_REQUIRED: "1"
+          CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          set -euo pipefail
+          fixtures=jl4/tests-cli/fixtures/dmn-engine-intersection
+
+          # KIE: all three, with warning counts pinned. The boxed-context
+          # file's ONE warning is MISSING_TYPE_REF on the context-bound
+          # function — the validator asking for the type Spouse -> boolean,
+          # which DMN's type language cannot spell. A finding, not noise.
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-inline.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-inline.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-ctx.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 1 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-ctx.log
+          grep -q 'MISSING_TYPE_REF' kie-ctx.log
+
+          ./etc/kie-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee kie-bkm.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 5/5 decision(s) SUCCEEDED, 5/5 value(s) as expected' kie-bkm.log
+
+          # Camunda: inline and BKM green...
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-inline.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-inline.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-inline.log
+
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-bkm-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" | tee cam-bkm.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 5/5 decision(s) evaluated, 5/5 value(s) as expected' cam-bkm.log
+
+          # ...and the boxed-context file MUST come back red, at parse, for
+          # the reason this fixture exists. `&& rc=0 || rc=$?` keeps `set -e`
+          # from ending the step on the very exit code being asserted.
+          ./etc/camunda-dmn-check/run.sh \
+            "$fixtures/spouse-context-table.dmn" \
+            --cases "$fixtures/spouse.cases.json" > cam-ctx.log 2>&1 && rc=0 || rc=$?
+          cat cam-ctx.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::zeebe-dmn now PARSES a decision table inside a boxed-context entry. This is GOOD NEWS from an engine upgrade, not a regression — the two-engine intersection has widened. Flip this leg to a positive control, update jl4/tests-cli/fixtures/dmn-engine-intersection/spouse-context-table.dmn's header and the DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6 measured note, and reconsider whether BKM emission is still the only portable route to an analyzable per-element predicate."
+            exit 1
+          fi
+          # Not just "exited non-zero": a harness that died before running
+          # also exits non-zero. The banner says it ran; the parse message
+          # says it failed for the pinned reason.
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT' cam-ctx.log
+          grep -q 'expected literal expression' cam-ctx.log
+
+      - name: dmn-moddle (DMN 1.3 metamodel)
+        run: npx --yes --package=dmn-moddle node etc/validate-dmn.mjs
 
   # ============================================
   # WASM Build & Test (only when Haskell changes)

@@ -1,0 +1,12 @@
+{
+  "note": [
+    "Cases for svc-no-output.dmn (probe D5, NEGATIVE CONTROL). 2 cases x 1",
+    "decision = 2 value checks. `step` is expected to answer correctly on both",
+    "engines whatever the service does; the measurement is in the error count",
+    "and in the SVC line, not in these values."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "step": 8 } },
+    { "name": "B. n = 0", "context": { "n": 0 }, "expect": { "step": 0 } }
+  ]
+}

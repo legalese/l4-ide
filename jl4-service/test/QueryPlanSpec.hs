@@ -7,10 +7,14 @@ module QueryPlanSpec (spec) where
 
 import Test.Hspec
 
+import Data.Either (isLeft, isRight)
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate (i)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Control.Monad.Trans.Except (runExceptT)
+import Servant (ServerError (..))
 
 import Backend.Jl4 (CompiledModule (..), precompileModule)
 import qualified Backend.DecisionQueryPlan as Service
@@ -121,14 +125,31 @@ compile fnName source = do
     Left err -> fail ("Compilation failed: " <> show err)
     Right cm -> pure cm
 
--- | Build a jl4-service CachedDecisionQuery from source.
+-- | Build a jl4-service CachedDecisionQuery from source, under the shipped
+-- default ladder node budget.
 serviceCache :: Text -> Text -> IO Service.CachedDecisionQuery
-serviceCache fnName source = do
+serviceCache = serviceCacheWithBudget defaultLadderNodeBudget
+
+-- | The default of 'Options.maxLadderNodes', repeated here rather than imported
+-- so a change to the shipped default shows up as a failure in this suite rather
+-- than silently moving what these tests exercise.
+defaultLadderNodeBudget :: Int
+defaultLadderNodeBudget = 10000
+
+serviceCacheWithBudget :: Int -> Text -> Text -> IO Service.CachedDecisionQuery
+serviceCacheWithBudget budget fnName source = do
   cm <- compile fnName source
-  result <- runExceptT $ Service.buildDecisionQueryCacheFromCompiled fnName cm source
+  result <- runExceptT $ Service.buildDecisionQueryCacheFromCompiled budget fnName cm source
   case result of
     Left err -> fail ("buildDecisionQueryCacheFromCompiled failed: " <> show err)
     Right c -> pure c
+
+-- | Like 'serviceCacheWithBudget' but returns the 'ServerError' instead of
+-- failing on it.
+serviceCacheEither :: Int -> Text -> Text -> IO (Either ServerError Service.CachedDecisionQuery)
+serviceCacheEither budget fnName source = do
+  cm <- compile fnName source
+  runExceptT $ Service.buildDecisionQueryCacheFromCompiled budget fnName cm source
 
 -- | Build an LSP CachedDecisionQuery + helpers from source.
 lspCache :: Text -> Text -> IO (VizExpr.RenderAsLadderInfo, LadderViz.VizState, Map.Map Int Text)
@@ -170,6 +191,60 @@ spec = do
   describe "LSP query plan" lspTests
   describe "service and LSP paths agree" agreementTests
   describe "TYPICALLY question ordering (end-to-end)" typicallyOrderingTests
+  describe "ladder node budget" ladderBudgetTests
+
+
+-- | The ladder is built by distributing OR over AND to reach a normal form, so
+-- its size is exponential in the width of a disjunction of conjunctions —
+-- @(x0 AND x1) OR (x2 AND x3) OR …@ over 2n variables becomes 2^n clauses. Both
+-- @\/query-plan@ and @\/ladder@ serialize the whole thing into their response,
+-- and @\/ladder@ is an unauthenticated, CORS-open, prefetchable GET, so the
+-- budget is the only thing standing between a 40-line L4 file and a response
+-- that streams tens of megabytes for minutes while holding a concurrency slot.
+--
+-- Measured on the service before the budget existed: 8 variables → 12 KB,
+-- 16 → 366 KB, 32 → still streaming past 36 MB after five minutes.
+--
+-- The budget bounds the RESPONSE. It does not bound the build — 'doVisualize'
+-- has already materialised the normal form by the time the budget can be
+-- consulted — which is why @evalTimeout@ guards the build separately in
+-- 'DataPlane.requireDecisionQueryCache'. IntegrationSpec pins that half.
+ladderBudgetTests :: Spec
+ladderBudgetTests = do
+  it "refuses a ladder past the budget, and says so" do
+    result <- serviceCacheEither defaultLadderNodeBudget "blowup" (dnfBlowupL4 32)
+    case result of
+      Right _ -> expectationFailure
+        "expected the 32-variable DNF blow-up to be refused under the default budget"
+      Left err -> do
+        errHTTPCode err `shouldBe` 400
+        show (errBody err) `shouldSatisfy` ("nodes" `List.isInfixOf`)
+
+  it "lets an ordinary decision through untouched" do
+    -- The guard must not be a tax on real models: eight variables is already a
+    -- big diagram and must still build.
+    cache <- serviceCacheWithBudget defaultLadderNodeBudget "blowup" (dnfBlowupL4 8)
+    (svcQP cache []).determined `shouldBe` Nothing
+
+  it "the budget is a threshold, not a constant refusal" do
+    -- Same source, two budgets, two answers — so the number is doing the work.
+    tight <- serviceCacheEither 4 "blowup" (dnfBlowupL4 8)
+    isLeft tight `shouldBe` True
+    loose <- serviceCacheEither defaultLadderNodeBudget "blowup" (dnfBlowupL4 8)
+    isRight loose `shouldBe` True
+
+-- | @(x0 AND x1) OR (x2 AND x3) OR …@ over @n@ boolean parameters.
+dnfBlowupL4 :: Int -> Text
+dnfBlowupL4 n =
+  Text.unlines $
+    [ "GIVEN " <> Text.intercalate "\n      " [param k <> " IS A BOOLEAN" | k <- [0 .. n - 1]]
+    , "GIVETH A BOOLEAN"
+    , "DECIDE blowup IF "
+        <> Text.intercalate " OR "
+             [ "(" <> param k <> " AND " <> param (k + 1) <> ")" | k <- [0, 2 .. n - 2] ]
+    ]
+ where
+  param k = "x" <> Text.pack (show (k :: Int))
 
 
 -- | End-to-end check that boolean TYPICALLY defaults flow all the way through

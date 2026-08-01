@@ -1,0 +1,218 @@
+-- The DATA-MODEL exhibit for the DMN exporter (Phase 3 of
+-- `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md`).
+--
+-- The other two DMN goldens are about DECISION SHAPE. This one is about TYPES,
+-- and it exists because §10's Phase 3 row and §4.2.1-8 both demand a golden that
+-- pins the `Lossy` nullary-only arm of `D-SUMTYPE` — the case where the emitted
+-- table is CORRECT (measured in KIE 8.44, §4.2.1-2) while its DOMAIN is not.
+-- Everything else here is a neighbouring case that has to be told apart from it,
+-- so a reader can see the line R4 and R8 actually draw:
+--
+--   * `Disposal`               a payload-carrying IS ONE OF. Its itemDefinition
+--                              lists ALL THREE constructors in <allowedValues>,
+--                              including the payload one, because that is what
+--                              makes the missing rule visible to a gap analyser
+--                              as a gap rather than as silence;
+--   * `is a sale`              CONSIDERs it over its NULLARY arms only, with an
+--                              OTHERWISE. The table survives, carries
+--                              <inputValues>, and the report says which
+--                              constructor has no cell     [D-SUMTYPE, lossy];
+--   * `stated term`            projects the payload field. FEEL has no tagged
+--                              value, so this is refused  [D-SUMTYPE, blocking];
+--   * `claim amount`           merely THREADS a record with a sum-typed field,
+--                              never reading it            [D-SUMTYPE, lossy];
+--   * `capped at ten`          GIVETH A MAYBE NUMBER, constructing JUST/NOTHING.
+--                              Since R8-d' (2026-07-31) this TABULATES: one row
+--                              `<= 10 -> n`, and the absent case is the
+--                              <defaultOutputEntry>, which is FEEL `null`. The
+--                              other half of the point is UNCHANGED and still
+--                              holds: `NOTHING` appears NOWHERE as a FEEL string
+--                              constant -- it is a literal now, not a string and
+--                              not a name         [D-MAYBE-NULL lossy];
+--   * `grade is settled` and   the TWO SPELLINGS of an absence test, lowered by
+--     `..., spelled longhand`  two different routes. The first is `isJust q`,
+--                              recognised by the prelude definition's own
+--                              Unique and rendered `q != null`; the second is
+--                              the explicit CONSIDER, rendered
+--                              `if p != null then true else false`. Both are
+--                              kept so a narrowing cannot take one silently.
+--                              `q` also shows R8-a's CARVE-OUT: its typeRef is
+--                              `Grade_optional`, a minted alias over `string`
+--                              with NO allowedValues, not `Grade`. Pointing at
+--                              `Grade` would re-assert the complete range one
+--                              typeRef hop on -- 7.3.3 reads the range off
+--                              whatever the typeRef resolves to -- and that
+--                              range has no absent case, so an enforcing
+--                              engine would reject the NOTHING. What the alias
+--                              costs is the OTHER half of a domain's job: at
+--                              `q` a value outside the three constructors is
+--                              no longer rejected either  [D-MAYBE-NULL lossy];
+--   * `Claim`                  a record with a MAYBE field, a LIST OF field and
+--                              a COMPUTED field. The computed one is read by
+--                              `claim payout`, which is what mints the HYDRATOR
+--                              and `Claim_hydrated`
+--                              [D-MAYBE-NULL, D-ITEMDEF lossy;
+--                               D-COMPUTEDFIELD advisory on the hydrated type];
+--   * `deep`                   GIVEN a MAYBE (MAYBE NUMBER). `null` does not
+--                              nest, so JUST NOTHING and NOTHING would become
+--                              one FEEL value and FEEL `=` would answer TRUE
+--                              where L4 answers FALSE      [D-SUMTYPE blocking];
+--   * `Grade` / `grade for`    the control: a plain nullary IS ONE OF, whose
+--                              table is inside the analysable fragment and
+--                              carries no note at all;
+--   * `number` / `is alpha`    a type name that collides with a FEEL BUILT-IN
+--                              type spelling. A typeRef is resolved against the
+--                              built-in names, so an itemDefinition called
+--                              `number` would not shadow FEEL's numeric type but
+--                              ALIAS onto it, and `n` (a genuine NUMBER) and `k`
+--                              (this enum) would share one typeRef with nothing
+--                              in the artifact saying they differ. The type name
+--                              is suffixed instead, so read `number_` here and
+--                              `number` on `n`.
+--
+-- Two things to read off the artifact rather than from this list. First, the
+-- alias is minted ONCE and only where it is pointed at: `Claim`'s `assessed
+-- grade` and the inputData `q` both carry typeRef="Grade_optional" and there is
+-- exactly one `itemdef_grade_optional`, while `Disposal` -- which has a domain
+-- too, but is never reached through a MAYBE -- gets no alias at all. Second,
+-- `capped at ten` is GIVETH A MAYBE NUMBER and its variable stays
+-- typeRef="number": a builtin asserts no range, so there is nothing for the
+-- typeRef hop to re-assert and nothing an alias would buy.
+--
+-- And one more, which changed with H1 (2026-07-31): `Claim`'s COMPUTED field
+-- `doubled amount` is still absent from `Claim`'s own <itemComponent> list --
+-- the base itemDefinition is the model's INPUT CONTRACT and a derived field is
+-- not part of it -- but it is no longer merely relocated to a decision reading a
+-- synthetic `_self` inputData. `claim payout` reads it, which mints a HYDRATOR:
+-- decision `claim payout` (hydrated), a boxed <context> whose entries are
+-- `Claim`'s stored fields copied from `cl` followed by `doubled_amount`
+-- computed from the sibling entry before it, typed by `Claim_hydrated`. The
+-- read itself is then plain path access. So `_self` and the synthetic decision
+-- BOTH disappear from the model, and the type `Claim_hydrated` carries
+-- D-COMPUTEDFIELD (advisory): DMN's tItemDefinition has no derived flag, so a
+-- reader of the hydrated type alone cannot tell a derived component from a
+-- stored one. Nothing an ENGINE needs is lost -- hydration means no caller ever
+-- supplies one.
+--
+-- Figures and terms are illustrative; the point is the TYPE, not the statute.
+
+-- `isJust` lives in the prelude, which this file did not import before R8-d'.
+-- Safe: `topDecls` walks only this module's own section, so no prelude decision
+-- enters the DRG.
+IMPORT prelude
+
+§ `Sum types and the data model`
+
+DECLARE Grade
+  IS ONE OF
+    `high`
+    `low`
+
+DECLARE Disposal
+  IS ONE OF
+    `sell`
+    `lease` HAS `term in years` IS A NUMBER
+    `assign`
+
+-- A record whose fields exercise D-ITEMDEF's collection reason, R8-b's domain
+-- suppression, the sum-typed component R4-a rules Lossy at the decision that
+-- threads it, and the computed field the desugarer has already taken away.
+DECLARE Claim
+  HAS `amount`           IS A NUMBER
+      `assessed grade`   IS A MAYBE Grade
+      `supporting notes` IS A LIST OF STRING
+      `the disposal`     IS A Disposal
+      `doubled amount`   IS A NUMBER MEANS `amount` TIMES 2
+
+-- The `Lossy` nullary-only arm. Two of the three constructors have a cell; the
+-- third carries a payload and cannot have one. The table is still exactly what
+-- the L4 says, which is why this is a domain loss and not a refusal.
+GIVEN d IS A Disposal
+GIVETH A BOOLEAN
+DECIDE `is a sale` d IF
+  CONSIDER d
+  WHEN `sell`   THEN TRUE
+  WHEN `assign` THEN FALSE
+  OTHERWISE FALSE
+
+-- The `Blocking` arm: reading the payload itself.
+GIVEN disposal IS A Disposal
+GIVETH A NUMBER
+`stated term` disposal MEANS
+  disposal's `term in years`
+
+-- Threading, not reading. Nothing here touches the sum type, so the table is
+-- fine; what is lost is the component's type, which FEEL cannot carry.
+GIVEN c IS A Claim
+GIVETH A NUMBER
+`claim amount` c MEANS
+  c's `amount`
+
+-- R8-d. A total function whose value channel carries the absence — which is
+-- exactly why §2.4 does NOT refuse it — but whose VALUES have no FEEL spelling.
+GIVEN n IS A NUMBER
+GIVETH A MAYBE NUMBER
+`capped at ten` n MEANS
+  IF n AT MOST 10 THEN JUST n ELSE NOTHING
+
+-- R8-a and R8-b at an inputData, and the TWO SPELLINGS of an absence test.
+-- The first is what L4 house style writes; the second is what it desugars to in
+-- the reader's head. Both are here on purpose, because R8-d' lowers them by two
+-- different routes and keeping only one would leave the other unexercised: the
+-- combinator table recognises `isJust` by the PRELUDE'S OWN UNIQUE, while the
+-- CONSIDER case handles the shape the table does not see.
+GIVEN q IS A MAYBE Grade
+GIVETH A BOOLEAN
+`grade is settled` q MEANS
+  isJust q
+
+-- The binder is `p`, not `q`: two GIVENs spelled `q` would fold to one
+-- inputData name and raise a D-SCOPE note that has nothing to do with what this
+-- fixture is about.
+GIVEN p IS A MAYBE Grade
+GIVETH A BOOLEAN
+`grade is settled, spelled longhand` p MEANS
+  CONSIDER p
+  WHEN JUST g  THEN TRUE
+  WHEN NOTHING THEN FALSE
+
+-- H1's GATE, and the PROJECTION spelling of a computed-field read. Without a
+-- reader, `Claim` gets no hydrator at all: a hydration decision with no
+-- dependents is noise in an artifact whose whole claim is that every line in it
+-- means something -- the same rule the `_optional` aliases follow. The binder is
+-- `cl` for the same D-SCOPE reason `p` is `p`.
+GIVEN cl IS A Claim
+GIVETH A NUMBER
+`claim payout` cl MEANS
+  cl's `doubled amount`
+
+-- R8-c. `null` does not nest.
+GIVEN m IS A MAYBE (MAYBE NUMBER)
+GIVETH A BOOLEAN
+`deep` m MEANS
+  TRUE
+
+-- The control. A plain nullary IS ONE OF: a U table, constant outputs, an
+-- itemDefinition with a complete domain, and nothing lost.
+GIVEN g IS A Grade
+GIVETH A NUMBER
+`grade for` g MEANS
+  CONSIDER g
+  WHEN `high` THEN 2
+  WHEN `low`  THEN 1
+
+-- The built-in type-name collision. Read the emitted itemDefinition name and
+-- the two typeRefs together: `k` is typeRef="number_" and `n`, above, is
+-- typeRef="number". Without the suffix both would read "number", and a consumer
+-- resolving `n`'s type would land on this string enum.
+DECLARE `number`
+  IS ONE OF
+    `alpha`
+    `beta`
+
+GIVEN k IS A `number`
+GIVETH A BOOLEAN
+`is alpha` k MEANS
+  CONSIDER k
+  WHEN `alpha` THEN TRUE
+  WHEN `beta`  THEN FALSE

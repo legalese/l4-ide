@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Dependency set for etc/kie/KieBpmnCheck.java, resolved by
+  etc/check-bpmn-kie.sh into a cache OUTSIDE the repository.
+
+  This pom is never built as a module and is not part of any workspace. It
+  exists so `mvn dependency:build-classpath` can produce a classpath.
+
+  VERSION PIN. 7.74.1.Final is the newest coherent jBPM BPMN stack: org.jbpm's
+  artifacts stop there, and kie/drools jumped to 10.x without bringing jbpm-bpmn2
+  along. Note that the DMN side of this repo cites 8.44.0.Final. That version is
+  real for kie-dmn but DOES NOT EXIST for org.jbpm:jbpm-bpmn2 (its pom 404s). Do
+  not "harmonise" the two; they are different product lines.
+
+  Built with Java 11 bytecode, so any JDK 11 or newer runs it.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.legalese.l4</groupId>
+  <artifactId>kie-bpmn-check</artifactId>
+  <version>1</version>
+  <packaging>jar</packaging>
+  <properties>
+    <jbpm.version>7.74.1.Final</jbpm.version>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.jbpm</groupId>
+      <artifactId>jbpm-bpmn2</artifactId>
+      <version>${jbpm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.jbpm</groupId>
+      <artifactId>jbpm-flow-builder</artifactId>
+      <version>${jbpm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.drools</groupId>
+      <artifactId>drools-compiler</artifactId>
+      <version>${jbpm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>1.7.36</version>
+    </dependency>
+  </dependencies>
+</project>

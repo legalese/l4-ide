@@ -124,6 +124,7 @@ count list @nlg the number of items in %list%
         WHEN EMPTY THEN acc
         WHEN x FOLLOWED BY xs THEN go (acc + 1) xs
 
+@nonexhaustive
 GIVEN
   a    IS A TYPE
   list IS A LIST OF a
@@ -328,6 +329,7 @@ minimum1 x list @nlg the smallest of %x% and the values in %list%
   WHEN EMPTY THEN x
   WHEN y FOLLOWED BY ys THEN minimum1 (min x y) ys
 
+@nonexhaustive
 GIVEN
   list IS A LIST OF NUMBER
 GIVETH A NUMBER
@@ -336,6 +338,7 @@ maximum list @nlg the largest value in %list%
   CONSIDER list
   WHEN x FOLLOWED BY xs THEN maximum1 x xs
 
+@nonexhaustive
 GIVEN
   list IS A LIST OF NUMBER
 GIVETH A NUMBER
@@ -350,6 +353,7 @@ GIVETH A MAYBE NUMBER
 minimum list @nlg the smallest value in %list%
   MEANS
   CONSIDER list
+  WHEN EMPTY THEN NOTHING
   WHEN x FOLLOWED BY xs THEN minimum1 x xs
 
 GIVEN
@@ -367,7 +371,13 @@ GIVEN
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 min x y @nlg the lesser of %x% and %y%
-  MEANS IF x <= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a <= b THEN x ELSE y
 
 GIVEN
   list IS A LIST OF MAYBE NUMBER
@@ -375,7 +385,8 @@ GIVETH A MAYBE NUMBER
 maximum list @nlg the largest value in %list%
   MEANS
   CONSIDER list
-  WHEN x FOLLOWED BY xs THEN minimum1 x xs
+  WHEN EMPTY THEN NOTHING
+  WHEN x FOLLOWED BY xs THEN maximum1 x xs
 
 GIVEN
   x    IS A MAYBE NUMBER
@@ -385,14 +396,20 @@ maximum1 x list @nlg the largest of %x% and the values in %list%
   MEANS
   CONSIDER list
   WHEN EMPTY THEN x
-  WHEN y FOLLOWED BY ys THEN maximum1 (min x y) ys
+  WHEN y FOLLOWED BY ys THEN maximum1 (max x y) ys
 
 GIVEN
   x IS A MAYBE NUMBER
   y IS A MAYBE NUMBER
 GIVETH A MAYBE NUMBER
 max x y @nlg the greater of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+  MEANS
+  CONSIDER x
+  WHEN NOTHING THEN y
+  WHEN JUST a THEN
+    CONSIDER y
+    WHEN NOTHING THEN x
+    WHEN JUST b THEN IF a >= b THEN x ELSE y
 
 
 §§ `Ranges, Sorting & Search`
@@ -1265,25 +1282,16 @@ GIVEN a IS A TYPE
 GIVETH A SET OF a
 `__MINUS__` MEANS p `LESS` q
 
--- Term-level AND/OR on sets both mean UNION: "residents of NY and NJ" and
--- "residents of NY or NJ" denote the same eligible population. The
--- type-directed dispatch (same word, different types, different
--- operations) is in the spirit of Partee & Rooth (1983); the union
--- READING is L4's chosen resolution of an ambiguity the authorities leave
--- open — no authority holds that nominal "and" denotes union (see
--- SET-OPERATORS-SPEC §9.3, §9.5, §10.6). Sentence-level AND on BOOLEANs
--- stays conjunction.
-GIVEN a IS A TYPE
-      p IS A SET OF a
-      q IS A SET OF a
-GIVETH A SET OF a
-`__AND__` MEANS p UNION q
-
-GIVEN a IS A TYPE
-      p IS A SET OF a
-      q IS A SET OF a
-GIVETH A SET OF a
-`__OR__` MEANS p UNION q
+-- REMOVED 2026-07-28: the AND/OR-on-sets overloads (`__AND__`/`__OR__`
+-- MEANS p UNION q). A second candidate for __AND__/__OR__ makes the
+-- checker re-check argument subtrees per candidate with no memoisation,
+-- giving base-3 exponential cost in the DEPTH of AND/OR chains: a flat
+-- 15-operand `TRUE AND ... AND TRUE` took 71.75s, 16+ never finished, and
+-- a real 27-operand statutory disjunction extrapolated to ~a year
+-- (smucclaw/l4-ide#929). Term-level set union is spelled UNION explicitly;
+-- sentence-level AND/OR on BOOLEANs is unaffected. The overloads may
+-- return ("un-un-overloading") only if typechecker memoisation delivers a
+-- big-O win — see SET-OPERATORS-SPEC §16.
 
 -- Set equality overload: makes bare EQUALS on two SETs an AMBIGUITY error
 -- rather than silently order-sensitive structural equality. The builtin

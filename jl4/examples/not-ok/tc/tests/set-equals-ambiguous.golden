@@ -1,6 +1,6 @@
 Parsing successful
 Typechecking successful
-Info | [Import Resolution] Resolving import: prelude from set-equals-ambiguous.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+Info | [Import Resolution] Resolving import: prelude from set-equals-ambiguous.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from set-equals-ambiguous.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: set-equals-ambiguous.l4
   Hidden: no
   Range: 15:7-15:68
@@ -16,4 +16,4 @@ File: set-equals-ambiguous.l4
     The options are:
 
       `__EQUALS__` (predefined) of type FOR ALL A FUNCTION FROM A AND A TO BOOLEAN
-      `__EQUALS__` (defined at prelude.l4:1302:1-13) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO BOOLEAN
+      `__EQUALS__` (defined at prelude.l4:1310:1-13) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO BOOLEAN

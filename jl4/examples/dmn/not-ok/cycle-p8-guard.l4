@@ -1,0 +1,45 @@
+-- NEGATIVE fixture for the future D-CYCLE check (spec §6.4.2, §6.3.7), and THE
+-- WORST INSTANCE IN THE SET.
+--
+-- p8: the cycle runs through a GUARD, i.e. through a table's INPUT position
+-- rather than through an output expression.
+--
+--     `the relief applies`  MEANS BRANCH IF `the charge is due` THEN FALSE
+--                                        OTHERWISE TRUE
+--     `the charge is due`   MEANS BRANCH IF `the relief applies` THEN FALSE
+--                                        OTHERWISE TRUE
+--
+-- Why it is the worst: the exporter's fidelity report reads `(nothing lost)` on
+-- this shape. Both decisions tabulate cleanly, every guard renders, no note
+-- fires -- and the file it certifies is one all three engines reject (§6.4.3(a):
+-- KIE reports `Cyclic dependency detected` then SKIPPED, Camunda 7 refuses with
+-- `DMN-02015 ... has a loop`, Camunda 8 rejects at parse with `Cyclic
+-- dependencies between decisions detected`). An exporter that says nothing lost
+-- about an unloadable artifact is worse than one that refuses, because the
+-- refusal is at least legible.
+--
+-- Expected after Phase 4: one D-CYCLE over an SCC of size 2, and `(nothing
+-- lost)` must no longer be the report.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `cycle through a guard`
+
+GIVETH A BOOLEAN
+`the relief applies` MEANS
+    BRANCH IF `the charge is due` THEN FALSE
+           OTHERWISE TRUE
+
+GIVETH A BOOLEAN
+`the charge is due` MEANS
+    BRANCH IF `the relief applies` THEN FALSE
+           OTHERWISE TRUE

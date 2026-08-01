@@ -172,3 +172,58 @@ describe('LadderModel — a plain (no-seam) function still works', () => {
     expect(m.verdict).toBe('Holds')
   })
 })
+
+/**
+ * The Unique-space surface the Step-4 sidebar reuse needs. Tested here, in the model, rather
+ * than through the shell: the sidebar assigns by `Unique` while a click on the picture
+ * assigns by `NodeId`, and R2 ("a binding must fan out to every drawn position") is a claim
+ * about what the MODEL does with a repeated atom, not about Svelte.
+ */
+describe('LadderModel — Unique-space bindings and labels (the sidebar surface)', () => {
+  // `dry` appears TWICE: two NodeIds, one Unique. That is R2's whole shape.
+  const repeatedFn: VizFunDecl = {
+    $type: 'FunDecl',
+    id: iid(300),
+    name: nm('repeated', 30),
+    params: [],
+    body: and(31, [
+      ubool(32, 70, 'dry'),
+      and(33, [ubool(34, 70, 'dry'), ubool(35, 71, 'sunny')]),
+    ]),
+  }
+  const mkRepeated = () => new LadderModel(repeatedFn, deps)
+
+  it('getLabelForUnique returns the leaf label, and is stable for a repeated atom', () => {
+    const m = mkRepeated()
+    expect(m.getLabelForUnique(70)).toBe('dry')
+    expect(m.getLabelForUnique(71)).toBe('sunny')
+    // twice, to exercise the memo as well as the walk
+    expect(m.getLabelForUnique(70)).toBe('dry')
+  })
+
+  it('getLabelForUnique falls back to #<unique> for an atom the drawn tree lacks', () => {
+    expect(mkRepeated().getLabelForUnique(9999)).toBe('#9999')
+  })
+
+  it('setValueForUnique reaches EVERY drawn position of a repeated atom (R2)', async () => {
+    const m = mkRepeated()
+    m.setValueForUnique(70, 'TrueV')
+    await m.recompute()
+    const v = m.valuation
+    expect(v.get(32)).toBe('TrueV')
+    expect(v.get(34)).toBe('TrueV')
+  })
+
+  it('setValueForUnique on an unknown Unique is accepted and simply never read', async () => {
+    const m = mkRepeated()
+    expect(() => m.setValueForUnique(4242, 'FalseV')).not.toThrow()
+    await m.recompute()
+    expect(m.verdict).toBe('Undetermined')
+  })
+
+  it('the label index is built off the DRAWN tree, so an Implies seam is walked too', () => {
+    const m = mk()
+    expect(m.getLabelForUnique(40)).toBe('upper') // in the scope
+    expect(m.getLabelForUnique(43)).toBe('shut') // in the requirement
+  })
+})

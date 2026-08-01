@@ -72,9 +72,15 @@
       button:hover {
         background: #f0f0f0;
       }
+      /* A pan/zoom host must have a DEFINITE height: the viewBox only means something
+         against a fixed viewport, so the controller clips instead of scrolling. */
       #ladder {
         padding: 26px 28px;
-        overflow-x: auto;
+        height: 62vh;
+      }
+      #ladder:focus-visible {
+        outline: 1px dotted #ccc;
+        outline-offset: -4px;
       }
       #ladder svg {
         display: block;
@@ -103,6 +109,10 @@
         <b>folded</b> box takes an <b>override</b> — assign the parent without
         naming which child decides it.
         <b>Click a heading, a connector, or a ▸ caret</b> to fold / expand.
+        <b>Drag</b> to pan; <b>⌘/ctrl-wheel</b> (or a trackpad pinch) to zoom at
+        the pointer; <b>double-click</b> to fit. A plain wheel scrolls the page
+        rather than zooming, on purpose — until the diagram has focus, which a
+        click gives it.
       </p>
     </header>
     <div class="controls">
@@ -124,6 +134,12 @@
         <span class="grp">fold</span>
         <label><input type="checkbox" id="fold-deception" /> deception</label>
         <label><input type="checkbox" id="fold-harm" /> harm</label>
+      </fieldset>
+      <fieldset>
+        <span class="grp">view</span>
+        <button id="zoom-out" type="button">−</button>
+        <button id="zoom-in" type="button">+</button>
+        <button id="fit" type="button">fit</button>
       </fieldset>
     </div>
     <div id="ladder"></div>

@@ -1,0 +1,61 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-SCOPE] lossy — input_s
+      two different terms fold to the FEEL name `s` (L4: `s`; used in art3 applies, art7 applies); they are emitted as the distinct globals `s`, `s_2`, because DMN's inputData is global and has no scope at all
+      lost: L4's lexical scoping of GIVEN parameters: a caller must now supply one value per element where the L4 has one locally-scoped name
+  [D-RENAME] lossy — input_s_2
+      `s` is emitted as the FEEL name `s_2`, not `s`: two elements of the DRG's flat variable namespace in this module fold to `s` (`s`, `s`), and the first claimant in source order keeps the base name
+      lost: the resemblance between the emitted FEEL name and the L4 name it came from; the L4 name survives in @label
+  [D-LITERALEXPR] blocking — decision_basic_monthly_benefit  (main.l4:40:3-64)
+      `basic monthly benefit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_benefit_cap  (main.l4:44:30-57)
+      `benefit cap` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_scaled_amount  (main.l4:56:30-47)
+      `scaled amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_low_estimate  (main.l4:59:22-41)
+      `low estimate` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_high_estimate  (main.l4:62:23-42)
+      `high estimate` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_art3_applies  (main.l4:67:24-53)
+      `art3 applies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_art7_applies  (main.l4:71:24-53)
+      `art7 applies` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_definition_benefit  (main.l4:82:3-53)
+      `definition — benefit` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_net_payout  (main.l4:98:26-41)
+      `net payout` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_payout_a  (main.l4:101:18-34)
+      `payout a` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] blocking — decision_payout_b  (main.l4:104:18-34)
+      `payout b` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
+      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-FIXTURE] advisory — sample claimant  (main.l4:74:1-75:44)
+      `sample claimant` is test scaffolding (referenced only from directive argument positions, with no callers in this module or its importers), so it is not emitted; pass --include-tests to emit it
+      lost: nothing about the rule set: the decision exists to exercise it, not to state it
+  [D-REGULATIVE] lossy — payment duty  (main.l4:88:1-93:18)
+      `payment duty` has a regulative body and no callers, so it is not emitted as a decision: DMN models decisions; lifecycle is BPMN's and CMMN's job, and a <decision> whose logic is raw deontic L4 misdescribes both
+      lost: the obligation's lifecycle: route this rule to the BPMN exporter instead
+  [D-INERT] advisory — decision_definition_benefit  (main.l4:80:1-82:53)
+      `definition — benefit` is kept, but its body forces no reference and no input — an inert prose carrier (typically statutory text plus a constant)
+      lost: nothing: the note exists so a reader can tell a constant stub from a live rule
+  [D-PARAMTYPE] blocking — input_s, input_s_2
+      the GIVEN parameter `s` is bound at two different declared types across un-lifted decisions (`Article3Case` in `art3 applies`; `Article7Case` in `art7 applies`), so the Phase 4 merge is REFUSED and the parameters are emitted as the distinct elements `s`, `s_2`. Merging them would make every decision read whichever value the caller bound to the one name — measured on both target engines as a null answer with status SUCCEEDED and zero runtime messages
+      lost: the one-input-per-name economy of the merge; every claimant keeps its own element, and a caller must bind each one
+  [D-PARAM-AS-INPUT] advisory — input_claimant
+      the GIVEN parameter `claimant` of three decisions (`basic monthly benefit`, `benefit cap`, `capped benefit`) became the one shared model input `input_claimant`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_gross
+      the GIVEN parameter `gross` of `net payout` became the model input `input_gross`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
+      lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
+  [D-BKM] advisory — decision_scaled_amount
+      `scaled amount` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `low estimate`, `high estimate`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
+      lost: nothing yet: this is a classification, not a change of behaviour
