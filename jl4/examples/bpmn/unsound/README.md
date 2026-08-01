@@ -263,10 +263,13 @@ recorded here rather than left for the next reader to discover:
 1. **jBPM never sees the file as emitted.** `KieBpmnCheck.adapt` rewrites it
    first, and A2 is a structural rewrite (end events are cloned and sequence
    flows re-targeted). The engine is independent; the document it reads is ours.
-2. **The single explored path is chosen by our own code.** Because the exporter
-   emits no branch guards at all (A3), the harness supplies them, and every
-   multi-way exclusive gateway takes its **first outgoing flow in document
-   order**. That interleaving is an artifact, not a representative run.
+2. **The single explored path is chosen by our own code.** Where a multi-way
+   exclusive gateway carries no guards (A3) — the exporter DOES emit
+   `conditionExpression`s where the L4 has a guard to draw from, as
+   deliberately opaque L4 text; among the goldens only `../handover.l4`'s ROR
+   has none — the harness supplies them, and that gateway takes its **first
+   outgoing flow in document order**. That interleaving is an artifact, not a
+   representative run.
 3. **The mechanism on `deadlock-boundary-in-rand.bpmn` is degenerate.** Work
    items auto-complete, so the interrupting boundary timer never fires; what
    jBPM observed is "the join wants 3 arrivals and got 2 because the timer never
