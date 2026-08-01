@@ -4463,6 +4463,19 @@ targets.
 > `D-FLAVOR-NOSERVICE`), plus byte-identity everywhere else, so drift in EITHER direction is
 > announced. Engine legs run each flavor's golden through its own engine: `svc.kie.dmn` MustPass
 > on KIE (8/8, 0 warnings), `svc.dmn` MustFail on Camunda at parse — the refusal is the exhibit.
+>
+> **The 23 probes are wired** (`jl4/tests-cli/Main.hs`, `bkmProbeMatrix`, 46 legs), per the
+> build plan §1's MustPass/MustFail table, re-run green on 2026-08-01. **Harness limitation —
+> RULED at the Phase 5 build, recorded rather than left unstated (the "`5/5 evaluated` is a
+> liveness claim" trap):** `--cases`' `expect` keys on DECISION names only, so a BKM's or a
+> service's own return value is never compared directly, and KIE's `evaluateDecisionService`
+> result is printed but not asserted. The alternative (`expectService`) was considered and NOT
+> built in this phase; instead every probe and both emitted exhibits assert invocables **through
+> caller decisions** — which also matches how the artifacts are consumed — and the limitation is
+> stated at the wiring site, in `bkm.cases.json`, and here. If a future case needs a service's
+> return shape pinned directly, build `expectService` symmetric like `expect` (so adding a
+> service cannot widen the unchecked surface) and note that KIE's returned context includes the
+> service's INPUTS as well as its output decisions (probe D1).
 
 **Goldens: one pair per flavor, not a base plus a diff** — but not yet, and the "not yet" is the
 interesting part.

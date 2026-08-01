@@ -247,6 +247,12 @@ dmnEngineCheck label script requiredVar =
 data HarnessOutcome = HarnessMustPass | HarnessMustFail
   deriving (Eq, Show)
 
+-- | For probe leg titles.
+outcomeWord :: HarnessOutcome -> String
+outcomeWord = \case
+  HarnessMustPass -> "MustPass"
+  HarnessMustFail -> "MustFail"
+
 -- | The general form: run one committed engine harness over one file and
 -- assert its VERDICT banner, under the same opt-in/skip contract as
 -- 'dmnEngineCheck'.
@@ -564,6 +570,54 @@ hydrationProbeCases = dmnHydrationProbeDir </> "hydration.cases.json"
 
 dmnHydrationProbeDir :: FilePath
 dmnHydrationProbeDir = fixtureDir </> "dmn-hydration-probe"
+
+-- The 23 Phase 5 BKM/service probes (spec §6.2, §13.3-§13.5;
+-- DMN-PHASE5-BUILD-PLAN.md §1 holds the full matrix). Hand-written, never
+-- regenerated: they pin the IDIOMS (BKM invocation, knowledgeRequirement
+-- topology, decisionService shapes, name-collision semantics) independently
+-- of the emitter — a red run on a probe isolates the ENGINE, a red run on
+-- the emitted goldens isolates the LOWERING, exactly the hydration split.
+--
+-- Each row: (label, fixture stem, KIE outcome, Camunda outcome), the
+-- outcomes transcribed from each fixture's own MEASURED header (2026-07-31)
+-- and re-run here. THE ASYMMETRY IS THE FLAVOR AXIS: the seven fixtures that
+-- fail on KIE and pass on Camunda (C4, D5, E4, E5, E6, and with C3/D3's null
+-- degradations beside them) are, without exception, cases where CAMUNDA'S
+-- SILENCE IS THE DANGER — KIE refuses at validator/compile where zeebe-dmn
+-- parses and answers something. A FLIP on any row means an engine changed
+-- its mind across an upgrade: re-read the fixture's header and the spec
+-- section it names before touching the row (e.g. C4 going green on KIE
+-- would relax §6.2's name==variable invariant; E4 agreeing would demote
+-- §5.2's BKM-in-scope-1 requirement).
+dmnBkmProbeDir :: FilePath
+dmnBkmProbeDir = fixtureDir </> "dmn-bkm-probe"
+
+bkmProbeMatrix :: [(String, String, HarnessOutcome, HarnessOutcome)]
+bkmProbeMatrix =
+  [ ("A1", "bkm-multiparam",               HarnessMustPass, HarnessMustPass)
+  , ("A2", "bkm-named-args",               HarnessMustPass, HarnessMustPass)
+  , ("A3", "bkm-table-multiparam",         HarnessMustPass, HarnessMustPass)
+  , ("B1", "bkm-in-context",               HarnessMustPass, HarnessMustPass)
+  , ("B2", "bkm-in-context-sibling",       HarnessMustPass, HarnessMustPass)
+  , ("B3", "bkm-null",                     HarnessMustPass, HarnessMustPass)
+  , ("C1", "bkm-chain",                    HarnessMustPass, HarnessMustPass)
+  , ("C2", "bkm-chain-flat",               HarnessMustFail, HarnessMustFail)
+  , ("C3", "bkm-chain-nokr",               HarnessMustFail, HarnessMustFail)
+  , ("C4", "bkm-name-mismatch",            HarnessMustFail, HarnessMustPass)
+  , ("D1", "svc-grouping",                 HarnessMustPass, HarnessMustPass)
+  , ("D2", "svc-invoked",                  HarnessMustPass, HarnessMustFail)
+  , ("D3", "svc-invoked-minus-kr",         HarnessMustFail, HarnessMustFail)
+  , ("D4", "svc-plus-bkm",                 HarnessMustPass, HarnessMustPass)
+  , ("D5", "svc-no-output",                HarnessMustFail, HarnessMustPass)
+  , ("D6", "svc-cycle",                    HarnessMustFail, HarnessMustFail)
+  , ("E1", "collide-param-input",          HarnessMustPass, HarnessMustPass)
+  , ("E2", "collide-param-param",          HarnessMustPass, HarnessMustPass)
+  , ("E3", "collide-param-decision",       HarnessMustFail, HarnessMustFail)
+  , ("E4", "collide-bkm-decision",         HarnessMustFail, HarnessMustPass)
+  , ("E5", "collide-svc-decision",         HarnessMustFail, HarnessMustPass)
+  , ("E6", "collide-svc-svc",              HarnessMustFail, HarnessMustPass)
+  , ("E7", "collide-param-shadow-visible", HarnessMustPass, HarnessMustPass)
+  ]
 
 -- The EMITTER'S OWN hydration output, and its cases. Strictly stronger than the
 -- hand-written probe above: that one pins that the boxed-context idiom
@@ -1681,6 +1735,28 @@ spec bin = do
           -- and pinning it here is what stops it being lost. See §11-R8-a.
           out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
           out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+
+  -- Tier 1 of the Phase 5 evidence: the 23 hand-written BKM/service probes,
+  -- exactly per DMN-PHASE5-BUILD-PLAN.md §1's matrix. See 'bkmProbeMatrix'
+  -- for what the asymmetry means and what a flip would say. What is asserted
+  -- per leg is the VERDICT banner (the harness RAN) and the exit direction
+  -- (the measured outcome); the value-level detail lives in each fixture's
+  -- own cases file and MEASURED header. NOTE the recorded harness limitation
+  -- (spec §13.6): `expect` keys on DECISION names only, so a BKM's or a
+  -- service's own return value is never compared directly — every probe
+  -- asserts invocables through caller decisions, deliberately.
+  describe "the 23 BKM/service probes (opt-in: L4_DMN_ENGINE_CHECK=1)" $
+    for_ bkmProbeMatrix \(label, stem, kieOutcome, camOutcome) -> do
+      let model = dmnBkmProbeDir </> (stem <> ".dmn")
+          cases = dmnBkmProbeDir </> (stem <> ".cases.json")
+      it (label <> " " <> stem <> ": KIE " <> outcomeWord kieOutcome) $
+        dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" kieOutcome
+          model [model, "--cases", cases] \out ->
+            out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
+      it (label <> " " <> stem <> ": Camunda " <> outcomeWord camOutcome) $
+        dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" camOutcome
+          model [model, "--cases", cases] \out ->
+            out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
 
   -- The Phase 5 EMITTED-BKM legs (spec §6.2, §13.6): the emitter's own BKM
   -- output through both engines, the strictly-stronger counterpart of the 23
