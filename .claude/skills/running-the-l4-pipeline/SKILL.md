@@ -32,7 +32,7 @@ Reach for this skill when the user wants to:
 
 1. **Run the demo** — "SEC Regulation Crowdfunding: go", or any subject named the same way. That is a milestone-G1 replay run against the committed corpus.
 2. **Resume an interrupted run** — a usage limit, a killed terminal, a machine that went to sleep. Re-entry is a digest comparison, not a memory, and every stage whose inputs are unchanged replays instead of re-running.
-3. **Understand a verdict** — what `G1 COMPLETE` means when eight of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
+3. **Understand a verdict** — what `G1 COMPLETE` means when nine of thirteen legs are not green, or why a leg that passed every checker still reports `DEGRADED`.
 4. **Grant or waive a human gate** — HG1 before the projections, HG2 before anything outward-facing.
 5. **Audit a run somebody else did** — recompute every verdict from the committed artifacts, with no build, no model and no network.
 
@@ -127,7 +127,7 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 ### 6. Resume, rather than restart
 
 ```bash
-etc/go/go.sh run --milestone g1 --subject regcf --run-id 2026-08-02-97b15013-001
+etc/go/go.sh run --milestone g1 --subject regcf --run-id <run-id>
 ```
 
 Each stage declares its own inputs; the driver digests them; an unchanged digest replays the receipt with its verdict intact. A second run back to back re-executes nothing but the report.

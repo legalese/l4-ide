@@ -39,7 +39,7 @@ etc/go/
 │                                fidelity-counts · plan-shape · split-digraphs ·
 │                                known-defects · gate-payload · verify-run ·
 │                                phase-prelude.sh
-├── phases/                      p0 p3-check p6 p7×8 p9  (run) ·
+├── phases/                      p0 p3-check p6 p7×9 p9  (run) ·
 │                                p1 p2 p3-encode p4 p5 p8 p10  (refuse)
 └── report/                      render-report.mjs + template.md
 
@@ -61,7 +61,7 @@ so a skill-only PR previously ran zero jobs.
 
 ## 1. Measured results — one G1 run on this worktree
 
-Run `2026-08-02-97b15013-001`, subject `regcf`, HG1 waived, clock pinned to
+Run id `<UTC-date>-97b15013-001` (the digest names the corpus), subject `regcf`, HG1 waived, clock pinned to
 `2025-01-31T00:00:00Z`. Every figure below came out of `journal.ndjson`; none was typed.
 
 | stage          | status              | oracle class | why                                                                                                                                                              |
@@ -81,7 +81,8 @@ Run `2026-08-02-97b15013-001`, subject `regcf`, HG1 waived, clock pinned to
 | `p9-report`    | PASS                | structural   | every section SPEC.md §P9 requires is present                                                                                                                    |
 | **milestone**  | **G1 COMPLETE**     |              |                                                                                                                                                                  |
 
-`G1 COMPLETE` with eight non-green legs is the intended outcome, not a lowered bar — see §3.
+Four of the thirteen are `PASS`. `G1 COMPLETE` with the other nine non-green is the intended
+outcome, not a lowered bar — see §3.
 
 ### 1.1 Three defects this build measured, which are findings in their own right
 
@@ -199,7 +200,7 @@ G1 = COMPLETE  iff  every declared stage has a receipt
 **Completeness of accounting, not greenness.** That is what SPEC.md §6 actually asks for when it
 permits a non-executable DMN at G1 _only if the report says so in Blocking terms_ — a rule about
 what the report contains, not about what colour the legs are. It is also why this design can be
-honest about eight legs and still terminate.
+honest about nine legs and still terminate.
 
 `BROKEN` outranks `GATE`, which outranks `INCOMPLETE`.
 

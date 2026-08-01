@@ -99,7 +99,7 @@ If a leg's only available oracle is weak, the honest status is `UNVERIFIED` with
 | `GATE`       | 3    | a human gate was not satisfied                                                                                                                                                    |
 | `BROKEN`     | 4    | a harness defect                                                                                                                                                                  |
 
-`COMPLETE` is **completeness of accounting, not greenness.** That reading is not a convenience: SPEC.md §6 defines G1 as permitting a non-executable DMN _only if the report says so in Blocking terms_, which is a rule about what the report contains, not about what colour the legs are. A milestone where eight of thirteen legs are honestly non-green and every one of them is explained is a successful milestone. A milestone where one leg is silently missing is not, even if the other twelve are green.
+`COMPLETE` is **completeness of accounting, not greenness.** That reading is not a convenience: SPEC.md §6 defines G1 as permitting a non-executable DMN _only if the report says so in Blocking terms_, which is a rule about what the report contains, not about what colour the legs are. A milestone where nine of thirteen legs are honestly non-green and every one of them is explained is a successful milestone. A milestone where one leg is silently missing is not, even if the other twelve are green.
 
 `BROKEN` outranks `GATE`, which outranks `INCOMPLETE`. A defective harness is not a gate problem and should not be reported as one.
 
