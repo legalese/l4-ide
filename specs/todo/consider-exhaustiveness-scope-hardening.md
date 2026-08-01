@@ -177,6 +177,21 @@ fixed):**
   `jl4-core/libraries` when testing library changes, or stale installed
   copies will masquerade as regressions.
 
+### Round 3 (2026-08-01): multi-clause groups are checked at matrix level
+
+Multi-clause `DECIDE`/`MEANS` pattern-matching groups — which the desugarer
+lowers to nested CONSIDERs whose exhaustiveness this oracle could not see (the
+fall-through suppression exempted n ≥ 2 groups entirely) — are now analysed
+**as a unit**: the parser attaches the source clause matrix to the fused
+Decide's annotation (`Extension.pmMatrix`), and `checkClauseMatrix` runs the
+same residual-set core (`analyzeGuardRows`, shared with `analyzePatternMatch`,
+caps intact) over it, emitting `PatternClausesMissing` at the clause-head hull
+with pasteable `DECIDE … IS` suggestions. The **owning document for this
+mechanism and its rulings is `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §14.7**; this
+note only records that the gap named there is closed on this oracle's side.
+Residual (owned there too): a user-written CONSIDER inside clause 2..n's body
+is still suppressed.
+
 ---
 
 ## Historical: the split-field proposal (NOT implemented — superseded above)

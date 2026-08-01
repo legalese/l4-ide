@@ -57,9 +57,12 @@
 //     defect in the exporter's history is invisible here. `validate-bpmn.mjs` is
 //     what covers drawing, and only for presence, not sanity.
 //   * Only ONE execution path, AND THIS HARNESS CHOOSES IT. Work items
-//     auto-complete, so boundary timers are never reached; and because the
-//     exporter emits no branch guards at all (A3), `addMissingGuards` below
-//     supplies them, sending every multi-way exclusive gateway down its FIRST
+//     auto-complete, so boundary timers are never reached; and where a
+//     multi-way exclusive gateway carries no guards — the exporter DOES emit
+//     conditionExpressions where the L4 has them, as deliberately opaque L4
+//     text; in the 2026-08-01 runs A3 fired only on handover.bpmn, whose ROR
+//     gateway has no PROVIDED to draw from — `addMissingGuards` below
+//     supplies them, sending that gateway down its FIRST
 //     OUTGOING FLOW IN DOCUMENT ORDER. The explored interleaving is therefore an
 //     artifact of our adaptation, not a representative run. It can prove a
 //     deadlock exists; it can NEVER prove one absent. That is precisely what

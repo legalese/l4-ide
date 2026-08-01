@@ -99,30 +99,43 @@ pre-fix exporter: only `handover.l4` had a `RAND` whose branches carried lapse
 timers, which is the shape the edge-counting predicate got wrong. A regression
 suite of those two goldens would have shown nothing at all.
 
-### What jBPM makes of the three directions
+### What jBPM makes of the four directions
 
 Worth recording, because it is the reason the corrected golden is *still*
 rejected and the reason the correction is still right. The same fixture, run
-three times with only `gatewayDirection` changed (`etc/check-bpmn-kie.sh`,
-jbpm-bpmn2 7.74.1.Final, JDK 17.0.20):
+with only `gatewayDirection` changed (`etc/check-bpmn-kie.sh`, jbpm-bpmn2
+7.74.1.Final, JDK 17.0.20):
 
 | declared      | jBPM says                                                                        |
 | ------------- | -------------------------------------------------------------------------------- |
 | `Diverging`   | `This type of node [Split_0, one of] cannot have more than one incoming connection!` |
 | `Converging`  | `This type of node [Split_0, one of] cannot have more than one outgoing connection!` |
 | `Mixed`       | `Unknown gateway direction: Mixed`                                                |
+| `Unspecified` | `Unknown gateway direction: Unspecified`                                          |
+
+The `Unspecified` row was measured 2026-08-01, on
+`../expected/regcf-reporting.bpmn` itself (2 incoming, 3 outgoing) rather than
+on this fixture; the same run reproduced the `Diverging` and `Converging`
+refusals verbatim on the real file, so the table holds for both shapes. It was
+measured because an attribute-level fix for the golden's rejection — emit
+`Unspecified` where `Mixed` is computed, on the theory that the XSD default
+would pass where the unimplemented value did not — had been planned, and the
+measurement killed it: jBPM's parser accepts exactly the two values it has
+node types for.
 
 So jBPM really does model a gateway as **either** a split **or** a join, and it
 picks which from this attribute: declare `Diverging` and you get a `Split` whose
 invariant is at most one incoming, declare `Converging` and you get a `Join`
-whose invariant is at most one outgoing. `Mixed` is not a value it implements at
-all — which BPMN 2.0 §10.5.2 permits and jBPM simply does not.
+whose invariant is at most one outgoing. `Mixed` and `Unspecified` are not
+values it implements at all — the former BPMN 2.0 §10.5.2 permits, the latter
+is the spec's own default, and jBPM takes neither.
 
 Two things follow. The message quoted from a `Diverging` run is about **incoming
 arity**, not about mixedness, and citing it as "jBPM refuses mixed gateways"
-reads the wrong constraint off it. And no value of this attribute makes jBPM
-accept a gateway with multiple of both: the shape is what it will not have, and
-saying so accurately is all the attribute can do.
+reads the wrong constraint off it. And no value of this attribute — now all
+four are measured — makes jBPM accept a gateway with multiple of both: the
+shape is what it will not have, and saying so accurately is all the attribute
+can do.
 
 ## The three hand-written join defects
 
@@ -250,10 +263,13 @@ recorded here rather than left for the next reader to discover:
 1. **jBPM never sees the file as emitted.** `KieBpmnCheck.adapt` rewrites it
    first, and A2 is a structural rewrite (end events are cloned and sequence
    flows re-targeted). The engine is independent; the document it reads is ours.
-2. **The single explored path is chosen by our own code.** Because the exporter
-   emits no branch guards at all (A3), the harness supplies them, and every
-   multi-way exclusive gateway takes its **first outgoing flow in document
-   order**. That interleaving is an artifact, not a representative run.
+2. **The single explored path is chosen by our own code.** Where a multi-way
+   exclusive gateway carries no guards (A3) — the exporter DOES emit
+   `conditionExpression`s where the L4 has a guard to draw from, as
+   deliberately opaque L4 text; among the goldens only `../handover.l4`'s ROR
+   has none — the harness supplies them, and that gateway takes its **first
+   outgoing flow in document order**. That interleaving is an artifact, not a
+   representative run.
 3. **The mechanism on `deadlock-boundary-in-rand.bpmn` is degenerate.** Work
    items auto-complete, so the interrupting boundary timer never fires; what
    jBPM observed is "the join wants 3 arrivals and got 2 because the timer never

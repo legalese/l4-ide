@@ -434,6 +434,15 @@ exportDmn opts tcRes = do
                 | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <- tcRes.infos
                 , Just r <- [rangeOf e]
                 ]
+            -- L1's Decide-level channel: the clause-matrix warnings for
+            -- multi-clause pattern-matching groups, extracted by the same
+            -- comprehension as above (the golden harness matches this
+            -- exactly, so the two cannot drift).
+            , dloClauseMatrixRanges =
+                [ r
+                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <- tcRes.infos
+                , Just r <- [rangeOf e]
+                ]
             , dloExternalRefNames = externalRefs
             }
           tcRes.module'

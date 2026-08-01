@@ -441,6 +441,15 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- sound when the caller really ran the checker — both call sites
     -- (@jl4\/app\/L4\/Cli\/Export.hs@ and the golden harness) extract these
     -- from the same 'TC.CheckErrorWithContext' list the module came from.
+  , dloClauseMatrixRanges :: ![SrcRange]
+    -- ^ the source ranges (clause-head hulls) of the checker's
+    -- @PatternClausesMissing@ warnings — L1's Decide-level channel for
+    -- multi-clause pattern-matching groups (§14.7). A separate list from
+    -- 'dloMissingMatchRanges' on purpose: those are matched against
+    -- CONSIDER ranges, which a clause-head hull never sits inside (the
+    -- desugarer's CONSIDERs are rangeless), and a shared list checked at
+    -- Decide level would double-report every ordinary partial CONSIDER.
+    -- Extracted at the same two call sites, by the same comprehension.
   , dloExternalRefNames :: !(Maybe (Set Text))
     -- ^ @FIXTURE(d)@'s importer view (§2.5.7): the L4 names referenced by
     -- modules that import this one. 'Nothing' = unavailable — the population
@@ -457,6 +466,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloMaybePredicates    = Nothing
   , dloIncludeTests       = False
   , dloMissingMatchRanges = []
+  , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
   }
 
@@ -3177,6 +3187,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     A.analyzeSafety
       A.MkSafetyInput
         { A.siMissingRanges  = opts.dloMissingMatchRanges
+        , A.siClauseMatrixRanges = opts.dloClauseMatrixRanges
         , A.siNonexhaustive  = A.nonexhaustiveDecides allDecides
         , A.siEnumFields     =
             Map.fromList

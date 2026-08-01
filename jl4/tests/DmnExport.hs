@@ -2695,6 +2695,41 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         notesOf "D-PARTIAL" drg `shouldBe` []
         length (inputsNamed "d" drg) `shouldBe` 1
 
+      -- The §14.7 probe: a partial multi-clause pattern-matching group.
+      -- Before OPEN-6 this exported clean (two Advisory notes, no D-PARTIAL,
+      -- passed --fail-on blocking, answered null for Blue); the checker's
+      -- clause-matrix warning now reaches L1 through the Decide-level channel
+      -- (siClauseMatrixRanges). The DMN half of §14.7's regression pair — the
+      -- l4-check half is ok/pattern-matching-partial-matrix.l4's golden.
+      it "L1, clause matrix: a partial multi-clause group is refused (§14.7)" $ do
+        let src =
+              "DECLARE Colour IS ONE OF Red, Green, Blue\n\
+              \GIVEN c IS A Colour\n\
+              \GIVETH A NUMBER\n\
+              \DECIDE `two clause partial` Red   IS 1\n\
+              \DECIDE `two clause partial` Green IS 2\n"
+            drg = drgOf src
+        [n | n <- notesOf "D-PARTIAL" drg, n.element == "decision_two_clause_partial"]
+          `shouldSatisfy` \case
+            [n] ->
+              n.severity == Blocking            -- a DRG root: no guard can fence the null
+                && Text.isInfixOf "L1" n.message
+                && Text.isInfixOf "multi-clause" n.message
+            _ -> False
+        -- Phase 4 classifies and reports; it does not change node kind: the
+        -- two-rule table is still emitted.
+        length (tableOf "two clause partial" src).dtRules `shouldBe` 2
+
+      it "L1, clause matrix: the total three-clause variant is certified" $ do
+        let drg = drgOf
+              "DECLARE Colour IS ONE OF Red, Green, Blue\n\
+              \GIVEN c IS A Colour\n\
+              \GIVETH A NUMBER\n\
+              \DECIDE `all three` Red   IS 1\n\
+              \DECIDE `all three` Green IS 2\n\
+              \DECIDE `all three` Blue  IS 3\n"
+        notesOf "D-PARTIAL" drg `shouldBe` []
+
       -- fixture 7: the same partial decision consumed ONLY from a lazy
       -- position (an IF arm) is Lossy, not Blocking — the consumer's guard
       -- can fence the null.
@@ -3576,6 +3611,14 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 , dloMissingMatchRanges =
                     [ r
                     | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <-
+                        tc.tcdErrors
+                    , Just r <- [rangeOf e]
+                    ]
+                -- L1's Decide-level channel (clause matrices), extracted by
+                -- the same comprehension as the CLI (jl4/app/L4/Cli/Export.hs)
+                , dloClauseMatrixRanges =
+                    [ r
+                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <-
                         tc.tcdErrors
                     , Just r <- [rangeOf e]
                     ]
