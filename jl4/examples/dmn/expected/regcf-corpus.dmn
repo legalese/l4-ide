@@ -1153,25 +1153,66 @@
     </literalExpression>
   </decision>
   <decision id="decision_ongoing_reporting_obligation" name="ongoing_reporting_obligation" label="ongoing reporting obligation">
-    <variable id="decision_ongoing_reporting_obligation_var" name="ongoing_reporting_obligation" label="ongoing reporting obligation" typeRef="Any"/>
+    <variable id="decision_ongoing_reporting_obligation_var" name="ongoing_reporting_obligation" label="ongoing reporting obligation" typeRef="string"/>
     <informationRequirement id="decision_ongoing_reporting_obligation_ir1">
-      <requiredDecision href="#decision_business_days_to_file_form_c_tr"/>
-    </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir2">
-      <requiredDecision href="#decision_days_to_file_the_annual_report_after_fiscal_year_end"/>
-    </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir3">
       <requiredDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
     </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir4">
+    <informationRequirement id="decision_ongoing_reporting_obligation_ir2">
       <requiredInput href="#input_annual_cycles"/>
     </informationRequirement>
-    <informationRequirement id="decision_ongoing_reporting_obligation_ir5">
-      <requiredInput href="#input_status_2"/>
-    </informationRequirement>
-    <literalExpression id="decision_ongoing_reporting_obligation_literal">
-      <text>IF (`ongoing reporting obligation may terminate` OF status) THEN (PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`) ELSE (IF (`annual cycles` AT MOST 0) THEN FULFILLED ELSE (PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)))</text>
-    </literalExpression>
+    <decisionTable id="decision_ongoing_reporting_obligation_table" hitPolicy="FIRST" preferredOrientation="Rule-as-Row" outputLabel="ongoing reporting obligation">
+      <input id="decision_ongoing_reporting_obligation_i1" label="`ongoing reporting obligation may terminate` OF status">
+        <inputExpression id="decision_ongoing_reporting_obligation_i1_expr" typeRef="boolean">
+          <text>ongoing_reporting_obligation_may_terminate</text>
+        </inputExpression>
+      </input>
+      <input id="decision_ongoing_reporting_obligation_i2" label="`annual cycles`">
+        <inputExpression id="decision_ongoing_reporting_obligation_i2_expr" typeRef="number">
+          <text>annual_cycles</text>
+        </inputExpression>
+      </input>
+      <output id="decision_ongoing_reporting_obligation_o1">
+        <outputValues>
+          <text>"file a Form C-TR termination of reporting","fulfilled","file a Form C-AR annual report and continue"</text>
+        </outputValues>
+      </output>
+      <rule id="decision_ongoing_reporting_obligation_r1">
+        <description>`ongoing reporting obligation may terminate` OF status</description>
+        <inputEntry id="decision_ongoing_reporting_obligation_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="decision_ongoing_reporting_obligation_r1_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_ongoing_reporting_obligation_r1_o1">
+          <text>"file a Form C-TR termination of reporting"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_ongoing_reporting_obligation_r2">
+        <description>`annual cycles` AT MOST 0</description>
+        <inputEntry id="decision_ongoing_reporting_obligation_r2_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_ongoing_reporting_obligation_r2_i2">
+          <text>&lt;= 0</text>
+        </inputEntry>
+        <outputEntry id="decision_ongoing_reporting_obligation_r2_o1">
+          <text>"fulfilled"</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_ongoing_reporting_obligation_r3">
+        <description>OTHERWISE</description>
+        <inputEntry id="decision_ongoing_reporting_obligation_r3_i1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="decision_ongoing_reporting_obligation_r3_i2">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="decision_ongoing_reporting_obligation_r3_o1">
+          <text>"file a Form C-AR annual report and continue"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
   </decision>
   <decision id="decision_transfer_is_within_the_one_year_restricted_period" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period">
     <variable id="decision_transfer_is_within_the_one_year_restricted_period_var" name="transfer_is_within_the_one_year_restricted_period" label="transfer is within the one-year restricted period" typeRef="boolean"/>
@@ -2046,6 +2087,20 @@
     <inputDecision href="#decision_minimum_days_publicly_available_before_any_sale"/>
     <inputData href="#input_arrangement"/>
   </decisionService>
+  <decisionService id="service__7_ongoing_reporting_rules_202_203_b" name="_7_Ongoing_reporting_Rules_202_203_b" label="7. Ongoing reporting — Rules 202, 203(b)">
+    <variable id="service__7_ongoing_reporting_rules_202_203_b_var" name="_7_Ongoing_reporting_Rules_202_203_b" label="7. Ongoing reporting — Rules 202, 203(b)" typeRef="string"/>
+    <outputDecision href="#decision_ongoing_reporting_obligation"/>
+    <encapsulatedDecision href="#decision_b_1_became_an_exchange_act_reporting_company"/>
+    <encapsulatedDecision href="#decision_b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record"/>
+    <encapsulatedDecision href="#decision_b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000"/>
+    <encapsulatedDecision href="#decision_b_4_all_securities_repurchased"/>
+    <encapsulatedDecision href="#decision_b_5_liquidated_or_dissolved"/>
+    <encapsulatedDecision href="#decision_ongoing_reporting_obligation_may_terminate"/>
+    <inputDecision href="#decision_holders_of_record_threshold"/>
+    <inputDecision href="#decision_total_assets_threshold"/>
+    <inputData href="#input_status"/>
+    <inputData href="#input_annual_cycles"/>
+  </decisionService>
   <decisionService id="service__8_resale_restrictions_rule_501" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501">
     <variable id="service__8_resale_restrictions_rule_501_var" name="_8_Resale_restrictions_Rule_501" label="8. Resale restrictions — Rule 501" typeRef="boolean"/>
     <outputDecision href="#decision_transfer_is_permitted"/>
@@ -2367,6 +2422,9 @@
       <dmndi:DMNShape id="service__5_intermediary_obligations_rules_100_a_3_301_302_303_shape" dmnElementRef="service__5_intermediary_obligations_rules_100_a_3_301_302_303">
         <dc:Bounds x="480" y="360" width="5940" height="440"/>
       </dmndi:DMNShape>
+      <dmndi:DMNShape id="service__7_ongoing_reporting_rules_202_203_b_shape" dmnElementRef="service__7_ongoing_reporting_rules_202_203_b">
+        <dc:Bounds x="40" y="200" width="7480" height="600"/>
+      </dmndi:DMNShape>
       <dmndi:DMNShape id="service__8_resale_restrictions_rule_501_shape" dmnElementRef="service__8_resale_restrictions_rule_501">
         <dc:Bounds x="920" y="360" width="6820" height="440"/>
       </dmndi:DMNShape>
@@ -2670,23 +2728,11 @@
         <di:waypoint x="810" y="460"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir1_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir1">
-        <di:waypoint x="3450" y="700"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir2_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir2">
-        <di:waypoint x="3230" y="700"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir3_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir3">
         <di:waypoint x="810" y="380"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir4_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir4">
+      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir2_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir2">
         <di:waypoint x="2790" y="860"/>
-        <di:waypoint x="150" y="300"/>
-      </dmndi:DMNEdge>
-      <dmndi:DMNEdge id="decision_ongoing_reporting_obligation_ir5_edge" dmnElementRef="decision_ongoing_reporting_obligation_ir5">
-        <di:waypoint x="2570" y="860"/>
         <di:waypoint x="150" y="300"/>
       </dmndi:DMNEdge>
       <dmndi:DMNEdge id="decision_transfer_is_within_the_one_year_restricted_period_ir1_edge" dmnElementRef="decision_transfer_is_within_the_one_year_restricted_period_ir1">

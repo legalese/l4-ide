@@ -2576,6 +2576,105 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         , n.code == "D-MD-CELLSYNTAX"
         ] `shouldSatisfy` (not . null)
 
+  ----------------------------------------------------------------------
+  -- The deontic verdict lowering (R13, spec §16)
+  ----------------------------------------------------------------------
+  describe "the deontic verdict lowering (R13, §16)" $ do
+    let corpusDrg = do
+          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          pure (drgAsCli "regcf.l4" src)
+        verdictDrg = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "deontic-verdict.l4")
+          pure (drgAsCli "deontic-verdict.l4" src)
+
+    it "lowers the corpus reporting spine to a FIRST verdict table over its guards" $ do
+      drg <- corpusDrg
+      let dec = decisionNamed "ongoing reporting obligation" drg
+      dec.dcnType `shouldBe` DmnString
+      case dec.dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          map (.feText) (map (.drOutput) t.dtRules)
+            `shouldBe` [ "\"file a Form C-TR termination of reporting\""
+                       , "\"fulfilled\""
+                       , "\"file a Form C-AR annual report and continue\""
+                       ]
+          t.dtOutput.ocType `shouldBe` DmnString
+          t.dtOutput.ocValues
+            `shouldBe` Just [ "file a Form C-TR termination of reporting"
+                            , "fulfilled"
+                            , "file a Form C-AR annual report and continue"
+                            ]
+        _ -> expectationFailure "expected the verdict decision table"
+      -- R13 × R11: the requirements are the GUARDS' survivors, nothing else —
+      -- in particular no self-edge (the HENCE call does not survive) and no
+      -- edge on the un-lifted callee's discarded argument.
+      dec.dcnRequirements
+        `shouldBe` [ RequiredDecision "decision_ongoing_reporting_obligation_may_terminate"
+                   , RequiredInput "input_annual_cycles"
+                   ]
+
+    it "makes the corpus D-CYCLE disappear by construction, and empties Blocking" $ do
+      drg <- corpusDrg
+      let notes = (dmnReport drg).notes
+      [n | n <- notes, n.code == "D-CYCLE"] `shouldBe` []
+      -- the R0 headline: nothing in the corpus report is Blocking any more
+      [(n.code, n.element) | n <- notes, n.severity == Blocking] `shouldBe` []
+      [n.severity | n <- notes, n.code == "D-VERDICT"] `shouldBe` [Lossy]
+      [n | n <- notes, n.code == "D-LITERALEXPR"
+         , n.element == "decision_ongoing_reporting_obligation"] `shouldBe` []
+      -- D-PARTIAL stays — it describes the L4 source — in its verdict-aware
+      -- form, which must not claim raw-L4 call sites the artifact lost
+      let partials = [n | n <- notes, n.code == "D-PARTIAL"]
+      map (.element) partials `shouldBe` ["decision_ongoing_reporting_obligation"]
+      map (.message) partials `shouldSatisfy`
+        all (Text.isInfixOf "verdict decision table")
+      map (.message) partials `shouldSatisfy`
+        all (not . Text.isInfixOf "remain raw L4")
+
+    it "pins every verdictOf spelling on the off-corpus exhibit" $ do
+      drg <- verdictDrg
+      let dec = decisionNamed "reporting duty" drg
+      case dec.dcnLogic of
+        LogicTable t -> do
+          t.dtHitPolicy `shouldBe` HitFirst
+          map (.feText) (map (.drOutput) t.dtRules)
+            `shouldBe` [ "\"file the termination report\""
+                       , "\"fulfilled\""
+                       , "\"may publish a notice\""
+                       , "\"must not advertise the offering\""
+                       , "\"file the annual report and continue\""
+                       ]
+        _ -> expectationFailure "expected the verdict decision table"
+      -- the HENCE self-call never becomes a self-edge
+      dec.dcnRequirements `shouldNotSatisfy`
+        elem (RequiredDecision "decision_reporting_duty")
+      [n | n <- (dmnReport drg).notes, n.code == "D-CYCLE"] `shouldBe` []
+
+    it "keeps the v1 scope: a RAND arm still refuses RegulativeBody" $ do
+      drg <- verdictDrg
+      case (decisionNamed "joint duty" drg).dcnLogic of
+        LogicTable _ -> expectationFailure "a RAND arm was verdict-tabulated"
+        _            -> pure ()
+      [ n | n <- (dmnReport drg).notes
+          , n.code == "D-LITERALEXPR"
+          , n.element == "decision_joint_duty"
+          , n.severity == Blocking
+          , Text.isInfixOf "deontic (regulative) body" n.message
+        ] `shouldSatisfy` ((== 1) . length)
+
+    it "keeps the v1 scope: a bare deontic body is still NotAGuardedChain" $ do
+      drg <- verdictDrg
+      case (decisionNamed "bare duty" drg).dcnLogic of
+        LogicTable _ -> expectationFailure "a bare deontic body was verdict-tabulated"
+        _            -> pure ()
+      [ n | n <- (dmnReport drg).notes
+          , n.code == "D-LITERALEXPR"
+          , n.element == "decision_bare_duty"
+          , n.severity == Blocking
+          , Text.isInfixOf "not a guarded chain" n.message
+        ] `shouldSatisfy` ((== 1) . length)
+
   describe "Phase 4: un-lifting, DMN-SAFE, and the population filter" $ do
     let notesOf code drg = [n | n <- (dmnReport drg).notes, n.code == code]
         firstNote = \case
@@ -3573,6 +3672,13 @@ goldenSubjects =
   , ( "dmn" </> "svc.l4"
     , "svc"
     , "the §-invocation exhibit"
+    )
+    -- The R13 exhibit (spec §16): the deontic verdict lowering, off-corpus —
+    -- one chain exercising every `verdictOf` spelling, plus the two negative
+    -- controls that pin the v1 scope (RAND arm; bare deontic body).
+  , ( "dmn" </> "deontic-verdict.l4"
+    , "deontic-verdict"
+    , "the deontic-verdict exhibit"
     )
   ]
 

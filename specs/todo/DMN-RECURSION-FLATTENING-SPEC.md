@@ -140,17 +140,38 @@ The cost is that the emitted DRG no longer records that the recursion exists; on
 does. Anyone reading the `.dmn` alone sees a decision with one fewer requirement and no hint that
 something was dropped. That is the gap this document closes when it is built.
 
+**AMENDED 2026-08-02 (R13, owned by `DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §16, per §9 below): the
+motivating instance has LEFT the refusal set.** `ongoing reporting obligation` no longer emits as
+a raw-L4 literal with a self-edge: R13's verdict lowering tabulates its guards and rewrites the
+deontic arm bodies to verdict strings, and the table's requirements are computed from the guards
+alone — so the HENCE self-call never enters the IR and the corpus `D-CYCLE` disappears **by
+construction, not by suppression**. §6.4.4-4a's XML-time self-edge eraser is untouched (still
+pinned by `cycle-p3-self`); it now guards the shapes R13 does not take (bare deontic bodies,
+mixed/RAND chains, non-deontic recursion). The gap named in the previous paragraph is therefore
+closed for THIS instance by a different door than this document proposed: the artifact carries a
+real decision table, and what the DRG no longer records — the recursion — is now recorded by the
+`D-VERDICT` + `D-PARTIAL` (verdict-aware form) pair rather than by `D-CYCLE`. This document's
+flattening remains unbuilt and remains the answer for the shapes the verdict lowering refuses.
+
 ## 8. Open questions
 
 - **Q1.** Does `for … in … return` inside our emitted boxed contexts evaluate identically on KIE
   8.44 and Camunda 8.7.6? **Must be measured first** — everything in §5 is conditional on it.
 - **Q2.** What does a flattened `DEONTIC` body lower _to_, elementwise? The current decision carries
   `typeRef="Any"`; a list of obligations wants a real itemDefinition, which is Phase 3 territory.
+  **Partially answered 2026-08-02 by R13 (DMN spec §16), for the GUARDED-CHAIN case only:** a
+  chain of single deontic arms lowers to a `typeRef="string"` VERDICT table whose output domain is
+  the enumerated arm verdicts (`outputValues`), with the lifecycle routed to BPMN. What a
+  flattened list-of-obligations UNROLLING would lower to — this document's own question — remains
+  open for the bare-body and mixed shapes the verdict lowering refuses.
 - **Q3.** Should R3 admit a decrement of a non-literal that is itself loop-invariant and provably
   positive? Cheap to allow, and it needs a positivity check we do not have.
 - **Q4.** Does any corpus definition other than `ongoing reporting obligation` satisfy R1–R5? If the
   answer is "one", this is a one-instance feature and should be scheduled accordingly. **Unmeasured**
-  — the recognition rule has never been run.
+  — the recognition rule has never been run. **Sharpened 2026-08-02 by R13 (§7's amendment): the
+  one known instance no longer needs this feature at all** — its verdict table ships and executes —
+  so the scheduling question is now "does any refused shape (bare deontic body, RAND/mixed chain,
+  non-deontic recursion) occur called-and-live in a corpus?", which is still unmeasured.
 - **Q5.** Where does the `Advisory` ordering note from §6 sit in the fidelity taxonomy — is it a new
   code, or `D-PARTIAL` with a distinct message? See `FIDELITY-SEVERITY-AXIS-SPEC.md`.
 

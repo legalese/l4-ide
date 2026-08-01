@@ -1,6 +1,6 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_sec_regulation_crowdfunding_17_cfr_part_227
-      dmnmd is a table format, not a graph: the 153 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 149 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
   [D-MD-NOBKM] blocking — bkm_the_rules_in_force_include
       `the rules in force include` is a businessKnowledgeModel — a named function of 2 parameter(s) — and dmnmd has no function form, so it is omitted, along with every invocation of it inside the decisions that remain
@@ -238,9 +238,6 @@ fidelity report — dmnmd
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_ongoing_reporting_obligation_may_terminate
       `ongoing reporting obligation may terminate` is a formula (false or (b_1_became_an_Exchange_Act_reporting_company or (b_2_one_annual_report_filed_and_fewer_than_300_holders_of_record or (b_3_three_annual_reports_filed_and_total_assets_not_exceeding_10_000_000 or (b_4_all_securities_repurchased or b_5_liquidated_or_dissolved))))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
-      lost: the decision itself; it is omitted from the markdown
-  [D-MD-NOLITERAL] blocking — decision_ongoing_reporting_obligation
-      `ongoing reporting obligation` is a formula (IF (`ongoing reporting obligation may terminate` OF status) THEN (PARTY Issuer MUST `file a Form C-TR termination of reporting` WITHIN `business days to file Form C-TR`) ELSE (IF (`annual cycles` AT MOST 0) THEN FULFILLED ELSE (PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE `ongoing reporting obligation` OF status, (`annual cycles` MINUS 1)))), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_transfer_is_within_the_one_year_restricted_period
       `transfer is within the one-year restricted period` is a formula (true and transfer.days_since_the_securities_were_issued < days_in_the_resale_restricted_period), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table

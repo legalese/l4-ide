@@ -5199,25 +5199,54 @@ lowerModule opts modul@(MkModule _ uri _) =
     , any (.csApplied) (Map.findWithDefault [] ownerU callGraph.cgCalls)
     ]
 
+  -- The decisions whose logic went through the R13 verdict lowering (§16),
+  -- read off the emitted notes: D-VERDICT's element is the decision id, and
+  -- the note is emitted exactly when the lowering fired, so this cannot drift
+  -- from the artifact. Consumed by 'partialNotes', whose default message
+  -- asserts artifact facts ("saturated call sites remain raw L4") the verdict
+  -- lowering falsifies.
+  verdictElemIds :: Set Text
+  verdictElemIds = Set.fromList
+    [n.element | (_, ns) <- lowered, n <- ns, n.code == "D-VERDICT"]
+
   -- D-PARTIAL (§2.4.2, OPEN-1): Phase 4 classifies and reports; it does not
   -- change node kind. A ¬DMN-SAFE decision simply does not un-lift — it keeps
   -- today's <decision> + verbatim call sites — and carries this note at the
   -- ruled severity, keyed off the CALL SITE, not the node kind (null arrives
   -- identically from a <decision> body, a BKM's encapsulatedLogic or an
   -- inlined cell; routing removes the widening, never the coercion).
+  --
+  -- A VERDICT-LOWERED decide (§16) takes a different message form: its body
+  -- ships as a decision table that always answers, and no raw-L4 call site of
+  -- it remains, so what stays uncertified is the L4 SOURCE — retexted rather
+  -- than left asserting artifact facts R13 falsified.
   partialNotes =
-    [ dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
-        ("`" <> decideName d <> "` could not be certified total ("
-           <> clauseText
-           <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
-              \call sites remain raw L4 (Phase 5 routes such decisions to a \
-              \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
-              \on every input any requiring decision is evaluated on, and an undefined \
-              \FEEL result is null, which reads as false in every consuming boolean \
-              \position"
-           <> fallbackText)
-        "the certainty that this node evaluates wherever the DRG reaches it: an input \
-        \outside the decision's domain answers null with status SUCCEEDED, not an error"
+    [ if Set.member did verdictElemIds
+        then
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted. Its deontic body is lowered to a verdict \
+                  \decision table (see D-VERDICT), which always answers one row, and no \
+                  \raw-L4 call site of it remains in the artifact; what could not be \
+                  \certified is the L4 source itself — the HENCE self-recursion may not \
+                  \terminate — and the artifact does not carry that recursion")
+            "the certainty that the SOURCE obligation spine terminates: the verdict \
+            \table answers regardless, and the L4 recursion it summarises is what could \
+            \not be certified"
+        else
+          dmnNote "D-PARTIAL" sev did (headIssue >>= \i -> i.safRange)
+            ("`" <> decideName d <> "` could not be certified total ("
+               <> clauseText
+               <> "), so it is not un-lifted: it keeps its <decision> node and its saturated \
+                  \call sites remain raw L4 (Phase 5 routes such decisions to a \
+                  \businessKnowledgeModel or inlines them). A DMN decision node is evaluated \
+                  \on every input any requiring decision is evaluated on, and an undefined \
+                  \FEEL result is null, which reads as false in every consuming boolean \
+                  \position"
+               <> fallbackText)
+            "the certainty that this node evaluates wherever the DRG reaches it: an input \
+            \outside the decision's domain answers null with status SUCCEEDED, not an error"
     | d <- decides
     , let u = getUnique (decideResolved d)
     , Just issues <- [Map.lookup u safetyIssues]
@@ -5689,6 +5718,38 @@ lowerModule opts modul@(MkModule _ uri _) =
       Dated arms oth _ -> Just (map (.daBody) arms <> [oth])
       _                -> Nothing
 
+    -- R13 (§16): the verdict lowering's one decision point, computed ONCE and
+    -- shared by 'ordinaryPath' (which emits the table) and 'dcnRequirements'
+    -- (which emits the edges), so the two cannot disagree — R11's own
+    -- discipline. The law-time gate keeps R10's ruling intact: a
+    -- law-time-guarded obligation (`dated-chain-regulative.l4`) stays refused
+    -- rather than quietly acquiring a verdict table under a ruling that never
+    -- looked at it.
+    verdictLowering :: Maybe (GuardedRows, GuardedRows, [Text], [Expr Resolved])
+    verdictLowering = do
+      guard (null sumTypeReasons)
+      rs0 <- guardedRows
+      guard (not (rowsElided body rs0))
+      let (rs, capped) = flattenGuarded rs0
+      guard (not (any guardReadsLawTime (map fst rs.grRows)))
+      (rs', vs) <- verdictRows rs
+      pure (rs, rs', vs, capped)
+
+    guardReadsLawTime g =
+      or
+        [ getUnique r == TC.rulesEffectiveDateUnique
+            || Map.member (getUnique r) lawTimePreds
+        | r@Ref {} <- toList g
+        ]
+
+    -- 'renderFeelIn' renders a saturated call to an un-lifted decision as the
+    -- callee's bare FEEL name, argument discarded (Phase 4, §2.1). The same
+    -- discard is applied here before 'survivingRefs' so the verdict table's
+    -- edges describe the emitted cells, not the source call.
+    pruneUnliftedArgs = transformOf (gplate @(Expr Resolved)) \case
+      App a f (_ : _) | Set.member (getUnique f) unliftedSet -> App a f []
+      e -> e
+
     plainLowering = case peeled of
       Left loss -> literalFallback loss
       -- A whole body that IS the select idiom is a formula, not a one-case
@@ -5744,11 +5805,37 @@ lowerModule opts modul@(MkModule _ uri _) =
      where
       ordinaryPath rs0
         | rowsElided body rs0 = literalFallback RowsElided
+        -- R13 (§16): the verdict lowering. The rewritten rows go through the
+        -- SAME 'rowsToDmnWith'' as every ordinary table; the overridden ctx
+        -- types the output column `string` and enumerates the verdict domain
+        -- as outputValues (§3.2's mechanism). A refusal it still hits
+        -- (an effectful guard, say) falls back to 'literalFallback' on the
+        -- ORIGINAL body, exactly as if the verdict path did not exist.
+        | Just (_, rs', vs, capped) <- verdictLowering =
+            let tctxV = tctx { tcOutputType = DmnString, tcOutputValues = Just vs }
+            in case rowsToDmnWith' tctxV inlined capped rs' of
+                 Right t   -> (LogicTable t, verdictNotes)
+                 Left loss -> literalFallback loss
         | otherwise =
             let (rs, capped) = flattenGuarded rs0
             in case rowsToDmnWith' tctx inlined capped rs of
                  Right t   -> (LogicTable t, [])
                  Left loss -> literalFallback loss
+
+      -- D-VERDICT (§16), Lossy: real content routed to another artifact
+      -- (D-REGULATIVE's precedent). Its own code per §7's house doctrine.
+      verdictNotes =
+        [ dmnNote "D-VERDICT" Lossy did (bestRange body)
+            ("`" <> decideName d <> "` has a deontic body; it is lowered to a VERDICT \
+             \decision table over its guards, each rule's output a string naming the \
+             \arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the \
+             \BPMN exporter's job (`l4 export --to=bpmn`): WITHIN deadlines are the \
+             \exported deadline decisions, the HENCE loop is the BPMN loop-back edge, \
+             \and a BPMN gateway consumes this verdict to choose the process path")
+            "the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into \
+            \this artifact; the verdict names the arm, the BPMN projection carries the \
+            \lifecycle"
+        ]
 
     -- Never drop a decision. DMN's own answer for logic that is not tabular is a
     -- boxed literal expression, and a DRG that quietly omitted such decisions
@@ -5832,14 +5919,34 @@ lowerModule opts modul@(MkModule _ uri _) =
             in sort . nubOrd $
                  RequiredInput lawId
                    : mapMaybe (classifyRef did) survivors <> hydratorEdges touched
-          _ ->
-            let (survivors, touched) = survivingRefs [view decideBody d]
-                -- 'freeRefs' bounds the survivors to what this decide does not
-                -- itself bind, exactly as before; the fold only removes.
-                free = Set.fromList (map getUnique (freeRefs d))
-                kept = [r | r <- survivors, Set.member (getUnique r) free]
-            in sort . nubOrd $
-                 mapMaybe (classifyRef did) kept <> hydratorEdges touched
+          _ -> case verdictLowering of
+            -- R13 × R11: a verdict table's requirements are computed from what
+            -- SURVIVES into the artifact — the GUARDS, and nothing else. The
+            -- deontic arm bodies are rewritten to string literals, so their
+            -- references (the WITHIN deadline decisions, the HENCE self-call)
+            -- must not become edges the expression contradicts; in particular
+            -- the self-edge never enters the IR, which is what makes the
+            -- corpus D-CYCLE disappear by construction rather than by
+            -- suppression (§6.4.4-4a's XML-time eraser is untouched and still
+            -- guarded by cycle-p3-self). A saturated call to an UN-LIFTED
+            -- decision renders as the callee's bare FEEL name with the
+            -- argument discarded, so the discarded argument's refs are pruned
+            -- for the same R11 reason: the emitted cell does not mention them.
+            Just (rs, _, _, _) ->
+              let (survivors, touched) =
+                    survivingRefs (map pruneUnliftedArgs (map fst rs.grRows))
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
+            Nothing ->
+              let (survivors, touched) = survivingRefs [view decideBody d]
+                  -- 'freeRefs' bounds the survivors to what this decide does not
+                  -- itself bind, exactly as before; the fold only removes.
+                  free = Set.fromList (map getUnique (freeRefs d))
+                  kept = [r | r <- survivors, Set.member (getUnique r) free]
+              in sort . nubOrd $
+                   mapMaybe (classifyRef did) kept <> hydratorEdges touched
       }
      where
       hydratorEdges touched =
@@ -6011,6 +6118,79 @@ isRegulative = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
   Event {}      -> True
   Breach {}     -> True
   _             -> False
+
+------------------------------------------------------------------------
+-- The deontic verdict lowering (R13, §16)
+------------------------------------------------------------------------
+
+-- | R13 (§16): a flattened guarded chain whose EVERY row body (and OTHERWISE)
+-- is a single deontic arm — one 'Regulative' node, or @FULFILLED@ — with at
+-- least one genuine 'Regulative' among them, lowers to a VERDICT decision
+-- table: each body is rewritten to a string literal naming the arm, and the
+-- table's guards carry the whole decision. The obligation semantics
+-- (PARTY\/MUST\/WITHIN\/HENCE\/LEST) are the BPMN exporter's job; a BPMN
+-- gateway consumes the verdict to choose the process path.
+--
+-- v1 scope, deliberately narrow: a MIXED chain (an arm that is @RAND@\/@ROR@
+-- of obligations, or any non-arm deontic shape) answers 'Nothing' here and
+-- keeps today's 'RegulativeBody' refusal; a BARE deontic body never reaches
+-- this function ('normaliseGuarded' answers 'Nothing') and keeps
+-- 'NotAGuardedChain'. The caller additionally gates law-time-guarded chains
+-- off this path (R10's fixture `dated-chain-regulative.l4` pins that
+-- refusal), so this function never needs to know about law time.
+--
+-- Returns the rewritten rows and the verdict domain (first-mention order,
+-- deduplicated) for the output column's @outputValues@.
+verdictRows :: GuardedRows -> Maybe (GuardedRows, [Text])
+verdictRows rs = do
+  guard (not (null rs.grRows))
+  let bodies = map snd rs.grRows <> maybeToList rs.grOtherwise
+  guard (any (\case Regulative {} -> True; _ -> False) bodies)
+  vs <- traverse verdictOf bodies
+  let (rowVs, othVs) = splitAt (length rs.grRows) vs
+      lit b v = Lit (getAnno b) (StringLit emptyAnno v)
+  pure
+    ( rs
+        { grRows = zipWith (\(g, b) v -> (g, lit b v)) rs.grRows rowVs
+        , grOtherwise = case (rs.grOtherwise, othVs) of
+            (Just b, [v]) -> Just (lit b v)
+            _             -> Nothing
+        }
+    , nubOrd vs
+    )
+
+-- | The verdict a deontic arm resolves to, or 'Nothing' when the arm is not a
+-- shape v1 summarises. Deterministic and total on the matched shapes:
+--
+--   * @MUST act@              → the action's declared name, verbatim
+--   * @… HENCE k@             → suffix @" and continue"@
+--   * @MAY act@               → prefix @"may "@
+--   * @SHANT act@ (@MUST NOT@) → prefix @"must not "@
+--   * @DO act@                → the action name (the modal adds no direction)
+--   * @FULFILLED@             → @"fulfilled"@
+--
+-- @WITHIN@, @LEST@ and @PROVIDED@ are deliberately absent from the string:
+-- deadlines are the already-exported deadline decisions, and the reparation
+-- path is process structure — both BPMN's, per the D-VERDICT note. Exact
+-- strings are pinned by goldens, not sacred.
+verdictOf :: Expr Resolved -> Maybe Text
+verdictOf = \case
+  Regulative _ d -> do
+    nm <- actionName d.action.action
+    let modal = case d.action.modal of
+          DMust    -> ""
+          DDo      -> ""
+          DMay     -> "may "
+          DMustNot -> "must not "
+        henceTail = maybe "" (const " and continue") d.hence
+    pure (modal <> nm <> henceTail)
+  App _ r [] | getUnique r == TC.fulfilUnique -> Just "fulfilled"
+  _ -> Nothing
+ where
+  actionName = \case
+    PatApp _ n _ -> Just (nameOf n)
+    PatVar _ n   -> Just (nameOf n)
+    _            -> Nothing
 
 ------------------------------------------------------------------------
 -- Small helpers
