@@ -27,13 +27,18 @@ deleting a golden and re-running `cabal test jl4:jl4-test` twice.
 `reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program
 model DMN itself has, and its **figures are illustrative** — its own header says so, and
 it must never be quoted as a statement of Reg CF. `regcf-corpus.*` is the real thing,
-and it is here to be honest about what the real thing costs. Measured 2026-07-31 on the
-shipped goldens: **102 decisions, 11 tables, 91 boxed literal expressions, 68 `inputData`,
-114 blocking notes.** The
-diagnosis is one sentence — a DMN decision is a 0-ary variable, so the house
+and it is here to be honest about what the real thing costs. Measured 2026-08-01 on the
+shipped goldens (Phase 5: BKM emission + the λ-lift + the fragment-keyed severity):
+**82 decisions, 10 businessKnowledgeModels, 7 decisionServices, 15 `inputData`,
+32 blocking notes (95 at the Phase 4 merge; the figure 114 previously quoted
+here was already stale when written)** — and the 32 decompose exactly: 15
+`EVAL UNDER RULES EFFECTIVE AT` bodies (the temporal family, not Phase 5's), the
+deontic reporting spine and its D-CYCLE, and 15 `D-RULEDATE-UNBOUND` companions.
+The old one-sentence diagnosis — a DMN decision is a 0-ary variable, so the house
 `GIVEN`+record style turns every cross-decision reference into an unevaluable `f(x)` —
-and it is written up at `../legal/regcf/PROJECTIONS.md` §1, which also records what
-the projection *cannot* say. Read that before citing either file.
+is RETIRED for tier 2: those call sites now render as FEEL invocations of emitted
+BKMs (`../legal/regcf/PROJECTIONS.md` §1 records the history). Read that file
+before citing either of these.
 
 `reg-cf.cases.json` is hand-written, not generated, and its keys are **FEEL** names
 (`annual_income`, not `annual income`). That is not a quirk of the harness — it is the
@@ -224,16 +229,45 @@ Two committed harnesses take `expected/reg-cf.dmn` to the two engines that matte
 report what the **engine** says, which is a different question from what a schema or a
 metamodel parser says:
 
-> **They run the toy, not the corpus.** Both commands below, and both `dmn-engines` CI
-> steps, name `expected/reg-cf.dmn` literally. **`expected/regcf-corpus.dmn` has never
-> been through KIE or Camunda at all** — the only tool that opens it is
-> `etc/validate-dmn.mjs` (dmn-moddle, a metamodel parser). So `25/25 value(s) as
-> expected` is a statement about the five-decision shape exhibit and says nothing
-> whatever about the 73-decision corpus projection, whose 84 blocking notes predict
-> that most of it would not evaluate. Do not read the engine banners as covering it.
-> Running the corpus through an engine needs a `regcf-corpus.cases.json` that does not
-> exist yet, and would first need the `f(x)` problem in `../legal/regcf/PROJECTIONS.md`
-> §1 solved; until then this is a gap, recorded rather than papered over.
+> **The corpus has now been through both engines, and here is what they said**
+> (2026-08-01, on the shipped `expected/regcf-corpus.dmn`, verbatim):
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID 17 error(s), 0 warning(s)`;
+>   `BUILD 17 error(s)` — and the harness then deliberately refuses to evaluate
+>   (any build error aborts the run; that is its ruled contract). All 17 errors
+>   are the DELIBERATE refusals the fidelity report names at Blocking — 15
+>   `EVAL UNDER RULES EFFECTIVE AT` bodies (the temporal family), the deontic
+>   reporting spine, and its cyclic-dependency echo. Every tier-2 call site,
+>   which accounted for the bulk of Phase 4's 37 residual errors, now compiles.
+> - Camunda 8.7.6: `PARSE INVALID: Invalid DMN model: Cyclic dependencies
+>   between decisions detected.` — the un-suppressed `ongoing reporting
+>   obligation` self-edge, honestly emitted, refused loudly; behind it zeebe
+>   also rejects raw-L4 literal expressions at parse.
+>
+> **Both verdicts above were superseded on 2026-08-02**, when the self-edge went
+> back to being erased at emission because DMN §7.3.1 forbids an element from
+> requiring itself and the file therefore would not load — ruled and measured at
+> `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §6.4.4-4a; the `D-CYCLE` note is
+> unchanged and still fires. Re-measured, both engines:
+>
+> - KIE 8.44.0.Final: `XSD valid`; `VALID 16 error(s), 0 warning(s)`;
+>   `BUILD 16 error(s)`; verdict `32 error(s)`, was 34. The whole delta is the
+>   cyclic-dependency echo, once per leg; the reporting spine still carries its
+>   own raw-L4 FEEL error, so nothing that was refused has become executable.
+> - Camunda 8.7.6: still `PARSE INVALID`, still `0 parsed` — now on
+>   `FEEL expression: failed to parse expression 'IF (…ongoing reporting
+>   obligation may terminate… OF status) THEN (PARTY Issuer MUST …'`, i.e. the
+>   raw-L4 deontic body the old note predicted would refuse next. **The corpus
+>   still does not load on Camunda 8.** What changed is the metamodel gate
+>   (`etc/validate-dmn.mjs` now passes) and one KIE error; the deontic-literal
+>   refusal is a separate defect.
+>
+> `regcf-corpus.cases.json` now EXISTS — the `f(x)` problem that blocked it
+> (`../legal/regcf/PROJECTIONS.md` §1) is what Phase 5 solved — and pins all 82
+> decisions symmetrically, with its own header recording why it is not yet
+> engine-exercisable and what must retire first. So `25/25 value(s) as expected`
+> below is still a statement about the five-decision shape exhibit only; the
+> corpus verdicts are the two quoted lines above, no more.
 
 ```sh
 etc/kie-dmn-check/run.sh     jl4/examples/dmn/expected/reg-cf.dmn --cases jl4/examples/dmn/reg-cf.cases.json

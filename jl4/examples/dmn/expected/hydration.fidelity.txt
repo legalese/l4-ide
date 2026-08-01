@@ -11,33 +11,36 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-COMPUTEDFIELD] advisory — itemdef_applicant_hydrated
       `Applicant` is hydrated as `Applicant_hydrated`, whose component(s) `total income`, `band`, `band width` are DERIVED: L4 defines each by a MEANS clause on the DECLARE, and this model computes them in the boxed context of the hydrated decision from the components declared before them. DMN cannot say so -- tItemDefinition has no derived flag, and a contextEntry is indistinguishable from a supplied value -- so a reader of the hydrated type alone cannot tell a derived component from a stored one
       lost: nothing an engine needs -- hydration means no caller ever supplies one. What is lost is a reader's ability to tell, FROM THE TYPE, which components are the model's input contract and which the model computes for itself
-  [D-LITERALEXPR] blocking — decision_applicant_score  (main.l4:108:3-45)
-      `applicant score` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_applicant_band_width  (main.l4:115:3-25)
-      `applicant band width` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_the_leading_applicant  (main.l4:140:3-31)
-      `the leading applicant` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_leading_total  (main.l4:144:3-43)
-      `leading total` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_applicant_score  (main.l4:108:3-45)
+      `applicant score` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_applicant_band_width  (main.l4:115:3-25)
+      `applicant band width` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_the_leading_applicant  (main.l4:140:3-31)
+      `the leading applicant` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_leading_total  (main.l4:144:3-43)
+      `leading total` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-MAYBE-NULL] lossy — decision_capped_bonus  (main.l4:150:3-45)
       `capped bonus` is declared `MAYBE OF NUMBER`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the emitted typeRef is the payload type's own. FEEL has one `null` and it means both "there is no value" and "the value could not be computed", so NOTHING and an undefined result can no longer be told apart in the artifact. ADOPTED 2026-07-31 (R8-d'): NOTHING now lowers to FEEL `null` on the VALUE channel, so the conflation this note reports is a price paid deliberately and not an accident of the encoding. What buys it is that the artifact becomes EXECUTABLE where it was previously L4 source no engine could compile. `null` is still refused as an input ENTRY -- DMN 1.3 grammar rule 34 makes it a literal and rule 33's `simple literal` does not include it -- so no cell in this model asks an engine to test against it
       lost: the distinction between an absent value and an undefined one
-  [D-LITERALEXPR] blocking — decision_bonus_is_settled  (main.l4:156:3-11)
-      `bonus is settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_bonus_is_unsettled  (main.l4:161:3-14)
-      `bonus is unsettled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_bonus_or_zero  (main.l4:167:3-169:22)
-      `bonus or zero` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_bonus_is_settled  (main.l4:156:3-11)
+      `bonus is settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_bonus_is_unsettled  (main.l4:161:3-14)
+      `bonus is unsettled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_bonus_or_zero  (main.l4:167:3-169:22)
+      `bonus or zero` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-PARAM-AS-INPUT] advisory — input_applicant
       the GIVEN parameter `applicant` of two decisions (`applicant score`, `applicant band width`) became the one shared model input `input_applicant`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
       lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-FLAVOR-NOSERVICE] advisory — service_hydration
+      the decisionService `Hydration` (§ `Hydration`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
+      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-COMPUTEDOUTPUT] advisory — decision_capped_bonus  (main.l4:150:26-32)
       the output entry `n` is an expression, not a constant; DMN 8.2.9 permits that, but every published decision-table analysis defines an output entry as a constant
       lost: gap and overlap analysis of this table: DMN renders it, DMN's checkers do not check it

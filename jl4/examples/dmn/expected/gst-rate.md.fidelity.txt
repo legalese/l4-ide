@@ -1,7 +1,10 @@
 fidelity report — dmnmd
   [D-MD-NODRG] blocking — definitions_gst_rate
-      dmnmd is a table format, not a graph: the 8 information requirement(s) between these decisions have no markdown form
+      dmnmd is a table format, not a graph: the 6 information requirement(s) between these decisions have no markdown form
       lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NOBKM] blocking — bkm_the_rules_in_force_include
+      `the rules in force include` is a businessKnowledgeModel — a named function of 2 parameter(s) — and dmnmd has no function form, so it is omitted, along with every invocation of it inside the decisions that remain
+      lost: the function itself, and the meaning of every call site that names it: in the markdown those calls reference a definition that is not there
   [D-MD-NOLITERAL] blocking — decision_the_2024_rate_change
       `the 2024 rate change` is a formula (date("2024-01-01")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
@@ -10,9 +13,6 @@ fidelity report — dmnmd
       lost: the decision itself; it is omitted from the markdown
   [D-MD-NOLITERAL] blocking — decision_gst_commenced
       `GST commenced` is a formula (date("1994-04-01")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
-      lost: the decision itself; it is omitted from the markdown
-  [D-MD-NOLITERAL] blocking — decision_the_rules_in_force_include
-      `the rules in force include` is a formula (RULES_EFFECTIVE_DATE >= change), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
       lost: the decision itself; it is omitted from the markdown
   [D-MD-CELLSYNTAX] blocking — decision_gst_rate_percent
       rule decision_gst_rate_percent_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted

@@ -294,10 +294,13 @@ fullFeelColumn =
 nonSFeelColumn :: Text
 nonSFeelColumn =
   -- `other` applies `double` to a SECOND, distinct argument, keeping it
-  -- tier 2 (Phase 4): a tier-1 `double` would un-lift and the call would
-  -- render as a clean bare FEEL name, which is precisely not this test's
-  -- subject — verbatim L4 in a <text> position.
-  "GIVEN n IS A NUMBER\n\
+  -- tier 2 (Phase 4), and @nonexhaustive keeps it SAFETY-REFUSED (Phase 5):
+  -- a clean tier-2 `double` would now emit as a BKM and the call would render
+  -- as a FEEL invocation, which is precisely not this test's subject —
+  -- verbatim L4 in a <text> position. The refused-tier-2 residue is the
+  -- population that still exercises it (§6.2's stated boundary).
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -315,8 +318,10 @@ nonSFeelColumn =
 -- entry, fails, and the decision evaluates to null with status FAILED.
 verbatimOutput :: Text
 verbatimOutput =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -335,8 +340,10 @@ verbatimOutput =
 -- null with status SUCCEEDED and no evaluation-time message.
 verbatimDefault :: Text
 verbatimDefault =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -355,8 +362,10 @@ verbatimDefault =
 -- @max(cash out, conversion amount(liq))@ in @safe-post-new.l4@.
 verbatimSelect :: Text
 verbatimSelect =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -944,7 +953,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral e -> e.feText `shouldBe` "a and b"
         LogicTable _   -> expectationFailure "expected a literal expression, got a decision table"
         LogicContext _ -> expectationFailure "unexpected boxed context"
-      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Blocking)]
+      -- Advisory since the Phase 5 severity re-key (recorded in spec §7):
+      -- `a and b` is genuine FEEL an engine evaluates, so what the boxed
+      -- literal forfeits is the table analyses, which is Advisory's
+      -- definition. The Blocking arm is pinned separately on a body that
+      -- stays raw L4 ("fidelity: L4 source in a <text> element is Blocking").
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Advisory)]
       emitDrg drg `shouldSatisfy` Text.isInfixOf "<literalExpression"
 
     -- __Both of these shapes are now refused EARLIER, and by a different code.__
@@ -1091,26 +1105,51 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- <description>, which carries the guard's full source.
       map (.severity) t.dtNotes `shouldNotContain` [Blocking]
 
-    -- NOT a lowering, and deliberately so. A `{f: v, …}` context literal for
-    -- record construction was written and reverted: `AppNamed` is L4's general
-    -- named-argument APPLICATION, so `f WITH x IS 3, y IS 4` (with `f MEANS x
-    -- TIMES y`) is 12 in L4 and `{x: 3, y: 4}` under that lowering — which KIE
-    -- compiles without complaint. It also drops the constructor tag (`Paid WITH
-    -- amount IS 40` and `Owed WITH amount IS 40` collapse to one FEEL value that
-    -- L4 says are unequal), never checks field names against FEEL's reserved
-    -- words (`{for: 1}` fails to compile while the decision still reports
-    -- SUCCEEDED), and omits computed fields that `Proj` still reads.
-    --
-    -- Each of those is a silently wrong answer reported Advisory, which is worse
-    -- than the honest Blocking below. This test is the regression guard.
-    it "record construction stays verbatim and is Blocking, not a context literal" $ do
+    -- The RECORD-CONSTRUCTION subset of AppNamed lowers to a context literal
+    -- (Phase 5 build; the arm's own comment in Lower.hs answers the four
+    -- reasons the unrestricted lowering was once written and reverted). The
+    -- restrictions the two tests after it pin: a construction missing a
+    -- stored field stays verbatim, and a FUNCTION applied WITH named
+    -- arguments stays verbatim — an enum's payload constructor stays under
+    -- D-SUMTYPE (the sumtype block).
+    it "RECORD construction lowers to a FEEL context literal in declaration order" $ do
       let t = tableOf "assess" recordConstruction
-      map (.drOutput.feFragment) t.dtRules `shouldBe` [L4Verbatim]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
       map (.drOutput.feText) t.dtRules
-        `shouldSatisfy` all (Text.isInfixOf "Assessment WITH")
-      map (.code) t.dtNotes `shouldContain` ["D-NONFEELOUTPUT"]
-      [n | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"]
-        `shouldSatisfy` all ((== Blocking) . (.severity))
+        `shouldBe` ["{rate: 40, band: \"high\"}"]
+      -- no D-NONFEELOUTPUT: the entry is FEEL now. The keys come from the
+      -- same field scope the itemDefinition components use, so the write side
+      -- and `r.f` cannot disagree.
+      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
+
+    -- No missing-field test, and the absence is a measurement: L4's
+    -- typechecker REJECTS a construction that omits a stored field ("you
+    -- forgot to supply the following arguments", measured 2026-08-01), so the
+    -- arm's completeness guard is unreachable through checked source and
+    -- stands as defence-in-depth only.
+    it "a FUNCTION applied WITH named arguments stays verbatim, BKM callee or not" $ do
+      -- Reason 1 of the reverted lowering, still standing: AppNamed is L4's
+      -- general named-argument application, and `f WITH x IS 3, y IS 4` over
+      -- `f MEANS x TIMES y` is 12 in L4 and a context under the naive
+      -- lowering. ALSO the recorded §6.1 deferral: a named-argument call to
+      -- an emitted BKM stays verbatim + Blocking in v1 (the argument names
+      -- would need checking against the BKM's parameters).
+      let drg = drgOf
+            "GIVEN\n\
+            \  x IS A NUMBER\n\
+            \  y IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \f x y MEANS x TIMES y\n\
+            \GIVETH A NUMBER\n\
+            \use MEANS f WITH x IS 3, y IS 4\n\
+            \GIVETH A NUMBER\n\
+            \use2 MEANS f WITH x IS 5, y IS 6\n"
+      -- two distinct argument shapes: `f` IS an emitted BKM...
+      map (.bkmName) (drgBkms drg) `shouldBe` ["f"]
+      -- ...and the AppNamed call sites still refuse
+      (decisionNamed "use" drg).dcnLogic `shouldSatisfy` \case
+        LogicLiteral fe -> fe.feFragment == L4Verbatim
+        _               -> False
 
     it "a projection off a record-typed parameter round-trips through the field names" $ do
       let t = tableOf "level" recordProjection
@@ -1701,10 +1740,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         -- Threading is NOT reading: R4-a keeps this one, and only says the
         -- component's type could not be carried.
         -- (it is also a plain projection rather than a chain, so it carries the
-        -- ordinary D-LITERALEXPR as well; the point here is the SEVERITY of the
-        -- sum-type note, which is Lossy and not Blocking)
+        -- ordinary D-LITERALEXPR as well — Advisory since the Phase 5
+        -- severity re-key: the projection renders as FEEL; the point here is
+        -- the SEVERITY of the sum-type note, which is Lossy and not Blocking)
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_claim_amount"]
-          `shouldBe` [("D-LITERALEXPR", Blocking), ("D-SUMTYPE", Lossy)]
+          `shouldBe` [("D-LITERALEXPR", Advisory), ("D-SUMTYPE", Lossy)]
 
       it "reports a LIST OF component, which needs an itemDefinition of its own" $ do
         drg <- sumtypeDrg
@@ -2039,17 +2079,41 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       (dmnReport (drgFlavored FlavorKie "T" spacedNames)).target
         `shouldBe` "DMN 1.3 (XML), kie flavor"
 
-    it "EXPECTED TO FAIL AT PHASE 5: the two flavors are still byte-identical" $ do
-      -- The one thing the flavors differ on is whether a <decisionService> may
-      -- be the target of a <knowledgeRequirement> (§13.4), and neither
-      -- decision services nor BKMs are emitted yet. So today the bit has no
-      -- observable effect -- which is exactly the trap this test exists to
-      -- spring. When Phase 5 lands, THIS TEST MUST FAIL, and the fix is to
-      -- split the goldens (reg-cf.kie.dmn beside reg-cf.dmn), not to delete it.
+    it "the flavors DIVERGE on exactly the §-invocation, and nowhere else" $ do
+      -- This test used to be the Phase 5 tripwire ("EXPECTED TO FAIL AT
+      -- PHASE 5: the two flavors are still byte-identical"), and it fired on
+      -- 2026-08-01. Flipped as its own comment instructed: split the goldens
+      -- (svc.kie.dmn beside svc.dmn), keep the test, and assert the seam in
+      -- BOTH directions.
+      --
+      -- Direction 1 — the POSITIVE divergence, on the one subject that
+      -- genuinely diverges (the §-invocation exhibit): the kie bytes carry a
+      -- requiredKnowledge pointing at a decisionService and the rendered
+      -- invocation; the camunda bytes carry neither, because that edge is
+      -- fatal to Camunda 8's parse() (§13.4).
+      svcSrc <- Text.readFile (examplesRoot </> "dmn" </> "svc.l4")
+      let kie     = emitDrg (drgFlavored FlavorKie "S" svcSrc)
+          camunda = emitDrg (drgFlavored FlavorCamunda "S" svcSrc)
+      kie `shouldSatisfy`
+        Text.isInfixOf "<requiredKnowledge href=\"#service_special_assessment\"/>"
+      kie `shouldSatisfy` Text.isInfixOf "special_assessment(p: 150, q: 5)"
+      camunda `shouldNotSatisfy` Text.isInfixOf "requiredKnowledge href=\"#service_"
+      camunda `shouldNotSatisfy` Text.isInfixOf "special_assessment(p:"
+      -- ...and the camunda side says WHY, at Blocking, rather than shipping
+      -- the gap silently (§13.5's D-FLAVOR-NOSERVICE).
+      let camNotes = (dmnReport (drgFlavored FlavorCamunda "S" svcSrc)).notes
+      [n.severity | n <- camNotes, n.code == "D-FLAVOR-NOSERVICE", n.severity == Blocking]
+        `shouldBe` [Blocking]
+      -- Direction 2 — everything WITHOUT a §-invocation stays byte-identical
+      -- (measured 2026-08-01 over every golden subject), so a future change
+      -- that makes the flavors drift anywhere else is announced here.
       emitDrg (drgFlavored FlavorCamunda "T" spacedNames)
         `shouldBe` emitDrg (drgFlavored FlavorKie "T" spacedNames)
       emitDrg (drgFlavored FlavorCamunda "Regulation Crowdfunding" considerConstructors)
         `shouldBe` emitDrg (drgFlavored FlavorKie "Regulation Crowdfunding" considerConstructors)
+      bkmSrc <- Text.readFile (examplesRoot </> "dmn" </> "bkm.l4")
+      emitDrg (drgFlavored FlavorCamunda "B" bkmSrc)
+        `shouldBe` emitDrg (drgFlavored FlavorKie "B" bkmSrc)
 
   describe "dmnmd markdown (the second emitter over the same IR)" $ do
     it "renders a table as a pipe table, with the hit policy as the first header cell" $ do
@@ -2363,8 +2427,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     -- rule-date arms, so it is `NotDated` rather than a refusal -- the mixed
     -- (partial-match) arm is covered by the not-ok fixture above.
     it "leaves a chain with no rule-date guard on the ordinary path (§15.8)" $ do
+      -- Phase 5: `financial statements required` is tier 2 and now emits as a
+      -- BKM — but §15.8's claim is about its LOGIC, which is unchanged: the
+      -- same multi-column ordinary FIRST table, now the encapsulatedLogic.
       drg <- corpusDrg
-      case (decisionNamed "financial statements required" drg).dcnLogic of
+      case (bkmNamed "financial statements required" drg).bkmLogic of
         LogicTable t -> do
           t.dtHitPolicy `shouldBe` HitFirst
           length t.dtInputs `shouldSatisfy` (> 1)
@@ -2548,9 +2615,10 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         map (.element) (notesOf "D-FIXTURE" drg) `shouldBe` ["sample"]
 
     describe "tier 2: the real λ (§2.1)" $ do
-      -- fixture 5. THE PHASE 5 TRIPWIRE: when BKM emission lands, `half`
-      -- stops being a <decision> with verbatim call sites and this test goes
-      -- red — that is its job. Do not silence it; rewrite it against the BKM.
+      -- fixture 5. This WAS the Phase 5 tripwire ("when BKM emission lands,
+      -- this test goes red — rewrite it against the BKM"), and it fired on
+      -- 2026-08-01. Rewritten as instructed: the same source now pins the
+      -- emission itself.
       let tier2Lambda =
             "GIVEN pot IS A NUMBER\n\
             \GIVETH A NUMBER\n\
@@ -2560,19 +2628,32 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             \GIVETH A NUMBER\n\
             \b MEANS half 200\n"
 
-      it "classifies two distinct argument shapes as a BKM candidate (D-BKM), behaviour unchanged" $ do
+      it "emits two distinct argument shapes as a BKM (D-BKM), invoked by name" $ do
         let drg = drgOf tier2Lambda
             ns  = notesOf "D-BKM" drg
         map (.severity) ns `shouldBe` [Advisory]
         (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`a`"
         (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`b`"
-        -- byte-identical to today: the call sites stay verbatim L4
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "emitted as a businessKnowledgeModel"
+        -- the callee is a BKM whose logic is the old body, parameterised
+        let bkm = bkmNamed "half" drg
+        map (.fpName) bkm.bkmParams `shouldBe` ["pot"]
+        -- the call sites render as FEEL named-argument invocations (probe A2),
+        -- each caller carrying its own knowledgeRequirement edge (probe C3:
+        -- required by KIE, silently nulled by Camunda without it)
         (decisionNamed "a" drg).dcnLogic `shouldSatisfy` \case
-          LogicLiteral fe -> fe.feFragment == L4Verbatim
+          LogicLiteral fe -> fe.feText == "half(pot: 100)" && fe.feFragment == FullFeel
           _               -> False
-        -- and no merge happened: `pot` stays one per-binder input
-        length (inputsNamed "pot" drg) `shouldBe` 1
+        (decisionNamed "a" drg).dcnKnowledgeReqs `shouldBe` [RequiredBkm "bkm_half"]
+        (decisionNamed "b" drg).dcnKnowledgeReqs `shouldBe` [RequiredBkm "bkm_half"]
+        -- `pot` is a formalParameter now, bound per call: NO inputData, no
+        -- merge question at all
+        length (inputsNamed "pot" drg) `shouldBe` 0
         notesOf "D-PARAM-AS-INPUT" drg `shouldBe` []
+        -- and the emitted bytes carry the invariant the default flavor never
+        -- checks (probe C4): element name == variable name
+        emitDrg drg `shouldSatisfy`
+          Text.isInfixOf "<businessKnowledgeModel id=\"bkm_half\" name=\"half\">"
 
     describe "D-PARTIAL: the DMN-SAFE side-condition (§2.4)" $ do
       -- fixtures 6+8, one adjacent pair: the SAME division is accepted when
@@ -3025,9 +3106,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               \mainrule n MEANS n TIMES 2\n\
               \#EVAL mainrule (builder 1)\n"
         decisionNames (drgOf helperSrc) `shouldNotSatisfy` elem "helper"
-        decisionNames
-          (drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n"))
-          `shouldSatisfy` elem "helper"
+        -- Phase 5: kept-and-live `helper` has two distinct argument shapes, so
+        -- it is now KEPT AS A BKM — the filter question (fixture-only vs live)
+        -- is unchanged; the node kind it is kept as moved.
+        let live = drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n")
+        map (.bkmName) (drgBkms live) `shouldSatisfy` elem "helper"
 
     -- §7.7: the 9th-constructor tripwire. 'UserEvalException' has exactly 8
     -- constructors, and every one is either foreclosed by a DMN-SAFE clause
@@ -3065,6 +3148,258 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     it (label <> "'s markdown fidelity report") $
       goldenOf examplesRoot srcPath (stem <> ".md.fidelity.txt")
         (renderReport . markdownReport)
+
+  -- §13.6 at Phase 5: the kie flavor's split goldens, for the (measured)
+  -- divergent subjects only. The default flavor keeps the unsuffixed names;
+  -- never a diff-golden — each file is reproducible byte-for-byte by one
+  -- `l4 export --flavor=kie` invocation and feedable to the KIE harness.
+  describe "golden (kie flavor)" $ forM_ kieGoldenSubjects \(srcPath, stem, label) -> do
+    it (label <> ", as DMN 1.3 XML (kie)") $
+      goldenKieOf examplesRoot srcPath (stem <> ".kie.dmn") emitDrg
+    it (label <> "'s fidelity report (kie)") $
+      goldenKieOf examplesRoot srcPath (stem <> ".kie.fidelity.txt")
+        (renderReport . dmnReport)
+
+  -- R5 (§6.4): checkDrg + D-CYCLE over the informationRequirement graph, and
+  -- the §6.4.4-2 self-edge un-suppression. Every expectation below was
+  -- MEASURED on 2026-08-01 against this tree (the fixtures' own headers say
+  -- their stated expectations were transcribed without a build and must be
+  -- measured, not copied — this block is that measurement).
+  describe "checkDrg / D-CYCLE (R5, §6.4)" $ do
+    it "counts a one-member SCC only when it has a self-edge (§6.4.4-3)" $ do
+      -- Both obvious defaults are wrong: literal "one per SCC" notes every
+      -- acyclic node; "size >= 2" silently undoes the self-edge fix.
+      let groups :: [(Text, Text, [Text])] -> [[Text]]
+          groups = cyclicGroups
+      groups [("a", "a", ["a"])] `shouldBe` [["a"]]
+      groups [("a", "a", []), ("b", "b", ["a"])] `shouldBe` []
+
+    let cycleNotesOf drg = [n | n <- drgNotesAll drg, n.code == "D-CYCLE"]
+        notOkDrg fp = do
+          src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> fp)
+          pure (drgAsCli fp src)
+
+    it "p1 (forward reference): genuinely acyclic, no D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p1-forward.l4"
+      cycleNotesOf drg `shouldBe` []
+
+    it "p2 (mutual recursion, nullary): one Blocking note naming both members by name AND id" $ do
+      drg <- notOkDrg "cycle-p2-mutual-nullary.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.severity `shouldBe` Blocking
+          n.range `shouldBe` Nothing
+          for_ [ "`the left total`", "decision_the_left_total"
+               , "`the right total`", "decision_the_right_total" ] \needle ->
+            n.message `shouldSatisfy` Text.isInfixOf needle
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
+    it "p2 (mutual recursion, parameterised): D-CYCLE now, and stays the §6.3.9 arm's corpus for Phase 5" $ do
+      -- MEASURED: the combined report carries one D-CYCLE (the requirement
+      -- graph records the cycle) AND two Lossy D-PARTIAL ("mutually recursive
+      -- with", every call site lazy) from Phase 4's SCC-ordered TOTAL pass —
+      -- so neither decide is certified total, neither can become a BKM, and
+      -- the knowledgeRequirement graph never carries this cycle. D-RECURSIVE
+      -- (§6.3.9) therefore has no reachable L4 source shape today; it is
+      -- exercised at the IR level instead (see the D-RECURSIVE block below).
+      drg <- notOkDrg "cycle-p2-mutual-parameterised.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+      [n.severity | n <- drgNotesAll drg, n.code == "D-PARTIAL"]
+        `shouldBe` [Lossy, Lossy]
+
+    it "p3 (self-recursion): a one-member SCC said as 'requires itself' — REPORTED in the IR, ERASED from the XML" $ do
+      -- Before §6.4.4-2 this exported with NO self-edge and advisory-only
+      -- fidelity: freeRefs bound the decide's own name and classifyRef
+      -- filtered target /= did, so the case §6.3.7 names FIRST was erased
+      -- before any graph saw it.
+      --
+      -- §6.4.4-4a (ruled 2026-08-02) splits those two halves apart, and this
+      -- test is where the split is pinned: the IR keeps the self-edge, so the
+      -- Blocking note still fires and still names the decision; the XML does
+      -- not, because DMN §7.3.1 forbids it and etc/validate-dmn.mjs rejects the
+      -- file. Erasing the edge must never erase the finding — if the first
+      -- assertion below ever goes quiet, the fix has become a cover-up.
+      drg <- notOkDrg "cycle-p3-self.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "requires itself"
+          n.message `shouldSatisfy` Text.isInfixOf "`countdown` (decision_countdown)"
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+      emitDrg drg `shouldNotSatisfy`
+        Text.isInfixOf "<requiredDecision href=\"#decision_countdown\"/>"
+
+    it "p2 (mutual recursion, nullary): a MULTI-node cycle keeps every edge — the §6.4.4-4a erasure is self-edges only" $ do
+      -- The negative control for the test above. Dropping one edge of a 2-cycle
+      -- would have to choose which member's meaning to change; §6.4.4-4 emits
+      -- it as it is and reports it, and that is unchanged by the 2026-08-02
+      -- ruling. If this ever goes red, the self-edge filter has widened.
+      drg <- notOkDrg "cycle-p2-mutual-nullary.l4"
+      let xml = emitDrg drg
+      for_ [ "<requiredDecision href=\"#decision_the_left_total\"/>"
+           , "<requiredDecision href=\"#decision_the_right_total\"/>" ] \needle ->
+        xml `shouldSatisfy` Text.isInfixOf needle
+
+    it "p4 (cycle through a WHERE-local, two decisions): D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p4-where-local.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p4-self (WHERE-local recursing on itself): NO cycle finding, by concession §6.4.5" $ do
+      -- The only cycle is INSIDE one node; no SCC over the DRG can see it.
+      -- This fixture is the concession's witness: it is caught today by
+      -- D-PARTIAL (TERMINATES) and D-LITERALEXPR, which is luck, not a graph
+      -- check. If a cycle finding ever appears here, the graph grew nodes it
+      -- did not have — reread §6.4.5 before touching this test.
+      drg <- notOkDrg "cycle-p4-where-local-self.l4"
+      cycleNotesOf drg `shouldBe` []
+      [n.code | n <- drgNotesAll drg, n.code `elem` ["D-PARTIAL", "D-LITERALEXPR"]]
+        `shouldSatisfy` (not . null)
+
+    it "p5 (cycle through a record computed field): the §6.4.5 obligation, re-measured — the hydrator closes it" $ do
+      -- §6.4.2's table (measured pre-Phase-3) said "no — one direction only,
+      -- Proj filtered". RE-MEASURED 2026-08-01 as §6.4.5 instructed: Phase
+      -- 3.6's hydration rewiring (R11) turned the missing edge into a present
+      -- one — the computed read folds onto the hydrator, the reading decision
+      -- requires the hydrator, and the hydrator requires its source decision —
+      -- so the cycle IS now in the DRG, with the hydrator as a member.
+      drg <- notOkDrg "cycle-p5-computed-field.l4"
+      case cycleNotesOf drg of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "decision_the_assessed_total"
+          n.message `shouldSatisfy` Text.isInfixOf "hydration_the_case_file"
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
+    it "p6 (section-qualified mutual recursion): D-CYCLE, no longer advisory-only" $ do
+      drg <- notOkDrg "cycle-p6-section-qualified.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p7 (nullary MEANS cycle): D-CYCLE" $ do
+      drg <- notOkDrg "cycle-p7-means.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p8 (cycle through a guard): D-CYCLE, no longer '(nothing lost)'" $ do
+      drg <- notOkDrg "cycle-p8-guard.l4"
+      length (cycleNotesOf drg) `shouldBe` 1
+
+    it "p9 (3-cycle among nullary decisions): one note, three members" $ do
+      drg <- notOkDrg "cycle-p9-triangle.l4"
+      case cycleNotesOf drg of
+        [n] -> for_ ["`stage one`", "`stage two`", "`stage three`"] \needle ->
+          n.message `shouldSatisfy` Text.isInfixOf needle
+        ns -> expectationFailure ("expected exactly one D-CYCLE, got " <> show (length ns))
+
+  -- §6.3.9 / §6.3-1: D-RECURSIVE, the SAME SCC routine over the SECOND graph
+  -- (the knowledgeRequirement edges), and D-KNOWLEDGEREQ, the completeness
+  -- assertion §13.3's consequence 2 makes mandatory (Camunda has no backstop:
+  -- a missing edge is a silent null on the default flavor).
+  --
+  -- Exercised at the IR level, and the reason is itself a measurement: no L4
+  -- source can currently reach a cyclic knowledgeRequirement graph, because a
+  -- recursive or mutually recursive decide is never certified total (Phase
+  -- 4's SCC-ordered TERMINATES pass), and §6.2's boundary keeps uncertified
+  -- tier-2 decides OUT of the emitted-BKM set — cycle-p2-mutual-parameterised
+  -- and cycle-p3 pin exactly that above (D-PARTIAL + D-CYCLE, no BKM). If a
+  -- future totality certificate learns to bless a recursive decide, these
+  -- tests are the contract its emission must meet.
+  describe "checkDrg / D-RECURSIVE + D-KNOWLEDGEREQ (§6.3.9, §6.2)" $ do
+    let testDrg ns = MkDrg
+          { drgId = "definitions_t", drgName = "t"
+          , drgNamespace = "ns", drgFlavor = FlavorCamunda
+          , drgItemDefs = [], drgNodes = ns, drgNotes = []
+          }
+        lit frag t = LogicLiteral (MkFeelExpr t frag)
+        bkmNode nm krs body = NodeBkm MkBkm
+          { bkmId = "bkm_" <> nm, bkmName = nm, bkmFeelName = nm
+          , bkmType = DmnNumber, bkmParams = [], bkmLogic = body
+          , bkmKnowledgeReqs = krs
+          }
+        decNode nm krs body = NodeDecision MkDecision
+          { dcnId = "decision_" <> nm, dcnName = nm, dcnFeelName = nm
+          , dcnType = DmnNumber, dcnLogic = body
+          , dcnRequirements = [], dcnKnowledgeReqs = krs
+          }
+        codesOf drg = [(n.code, n.element) | n <- checkDrg drg]
+
+    it "a BKM that requires ITSELF — the case §6.3.9 names first — is a one-member SCC" $ do
+      let drg = testDrg
+            [bkmNode "f" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 1)")]
+      case [n | n <- checkDrg drg, n.code == "D-RECURSIVE"] of
+        [n] -> do
+          n.severity `shouldBe` Blocking
+          n.message `shouldSatisfy` Text.isInfixOf "requires itself"
+          n.message `shouldSatisfy` Text.isInfixOf "`f` (bkm_f)"
+        ns  -> expectationFailure ("expected one D-RECURSIVE, got " <> show (length ns))
+
+    it "two BKMs requiring each other: one note, both members, decisions not implicated" $ do
+      let drg = testDrg
+            [ bkmNode "f" [RequiredBkm "bkm_g"] (lit FullFeel "g(p: 1)")
+            , bkmNode "g" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 1)")
+            , decNode "use" [RequiredBkm "bkm_f"] (lit FullFeel "f(p: 2)")
+            ]
+      case [n | n <- checkDrg drg, n.code == "D-RECURSIVE"] of
+        [n] -> do
+          n.message `shouldSatisfy` Text.isInfixOf "`f` (bkm_f)"
+          n.message `shouldSatisfy` Text.isInfixOf "`g` (bkm_g)"
+          n.message `shouldNotSatisfy` Text.isInfixOf "use"
+        ns  -> expectationFailure ("expected one D-RECURSIVE, got " <> show (length ns))
+
+    it "an acyclic decision→BKM→BKM chain (probe C1's shape) raises nothing" $ do
+      let drg = testDrg
+            [ bkmNode "inner" [] (lit SFeel "v * 10")
+            , bkmNode "outer" [RequiredBkm "bkm_inner"] (lit FullFeel "inner(v: v)")
+            , decNode "use" [RequiredBkm "bkm_outer"] (lit FullFeel "outer(v: n)")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "a rendered invocation with NO edge on its owner is D-KNOWLEDGEREQ (probe C3's silent null)" $ do
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            , decNode "use" [] (lit FullFeel "f(p: 2)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "decision_use")]
+
+    it "the completeness scan is token-bounded and skips verbatim texts" $ do
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            -- `affine(2)` CONTAINS "f" twice, neither at a token boundary
+            -- with an open paren; the verbatim body spells a call-shaped
+            -- `f (x)` but raw L4 is not FEEL and is skipped.
+            , decNode "clean"    [] (lit FullFeel "affine(2)")
+            , decNode "verbatim" [] (lit L4Verbatim "f (x) PLUS 1")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "a `name(` inside a FEEL string literal is prose, not an invocation" $ do
+      -- The false-positive shape found by review: the exporter generates
+      -- string literals too (an L4 STRING constant renders as one), and this
+      -- exact model runs green on BOTH engine harnesses — KIE 8.44.0.Final
+      -- 0 errors 0 warnings, Camunda 8.7.6 parsed — so a Blocking note here
+      -- fails `--fail-on blocking` on a fully valid artifact.
+      let drg = testDrg
+            [ bkmNode "half" [] (lit SFeel "p + 1")
+            , decNode "note" [] (lit FullFeel "\"please call half(now) about this\"")
+            ]
+      checkDrg drg `shouldBe` []
+
+    it "blanking a string literal (escapes included) does not blind the scan beside it" $ do
+      -- One text, three lessons: the quoted decoy is skipped, the \" escape
+      -- does not end the literal early, and the REAL invocation after the
+      -- closing quote is still caught.
+      let drg = testDrg
+            [ bkmNode "f" [] (lit SFeel "p + 1")
+            , decNode "use" [] (lit FullFeel "\"f(decoy) \\\" still inside\" + f(p: 2)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "decision_use")]
+
+    it "the edge must be on the INVOKING node, not somewhere in the file (C2/C3's lesson)" $ do
+      let drg = testDrg
+            [ bkmNode "inner" [] (lit SFeel "v * 10")
+            , bkmNode "outer" [] (lit FullFeel "inner(v: v)")
+            -- the top-level caller carries BOTH edges — the flat shape
+            -- bkm-chain-flat measured FAILING on both engines
+            , decNode "use" [RequiredBkm "bkm_outer", RequiredBkm "bkm_inner"]
+                (lit FullFeel "outer(v: n)")
+            ]
+      codesOf drg `shouldBe` [("D-KNOWLEDGEREQ", "bkm_outer")]
 
 ------------------------------------------------------------------------
 -- golden
@@ -3141,6 +3476,35 @@ goldenSubjects =
     , "unlift"
     , "the Phase 4 un-lifting exhibit"
     )
+    -- The Phase 5 exhibits. `bkm` holds one of each emission shape (multi-
+    -- parameter BKM, BKM→BKM chain, BKM inside a hydrator, λ-lifted closure)
+    -- and is flavor-IDENTICAL by measurement; `svc` isolates the ONE
+    -- construct that splits the flavors (§-invocation, §13.5) and is the
+    -- only subject with a `.kie.` golden pair — see the kie-flavor golden
+    -- block below and each file's own header.
+  , ( "dmn" </> "bkm.l4"
+    , "bkm"
+    , "the Phase 5 BKM exhibit"
+    )
+  , ( "dmn" </> "svc.l4"
+    , "svc"
+    , "the §-invocation exhibit"
+    )
+  ]
+
+-- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
+-- diverge by flavor. Measured 2026-08-01 over every golden subject: reg-cf,
+-- gst-rate, regcf-corpus, sumtype, hydration, unlift and bkm are all
+-- byte-IDENTICAL at both flavors (nothing in them invokes a §; BKM emission
+-- is flavor-ungated), so they keep unsuffixed goldens only, and the
+-- flavor-divergence test asserts that identity stays true. `svc` diverges by
+-- construction and gets the split pair.
+kieGoldenSubjects :: [(FilePath, FilePath, String)]
+kieGoldenSubjects =
+  [ ( "dmn" </> "svc.l4"
+    , "svc"
+    , "the §-invocation exhibit"
+    )
   ]
 
 -- | One golden: read the source, lower it the way the CLI would, render it
@@ -3151,6 +3515,16 @@ goldenOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text
 goldenOf examplesRoot srcPath name render = do
   src <- Text.readFile (examplesRoot </> srcPath)
   pure (mkGolden examplesRoot name (render (drgAsCli srcPath src)))
+
+-- | 'goldenOf' at the KIE flavor: what `l4 export --to=dmn --flavor=kie FILE`
+-- writes, with the same model-name precedence.
+goldenKieOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text)
+goldenKieOf examplesRoot srcPath name render = do
+  src <- Text.readFile (examplesRoot </> srcPath)
+  let drg = drgFlavoredWith FlavorKie
+              (\m -> fromMaybe (Text.pack (takeBaseName srcPath)) (moduleTitle m))
+              src
+  pure (mkGolden examplesRoot name (render drg))
 
 -- | Lower exactly as @l4 export --to=dmn FILE@ does with no @--model-name@:
 -- the module's outermost @§@ heading if it has one, else the file's base name.
@@ -3298,6 +3672,11 @@ decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of
   (d : _) -> d
   []      -> error ("no decision named " <> show nm)
+
+bkmNamed :: Text -> Drg -> Bkm
+bkmNamed nm drg = case [b | b <- drgBkms drg, b.bkmName == nm] of
+  (b : _) -> b
+  []      -> error ("no businessKnowledgeModel named " <> show nm)
 
 tableOf :: Text -> Text -> DecisionTable
 tableOf nm src = case (decisionNamed nm (drgOf src)).dcnLogic of

@@ -604,12 +604,25 @@ jobs:
       #
       # What these add that the reg-cf steps above cannot: the SAME model
       # answering DIFFERENTLY for different rule dates, driven only by half-open
-      # date intervals on a UNIQUE decision table. Ten rule dates x seven
-      # decisions = 70, and seven of the ten exist purely to pin the
+      # date intervals on a UNIQUE decision table. Ten rule dates x six
+      # decisions = 60, and seven of the ten exist purely to pin the
       # closed-low/open-high convention: a day-of/day-before pair on EACH of the
       # table's three seams, plus a date well before commencement. Straddling
       # only the newest seam (which an earlier version did) would have let an
       # off-by-one on the middle interval or on the floor row pass green.
+      #
+      # THE COUNT WAS 70 UNTIL PHASE 5, and shrank for a structural reason, not
+      # because coverage was dropped: `the_rules_in_force_include` emitted as a
+      # <decision> before and emits as a <businessKnowledgeModel> now. A BKM is
+      # INVOKED, not evaluated, so it no longer appears in either engine's
+      # decision tally -- seven decisions per case became six.
+      #
+      # What that costs, stated plainly: nothing here value-checks
+      # `the_rules_in_force_include`'s own result any more. Its correctness now
+      # rides on the decisions that invoke it still matching their expected
+      # values. That is weaker than checking it head-on, and it is an accepted
+      # trade (Meng, 2026-08-02). If it ever needs pinning directly again, give
+      # it a thin wrapper decision rather than reverting the BKM.
       - name: Law time -- the dated-regime exhibit (KIE + Camunda)
         env:
           KIE_CHECK_REQUIRED: "1"
@@ -621,12 +634,12 @@ jobs:
           ./etc/kie-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee kie-gst.log
-          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 70/70 decision(s) SUCCEEDED, 70/70 value(s) as expected' kie-gst.log
+          grep -q 'KIE 8.44.0.Final VERDICT: .*0 error(s), 0 warning(s), 60/60 decision(s) SUCCEEDED, 60/60 value(s) as expected' kie-gst.log
 
           ./etc/camunda-dmn-check/run.sh \
             jl4/examples/dmn/expected/gst-rate.dmn \
             --cases jl4/examples/dmn/gst-rate.cases.json | tee camunda-gst.log
-          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 70/70 decision(s) evaluated, 70/70 value(s) as expected' camunda-gst.log
+          grep -q 'Camunda 8.7.6 (zeebe-dmn) VERDICT: .*1 parsed, 0 error(s), 60/60 decision(s) evaluated, 60/60 value(s) as expected' camunda-gst.log
 
       # The hand-written probe PAIR (spec §15.6). Not redundant with the step
       # above: the emitter cannot produce an <annotationEntry> carrying an @id,
