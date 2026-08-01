@@ -587,7 +587,14 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     {
       BREACH: {
         deadline: 1,
-        eventAction: "`wear seatbelt`",
+        // eventAction is the event's own action name, which the reference
+        // renders PLAIN (a9caf2f6 replaced prettyLayout with constructorText
+        // in Backend.Jl4). obligationAction on the very same object keeps its
+        // backticks, because that one is still prettyLayout of an unevaluated
+        // Name in ValueLazyJSON. The asymmetry is the reference's, not ours,
+        // and the live differential run agrees: deontic-seatbelt is
+        // byte-identical against jl4-service with exactly these two spellings.
+        eventAction: "wear seatbelt",
         eventParty: { Driver: { name: "Alice" } },
         obligationAction: "`wear seatbelt`",
         reason: "deadline_missed",

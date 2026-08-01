@@ -822,6 +822,16 @@ function deonticStripBackticks(s) {
   return s;
 }
 
+// The L4 SOURCE spelling of a name: backticked unless it is a bare identifier.
+// This is what `Print.prettyLayout` emits, and it is what the reference falls
+// back to when it prints an UNEVALUATED party expression. The evaluated value
+// of the same party is the plain name (`Backend.Jl4.constructorText`) — see
+// 'deonticObligationToWire' for which case gets which.
+function deonticSourceSpelling(s) {
+  if (typeof s !== "string") return s;
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(s) ? s : "`" + s + "`";
+}
+
 function deonticObligationToWire(o, ctx, remainingNum, observed) {
   const resolvedParty = resolveDeonticExpr(o.party, ctx);
   const resolvedAction = resolveDeonticExpr(o.action, ctx);
@@ -833,14 +843,21 @@ function deonticObligationToWire(o, ctx, remainingNum, observed) {
   // (Jl4.hs:1085 serializeEitherValue Left → prettyLayout of the party expr).
   // Once an event has been compared, the party is a resolved value that
   // records tag as @{<TypeName>: …}@ from the bundle's @x-l4-type@ stamp.
-  // Literal-string parties (@PARTY `the buyer`@) print identically either way.
+  //
+  // A LITERAL party (@PARTY `the seller`@) splits the same way, and an earlier
+  // version of this comment claimed it "prints identically either way". That
+  // stopped being true at a9caf2f6: unobserved, the reference still prints the
+  // unevaluated expression via `prettyLayout` and the backticks survive;
+  // observed, it prints the constructor VALUE via `constructorText` and they do
+  // not. The schema carries the plain name, so the source spelling is
+  // reconstructed here rather than stored twice.
   let party;
   if (o.party && typeof o.party === "object" && o.party.param != null) {
     party = observed
       ? deonticTagRecord(resolvedParty, ctx, o.party.param)
       : o.party.param;
   } else {
-    party = resolvedParty;
+    party = observed ? resolvedParty : deonticSourceSpelling(resolvedParty);
   }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
@@ -901,9 +918,18 @@ function deonticRenderEventParty(evParty, obligation, ctx) {
 // that is a plain identifier prints bare; anything with spaces / punctuation
 // is backtick-quoted. Enum constructors in the deontic corpus follow this
 // rule (@drive@ vs @`wear seatbelt`@).
+// A party / event-action name as the JSON payload should carry it: PLAIN.
+//
+// This used to backtick anything that wasn't a bare identifier, mirroring
+// `Print.prettyLayout`. jl4-service stopped doing that (a9caf2f6): it renders a
+// constructor through `Backend.Jl4.constructorText`, which carries no
+// backticks, because the service declares the un-backticked spelling in its own
+// `returnSchema` enum and was otherwise handing out a schema its responses
+// fail. `eventAction` and every party field follow the plain spelling;
+// `obligationAction` does NOT — that one is still `prettyLayout` of an
+// unevaluated Name on the reference side, so it keeps its backticks.
 function deonticRenderEnumName(name) {
-  if (typeof name !== "string") return name;
-  return /^[A-Za-z][A-Za-z0-9_]*$/.test(name) ? name : "`" + name + "`";
+  return name;
 }
 
 // Wrap a resolved parameter value in its L4 type name when the
@@ -2692,11 +2718,18 @@ export function createRuntime(opts) {
     if (type === "DATETIME") return formatDatetime(raw);
     return Number(raw);
   }
+  // MAYBE on the VALUE wire, matching jl4-service since a9caf2f6: NOTHING is
+  // JSON `null` and `JUST x` is `x`. The old `"NOTHING"` / `{JUST:[x]}` shapes
+  // were wrong twice over — `"NOTHING"` is indistinguishable from a genuine
+  // string answer (which is exactly what `MAYBE STRING` exists to avoid), and
+  // the JUST wrapper made every optional field a tagged union the caller has to
+  // unwrap. The TRACE path (`walkMaybe`) still speaks `{JUST:[…]}`; that is a
+  // different surface and `prettyResultText` / `prettyL4Value` still accept it.
   function unmarshalMaybe(raw, innerType) {
     const ptr = Number(f64ToU64(raw));
-    if (!ptr) return "NOTHING";
+    if (!ptr) return null;
     const tag = memView.getFloat64(ptr, true);
-    if (tag === 0.0) return "NOTHING";
+    if (tag === 0.0) return null;
     let payload;
     if (innerType === "NUMBER") {
       // The slot holds the f64 bit-pattern of a rational handle.
@@ -2707,7 +2740,7 @@ export function createRuntime(opts) {
     else if (innerType === "STRING")
       payload = readCString(Number(memView.getBigUint64(ptr + 8, true)));
     else payload = memView.getFloat64(ptr + 8, true);
-    return { JUST: [payload] };
+    return payload;
   }
   // M7+ — when the schema carries a structured 'returnSchema' (record /
   // enum / list / maybe), use it to decode the wasm return faithfully.
@@ -2736,13 +2769,14 @@ export function createRuntime(opts) {
       return schema.values[idx];
     return idx;
   }
+  // See 'unmarshalMaybe': NOTHING is null, JUST x is x.
   function unmarshalMaybeStructured(raw, innerSchema) {
     const ptr = Number(f64ToU64(raw));
-    if (!ptr) return "NOTHING";
+    if (!ptr) return null;
     const tag = memView.getFloat64(ptr, true);
-    if (tag === 0.0) return "NOTHING";
+    if (tag === 0.0) return null;
     const slot = memView.getFloat64(ptr + 8, true);
-    return { JUST: [unmarshalWithSchema(slot, innerSchema)] };
+    return unmarshalWithSchema(slot, innerSchema);
   }
   function unmarshalRecord(raw, schema) {
     const ptr = Number(f64ToU64(raw));
@@ -2754,12 +2788,15 @@ export function createRuntime(opts) {
       const slot = memView.getFloat64(ptr + i * 8, true);
       out[fname] = unmarshalWithSchema(slot, (schema.fields || {})[fname]);
     }
-    // Match svc's prettyLayout convention: multi-word constructor
-    // names render with surrounding backticks in the JSON envelope.
-    const tagName = /\s/.test(schema.name)
-      ? "`" + schema.name + "`"
-      : schema.name;
-    return { [tagName]: out };
+    // The constructor's PLAIN name, matching `Backend.Jl4.constructorText`.
+    // This used to backtick multi-word names to mirror `prettyLayout`; the
+    // reference stopped doing that in a9caf2f6 for the same reason it stopped
+    // backticking parties — the backticked spelling fails the enum the service
+    // declares in its own returnSchema. No multi-word record tag appears in the
+    // sweep corpus, so this arm is corrected by construction rather than
+    // measured; the single-word tags it does exercise (OBLIGATION, BREACH,
+    // Driver) are unaffected either way.
+    return { [schema.name]: out };
   }
 
   function unmarshalResult(raw, returnType, returnSchema) {
@@ -4163,6 +4200,18 @@ export function isEmptyReasoning(r) {
 // keep the slice-1 behaviour of bare strings.
 export function prettyResultText(value, returnType) {
   if (value === null || value === undefined) return "NOTHING";
+  // A MAYBE payload arrives UNWRAPPED on the value wire (see 'unmarshalMaybe'),
+  // but the pretty surface is jl4-core's `prettyLayout` of the L4 value, which
+  // still says `JUST OF …`. The two surfaces disagree on purpose: JSON unwraps,
+  // prose does not. The `{JUST:[…]}` branch below still serves the trace path,
+  // so this arm skips that shape and lets the old one handle it.
+  if (
+    typeof returnType === "string" &&
+    returnType.startsWith("MAYBE ") &&
+    !(value && typeof value === "object" && Array.isArray(value.JUST))
+  ) {
+    return "JUST OF " + prettyResultText(value, returnType.slice(6));
+  }
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "string") {
     // If the return type says STRING, jl4-service renders the value

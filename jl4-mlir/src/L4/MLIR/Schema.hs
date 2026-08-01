@@ -876,7 +876,7 @@ exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
   Regulative _ deonton -> deontonToContract deonton
   Breach _ mBy mBec ->
-    Just (DCBreach (Print.prettyLayout <$> mBy) (Print.prettyLayout <$> mBec))
+    Just (DCBreach (partyLiteralText <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
     | rawNameToText (rawName (getActual headRes)) `elem` ["Fulfilled", "FULFILLED"] ->
         Just DCFulfilled
@@ -927,7 +927,7 @@ deontonToContract deonton = do
   dcHence_ <- traverse exprToContract deonton.hence
   dcLest_  <- traverse exprToContract deonton.lest
   Just DCObligation
-    { dcParty    = exprToDeonticExpr (deonton.party)
+    { dcParty    = exprToDeonticParty (deonton.party)
     , dcAction   = patternToDeonticExpr (deonton.action.action)
     , dcModal    = modalToText deonton.action.modal
     , dcDeadline = dcDeadline_
@@ -935,18 +935,38 @@ deontonToContract deonton = do
     , dcLest     = dcLest_
     }
 
--- | Classify the party/action expression as either a parameter
--- reference (so the runtime can resolve it against the request's
--- @arguments@ bag) or a literal text (party / action names that
--- pre-render via 'L4.Print.prettyLayout' to a stable string).
-exprToDeonticExpr :: Expr Resolved -> DeonticExpr
-exprToDeonticExpr e = case e of
-  -- Bare Var: pretty-print as the param name without backticks so
-  -- 'DEParam' lookups land in the request's @arguments@ bag.
+-- | Classify a party expression as either a parameter reference (so the
+-- runtime can resolve it against the request's @arguments@ bag) or a literal
+-- name.
+--
+-- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
+-- prettyLayout emits L4 /source/, so a multi-word party comes back
+-- backtick-quoted; jl4-service evaluates the party to a constructor VALUE and
+-- renders it through @Backend.Jl4.constructorText@
+-- (@rawNameToText . rawName . getActual@), which carries no backticks. Emitting
+-- @\`the seller\`@ where the reference says @the seller@ is a wrong answer at
+-- @supported: true@, and it is the shape a caller compares against the
+-- @enum@ the service declares in its own @returnSchema@.
+--
+-- The ACTION is deliberately NOT treated this way: the reference prints it
+-- with 'Print.prettyLayout' of an unevaluated Name (@ValueLazyJSON@'s
+-- @obligationAction .= prettyLayout action@), backticks included. Party and
+-- action genuinely disagree on the wire, and this asymmetry is measured:
+-- deontic-sale's residual OBLIGATION is @{"party":"the seller",
+-- "action":"\`deliver the goods\`"}@ on both sides.
+exprToDeonticParty :: Expr Resolved -> DeonticExpr
+exprToDeonticParty e = case e of
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral (Print.prettyLayout e)
+    in if isLikelyParam nm then DEParam nm else DELiteral nm
   _ -> DELiteral (Print.prettyLayout e)
+
+-- | The plain-name rendering of a party expression. See 'exprToDeonticParty'
+-- for why this is not 'Print.prettyLayout'.
+partyLiteralText :: Expr Resolved -> Text
+partyLiteralText e = case e of
+  App _ headRes [] -> rawNameToText (rawName (getActual headRes))
+  _                -> Print.prettyLayout e
 
 -- | Pattern variant: 'PatVar' is the param-ref shape; everything
 -- else collapses to its pretty-printed form.
