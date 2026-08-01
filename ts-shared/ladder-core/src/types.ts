@@ -155,6 +155,42 @@ export interface FunDecl {
 /** Orthogonal to T/F/U; see DESIGN §15.1. Default 'inert'. */
 export type State = "live" | "inert" | "dead" | "eliminable";
 
+/**
+ * How to read an atom the source left UNGROUNDED — the choice of epistemics, made
+ * explicit and reversible (DESIGN §22; `NEGATION-AS-FAILURE-SPEC.md`).
+ *
+ * The L4 library already ships the three eliminators this mirrors — `holds`
+ * (unproven ⇒ FALSE), `presumed` (unproven ⇒ TRUE), `decided` (is there a verdict at
+ * all?) — and the spec calls the default value *"the knob that turns NAF into general
+ * defeasible / default reasoning"*, where flipping it FALSE→TRUE *"is exactly the
+ * closed-world / open-world switch"*. This is that knob, surfaced.
+ *
+ *   'none'   — Kleene. Unknown stays unknown; the picture shows only what is known.
+ *   'closed' — negation as failure. Unproven reads FALSE (`holds`).
+ *   'open'   — unproven reads TRUE (`presumed`).
+ *
+ * TWO INVARIANTS make this principled rather than a global truth-value hack, and both
+ * are load-bearing:
+ *
+ * 1. **Collapse at the eliminator, never in the data.** The grounded reading drives
+ *    CONDUCTION (energize / lamps / `complete`) only. Render state — box ink, the
+ *    open-contact break — keeps reading the honest three-valued evaluation, so an
+ *    assumed atom still draws grey-and-unbroken, never as a tested-and-false contact.
+ *    §25.4 reads N/A off exactly that ink, and a grounding switch must not forge it.
+ * 2. **It defaults for silence; it never overrules speech.** Grounding applies only
+ *    where the source said nothing. An L4 author who wrote `holds p` in one clause and
+ *    `presumed q` in another has already chosen per use site — that choice is in the
+ *    valuation and this knob cannot reach it. (`NEGATION-AS-FAILURE-SPEC.md` assigns
+ *    them by polarity: `presumed`/open for permission, `holds`/closed for obligation
+ *    discharge, which is precisely why one global setting could never be the whole
+ *    answer.)
+ *
+ * Closure that rests on an assumption is capped at STREAMER weight (§20/§22) — the
+ * lightning model now carries three reasons for provisional closure: locality, a
+ * TYPICALLY presumption, and an assumption. One channel, three reasons.
+ */
+export type Grounding = "none" | "closed" | "open";
+
 export type Scale = "full" | "small" | "tiny";
 export type Orient = "LR" | "TB";
 export type Theme = "screen" | "ink";
@@ -200,6 +236,23 @@ export interface ViewSpec {
    * Absent ⇒ `given`. Injected data (like `states`); populated upstream from the L4
    * TYPICALLY field once the wire IR carries it. */
   readonly provenance: ReadonlyMap<NodeId, Provenance>;
+  /**
+   * The VALUES the source's TYPICALLY presumptions supply, keyed by node `id` — kept in
+   * their own map, separate from `valuation`, because that separation IS the `Left`/`Right`
+   * of `Either (Maybe Bool) (Maybe Bool)` (DESIGN §22):
+   *
+   *   `valuation` = **Right** — what the user or the data actually said;
+   *   `defaults`  = **Left**  — what the drafter presumed in their absence.
+   *
+   * `valuation` always wins where both have an entry, so an answered question is never
+   * overwritten by a presumption. And `respectDefaults` can then withdraw the presumptions
+   * without touching a single user answer — which a single merged map makes impossible to
+   * do correctly, because once merged there is no longer any way to tell whose value it was.
+   *
+   * Distinct from `provenance`, which marks a DECLARATION site ("this leaf has a TYPICALLY
+   * clause") and is therefore true whether or not the presumption is currently in play.
+   */
+  readonly defaults: ReadonlyMap<NodeId, UBoolValue>;
   readonly scale: Scale;
   readonly orient: Orient;
   readonly theme: Theme;
@@ -207,6 +260,21 @@ export interface ViewSpec {
   /** Render current flow (DESIGN §20): closed connectors thick+dark, open thin+light.
    *  Off by default so static/print demos keep state-coloured connectors. */
   readonly showCurrent: boolean;
+  /** How to read an ungrounded atom. Default 'none' — the honest Kleene picture. */
+  readonly grounding: Grounding;
+  /**
+   * Honour the TYPICALLY defaults the L4 source supplies (DESIGN §22)? Default `true`.
+   *
+   * This is the OTHER axis, and it is genuinely independent of `grounding`: it is the
+   * `Left`/`Right` of `Either (Maybe Bool) (Maybe Bool)`, not the Just/Nothing. Turning
+   * it off demotes every `Left (Just b)` to `Left Nothing` — the presumption's VALUE is
+   * dropped while the mark that one exists is kept — which answers "how much of this
+   * verdict rests on presumptions?" by simply removing them and seeing what survives.
+   *
+   * Off + `grounding: 'none'` is the strictest reading available: only what the user
+   * actually told us, with nothing filled in from either direction.
+   */
+  readonly respectDefaults: boolean;
 }
 
 export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
@@ -215,11 +283,14 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     valuation: partial.valuation ?? new Map(),
     states: partial.states ?? new Map(),
     provenance: partial.provenance ?? new Map(),
+    defaults: partial.defaults ?? new Map(),
     scale: partial.scale ?? "full",
     orient: partial.orient ?? "LR",
     theme: partial.theme ?? "screen",
     connectiveStyle: partial.connectiveStyle ?? "straddle-wire",
     showCurrent: partial.showCurrent ?? false,
+    grounding: partial.grounding ?? "none",
+    respectDefaults: partial.respectDefaults ?? true,
   };
 }
 
@@ -287,6 +358,16 @@ export type ScenePrim =
       kind: "glyph";
       at: Pt;
       role: "open-contact" | "power-terminal" | "inverter" | "changeover";
+      /** For `open-contact` only: whose break is this? A `dead` break is a settled fact
+       *  and draws in the firm dead ink; an `eliminable` one is a ghost (DESIGN §15.1).
+       *  Absent ⇒ ghost, the pre-existing behaviour. */
+      state?: State;
+      /** …and is the FALSITY itself only presumed (DESIGN §22)? A `TYPICALLY FALSE` leaf
+       *  really is false and really does break the circuit, so it earns a break — but a
+       *  rebuttable one. Takes §22's fine dash, matching the box it hangs off: the closure
+       *  side is already softened this way, and a break is just closure with the sign
+       *  flipped. Without this, a presumed-false contact reports as firmly as a tested one. */
+      tentative?: boolean;
     }
   /** A SINK (DESIGN §25.4). The right-hand half of a rung, which our diagrams have
    *  never drawn: an implication routes its verdict to one of two lamps. `lit` is the
@@ -321,6 +402,10 @@ export type ScenePrim =
         | "connective"
         | "caret"
         | "typically"
+        /** §Grounding — "assumed false" / "assumed true": this atom was never answered
+         *  and the reader has chosen an epistemics for it. Distinct from `typically`,
+         *  which is a presumption the SOURCE supplied; this one is the reader's. */
+        | "assumed"
         | "seam"; // §25 — the MUST / ⇒ connective between scope and requirement
       size?: number;
       /** node id this text belongs to (heading -> its group; label -> its box) —
@@ -332,6 +417,28 @@ export type ScenePrim =
 export interface Scene {
   size: { w: number; h: number };
   prims: ScenePrim[];
+  /**
+   * Does the circuit conduct END TO END — source rail through to the sink (DESIGN §20,
+   * TODO G1)? A connector's own `flow: "closed"` only says *the leader reached me*; it
+   * cannot tell a path that completes from one that energizes half the diagram and then
+   * dies at an open contact. That is a whole-scene property, so it lives here rather
+   * than on each prim, and renderers use it to distinguish a **made** circuit from a
+   * merely live one. `undefined` when current flow is off (`showCurrent: false`).
+   *
+   * For an `Implies` body this stays false: a rule with two lamps has no single sink to
+   * reach, and the lamps already report the verdict (§25.4).
+   */
+  complete?: boolean;
+  /**
+   * Does any closure in this scene rest on something the user did not actually assert —
+   * a TYPICALLY presumption (§22) or a `grounding` assumption (`Grounding`)?
+   *
+   * Kept separate from `complete` because the honest answer to "is this circuit made?"
+   * has two parts, and merging them is how a picture ends up overclaiming: a circuit can
+   * be made ENTIRELY on assumed atoms, and a reader who sees only the made-green would
+   * have no way to know. Renderers should soften the made-circuit signal when set.
+   */
+  provisional?: boolean;
 }
 
 /* -------------------------------------------------------------- TextMetrics */

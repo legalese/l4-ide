@@ -27,9 +27,10 @@
 import type { Theme } from "@repo/ladder-core";
 
 /**
- * Every colour the SVG emit can produce — 26 fields, and `test/palette.test.ts` pins that
+ * Every colour the SVG emit can produce — 31 fields, and `test/palette.test.ts` pins that
  * count because three specs quote it. The first seven were already a `Palette` in `svg.ts`;
- * the other nineteen were inline literals, and the comment on each says where it was baked.
+ * nineteen more were inline literals, and the comment on each says where it was baked. The
+ * last five arrived with the FALSE-vs-UNKNOWN fix (DESIGN §26) and are marked.
  *
  * All of them are required. An optional field would let a caller hand over a half-palette
  * and silently inherit a light-theme literal into a dark diagram, which is precisely the
@@ -39,9 +40,15 @@ export interface Palette {
   /* --- the original seven (svg.ts:10-18) --- */
   /** A box/text that carries current. */
   live: string;
-  /** A box/text that does not. */
+  /** A box/text that does not — an atom nobody has answered. */
   inert: string;
-  /** Reserved for the dead state; equal to `inert` in both built-ins. */
+  /**
+   * A box/text that was tested and came out FALSE. Was equal to `inert` in every built-in
+   * and never read by the emit at all, which is the defect DESIGN §26.1 describes: a false
+   * atom and an unanswered one produced byte-identical SVG. §25.4 tells N/A from
+   * undetermined purely by that contrast, so the two-lamp form had lost its only way to
+   * say which a reader was looking at.
+   */
   dead: string;
   /** Eliminable (DESIGN §15) — a rung that cannot matter. */
   ghost: string;
@@ -91,14 +98,47 @@ export interface Palette {
   typically: string;
   /** Tagged (non-body) text that is not otherwise special-cased (was svg.ts:149). */
   tagInk: string;
+
+  /* --- the made-circuit inks and `assumed` (new with DESIGN §26; no former site) --- */
+  /**
+   * A closed run on a circuit that is MADE end to end (`Scene.complete`). The difference
+   * between "current has reached here" and "this circuit conducts, source to sink" is the
+   * most legible thing the picture can say, and colour says it without changing the weight
+   * the eye already reads as live.
+   */
+  wireMade: string;
+  /**
+   * A made circuit resting on assumptions (`Scene.provisional`). The reader is still told
+   * the circuit conducts, but not in the same voice as one made of answered facts:
+   * suppressing the green would hide a real result, and giving it the full green would let
+   * an all-assumed path pass for a finding.
+   */
+  wireMadeProvisional: string;
+  /** A lit "complies" coil under `Scene.provisional`. */
+  coilGreenSoft: string;
+  /** A lit "in breach" coil under `Scene.provisional`. */
+  coilRedSoft: string;
+  /**
+   * Text tagged `assumed` — an atom the READER chose to assume via the grounding knob. Kept
+   * distinct from `typically`, which is what the SOURCE presumed: confusing a drafter's
+   * presumption with a viewer's setting is exactly the audit failure to avoid.
+   */
+  assumed: string;
 }
 
-/** The default. Every value is the literal that stood at the cited site before S8, verbatim,
- *  which is what makes `sceneToSvg(scene)` byte-identical to its pre-S8 output. */
+/**
+ * The default. Every value carried over from S8 is the literal that stood at its cited site,
+ * verbatim. The exception is `dead`, which is no longer `inert`'s grey — see the field.
+ *
+ * Determinacy is what the leaf inks track: a settled fact is drawn FIRMLY (dark slate), an
+ * open question FAINTLY (light grey), a don't-care fainter still (`ghost`). Red is
+ * deliberately not used — it belongs to the breach lamp, and a false atom is very often the
+ * good outcome (an exception that did not apply).
+ */
 export const SCREEN_PALETTE: Palette = {
   live: "#1a7f37",
   inert: "#9aa0a6",
-  dead: "#9aa0a6",
+  dead: "#4a5560",
   ghost: "#b9bdc2",
   rail: "#3a3a3a",
   ink: "#222",
@@ -122,22 +162,29 @@ export const SCREEN_PALETTE: Palette = {
   seam: "#1b1b1b",
   typically: "#9a7b34",
   tagInk: "#555",
+  wireMade: "#0f5c2a", // dark green — a completed source→sink path
+  wireMadeProvisional: "#5f9e77", // muted green — completed, but on presumptions
+  coilGreenSoft: "#5f9e77",
+  coilRedSoft: "#cd8b84",
+  assumed: "#3f6d8f",
 };
 
 /**
- * The print look. Exactly the same six overrides `svg.ts` applied before S8 — no more, no
- * fewer — so the committed doc figures do not move.
+ * The print look. Still the same six overrides `svg.ts` applied before S8, but two of them
+ * change VALUE: `inert` moves from `#555` to `#777` to open a gap for `dead` at `#333`.
+ * Under the old palette `dead` WAS `#555` — the same ink as `inert`, which is the defect;
+ * three determinacy levels need three separations, and `#555`/`#555`/`#999` only had two.
  *
- * **Known wart, preserved deliberately.** It inherits the chromatic `coilGreen`/`coilRed`,
- * so a lit coil prints in colour even in the "ink" theme. It did that before S8 too, because
- * those literals never went through the palette at all. Fixing it re-bytes the print
- * figures, which is Step 2's business, not Step 4's — recorded in S8's row.
+ * **Known wart, preserved deliberately.** It inherits the chromatic `coilGreen`/`coilRed`
+ * (and now their soft variants), so a lit coil prints in colour even in the "ink" theme. It
+ * did that before S8 too, because those literals never went through the palette at all.
+ * Fixing it is Step 2's business — recorded in S8's row.
  */
 export const INK_PALETTE: Palette = {
   ...SCREEN_PALETTE,
   live: "#222",
-  inert: "#555",
-  dead: "#555",
+  inert: "#777",
+  dead: "#333",
   ghost: "#999",
   rail: "#222",
   ink: "#111",
@@ -152,7 +199,9 @@ export const INK_PALETTE: Palette = {
 export const DARK_PALETTE: Palette = {
   live: "#4ec97a",
   inert: "#8b9096",
-  dead: "#8b9096",
+  // Determinacy runs the other way against a dark backdrop: firm means BRIGHTER, so the
+  // settled-false ink sits between `inert` and `ink` rather than below `inert`.
+  dead: "#c3c9d0",
   ghost: "#5a6068",
   rail: "#b9bdc2",
   ink: "#e6e6e6",
@@ -176,6 +225,11 @@ export const DARK_PALETTE: Palette = {
   seam: "#e6e6e6",
   typically: "#d6b56a",
   tagInk: "#a8adb3",
+  wireMade: "#7ee39c",
+  wireMadeProvisional: "#3f8c5c",
+  coilGreenSoft: "#2f7d4e",
+  coilRedSoft: "#a34f42",
+  assumed: "#7fb0d4",
 };
 
 /* ------------------------------------------------------------------------------------

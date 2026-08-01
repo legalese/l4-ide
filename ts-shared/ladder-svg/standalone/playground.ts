@@ -39,6 +39,8 @@ import type {
   UBoolValue,
   Provenance,
   ConnectiveStyle,
+  Grounding,
+  Scene,
 } from "@repo/ladder-core";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -51,13 +53,29 @@ const sentList = $("sentences") as HTMLOListElement;
 const sentCount = $("sent-count");
 
 /* ------------------------------------------------------------------- state */
-type Decoded = { fn: FunDecl; provenance: Map<NodeId, Provenance> };
+type Decoded = {
+  fn: FunDecl;
+  provenance: Map<NodeId, Provenance>;
+  /** §22 `Left`: the VALUES the source presumes, kept apart from user answers. */
+  defaults: Map<NodeId, UBoolValue>;
+};
+/** One LSP diagnostic, flattened by `/render` (1-based line/column). */
+type Diagnostic = {
+  severity: number; // 1 Error, 2 Warning, 3 Information, 4 Hint
+  line: number;
+  column: number;
+  message: string;
+};
 let decisions: Decoded[] = [];
 let cur: Decoded | null = null;
 const nameMap = new Map<string, Decoded>(); // cleaned DECIDE name -> its tree
 const foldSet = new Set<NodeId>();
 const valuation = new Map<NodeId, UBoolValue>();
 let connective: ConnectiveStyle = "straddle-wire";
+/** How to read an atom nobody answered, and whether the source's own TYPICALLY
+ *  presumptions are in play. Two independent axes; see `Grounding` in ladder-core. */
+let grounding: Grounding = "none";
+let respectDefaults = true;
 
 /* hydration: display ids currently expanded, and a stable id-remap for the
  * subtrees we splice in (so ids survive re-render for FLIP + click + fold). */
@@ -82,6 +100,7 @@ function refNameOf(e: IRExpr): string | null {
 
 /* per-render scratch, rebuilt by buildDisplay each frame */
 let activeProv = new Map<NodeId, Provenance>();
+let activeDefaults = new Map<NodeId, UBoolValue>();
 let collapsedRefs = new Set<NodeId>(); // display id -> clicking hydrates
 let wrappers = new Map<NodeId, NodeId>(); // wrapper group id -> the ref id it stands for
 
@@ -108,6 +127,7 @@ function buildDisplay(node: IRExpr, remap: (id: NodeId) => NodeId): IRExpr {
         const target = nameMap.get(ref)!;
         const sub = (o: NodeId) => rid(`${id}:${o}`);
         for (const [o, p] of target.provenance) activeProv.set(sub(o), p);
+        for (const [o, v] of target.defaults) activeDefaults.set(sub(o), v);
         const inner = buildDisplay(target.fn.body, sub);
         const wrapperId = rid(`${id}:__wrap`);
         wrappers.set(wrapperId, id);
@@ -177,6 +197,7 @@ function render(animate: boolean) {
   if (!cur) return;
   // rebuild the display tree (with hydrations spliced in) and its provenance
   activeProv = new Map(cur.provenance);
+  activeDefaults = new Map(cur.defaults);
   collapsedRefs = new Set();
   wrappers = new Map();
   const body = buildDisplay(cur.fn.body, (x) => x);
@@ -186,17 +207,55 @@ function render(animate: boolean) {
   // The display tree is rebuilt every frame, so the controller's `fn` is swapped every
   // frame too — but `keepBaseline` when animating, because a hydration IS the thing the
   // FLIP is there to show. `animate: false` (a fresh decision) drops the baseline.
+  //
+  // The two epistemic knobs ride the ViewSpec, so the controller needs no knowledge of
+  // them; `render` hands back the Scene, which is what the banner reads its wording off.
   controller.setFunDecl(fn, animate);
-  controller.render(
+  const scene = controller.render(
     defaultViewSpec({
       valuation,
       foldSet,
       provenance: activeProv,
+      defaults: activeDefaults,
       connectiveStyle: connective,
       showCurrent: true,
+      grounding,
+      respectDefaults,
     }),
   );
+  renderEpiNote(scene);
   renderSentences();
+}
+
+/**
+ * Say IN WORDS what reading the picture is under, because the colour grammar alone
+ * cannot: a muted-green completed circuit and a dark-green one differ by one shade, and
+ * the difference between them is "this is what the facts say" versus "this is what the
+ * facts say once I fill in the gaps myself". A viewer who mis-reads that is exactly the
+ * audit failure the two knobs exist to prevent, so the banner is not decoration.
+ */
+function renderEpiNote(scene: Scene) {
+  const note = $("epi-note");
+  const parts: string[] = [];
+  if (grounding !== "none")
+    parts.push(
+      grounding === "closed"
+        ? "Unanswered atoms are being read as <b>false</b> (closed world / negation as failure)."
+        : "Unanswered atoms are being read as <b>true</b> (open world).",
+    );
+  if (!respectDefaults)
+    parts.push(
+      "<code>TYPICALLY</code> defaults from the source are <b>ignored</b>.",
+    );
+  if (scene.complete && scene.provisional)
+    parts.push(
+      "The circuit is made, but <b>provisionally</b> — some closed contact is presumed or assumed, not answered.",
+    );
+  const on = grounding !== "none" || !respectDefaults;
+  note.className = on ? "assumed" : "grounded";
+  note.innerHTML = parts.length
+    ? parts.join(" ")
+    : "Showing only what is known — unanswered atoms stay unanswered.";
 }
 
 /** Combination view: enumerate every way to satisfy the rule (the hydrated
@@ -262,8 +321,8 @@ async function doRender() {
     decisions = (data.funcs ?? [])
       .filter((f: { funDecl?: unknown }) => f.funDecl)
       .map((f: { funDecl: Parameters<typeof fromVizFunDecl>[0] }) => {
-        const { fn, provenance } = fromVizFunDecl(f.funDecl);
-        return { fn, provenance };
+        const { fn, provenance, defaults } = fromVizFunDecl(f.funDecl);
+        return { fn, provenance, defaults };
       });
     nameMap.clear();
     decisions.forEach((d) => nameMap.set(clean(d.fn.name), d));
@@ -275,6 +334,33 @@ async function doRender() {
       picker.appendChild(o);
     });
     if (!decisions.length) {
+      // Drop the PREVIOUS module's tree too. `render()` early-returns on a null `cur`, so
+      // leaving it set means any later control — a grounding radio, a fold — silently
+      // redraws the last file that compiled, on top of the diagnostics explaining why this
+      // one did not. A ladder for a program you are no longer looking at is worse than none.
+      cur = null;
+      lastDisplayFn = null;
+      // …and the controller's FLIP baseline with it, or the next module that DOES compile
+      // animates out of a scene belonging to a program nobody is looking at.
+      controller.setFunDecl(EMPTY_FN);
+      picker.innerHTML = "";
+      sentList.innerHTML = "";
+      sentCount.textContent = "";
+      // Prefer the compiler's own words. "No DECIDE found" is true but useless
+      // when the real reason is a parse error on a line we can name.
+      const diags: Diagnostic[] = data.diagnostics ?? [];
+      const errs = diags.filter((d) => d.severity === 1);
+      if (errs.length) {
+        status.textContent = `${errs.length} error(s)`;
+        container.innerHTML = "";
+        const pre = document.createElement("pre");
+        pre.className = "diagnostics";
+        pre.textContent = errs
+          .map((d) => `line ${d.line}:${d.column}  ${d.message}`)
+          .join("\n\n");
+        container.appendChild(pre);
+        return;
+      }
       status.textContent = "no visualizable DECIDE found";
       container.innerHTML = "";
       return;
@@ -291,6 +377,19 @@ $("render").addEventListener("click", doRender);
 picker.addEventListener("change", () => selectDecision(Number(picker.value)));
 ($("connective") as HTMLSelectElement).addEventListener("change", (e) => {
   connective = (e.target as HTMLSelectElement).value as ConnectiveStyle;
+  render(true);
+});
+document
+  .querySelectorAll<HTMLInputElement>('input[name="grounding"]')
+  .forEach((el) =>
+    el.addEventListener("change", () => {
+      if (!el.checked) return;
+      grounding = el.value as Grounding;
+      render(true);
+    }),
+  );
+($("respect-defaults") as HTMLInputElement).addEventListener("change", (e) => {
+  respectDefaults = (e.target as HTMLInputElement).checked;
   render(true);
 });
 $("expand-all").addEventListener("click", () => {

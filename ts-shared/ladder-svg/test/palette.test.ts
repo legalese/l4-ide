@@ -57,6 +57,13 @@ const prims: ScenePrim[] = [
     state: "live",
   },
   {
+    kind: "box",
+    id: 5,
+    rect: { x: 0, y: 160, w: 80, h: 30 },
+    role: "leaf",
+    state: "dead",
+  },
+  {
     kind: "wire",
     path: [
       { x: 0, y: 0 },
@@ -168,9 +175,26 @@ const prims: ScenePrim[] = [
     state: "inert",
     tag: "title",
   },
+  {
+    kind: "text",
+    at: { x: 1, y: 7 },
+    text: "assumed false",
+    anchor: "start",
+    state: "live",
+    tag: "assumed",
+  },
 ];
 
 const scene: Scene = { size: { w: 400, h: 200 }, prims };
+
+/** `complete` and `provisional` are SCENE-level and mutually exclusive in what they select
+ *  — `wireMade` needs a made circuit, `wireMadeProvisional` needs a made-but-presumed one —
+ *  so no single render can reach both. The contract test unions all three readings. */
+const scenes: Scene[] = [
+  scene,
+  { ...scene, complete: true },
+  { ...scene, complete: true, provisional: true },
+];
 
 /* --------------------------------------------------------------- byte-identity (R3) */
 
@@ -187,10 +211,11 @@ test("the ink theme name and INK_PALETTE are the same palette", () => {
 
 /* ------------------------------------------------- the contract: every field is wired */
 
-/** Every field EXCEPT `dead` — see the test below it. */
+/** Every field. `dead` used to be excluded — see the test that now covers it. */
 const REACHABLE: Array<keyof Palette> = [
   "live",
   "inert",
+  "dead",
   "ghost",
   "rail",
   "ink",
@@ -214,39 +239,43 @@ const REACHABLE: Array<keyof Palette> = [
   "seam",
   "typically",
   "tagInk",
+  "wireMade",
+  "wireMadeProvisional",
+  "coilGreenSoft",
+  "coilRedSoft",
+  "assumed",
 ];
 
 /** A palette whose every field is a distinct sentinel, so "did this field reach the emit"
  *  is a substring search rather than an argument. */
 const sentinelPalette = (): Palette => {
   const out = {} as Record<string, string>;
-  const all = [...REACHABLE, "dead" as const];
-  all.forEach((f, i) => {
+  REACHABLE.forEach((f, i) => {
     out[f] = `#${(0xaa0000 + i).toString(16).padStart(6, "0")}`;
   });
   return out as unknown as Palette;
 };
 
-test("the palette has exactly the 26 fields the specs quote", () => {
+test("the palette has exactly the 31 fields the specs quote", () => {
   // Pinned because the count is quoted in prose that cannot check itself: E1-IDE-INTEGRATION
   // .md's S8 row and EMBEDDABLE.md §2 / §9 R8 all name it. An earlier draft of those rows said
   // "21 colours … 14 literals" — 14 was a count of SITES (svg.ts:41 carried three colours,
   // :59, :90 and :113 two each), and the wrong number was transcribed into three owning
   // documents before anyone counted. Adding a field now fails here, which is the reminder to
   // move the prose with the code.
-  assert.equal(Object.keys(SCREEN_PALETTE).length, 26);
-  assert.equal(Object.keys(INK_PALETTE).length, 26);
-  assert.equal(Object.keys(DARK_PALETTE).length, 26);
-  assert.equal(
-    REACHABLE.length + 1,
-    26,
-    "REACHABLE + `dead` must cover the type",
-  );
+  //
+  // 26 -> 31: DESIGN §26's fix wired `dead` up and brought five new colours (the two
+  // made-circuit inks, the two soft coils, and `assumed`). The three owning documents
+  // moved in the same commit.
+  assert.equal(Object.keys(SCREEN_PALETTE).length, 31);
+  assert.equal(Object.keys(INK_PALETTE).length, 31);
+  assert.equal(Object.keys(DARK_PALETTE).length, 31);
+  assert.equal(REACHABLE.length, 31, "REACHABLE must cover the type");
 });
 
 test("every reachable Palette field actually reaches the emit", () => {
   const pal = sentinelPalette();
-  const svg = sceneToSvg(scene, pal);
+  const svg = scenes.map((s) => sceneToSvg(s, pal)).join("\n");
   const missing = REACHABLE.filter((f) => !svg.includes(pal[f]));
   assert.deepEqual(
     missing,
@@ -256,30 +285,59 @@ test("every reachable Palette field actually reaches the emit", () => {
   );
   assert.notEqual(
     svg,
-    sceneToSvg(scene),
+    scenes.map((s) => sceneToSvg(s)).join("\n"),
     "a custom palette must change the bytes",
   );
 });
 
-test("`dead` is declared but unreachable today, and that is a pre-existing fact", () => {
-  // `strokeFor` maps live -> live, eliminable -> ghost, and EVERYTHING ELSE -> inert, so
-  // the `dead` State never reads `pal.dead`. That was true before S8 too (the field sat in
-  // the old seven-field Palette unused). It is asserted rather than quietly tolerated: the
-  // day someone wires the dead state up, this test tells them to add `dead` to REACHABLE.
+test("a FALSE box does not render as an UNKNOWN one — DESIGN §26.1", () => {
+  // The regression test for the headline defect. `strokeFor` used to map live -> live,
+  // eliminable -> ghost and EVERYTHING ELSE -> inert, so the `dead` State never read
+  // `pal.dead`; with `dead === inert` in every built-in palette, a tested-and-false box
+  // emitted BYTE-IDENTICAL SVG to one nobody had answered. §25.4 tells N/A from
+  // undetermined purely by that contrast, so the two-lamp form had lost its only way to
+  // say which a reader was looking at.
   const pal = sentinelPalette();
-  const dead: ScenePrim = {
-    kind: "box",
-    id: 1,
-    rect: { x: 0, y: 0, w: 8, h: 8 },
-    role: "leaf",
-    state: "dead",
-  };
-  const svg = sceneToSvg({ size: { w: 10, h: 10 }, prims: [dead] }, pal);
-  assert.ok(!svg.includes(pal.dead), "pal.dead unexpectedly reached the emit");
-  assert.ok(
-    svg.includes(pal.inert),
-    "the dead state renders through pal.inert",
+  const emit = (state: "dead" | "inert") =>
+    sceneToSvg(
+      {
+        size: { w: 10, h: 10 },
+        prims: [
+          {
+            kind: "box",
+            id: 1,
+            rect: { x: 0, y: 0, w: 8, h: 8 },
+            role: "leaf",
+            state,
+          } as ScenePrim,
+        ],
+      },
+      pal,
+    );
+
+  assert.notEqual(
+    emit("dead"),
+    emit("inert"),
+    "a false atom and an unanswered one must not be the same picture",
   );
+  assert.ok(emit("dead").includes(pal.dead), "pal.dead must reach the emit");
+  assert.ok(!emit("dead").includes(pal.inert), "and pal.inert must not");
+});
+
+test("every built-in palette separates dead from inert", () => {
+  // The ink is only half of it: the fix is worthless if a palette hands the same value to
+  // both fields, which is exactly how the defect survived S8 — `dead` was declared, and
+  // set to `inert`'s grey, in all three.
+  for (const [name, pal] of [
+    ["SCREEN", SCREEN_PALETTE],
+    ["INK", INK_PALETTE],
+    ["DARK", DARK_PALETTE],
+  ] as const)
+    assert.notEqual(
+      pal.dead,
+      pal.inert,
+      `${name}: dead must differ from inert`,
+    );
 });
 
 test("a dark palette leaves no white fill behind — S8's actual complaint", () => {

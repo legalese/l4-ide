@@ -708,9 +708,15 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
 - Scene IR gains `{ kind: 'curve'; from; c1; c2; to }`; `hCurve(from, to, state)`
   builds it (tangent `t = clamp(max(0.6·|dx|, 0.35·|dy|), 22, 60)`); svg emits a
   `<path>` (class `lad-wire`, so it still fades on FLIP).
-- An eliminable/dead rung's in-curve is dashed/ghosted with the open-contact break
-  glyph at the curve's parametric midpoint (`cubicMid`).
-- Curves carry the rung's `state` colour (green live / grey unknown / ghost dead).
+- An eliminable rung's in-curve is dashed/ghosted with the open-contact break glyph at
+  the curve's parametric midpoint (`cubicMid`). **A dead rung no longer takes its break
+  here** — see §26: the break is drawn at the leaf that actually failed, and the fan
+  suppresses its own when the rung already drew one.
+- Curves carry the rung's `state` colour. This bullet used to read "green live / grey
+  unknown / ghost dead", which was **wrong in two directions at once** and is corrected
+  in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
+  and it is not a ghost either — ghost belongs to `eliminable` (§15.1). Four states,
+  four inks: green live / light-grey unknown / **firm slate dead** / ghost eliminable.
 
 ---
 
@@ -1541,6 +1547,97 @@ point (§25a), so its LIR has no seam and its partial-eval never sees one. It is
 — it prints the boolean and claims nothing about compliance — but it cannot draw the two lamps, and
 in the IDE that is still the picture a user gets. The fix is not to retrofit a verdict into it; it is
 `ladder-core`, which is what this whole project is for.
+
+---
+
+## 26. The epistemic knobs — grounding, defaults, and provisionality **(SHIPPED)**
+
+Two things landed together here, and they are the same subject seen from opposite ends: what
+the picture says about an atom **nobody answered**, and what it says about one it answered
+**false**. §6 and §15.1 always specified both; only one of them was actually drawn.
+
+### 26.1 FALSE was rendering as UNKNOWN — a silent spec violation
+
+`svg.ts` routed render state `dead` to the _unknown_ ink and set `dead === inert` in every
+built-in palette, so `p.dead` was never read and a **tested-and-false element emitted
+byte-identical SVG to a never-asked one**. Step 4's seam-S8 palette extraction (`e720e3da`)
+carried the defect forward faithfully — `DARK_PALETTE`, added there, set `dead` to `inert`'s
+grey too, and `palette.test.ts` gained a test _asserting_ the byte-identity as "a
+pre-existing fact", with a note to whoever wired the state up. This is that. That contradicted §6 ("known false → gap / open contact" vs
+"unknown → plain pass-through box"), §15.1's four-state table, and §18's curve-colour bullet —
+and it broke something load-bearing: §25.4 distinguishes **N/A** from **undetermined** purely
+by _where the break is_ ("a scope that is definitively ✗ shows a clean open contact… a scope
+that is `?` is grey"). With one grey and no break, the two-lamp form had lost its only way to
+say which of those a reader was looking at. The ASCII carrier had honoured the design all
+along (`✓ / ✗ / ?`, §24.3); the SVG had not.
+
+Now: four states, four inks — green `live` / light-grey `inert` / **firm slate `dead`** /
+ghost `eliminable`. Determinacy is what the ink tracks: a settled fact is drawn firmly, an
+open question faintly, a don't-care fainter still. Red is deliberately unused (it belongs to
+the breach lamp, and a false atom is very often the _good_ outcome — an exception that did
+not apply). And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
+the box, so the break sits where the current actually stopped rather than on some enclosing
+group. `Measured.ownBreak` stops the OR fan double-reporting the same failure.
+
+### 26.2 `ViewSpec.grounding` — choosing the epistemics, visibly and reversibly
+
+`NEGATION-AS-FAILURE-SPEC.md` calls the default value _"the knob that turns NAF into general
+defeasible / default reasoning"_, where flipping it FALSE→TRUE _"is exactly the closed-world /
+open-world switch"_. `grounding: 'none' | 'closed' | 'open'` is that knob, mirroring the
+library's own `holds` / `presumed` eliminators. Two invariants keep it from degenerating into
+a global truth-value hack:
+
+1. **Collapse at the eliminator, never in the data.** `layout` computes the honest Kleene
+   values _and_ a second grounded map. Honest values drive **render state** — box ink, the
+   open-contact break; grounded values drive **conduction** — energize, lamps, `complete`. An
+   assumed atom therefore still draws grey and unbroken, and §25.4's read-off survives.
+2. **It defaults for silence; it never overrules speech.** Grounding fills only atoms with no
+   stated value. An author who wrote `holds p` here and `presumed q` there has chosen per use
+   site, and this knob cannot reach that. (The spec assigns them by polarity — `presumed` for
+   permission, `holds` for obligation discharge — which is precisely why one global setting
+   can never be the whole answer. The fixture `jl4/examples/ok/inert/grounding-variants.l4`
+   opens with a rule whose two atoms want _opposite_ readings, in one conjunction.)
+
+### 26.3 `respectDefaults` — the other axis, and the `Left`/`Right` it needs
+
+Independent of grounding: this is §22's `Left`/`Right`, not its `Just`/`Nothing`. It required
+a new `ViewSpec.defaults` map, and that is the substantive lesson. **`provenance` marks a
+DECLARATION site** — "this leaf has a TYPICALLY clause" — and stays true whether or not the
+presumption is what is currently supplying the value. A first cut withdrew defaults by
+deleting valuation entries whose node was marked `provenance: 'default'`, which therefore
+deleted **the user's own answer** on any atom the drafter had written a TYPICALLY for; and
+since the decode path marked provenance while dropping the payload, that was the _only_ thing
+the switch could ever do. `defaults` (the presumed values) now sits under `valuation` (the
+answers), an answer always wins, and withdrawing presumptions touches no answer.
+
+### 26.4 `Scene.provisional` — "made" and "made out of what" are two questions
+
+A circuit can be complete on atoms nobody answered. `provisional` reports that, and renderers
+soften accordingly: a made circuit goes **muted** green rather than the §20 made-green, a lit
+lamp goes **hollow and dashed** rather than filled and bold, and a presumed-FALSE break takes
+§22's fine dash. The lamp case is not optional polish — an `Implies` body is never `complete`
+(it has two sinks), so the wire treatment can never fire on a _rule_, which is exactly the
+diagram where a knob can carry a reader from "undetermined" to a lit IN BREACH lamp with no
+new facts.
+
+Detected by **comparison, not by node identity**: provisional iff a node conducts under the
+reading but would not conduct on what was actually said. Testing "is this node an assumed or
+presumed atom?" is polarity-blind — an assumption under a `NOT` contributes by _not_
+conducting, and an unreached seam by its scope not conducting, so neither node is ever in the
+assumed set. `naf p MEANS NOT (holds p)` is the canonical NAF shape _and_ the first rule in
+our own fixture, and the identity test painted it full made-green while resting on nothing.
+
+### 26.5 Consequences elsewhere
+
+- §20's flow table gains two entries: a `closed` run is near-black, **made** dark green, or
+  **made-but-provisional** muted green.
+- §22's "streamer means closed-but-not-confirmed, by locality **or** by provenance" becomes
+  _one channel, three reasons_ — locality, presumption, and now assumption.
+- §22's future-work item (b) — distinguishing `Left Nothing` from `Right Nothing` — remains
+  open. `defaults` supplies the `Just`/`Nothing` of the `Left`; a confirmed don't-know is
+  still not representable.
+- `verdictFor` takes an optional `reading`. Its contract is "says exactly what the ladder
+  shows", which is false the moment header and picture evaluate under different epistemics.
 
 ---
 

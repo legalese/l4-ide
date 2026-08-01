@@ -26,6 +26,7 @@ import type {
   UBoolValue,
   Flow,
   Implies,
+  Grounding,
 } from "./types.js";
 import type { Verdict } from "@repo/boolean-analysis";
 
@@ -95,10 +96,19 @@ export const PIXEL_GEOMETRY: Geometry = {
   COIL_LABEL: 74,
 };
 
+/** Half-width of the open-contact glyph's bar pair, plus a hair. A dead leaf's break sits
+ *  this far past its right edge so BOTH bars clear the box (see `leafBox`). Every context a
+ *  leaf can sit in leaves more room than this downstream: GAP_SERIES 44, LEAD 40, SEAM_W 66. */
+const BREAK_CLEAR = 9;
+
 interface Measured {
   w: number;
   h: number;
   state: State; // own state (leaf state, or 'inert' for a group/placeholder/inert)
+  /** Did this element already draw its own open-contact break (DESIGN §15.1)? Set by
+   *  `leafBox` for a `dead` leaf, so a parent does not draw a SECOND break for the same
+   *  failure — the break belongs at the point where current actually stopped. */
+  ownBreak?: boolean;
   emit(ox: number, oy: number, out: ScenePrim[]): { inPort: Pt; outPort: Pt };
 }
 
@@ -106,7 +116,21 @@ interface Ctx {
   vs: ViewSpec;
   tm: TextMetrics;
   k: Geometry;
-  values: Map<NodeId, UBoolValue>; // evaluated T/F/U per node id
+  /** HONEST three-valued evaluation — what is actually known. Drives RENDER STATE only
+   *  (box ink, the open-contact break), so the picture never forges a tested contact out
+   *  of an assumption. */
+  values: Map<NodeId, UBoolValue>;
+  /** The same evaluation READ UNDER `vs.grounding` — unknown atoms collapsed to F or T.
+   *  Drives CONDUCTION only (energize, local closure, lamps, `complete`). Identical to
+   *  `values` when grounding is 'none'. This split IS the "collapse at the eliminator,
+   *  never in the data" rule, made structural. */
+  gvalues: Map<NodeId, UBoolValue>;
+  /** Atoms whose conducting value is an assumption rather than an answer. */
+  assumed: ReadonlySet<NodeId>;
+  /** The STRICTEST reading: `valuation` alone — no presumptions, nothing grounded. Only
+   *  what was actually said. Anything conducting under `gvalues` but NOT under this is
+   *  conducting on something nobody asserted, which is what `provisional` means. */
+  strict: Map<NodeId, UBoolValue>;
   em: Map<NodeId, Energ> | null; // energization per node id, when showCurrent
 }
 
@@ -187,6 +211,75 @@ function nodeValue(
   return v;
 }
 
+/** An ATOM — a leaf the reader could actually answer. Grounding reaches these and
+ *  nothing else: groups derive, and constants are already settled. */
+const isAtom = (e: IRExpr): boolean =>
+  e.$type === "UBoolVar" || e.$type === "App";
+
+/** Every node in the tree, once, in source order. */
+function allNodes(e: IRExpr, out: IRExpr[] = []): IRExpr[] {
+  out.push(e);
+  if (e.$type === "And" || e.$type === "Or")
+    e.args.forEach((a) => allNodes(a, out));
+  else if (e.$type === "Not") allNodes(e.negand, out);
+  else if (e.$type === "Implies") {
+    allNodes(e.scope, out);
+    allNodes(e.requirement, out);
+  }
+  return out;
+}
+
+/**
+ * The DEFAULTS axis (`ViewSpec.respectDefaults`, DESIGN §22). Presumptions are LAID UNDER
+ * the user's answers, never over them: `defaults` supplies a value only where `valuation`
+ * is silent, which is the `Left`/`Right` of the four-cell model doing its actual job.
+ *
+ * An earlier version of this went the other way — it merged the two and then, when
+ * defaults were switched off, deleted every valuation entry whose node was marked
+ * `provenance: 'default'`. That is wrong twice over, and dangerously so. `provenance`
+ * marks a DECLARATION site ("this leaf has a TYPICALLY clause"), not the origin of the
+ * value now sitting on it, so the deletion threw away the USER'S OWN ANSWER on any atom
+ * the drafter happened to write a TYPICALLY for. In the real decode path the adapter
+ * marks provenance but supplies no default value at all, which made that the *only*
+ * thing the switch could ever do.
+ */
+function effectiveValuation(vs: ViewSpec): ReadonlyMap<NodeId, UBoolValue> {
+  if (!vs.respectDefaults || vs.defaults.size === 0) return vs.valuation;
+  const out = new Map(vs.defaults);
+  for (const [id, v] of vs.valuation) out.set(id, v); // an answer always beats a presumption
+  return out;
+}
+
+/**
+ * The GROUNDING axis — the eliminator, applied. Returns a second value map in which
+ * every ATOM that the honest evaluation left `UnknownV` reads FALSE (closed world) or
+ * TRUE (open world), with groups re-derived from there.
+ *
+ * A SECOND map, not a mutation of the first, is the whole point: the honest values go on
+ * driving render state, so an assumed atom still draws as the unanswered question it is.
+ * `grounding: 'none'` returns the honest map itself, so the no-grounding path is not
+ * merely equivalent but *identical*.
+ */
+function groundValues(
+  body: IRExpr,
+  valuation: ReadonlyMap<NodeId, UBoolValue>,
+  honest: Map<NodeId, UBoolValue>,
+  grounding: Grounding,
+): { values: Map<NodeId, UBoolValue>; assumed: Set<NodeId> } {
+  if (grounding === "none") return { values: honest, assumed: new Set() };
+  const fill: UBoolValue = grounding === "closed" ? "FalseV" : "TrueV";
+  const assumed = new Set<NodeId>();
+  const seed = new Map(valuation);
+  for (const n of allNodes(body))
+    if (isAtom(n) && honest.get(n.id) === "UnknownV") {
+      seed.set(n.id, fill);
+      assumed.add(n.id);
+    }
+  const values = new Map<NodeId, UBoolValue>();
+  nodeValue(body, seed, values);
+  return { values, assumed };
+}
+
 /** Which lamp is lit (DESIGN §25.4). The whole verdict, in two booleans.
  *  Neither lit ⇒ **N/A** (the scope did not conduct) or **undetermined** (something
  *  is still `?`). The reader tells those apart by looking at WHERE the break is —
@@ -244,13 +337,32 @@ function lampsFor(
  *
  * `valuation` is the same map `layout` takes (`ViewSpec.valuation`): positional per-node
  * pins/values, three-valued-evaluated through the tree exactly as the render is.
+ *
+ * **Pass `reading` whenever the picture beside it has a knob turned.** "Says exactly what
+ * the ladder shows" is the whole contract, and it is false the moment the two evaluate under
+ * different epistemics: a header reading `Undetermined` above two lit lamps is worse than no
+ * header. The fields mirror `ViewSpec` exactly, and omitting `reading` is the honest Kleene
+ * default, so existing callers keep their behaviour unchanged.
  */
 export function verdictFor(
   fn: FunDecl,
   valuation: ReadonlyMap<NodeId, UBoolValue>,
+  reading: {
+    grounding?: Grounding;
+    defaults?: ReadonlyMap<NodeId, UBoolValue>;
+    respectDefaults?: boolean;
+  } = {},
 ): Verdict {
-  const values = new Map<NodeId, UBoolValue>();
-  nodeValue(fn.body, valuation, values);
+  const { grounding = "none", defaults, respectDefaults = true } = reading;
+  let eff = valuation;
+  if (respectDefaults && defaults?.size) {
+    const merged = new Map(defaults);
+    for (const [id, v] of valuation) merged.set(id, v); // an answer beats a presumption
+    eff = merged;
+  }
+  const honest = new Map<NodeId, UBoolValue>();
+  nodeValue(fn.body, eff, honest);
+  const values = groundValues(fn.body, eff, honest, grounding).values;
   const body = fn.body;
   if (body.$type !== "Implies") {
     const v = values.get(body.id);
@@ -324,10 +436,31 @@ function energize(
 const trueConducts = (vals: Map<NodeId, UBoolValue>, n: IRExpr): boolean =>
   n.$type !== "InertE" && vals.get(n.id) === "TrueV";
 
-/** Is a node a *presumed* closed contact (DESIGN §22)? — conducting on a TYPICALLY
- *  default the user hasn't confirmed. Its adjacent connectors cap at streamer. */
-const presumedConducts = (ctx: Ctx, n: IRExpr): boolean =>
-  trueConducts(ctx.values, n) && ctx.vs.provenance.get(n.id) === "default";
+/**
+ * Is a node a closed contact the user never actually asserted? Two ways to be one, and
+ * they get the same ink because they make the same epistemic claim — *this closes the
+ * circuit, provisionally*:
+ *
+ *   - **presumed** (DESIGN §22) — conducting on a TYPICALLY default from the SOURCE;
+ *   - **assumed** (`Grounding`) — never answered at all, and conducting because the
+ *     READER chose open-world.
+ *
+ * Both cap their adjacent connectors at streamer weight, which is §20's lightning model
+ * doing a third job it already fits: streamer has always meant "closed, but not (yet)
+ * confirmed". One channel, three reasons.
+ *
+ * Detected by COMPARISON rather than by node identity: a node is conducting provisionally
+ * iff it conducts under the reading but would NOT conduct on what was actually said.
+ *
+ * Asking instead "is this node itself an assumed or presumed atom?" — the obvious
+ * implementation — is polarity-blind, and silently so. An assumption under a `NOT`
+ * contributes by NOT conducting, and an unreached seam contributes by its scope not
+ * conducting; neither node is ever in `assumed`, so `naf p = NOT (holds p)` — the
+ * canonical negation-as-failure shape, and the first rule in our own fixture — would
+ * light the full made-circuit green while resting on nothing at all.
+ */
+const provisionalConducts = (ctx: Ctx, n: IRExpr): boolean =>
+  trueConducts(ctx.gvalues, n) && !trueConducts(ctx.strict, n);
 
 /** Connector flow (DESIGN §20): reached by the leader -> 'closed'; else local closure
  *  nearby -> 'streamer'; else 'open'. `tentative` (DESIGN §22) caps a would-be
@@ -374,6 +507,9 @@ function leafBox(
   tm: TextMetrics,
   k: Geometry,
   tentative = false,
+  /** The small line above the box, when the value is not simply a given fact:
+   *  a TYPICALLY presumption from the source, or an assumption from the reader. */
+  tag?: { text: string; kind: "typically" | "assumed" },
 ): Measured {
   const { FONT, PAD_X, PAD_Y, CARET_PAD, TAG_RISE } = k;
   const caretW = role === "placeholder" ? tm.width("▸", FONT) + CARET_PAD : 0;
@@ -383,6 +519,12 @@ function leafBox(
     w,
     h,
     state,
+    // A known-FALSE leaf breaks the circuit, and DESIGN §15.1 says so in ink: known-false
+    // is an OPEN GAP, where unknown is a plain grey pass-through. That distinction is
+    // load-bearing — §25.4 tells N/A from undetermined purely by "where the break is" —
+    // so the break is drawn at the leaf that actually stopped the current, not at some
+    // enclosing group.
+    ownBreak: state === "dead" || undefined,
     emit(ox, oy, out) {
       const cy = oy + h / 2;
       out.push({
@@ -394,6 +536,18 @@ function leafBox(
         tentative: tentative || undefined,
         act: { t: "value", id },
       });
+      if (state === "dead")
+        out.push({
+          kind: "glyph",
+          // BREAK_CLEAR past the box, not ON it: the glyph is two vertical bars drawn at
+          // ±7 about its centre, so centring it on the out-port put the left-hand bar 7px
+          // INSIDE the box — reading as a stray stroke through the label rather than as a
+          // gap in the wire. The break belongs on the conductor leaving the contact.
+          at: { x: ox + w + BREAK_CLEAR, y: cy },
+          role: "open-contact",
+          state,
+          tentative: tentative || undefined,
+        });
       if (role === "placeholder")
         out.push({
           kind: "text",
@@ -422,15 +576,15 @@ function leafBox(
           tag: "otiose",
           size: 11,
         });
-      else if (tentative)
-        // riding a TYPICALLY presumption (DESIGN §22)
+      else if (tag)
+        // riding a TYPICALLY presumption (DESIGN §22) or a grounding assumption
         out.push({
           kind: "text",
           at: { x: ox + w / 2, y: oy - TAG_RISE },
-          text: "typically",
+          text: tag.text,
           anchor: "middle",
           state,
-          tag: "typically",
+          tag: tag.kind,
           size: 10,
         });
       return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } };
@@ -664,7 +818,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
           flow: flowFor(
             ctx.em,
             !!ctx.em?.get(e.negand.id)?.outE,
-            trueConducts(ctx.values, e.negand),
+            trueConducts(ctx.gvalues, e.negand),
           ),
         });
         out.push({
@@ -684,7 +838,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
           flow: flowFor(
             ctx.em,
             !!ctx.em?.get(e.id)?.outE,
-            trueConducts(ctx.values, e),
+            trueConducts(ctx.gvalues, e),
           ),
         });
         return { inPort: { x: ox, y: cy }, outPort: { x: ox + w, y: cy } };
@@ -695,6 +849,32 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
   if (e.$type === "Implies") return measureImplies(e, ctx);
 
   if (e.$type !== "And" && e.$type !== "Or") {
+    // Three ways a leaf's conducting value can be something other than a plain given
+    // fact, and the tag has to name which — a reader who cannot tell an answer from an
+    // assumption cannot audit the verdict.
+    // `declared` is a DECLARATION-site fact and stays true whatever the knobs say — it is
+    // what earns the tentative dash. `withheld` is the narrower thing: a presumption that
+    // exists, was not answered over, and is currently switched off. Saying "typically off"
+    // on a leaf whose value the user supplied themselves would be a lie about whose
+    // answer it is.
+    const declared = vs.provenance.get(e.id) === "default";
+    const assumed = ctx.assumed.has(e.id);
+    const withheld =
+      !vs.respectDefaults && vs.defaults.has(e.id) && !vs.valuation.has(e.id);
+    const tag = assumed
+      ? {
+          text:
+            (ctx.gvalues.get(e.id) === "TrueV"
+              ? "assumed true"
+              : "assumed false") + (withheld ? " (typically off)" : ""),
+          kind: "assumed" as const,
+        }
+      : declared || withheld
+        ? {
+            text: withheld ? "typically off" : "typically",
+            kind: "typically" as const,
+          }
+        : undefined;
     return leafBox(
       e.id,
       e.label,
@@ -702,7 +882,8 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
       "leaf",
       tm,
       k,
-      vs.provenance.get(e.id) === "default",
+      declared || assumed || withheld,
+      tag,
     );
   }
 
@@ -741,9 +922,9 @@ function measureAnd(e: And, ctx: Ctx): Measured {
       });
       const fold = { t: "fold", id: e.id } as const;
       const tc = (n: IRExpr | undefined) =>
-        n ? trueConducts(ctx.values, n) : false;
+        n ? trueConducts(ctx.gvalues, n) : false;
       const pc = (n: IRExpr | undefined) =>
-        n ? presumedConducts(ctx, n) : false;
+        n ? provisionalConducts(ctx, n) : false;
       // connectors between consecutive children
       for (let i = 0; i < ports.length - 1; i++) {
         const leader = !!ctx.em?.get(e.args[i].id)?.outE;
@@ -866,8 +1047,8 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         // organic Bézier fan: group port -> rung port, and back (DESIGN §17a).
         // Clicking a fan curve folds this OR (DESIGN §19).
         const fold = { t: "fold", id: e.id } as const;
-        const local = trueConducts(ctx.values, node); // this branch is a closed contact
-        const tentative = presumedConducts(ctx, node); // …on a rebuttable presumption (§22)
+        const local = trueConducts(ctx.gvalues, node); // this branch is a closed contact
+        const tentative = provisionalConducts(ctx, node); // …on a rebuttable presumption (§22)
         const leaderOut = !!ctx.em?.get(node.id)?.outE;
         const inCurve = hCurve(groupIn, p.inPort, m.state);
         inCurve.act = fold;
@@ -877,9 +1058,19 @@ function measureOr(e: Or, ctx: Ctx): Measured {
         outCurve.act = fold;
         outCurve.flow = flowFor(ctx.em, leaderOut, local, tentative);
         out.push(outCurve);
-        if (m.state === "eliminable" || m.state === "dead") {
+        // Break on the fan only when the rung has not already drawn its own (a dead LEAF
+        // marks itself, so a second glyph here would double-report one failure). A dead
+        // GROUP still gets one: it says "this whole branch is out", and the interior break
+        // says why.
+        if (m.state === "eliminable" || (m.state === "dead" && !m.ownBreak)) {
           const mid = cubicMid(inCurve);
-          out.push({ kind: "glyph", at: mid, role: "open-contact" }); // current can't pass
+          // current can't pass
+          out.push({
+            kind: "glyph",
+            at: mid,
+            role: "open-contact",
+            state: m.state,
+          });
         }
         y += m.h;
       });
@@ -936,14 +1127,20 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
       const em = ctx.em;
       const inE = !!em?.get(e.id)?.inE;
       const scopeOut = !!em?.get(e.scope.id)?.outE; // did current LEAVE the scope?
-      const lamps = lampsFor(e, ctx.values, inE);
+      // The lamps report the verdict UNDER THE READING — that is the entire point of a
+      // grounding knob. With grounding 'none' these are the honest values unchanged.
+      const lamps = lampsFor(e, ctx.gvalues, inE);
 
       // ── the seam: the drafter's own connective, ON the wire ────────────────────
       // The wire is drawn in TWO segments with a gap, so the connective sits in the
       // line rather than being struck through by it (the 'on-wire' idiom of §17).
       const seamMid = seamX + SEAM_W / 2;
       const gap = tm.width(seam, 12.5) / 2 + 8;
-      const seamFlow = flowFor(em, scopeOut, trueConducts(ctx.values, e.scope));
+      const seamFlow = flowFor(
+        em,
+        scopeOut,
+        trueConducts(ctx.gvalues, e.scope),
+      );
       out.push({
         kind: "wire",
         path: [sp.outPort, { x: seamMid - gap, y: cy }],
@@ -1024,11 +1221,18 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
       // N/A is not a stamp and not a path — it is BOTH LAMPS DARK, with the break
       // visible in the scope. We only say so in words when the scope is DEFINITIVELY
       // open (a `?` scope is merely undetermined, and must not be reported as N/A).
-      if (inE && ctx.values.get(e.scope.id) === "FalseV")
+      if (inE && ctx.gvalues.get(e.scope.id) === "FalseV")
         out.push({
           kind: "text",
           at: { x: coilX + COIL_R + 7, y: cy },
-          text: "N/A — the rule does not reach this case",
+          // …and say so when the "definitively" is the READER's doing rather than the
+          // facts'. A scope that is only false because unanswered atoms were read as
+          // false is still N/A — but N/A on an assumption, and the note must not pass
+          // that off as a finding.
+          text:
+            ctx.values.get(e.scope.id) === "FalseV"
+              ? "N/A — the rule does not reach this case"
+              : "N/A — on this reading of the unanswered facts",
           anchor: "start",
           state: "inert",
           tag: "note",
@@ -1048,11 +1252,28 @@ export function layout(
 ): Scene {
   const { LEAD, MARGIN } = k;
   const prims: ScenePrim[] = [];
+  // Two axes, applied in order, and the order matters: dropping a TYPICALLY default
+  // turns its leaf back into an open question, which GROUNDING may then answer. Run
+  // them the other way and a stripped default would never be reachable by the knob.
+  const valuation = effectiveValuation(vs);
   const values = new Map<NodeId, UBoolValue>();
-  nodeValue(fn.body, vs.valuation, values);
+  nodeValue(fn.body, valuation, values);
+  const { values: gvalues, assumed } = groundValues(
+    fn.body,
+    valuation,
+    values,
+    vs.grounding,
+  );
+  // …and once more on `valuation` ALONE, which is the yardstick `provisionalConducts`
+  // measures against. Cheap (one more three-valued walk) and it is the only formulation
+  // that catches an assumption contributing through a NOT or through vacuity.
+  const strict = new Map<NodeId, UBoolValue>();
+  nodeValue(fn.body, vs.valuation, strict);
   const em = vs.showCurrent ? new Map<NodeId, Energ>() : null;
-  if (em) energize(fn.body, true, values, em);
-  const ctx: Ctx = { vs, tm, k, values, em };
+  // Current flows under the READING, not under the bare facts — that is what makes the
+  // knob visible at all. Render state below still reads `values`.
+  if (em) energize(fn.body, true, gvalues, em);
+  const ctx: Ctx = { vs, tm, k, values, gvalues, assumed, strict, em };
   const m = measure(fn.body, ctx);
   const ox = MARGIN + LEAD;
   const oy = MARGIN;
@@ -1085,8 +1306,8 @@ export function layout(
       flow: flowFor(
         em,
         !!em?.get(fn.body.id)?.outE,
-        trueConducts(values, fn.body),
-        presumedConducts(ctx, fn.body),
+        trueConducts(gvalues, fn.body),
+        provisionalConducts(ctx, fn.body),
       ),
     });
     prims.push({
@@ -1097,7 +1318,21 @@ export function layout(
   }
 
   const w = ox + m.w + (twoSinks ? 0 : LEAD) + MARGIN;
-  return { size: { w, h: oy + m.h + MARGIN }, prims };
+  // The root's `outE` IS the end-to-end answer: `energize` seeds the body with the
+  // source rail's current, so the body conducting out means the leader reached the
+  // sink. No second pass needed — the forward pass already knows (DESIGN §20 / G1).
+  const complete = em ? !twoSinks && !!em.get(fn.body.id)?.outE : undefined;
+  // "Made" and "made ON WHAT" are two different questions, and a circuit can be complete
+  // entirely on atoms nobody answered. `provisional` is that second answer: some element
+  // actually carrying current does so on a presumption or an assumption. Scoped to
+  // energized nodes so an untouched presumption elsewhere in the tree does not taint a
+  // verdict it played no part in.
+  const provisional = em
+    ? allNodes(fn.body).some(
+        (n) => em.get(n.id)?.outE && provisionalConducts(ctx, n),
+      )
+    : undefined;
+  return { size: { w, h: oy + m.h + MARGIN }, prims, complete, provisional };
 }
 
 /** Cheap P0 metrics — proportional-ish estimate; good enough to prove centering.

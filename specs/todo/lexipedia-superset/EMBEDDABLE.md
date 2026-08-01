@@ -267,7 +267,7 @@ row (now amended):
   page **unless the ladder has focus**, exactly as §3.3 words it (and note that a click
   focuses the host, since the controller makes it `tabindex="0"`).
 - **Seam S8 — baked palettes.** ⚠️ **HALF-CLOSED in ladder Step 4** (`e720e3da`). The palette is
-  a **parameter** now, not a bake: all 26 colours the emit names are fields of an exported
+  a **parameter** now, not a bake: all 31 colours the emit names are fields of an exported
   `Palette`, `sceneToSvg` takes one, `LadderController.setTheme` re-themes a live diagram
   without remounting it, and `DARK_PALETTE` is the proof — so a widget pasted into
   a host page whose colours we do not control no longer has to read as a foreign white
@@ -1054,8 +1054,9 @@ Criteria 8 and 9 do **not** gate M2 or M3 (§1.3). They gate the distribution cl
   the wire for free) and not E1a/static.
 - **R8 — ANSWERED 2026-07-30 (ladder Step 4, `e720e3da`). It does not gate E1, because the half
   that mattered landed.** The palette is no longer baked: it is a **parameter**. `Palette` is
-  exported from `@repo/ladder-svg` with all 26 colours the emit names (the seven that were
-  already a `Palette` plus the nineteen that were inline literals), `sceneToSvg(scene, theme
+  exported from `@repo/ladder-svg` with all 31 colours the emit names (the seven that were
+  already a `Palette`, the nineteen that were inline literals, and the five added by DESIGN
+  §26's FALSE-vs-UNKNOWN fix), `sceneToSvg(scene, theme
 | palette)` takes one, and `DARK_PALETTE` ships as the second implementation. So a host that
   already knows its own theme — which a wiki embed does — passes a `Palette` and gets a legible
   diagram **today**, without `auto`; and `LadderController.setTheme` lets it change its mind

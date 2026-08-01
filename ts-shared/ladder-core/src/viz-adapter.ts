@@ -79,6 +79,9 @@ export interface DecodedViz extends DecodedIdentity {
   /** Positional (keyed by node id) provenance lifted from `UBoolVar.typically`;
    *  a node is present here as `"default"` iff its wire `typically` key was present. */
   readonly provenance: Map<NodeId, Provenance>;
+  /** Positional VALUES of those presumptions — §22's `Left`. Feed straight to
+   *  `ViewSpec.defaults`, which lays them under `valuation` without overwriting it. */
+  readonly defaults: Map<NodeId, UBoolValue>;
 }
 
 /** Everything `convert` fills as it walks. Bundling the side-channels keeps the recursive
@@ -86,6 +89,7 @@ export interface DecodedViz extends DecodedIdentity {
 interface Sink {
   readonly valuation: Map<NodeId, UBoolValue>;
   readonly provenance: Map<NodeId, Provenance>;
+  readonly defaults: Map<NodeId, UBoolValue>;
   readonly uniqueByNode: Map<NodeId, Unique>;
   readonly atomIdByNode: Map<NodeId, string>;
 }
@@ -93,6 +97,7 @@ interface Sink {
 const emptySink = (): Sink => ({
   valuation: new Map(),
   provenance: new Map(),
+  defaults: new Map(),
   uniqueByNode: new Map(),
   atomIdByNode: new Map(),
 });
@@ -129,6 +134,7 @@ export function fromVizFunDecl(viz: VizFunDecl): DecodedViz {
     fn,
     valuation: sink.valuation,
     provenance: sink.provenance,
+    defaults: sink.defaults,
     ...identityOf(sink),
   };
 }
@@ -138,6 +144,7 @@ export function fromVizExpr(viz: VizIRExpr): DecodedIdentity & {
   readonly expr: IRExpr;
   readonly valuation: Map<NodeId, UBoolValue>;
   readonly provenance: Map<NodeId, Provenance>;
+  readonly defaults: Map<NodeId, UBoolValue>;
 } {
   const sink = emptySink();
   const expr = convert(viz, sink);
@@ -145,6 +152,7 @@ export function fromVizExpr(viz: VizIRExpr): DecodedIdentity & {
     expr,
     valuation: sink.valuation,
     provenance: sink.provenance,
+    defaults: sink.defaults,
     ...identityOf(sink),
   };
 }
@@ -203,8 +211,16 @@ function convert(e: VizIRExpr, sink: Sink): IRExpr {
       // non-presumed atom arrives as `null`, which must NOT be read as a default.
       // Gate on true/false, matching viz-expr's `typicallyBridge`. Orthogonal to
       // `value`. Presence-of-a-boolean, not truthiness, decides provenance.
-      if (e.typically === true || e.typically === false)
+      if (e.typically === true || e.typically === false) {
         provenance.set(e.id.id, "default");
+        // …and lift the PAYLOAD too, into `defaults` — the `Left` half of §22's
+        // `Either (Maybe Bool) (Maybe Bool)`. Provenance alone says a presumption was
+        // DECLARED here; only the value says what it presumes, and without it a viewer
+        // switching defaults off has nothing to withdraw and `layout` has nothing to lay
+        // under an unanswered leaf. The boolean was already on the wire and was being
+        // dropped on the floor.
+        sink.defaults.set(e.id.id, e.typically ? "TrueV" : "FalseV");
+      }
       // §E1/S1: carry the semantic identity the evaluator keys on. `unique` and the
       // unique-maps are UBoolVar-only; `atomId` also indexes App below.
       sink.uniqueByNode.set(e.id.id, e.name.unique);
