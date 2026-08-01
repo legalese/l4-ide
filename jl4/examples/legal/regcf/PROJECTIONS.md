@@ -41,9 +41,14 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn --fidelity-report
 ```
 
-**Measured 2026-07-31 on the shipped goldens.** 102 `<decision>` elements — 11 of them decision
-tables, 91 boxed literal expressions — 68 `<inputData>`, 202 `<informationRequirement>` edges, one
-diagram. Loads clean in `dmn-moddle`.
+**Measured 2026-08-02 on the shipped goldens (R12 + R13,
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** 67 `<decision>` elements — 9 decision
+tables, 57 boxed literal expressions, 1 boxed context — plus 10 `businessKnowledgeModel`s (3 more
+tables live inside them) and 7 `decisionService`s; 15 `<inputData>`, 149 `<informationRequirement>`
+edges, 31 `<knowledgeRequirement>`s, one diagram. Loads clean in `dmn-moddle` — and **evaluates**:
+KIE 8.44.0.Final answers 67/67 decisions, 67/67 values as expected (14/14 decision-service output
+values); Camunda 8.7.6 (zeebe-dmn) parses and answers 67/67. The verbatim verdict lines live in
+`jl4/examples/dmn/README.md` and are CI-gated (`.github/workflows/pr-checks.yml`, dmn-engines).
 
 **A note on the neighbour.** `jl4/examples/dmn/reg-cf.l4` is a 101-line **toy** — five decisions
 chosen so the goldens exhibit every outcome the exporter has. It is not this corpus and its own
@@ -51,49 +56,68 @@ header says its figures are illustrative. Both are kept, and both are labelled, 
 a shape exhibit and this is the real thing. `expected/reg-cf.*` is the toy; `expected/regcf-corpus.*`
 is the corpus.
 
-### Fidelity: 114 blocking, 46 lossy, 18 advisory (measured 2026-07-31)
+### Fidelity: 0 blocking, 21 lossy, 125 advisory (measured 2026-08-02)
 
-| Code                 | ×  | Severity | What it means here                                                                                             |
-| -------------------- | -- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `D-LITERALEXPR`      | 89 | blocking | not a guarded chain, so a boxed literal expression, not a table                                                 |
-| `D-RENAME`           | 37 | lossy    | one FEEL name would have served several elements the module keeps apart, so all but one were renamed apart      |
-| `D-RULEDATE-UNBOUND` | 15 | blocking | `EVAL UNDER RULES EFFECTIVE AT`: a sub-graph under its OWN rule date, which one global DMN input cannot express |
-| `D-SCOPE`            | 9  | lossy    | e.g. **nine** different terms all named `issuer` in the source                                                  |
-| `D-COMPUTEDOUTPUT`   | 9  | advisory | the output entry is an expression, not a constant                                                               |
-| `D-NONFEELINPUT`     | 6  | blocking | column text is L4 source, not FEEL; no engine can compile it                                                    |
-| `D-UNDECOMPOSABLE`   | 5  | advisory | guard has no constant endpoint, so no interval analysis                                                         |
-| `D-NONFEELOUTPUT`    | 4  | blocking | output entry is L4 source; **silent** null when it is the default output                                        |
-| `D-INLINEDLOCAL`     | 2  | advisory | `WHERE` locals inlined; DMN has no scoped intermediate value                                                    |
-| `D-RULEDATE`         | 1  | advisory | the model is temporally parameterised; bind `RULES_EFFECTIVE_DATE` or every dated decision answers null         |
-| `D-ORDERDEPENDENT`   | 1  | advisory | `First` hit policy — DMN §8.2.10's own "has to be used with care"                                               |
+| Code                 | ×   | Severity | What it means here                                                                                                             |
+| -------------------- | --- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `D-LITERALEXPR`      | 64  | advisory | not a guarded chain, so a boxed literal expression, not a table — the expression is FEEL and an engine evaluates it              |
+| `D-RULEDATE-UNBOUND` | 15  | lossy    | `EVAL UNDER RULES EFFECTIVE AT`: a sub-graph under its OWN rule date, which a DRG cannot express — the decide is **not emitted** |
+| `D-PARAM-AS-INPUT`   | 10  | advisory | un-lifting's cost: the decisions read one shared global where L4 bound per call site                                             |
+| `D-COMPUTEDOUTPUT`   | 10  | advisory | the output entry is an expression, not a constant                                                                                |
+| `D-BKM`              | 10  | advisory | a tier-2 callee emitted as a `businessKnowledgeModel`; call sites render as FEEL invocations                                     |
+| `D-SVCEMPTY`         | 8   | advisory | a § for which no `decisionService` is emitted, named — the all-dropped arm and the shapeless arm                                  |
+| `D-FLAVOR-NOSERVICE` | 7   | advisory | an emitted service is GROUPING only: no call site invokes it                                                                     |
+| `D-FIXTURE`          | 7   | advisory | test scaffolding, not emitted; `--include-tests` restores it                                                                     |
+| `D-INERT`            | 4   | advisory | statutory prose carrier with no operative logic, kept and flagged                                                                |
+| `D-REGULATIVE`       | 2   | lossy    | an uncalled regulative body belongs to BPMN, not to a fake decision                                                              |
+| `D-VERDICT`          | 1   | lossy    | the deontic reporting spine lowered to a verdict decision table; the obligation lifecycle is BPMN's                              |
+| `D-UNDECOMPOSABLE`   | 1   | advisory | guard has no constant endpoint, so no interval analysis                                                                          |
+| `D-SCOPE`            | 1   | lossy    | two differently-scoped `status` terms fold to one FEEL name; emitted as distinct globals                                          |
+| `D-RULEDATE`         | 1   | advisory | the model is temporally parameterised; bind `RULES_EFFECTIVE_DATE` or every dated decision answers null                          |
+| `D-RENAME`           | 1   | lossy    | the second `status` claimant is emitted as `status_2`                                                                            |
+| `D-PARTIAL`          | 1   | lossy    | a partial source function consumed strictly; outside its domain FEEL answers null                                                |
+| `D-ORDERDEPENDENT`   | 1   | advisory | `First` hit policy — DMN §8.2.10's own "has to be used with care"                                                                |
+| `D-COMPUTEDFIELD`    | 1   | advisory | a hydrated itemDefinition's derived components carry no derived flag                                                             |
+| `D-BKM-CONSUMERS`    | 1   | advisory | which decisions read each BKM, recorded                                                                                          |
 
-`D-FEELNAME` used to appear here nine times and is now **zero by construction**: colliding FEEL names
-are renamed apart rather than collapsed, which is what the `D-RENAME` row counts. Eight of the eleven
-tables are rule-date interval tables carrying `hitPolicy="UNIQUE"`; the before/after arithmetic — and
-why the blocking total falls by only 8 net while 15 new blocking notes appear — is in
-`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.7.
+`D-FEELNAME` is **zero by construction**: colliding FEEL names are renamed apart rather than
+collapsed (`D-RENAME`). `D-NONFEELINPUT`/`D-NONFEELOUTPUT`, 89 `D-LITERALEXPR` **blocking**, 37
+`D-RENAME` and 9 `D-SCOPE` — the 2026-07-31 census this table used to carry — are gone or shrunk
+because Phase 5's BKM emission + un-lifting retired the verbatim `f(x)` family, and R12/R13
+(`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16) removed the two families that still
+refused: the 15 law-time-rebinding scenarios (dropped, Lossy-noted) and the raw-L4 deontic spine
+(now the verdict table). Ten of the twelve tables are rule-date interval tables carrying
+`hitPolicy="UNIQUE"`; the movement arithmetic is in that spec's §15.7 and §16.3.
 
 ### What this projection **cannot** say
 
-- **It is well-formed and nearly inert.** 11 decision tables against **91** boxed literal
-  expressions. A DMN decision is a 0-ary variable, so under the corpus's house `GIVEN` + record
-  style every cross-decision reference becomes an unevaluable `f(x)`. The XML loads; almost none of
-  it evaluates. That is a fact about DMN's program model, not about this corpus, and it is in a
-  golden rather than a paragraph precisely so it can be regression-tested.
-- **It cannot keep two `issuer`s apart — but it no longer pretends otherwise.** L4 scopes a `GIVEN`
-  to its own decision; DMN's `inputData` is global. 68 inputs, and the nine source terms named
-  `issuer` are renamed apart (`issuer_2` … `issuer_9`) rather than collapsed into one name, which is
-  what `D-RENAME` ×37 counts and why `D-FEELNAME` is now zero. `D-SCOPE` still names the underlying
-  collision; renaming makes the artifact loadable, not the scoping faithful.
-- **It CAN now say when a rule took effect — this bullet used to say the opposite.** The eight dated
+- **It executes — this bullet used to say "nearly inert", and stopped being true on 2026-08-02.**
+  Phase 5's BKM emission retired the unevaluable `f(x)` family (tier-1 calls read shared inputs
+  after un-lifting; tier-2 calls invoke `businessKnowledgeModel`s), and R12/R13 removed the last
+  two refusing families. Both engines now answer all 67 decisions with every value as expected.
+  What is still true: a DMN decision is a 0-ary variable, and the price of making the corpus fit
+  that program model is itemised in the fidelity table above (the un-lift's shared globals, the
+  dropped scenarios, the verdict split).
+- **It cannot scope a name — but it no longer pretends otherwise.** L4 scopes a `GIVEN` to its own
+  decision; DMN's `inputData` is global. Hydration shrank the flat namespace to 15 inputs, and the
+  one surviving collision — two differently-scoped `status` terms — is renamed apart
+  (`status`/`status_2`, `D-RENAME` ×1) rather than collapsed, which is why `D-FEELNAME` is zero.
+  `D-SCOPE` still names the underlying collision; renaming makes the artifact loadable, not the
+  scoping faithful.
+- **It CAN say when a rule took effect — this bullet used to say the opposite.** The dated
   thresholds in `README.md` §2 lower to `hitPolicy="UNIQUE"` tables over a `RULES_EFFECTIVE_DATE`
-  input, with half-open FEEL date-interval cells and an annotation column carrying each regime's name
-  and its `@ref` citation (spec §15). What it still cannot say is a rule date **scoped to one
-  decision**: 15 `EVAL UNDER RULES EFFECTIVE AT` decisions rebind law time locally, DMN has one
-  global input and no scoped rebinding, and `D-RULEDATE-UNBOUND` ×15 is the artifact saying so.
-- **It has no deontic content at all.** Groups 6, 7 and 8 are duties and prohibitions. DMN is a
-  decision notation; those go to BPMN (§3), and the DMN/BPMN link is an association, not a
-  semantics.
+  input, with half-open FEEL date-interval cells and an annotation column carrying each regime's
+  name and its `@ref` citation (spec §15). What it still cannot say is a rule date **scoped to one
+  decision**: the 15 `EVAL UNDER RULES EFFECTIVE AT` scenarios rebind law time locally, DMN has one
+  global input and no scoped rebinding — so since R12 those decides are **not emitted at all**, and
+  `D-RULEDATE-UNBOUND` ×15 (lossy) is the artifact saying so.
+- **Its deontic content is verdicts, not obligations.** Groups 6, 7 and 8 are duties and
+  prohibitions. Since R13 the reporting spine's guards ARE here — `ongoing reporting obligation` is
+  a real `FIRST` decision table answering `"file a Form C-TR …"`/`"fulfilled"`/`"file a Form C-AR …
+  and continue"` — but the obligation lifecycle (PARTY/MUST/WITHIN/HENCE/LEST) is BPMN's content
+  (§3), consumed there by a gateway over the verdict strings; `D-VERDICT` records the split. The
+  two uncalled regulative rules (`advertising restriction`, `resale restriction`) still have no DMN
+  counterpart at all (`D-REGULATIVE` ×2).
 
 _Fixed on the way here, so no longer in the loss list:_ 22 decisions used to emit FEEL that named a
 value through the section heading it was declared under —
@@ -113,24 +137,27 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn.md --fidelity-report
 ```
 
-**Measured 2026-07-31: 1,241 lines of law become ONE markdown table**, and 397 lines of loss report.
-This is the most honest artifact in the set and the least useful one, which is why it ships.
+**Measured 2026-08-02: 1,236 lines of law become ONE markdown table** — the R13 verdict table, as
+it happens — and 301 lines of loss report. This is the most honest artifact in the set and the
+least useful one, which is why it ships.
 
 | Code                  | ×   | What it costs                                                       |
 | --------------------- | --- | ------------------------------------------------------------------- |
-| `D-MD-NOLITERAL`      | 91  | dmnmd has no boxed-expression form; the decision is **omitted**      |
-| `D-MD-CELLSYNTAX`     | 33  | a cell dmnmd cannot read; the **whole table** is omitted             |
-| `D-MD-NONIDENTCOLUMN` | 7   | column header must be an identifier; the **whole table** is omitted  |
-| `D-MD-NODRG`          | 1   | 202 information requirements have no markdown form                   |
+| `D-MD-NOLITERAL`      | 57  | dmnmd has no boxed-expression form; the decision is **omitted**      |
+| `D-MD-CELLSYNTAX`     | 31  | a cell dmnmd cannot read; the **whole table** is omitted             |
+| `D-MD-NOBKM`          | 10  | dmnmd has no businessKnowledgeModel form; the BKM is omitted         |
+| `D-MD-NOCONTEXT`      | 1   | a hydrator is a boxed context; dmnmd cannot say it                   |
+| `D-MD-NODRG`          | 1   | 149 information requirements have no markdown form                   |
 
-31 of the 33 `D-MD-CELLSYNTAX` instances name a **date** cell: the rule-date interval tables are the
-one thing the XML target gained and the markdown target cannot hold at all, because dmnmd's cell
-grammar has no date datatype. That is the two-target thesis doing its job on a real corpus.
+All 31 `D-MD-CELLSYNTAX` instances name a **date** cell: the rule-date interval tables are the one
+thing the XML target gained and the markdown target cannot hold at all, because dmnmd's cell
+grammar has no date datatype. (`D-MD-NONIDENTCOLUMN`, ×7 in the 2026-07-31 census, is zero on the
+shipped goldens.) That is the two-target thesis doing its job on a real corpus.
 
 ### What this projection cannot say
 
 Everything the DMN loses, plus: it is a table format, not a graph, so **which decision feeds which
-is invisible**. The 202 edges that make the DRG single-sourced are exactly what does not survive.
+is invisible**. The 149 edges that make the DRG single-sourced are exactly what does not survive.
 
 ---
 

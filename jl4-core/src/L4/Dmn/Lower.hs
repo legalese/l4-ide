@@ -4912,10 +4912,11 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- D-SVCEMPTY (§15.12's companion): one code, one severity, two message
       -- forms (D-FIXTURE's precedent). Advisory, and the Advisory ⟹ Faithful
       -- argument is discharged in FIDELITY-SEVERITY-AXIS-SPEC.md §5.2: the
-      -- per-decision loss is already carried (Lossy) by D-RULEDATE-UNBOUND,
-      -- and a service shell is grouping metadata (D-FLAVOR-NOSERVICE's
-      -- grouping-arm precedent). Elements are named by the §'s FEEL-folded
-      -- name, never by a service id the artifact does not contain.
+      -- per-decision loss is already carried by each member's own note
+      -- (D-RULEDATE-UNBOUND / D-REGULATIVE Lossy, D-FIXTURE Advisory), and a
+      -- service shell is grouping metadata (D-FLAVOR-NOSERVICE's grouping-arm
+      -- precedent). Elements are named by the §'s FEEL-folded name, never by
+      -- a service id the artifact does not contain.
       --
       -- Arm (i): a § whose ENTIRE decide membership was population-dropped —
       -- for ANY 'A.DropReason', not only the rebind one. The kept-only

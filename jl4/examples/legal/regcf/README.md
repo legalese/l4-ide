@@ -414,45 +414,58 @@ projection *cannot* say. What follows is the summary.
 | Target     | Artifact                                                                      | Status                                                       |
 | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **Ladder** | `figures/*.{svg,txt,mmd,sentences}`, 6 decisions × 4 carriers                  | works; 3 of 6 too wide for a page — see `figures/README.md`   |
-| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **does not evaluate** — see below           |
+| **DMN**    | `../../dmn/expected/regcf-corpus.{dmn,dmn.md,fidelity.txt,md.fidelity.txt}`    | emits, validates, **executes 67/67 on both engines** — see below |
 | **BPMN**   | `../../bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}` | cut from this file, three rules, three processes              |
 
-Every DMN and BPMN golden reproduces byte for byte from a bare CLI invocation — no
-`--model-name`, no flag but `--rule`. The `<definitions>` name comes from this file's own
-outermost `§` heading.
+Every BPMN golden, and the DMN **markdown** golden, reproduces byte for byte from a bare
+CLI invocation — no `--model-name`, no flag but `--rule`. The DMN **XML** golden differs
+from the CLI's bytes in exactly its 23 source-range annotation labels (`main.l4:` vs
+`regcf.l4:` — the golden harness loads the module under a virtual URI; measured
+2026-08-02, see `../../dmn/README.md` "From the CLI"). The `<definitions>` name comes
+from this file's own outermost `§` heading.
 
-### 6.1 DMN: 102 decisions, 11 tables, and a model no engine can bind
+### 6.1 DMN: 67 decisions, 12 tables, and a model both engines evaluate
 
-**Measured 2026-07-31 on the shipped goldens.** `l4 export --to=dmn` on this file succeeds
-and the XML parses under `dmn-moddle` with **zero warnings**. It is also, as a program,
-nearly inert:
+**Measured 2026-08-02 on the shipped goldens (R12 + R13,
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export --to=dmn` on
+this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
+since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
+reporting spine to a verdict decision table — **both engines evaluate it end to end**:
+KIE 8.44.0.Final answers 67/67 decisions with 67/67 values as expected (plus 14/14
+decision-service output values), and Camunda 8.7.6 (zeebe-dmn) parses it and answers
+67/67. An earlier revision of this section — "102 decisions, 11 tables, and a model no
+engine can bind" — described the pre-BKM, pre-R12/R13 artifact; that model no longer
+ships.
 
-- **102 `<decision>`** elements — every top-level `DECIDE`/`MEANS` including the record
-  fixtures and the test scenarios — of which **11** are decision tables and **91** are
-  boxed literal expressions (`D-LITERALEXPR`, blocking, ×89). Eight of the eleven tables
-  are rule-date interval tables and carry `hitPolicy="UNIQUE"`.
-- **68 `<inputData>`** elements, one of which is the rule-date input
-  `RULES_EFFECTIVE_DATE` (`typeRef="date"`). The nine source terms named `issuer` — and
-  the `status`, `offering` and `investor` groups — are **renamed apart** (`issuer_2` …
-  `issuer_9`) rather than collapsed onto one FEEL name, which is what `D-RENAME` (lossy,
-  ×37) counts and why `D-FEELNAME` is now **zero**. `D-SCOPE` (lossy, ×9) still names the
-  underlying collision: L4 scopes a `GIVEN` to its own decision and DMN's `inputData` is
-  global, and renaming makes the artifact loadable rather than the scoping faithful.
-- **114 blocking, 46 lossy, 18 advisory** notes in total. Fifteen of the blocking notes
-  are `D-RULEDATE-UNBOUND`: those decisions rebind law time with `EVAL UNDER RULES
-  EFFECTIVE AT`, and a DMN DRG has one global rule-date input and no scoped rebinding.
-  The per-code table, and why the blocking total fell by only 8 net when the law-time
-  work landed, are in `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.7.
+- **67 `<decision>`** elements — 9 decision tables, 57 boxed literal expressions, 1
+  boxed context — plus **10 `businessKnowledgeModel`s** (Phase 5's tier-2 λ-lifts,
+  3 of which carry the other 3 of the artifact's 12 `<decisionTable>`s) and **7
+  `decisionService`s**. Of the 12 tables, 10 are `hitPolicy="UNIQUE"` rule-date
+  interval tables and 2 are `FIRST` — one of them the R13 verdict table over the
+  reporting spine. The boxed literals are FEEL an engine evaluates:
+  `D-LITERALEXPR` is now **advisory**, ×64 (57 decisions + 7 BKM bodies).
+- **15 `<inputData>`** elements, one of which is the rule-date input
+  `RULES_EFFECTIVE_DATE` (`typeRef="date"`). The flat-namespace collision story shrank
+  with them: hydration and the BKM lowering absorbed most of the old scalar inputs, so
+  `D-RENAME` and `D-SCOPE` fire once each (the two `status` terms) and `D-FEELNAME` is
+  zero.
+- **0 blocking, 21 lossy, 125 advisory** notes in total. The lossy set is the honest
+  remainder: 15 `D-RULEDATE-UNBOUND` (the `EVAL UNDER RULES EFFECTIVE AT` scenarios
+  are **not emitted** — a DRG has one global rule-date input and no scoped rebinding),
+  2 `D-REGULATIVE`, 1 `D-VERDICT` (the obligation lifecycle is the BPMN projection's
+  content), plus naming/partiality notes. The per-code table is in `PROJECTIONS.md`
+  §1; the engine verdicts and their history are in `../../dmn/README.md`.
 
-The cause is one sentence: **a DMN decision is a 0-ary variable**, so every
-cross-decision call `f x` — which is every reference in this corpus, because the
-house style threads a record through `GIVEN` — leaves the FEEL fragment and is
-emitted verbatim (`D-NONFEELINPUT` / `D-NONFEELOUTPUT`, blocking). The exporter is
-right to refuse to invent a rendering; the report says so at each site.
+The old one-sentence diagnosis — **a DMN decision is a 0-ary variable**, so every
+cross-decision call `f x` was emitted verbatim and unevaluable — is retired: tier-1
+calls read shared `inputData` after un-lifting, tier-2 calls render as FEEL
+invocations of emitted BKMs, and what could not be made faithful was dropped with a
+note rather than shipped broken.
 
-The `dmnmd` markdown leg makes the same point in one glance: 1,241 lines of law become
-**one table**, plus 397 lines of loss report — and 31 of those notes are the date cells
-the rule-date interval tables introduced, which dmnmd's grammar cannot hold at all.
+The `dmnmd` markdown leg still makes the loss-report point in one glance: 1,236 lines
+of law become **one table** — the R13 verdict table, as it happens — plus 301 lines of
+loss report; 57 decisions have no dmnmd form at all (`D-MD-NOLITERAL`) and 31 tables
+fall to date cells dmnmd's grammar cannot hold.
 
 An earlier revision of this section reported two further defects that the fidelity
 report did not catch — a section heading spliced into FEEL as a path step (22
