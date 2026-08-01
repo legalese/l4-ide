@@ -1228,9 +1228,24 @@ checkDrg drg = cycleNotes <> recursiveNotes <> serviceCycleNotes <> knowledgeReq
 
   -- Does the text contain `name(` at a token boundary? The name is a folded
   -- FEEL identifier (no spaces), so a boundary check on the preceding
-  -- character is exact enough for text this exporter itself generated.
-  invokes nm txt = go txt
+  -- character is exact enough for text this exporter itself generated —
+  -- PROVIDED string literals are blanked first: the exporter also generates
+  -- FEEL string literals (an L4 STRING constant renders as one), and
+  -- "please call half(now)" inside quotes is prose, not an invocation.
+  -- Each double-quoted span (backslash escapes respected) is replaced by a
+  -- single space, preserving the token boundaries on both sides; an unterminated quote blanks to end-of-text, which fails safe —
+  -- a span the scanner cannot delimit can only suppress a note, never
+  -- invent one on a model both engines accept.
+  invokes nm txt = go (blankStrings txt)
    where
+    blankStrings t = case Text.breakOn "\"" t of
+      (pre, "")   -> pre
+      (pre, rest) -> pre <> " " <> blankStrings (skipString (Text.drop 1 rest))
+    skipString t = case Text.uncons t of
+      Nothing         -> ""
+      Just ('\\', t') -> skipString (Text.drop 1 t')
+      Just ('"', t')  -> t'
+      Just (_, t')    -> skipString t'
     go t = case Text.breakOn nm t of
       (_, "") -> False
       (before, rest) ->

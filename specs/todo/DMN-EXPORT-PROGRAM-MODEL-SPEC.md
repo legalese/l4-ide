@@ -2812,8 +2812,10 @@ spec.
 > global spellings first, `D-FEELNAME`'s claimant list widened to name `businessKnowledgeModel`
 > as a kind, and **BKMs are drawn**: KIE's validator raises `WARN [DMNDI_MISSING_DIAGRAM]` for a
 > shape-less element (measured against the gst-rate leg's zero-warning pin), so each BKM gets a
-> `DMNShape` on its own row above the decisions, while knowledgeRequirement edges get no
-> `DMNEdge` (measured: nothing asks for one).
+> `DMNShape` on its own row above the decisions, and each knowledgeRequirement edge gets a
+> `DMNEdge` (measured the same way: KIE warns `Missing DMNEdge for '<owner>_kr1'` for each
+> undrawn one — an earlier draft of this note asserted the opposite, from a measurement taken
+> before the decisionService commit landed the edges; §13.5 states the same corrected fact).
 
 ### 6.3 Refuse loudly — three cases, not BKMs in general
 

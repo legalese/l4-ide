@@ -540,9 +540,10 @@ dmndiXml drg =
   -- gst-rate engine leg pins its warning count at zero). They sit outside
   -- 'decisionLevels'' longest-path-to-an-input frame — a BKM has no
   -- information requirements — so the top row is a placement, not a claim
-  -- about dataflow. The knowledgeRequirement edges get no DMNEdge: KIE's
-  -- validator does not ask for one (measured on the same leg), and a
-  -- requirement with no waypoints is simply not drawn.
+  -- about dataflow. The knowledgeRequirement edges ARE drawn — see
+  -- 'krEdgesXml' above, and its measurement (KIE warns
+  -- [DMNDI_MISSING_DIAGRAM] for each undrawn one); an earlier version of
+  -- this comment asserted the opposite, from before those edges landed.
   nodeIds =
     mapMaybe nodeId drg.drgNodes
       <> [b.bkmId | NodeBkm b <- drg.drgNodes]
