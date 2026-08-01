@@ -4,9 +4,9 @@ What each stage of the single-instruction pipeline is for, what it deposits as i
 
 **Canonical references:**
 
-- The pipeline itself: <file:specs/todo/single-instruction-demo/SPEC.md>
-- What runs today, in the present tense: <file:specs/todo/single-instruction-demo/ORCHESTRATOR.md>
-- The fork-representation design note P4 is waiting on: <file:specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md>
+- The pipeline itself: `specs/todo/single-instruction-demo/SPEC.md`
+- What runs today, in the present tense: `specs/todo/single-instruction-demo/ORCHESTRATOR.md`
+- The fork-representation design note P4 is waiting on: `specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md`
 
 ---
 
@@ -117,4 +117,4 @@ If you are adding a leg, copy `p7-lts.sh`: it is the shortest one that has a rea
 
 - [status-vocabulary.md](status-vocabulary.md) — what each status licenses
 - [gates.md](gates.md) — the two human gates and what they certify
-- <file:etc/go/README.md> — invocation, exit codes, environment
+- `etc/go/README.md` — invocation, exit codes, environment

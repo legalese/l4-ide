@@ -1,6 +1,6 @@
 # Projections of the Reg CF corpus
 
-Everything on this page is **cut from `regcf.l4`**, the 992-line formalisation of 17 CFR Part 227.
+Everything on this page is **cut from `regcf.l4`**, the 1,236-line formalisation of 17 CFR Part 227.
 Nothing here is transcribed. If a threshold changes in the corpus, it changes in every artifact
 below on the next run, because no artifact below holds a second copy of it.
 
@@ -25,10 +25,21 @@ what the corpus deliberately does not model (§5). This page is only about what 
 | 4 | Ladder figures (6 decisions × 4 carriers)      | 24    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
 | 5 | Deployable API / MCP surface                   | 1 `.l4` | `POST /deployments` to `jl4-service`              | `cabal test jl4:jl4-test`       |
 
-Every one of 1–3 reproduces **byte for byte from the command line with no flags** other than
+Artifacts 3 (BPMN) reproduce **byte for byte from the command line with no flags** other than
 `--rule` (which selects _which_ process, since a BPMN document holds exactly one). That was not
 true before 2026-07-27: the model name was hand-typed in the golden test, so the corpus's DMN model
 had three different names at once. It now comes from the corpus's own outermost `§` heading.
+
+**Artifacts 1 and 2 (DMN, dmnmd) do NOT — this sentence used to claim they did.** Measured
+2026-08-02: `l4 export regcf.l4 --to dmn` differs from the committed golden on 92 lines, every one
+of the form `main.l4:<position>` in the golden against `regcf.l4:<position>` from the CLI.
+`jl4/tests/DmnExport.hs:3212` typechecks goldens against an empty virtual file system
+(`drgFlavoredWith = drgGeneral emptyVFS id`), so no source URI reaches the `@ref` renderer and
+provenance renders a placeholder. The exporter output is identical in every other byte, and the
+two files agree exactly once that one substitution is applied. Do **not** regenerate the goldens
+from the CLI to close the gap: `jl4-test` defends them. The fix is in the golden runner. Tracked as
+D1 in `specs/todo/single-instruction-demo/ORCHESTRATOR.md` §1.1, and worked around — visibly, with
+a stated deletion condition — in `etc/go/lib/canon-diff.mjs`.
 
 Pin `JL4_LIBRARY_PATH=<repo>/jl4-core/libraries` for every command on this page.
 
@@ -41,9 +52,11 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn --fidelity-report
 ```
 
-**Measured 2026-07-31 on the shipped goldens.** 102 `<decision>` elements — 11 of them decision
-tables, 91 boxed literal expressions — 68 `<inputData>`, 202 `<informationRequirement>` edges, one
-diagram. Loads clean in `dmn-moddle`.
+**Measured 2026-08-02 on the shipped goldens.** 92 `<decision>` elements — 11 of them decision
+tables, 80 boxed literal expressions — 37 `<inputData>`, 189 `<informationRequirement>` edges, one
+diagram. Loads clean in `dmn-moddle`. (This paragraph previously read 102 / 91 / 68 / 202, from a
+2026-07-31 measurement that the artifact has since moved past; re-derive with
+`npx --yes --package=dmn-moddle node etc/validate-dmn.mjs jl4/examples/dmn/expected/regcf-corpus.dmn`.)
 
 **A note on the neighbour.** `jl4/examples/dmn/reg-cf.l4` is a 101-line **toy** — five decisions
 chosen so the goldens exhibit every outcome the exporter has. It is not this corpus and its own
@@ -51,12 +64,17 @@ header says its figures are illustrative. Both are kept, and both are labelled, 
 a shape exhibit and this is the real thing. `expected/reg-cf.*` is the toy; `expected/regcf-corpus.*`
 is the corpus.
 
-### Fidelity: 114 blocking, 46 lossy, 18 advisory (measured 2026-07-31)
+### Fidelity: 95 blocking, 21 lossy, 54 advisory (measured 2026-08-02)
+
+Re-derive every number in this section with
+`node etc/go/lib/fidelity-counts.mjs jl4/examples/dmn/expected/regcf-corpus.fidelity.txt --json`.
+The previous heading said 114 / 46 / 18 and its table said `D-LITERALEXPR` 89 and
+`D-RENAME` 37; all five were transcribed once and never re-measured.
 
 | Code                 | ×  | Severity | What it means here                                                                                             |
 | -------------------- | -- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `D-LITERALEXPR`      | 89 | blocking | not a guarded chain, so a boxed literal expression, not a table                                                 |
-| `D-RENAME`           | 37 | lossy    | one FEEL name would have served several elements the module keeps apart, so all but one were renamed apart      |
+| `D-LITERALEXPR`      | 80 | blocking | not a guarded chain, so a boxed literal expression, not a table                                                 |
+| `D-RENAME`           | 11 | lossy    | one FEEL name would have served several elements the module keeps apart, so all but one were renamed apart      |
 | `D-RULEDATE-UNBOUND` | 15 | blocking | `EVAL UNDER RULES EFFECTIVE AT`: a sub-graph under its OWN rule date, which one global DMN input cannot express |
 | `D-SCOPE`            | 9  | lossy    | e.g. **nine** different terms all named `issuer` in the source                                                  |
 | `D-COMPUTEDOUTPUT`   | 9  | advisory | the output entry is an expression, not a constant                                                               |
@@ -75,15 +93,15 @@ why the blocking total falls by only 8 net while 15 new blocking notes appear �
 
 ### What this projection **cannot** say
 
-- **It is well-formed and nearly inert.** 11 decision tables against **91** boxed literal
+- **It is well-formed and nearly inert.** 11 decision tables against **80** boxed literal
   expressions. A DMN decision is a 0-ary variable, so under the corpus's house `GIVEN` + record
   style every cross-decision reference becomes an unevaluable `f(x)`. The XML loads; almost none of
   it evaluates. That is a fact about DMN's program model, not about this corpus, and it is in a
   golden rather than a paragraph precisely so it can be regression-tested.
 - **It cannot keep two `issuer`s apart — but it no longer pretends otherwise.** L4 scopes a `GIVEN`
-  to its own decision; DMN's `inputData` is global. 68 inputs, and the nine source terms named
-  `issuer` are renamed apart (`issuer_2` … `issuer_9`) rather than collapsed into one name, which is
-  what `D-RENAME` ×37 counts and why `D-FEELNAME` is now zero. `D-SCOPE` still names the underlying
+  to its own decision; DMN's `inputData` is global. 37 inputs, and colliding source terms are
+  renamed apart — `issuer` and `issuer_2` — rather than collapsed into one name, which is what
+  `D-RENAME` ×11 counts and why `D-FEELNAME` is now zero. `D-SCOPE` still names the underlying
   collision; renaming makes the artifact loadable, not the scoping faithful.
 - **It CAN now say when a rule took effect — this bullet used to say the opposite.** The eight dated
   thresholds in `README.md` §2 lower to `hitPolicy="UNIQUE"` tables over a `RULES_EFFECTIVE_DATE`
@@ -113,24 +131,24 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn.md --fidelity-report
 ```
 
-**Measured 2026-07-31: 1,241 lines of law become ONE markdown table**, and 397 lines of loss report.
+**Measured 2026-08-02: 1,236 lines of law become ONE markdown table**, and 364 lines of loss report.
 This is the most honest artifact in the set and the least useful one, which is why it ships.
 
 | Code                  | ×   | What it costs                                                       |
 | --------------------- | --- | ------------------------------------------------------------------- |
-| `D-MD-NOLITERAL`      | 91  | dmnmd has no boxed-expression form; the decision is **omitted**      |
-| `D-MD-CELLSYNTAX`     | 33  | a cell dmnmd cannot read; the **whole table** is omitted             |
-| `D-MD-NONIDENTCOLUMN` | 7   | column header must be an identifier; the **whole table** is omitted  |
-| `D-MD-NODRG`          | 1   | 202 information requirements have no markdown form                   |
+| `D-MD-NOLITERAL`      | 80  | dmnmd has no boxed-expression form; the decision is **omitted**      |
+| `D-MD-CELLSYNTAX`     | 34  | a cell dmnmd cannot read; the **whole table** is omitted             |
+| `D-MD-NONIDENTCOLUMN` | 5   | column header must be an identifier; the **whole table** is omitted  |
+| `D-MD-NODRG`          | 1   | 189 information requirements have no markdown form                   |
 
-31 of the 33 `D-MD-CELLSYNTAX` instances name a **date** cell: the rule-date interval tables are the
+31 of the 34 `D-MD-CELLSYNTAX` instances name a **date** cell: the rule-date interval tables are the
 one thing the XML target gained and the markdown target cannot hold at all, because dmnmd's cell
 grammar has no date datatype. That is the two-target thesis doing its job on a real corpus.
 
 ### What this projection cannot say
 
 Everything the DMN loses, plus: it is a table format, not a graph, so **which decision feeds which
-is invisible**. The 202 edges that make the DRG single-sourced are exactly what does not survive.
+is invisible**. The 189 edges that make the DRG single-sourced are exactly what does not survive.
 
 ---
 

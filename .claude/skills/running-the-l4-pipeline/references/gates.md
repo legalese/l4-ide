@@ -4,9 +4,9 @@ SPEC.md §7.3 defines exactly two human gates in this pipeline. Everything else 
 
 **Canonical references:**
 
-- The gates as specified: <file:specs/todo/single-instruction-demo/SPEC.md>
-- The enrolment file and its instructions: <file:specs/todo/single-instruction-demo/gate-allowed-signers>
-- The default-deny check: <file:etc/go/gate-verify.sh>
+- The gates as specified: `specs/todo/single-instruction-demo/SPEC.md`
+- The enrolment file and its instructions: `specs/todo/single-instruction-demo/gate-allowed-signers`
+- The default-deny check: `etc/go/gate-verify.sh`
 
 ---
 
@@ -126,4 +126,4 @@ If a non-loopback deployment is genuinely wanted, it needs its own HG2 signature
 
 - [phases.md](phases.md) — which stages each gate blocks
 - [status-vocabulary.md](status-vocabulary.md) — how a refused gate becomes a milestone verdict
-- <file:specs/todo/single-instruction-demo/ORCHESTRATOR.md> — the gate machinery as built, in the present tense
+- `specs/todo/single-instruction-demo/ORCHESTRATOR.md` — the gate machinery as built, in the present tense

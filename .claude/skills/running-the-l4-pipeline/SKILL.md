@@ -9,7 +9,7 @@ The instruction is one line — **"SEC Regulation Crowdfunding: go"** — and it
 
 **Canonical documentation** — always authoritative for what actually runs today:
 
-<file:specs/todo/single-instruction-demo/ORCHESTRATOR.md>
+`specs/todo/single-instruction-demo/ORCHESTRATOR.md`
 
 That spec states, in the present tense and against a named commit, which stages run and which are scaffolded and cannot run. Where this skill disagrees with it, it wins; where it disagrees with the tree, the tree wins. Three deeper references ship in this skill:
 
@@ -264,14 +264,14 @@ The first sentence can be checked by someone who disagrees with it. The second c
 
 ## Further reading
 
-<file:specs/todo/single-instruction-demo/ORCHESTRATOR.md>
+`specs/todo/single-instruction-demo/ORCHESTRATOR.md`
 
-<file:specs/todo/single-instruction-demo/SPEC.md>
+`specs/todo/single-instruction-demo/SPEC.md`
 
-<file:specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md>
+`specs/todo/single-instruction-demo/R4-FORK-REPRESENTATION.md`
 
-<file:etc/go/README.md>
+`etc/go/README.md`
 
-<file:jl4/examples/legal/regcf/PROJECTIONS.md>
+`jl4/examples/legal/regcf/PROJECTIONS.md`
 
 The spec files are ground truth over anything written in this skill. If a command in here has drifted from `etc/go/go.sh`, believe `etc/go/go.sh help` — and fix this file in the same change that revealed the drift, because a stale entry here is worse than a missing one.

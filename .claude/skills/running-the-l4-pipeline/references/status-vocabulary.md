@@ -4,9 +4,9 @@ Eight statuses, five oracle classes, four milestone verdicts, and the rules that
 
 **Canonical references:**
 
-- What actually runs today: <file:specs/todo/single-instruction-demo/ORCHESTRATOR.md>
-- The rules as executable code: <file:etc/go/lib/verdict.mjs>
-- The proof they can still say no: <file:etc/go/selftest.mjs>
+- What actually runs today: `specs/todo/single-instruction-demo/ORCHESTRATOR.md`
+- The rules as executable code: `etc/go/lib/verdict.mjs`
+- The proof they can still say no: `etc/go/selftest.mjs`
 
 ---
 
@@ -135,4 +135,4 @@ The hazard to watch is an **under-declared input set**. A stage that forgets to 
 
 - [phases.md](phases.md) — what each stage is for, and which ones refuse
 - [gates.md](gates.md) — HG1 and HG2
-- <file:etc/go/lib/verdict.mjs> — the rules above, as the code that enforces them
+- `etc/go/lib/verdict.mjs` — the rules above, as the code that enforces them
