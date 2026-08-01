@@ -3116,7 +3116,18 @@ load-bearing question is _which graph_, and there are three.
    decision was already refused, is still refused, and the corpus's executable population does not
    change. That is (2)'s own cost argument, now measured on a target engine from the other
    direction: un-suppressing cost nothing because these decisions were already `Blocking`, and
-   re-suppressing gives nothing back for the same reason. What it buys is a loadable file.
+   re-suppressing gives nothing back for the same reason.
+
+   **[M] What it buys is the metamodel gate, not yet a loadable corpus — and the difference is
+   worth stating.** Camunda 8.7.6 was re-measured too, and it still refuses `regcf-corpus.dmn`
+   whole: `PARSE INVALID`, `0 parsed`, now on
+   `FEEL expression: failed to parse expression 'IF (`ongoing reporting obligation may terminate`
+   OF status) THEN (PARTY Issuer MUST …'` instead of on the cycle. That is the **same decision**
+   refusing on its **other** already-`Blocking` defect, the raw-L4 deontic body — which nothing
+   about self-edges could have fixed. So 4a discharges the `dmn-moddle` metamodel violation (the
+   red check) and removes one KIE error; it does **not** on its own make the corpus load, and R0 is
+   advanced rather than satisfied. The remaining refusal belongs to the deontic-lowering work, not
+   here.
 
    **What this costs, stated plainly:** the emitted DRG no longer records that the recursion
    exists; only the report does. A reader with the `.dmn` alone sees a decision with one fewer
@@ -5325,15 +5336,29 @@ shipped artifact.
 > `regcf-corpus.cases.json` exists, pins all 82 decisions symmetrically, and records in its own
 > header why it is not yet engine-exercisable and what must retire first.
 >
-> **Superseded in part on 2026-08-02 by §6.4.4-4a, which changed these bytes.** The KIE leg was
-> re-run on the new golden and the whole delta is the cyclic-dependency error, once per leg:
-> **[M]** `XSD valid`, `VALID 16 error(s), 0 warning(s)`, `BUILD 16 error(s) / 16 message(s)`,
-> verdict `32 error(s)` (was 34). `ongoing reporting obligation` still carries its raw-L4 FEEL
-> error in both legs, so the Blocking population and the executable population are unchanged and
-> the sentence above about tier-2 call sites still holds. **The Camunda 8.7.6 line is now stale and
-> has NOT been re-measured** — there is no JDK 21 on the machine this was run from, so the Camunda
-> leg is CI-only. Its stated cause (the self-edge) is gone; what it refuses on next is
-> **unmeasured**, and the parenthetical's guess is a guess. Re-measure before quoting it.
+> **Superseded on 2026-08-02 by §6.4.4-4a, which changed these bytes. Both legs re-measured.**
+>
+> **[M]** KIE 8.44.0.Final: `XSD valid`, `VALID 16 error(s), 0 warning(s)`,
+> `BUILD 16 error(s) / 16 message(s)`, verdict `32 error(s)` (was 34). The whole delta is the
+> cyclic-dependency error, once per leg; `ongoing reporting obligation` still carries its raw-L4
+> FEEL error in both legs, so the Blocking population and the executable population are unchanged
+> and the sentence above about tier-2 call sites still holds.
+>
+> **[M]** Camunda 8.7.6 (zeebe-dmn): still `PARSE INVALID`, still 1 error, still `0 parsed` — but on
+> a different cause. Verbatim, the head of the message is now
+> `FEEL expression: failed to parse expression 'IF (`ongoing reporting obligation may terminate` OF
+status) THEN (PARTY Issuer MUST …': Expected (binaryComparison | between | instanceOf | in | "and"
+| "or" | end-of-input):1:4`. **The old parenthetical's prediction — "raw-L4 literals would refuse
+> next" — is confirmed, and it is the same decision refusing on its other defect.**
+>
+> **So the corpus still does not load on Camunda 8, and 4a did not claim it would.** What 4a buys is
+> the metamodel gate (`etc/validate-dmn.mjs`, which was the red check) and one fewer KIE error; the
+> remaining refusal is the raw-L4 deontic body, a separate and already-`Blocking` defect that no
+> decision about self-edges could have touched. R0 is advanced here, not discharged.
+>
+> Both legs were run from `etc/{kie,camunda}-dmn-check/run.sh` on this machine — KIE on the
+> openjdk@17 keg, Camunda on the unversioned Homebrew `openjdk` (26.0.1), which satisfies the
+> harness's `21+` floor.
 
 > **The blocking total falls by only 8 net, because 15 new Blocking notes appear — and that is the
 > point.** The complaint this section answers is that the report was _silent_ about law time; making
