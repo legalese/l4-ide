@@ -4808,9 +4808,16 @@ lowerModule opts modul@(MkModule _ uri _) =
              "nothing: an uninvoked grouping service is inert on both engines (probe D1)"
          | ((_, nm, _), feel, sid, i) <-
              zip4 finalServiceStructs svcFeelNames svcIds [0 :: Int ..]
+         -- only services that actually EMIT (the D5/§6.3.10 skips filter some
+         -- structs out); a note naming an element id the artifact does not
+         -- contain would be describing a different file
+         , Set.member sid emittedServiceIds
          , i `notElem`
              [ j | (uf, j) <- Map.toList svcInvocable, not (null (qualifyingCallers uf)) ]
          ]
+
+  emittedServiceIds :: Set Text
+  emittedServiceIds = Set.fromList [s.dsvId | NodeService s <- serviceNodes]
 
   -- The call sites that MEET the §-invocation condition, per callee: applied,
   -- arity-matching, from an emitted caller. Flavor-independent — on kie they

@@ -1,5 +1,31 @@
 # DMN Phase 5 — build plan: BKM emission, `knowledgeRequirement`, the three refusals, flavor split
 
+> **Status: DISCHARGED 2026-08-01 — the build this plan ordered has landed** (branch
+> `mengwong/dmn-phase5-bkm`, off `unstable` at `4d83ab73`; six commits, W1–W8). Retained because
+> the probe matrix in §1 is the measurement of record for the 46 wired engine legs, and because
+> `bkmProbeMatrix` in `jl4/tests-cli/Main.hs` cites it. Every ruling it discusses is recorded in
+> the spec's own sections (§5.2, §6.1–§6.4, §7, §13.5–§13.6, §15.7), which win over this file.
+>
+> **Corrections measured at the build, against the tree at `4d83ab73`** (this file was measured
+> at `05e46d9a`, pre-Phase-4-merge, and several of its claims had gone stale by landing time):
+>
+> - Every `Lower.hs`/`Main.hs`/`DmnExport.hs` line number cited below moved; the build brief's
+>   correction table was used instead of the cites here. Do not navigate by this file's numbers.
+> - **§11's baseline is dead twice over.** At `4d83ab73` the corpus read **95 blocking / 21
+>   lossy / 54 advisory** (170 notes), not 112/44/21; all 8 `D-NONFEEL*` notes were already gone
+>   (the tier-2 call sites lived inside `D-LITERALEXPR` literal bodies), so the "112 → 104"
+>   prediction had nothing left to retire. The landed movement is recorded in spec §15.7's dated
+>   Phase 5 row: **95 → 32 Blocking**, via BKM emission AND the fragment-keyed `D-LITERALEXPR`
+>   severity (spec §7), with KIE's residual compile errors 37 → 17 (all deliberate refusals).
+> - P5.0a–c landed as the PR's first commit (not a separate Phase 0 PR); §6.4.4 records the
+>   P5.0b dependency.
+> - The §6.2 body-environment question this plan left open ("a BKM body may read…") was MEASURED
+>   at the build and the engines DISAGREE (KIE refuses an unshadowed inputData read at compile;
+>   Camunda answers), so bodies are λ-LIFTED — spec §6.2's 2026-08-01 note is the record.
+> - P5.8's `expectService` was ruled NOT built; the limitation is recorded (spec §13.6).
+>
+> Original header follows.
+
 > **Status: build plan, not a spec — rulings live in `DMN-EXPORT-PROGRAM-MODEL-SPEC.md`. The
 > Phase 5 code build is blocked on Phase 4 (branch `mengwong/bkm-phase4-unlift`). Probe
 > measurements dated 2026-07-31.**

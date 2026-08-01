@@ -401,17 +401,8 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-BKM-CONSUMERS] advisory — definitions
       10 decision(s) are emitted as businessKnowledgeModels. Both target flavors execute BKMs (KIE 8.44, Camunda 8; §13.3), but two known NON-target consumers cannot: @hbtgmbh/dmn-eval-js has no BKM support and falls through to the next rule on an unresolvable callee (a plausible wrong answer), and Camunda 7 answers null, silently
       lost: nothing on the target engines; portability to BKM-less consumers, which fail silently rather than loudly
-  [D-FLAVOR-NOSERVICE] advisory — service_thresholds_every_dollar_figure_bound_once_dated_per_regime
-      the decisionService `Thresholds_every_dollar_figure_bound_once_dated_per_regime` (§ `Thresholds — every dollar figure, bound once, dated per regime`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service_periods_every_deadline_bound_once
-      the decisionService `Periods_every_deadline_bound_once` (§ `Periods — every deadline, bound once`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-FLAVOR-NOSERVICE] advisory — service__1_issuer_eligibility_rule_100_b
       the decisionService `_1_Issuer_eligibility_Rule_100_b` (§ `1. Issuer eligibility — Rule 100(b)`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service__2_offering_limit_rule_100_a_1
-      the decisionService `_2_Offering_limit_Rule_100_a_1` (§ `2. Offering limit — Rule 100(a)(1)`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-FLAVOR-NOSERVICE] advisory — service__3_investor_investment_limits_rule_100_a_2
       the decisionService `_3_Investor_investment_limits_Rule_100_a_2` (§ `3. Investor investment limits — Rule 100(a)(2)`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
@@ -422,20 +413,8 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-FLAVOR-NOSERVICE] advisory — service__5_intermediary_obligations_rules_100_a_3_301_302_303
       the decisionService `_5_Intermediary_obligations_Rules_100_a_3_301_302_303` (§ `5. Intermediary obligations — Rules 100(a)(3), 301, 302, 303`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service__6_advertising_restrictions_rule_204
-      the decisionService `_6_Advertising_restrictions_Rule_204` (§ `6. Advertising restrictions — Rule 204`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service__7_ongoing_reporting_rules_202_203_b
-      the decisionService `_7_Ongoing_reporting_Rules_202_203_b` (§ `7. Ongoing reporting — Rules 202, 203(b)`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-FLAVOR-NOSERVICE] advisory — service__8_resale_restrictions_rule_501
       the decisionService `_8_Resale_restrictions_Rule_501` (§ `8. Resale restrictions — Rule 501`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service_fixtures
-      the decisionService `Fixtures` (§ `Fixtures`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
-      lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
-  [D-FLAVOR-NOSERVICE] advisory — service_group_4_disclosure_rule_201_t_boundaries_at_124_000_618_000_1_235_000
-      the decisionService `Group_4_disclosure_Rule_201_t_boundaries_at_124_000_618_000_1_235_000` (§ `Group 4 — disclosure (Rule 201(t)), boundaries at $124,000 / $618,000 / $1,235,000`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)
   [D-FLAVOR-NOSERVICE] advisory — service_top_level_the_whole_exemption
       the decisionService `Top_level_the_whole_exemption` (§ `Top level — the whole exemption`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
