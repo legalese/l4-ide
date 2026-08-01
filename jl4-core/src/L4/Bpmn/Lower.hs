@@ -986,6 +986,23 @@ withGatewayDirections flows = map redirect
 -- §10.5.2 permits, whatever any one engine makes of it); and a gateway with
 -- multiple of neither can only be @Unspecified@, the XSD default, since the
 -- other three all /require/ a multiplicity it does not have.
+--
+-- @Mixed@ stays emitted even though jBPM rejects the value (@unable to parse
+-- xml : … Unknown gateway direction: Mixed@), because avoiding the /value/
+-- cannot buy acceptance of the /shape/: all four attribute values were run
+-- against @regcf-reporting.bpmn@'s 2-in\/3-out gateway on 2026-08-01
+-- (jbpm-bpmn2 7.74.1.Final, @etc\/check-bpmn-kie.sh@) and all four are
+-- rejected — @Unspecified@ with @Unknown gateway direction: Unspecified@,
+-- @Diverging@ with @cannot have more than one incoming connection!@,
+-- @Converging@ with @cannot have more than one outgoing connection!@. jBPM
+-- implements a gateway as either a split or a join, chosen by this attribute,
+-- and has no node for a gateway that is both; only a structural rewrite
+-- (splitting the node into a converging→diverging pair) could satisfy it, and
+-- that is not attribute-level work. Meanwhile @Mixed@ is the one value
+-- @etc\/check-bpmn-soundness.mjs@ can hold against the edges — @Unspecified@
+-- it skips — so the truthful value is also the checkable one. See
+-- @specs\/todo\/lexipedia-superset\/PROCESS-TRACK.md@ §8.1 class (a) and
+-- @jl4\/examples\/bpmn\/unsound\/README.md@.
 gatewayFlowFor :: Int -> Int -> GatewayFlow
 gatewayFlowFor ins outs = case (ins > 1, outs > 1) of
   (True, True) -> Mixed
