@@ -1,7 +1,7 @@
 fidelity report — DMN 1.3 (XML), camunda flavor
-  [D-LITERALEXPR] blocking — decision_combined_resources  (main.l4:66:3-35)
-      `combined resources` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_combined_resources  (main.l4:66:3-35)
+      `combined resources` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-FLAVOR-NOSERVICE] advisory — service_regulation_crowdfunding
       the decisionService `Regulation_Crowdfunding` (§ `Regulation Crowdfunding`) is emitted as GROUPING only: no call site invokes it, and on this flavor none could — the `camunda` flavor never emits the knowledgeRequirement→decisionService edge an invocation needs (§13.4/§13.5)
       lost: nothing: an uninvoked grouping service is inert on both engines (probe D1)

@@ -5703,16 +5703,46 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- because FEEL has no sum type is @D-SUMTYPE@, everything else is
     -- @D-LITERALEXPR@. One shape, two diagnoses, which is §4.2.1-8's
     -- requirement expressed where it cannot be forgotten.
+    --
+    -- @D-LITERALEXPR@'s SEVERITY is keyed on the RENDERED FRAGMENT (ruled at
+    -- the Phase 5 build, recorded in §7): Blocking's definition is "the target
+    -- cannot express this at all; we emitted a fallback", which is true of a
+    -- raw-L4 literal no engine can compile and FALSE of a boxed literal whose
+    -- body is genuine FEEL — that one EXECUTES, and what it forfeits is the
+    -- decision-table analyses, which is Advisory's definition to the letter.
+    -- Before this, `Reg CF commenced MEANS Date 20 9 2016` — a date constant
+    -- both engines evaluate — was counted in the same Blocking total as a
+    -- deontic body, and the corpus's headline could not distinguish "will not
+    -- execute" from "will not tabulate". @D-SUMTYPE@ keeps its ruled Blocking
+    -- regardless of fragment (§4.2.1: the rendered text may compile and still
+    -- answer differently from L4, which is worse than not compiling).
     literalFallback loss =
       ( LogicLiteral rendered
-      , [ dmnNote (fidelityLossCode loss) Blocking did (bestRange body)
-            ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
-               <> ", so it is emitted as a boxed literal expression rather than a decision table")
-            "every decision-table analysis: gap, overlap, consistency and manual review"
+      , [ if blocking
+            then
+              dmnNote code Blocking did (bestRange body)
+                ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
+                   <> ", so it is emitted as a boxed literal expression rather than a \
+                      \decision table" <> verbatimTail)
+                "every decision-table analysis: gap, overlap, consistency and manual review"
+            else
+              dmnNote code Advisory did (bestRange body)
+                ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
+                   <> ", so it is emitted as a boxed literal expression rather than a \
+                      \decision table; the expression is FEEL, and an engine evaluates it")
+                "the decision-table analyses (gap, overlap, consistency): the literal \
+                \computes, but it is not rules a checker can reach"
         ]
       )
      where
       rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
+      code     = fidelityLossCode loss
+      blocking = code == "D-SUMTYPE" || rendered.feFragment == L4Verbatim
+      verbatimTail
+        | rendered.feFragment == L4Verbatim =
+            ". Its body could not be rendered as FEEL, so the emitted text is raw L4 \
+            \that NO engine can evaluate"
+        | otherwise = ""
 
     decision = MkDecision
       { dcnId           = did

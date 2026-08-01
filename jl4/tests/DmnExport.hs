@@ -953,7 +953,12 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicLiteral e -> e.feText `shouldBe` "a and b"
         LogicTable _   -> expectationFailure "expected a literal expression, got a decision table"
         LogicContext _ -> expectationFailure "unexpected boxed context"
-      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Blocking)]
+      -- Advisory since the Phase 5 severity re-key (recorded in spec §7):
+      -- `a and b` is genuine FEEL an engine evaluates, so what the boxed
+      -- literal forfeits is the table analyses, which is Advisory's
+      -- definition. The Blocking arm is pinned separately on a body that
+      -- stays raw L4 ("fidelity: L4 source in a <text> element is Blocking").
+      [(n.code, n.severity) | n <- drg.drgNotes] `shouldBe` [("D-LITERALEXPR", Advisory)]
       emitDrg drg `shouldSatisfy` Text.isInfixOf "<literalExpression"
 
     -- __Both of these shapes are now refused EARLIER, and by a different code.__
@@ -1735,10 +1740,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         -- Threading is NOT reading: R4-a keeps this one, and only says the
         -- component's type could not be carried.
         -- (it is also a plain projection rather than a chain, so it carries the
-        -- ordinary D-LITERALEXPR as well; the point here is the SEVERITY of the
-        -- sum-type note, which is Lossy and not Blocking)
+        -- ordinary D-LITERALEXPR as well — Advisory since the Phase 5
+        -- severity re-key: the projection renders as FEEL; the point here is
+        -- the SEVERITY of the sum-type note, which is Lossy and not Blocking)
         [(n.code, n.severity) | n <- drgNotesAll drg, n.element == "decision_claim_amount"]
-          `shouldBe` [("D-LITERALEXPR", Blocking), ("D-SUMTYPE", Lossy)]
+          `shouldBe` [("D-LITERALEXPR", Advisory), ("D-SUMTYPE", Lossy)]
 
       it "reports a LIST OF component, which needs an itemDefinition of its own" $ do
         drg <- sumtypeDrg

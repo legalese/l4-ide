@@ -2,33 +2,33 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-COMPUTEDFIELD] advisory — itemdef_pay_hydrated
       `Pay` is hydrated as `Pay_hydrated`, whose component(s) `total` are DERIVED: L4 defines each by a MEANS clause on the DECLARE, and this model computes them in the boxed context of the hydrated decision from the components declared before them. DMN cannot say so -- tItemDefinition has no derived flag, and a contextEntry is indistinguishable from a supplied value -- so a reader of the hydrated type alone cannot tell a derived component from a stored one
       lost: nothing an engine needs -- hydration means no caller ever supplies one. What is lost is a reader's ability to tell, FROM THE TYPE, which components are the model's input contract and which the model computes for itself
-  [D-LITERALEXPR] blocking — bkm_weighted_sum  (main.l4:42:26-42)
-      `weighted sum` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — bkm_boosted  (main.l4:46:19-44)
-      `boosted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_case_one  (main.l4:49:18-30)
-      `case one` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_case_two  (main.l4:52:18-30)
-      `case two` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_pay_check  (main.l4:55:19-37)
-      `pay check` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_baseline  (main.l4:58:18-19)
-      `baseline` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — bkm_adjusted  (main.l4:62:20-37)
-      `adjusted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_adj_one  (main.l4:65:17-29)
-      `adj one` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_adj_two  (main.l4:68:17-29)
-      `adj two` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — bkm_weighted_sum  (main.l4:42:26-42)
+      `weighted sum` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — bkm_boosted  (main.l4:46:19-44)
+      `boosted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_case_one  (main.l4:49:18-30)
+      `case one` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_case_two  (main.l4:52:18-30)
+      `case two` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_pay_check  (main.l4:55:19-37)
+      `pay check` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_baseline  (main.l4:58:18-19)
+      `baseline` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — bkm_adjusted  (main.l4:62:20-37)
+      `adjusted` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_adj_one  (main.l4:65:17-29)
+      `adj one` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_adj_two  (main.l4:68:17-29)
+      `adj two` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-BKM] advisory — bkm_weighted_sum
       `weighted sum` is emitted as a businessKnowledgeModel (tier 2): it is applied to distinct argument expressions by `boosted`. Saturated call sites render as FEEL named-argument invocations with a knowledgeRequirement edge on each caller
       lost: the decision-as-variable reading: the callee no longer appears as a 0-ary decision variable, and is reachable only by invocation

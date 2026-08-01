@@ -20,24 +20,24 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-SUMTYPE] blocking — decision_stated_term  (main.l4:142:3-29)
       `stated term` is a reader of `Disposal`, a payload-carrying sum type FEEL has no way to represent (it projects the payload field `term in years`), so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_claim_amount  (main.l4:149:3-15)
-      `claim amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_claim_amount  (main.l4:149:3-15)
+      `claim amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-SUMTYPE] lossy — decision_claim_amount
       `claim amount` threads `Claim`, whose field `the disposal` is typed `Disposal`, a payload-carrying sum type; the itemComponent is emitted as typeRef="Disposal", which resolves to an itemDefinition over `string` listing every constructor as a bare tag -- FEEL has no tagged value, so a constructor that carries a payload and the same constructor without one are a single FEEL string
       lost: the tag/payload distinction: every `Disposal` constructor is spelled as a bare string, and the payload one of them carries has no image in the component at all
   [D-MAYBE-NULL] lossy — decision_capped_at_ten  (main.l4:156:3-43)
       `capped at ten` is declared `MAYBE OF NUMBER`, and DMN has no nullability marker -- tItemDefinition has no such flag -- so the emitted typeRef is the payload type's own. FEEL has one `null` and it means both "there is no value" and "the value could not be computed", so NOTHING and an undefined result can no longer be told apart in the artifact. ADOPTED 2026-07-31 (R8-d'): NOTHING now lowers to FEEL `null` on the VALUE channel, so the conflation this note reports is a price paid deliberately and not an accident of the encoding. What buys it is that the artifact becomes EXECUTABLE where it was previously L4 source no engine could compile. `null` is still refused as an input ENTRY -- DMN 1.3 grammar rule 34 makes it a literal and rule 33's `simple literal` does not include it -- so no cell in this model asks an engine to test against it
       lost: the distinction between an absent value and an undefined one
-  [D-LITERALEXPR] blocking — decision_grade_is_settled  (main.l4:167:3-11)
-      `grade is settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_grade_is_settled_spelled_longhand  (main.l4:175:3-177:26)
-      `grade is settled, spelled longhand` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_claim_payout  (main.l4:187:3-24)
-      `claim payout` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_grade_is_settled  (main.l4:167:3-11)
+      `grade is settled` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_grade_is_settled_spelled_longhand  (main.l4:175:3-177:26)
+      `grade is settled, spelled longhand` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_claim_payout  (main.l4:187:3-24)
+      `claim payout` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-SUMTYPE] lossy — decision_claim_payout
       `claim payout` threads `Claim`, whose field `the disposal` is typed `Disposal`, a payload-carrying sum type; the itemComponent is emitted as typeRef="Disposal", which resolves to an itemDefinition over `string` listing every constructor as a bare tag -- FEEL has no tagged value, so a constructor that carries a payload and the same constructor without one are a single FEEL string
       lost: the tag/payload distinction: every `Disposal` constructor is spelled as a bare string, and the payload one of them carries has no image in the component at all

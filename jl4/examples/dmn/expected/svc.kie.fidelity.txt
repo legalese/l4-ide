@@ -1,13 +1,13 @@
 fidelity report — DMN 1.3 (XML), kie flavor
-  [D-LITERALEXPR] blocking — decision_base_charge  (main.l4:33:21-23)
-      `base charge` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_special_case  (main.l4:36:22-61)
-      `special case` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_assessment_floor  (main.l4:41:26-29)
-      `assessment floor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+  [D-LITERALEXPR] advisory — decision_base_charge  (main.l4:33:21-23)
+      `base charge` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_special_case  (main.l4:36:22-61)
+      `special case` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_assessment_floor  (main.l4:41:26-29)
+      `assessment floor` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-PARTIAL] blocking — decision_special_case
       `special case` could not be certified total (TOTAL: calls `special rate`, which could not itself be certified total), so it is not un-lifted: it keeps its <decision> node and its saturated call sites remain raw L4 (Phase 5 routes such decisions to a businessKnowledgeModel or inlines them). A DMN decision node is evaluated on every input any requiring decision is evaluated on, and an undefined FEEL result is null, which reads as false in every consuming boolean position. No call site consumes it (it is a DRG root), so no guard can fence the null
       lost: the certainty that this node evaluates wherever the DRG reaches it: an input outside the decision's domain answers null with status SUCCEEDED, not an error
