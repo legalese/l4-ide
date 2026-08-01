@@ -11,7 +11,7 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-LITERALEXPR] blocking — decision_benefit_cap  (main.l4:44:30-57)
       `benefit cap` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
-  [D-LITERALEXPR] blocking — decision_scaled_amount  (main.l4:56:30-47)
+  [D-LITERALEXPR] blocking — bkm_scaled_amount  (main.l4:56:30-47)
       `scaled amount` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table
       lost: every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] blocking — decision_low_estimate  (main.l4:59:22-41)
@@ -56,6 +56,6 @@ fidelity report — DMN 1.3 (XML), camunda flavor
   [D-PARAM-AS-INPUT] advisory — input_gross
       the GIVEN parameter `gross` of `net payout` became the model input `input_gross`; the decision can no longer be applied to different subjects within this model, and the argument expressions at its call sites are discarded — each call site now reads the one global value
       lost: per-call-site argument binding: L4 applied this decision to an expression; the DMN model reads one global value
-  [D-BKM] advisory — decision_scaled_amount
-      `scaled amount` is classified as a businessKnowledgeModel candidate (tier 2): it is applied to distinct argument expressions by `low estimate`, `high estimate`. In Phase 4 it keeps its <decision> node and its call sites stay verbatim; Phase 5 emits it as a BKM with knowledgeRequirement edges
-      lost: nothing yet: this is a classification, not a change of behaviour
+  [D-BKM] advisory — bkm_scaled_amount
+      `scaled amount` is emitted as a businessKnowledgeModel (tier 2): it is applied to distinct argument expressions by `low estimate`, `high estimate`. Saturated call sites render as FEEL named-argument invocations with a knowledgeRequirement edge on each caller
+      lost: the decision-as-variable reading: the callee no longer appears as a 0-ary decision variable, and is reachable only by invocation

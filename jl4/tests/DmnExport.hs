@@ -294,10 +294,13 @@ fullFeelColumn =
 nonSFeelColumn :: Text
 nonSFeelColumn =
   -- `other` applies `double` to a SECOND, distinct argument, keeping it
-  -- tier 2 (Phase 4): a tier-1 `double` would un-lift and the call would
-  -- render as a clean bare FEEL name, which is precisely not this test's
-  -- subject — verbatim L4 in a <text> position.
-  "GIVEN n IS A NUMBER\n\
+  -- tier 2 (Phase 4), and @nonexhaustive keeps it SAFETY-REFUSED (Phase 5):
+  -- a clean tier-2 `double` would now emit as a BKM and the call would render
+  -- as a FEEL invocation, which is precisely not this test's subject —
+  -- verbatim L4 in a <text> position. The refused-tier-2 residue is the
+  -- population that still exercises it (§6.2's stated boundary).
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -315,8 +318,10 @@ nonSFeelColumn =
 -- entry, fails, and the decision evaluates to null with status FAILED.
 verbatimOutput :: Text
 verbatimOutput =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -335,8 +340,10 @@ verbatimOutput =
 -- null with status SUCCEEDED and no evaluation-time message.
 verbatimDefault :: Text
 verbatimDefault =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -355,8 +362,10 @@ verbatimDefault =
 -- @max(cash out, conversion amount(liq))@ in @safe-post-new.l4@.
 verbatimSelect :: Text
 verbatimSelect =
-  -- `other` keeps `double` tier 2 (Phase 4); see 'nonSFeelColumn'.
-  "GIVEN n IS A NUMBER\n\
+  -- `other` keeps `double` tier 2, @nonexhaustive keeps it refused (Phase 5);
+  -- see 'nonSFeelColumn'.
+  "@nonexhaustive\n\
+  \GIVEN n IS A NUMBER\n\
   \GIVETH A NUMBER\n\
   \double n MEANS n TIMES 2\n\
   \\n\
@@ -1091,26 +1100,51 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- <description>, which carries the guard's full source.
       map (.severity) t.dtNotes `shouldNotContain` [Blocking]
 
-    -- NOT a lowering, and deliberately so. A `{f: v, …}` context literal for
-    -- record construction was written and reverted: `AppNamed` is L4's general
-    -- named-argument APPLICATION, so `f WITH x IS 3, y IS 4` (with `f MEANS x
-    -- TIMES y`) is 12 in L4 and `{x: 3, y: 4}` under that lowering — which KIE
-    -- compiles without complaint. It also drops the constructor tag (`Paid WITH
-    -- amount IS 40` and `Owed WITH amount IS 40` collapse to one FEEL value that
-    -- L4 says are unequal), never checks field names against FEEL's reserved
-    -- words (`{for: 1}` fails to compile while the decision still reports
-    -- SUCCEEDED), and omits computed fields that `Proj` still reads.
-    --
-    -- Each of those is a silently wrong answer reported Advisory, which is worse
-    -- than the honest Blocking below. This test is the regression guard.
-    it "record construction stays verbatim and is Blocking, not a context literal" $ do
+    -- The RECORD-CONSTRUCTION subset of AppNamed lowers to a context literal
+    -- (Phase 5 build; the arm's own comment in Lower.hs answers the four
+    -- reasons the unrestricted lowering was once written and reverted). The
+    -- restrictions the two tests after it pin: a construction missing a
+    -- stored field stays verbatim, and a FUNCTION applied WITH named
+    -- arguments stays verbatim — an enum's payload constructor stays under
+    -- D-SUMTYPE (the sumtype block).
+    it "RECORD construction lowers to a FEEL context literal in declaration order" $ do
       let t = tableOf "assess" recordConstruction
-      map (.drOutput.feFragment) t.dtRules `shouldBe` [L4Verbatim]
+      map (.drOutput.feFragment) t.dtRules `shouldBe` [FullFeel]
       map (.drOutput.feText) t.dtRules
-        `shouldSatisfy` all (Text.isInfixOf "Assessment WITH")
-      map (.code) t.dtNotes `shouldContain` ["D-NONFEELOUTPUT"]
-      [n | n <- t.dtNotes, n.code == "D-NONFEELOUTPUT"]
-        `shouldSatisfy` all ((== Blocking) . (.severity))
+        `shouldBe` ["{rate: 40, band: \"high\"}"]
+      -- no D-NONFEELOUTPUT: the entry is FEEL now. The keys come from the
+      -- same field scope the itemDefinition components use, so the write side
+      -- and `r.f` cannot disagree.
+      map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
+
+    -- No missing-field test, and the absence is a measurement: L4's
+    -- typechecker REJECTS a construction that omits a stored field ("you
+    -- forgot to supply the following arguments", measured 2026-08-01), so the
+    -- arm's completeness guard is unreachable through checked source and
+    -- stands as defence-in-depth only.
+    it "a FUNCTION applied WITH named arguments stays verbatim, BKM callee or not" $ do
+      -- Reason 1 of the reverted lowering, still standing: AppNamed is L4's
+      -- general named-argument application, and `f WITH x IS 3, y IS 4` over
+      -- `f MEANS x TIMES y` is 12 in L4 and a context under the naive
+      -- lowering. ALSO the recorded §6.1 deferral: a named-argument call to
+      -- an emitted BKM stays verbatim + Blocking in v1 (the argument names
+      -- would need checking against the BKM's parameters).
+      let drg = drgOf
+            "GIVEN\n\
+            \  x IS A NUMBER\n\
+            \  y IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \f x y MEANS x TIMES y\n\
+            \GIVETH A NUMBER\n\
+            \use MEANS f WITH x IS 3, y IS 4\n\
+            \GIVETH A NUMBER\n\
+            \use2 MEANS f WITH x IS 5, y IS 6\n"
+      -- two distinct argument shapes: `f` IS an emitted BKM...
+      map (.bkmName) (drgBkms drg) `shouldBe` ["f"]
+      -- ...and the AppNamed call sites still refuse
+      (decisionNamed "use" drg).dcnLogic `shouldSatisfy` \case
+        LogicLiteral fe -> fe.feFragment == L4Verbatim
+        _               -> False
 
     it "a projection off a record-typed parameter round-trips through the field names" $ do
       let t = tableOf "level" recordProjection
@@ -2363,8 +2397,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     -- rule-date arms, so it is `NotDated` rather than a refusal -- the mixed
     -- (partial-match) arm is covered by the not-ok fixture above.
     it "leaves a chain with no rule-date guard on the ordinary path (§15.8)" $ do
+      -- Phase 5: `financial statements required` is tier 2 and now emits as a
+      -- BKM — but §15.8's claim is about its LOGIC, which is unchanged: the
+      -- same multi-column ordinary FIRST table, now the encapsulatedLogic.
       drg <- corpusDrg
-      case (decisionNamed "financial statements required" drg).dcnLogic of
+      case (bkmNamed "financial statements required" drg).bkmLogic of
         LogicTable t -> do
           t.dtHitPolicy `shouldBe` HitFirst
           length t.dtInputs `shouldSatisfy` (> 1)
@@ -2548,9 +2585,10 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         map (.element) (notesOf "D-FIXTURE" drg) `shouldBe` ["sample"]
 
     describe "tier 2: the real λ (§2.1)" $ do
-      -- fixture 5. THE PHASE 5 TRIPWIRE: when BKM emission lands, `half`
-      -- stops being a <decision> with verbatim call sites and this test goes
-      -- red — that is its job. Do not silence it; rewrite it against the BKM.
+      -- fixture 5. This WAS the Phase 5 tripwire ("when BKM emission lands,
+      -- this test goes red — rewrite it against the BKM"), and it fired on
+      -- 2026-08-01. Rewritten as instructed: the same source now pins the
+      -- emission itself.
       let tier2Lambda =
             "GIVEN pot IS A NUMBER\n\
             \GIVETH A NUMBER\n\
@@ -2560,19 +2598,32 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             \GIVETH A NUMBER\n\
             \b MEANS half 200\n"
 
-      it "classifies two distinct argument shapes as a BKM candidate (D-BKM), behaviour unchanged" $ do
+      it "emits two distinct argument shapes as a BKM (D-BKM), invoked by name" $ do
         let drg = drgOf tier2Lambda
             ns  = notesOf "D-BKM" drg
         map (.severity) ns `shouldBe` [Advisory]
         (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`a`"
         (firstNote ns).message `shouldSatisfy` Text.isInfixOf "`b`"
-        -- byte-identical to today: the call sites stay verbatim L4
+        (firstNote ns).message `shouldSatisfy` Text.isInfixOf "emitted as a businessKnowledgeModel"
+        -- the callee is a BKM whose logic is the old body, parameterised
+        let bkm = bkmNamed "half" drg
+        map (.fpName) bkm.bkmParams `shouldBe` ["pot"]
+        -- the call sites render as FEEL named-argument invocations (probe A2),
+        -- each caller carrying its own knowledgeRequirement edge (probe C3:
+        -- required by KIE, silently nulled by Camunda without it)
         (decisionNamed "a" drg).dcnLogic `shouldSatisfy` \case
-          LogicLiteral fe -> fe.feFragment == L4Verbatim
+          LogicLiteral fe -> fe.feText == "half(pot: 100)" && fe.feFragment == FullFeel
           _               -> False
-        -- and no merge happened: `pot` stays one per-binder input
-        length (inputsNamed "pot" drg) `shouldBe` 1
+        (decisionNamed "a" drg).dcnKnowledgeReqs `shouldBe` [RequiredBkm "bkm_half"]
+        (decisionNamed "b" drg).dcnKnowledgeReqs `shouldBe` [RequiredBkm "bkm_half"]
+        -- `pot` is a formalParameter now, bound per call: NO inputData, no
+        -- merge question at all
+        length (inputsNamed "pot" drg) `shouldBe` 0
         notesOf "D-PARAM-AS-INPUT" drg `shouldBe` []
+        -- and the emitted bytes carry the invariant the default flavor never
+        -- checks (probe C4): element name == variable name
+        emitDrg drg `shouldSatisfy`
+          Text.isInfixOf "<businessKnowledgeModel id=\"bkm_half\" name=\"half\">"
 
     describe "D-PARTIAL: the DMN-SAFE side-condition (§2.4)" $ do
       -- fixtures 6+8, one adjacent pair: the SAME division is accepted when
@@ -2990,9 +3041,11 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               \mainrule n MEANS n TIMES 2\n\
               \#EVAL mainrule (builder 1)\n"
         decisionNames (drgOf helperSrc) `shouldNotSatisfy` elem "helper"
-        decisionNames
-          (drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n"))
-          `shouldSatisfy` elem "helper"
+        -- Phase 5: kept-and-live `helper` has two distinct argument shapes, so
+        -- it is now KEPT AS A BKM — the filter question (fixture-only vs live)
+        -- is unchanged; the node kind it is kept as moved.
+        let live = drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n")
+        map (.bkmName) (drgBkms live) `shouldSatisfy` elem "helper"
 
     -- §7.7: the 9th-constructor tripwire. 'UserEvalException' has exactly 8
     -- constructors, and every one is either foreclosed by a DMN-SAFE clause
@@ -3365,6 +3418,11 @@ decisionNamed :: Text -> Drg -> Decision
 decisionNamed nm drg = case [d | d <- drgDecisions drg, d.dcnName == nm] of
   (d : _) -> d
   []      -> error ("no decision named " <> show nm)
+
+bkmNamed :: Text -> Drg -> Bkm
+bkmNamed nm drg = case [b | b <- drgBkms drg, b.bkmName == nm] of
+  (b : _) -> b
+  []      -> error ("no businessKnowledgeModel named " <> show nm)
 
 tableOf :: Text -> Text -> DecisionTable
 tableOf nm src = case (decisionNamed nm (drgOf src)).dcnLogic of

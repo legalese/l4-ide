@@ -1472,19 +1472,25 @@ spec bin = do
   -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
   -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
   -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `70/70 value(s) as expected` over ten cases is the claim -- ten rule
-  -- dates x seven decisions -- and seven of those ten exist purely to pin the
-  -- interval convention: a day-of/day-before pair on each of the three seams,
-  -- plus a rule date well before commencement.
+  -- table. `60/60 value(s) as expected` over ten cases is the claim -- ten rule
+  -- dates x six decisions (Phase 5 moved the seventh, `the rules in force
+  -- include`, to a businessKnowledgeModel, which the cases schema cannot
+  -- assert -- its logic is exercised through the interval endpoints D2 inlined
+  -- it into) -- and seven of those ten cases exist purely to pin the interval
+  -- convention: a day-of/day-before pair on each of the three seams, plus a
+  -- rule date well before commencement.
   describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
     it "KIE answers the dated-regime exhibit correctly for ten rule dates" $
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
         gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
           out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
+          -- zero warnings is load-bearing: the emitted BKM must carry its
+          -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
+          -- 2026-08-01; the shape row above the decisions exists for this).
           out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 decision(s) SUCCEEDED" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
 
     it "Camunda answers the dated-regime exhibit correctly for ten rule dates" $
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
@@ -1492,8 +1498,8 @@ spec bin = do
           out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
           out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("70/70 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 decision(s) evaluated" `isInfixOf`)
+          out `shouldSatisfy` ("60/60 value(s) as expected" `isInfixOf`)
 
     -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
     -- the emitter cannot generate an <annotationEntry> carrying an @id, so only

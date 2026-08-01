@@ -326,7 +326,7 @@ textShowInt = Text.pack . show
 markdownReport :: Drg -> FidelityReport
 markdownReport drg =
   foldl' (flip addNote) (emptyReport "dmnmd") $
-    drgNotes <> concatMap decisionNotes (drgDecisions drg)
+    drgNotes <> bkmNotes <> concatMap decisionNotes (drgDecisions drg)
  where
   drgNotes =
     [ note "D-MD-NODRG" Blocking drg.drgId
@@ -338,6 +338,26 @@ markdownReport drg =
     ]
 
   requirements = concatMap (.dcnRequirements) (drgDecisions drg)
+
+  -- Ruled at the Phase 5 build (recorded in spec §8): dmnmd says a decision
+  -- over cases and NOTHING else — it has no DRG (D-MD-NODRG already says so),
+  -- no invocable, and no formalParameter — so a businessKnowledgeModel is
+  -- omitted whole, whatever its logic shape. Rendering its table as a plain
+  -- dmnmd table was considered and refused: the columns would read the BKM's
+  -- parameters as though they were the module's inputs, which is a silently
+  -- different model. Its own code, for D-MD-NOCONTEXT's reason: widening
+  -- D-MD-NOLITERAL's "is a formula" to a function would make one counted line
+  -- describe two losses.
+  bkmNotes =
+    [ note "D-MD-NOBKM" Blocking b.bkmId
+        ("`" <> b.bkmName <> "` is a businessKnowledgeModel — a named function of "
+           <> textShowInt (length b.bkmParams)
+           <> " parameter(s) — and dmnmd has no function form, so it is omitted, along \
+              \with every invocation of it inside the decisions that remain")
+        "the function itself, and the meaning of every call site that names it: in the \
+        \markdown those calls reference a definition that is not there"
+    | b <- drgBkms drg
+    ]
 
   decisionNotes d = case d.dcnLogic of
     LogicLiteral e ->

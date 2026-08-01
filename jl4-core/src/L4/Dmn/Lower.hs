@@ -182,6 +182,61 @@ data NameEnv = MkNameEnv
     -- Phase 4 made this guard load-bearing — an un-lifted call in base
     -- position now renders as a clean bare name, which would otherwise
     -- launder the whole projection into 'SFeel'.
+  , neBkms       :: !(Map Unique BkmCallInfo)
+    -- ^ Phase 5 (§6.1, §6.2): the emitted BKMs, keyed by the decide's
+    -- 'Unique'. A __saturated__ call to one renders as a FEEL named-argument
+    -- invocation @f(p: x, q: y, …)@ — named rather than positional because it
+    -- makes §6.2's position→name binding visible and kills silent argument
+    -- transposition (probe A2: zeebe-dmn accepts named args in scrambled
+    -- order; A1 shows positional also works). A __bare__ reference renders
+    -- verbatim: a BKM is an invocable, not a variable, and §6.3-2 refuses
+    -- higher-order use. The map's values carry the resolved parameter names,
+    -- so the call site and the emitted @formalParameter@ cannot disagree.
+  , neBkmParams  :: !(Set Unique)
+    -- ^ the @GIVEN@ binders of every emitted BKM. Inside a BKM body they
+    -- render by their formalParameter FEEL names (via 'neVars' entries), and
+    -- a COMPUTED-field read through one takes the inline arm
+    -- ('neComputedInline') rather than the hydrator fold — a parameter is
+    -- per-call, so no global hydrator can stand for it.
+  , neRecordCtors :: !(Map Unique [Unique])
+    -- ^ RECORD constructors only (never an enum's payload constructor — those
+    -- carry a tag FEEL cannot spell and stay refused under @D-SUMTYPE@), each
+    -- to its declared STORED field selectors in declaration order. A
+    -- saturated @R WITH f IS e, …@ construction lowers to the FEEL context
+    -- literal @{f: e, …}@ — the same reading the hydration design gives a
+    -- record (a FEEL context IS the record) — iff every stored field is
+    -- supplied exactly once; anything else stays verbatim.
+  , neComputedInline :: !(Map Unique (Unique, Expr Resolved))
+    -- ^ self-contained computed selectors (§4.4 × §6.2): selector 'Unique' →
+    -- (the @_self@ binder's 'Unique', the prepared body). A computed read
+    -- through a BKM __parameter__ inlines the selector body with @_self@
+    -- substituted by the receiver — the only faithful form, since the
+    -- parameter cannot be hydrated. Restricted to selectors whose bodies
+    -- reference nothing beyond @_self@ (no module globals, no sibling
+    -- computed reads), so the inline cannot smuggle unliftable environment
+    -- references into a BKM body.
+  }
+
+-- | One member of a BKM's λ-lifted closure (§6.2): either a module element
+-- read directly (an @inputData@ or a decision variable, by canonical
+-- 'Unique'), or the __hydrator__ of an instance whose computed field the body
+-- reads — the fold points the rendered text at the hydrator, so the hydrator
+-- is what must be passed.
+data ClosureRef = EnvDirect !Unique | EnvHydrator !Unique
+  deriving stock (Eq, Ord, Show)
+
+-- | What a call site needs to know about an emitted BKM (§6.2).
+data BkmCallInfo = MkBkmCallInfo
+  { bciFeelName :: !Text
+  , bciParams   :: ![Text]
+    -- ^ the resolved FEEL names of the L4 @GIVEN@ parameters, positional — the
+    -- position→name map fixed once at the BKM and reused at every call site.
+  , bciClosure  :: ![Text]
+    -- ^ the λ-lifted closure parameters (§6.2's measured boundary: a BKM body
+    -- may read nothing beyond its parameters and knowledge requirements),
+    -- each named exactly as the module element it lifts; the call site
+    -- supplies each as @name: name@, which the caller has in scope through
+    -- its own requirement edges.
   }
 
 -- | The resolved 'Unique's of the prelude's @isJust@ and @isNothing@.
@@ -208,6 +263,10 @@ emptyNameEnv = MkNameEnv
   , neBareProj   = Set.empty
   , neUnlifted   = Set.empty
   , neComputedFields = Set.empty
+  , neBkms       = Map.empty
+  , neBkmParams  = Set.empty
+  , neRecordCtors = Map.empty
+  , neComputedInline = Map.empty
   }
 
 -- | What a single table needs to know beyond its rows.
@@ -1578,6 +1637,11 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- refusal stays loud.
     App _ r [] | getUnique r == TC.nothingUnique, flatMaybe e -> (atomPrec, "null", FullFeel)
                | isBuiltinSumCon r                            -> verbatim e
+               -- A BARE reference to an emitted BKM (§6.3-2): a BKM is an
+               -- invocable, not a variable, and its FEEL name no longer names
+               -- a decision variable — rendering it bare would be valid-looking
+               -- FEEL that KIE refuses and Camunda nulls. Verbatim, Blocking.
+               | Map.member (getUnique r) names.neBkms        -> verbatim e
                | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
     -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
     -- image; the payload does. (R8-d′)
@@ -1609,6 +1673,19 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     _ | Just (x, f) <- foldableComputedRead e
       , Just h <- Map.lookup (getUnique x) names.neHydrated ->
           (atomPrec, h <> "." <> feelFieldIn names f, SFeel)
+    -- §4.4 × §6.2: a computed read through a BKM PARAMETER. The parameter is
+    -- per-call, so no global hydrator can stand for it; the faithful form is
+    -- to inline the selector's own body with `_self` substituted by the
+    -- receiver, which turns `investor's greater of a or b` into FEEL over the
+    -- parameter's STORED components (`max(investor.a, investor.b)`). Gated to
+    -- BKM parameters (so D12's verbatim boundary is untouched everywhere
+    -- else) and to SELF-CONTAINED selectors ('neComputedInline' membership),
+    -- so the inline cannot pull module globals or sibling computed reads into
+    -- a BKM body behind the closure computation's back.
+    _ | Just (x, f) <- foldableComputedRead e
+      , Set.member (getUnique x) names.neBkmParams
+      , Just (self, sbody) <- Map.lookup (getUnique f) names.neComputedInline ->
+          go (substLocals (Map.singleton self (App emptyAnno x [])) sbody)
     -- §4.4, D12's boundary, preserved under Phase 4 un-lifting: a COMPUTED
     -- field that was NOT folded onto a hydrator (the arm above) has no image
     -- in the artifact — the emitted record carries stored components only —
@@ -1668,33 +1745,51 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- FEEL has no cons operator, but it has `concatenate` (DMN 1.1 §10.3.4), and
     -- a one-element list literal is how you spell the head.
     Cons _ x xs -> pair e FullFeel (\tx txs -> "concatenate([" <> tx <> "], " <> txs <> ")") x xs
-    -- @AppNamed@ deliberately has NO case here: it falls to 'verbatim' below and
-    -- is therefore reported @D-NONFEELOUTPUT@ \/ Blocking.
-    --
-    -- It is tempting to render it as a FEEL context literal @{f: v, …}@, since
-    -- 'Proj' above renders the read side as @r.f@. That lowering was written and
-    -- REVERTED, because it is wrong four ways, each verified by running both
-    -- evaluators:
+    -- @AppNamed@: the RECORD-CONSTRUCTION subset lowers to a FEEL context
+    -- literal; everything else still falls to 'verbatim' below and is reported
+    -- Blocking. An unrestricted @{f: v, …}@ lowering was once written and
+    -- REVERTED for four measured reasons; the arm below is gated so that each
+    -- is answered rather than reintroduced:
     --
     --   1. @AppNamed@ is L4\'s general NAMED-ARGUMENT APPLICATION, not record
-    --      construction. 'inferAppNamed' types it against any @Fun@, and the
-    --      evaluator reduces it to @App@. With @f MEANS x TIMES y@,
-    --      @f WITH x IS 3, y IS 4@ is @12@ in L4 and @{x: 3, y: 4}@ under that
-    --      lowering — which KIE compiles happily and returns as a context.
-    --   2. It drops the constructor tag, so @Paid WITH amount IS 40@ and
-    --      @Owed WITH amount IS 40@ both become @{amount: 40}@. L4 says those are
-    --      unequal; a DMN engine says they are equal.
-    --   3. Field names are not checked against FEEL\'s reserved words, so a field
-    --      called @for@ or @in@ emits @{for: 1}@, which KIE fails to compile while
-    --      still reporting the decision SUCCEEDED with an empty result.
-    --   4. Computed fields (@HAS f IS A T MEANS …@) are not supplied as arguments,
-    --      so they are absent from the context while 'Proj' still reads @r.f@ —
-    --      null in DMN, a value in L4.
-    --
-    -- Each of those turns an honest Blocking note into a silently wrong answer
-    -- reported Advisory, which is strictly worse than not lowering at all. A
-    -- correct version must check the head is a constructor, quote the tag,
-    -- validate keys, and supply computed fields; until then, verbatim is honest.
+    --      construction ('inferAppNamed' types it against any @Fun@) — so the
+    --      head must resolve in 'neRecordCtors', which holds record
+    --      constructors and nothing else. @f WITH x IS 3@ over a function @f@
+    --      stays verbatim. (A named-argument call to an emitted BKM also stays
+    --      verbatim + Blocking — deferred, recorded in spec §6.1.)
+    --   2. An enum\'s payload constructor carries a TAG FEEL cannot spell
+    --      (@Paid WITH amount IS 40@ ≠ @Owed WITH amount IS 40@) — so enum
+    --      constructors are not in the map at all, and stay under @D-SUMTYPE@.
+    --      A record has one constructor; a context IS its faithful image, and
+    --      it is the same image hydration already gives records.
+    --   3. Field names must be FEEL-safe — the entry keys come from the same
+    --      'neFields' scope the 'ItemComponent' names and 'Proj' path steps
+    --      use, so a field called @for@ folds exactly as its component does
+    --      and the write side cannot disagree with the read side.
+    --   4. Computed fields are ABSENT from the context, deliberately: a
+    --      stored-components-only context is what the hydration design calls
+    --      the record, and every computed READ is separately guarded — folded
+    --      onto a hydrator (global instances), inlined ('neComputedInline',
+    --      BKM parameters), or refused verbatim ('neComputedFields'). The
+    --      construction must still supply every STORED field exactly once, or
+    --      a missing entry would answer null where L4 has a value — the guard
+    --      compares the supplied set against the declaration.
+    AppNamed _ r nes _
+      | Just fields <- Map.lookup (getUnique r) names.neRecordCtors
+      , let supplied = Map.fromList [(getUnique n, (n, x)) | MkNamedExpr _ n x <- nes]
+      , length nes == length fields
+      , Map.keysSet supplied == Set.fromList fields ->
+          let entries =
+                [ (feelFieldIn names n, go x)
+                | fu <- fields
+                , Just (n, x) <- [Map.lookup fu supplied]
+                ]
+          in if any (\(_, (_, _, fr)) -> fr == L4Verbatim) entries
+               then verbatim e
+               else ( atomPrec
+                    , "{" <> Text.intercalate ", " [k <> ": " <> t | (k, (_, t, _)) <- entries] <> "}"
+                    , FullFeel
+                    )
     -- A conditional whose arms ARE its comparison's operands is not a decision;
     -- it is `max` / `min`. Lower it to FEEL's own function rather than to an
     -- `if`, the way a compiler backend recognises a select pattern instead of
@@ -1737,6 +1832,31 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- (deliberately not built in Phase 4).
     App _ f (_ : _) | Set.member (getUnique f) names.neUnlifted ->
       (atomPrec, feelIdentIn names f, SFeel)
+    -- Phase 5 (§6.1, corrected block; §6.2): a SATURATED call to an emitted
+    -- BKM renders as a FEEL named-argument invocation. Named, not positional
+    -- (probe A2), so the position→name binding is visible in the artifact and
+    -- an argument transposition cannot be silent. The λ-lifted closure
+    -- parameters are appended as `name: name` — the caller has each lifted
+    -- element in scope through its own requirement edges, and the parameter
+    -- deliberately shadows the same-named global inside the BKM body (probes
+    -- E1/E7). The fragment is FullFeel: an invocation is not S-FEEL. A
+    -- partial application (wrong arity) falls through to verbatim, which is
+    -- §6.3-2's refusal.
+    App _ f es@(_ : _)
+      | Just info <- Map.lookup (getUnique f) names.neBkms
+      , length es == length info.bciParams ->
+          let parts = map go es
+          in if any (\(_, _, fr) -> fr == L4Verbatim) parts
+               then verbatim e
+               else ( atomPrec
+                    , info.bciFeelName <> "("
+                        <> Text.intercalate ", "
+                             ( zipWith (\p (_, t, _) -> p <> ": " <> t) info.bciParams parts
+                                 <> [c <> ": " <> c | c <- info.bciClosure]
+                             )
+                        <> ")"
+                    , FullFeel
+                    )
     App _ _ (_ : _) -> verbatim e
     -- R8-d′. A CONSIDER over a MAYBE is an ABSENCE TEST, and FEEL spells one
     -- with a comparison against null. Two arms, in either source order, one
@@ -2852,10 +2972,104 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Named rather than inlined into 'drgNodes' because the itemDefinition list
   -- reads the emitted types back off it, to decide which domain-free aliases
   -- are pointed at. Nothing flows the other way, so there is no knot.
+  --
+  -- Phase 5: the tier-2 emitted-BKM decides leave the decision block and are
+  -- APPENDED as businessKnowledgeModel nodes (tDefinitions sequences
+  -- drgElement*, and intra-group order is free — the same reasoning that puts
+  -- hydrators after the decisions). Every caller — decision and hydrator
+  -- alike — goes through 'finishCaller', which splits classifyRef's uniform
+  -- edges into informationRequirements and knowledgeRequirements and adds the
+  -- requirement edges the rendered closure arguments need.
   nodes =
     map NodeInputData inputNodes
-      <> map (NodeDecision . fst) lowered
-      <> map NodeDecision hydratorNodes
+      <> [ NodeDecision (finishCaller dec)
+         | (d, (dec, _)) <- zip decides lowered
+         , not (isBkmDecide d)
+         ]
+      <> map (NodeDecision . finishCaller) hydratorNodes
+      <> [ NodeBkm (toBkm d dec)
+         | (d, (dec, _)) <- zip decides lowered
+         , isBkmDecide d
+         ]
+
+  -- The emitted BKM ids, and the way back from an edge target to the BKM.
+  bkmIdSet :: Set Text
+  bkmIdSet = Set.fromList (Map.elems bkmIdByUnique)
+
+  bkmIdByUnique :: Map Unique Text
+  bkmIdByUnique = Map.fromList
+    [ (getUnique (decideResolved d), did)
+    | (d, did) <- zip decides decideIds
+    , isBkmDecide d
+    ]
+
+  bkmUniqueById :: Map Text Unique
+  bkmUniqueById = Map.fromList [(i, u) | (u, i) <- Map.toList bkmIdByUnique]
+
+  -- Phase 5 (§6.2): split the uniform RequiredDecision edges 'classifyRef'
+  -- produced into (a) true informationRequirements, (b) knowledgeRequirement
+  -- edges for called BKMs — the edge is REQUIRED by KIE (compile error
+  -- without it) and Camunda has no backstop at all (silent null), probes
+  -- C3/D3 — and (c) the extra information requirements the caller needs so
+  -- that every λ-lifted closure argument it now renders (`name: name`) is in
+  -- its FEEL scope.
+  finishCaller :: Decision -> Decision
+  finishCaller dec =
+    dec
+      { dcnRequirements  = sort (nubOrd (infoEdges <> closureExtras))
+      , dcnKnowledgeReqs = sort (nubOrd [RequiredBkm t | RequiredDecision t <- bkmEdges])
+      }
+   where
+    (bkmEdges, infoEdges) = partition isBkmEdge dec.dcnRequirements
+    isBkmEdge = \case
+      RequiredDecision t -> Set.member t bkmIdSet
+      RequiredInput _    -> False
+    closureExtras =
+      [ edge
+      | RequiredDecision t <- bkmEdges
+      , Just bu <- [Map.lookup t bkmUniqueById]
+      , cr <- Set.toList (Map.findWithDefault Set.empty bu bkmClosure)
+      , Just edge <- [closureEdge cr]
+      ]
+
+  -- A lowered tier-2 decide, rewrapped as the BKM it is (§6.2). Its
+  -- 'dcnRequirements' are consumed rather than kept: the BKM-target edges
+  -- become its OWN knowledgeRequirements (the BKM→BKM edge lives on the
+  -- calling BKM, probe C1), and everything else was λ-lifted into
+  -- formalParameters — a BKM has no informationRequirement child at all.
+  toBkm :: Decide Resolved -> Decision -> Bkm
+  toBkm d dec =
+    MkBkm
+      { bkmId            = dec.dcnId
+      , bkmName          = dec.dcnName
+      , bkmFeelName      = dec.dcnFeelName
+      , bkmType          = dec.dcnType
+      , bkmParams        =
+          [ MkFormalParameter
+              { fpId    = dec.dcnId <> "_p" <> tshow i
+              , fpName  = fn
+              , fpLabel = lbl
+              , fpType  = t
+              }
+          | (i, (fn, lbl, t)) <- zip [1 :: Int ..] (givenTriples <> closureTriples)
+          ]
+      , bkmLogic         = dec.dcnLogic
+      , bkmKnowledgeReqs =
+          sort
+            (nubOrd
+               [ RequiredBkm t
+               | RequiredDecision t <- dec.dcnRequirements
+               , Set.member t bkmIdSet
+               ])
+      }
+   where
+    (givens, closures) =
+      Map.findWithDefault ([], []) (getUnique (decideResolved d)) bkmSignatures
+    givenTriples   = [(gn, lbl, t) | (_, lbl, gn, t) <- givens]
+    -- A closure parameter's label IS its name: the parameter stands for the
+    -- module element of that exact spelling, and 'namedAttrs' omits an
+    -- @label@ that equals the @name@.
+    closureTriples = [(cn, cn, t) | (_, cn, t) <- closures]
 
   decls   = topDecls modul
   -- The TopDecl's own annotation is kept, not discarded: `attachRef` claims an
@@ -2965,6 +3179,41 @@ lowerModule opts modul@(MkModule _ uri _) =
     , not (null (A.decideParams d))
     , A.tierOf callGraph u == A.Tier1
     , not (Map.member u safetyIssues)
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: BKM emission (§6.2)
+  ------------------------------------------------------------------------
+
+  -- Tier-2, DMN-SAFE, parameterised, kept: the emitted-BKM set. The same
+  -- predicate as the D-BKM classification, MINUS the safety-refused members
+  -- (§6.2's stated boundary): a tier-2 decide with safetyIssues keeps its
+  -- <decision> node, its verbatim call sites and its D-PARTIAL note exactly
+  -- as in Phase 4 — an uncertified body inside a BKM would be the same silent
+  -- null one element kind later.
+  bkmCandidateSet :: Set Unique
+  bkmCandidateSet = Set.fromList
+    [ u
+    | d <- decides
+    , let u = getUnique (decideResolved d)
+    , not (null (A.decideParams d))
+    , A.tierOf callGraph u == A.Tier2
+    , not (Map.member u safetyIssues)
+    ]
+
+  isBkmDecide d = Set.member (getUnique (decideResolved d)) bkmCandidateSet
+
+  (bkmDecides, plainDecides) = partition isBkmDecide decides
+
+  -- The GIVEN binders of every emitted BKM. These leave the inputData
+  -- population ('decideFreeTerms' filters them): a BKM parameter is bound
+  -- per-call by the invocation, not supplied globally — which is the whole
+  -- point of tier 2.
+  bkmParamSet :: Set Unique
+  bkmParamSet = Set.fromList
+    [ getUnique p
+    | d <- bkmDecides
+    , (p, _) <- A.decideParams d
     ]
 
   ------------------------------------------------------------------------
@@ -3448,6 +3697,10 @@ lowerModule opts modul@(MkModule _ uri _) =
         , dcnName         = nm
         , dcnFeelName     = feel
         , dcnType         = DmnNamed hnm DmnAny
+        -- filled by 'finishCaller': a hydrator entry may invoke a BKM (probe
+        -- B1 — the edge lives on the ENCLOSING decision), and classifyRef
+        -- records the reference below like any other.
+        , dcnKnowledgeReqs = []
         , dcnLogic        = LogicContext (storedEntries <> computedEntries)
         -- ★ The source instance is NOT the only edge, and treating it as the
         -- only one was a defect: a computed field's @MEANS@ body may reference
@@ -3580,7 +3833,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   nodeTypeRefs :: DrgNode -> [DmnType]
   nodeTypeRefs = \case
     NodeInputData i -> [i.idType]
-    NodeDecision  d -> d.dcnType : case d.dcnLogic of
+    NodeDecision  d -> d.dcnType : logicTypeRefs d.dcnLogic
+    -- A BKM's variable, its formalParameters and its logic all carry typeRefs
+    -- (§6.2), and each is a reference like any other.
+    NodeBkm b -> b.bkmType : map (.fpType) b.bkmParams <> logicTypeRefs b.bkmLogic
+   where
+    logicTypeRefs = \case
       LogicTable t    -> map (.icType) t.dtInputs
       LogicLiteral _  -> []
       -- A hydrator's entry typeRefs are REFERENCES like any other, and this
@@ -3699,7 +3957,15 @@ lowerModule opts modul@(MkModule _ uri _) =
     , u <- getUnique cn : [getUnique fn | MkTypedName _ fn _ _ _ <- cfs]
     ]
 
-  decideIds      = assignIds "decision_" (map decideName decides)
+  -- Aligned with 'decides'. Emitted BKMs take a "bkm_" id prefix (the probes'
+  -- own convention); the mixed list goes through ONE 'uniquifyIn' so the two
+  -- kinds cannot collide, and the differing prefixes keep every pre-Phase-5
+  -- decision id byte-stable in a module with no tier-2 decides.
+  decideIds =
+    uniquifyIn
+      [ (if isBkmDecide d then "bkm_" else "decision_") <> sanitiseId (decideName d)
+      | d <- decides
+      ]
 
   -- A nullary decision whose body is a literal is a NAMED THRESHOLD -- the thing
   -- that makes a lifted max/min worth a D-LIFTEDTHRESHOLD note.
@@ -3734,6 +4000,9 @@ lowerModule opts modul@(MkModule _ uri _) =
     nubOrdOn (\(u, _, _) -> u)
       [ (u, nm, owner)
       | (u, nm) <- instanceCandidates
+      -- Phase 5: an emitted BKM is applied, not read as a record instance,
+      -- and a hydrator over one would read a global that no longer exists.
+      , not (Set.member u bkmCandidateSet)
       , Set.member u computedlyRead
       , Just owner <- [Map.lookup u instanceRecordOf]
       , not (null (Map.findWithDefault [] owner computedFieldsOf))
@@ -3897,6 +4166,9 @@ lowerModule opts modul@(MkModule _ uri _) =
     , not (Map.member u decideByUnique)
     , not (Set.member u constructors)
     , not (Set.member u selectors)
+    -- Phase 5 (§6.2): an emitted BKM's GIVEN binders are formalParameters,
+    -- bound per-call by the invocation. They must not mint inputData.
+    , not (Set.member u bkmParamSet)
     ]
 
   -- The emitted element id of the rule-date input, when the module reaches law
@@ -3938,30 +4210,61 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- order is inputData then decision, which is the order 'drgNodes' is
   -- assembled in above, so the resolution is a function of source order alone.
   --
-  -- Two further scopes §5.2 names have no emitter yet and therefore no entry
-  -- here: `decisionService` names (§2.3) and BKM `formalParameter` names (§6.2),
-  -- both Phase 5. Each is its own 'uniquifyIn' scope -- neither shares this one
-  -- -- so extending this is adding a scope, not widening it.
-  -- Hydrator names are APPENDED, after the decisions, for the same reason law
-  -- time's inputData is (§15.2): appending keeps every existing FEEL name
-  -- byte-stable, so a hydration diff shows the hydrators and nothing else.
+  -- BKM element/variable names are IN this scope, appended last -- a hard
+  -- requirement, not a convenience: probe E4 (`collide-bkm-decision`) measured
+  -- the two engines DISAGREEING about what a colliding document means (KIE:
+  -- the BKM wins and the decision is deleted from the result, build clean;
+  -- Camunda: disjoint namespaces, both right, silent), so neither engine can
+  -- backstop the emitter. Two further scopes now exist as their own
+  -- 'uniquifyIn' calls, per Group E's measurement: BKM `formalParameter`
+  -- names, one scope per encapsulatedLogic ('bkmSignatures' below; E1/E2/E7:
+  -- a parameter shadows same-named inputData and decisions, and parameters do
+  -- not collide across BKMs), and `decisionService` names (§2.3, their own
+  -- scope, arriving with the service emitter).
+  -- Hydrator names are APPENDED after the decisions, and BKM names after the
+  -- hydrators, for the same reason law time's inputData is (§15.2): appending
+  -- keeps every existing FEEL name byte-stable, so the diff shows only the
+  -- new element kind.
   varFolded =
     map (feelIdentText . snd) freeTerms
-      <> map (feelIdentText . decideName) decides
+      <> map (feelIdentText . decideName) plainDecides
       <> [feelIdentText (nm <> " hydrated") | (_, nm, _) <- hydratedInstances]
+      <> map (feelIdentText . decideName) bkmDecides
   varResolved = uniquifyIn varFolded
   (inputFeelNames, varRest) = splitAt (length freeTerms) varResolved
-  (decideFeelNames, hydratorFeelNames) = splitAt (length decides) varRest
+  (plainDecideFeelNames, varRest2) = splitAt (length plainDecides) varRest
+  (hydratorFeelNames, bkmFeelNames) = splitAt (length hydratedInstances) varRest2
+
+  -- Every decide's resolved FEEL name, whichever segment it came from.
+  feelNameByDecideU :: Map Unique Text
+  feelNameByDecideU = Map.fromList
+    ( zip (map (getUnique . decideResolved) plainDecides) plainDecideFeelNames
+        <> zip (map (getUnique . decideResolved) bkmDecides) bkmFeelNames
+    )
+
+  -- Aligned with 'decides', as every zip3 consumer below expects.
+  decideFeelNames =
+    [ Map.findWithDefault (feelIdentText (decideName d)) (getUnique (decideResolved d)) feelNameByDecideU
+    | d <- decides
+    ]
+
+  -- The variable namespace WITHOUT the BKM parameter entries. Named so that
+  -- 'closureFeelName' can read it: reading the finished 'neVars' there would
+  -- tie a strict knot (neVars ← bkmParamNames ← bkmSignatures ←
+  -- closureFeelName ← neVars), and a closure member is a global, never a
+  -- parameter, so the base map is also the RIGHT map.
+  baseVarNames :: Map Unique Text
+  baseVarNames =
+    let base = Map.fromList
+          ( zip (map fst freeTerms) inputFeelNames
+              <> Map.toList feelNameByDecideU
+          )
+    -- a body reference through a merged MEMBER binder renders the
+    -- canonical (shared) FEEL name
+    in Map.union base (aliasThrough base)
 
   nameEnv = MkNameEnv
-    { neVars   =
-        let base = Map.fromList
-              ( zip (map fst freeTerms) inputFeelNames
-                  <> zip (map (getUnique . decideResolved) decides) decideFeelNames
-              )
-        -- a body reference through a merged MEMBER binder renders the
-        -- canonical (shared) FEEL name
-        in Map.union base (aliasThrough base)
+    { neVars   = Map.union baseVarNames bkmParamNames
     , neFields = fieldNames
     , neMaybePreds = opts.dloMaybePredicates
     , neHydrated   = Map.union hydratorFeelNameByInstance (aliasThrough hydratorFeelNameByInstance)
@@ -3969,7 +4272,189 @@ lowerModule opts modul@(MkModule _ uri _) =
     , neUnlifted   = unliftedSet
     , neComputedFields =
         Set.fromList (map (getUnique . decideResolved) computedSelectorDecides)
+    , neBkms       = bkmCallInfos
+    , neBkmParams  = bkmParamSet
+    , neRecordCtors = recordCtorFields
+    , neComputedInline = selfContainedSelectors
     }
+
+  -- RECORD constructors only — see 'neRecordCtors'. An enum's constructors
+  -- (payload-carrying or not) are deliberately absent.
+  recordCtorFields :: Map Unique [Unique]
+  recordCtorFields = Map.fromList
+    [ (getUnique cn, [getUnique n | MkTypedName _ n _ _ _ <- fs])
+    | Declare _ (MkDeclare _ _ _ (RecordDecl _ mn fs)) <- decls
+    , cn <- maybeToList mn
+    ]
+
+  ------------------------------------------------------------------------
+  -- Phase 5: BKM signatures — parameter scopes and the λ-lifted closure (§6.2)
+  ------------------------------------------------------------------------
+
+  -- What a BKM body may reference beyond its own parameters, measured on both
+  -- engines (§6.2, 2026-08-01): NOTHING that is not passed. A decision
+  -- variable read from inside an encapsulatedLogic is a KIE whole-model
+  -- compile error and a silent Camunda null (probe E3); an unshadowed
+  -- inputData read is a KIE compile error while Camunda ANSWERS (the engines
+  -- disagree, so neither spelling-by-omission is portable). The lift is the
+  -- classical λ-lift: each module-level free reference of the body becomes an
+  -- extra formalParameter named EXACTLY as the global it lifts — a parameter
+  -- shadows the same-named global on both engines (E1/E7), so the body text
+  -- is unchanged — and every call site supplies it as `name: name`.
+  --
+  -- The closure is TRANSITIVE through BKM→BKM calls (measured: the threaded
+  -- shape passes both engines): if g calls h and h lifts `n`, then g lifts
+  -- `n` too, so g's own body can supply `n: n` from its parameter scope.
+  bkmEnvRefs :: Map Unique (Set ClosureRef, Set Unique)
+  bkmEnvRefs = Map.fromList
+    [ (u, (Set.fromList (envRefs <> hydraRefs), Set.fromList callees))
+    | d <- bkmDecides
+    , let u = getUnique (decideResolved d)
+    , let params = Set.fromList (map (getUnique . fst) (A.decideParams d))
+    , let (survivors, touched) = survivingRefs [view decideBody d]
+    , let classified =
+            [ cls
+            | r <- survivors
+            , let ru = getUnique r
+            , not (Set.member ru params)
+            , not (Set.member ru computedSelfUniques)
+            , Just cls <-
+                [ if Set.member ru bkmCandidateSet
+                    then Just (Right ru)
+                    else if Map.member ru decideByUnique
+                      then Just (Left (EnvDirect ru))
+                      else if Map.member ru inputByUnique
+                        then Just (Left (EnvDirect (canonUnique ru)))
+                        else Nothing
+                ]
+            ]
+    , let envRefs  = [c | Left c  <- classified]
+    , let callees  = [c | Right c <- classified]
+    , let hydraRefs =
+            [ EnvHydrator (canonUnique t)
+            | t <- touched
+            , not (Set.member t params)
+            , Map.member t hydratorIdByInstance
+            ]
+    ]
+
+  -- Least fixpoint of closure(b) = env(b) ∪ ⋃ closure(callees b). Monotone
+  -- and bounded by the module's element count, so the iteration terminates
+  -- even on a (refused, D-RECURSIVE) cyclic BKM graph.
+  bkmClosure :: Map Unique (Set ClosureRef)
+  bkmClosure = go (Map.map fst bkmEnvRefs)
+   where
+    go m =
+      let m' = Map.mapWithKey step m
+          step u env =
+            Set.unions
+              ( env
+                  : [ Map.findWithDefault Set.empty k m
+                    | k <- Set.toList (maybe Set.empty snd (Map.lookup u bkmEnvRefs))
+                    ]
+              )
+      in if m' == m then m else go m'
+
+  closureFeelName :: ClosureRef -> Text
+  closureFeelName = \case
+    EnvDirect u   -> Map.findWithDefault "" u baseVarNames
+    EnvHydrator u -> Map.findWithDefault "" u hydratorFeelNameByInstance
+
+  closureDmnType :: ClosureRef -> DmnType
+  closureDmnType = \case
+    EnvDirect u
+      | Just t <- Map.lookup u freeTermTypes     -> t
+      | Just t <- Map.lookup u decideGivethTypes -> t
+      | otherwise                                -> DmnAny
+    EnvHydrator u -> Map.findWithDefault DmnAny u hydratorTypeByInstance
+
+  closureEdge :: ClosureRef -> Maybe Requirement
+  closureEdge = \case
+    EnvDirect u -> case Map.lookup u decideByUnique of
+      Just t  -> Just (RequiredDecision t)
+      Nothing -> RequiredInput <$> Map.lookup u inputByUnique
+    EnvHydrator u -> RequiredDecision <$> Map.lookup u hydratorIdByInstance
+
+  decideGivethTypes :: Map Unique DmnType
+  decideGivethTypes = Map.fromList
+    [ (getUnique (decideResolved d), t)
+    | d@(MkDecide _ (MkTypeSig _ _ (Just (MkGivethSig _ ty))) _ _) <- decides
+    , let (t, _, _) = classifyType typeEnv ty
+    ]
+
+  -- Independent of 'hydratorNodes', deliberately: 'neBkms' needs the type and
+  -- reading it off the node list would thread a lazy knot through renderFeelIn.
+  hydratorTypeByInstance :: Map Unique DmnType
+  hydratorTypeByInstance = Map.fromList
+    [ (u, DmnNamed hnm DmnAny)
+    | (u, _, owner) <- hydratedInstances
+    , Just hnm <- [Map.lookup owner hydratedNameOf]
+    ]
+
+  -- One 'uniquifyIn' scope PER encapsulatedLogic (§5.2 scope 4, measured by
+  -- E1/E2/E7). The closure names go through it FIRST so each keeps the exact
+  -- spelling of the global it lifts (globals are already injective under
+  -- scope 1); a GIVEN whose fold collides with a lifted global is the one
+  -- that gets the suffix — its body references resolve through 'neVars' to
+  -- the suffixed name, so declaration and reference cannot disagree.
+  bkmSignatures :: Map Unique ([(Unique, Text, Text, DmnType)], [(ClosureRef, Text, DmnType)])
+  bkmSignatures = Map.fromList
+    [ (u, (givens, closures))
+    | d <- bkmDecides
+    , let u = getUnique (decideResolved d)
+    , let givenPs = A.decideParams d
+    , let closureRefs =
+            sortOn closureFeelName (Set.toList (Map.findWithDefault Set.empty u bkmClosure))
+    , let closureNames = map closureFeelName closureRefs
+    , let resolved = uniquifyIn (closureNames <> map (feelIdentText . nameOf . fst) givenPs)
+    , let (closResolved, givenResolved) = splitAt (length closureNames) resolved
+    , let givens =
+            [ (getUnique p, nameOf p, gn, Map.findWithDefault DmnAny (getUnique p) freeTermTypes)
+            | ((p, _), gn) <- zip givenPs givenResolved
+            ]
+    , let closures =
+            [ (cr, cn, closureDmnType cr)
+            | (cr, cn) <- zip closureRefs closResolved
+            ]
+    ]
+
+  -- Body references to a GIVEN of an emitted BKM render by its resolved
+  -- formalParameter name. Keyed by binder 'Unique', so the entries are
+  -- per-BKM by construction even though they live in the one shared map.
+  bkmParamNames :: Map Unique Text
+  bkmParamNames = Map.fromList
+    [ (pu, gn)
+    | (givens, _) <- Map.elems bkmSignatures
+    , (pu, _, gn, _) <- givens
+    ]
+
+  bkmCallInfos :: Map Unique BkmCallInfo
+  bkmCallInfos = Map.fromList
+    [ ( u
+      , MkBkmCallInfo
+          { bciFeelName = Map.findWithDefault "" u feelNameByDecideU
+          , bciParams   = [gn | (_, _, gn, _) <- givens]
+          , bciClosure  = [cn | (_, cn, _) <- closures]
+          }
+      )
+    | (u, (givens, closures)) <- Map.toList bkmSignatures
+    ]
+
+  -- §4.4 × §6.2: computed selectors whose bodies reference nothing beyond the
+  -- record's own `_self` — the only ones safe to inline at a BKM parameter
+  -- receiver (anything wider would smuggle environment references past the
+  -- closure computation; anything nested would recurse through another
+  -- selector). Everything else falls to verbatim, Blocking-noted as today.
+  selfContainedSelectors :: Map Unique (Unique, Expr Resolved)
+  selfContainedSelectors = Map.fromList
+    [ (getUnique (decideResolved d), (getUnique self, prepared))
+    | d <- computedSelectorDecides
+    , Just (_, self, _) <- [computedSelectorOwner d]
+    , let prepared = hydratorBody (view decideBody d)
+    , let (survivors, touchedS) = survivingRefs [prepared]
+    , all (\r -> Set.member (getUnique r) computedSelfUniques) survivors
+    , null touchedS
+    ]
 
   -- A GIVEN's declared type is the best evidence about a free term; an ASSUME's
   -- is the other source. Anything else stays Any.
@@ -4264,21 +4749,41 @@ lowerModule opts modul@(MkModule _ uri _) =
                 (Lossy, ". Every call site consumes it from a lazy position (an IF/CONSIDER arm), so a guard in the consumer can fence the null")
     ]
 
-  -- D-BKM (W9, report-only in Phase 4): tier-2 classification made visible a
-  -- phase early. The decision keeps today's behaviour — a <decision> whose
-  -- saturated call sites render verbatim, already Blocking-noted — and
-  -- Phase 5's BKM emission is what will change it (the golden pinning this is
-  -- the tripwire that goes red that day).
+  -- D-BKM (Phase 5, §6.2): the tier-2 classification, now carried out. The
+  -- decide is emitted as a <businessKnowledgeModel>; saturated call sites
+  -- render as FEEL named-argument invocations backed by a knowledgeRequirement
+  -- edge on each caller; module-level free terms of the body are λ-lifted
+  -- into extra formal parameters (see 'bkmSignatures'). Advisory, per §7: the
+  -- note records the emission and its lift, not a loss.
+  --
+  -- The SAFETY-REFUSED tier-2 residue (a member of safetyIssues) keeps the
+  -- Phase 4 wording: it stays a <decision> with verbatim call sites, D-PARTIAL
+  -- says why, and this note says what that costs.
   bkmNotes =
-    [ dmnNote "D-BKM" Advisory did Nothing
-        ("`" <> decideName d <> "` is classified as a businessKnowledgeModel candidate \
-          \(tier 2): it is applied to distinct argument expressions"
-           <> (if null callerNames
-                 then ""
-                 else " by " <> Text.intercalate ", " (map tick callerNames))
-           <> ". In Phase 4 it keeps its <decision> node and its call sites stay verbatim; \
-              \Phase 5 emits it as a BKM with knowledgeRequirement edges")
-        "nothing yet: this is a classification, not a change of behaviour"
+    [ if Set.member u bkmCandidateSet
+        then
+          dmnNote "D-BKM" Advisory did Nothing
+            ("`" <> decideName d <> "` is emitted as a businessKnowledgeModel \
+              \(tier 2): it is applied to distinct argument expressions"
+               <> (if null callerNames
+                     then ""
+                     else " by " <> Text.intercalate ", " (map tick callerNames))
+               <> ". Saturated call sites render as FEEL named-argument invocations \
+                  \with a knowledgeRequirement edge on each caller"
+               <> closureText)
+            "the decision-as-variable reading: the callee no longer appears as a 0-ary \
+            \decision variable, and is reachable only by invocation"
+        else
+          dmnNote "D-BKM" Advisory did Nothing
+            ("`" <> decideName d <> "` is classified as a businessKnowledgeModel candidate \
+              \(tier 2): it is applied to distinct argument expressions"
+               <> (if null callerNames
+                     then ""
+                     else " by " <> Text.intercalate ", " (map tick callerNames))
+               <> ", but it could not be certified total (see its D-PARTIAL note), so it \
+                  \keeps its <decision> node and its call sites stay verbatim")
+            "the invocation: an uncertified body inside a BKM would answer the same silent \
+            \null one element kind later, so the emission is refused rather than degraded"
     | d <- decides
     , let u = getUnique (decideResolved d)
     , not (null (A.decideParams d))
@@ -4289,6 +4794,15 @@ lowerModule opts modul@(MkModule _ uri _) =
             | s <- Map.findWithDefault [] u callGraph.cgCalls
             , Just c <- [s.csCaller]
             ]
+    , let closureText = case Map.findWithDefault ([], []) u bkmSignatures of
+            (_, [])       -> ""
+            (_, closures) ->
+              "; " <> tshow (length closures)
+                <> " module-level free reference(s) of its body ("
+                <> Text.intercalate ", " [tick cn | (_, cn, _) <- closures]
+                <> ") are λ-lifted into extra formal parameters, supplied at every call \
+                   \site as `name: name` — a BKM body may read nothing beyond its \
+                   \parameters (measured on both engines, §6.2)"
     ]
 
   -- D-RULEDATE (§15.5), Advisory, exactly ONE per DRG. Structural model:
@@ -4420,8 +4934,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   declaredFeelNames :: [(Text, (Text, Text, Text))]
   declaredFeelNames =
     [ (n.idFeelName, ("inputData", n.idName, n.idId)) | n <- inputNodes ]
-      <> [ (feel, ("decision", decideName d, did))
+      <> [ (feel, (kind, decideName d, did))
          | (d, did, feel) <- zip3 decides decideIds decideFeelNames
+         -- Phase 5: BKM names live in the same flat scope (probe E4 — the
+         -- engines DISAGREE on a BKM/decision collision, so the detector must
+         -- cover it), and the note should name the element kind that collided.
+         , let kind = if isBkmDecide d then "businessKnowledgeModel" else "decision"
          ]
 
   feelNameCollisionNotes =
@@ -4795,6 +5313,9 @@ lowerModule opts modul@(MkModule _ uri _) =
       { dcnId           = did
       , dcnName         = decideName d
       , dcnFeelName     = feelName
+      -- filled by 'finishCaller' (or consumed by 'toBkm'), from the edge set
+      -- computed below.
+      , dcnKnowledgeReqs = []
       , dcnType         = case logic of
           LogicTable t    -> t.dtOutput.ocType
           LogicLiteral _  -> declaredType

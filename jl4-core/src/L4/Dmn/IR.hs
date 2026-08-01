@@ -72,8 +72,13 @@ module L4.Dmn.IR
   , InputData (..)
   , Requirement (..)
   , requirementTarget
+  , KnowledgeRequirement (..)
+  , knowledgeRequirementTarget
+  , Bkm (..)
+  , FormalParameter (..)
   , drgDecisions
   , drgInputData
+  , drgBkms
     -- * Fidelity
     -- $fidelity
   , FidelityLoss (..)
@@ -718,6 +723,28 @@ requirementTarget = \case
   RequiredDecision t -> t
   RequiredInput t    -> t
 
+-- | A knowledge requirement: DMN §6.2.2.3 allows these "from Business
+-- Knowledge Models to Decisions and to other Business Knowledge Models", and —
+-- on the @kie@ flavor only, §13.5 — to a 'DecisionService'.
+--
+-- __A separate sum from 'Requirement', deliberately__: the two are different
+-- XML elements in different XSD sequence positions, and the engines treat them
+-- asymmetrically — the knowledge edge is what puts an invocable\'s name into a
+-- caller\'s FEEL scope on KIE (compile error without it, probe @bkm-chain-nokr@)
+-- while Camunda has __no backstop at all__ (parses, and the calling decision
+-- answers @null@ with no message at any severity, probes C3\/D3). The edge set
+-- is the __direct__-call set, not its transitive closure (C1 passes where C2
+-- fails, byte-identical diagnostics on both engines).
+data KnowledgeRequirement
+  = RequiredBkm !Text      -- ^ the target 'bkmId'
+  | RequiredService !Text  -- ^ the target service id (@kie@ flavor only, §13.4/§13.5)
+  deriving stock (Eq, Ord, Show, Generic)
+
+knowledgeRequirementTarget :: KnowledgeRequirement -> Text
+knowledgeRequirementTarget = \case
+  RequiredBkm t     -> t
+  RequiredService t -> t
+
 -- | One @\<contextEntry\>@ of a 'LogicContext'.
 --
 -- __Every entry is NAMED.__ A context entry with no @\<variable\>@ is DMN's
@@ -767,12 +794,64 @@ data DecisionLogic
 -- than by an emitter remembering to re-fold). Resolution is a property of the
 -- whole graph, so it cannot be recomputed from the string at emission time.
 data Decision = MkDecision
-  { dcnId           :: !Text
-  , dcnName         :: !Text
-  , dcnFeelName     :: !Text
-  , dcnType         :: !DmnType
-  , dcnLogic        :: !DecisionLogic
-  , dcnRequirements :: ![Requirement]  -- ^ sorted by target id, for determinism
+  { dcnId            :: !Text
+  , dcnName          :: !Text
+  , dcnFeelName      :: !Text
+  , dcnType          :: !DmnType
+  , dcnLogic         :: !DecisionLogic
+  , dcnRequirements  :: ![Requirement]  -- ^ sorted by target id, for determinism
+  , dcnKnowledgeReqs :: ![KnowledgeRequirement]
+    -- ^ one per invocable this decision\'s rendered logic invokes (§6.2). Sorted
+    -- by target id. Every rendered invocation must have its edge here — KIE
+    -- refuses at compile without it and Camunda silently answers @null@, so
+    -- 'checkDrg' asserts the completeness.
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | One @\<formalParameter\>@ of a BKM\'s @\<encapsulatedLogic\>@
+-- (@tFunctionDefinition@). Two names for 'ItemComponent'\'s reason: 'fpName' is
+-- the resolved FEEL name (its own 'uniquifyIn' scope, one per
+-- @encapsulatedLogic@ — §5.2 scope 4, measured by probes E1\/E2\/E7), 'fpLabel'
+-- the verbatim L4 name.
+data FormalParameter = MkFormalParameter
+  { fpId    :: !Text
+  , fpName  :: !Text
+  , fpLabel :: !Text
+  , fpType  :: !DmnType
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | A @\<businessKnowledgeModel\>@ (§6.2): a tier-2 decide emitted as a named
+-- first-order FEEL function.
+--
+-- 'bkmName'\/'bkmFeelName' mirror the 'dcnName'\/'dcnFeelName' split so the
+-- __@\@name@ == @variable\/\@name@ invariant is true by construction__ — probe
+-- C4 measured that this is the ONLY backstop: KIE\'s validator flags a mismatch
+-- and the runtime then fails, but Camunda tolerates it silently and answers
+-- correctly (binds by @\@name@, never reads @variable\/\@name@), so on the
+-- default flavor nothing downstream would ever notice an emitter drift.
+--
+-- 'bkmParams' is the L4 @GIVEN@ list __plus the λ-lifted closure__: a BKM body
+-- may read nothing beyond its parameters and its knowledge requirements —
+-- measured on BOTH kinds of environment reference: a decision variable (probe
+-- E3, @collide-param-decision@: KIE whole-model compile error, Camunda null)
+-- and an unshadowed @inputData@ (measured 2026-08-01: KIE
+-- @Unknown variable@ at compile; Camunda answers, so the engines DISAGREE and
+-- the only portable spelling is to pass the value). Each module-level free
+-- term of the body therefore becomes an extra formal parameter named exactly
+-- as the global it lifts (parameters shadow same-named globals on both
+-- engines, probes E1\/E7), and every call site supplies it as @name: name@.
+data Bkm = MkBkm
+  { bkmId            :: !Text
+  , bkmName          :: !Text            -- ^ verbatim L4 name → @\@label@
+  , bkmFeelName      :: !Text            -- ^ resolved → @\@name@ AND @variable\/\@name@
+  , bkmType          :: !DmnType         -- ^ the function\'s result type
+  , bkmParams        :: ![FormalParameter]
+  , bkmLogic         :: !DecisionLogic   -- ^ 'LogicTable' works unchanged (probe A3)
+  , bkmKnowledgeReqs :: ![KnowledgeRequirement]
+    -- ^ the BKMs this BKM\'s own body invokes — the edge lives on the CALLING
+    -- BKM (probe C1), never hoisted to the top-level caller (C2 fails on both
+    -- engines).
   }
   deriving stock (Eq, Show, Generic)
 
@@ -793,6 +872,7 @@ data InputData = MkInputData
 data DrgNode
   = NodeDecision !Decision
   | NodeInputData !InputData
+  | NodeBkm !Bkm
   deriving stock (Eq, Show, Generic)
 
 data Drg = MkDrg
@@ -825,6 +905,9 @@ drgDecisions drg = [d | NodeDecision d <- drg.drgNodes]
 
 drgInputData :: Drg -> [InputData]
 drgInputData drg = [i | NodeInputData i <- drg.drgNodes]
+
+drgBkms :: Drg -> [Bkm]
+drgBkms drg = [b | NodeBkm b <- drg.drgNodes]
 
 ------------------------------------------------------------------------
 -- Fidelity

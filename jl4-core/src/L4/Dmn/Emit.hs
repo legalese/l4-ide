@@ -222,18 +222,61 @@ nodeXml = \case
   NodeDecision d ->
     Elem "decision" (namedAttrs d.dcnId d.dcnFeelName d.dcnName) $
       -- tDecision is an xsd:sequence: variable, then informationRequirement*,
-      -- then the expression.
+      -- then knowledgeRequirement*, then the expression. Getting the KR after
+      -- the IRs and before the expression is a Xerces-checked sequence
+      -- constraint of the same class the dmn-xsd-order fixture pins.
       [ Elem "variable"
           (namedAttrs (d.dcnId <> "_var") d.dcnFeelName d.dcnName
              <> [("typeRef", dmnTypeAttr d.dcnType)])
           []
       ]
         <> zipWith (requirementXml d.dcnId) [1 :: Int ..] d.dcnRequirements
-        <> [ case d.dcnLogic of
-               LogicTable t    -> decisionTableXml t
-               LogicLiteral e  -> literalXml (d.dcnId <> "_literal") e
-               LogicContext es -> contextXml (d.dcnId <> "_ctx") es
-           ]
+        <> zipWith (knowledgeRequirementXml d.dcnId) [1 :: Int ..] d.dcnKnowledgeReqs
+        <> [logicXml d.dcnId d.dcnLogic]
+  NodeBkm b -> bkmXml b
+
+-- | The one boxed-expression child every logic carrier shares. The id scheme is
+-- the decision one, unchanged, so pre-BKM goldens keep their bytes.
+logicXml :: Text -> DecisionLogic -> Xml
+logicXml prefix = \case
+  LogicTable t    -> decisionTableXml t
+  LogicLiteral e  -> literalXml (prefix <> "_literal") e
+  LogicContext es -> contextXml (prefix <> "_ctx") es
+
+-- | A @\<businessKnowledgeModel\>@ (§6.2).
+--
+-- Child order (@tBusinessKnowledgeModel@, xsd:sequence, inherited first):
+-- @description?@, @extensionElements?@, @variable?@, @encapsulatedLogic?@,
+-- @knowledgeRequirement*@, @authorityRequirement*@. __@formalParameter@ is NOT
+-- a BKM child__ — it belongs inside @encapsulatedLogic@
+-- (@tFunctionDefinition@: @formalParameter*@ then the expression). The
+-- @\@name@ == @variable\/\@name@ invariant is carried by construction from
+-- 'Bkm' ('bkmFeelName' feeds both), because probe C4 measured that Camunda
+-- never checks it (§13.8-5b).
+bkmXml :: Bkm -> Xml
+bkmXml b =
+  Elem "businessKnowledgeModel" (namedAttrs b.bkmId b.bkmFeelName b.bkmName) $
+    [ Elem "variable"
+        (namedAttrs (b.bkmId <> "_var") b.bkmFeelName b.bkmName
+           <> [("typeRef", dmnTypeAttr b.bkmType)])
+        []
+    , Elem "encapsulatedLogic" [("id", b.bkmId <> "_logic")] $
+        [ Elem "formalParameter"
+            (namedAttrs p.fpId p.fpName p.fpLabel <> [("typeRef", dmnTypeAttr p.fpType)])
+            []
+        | p <- b.bkmParams
+        ]
+          -- The single <output> of a table in here carries no typeRef;
+          -- 'outputXml' already omits it (probe A3 measured KIE
+          -- WARN [ILLEGAL_USE_OF_TYPEREF] on one that does).
+          <> [logicXml b.bkmId b.bkmLogic]
+    ]
+      <> zipWith (knowledgeRequirementXml b.bkmId) [1 :: Int ..] b.bkmKnowledgeReqs
+
+knowledgeRequirementXml :: Text -> Int -> KnowledgeRequirement -> Xml
+knowledgeRequirementXml owner i kr =
+  Elem "knowledgeRequirement" [("id", owner <> "_kr" <> Text.pack (show i))]
+    [Elem "requiredKnowledge" [("href", "#" <> knowledgeRequirementTarget kr)] []]
 
 -- | A boxed @\<context\>@ (DMN §7.3.6, @tContext@).
 --
@@ -390,7 +433,11 @@ dmndiXml drg =
         (map shapeXml placed <> concatMap edgesXml (drgDecisions drg))
     ]
  where
-  levels = decisionLevels drg
+  decLevels = decisionLevels drg
+  bkmLevel  = 1 + maximum (0 : Map.elems decLevels)
+  levels =
+    Map.union decLevels
+      (Map.fromList [(b.bkmId, bkmLevel) | NodeBkm b <- drg.drgNodes])
   levelOf eid = Map.findWithDefault 0 eid levels
   maxLevel = maximum (0 : Map.elems levels)
 
@@ -398,10 +445,22 @@ dmndiXml drg =
   byLevel :: Map Int [Text]
   byLevel = Map.fromListWith (flip (<>)) [(levelOf eid, [eid]) | eid <- nodeIds]
 
-  nodeIds = map nodeId drg.drgNodes
+  -- BKM nodes are drawn on their own row ABOVE every decision (ruled at the
+  -- Phase 5 build, measured rather than aesthetic: KIE's validator raises
+  -- WARN [DMNDI_MISSING_DIAGRAM] for any element without a DMNShape, and the
+  -- gst-rate engine leg pins its warning count at zero). They sit outside
+  -- 'decisionLevels'' longest-path-to-an-input frame — a BKM has no
+  -- information requirements — so the top row is a placement, not a claim
+  -- about dataflow. The knowledgeRequirement edges get no DMNEdge: KIE's
+  -- validator does not ask for one (measured on the same leg), and a
+  -- requirement with no waypoints is simply not drawn.
+  nodeIds =
+    mapMaybe nodeId drg.drgNodes
+      <> [b.bkmId | NodeBkm b <- drg.drgNodes]
   nodeId = \case
-    NodeInputData i -> i.idId
-    NodeDecision d  -> d.dcnId
+    NodeInputData i -> Just i.idId
+    NodeDecision d  -> Just d.dcnId
+    NodeBkm _       -> Nothing
 
   placed =
     [ (eid, x, y)
