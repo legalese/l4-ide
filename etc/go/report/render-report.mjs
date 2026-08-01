@@ -97,6 +97,17 @@ const stageEnds = [...new Map(allStageEnds.map((r) => [r.stage, r])).values()];
 const gateRecs = records.filter((r) => r.kind === "gate");
 const byStage = new Map(stageEnds.map((r) => [r.stage, r]));
 
+// A journal with no run_begin describes no run, and a report over it would be
+// a page of "(none)" carrying a verdict nothing earned. Refuse rather than
+// render: an empty report that looks complete is worse than no report.
+if (!begin) {
+  process.stderr.write(
+    `render-report.mjs: ${journalPath} has no run_begin record, so there is no run to report on. ` +
+      `Refusing to render a report whose every field would be a placeholder.\n`,
+  );
+  process.exit(4);
+}
+
 const declared = begin?.declared_stages ?? [];
 const gateStates = [...new Map(gateRecs.map((g) => [g.gate, g])).values()].map(
   (g) => ({

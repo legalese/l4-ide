@@ -207,13 +207,23 @@ jobs:
       # The report template may not carry a typed number. This is the mechanical
       # form of the drift that put "114 blocking, 46 lossy, 18 advisory" into
       # PROJECTIONS.md against an exporter that emits different figures.
+      # A number typed into the template is a claim with no evidence behind it,
+      # and it is how PROJECTIONS.md came to carry eleven stale figures. The
+      # renderer refuses such a template with 'TEMPLATE DEFECT' before it reads
+      # any journal at all, so an empty run directory is enough to reach the
+      # check — and the SECOND assertion proves the check was actually reached,
+      # rather than the renderer having bailed out earlier for another reason.
       - name: The report template carries no transcribed measurement
         run: |
           mkdir -p /tmp/empty-run
           printf '' > /tmp/empty-run/journal.ndjson
           out=$(node etc/go/report/render-report.mjs /tmp/empty-run 2>&1) || true
           echo "$out" | grep -q 'TEMPLATE DEFECT' && { echo "::error::$out"; exit 1; }
-          echo "ok the template contains no literal measurement"
+          echo "$out" | grep -q 'no run_begin' || {
+            echo "::error::expected the renderer to get past the template check and refuse the empty journal; it said: $out"
+            exit 1
+          }
+          echo "ok the template contains no literal measurement, and the renderer refuses a runless journal"
 
   bpmn:
     name: BPMN Soundness

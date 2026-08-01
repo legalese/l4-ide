@@ -159,6 +159,21 @@ export function milestoneVerdict({ declared, receipts, gates }) {
   const byStage = new Map();
   for (const r of receipts) byStage.set(r.stage, r);
 
+  // A milestone that declares nothing is not a completed milestone, it is an
+  // unstarted one. Without this, an EMPTY journal satisfies every clause of the
+  // rule below vacuously and reports COMPLETE — the exact vacuous-pass failure
+  // this lattice exists to refuse everywhere else.
+  if (!declared.length)
+    return {
+      verdict: "INCOMPLETE",
+      exit: 1,
+      missing: [],
+      broken: [],
+      unexplained: [],
+      ungated: [],
+      note: "no stages declared: the run has a journal but no run_begin naming what it was supposed to do",
+    };
+
   const missing = declared.filter((s) => !byStage.has(s));
   const broken = receipts.filter((r) => r.status === "BROKEN");
   const unexplained = receipts.filter(

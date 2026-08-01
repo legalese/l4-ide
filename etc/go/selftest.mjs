@@ -15,7 +15,7 @@
 // needs $L4 pointing at a prebuilt binary; without one it SKIPS with a named
 // reason rather than passing silently.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -219,6 +219,11 @@ check(
   }).verdict === "COMPLETE",
 );
 check(
+  "a milestone that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
+  milestoneVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
+    "INCOMPLETE",
+);
+check(
   "BROKEN outranks GATE",
   milestoneVerdict({
     declared,
@@ -417,6 +422,19 @@ if (!process.argv.includes("--with-driver")) {
 process.stdout.write("\n-- the report --\n");
 
 const template = readFileSync(resolve(HERE, "report/template.md"), "utf8");
+check(
+  "the report refuses a journal with no run_begin",
+  (() => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-emptyjournal-"));
+    writeFileSync(resolve(d, "journal.ndjson"), "");
+    const r = spawnSync(
+      "node",
+      [resolve(HERE, "report/render-report.mjs"), d],
+      { encoding: "utf8" },
+    );
+    return r.status === 4 && /no run_begin/.test(r.stderr);
+  })(),
+);
 check(
   "the report template contains at least one placeholder",
   /\{\{[^}]+\}\}/.test(template),
