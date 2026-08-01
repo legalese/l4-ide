@@ -110,28 +110,50 @@ const verdict = milestoneVerdict({
 // --- 3. gate ordering ----------------------------------------------------------
 // A granted gate must be recorded BEFORE the first stage it gates began. If a
 // gated stage started first, the gate did not gate anything.
+//
+// BOTH record kinds count. `stage_begin` is written only by go.sh, and go.sh
+// decides the gate strictly before emitting it — so a check that looked at
+// `stage_begin` alone could never fire on a driver-produced journal, and was
+// blind to the case it exists for: a phase script invoked DIRECTLY (which the
+// skill and `go.sh plan` both tell the reader to do) writes a `stage_end`
+// through go_receipt and no `stage_begin` at all. Widening the predicate is the
+// difference between a check that fires in no reachable case and one that
+// catches gated work performed outside the driver.
 const gateOrder = [];
 if (wantGates) {
   const GATED_BY = begin?.gated_stages ? JSON.parse(begin.gated_stages) : {};
+  // A gate is granted by its EARLIEST satisfied/waived row. A later duplicate
+  // row for the same gate re-states an authorisation that already existed, and
+  // measuring stage order against the duplicate would report every stage the
+  // first grant legitimately authorised.
+  const firstGrant = new Map();
+  for (const g of gates) {
+    if (g.state !== "satisfied" && g.state !== "waived") continue;
+    if (!firstGrant.has(g.gate)) firstGrant.set(g.gate, g);
+  }
   for (const g of gates) {
     const gatedStages = GATED_BY[g.gate] ?? [];
-    const early = records.filter(
-      (r) =>
-        r.kind === "stage_begin" &&
-        gatedStages.includes(r.stage) &&
-        r.seq < g.seq,
-    );
+    const grants = firstGrant.get(g.gate) === g;
+    const early = grants
+      ? records.filter(
+          (r) =>
+            (r.kind === "stage_begin" || r.kind === "stage_end") &&
+            gatedStages.includes(r.stage) &&
+            r.seq < g.seq,
+        )
+      : [];
     gateOrder.push({
       gate: g.gate,
       state: g.state,
       seq: g.seq,
+      grants,
       gated_stages: gatedStages,
-      began_before_gate: early.map((e) => e.stage),
+      began_before_gate: early.map((e) => `${e.stage}@${e.seq}/${e.kind}`),
     });
     if (early.length)
       findings.push({
         kind: "gate-order",
-        detail: `${g.gate} was recorded at seq ${g.seq} but ${early.map((e) => e.stage).join(", ")} began before it — the gate did not gate anything`,
+        detail: `${g.gate} was recorded at seq ${g.seq} but ${early.map((e) => `${e.stage} (${e.kind} at seq ${e.seq})`).join(", ")} came before it — the gate did not gate anything`,
       });
     if (g.state === "satisfied" && !g.signature_file)
       findings.push({

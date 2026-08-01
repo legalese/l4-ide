@@ -208,7 +208,9 @@ jobs:
       # form of the drift that put "114 blocking, 46 lossy, 18 advisory" into
       # PROJECTIONS.md against an exporter that emits different figures.
       # A number typed into the template is a claim with no evidence behind it,
-      # and it is how PROJECTIONS.md came to carry eleven stale figures. The
+      # and it is how PROJECTIONS.md came to state a fidelity heading, a per-code
+      # table and two line counts that its own artifacts contradicted. (No count
+      # is given: this comment and two others once gave three different ones.) The
       # renderer refuses such a template with 'TEMPLATE DEFECT' before it reads
       # any journal at all, so an empty run directory is enough to reach the
       # check — and the SECOND assertion proves the check was actually reached,

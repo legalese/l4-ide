@@ -6,10 +6,11 @@
   Unresolved placeholders are a hard error, and a bare digit-run that is not on
   the small allowlist in render-report.mjs is a hard error too.
 
-  The reason is on the record: PROJECTIONS.md carries "114 blocking, 46 lossy,
-  18 advisory" while the exporter emits different counts, and two different
-  stale line counts for one file. Those numbers were transcribed once and
-  never re-measured. A claim with no journal row cannot be printed here.
+  The reason is on the record: PROJECTIONS.md stated "114 blocking, 46 lossy,
+  18 advisory" while the exporter emitted different counts, gave two different
+  stale line counts for one file, and carried a per-code table that summed to
+  neither. Those numbers were transcribed once and never re-measured. A claim
+  with no journal row cannot be printed here.
 -->
 
 # {{run.milestone_upper}} conversion report — {{run.subject}}
@@ -92,7 +93,8 @@ etc/go/go.sh verify --run-id {{run.id}} --gates
 ```
 
 That re-reads `journal.ndjson`, re-hashes every artifact a receipt names, checks
-that each granted gate was recorded before the first stage it gates began, and
+that each granted gate was recorded before the first stage it gates began (by
+record of either kind, so gated work run outside the driver is caught), and
 recomputes the milestone verdict. It runs no build, calls no model, and makes no
 network request. A second party can run it later against the same run directory
 and does not have to believe anything this report says.

@@ -73,12 +73,29 @@ To enrol:
   1. append one line to that file, in ssh allowed_signers format:
        mengwong@gmail.com ssh-ed25519 AAAA… comment
   2. etc/go/gate-verify.sh reads it; nothing else does.
+EOF
+  # The waiver route is HG1's alone, and this script must not advise otherwise:
+  # HG2's subject is anything outward-facing, and no agent decides on its own
+  # that an outward-facing act is warranted. go.sh REFUSES --waive HG2 (exit 2).
+  # Printing the waiver recipe under every gate name is how a script with an
+  # exit code came to recommend the one thing the skill forbids.
+  if [[ "$GATE" == "HG1" ]]; then
+    cat >&2 <<EOF
 
 To proceed WITHOUT a signature, waive the gate explicitly:
-  etc/go/go.sh run … --waive $GATE="why this run may proceed unsigned"
+  etc/go/go.sh run … --waive HG1="why this run may proceed unsigned"
 A waiver is recorded on the journal and printed in the report's Gates section.
-It is not an absence; it is a verdict with your reason attached.
+It is not an absence; it is a verdict with your reason attached — and it binds
+to the corpus it was granted over, so editing a corpus file re-opens the gate.
 EOF
+  else
+    cat >&2 <<EOF
+
+There is NO waiver route past $GATE. Its subject is anything outward-facing,
+which is Meng's decision and not an agent's, so \`go.sh run --waive $GATE=…\`
+exits 2. Enrol a key and sign, or the gated stages stay refused.
+EOF
+  fi
   exit 3
 fi
 

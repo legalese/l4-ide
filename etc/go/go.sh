@@ -16,7 +16,10 @@
 #   Usage:  etc/go/go.sh <command> [options]
 #
 #     run     --milestone g1 --subject regcf [--run-id ID] [--through STAGE]
-#             [--only STAGE] [--waive GATE=REASON] [--fixed-now ISO8601]
+#             [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
+#
+#             HG1 is the only waivable gate. HG2 guards anything outward-facing
+#             and opens on a signature or not at all; --waive HG2 exits 2.
 #     plan    [--milestone g1|g2]
 #     status  [--run-id ID]
 #     verify  [--run-id ID] [--gates]
@@ -72,7 +75,7 @@ gated_by_HG1="p6-tests p7-dmn p7-dmn-md p7-bpmn p7-ladder p7-lts p7-mcp p7-tnr p
 gated_by_HG2="p10-publish"
 
 usage() {
-  sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 die_usage() {
@@ -206,6 +209,34 @@ latest_run() {
   ls -1d "$RUNDIR_BASE"/*/ 2>/dev/null | sort | tail -1 | sed 's:/$::'
 }
 
+# gate_grant_state JOURNAL GATE CORPUS_DIGEST -> open | stale | closed
+#
+# A gate is open only while a granting row (satisfied or waived) records the
+# corpus digest this run is actually using. `stale` means the gate WAS granted
+# and the corpus has moved since, which is the case the design's "a post-gate
+# edit re-opens the gate" claim is about.
+#
+# This replaces a grep for any granting row anywhere in the journal. That grep
+# memoised the gate for the life of the run directory, so one waiver covered
+# every later encoding change — and, because it also matched `satisfied`, a
+# resumed run never re-ran gate-verify.sh either, which is where the signed
+# route's own content binding lives. Both routes are re-checked here.
+gate_grant_state() {
+  node -e '
+    import("'"$LIB"'/ledger.mjs").then((m) => {
+      const [journal, gate, digest] = process.argv.slice(1);
+      const rows = m
+        .read(journal)
+        .filter((r) => r.kind === "gate" && r.gate === gate);
+      const granting = rows.filter(
+        (r) => r.state === "satisfied" || r.state === "waived",
+      );
+      const open = granting.some((r) => r.corpus_digest === digest);
+      process.stdout.write(open ? "open" : granting.length ? "stale" : "closed");
+    });
+  ' "$1" "$2" "$3"
+}
+
 resolve_run() {
   if [[ -n "$RUN_ID" ]]; then
     echo "$RUNDIR_BASE/$RUN_ID"
@@ -281,8 +312,12 @@ EOF
   export JL4_LIBRARY_PATH="${JL4_LIBRARY_PATH:-$GO_ROOT/jl4-core/libraries}"
 
   # --- run id + run dir ------------------------------------------------------
-  local corpus_sha8
-  corpus_sha8=$(node "$LIB/digest.mjs" "$GO_CORPUS" "$GO_WIZARD" | sed 's/^sha256://' | cut -c1-8)
+  # The corpus this run is about, as one digest. It names the run, and the gate
+  # rows bind to it so a waiver granted over one corpus does not silently cover
+  # a later edit.
+  local corpus_digest corpus_sha8
+  corpus_digest=$(node "$LIB/digest.mjs" "$GO_CORPUS" "$GO_WIZARD")
+  corpus_sha8=$(printf '%s' "$corpus_digest" | sed 's/^sha256://' | cut -c1-8)
   local RUN
   if [[ -n "$RUN_ID" ]]; then
     RUN="$RUNDIR_BASE/$RUN_ID"
@@ -304,6 +339,23 @@ EOF
   head=$(git -C "$GO_ROOT" rev-parse HEAD 2>/dev/null || echo "(not a git tree)")
   if [[ -n "$(git -C "$GO_ROOT" status --porcelain 2>/dev/null)" ]]; then tree_state="dirty"; else tree_state="clean"; fi
 
+  # The `l4` binary is an input to every stage and is declared by none: no phase
+  # script can see the path the driver was handed. Hash it ONCE here and fold
+  # the digest into every stage's inputs digest below.
+  #
+  # Without this fold, a run resumed after `l4` was rebuilt or repointed
+  # replayed EVERY leg without invoking the binary once — measured with a stub
+  # that exits 1 on every call: thirteen `replayed` lines, `VERDICT: g1
+  # COMPLETE`, exit 0, and a report still naming the ORIGINAL binary. p0's
+  # CLI-surface pin and its failing-#ASSERT tripwire, which exist precisely to
+  # catch a moved binary, were both skipped. Resuming an interrupted run is the
+  # documented workflow, and rebuilding `l4` in between is the obvious thing to
+  # have done.
+  local l4_path l4_sha
+  l4_path="$(command -v "$L4" || echo "$L4")"
+  l4_sha="$(node "$LIB/digest.mjs" "$l4_path")"
+  export GO_L4_PATH="$l4_path" GO_L4_SHA="$l4_sha"
+
   export GO_ROOT GO_CORPUS GO_WIZARD
   export GO_RUN="$RUN" GO_RUNID="$RUN_ID" GO_SUBJECT="$SUBJECT" GO_MILESTONE="$MILESTONE"
   export GO_FIXED_NOW="$FIXED_NOW"
@@ -324,15 +376,52 @@ EOF
   [[ "$tree_state" == "dirty" ]] && echo "go: NOTE — the working tree is dirty. That is a fact, not a failure; it is stamped on the report."
 
   # --- waivers, recorded as verdicts, never as absences ----------------------
-  local w
+  # A waiver is bound to the corpus it was granted over (`--corpus-digest`), and
+  # the gate check below re-derives that digest before every gated stage. Before
+  # this binding existed, one `--waive HG1` at the top of a run covered every
+  # later edit to the encoding: the corpus could be changed mid-run and every
+  # HG1-gated stage re-ran against unreviewed content with no diff, no chain
+  # break and no verify finding — the circumvention was not merely unfakeable
+  # but deniable, which is the opposite of what §6.3 claims.
+  #
+  # HG2 cannot be waived here at all. Its subject is anything outward-facing,
+  # and the skill's rule is that no agent decides that on its own; a rule that
+  # lives only in prose while the driver accepts the flag is not a rule.
+  # Two passes: every waiver is validated before ANY is recorded, so a refused
+  # one does not leave the journal carrying its accepted siblings.
+  local w gname greason
   for w in "${WAIVERS[@]:-}"; do
     [[ -n "$w" ]] || continue
-    local gname="${w%%=*}"
-    local greason="${w#*=}"
-    [[ "$gname" == "HG1" || "$gname" == "HG2" ]] || die_usage "--waive: unknown gate '$gname'; SPEC.md §7.3 defines HG1 and HG2"
+    gname="${w%%=*}"
+    greason="${w#*=}"
+    if [[ "$gname" == "HG2" ]]; then
+      cat >&2 <<EOF
+go.sh: --waive HG2 is REFUSED.
+
+HG2 is Meng's go on anything outward-facing — creating the corpus repo,
+publishing the report, any lexipedia contact. An agent may not decide on its own
+that an outward-facing act is warranted, so there is no self-service route past
+it: HG2 opens on a signature or not at all.
+
+  etc/go/gate-request.sh HG2 --run <rundir>     # prints the payload to sign
+  ssh-keygen -Y sign -f <key> -n l4-go-gate-hg2 <rundir>/HG2.payload.txt
+
+HG1 may be waived (--waive HG1="reason"), because its subject is a review this
+run can proceed without having had, provided the report says so.
+EOF
+      exit 2
+    fi
+    [[ "$gname" == "HG1" ]] || die_usage "--waive: unknown gate '$gname'; SPEC.md §7.3 defines HG1 and HG2, and only HG1 is waivable"
     [[ -n "$greason" && "$greason" != "$gname" ]] || die_usage "--waive $gname= needs a reason; a waiver with no reason cannot be printed in the report"
-    node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state waived --reason "$greason"
+  done
+  for w in "${WAIVERS[@]:-}"; do
+    [[ -n "$w" ]] || continue
+    gname="${w%%=*}"
+    greason="${w#*=}"
+    node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gname" --state waived \
+      --corpus-digest "$corpus_digest" --reason "$greason"
     echo "go: gate $gname WAIVED — $greason"
+    echo "go:   the waiver covers corpus $corpus_digest and nothing else; edit a corpus file and $gname re-opens."
   done
 
   # --- dispatch --------------------------------------------------------------
@@ -347,15 +436,23 @@ EOF
     [[ " $gated_by_HG1 " == *" $s "* ]] && gate="HG1"
     [[ " $gated_by_HG2 " == *" $s "* ]] && gate="HG2"
     if [[ -n "$gate" ]]; then
-      if ! grep -q "\"gate\":\"$gate\",\"state\":\"waived\"" "$RUN/journal.ndjson" 2>/dev/null &&
-        ! grep -q "\"gate\":\"$gate\",\"state\":\"satisfied\"" "$RUN/journal.ndjson" 2>/dev/null; then
+      local gstate
+      gstate=$(gate_grant_state "$RUN/journal.ndjson" "$gate" "$corpus_digest")
+      if [[ "$gstate" != "open" ]]; then
+        if [[ "$gstate" == "stale" ]]; then
+          echo "go: $gate was granted over a different corpus than this run is now using." >&2
+          echo "go:   corpus now: $corpus_digest" >&2
+          echo "go:   The grant does not cover it, so the gate is closed again." >&2
+        fi
         if bash "$GO_ROOT/etc/go/gate-verify.sh" "$gate" --run "$RUN"; then
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state satisfied \
             --namespace "$([[ $gate == HG1 ]] && echo l4-go-gate || echo l4-go-gate-hg2)" \
+            --corpus-digest "$corpus_digest" \
             --signature-file "$RUN/$gate.payload.txt.sig"
         else
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state refused \
-            --reason "no verifying signature; see etc/go/gate-request.sh $gate --run $RUN"
+            --corpus-digest "$corpus_digest" \
+            --reason "no verifying signature over the current corpus; see etc/go/gate-request.sh $gate --run $RUN"
           echo "go: $gate is not satisfied — refusing $s and every stage after it." >&2
           echo "go: VERDICT: GATE" >&2
           node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict GATE --exit 3
@@ -372,11 +469,14 @@ EOF
 
     export GO_STAGE="$s"
 
-    # inputs digest: the stage declares its own inputs, the driver digests them.
+    # inputs digest: the stage declares its own inputs, the driver digests them,
+    # and the driver folds in the one input no stage can declare — the `l4`
+    # binary it was handed. `text:` entries are literal digest contributors; see
+    # digestSet in lib/ledger.mjs.
     local inputs digest
     inputs=$(GO_STAGE="$s" bash "$script" --inputs 2>/dev/null || true)
     if [[ -n "$inputs" ]]; then
-      digest=$(printf '%s\n' "$inputs" | node "$LIB/digest.mjs" --stdin)
+      digest=$(printf '%s\ntext:l4-binary=%s\n' "$inputs" "$l4_sha" | node "$LIB/digest.mjs" --stdin)
     else
       digest=""
     fi
@@ -388,26 +488,58 @@ EOF
       prior=$(node -e '
         import("'"$LIB"'/ledger.mjs").then(m => {
           const r = m.findReplayable(process.argv[1], process.argv[2], process.argv[3]);
-          if (r) process.stdout.write(JSON.stringify({hash: r.hash, status: r.status, reason: r.reason ?? "", blocker: r.blocker ?? ""}));
+          if (r) process.stdout.write(JSON.stringify({hash: r.hash, status: r.status, reason: r.reason ?? "", blocker: r.blocker ?? "", label: r.label ?? "", metrics: r.metrics ?? {}, notes: r.notes ?? []}));
         });
       ' "$RUN/journal.ndjson" "$s" "$digest")
     fi
 
     if [[ -n "$prior" ]]; then
-      local phash pstatus preason pblocker
-      phash=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).hash))')
-      pstatus=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).status))')
-      preason=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).reason))')
-      pblocker=$(echo "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).blocker))')
+      local phash pstatus preason pblocker plabel pmetrics pnotes pauthors
+      local field
+      for field in hash status reason blocker label; do
+        printf -v "p$field" '%s' "$(printf '%s' "$prior" | node -e '
+          let s = "";
+          process.stdin.on("data", (d) => (s += d)).on("end", () => process.stdout.write(String(JSON.parse(s)[process.argv[1]] ?? "")));
+        ' "$field")"
+      done
+      pmetrics=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s).metrics||{};process.stdout.write(Object.entries(m).map(([k,v])=>`${k}=${String(v).replace(/\n/g," ")}`).join("\n"))})')
+      pnotes=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s).notes||[];process.stdout.write(n.map(x=>String(x.text).replace(/\n/g," ")).join("\n"))})')
+      pauthors=$(printf '%s' "$prior" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=[...new Set((JSON.parse(s).notes||[]).map(x=>x.author))];process.stdout.write(a.length===1?a[0]:"")})')
       # A replayed receipt KEEPS its verdict and names the receipt that earned
       # it. It carries no oracle of its own, and it should not: the oracle ran,
       # on inputs whose digest is byte-identical, and its row is in the same
       # hash-chained journal. Demoting a replayed PASS would make the milestone
       # verdict change when the same milestone is run twice, which is exactly
       # the property resumability needs to preserve.
+      #
+      # Everything else on the receipt DOES carry forward, because
+      # render-report.mjs reads the LATEST row per stage and a replay is that
+      # row. Dropping them silently rewrote the report on the first resume:
+      #   * metrics — every measured number vanished (fidelity counts, assertion
+      #     count) and the corpus sha256 table rendered "(none recorded)" for
+      #     files the run demonstrably read one journal row earlier;
+      #   * label — `PASS (INTERIM)` became a bare `PASS` and
+      #     `UNVERIFIED (EXTRA)` a bare `UNVERIFIED`. The label rides IN the
+      #     status by design, so losing it upgrades what the report claims;
+      #   * notes — the "claimed, not verified" caveats disappeared, which is
+      #     the wrong direction for a caveat to drift.
       local extra=()
       [[ -n "$preason" ]] && extra+=(--reason "$preason")
       [[ -n "$pblocker" ]] && extra+=(--blocker "$pblocker")
+      [[ -n "$plabel" ]] && extra+=(--label "$plabel")
+      [[ -n "$pauthors" ]] && extra+=(--author "$pauthors")
+      if [[ -n "$pmetrics" ]]; then
+        local kv
+        while IFS= read -r kv; do
+          [[ -n "$kv" ]] && extra+=(--metric "$kv")
+        done <<<"$pmetrics"
+      fi
+      if [[ -n "$pnotes" ]]; then
+        local nt
+        while IFS= read -r nt; do
+          [[ -n "$nt" ]] && extra+=(--note "$nt")
+        done <<<"$pnotes"
+      fi
       node "$LIB/receipt.mjs" stage-end --run "$RUN" --stage "$s" --status "$pstatus" \
         --inputs-digest "$digest" --replayed-from "$phash" --artifacts-from "$phash" "${extra[@]}"
       echo "go: $s replayed (inputs unchanged)"
@@ -446,9 +578,34 @@ EOF
   done <<<"$stages"
 
   # --- milestone verdict, recomputed from the journal ------------------------
-  local vjson verdict vexit
+  # verify-run.mjs answers three questions — does the chain verify, do the
+  # artifacts every receipt names still hash as recorded, and what is the
+  # milestone verdict — and encodes the first two in `chain_ok`/`findings` and
+  # in its EXIT CODE. This used to read `.verdict` and discard the rest behind
+  # `|| true`, so a run whose recorded artifacts had vanished, or whose journal
+  # had been hand-edited, still printed `COMPLETE` and exited 0 while
+  # `go.sh verify` over the same directory listed the findings and exited 1.
+  # The second-party check is still the authority; the driver simply no longer
+  # contradicts it.
+  local vjson vsummary vhead verdict vexit chain_state findings_n
   vjson=$(node "$LIB/verify-run.mjs" "$RUN" --json || true)
-  verdict=$(printf '%s' "$vjson" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).verdict))')
+  vsummary=$(printf '%s' "$vjson" | node -e '
+    let s = "";
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      const j = JSON.parse(s);
+      process.stdout.write(`${j.verdict}\t${j.chain_ok ? "ok" : "broken"}\t${j.findings.length}\n`);
+      for (const f of j.findings) process.stdout.write(`  finding [${f.kind}] ${f.detail}\n`);
+    });
+  ')
+  vhead=$(printf '%s\n' "$vsummary" | head -1)
+  verdict=$(printf '%s' "$vhead" | cut -f1)
+  chain_state=$(printf '%s' "$vhead" | cut -f2)
+  findings_n=$(printf '%s' "$vhead" | cut -f3)
+
+  # A journal that does not verify was written by something other than
+  # receipt.mjs, so nothing computed from it is a statement about the corpus.
+  if [[ "$chain_state" != "ok" ]]; then verdict="BROKEN"; fi
+
   case "$verdict" in
     COMPLETE) vexit=0 ;;
     GATE) vexit=3 ;;
@@ -456,6 +613,14 @@ EOF
     *) vexit=1 ;;
   esac
   [[ $overall -eq 1 && $vexit -eq 0 ]] && vexit=0 # a leg finding is accounted for, not a milestone failure
+
+  if [[ "${findings_n:-0}" -gt 0 ]]; then
+    echo >&2
+    echo "go: verify-run reported $findings_n finding(s) about this run's own journal and artifacts:" >&2
+    printf '%s\n' "$vsummary" | tail -n +2 >&2
+    echo "go:   re-derive with: etc/go/go.sh verify --run-id $RUN_ID --gates" >&2
+    [[ $vexit -eq 0 ]] && vexit=1
+  fi
 
   node "$LIB/receipt.mjs" run-end --run "$RUN" --verdict "$verdict" --exit "$vexit"
 

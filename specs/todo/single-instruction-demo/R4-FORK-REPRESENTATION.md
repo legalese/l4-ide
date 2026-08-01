@@ -58,7 +58,7 @@ keeps a repealed regime). A court striking a reading likewise demotes, never del
   artifact; every consumer must know all the private names.
 - **This shape is checked by machinery that already shipped**: adding a reading to the enum makes
   every delegation site's `CONSIDER` non-exhaustive, which the oracle (PR #182, merged) reports —
-  at clause-matrix level too once PR #185 (open at this writing) lands. A fork added in P4 that
+  at clause-matrix level too, since PR #185 merged on 2026-08-01. A fork added in P4 that
   some public interface forgot to thread is a _compile-time_ finding, not a review hope.
 
 ## 3. What each downstream leg gets, for free

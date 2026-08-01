@@ -25,11 +25,13 @@ WHAT IT WOULD DO
 
 BLOCKER
   SPEC.md §6 gates G2 entry on ruling R4 (ambiguity-fork representation),
-  which is OPEN in SPEC.md §9. Independently, SPEC.md §8's own flag list
-  records that P1 has NO bundle schema or manifest format defined anywhere
-  in the spec, so there is nothing for an ingest stage to write into and no
-  acceptance condition to check it against. Defining specs/todo/single-
-  instruction-demo/schemas/source-bundle.schema.json is the prerequisite.
+  which is OPEN in SPEC.md §9. Independently, NO bundle schema or manifest
+  format is defined anywhere in SPEC.md -- grepped 2026-08-02, 'bundle'
+  occurs once, in §4's P1 deliverable ("a source bundle with provenance"),
+  and 'manifest' not at all -- so there is nothing for an ingest stage to
+  write into and no acceptance condition to check it against. Defining
+  specs/todo/single-instruction-demo/schemas/source-bundle.schema.json is
+  the prerequisite; that directory exists and is EMPTY.
 
 Nothing was written and no receipt was recorded.
 MSG

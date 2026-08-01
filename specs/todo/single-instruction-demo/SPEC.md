@@ -6,8 +6,8 @@ reachable projection and emits conversion report v0; the seven de novo and publi
 scaffolded entry points that refuse with a named blocker, five of them because a ruling here is
 still open. The orchestrator's own present-tense inventory is
 [ORCHESTRATOR.md](./ORCHESTRATOR.md); §5 below still names what does not exist (BKM emission, the
-ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo — and P8 has no component row
-at all). §5 is the verified inventory and §6 is the gap register.
+ladder IDE steps, the LTS visualiser proper, the corpus-of-law repo — and P8's component row
+inventories nothing, pending R5). §5 is the verified inventory and §6 is the gap register.
 This document owns the pipeline decisions; per-projection rulings stay in their own specs
 (`DMN-EXPORT-PROGRAM-MODEL-SPEC.md`, `lexipedia-superset/SPEC.md`,
 `ladder-diagrams-2026/DESIGN.md`, `QUESTION-ORDERING-SPEC.md`), which this spec cites but does
@@ -132,7 +132,7 @@ good as it can be: isomorphism spot-checks against source text, house-style conf
 fork-register completeness, and disposition of every entry in P2's external-modification
 register (consumed by the encoding, consumed by a fork, or explicitly deferred with a reason).
 This is the same adversarial-workflow discipline used on the DMN
-and ladder builds (#175/#176/#178 merged, #177 open), aimed at the encoding instead of the
+and ladder builds (#175/#176/#177/#178 all merged), aimed at the encoding instead of the
 code.
 
 ### P6 — Tests

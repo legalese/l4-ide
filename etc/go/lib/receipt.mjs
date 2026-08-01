@@ -15,7 +15,9 @@
 //        [--replayed-from HASH] [--metric key=value]...
 //   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --milestone M --subject S ...
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
-//   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused ...
+//   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
+//        [--namespace NS] [--payload-digest D] [--corpus-digest D] \
+//        [--signature-file PATH] [--reason TEXT]
 //
 // Exit codes: 0 written · 2 usage · 4 the receipt violates the lattice rules
 // (a defect in the calling phase script, never a finding about the corpus).
@@ -184,6 +186,16 @@ switch (kind) {
       state: args.state, // satisfied | waived | refused
       namespace: args.namespace ?? null,
       payload_digest: args.payload_digest ?? null,
+      // The sha256 over the corpus files this gate was granted over. A
+      // SIGNATURE binds to content by construction (gate-payload.mjs hashes
+      // every corpus file and gate-verify.sh rebuilds the payload each time); a
+      // WAIVER bound to nothing, so one waiver covered every later encoding
+      // change in the run — and since `gate-allowed-signers` ships with no key,
+      // the waiver is the only route anyone can take. go.sh records this at the
+      // moment of the waiver and re-checks it before every gated stage, which
+      // is what makes "a post-gate edit re-opens the gate" true of the shipped
+      // configuration rather than only of the signed one.
+      corpus_digest: args.corpus_digest ?? null,
       signer: args.signer ?? null,
       signature_file: args.signature_file ?? null,
       reason: args.reason ?? null,

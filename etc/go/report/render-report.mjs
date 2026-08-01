@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Render the conversion report from journal.ndjson AND NOTHING ELSE.
 //
-// Three rules, all enforced here rather than by convention:
+// Four rules, all enforced here rather than by convention:
 //
 //   1. The template carries no measured numbers. Every figure is a placeholder
 //      resolved from a journal row. A digit-run in the template that is not on
@@ -10,6 +10,14 @@
 //      journal row cannot be printed.
 //   3. A required section with no rows renders as "ABSENT", never omitted, and
 //      says which stage would have supplied it.
+//   4. Every CLAIM comes from the journal — but the artifacts table also asks
+//      the disk whether the files those claims name are still there, and prints
+//      GONE or CHANGED when they are not. Rule 1 forbids typing a number;
+//      it does not license printing a recorded byte count and sha256 under the
+//      heading "Every artifact this run put on disk" for a file that is not on
+//      disk. That is what this renderer used to do, on every resumed run whose
+//      artifacts had been cleaned up: `go.sh verify` found them GONE while the
+//      report tabulated their sizes as fact.
 //
 // And one property that makes the whole honesty stance self-defending: this
 // renderer verifies the journal's hash chain, and prints the failure IN THE
@@ -20,9 +28,9 @@
 // Exit:  0 rendered · 2 usage · 4 template defect or unresolved placeholder
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verify } from "../lib/ledger.mjs";
+import { sha256File, verify } from "../lib/ledger.mjs";
 import { milestoneVerdict } from "../lib/verdict.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -79,7 +87,9 @@ const template = readFileSync(TEMPLATE, "utf8");
       `render-report.mjs: TEMPLATE DEFECT — literal numbers in ${TEMPLATE}: ${[...new Set(stray)].join(", ")}\n` +
         `Every measured figure must be a {{placeholder}} resolved from a journal row. A number typed\n` +
         `into the template is a claim with no evidence behind it, and it is how PROJECTIONS.md came to\n` +
-        `carry three stale figures for one file.\n`,
+        `state a fidelity heading, a per-code table and two line counts that its own artifacts\n` +
+        `contradicted. (This sentence gives no COUNT on purpose: three sites once gave three\n` +
+        `different ones, and the count changes every time the document is repaired.)\n`,
     );
     process.exit(4);
   }
@@ -159,12 +169,25 @@ function projectionsTable() {
   const rows = legs.map((s) => {
     const r = byStage.get(s);
     if (!r) return `| \`${s}\` | — | **no receipt** | the stage did not run |`;
-    const oracle = r.oracle ? `${r.oracle.class}` : "none";
+    // A replayed receipt deliberately carries no oracle of its own: the oracle
+    // ran, on inputs whose digest is byte-identical, and its row is in this
+    // same journal. Say that, rather than printing a bare "none" against a
+    // PASS — which reads as a PASS the lattice would have refused.
+    const oracle = r.oracle
+      ? `${r.oracle.class}`
+      : r.replayed_from
+        ? "replayed"
+        : "none";
     const label = r.label ? ` (${r.label})` : "";
     // A PASS carries no `reason` — the lattice requires a reason only where the
     // status is not green. What it does carry is the oracle's `because`, which
     // is the equivalent sentence: why this evidence licenses this status.
-    const says = r.reason ?? r.oracle?.because ?? "";
+    const says =
+      r.reason ??
+      r.oracle?.because ??
+      (r.replayed_from
+        ? `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… on this journal`
+        : "");
     return `| \`${s}\` | ${r.status}${label} | ${oracle} | ${esc(says)} |`;
   });
   return [
@@ -193,6 +216,11 @@ function projectionsDetail() {
         `**Oracle** (\`${r.oracle.class}\`, exit ${r.oracle.exit}): \`${r.oracle.cmd}\``,
       );
       if (r.oracle.because) out.push(`${r.oracle.because}`);
+    } else if (r.replayed_from) {
+      out.push("");
+      out.push(
+        "**Oracle:** none in this receipt — see the replay note below, which names the receipt whose oracle did run.",
+      );
     } else {
       out.push("");
       out.push("**Oracle:** none ran.");
@@ -309,12 +337,30 @@ function triageSection() {
   );
 }
 
+// The one place this renderer looks at anything other than the journal, and it
+// looks only to CONTRADICT the journal where the journal has gone stale. It
+// prints no figure taken from disk: the bytes and sha256 columns are still the
+// recorded ones, and the state column says whether they are still true.
+function artifactState(a) {
+  if (a.absent) return "ABSENT";
+  const p = isAbsolute(a.path) ? a.path : resolve(rundir, a.path);
+  if (!existsSync(p)) return "GONE";
+  try {
+    return sha256File(p) === a.sha256 ? "on disk" : "CHANGED";
+  } catch {
+    return "UNREADABLE";
+  }
+}
+
 function artifactsTable() {
   const rows = [];
+  let notOnDisk = 0;
   for (const r of stageEnds) {
     for (const a of r.artifacts || []) {
+      const state = artifactState(a);
+      if (state !== "on disk") notOnDisk++;
       rows.push(
-        `| \`${r.stage}\` | \`${basename(a.path)}\` | ${a.absent ? "ABSENT" : a.bytes} | \`${a.absent ? "—" : a.sha256.slice(0, 23)}…\` |`,
+        `| \`${r.stage}\` | \`${basename(a.path)}\` | ${a.absent ? "—" : a.bytes} | \`${a.absent ? "—" : a.sha256.slice(0, 23)}…\` | ${state === "on disk" ? state : `**${state}**`} |`,
       );
     }
   }
@@ -323,10 +369,19 @@ function artifactsTable() {
       "Every status must point at an artifact.",
       "no receipt names one, which should be impossible.",
     );
-  return [
-    "| stage | artifact | bytes | sha256 |",
-    "| --- | --- | --- | --- |",
+  const table = [
+    "| stage | artifact | bytes (recorded) | sha256 (recorded) | state now |",
+    "| --- | --- | --- | --- | --- |",
     ...rows,
+  ].join("\n");
+  if (!notOnDisk) return table;
+  return [
+    `**${notOnDisk} of the ${rows.length} artifacts this run recorded no longer hash as recorded.** The bytes and sha256 ` +
+      `columns below are what the receipts said at the time; the last column is what the disk says now. A ` +
+      `\`GONE\` or \`CHANGED\` row means this report's evidence for that stage's status cannot be re-checked ` +
+      `from this run directory. Re-derive with \`etc/go/go.sh verify\`, which reports the same rows and exits 1.`,
+    "",
+    table,
   ].join("\n");
 }
 

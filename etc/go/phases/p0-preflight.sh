@@ -18,10 +18,15 @@ PROBES="$GO_OUT/probes.json"
 PINLOG="$GO_OUT/cli-surface.txt"
 
 # --- 1. the binary and the clock --------------------------------------------
-# There is no `l4 --version` (verified: `Invalid option`, exit 0), so the binary
-# is identified by its own sha256 and mtime, which is what a report can cite.
-L4_PATH="$(command -v "$L4" || echo "$L4")"
-L4_SHA="$(node "$GO_LIB/digest.mjs" "$L4_PATH")"
+# There is no `l4 --version` (verified 2026-08-02: it prints "Invalid option
+# `--version'" plus the usage block and exits 1), so the binary is identified by
+# its own sha256, which is what a report can cite.
+#
+# go.sh has already hashed it — it folds that digest into every stage's inputs
+# digest, which is what makes a resumed run notice a rebuilt binary — so reuse
+# the value rather than reading 200 MB a second time.
+L4_PATH="${GO_L4_PATH:-$(command -v "$L4" || echo "$L4")}"
+L4_SHA="${GO_L4_SHA:-$(node "$GO_LIB/digest.mjs" "$L4_PATH")}"
 
 # --- 2. toolchain probes; every miss carries a named reason ------------------
 node "$GO_LIB/probe.mjs" >"$PROBES"

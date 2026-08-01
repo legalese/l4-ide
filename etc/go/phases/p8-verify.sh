@@ -29,9 +29,11 @@ BLOCKER
   branch detection, and an external model checker. There is also no CLI
   footing at all — the verified command list is
   run/check/format/ast/batch/trace/state-graph/render/export/openfisca and
-  none of them verifies anything. SPEC.md §5 gives P8 no component row and
-  §6 gives it no pass condition, so a stage here would be pure UNVERIFIED by
-  construction. P8 gates nothing in G0-G4.
+  none of them verifies anything. SPEC.md §5's 'P8 verifier toolchain' row
+  inventories nothing ('not inventoried here -- R5 asks which existing
+  machinery or external tool goes first') and §6 gives it no pass condition,
+  so a stage here would be pure UNVERIFIED by construction. P8 gates nothing
+  in G0-G4.
 
 Nothing was written and no receipt was recorded.
 MSG

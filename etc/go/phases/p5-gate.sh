@@ -22,9 +22,9 @@ WHAT IT WOULD DO
   register, and refuse to start projection work until they are satisfied.
 
 BLOCKER
-  SPEC.md §8 records that this gate's condition is EXPLICITLY a judgement —
-  'independent adversarial review is satisfied the encoding is as good as it
-  can be'. Two of its five checks are automatable and already run inside
+  SPEC.md §4's P5 stage states this gate's condition EXPLICITLY as a
+  judgement — 'independent adversarial review is satisfied the encoding is
+  as good as it can be'. Two of its five checks are automatable and already run inside
   p3-check.sh (house style, temporal closure); the other three — isomorphism
   spot-checks, fork-register completeness, and disposition of every P2 entry
   — are not mechanisable, and two of them are joins over registers whose

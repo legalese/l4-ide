@@ -27,11 +27,11 @@ BLOCKER
   Two blockers. (1) The sweep is a web-search stage and this orchestrator
   makes no outward network requests except the loopback deployment in
   p7-mcp.sh; a search stage would be the second, and it needs its own
-  decision. (2) SPEC.md §8 names the absence of a machine-readable external-
-  modification register as one of the two highest-leverage gaps in the whole
-  pipeline — without it, P5's 'every entry disposed' cannot be checked.
-  specs/todo/single-instruction-demo/schemas/external-modification-
-  register.schema.json ships as the proposed shape; nothing reads it yet.
+  decision. (2) SPEC.md defines NO machine-readable external-modification
+  register anywhere — without one, P5's 'every entry disposed' (SPEC.md §4,
+  P5) cannot be checked. specs/todo/single-instruction-demo/schemas/external-
+  modification-register.schema.json does NOT exist: that directory is empty,
+  and this blocker used to claim the schema shipped.
 
 Nothing was written and no receipt was recorded.
 MSG

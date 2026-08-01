@@ -28,9 +28,15 @@
 #   ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n l4-go-gate <rundir>/HG1.payload.txt
 #
 # Agents can verify and cannot sign. Until a key is enrolled here, the only way
-# past a gate is an explicit, recorded waiver:
+# past HG1 is an explicit, recorded waiver:
 #
 #   etc/go/go.sh run … --waive HG1="reason this run may proceed unsigned"
 #
 # which lands on the journal as a gate record with state=waived and prints in
-# the report's Gates section. A waiver that is not in the report is impossible.
+# the report's Gates section. A waiver that is not in the report is impossible,
+# and a waiver is bound to the sha256 of the corpus files it was granted over:
+# edit one and HG1 closes again, for that run and every resume of it.
+#
+# THERE IS NO WAIVER ROUTE PAST HG2. Its subject is anything outward-facing,
+# which is Meng's decision and not an agent's, so `go.sh run --waive HG2=…`
+# exits 2. HG2 opens on a signature or not at all.

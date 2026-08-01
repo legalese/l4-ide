@@ -4,8 +4,10 @@
 # Reads journal.ndjson and nothing else. A required section with no journal rows
 # renders as ABSENT with the reason, never omitted; agent notes render in a block
 # labelled "claimed, not verified"; and the renderer refuses a template that
-# contains a typed number, because that is how PROJECTIONS.md came to carry
-# three stale figures for one file.
+# contains a typed number, because that is how PROJECTIONS.md came to state a
+# fidelity heading, a per-code table and two line counts that its own artifacts
+# contradicted. No COUNT is given here: three sites once gave three different
+# ones, and the count changes every time the document is repaired.
 #
 # The report is written INTO THE RUN DIRECTORY, not into the tree. Copying it
 # anywhere a person other than the operator can see it is publication, which is

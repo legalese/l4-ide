@@ -20,7 +20,11 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
  * MEASURED 2026-08-02 on this worktree (HEAD 162e5070):
  *   l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn -o /tmp/x.dmn
  *   diff /tmp/x.dmn jl4/examples/dmn/expected/regcf-corpus.dmn | wc -l   →  92
- * every differing line is `(main.l4:L:C-C)` in the golden against
+ * That is 92 lines of diff OUTPUT over 23 differing lines: `NNcNN`, `<`, `---`
+ * and `>` per changed line, 23 × 4. Do not "correct" the 92 — the `wc -l`
+ * framing is what makes it true, and three prose sites elsewhere went stale by
+ * quoting the 92 without it, as a count of differing lines.
+ * Every differing line is `(main.l4:L:C-C)` in the golden against
  * `(regcf.l4:L:C-C)` from the CLI, in @ref provenance text. After the D1
  * rewrite below the diff is EMPTY (verified).
  */

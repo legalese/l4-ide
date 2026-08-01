@@ -12,7 +12,7 @@ cannot run. The pipeline it serves is `specs/todo/single-instruction-demo/SPEC.m
 
 ```
 etc/go/go.sh run     --milestone g1 --subject regcf [--run-id ID] [--through STAGE]
-                     [--only STAGE] [--waive GATE=REASON] [--fixed-now ISO8601]
+                     [--only STAGE] [--waive HG1=REASON] [--fixed-now ISO8601]
 etc/go/go.sh plan    [--milestone g1|g2]
 etc/go/go.sh status  [--run-id ID]
 etc/go/go.sh verify  [--run-id ID] [--gates]
@@ -50,15 +50,15 @@ Extending `etc/check-bpmn-kie.sh`'s 0/1/2/3/4:
 
 ## Environment
 
-| variable             | effect                                                                                                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `L4`                 | **required.** Path to a prebuilt `l4`. This orchestrator never runs `cabal`; the build lock is a shared resource and concurrent invocations in one worktree corrupt each other. Same escape hatch as `JL4_LSP_CMD=` / `DMNMD=`. |
-| `JL4_LIBRARY_PATH`   | defaults to `<repo>/jl4-core/libraries`                                                                                                                                                                                         |
-| `JL4_LSP_CMD`        | a prebuilt `jl4-lsp`, for the ladder leg. Absent ⇒ that leg is `SKIPPED` with a named reason.                                                                                                                                   |
-| `JL4_GO_SERVICE_URL` | a **loopback** `jl4-service` for the MCP leg. A non-loopback host is refused: an outward-facing deployment is HG2's subject, not an environment variable's.                                                                     |
-| `L4_GO_RUNDIR`       | where runs live (default `$TMPDIR/l4-go`). Never the tree.                                                                                                                                                                      |
-| `L4_GO_REQUIRED`     | `1` ⇒ any `SKIPPED` stage is fatal (exit 5), which is what CI wants                                                                                                                                                             |
-| `L4_GO_FIXED_NOW`    | pins the clock threaded into every `run`/`check`/`render` (default `2025-01-31T00:00:00Z`)                                                                                                                                      |
+| variable             | effect                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `L4`                 | **required.** Path to a prebuilt `l4`. This orchestrator never runs `cabal`; the build lock is a shared resource and concurrent invocations in one worktree corrupt each other. Same escape hatch as `JL4_LSP_CMD=` / `DMNMD=`.                                                                                                                      |
+| `JL4_LIBRARY_PATH`   | defaults to `<repo>/jl4-core/libraries`                                                                                                                                                                                                                                                                                                              |
+| `JL4_LSP_CMD`        | a prebuilt `jl4-lsp`, for the ladder leg. Absent ⇒ that leg is `SKIPPED` with a named reason.                                                                                                                                                                                                                                                        |
+| `JL4_GO_SERVICE_URL` | a **loopback** `jl4-service` for the MCP leg. The URL is parsed, not string-trimmed, and userinfo is refused outright — `http://127.0.0.1:8080@REALHOST/` reads as loopback to a naive parser and as credentials-for-REALHOST to curl. A non-loopback host is refused: an outward-facing deployment is HG2's subject, not an environment variable's. |
+| `L4_GO_RUNDIR`       | where runs live (default `$TMPDIR/l4-go`). Never the tree.                                                                                                                                                                                                                                                                                           |
+| `L4_GO_REQUIRED`     | `1` ⇒ any `SKIPPED` stage is fatal (exit 5), which is what CI wants                                                                                                                                                                                                                                                                                  |
+| `L4_GO_FIXED_NOW`    | pins the clock threaded into every `run`/`check`/`render` (default `2025-01-31T00:00:00Z`)                                                                                                                                                                                                                                                           |
 
 ## Requirements
 
@@ -96,7 +96,10 @@ not build one.
 **`GATE HG1: REFUSED — no signer is enrolled.`** — the shipped state.
 `specs/todo/single-instruction-demo/gate-allowed-signers` carries no public key,
 so nothing verifies. Enrol a key, or waive the gate with a reason that will
-appear in the report.
+appear in the report. A waiver binds to the sha256 of the corpus files it was
+granted over: edit one and the gate re-opens, for that run and every resume of
+it. **HG2 cannot be waived** — `--waive HG2=…` exits 2, because its subject is
+anything outward-facing and that decision is not an agent's.
 
 **`the CLI surface the stage table depends on has moved`** (exit 4) — a
 discovery call returned a set that differs from `etc/go/PINS.json`. The message

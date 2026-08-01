@@ -122,7 +122,7 @@ etc/go/go.sh run --milestone g1 --subject regcf \
 
 - **A waiver is a verdict, not an absence.** It lands on the journal and prints in the report's Gates section with your reason attached. A waiver that is not in the report is impossible.
 - **Write the reason for the reader, not for the parser.** Someone will read it a year from now trying to work out whether the gate mattered.
-- **Never waive HG2.** HG1 covers work that has already been reviewed by other means; HG2 covers anything outward-facing, and there is no circumstance in which an agent should decide that on its own. See [references/gates.md](references/gates.md).
+- **HG2 cannot be waived** — `go.sh run --waive HG2=…` exits 2, so this is the driver's rule and not only the skill's. HG1 covers work that has already been reviewed by other means; HG2 covers anything outward-facing, and there is no circumstance in which an agent should decide that on its own. See [references/gates.md](references/gates.md).
 
 ### 6. Resume, rather than restart
 
@@ -154,7 +154,7 @@ Run directories accumulate. `etc/go/go.sh gc` prunes them, keeping the most rece
 etc/go/go.sh verify --run-id <run-id> --gates
 ```
 
-This re-reads the journal, re-hashes every artifact a receipt names, checks that each granted gate was recorded before the first stage it gates began, and recomputes the milestone verdict. No build, no model, no network. It is the one check the agent that did the run cannot pre-satisfy, and it is what makes the run's claims worth anything to a second party.
+This re-reads the journal, re-hashes every artifact a receipt names, checks that each granted gate was recorded before the first stage it gates began — counting `stage_end` as well as `stage_begin`, so gated work run outside the driver is caught — and recomputes the milestone verdict. No build, no model, no network. It is the one check the agent that did the run cannot pre-satisfy, and it is what makes the run's claims worth anything to a second party.
 
 ---
 
@@ -172,7 +172,7 @@ That is the single largest simplification in this design and the first thing a l
 
 | stage               | why it cannot be a script                                                                                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P3 encode           | "isomorphic — a domain expert can review it section by section against the regulation" has no mechanical form. SPEC.md §8 says so explicitly.                                  |
+| P3 encode           | "isomorphic — a domain expert can review it section by section against the regulation" has no mechanical form. It is SPEC.md §4's P3 deliverable and SPEC.md §7.3's HG1.       |
 | P4 forks            | fork-register **completeness** is unfalsifiable in principle: no procedure establishes that you found every ambiguity.                                                         |
 | P5 adversarial gate | its own condition is "as good as it can be", which is a judgement three of whose five checks are joins over registers that have no format yet.                                 |
 | §8 triage           | the diff is mechanical; classifying each disagreement as encoding error / genuine ambiguity / improvement over the hand corpus is not, and no diff outcome constitutes a fail. |

@@ -16,8 +16,18 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 
-/** Bumped when the record shape changes. An unknown schema is BROKEN, not guessed at. */
-export const JOURNAL_SCHEMA = 1;
+/**
+ * Bumped when the record shape changes. An unknown schema is BROKEN, not
+ * guessed at.
+ *
+ * 2 (2026-08-02): the `gate` record gained `corpus_digest`, the sha256 over the
+ * corpus files the gate was granted over. go.sh re-checks it before letting a
+ * gated stage run, so a waiver no longer covers arbitrary later edits. A
+ * schema-1 gate row carries no such binding, and cannot be distinguished from a
+ * schema-2 row that failed to record one — which is exactly the ambiguity this
+ * number exists to refuse.
+ */
+export const JOURNAL_SCHEMA = 2;
 
 export const GENESIS =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -49,9 +59,19 @@ export function sha256Text(text) {
   return "sha256:" + createHash("sha256").update(text).digest("hex");
 }
 
-/** Digest a set of files as one value. Order-independent; missing files are named, not skipped. */
+/**
+ * Digest a set of files as one value. Order-independent; missing files are
+ * named, not skipped.
+ *
+ * An entry of the form `text:<value>` is a LITERAL contributor: a fact about
+ * the run that is not a file, hashed as written. It exists so the driver can
+ * fold in the sha256 of the `l4` binary — a 200 MB file that every stage
+ * depends on and that would otherwise be re-read once per stage — without
+ * pretending it is one of the stage's declared source paths.
+ */
 export function digestSet(paths) {
   const parts = [...paths].sort().map((p) => {
+    if (p.startsWith("text:")) return p;
     if (!existsSync(p)) return `${p}\tABSENT`;
     return `${p}\t${statSync(p).size}\t${sha256File(p)}`;
   });
@@ -121,8 +141,15 @@ export function append(journalPath, record) {
  *
  * The honesty hazard here is under-declaring the input set: a stage that omits
  * one of its real inputs from `inputs_digest` will report `replayed` after that
- * input changes. Phase scripts therefore digest the corpus files AND their own
- * script source AND the pinned CLI surface; see PHASE_INPUTS in go.sh.
+ * input changes. Each phase script therefore declares its own inputs — the
+ * corpus files it reads, its own script source, and whatever pin it depends on
+ * — behind `--inputs`, and go.sh (see `cmd_run`'s dispatch loop) digests that
+ * list AFTER folding in the sha256 of the `l4` binary, which every stage
+ * depends on and no stage can see. That fold is not decoration: without it a
+ * run resumed against a REBUILT or SUBSTITUTED binary replayed every leg
+ * without invoking it once, so p0-preflight's CLI-surface pin and its
+ * failing-#ASSERT tripwire were skipped and the report still named the old
+ * binary.
  */
 export function findReplayable(journalPath, stage, inputsDigest) {
   const records = read(journalPath);

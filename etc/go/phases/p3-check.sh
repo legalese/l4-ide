@@ -91,12 +91,40 @@ process.stdout.write(bad.join("\n"));
 NODEEOF
 )
 DATED_ARMS=$(cat "$COUNTFILE" 2>/dev/null || echo 0)
+
+# The non-vacuity floor, symmetric with p6-tests.sh's MIN_ASSERTIONS.
+#
+# "every dated arm carries an @ref" is satisfied VACUOUSLY by an empty matched
+# set, and the matcher is a single-physical-line regex: it requires
+# `RULES EFFECTIVE DATE` and a `Date <digit>` literal on the SAME line. Reflow
+# the two arms so the literal sits on the next line — by hand, or by any future
+# formatter width change; `l4 format` preserves the split rather than repairing
+# it — and armCount goes to 0 while the check prints a green
+# "all 0 dated arm(s) carry an @ref". Measured 2026-08-02 on a copy of the
+# corpus with every `@ref` deleted and the two arms reflowed: UNREFD empty,
+# armCount 0, `l4 check` still exit 0.
+#
+# So a zero, or a drop below the known population, is a finding about the
+# MATCHER and is reported as one. The pin is the corpus's own measured count:
+# regcf.l4 has 5 `RULES EFFECTIVE DATE` sites of which 2 are dated arms (the
+# other 3 are comment prose ×2 and one parameterised `AT LEAST amendment`);
+# regcf-wizard.l4 has 1, a comment. Raise MIN_DATED_ARMS when the corpus gains
+# arms; do not lower it to make this pass.
+MIN_DATED_ARMS=2
+
 if [[ -n "$UNREFD" ]]; then
   note "FINDING: dated arms with no @ref anywhere in their own declaration block:"
   note "$UNREFD"
   FINDINGS=$((FINDINGS + 1))
+elif [[ "$DATED_ARMS" -lt "$MIN_DATED_ARMS" ]]; then
+  note "FINDING: the temporal-closure check matched only $DATED_ARMS dated arm(s), below the pinned floor of $MIN_DATED_ARMS."
+  note "  An empty or near-empty matched set satisfies 'every dated arm carries an @ref' vacuously,"
+  note "  so this is a finding about the matcher (or about a corpus that lost its dated arms), not a pass."
+  note "  The matcher requires \`RULES EFFECTIVE DATE\` and a \`Date <digit>\` literal on the SAME line;"
+  note "  a reflow across two lines makes an arm invisible to it and \`l4 format\` will not put it back."
+  FINDINGS=$((FINDINGS + 1))
 else
-  note "temporal closure: all $DATED_ARMS dated arm(s) carry an @ref inside their own declaration block"
+  note "temporal closure: all $DATED_ARMS dated arm(s) carry an @ref inside their own declaration block (floor: $MIN_DATED_ARMS)"
 fi
 
 # --- 4. the half that is not checkable, recorded rather than omitted --------
@@ -107,18 +135,25 @@ note "  section by section'. That is a judgement. SPEC.md §7.3 carries it as HG
 note "  This stage's PASS means the two automatable house rules hold and the"
 note "  module typechecks. It does not mean the encoding is faithful."
 
+# Every figure this stage states is recorded as a metric, so a reader of the
+# journal can reproduce the prose without opening the artifact. `ELSE IF` count
+# used to live only in $LOG, which the journal names by path and sha256 — and a
+# sha256 is not invertible, so "nine ELSE IF sites" was a number nobody could
+# get back out of the journal it was said to come from.
+METRICS=(--metric "else_if_sites=$ELSEIF_N" --metric "dated_arms=$DATED_ARMS" --metric "min_dated_arms=$MIN_DATED_ARMS")
+
 if [[ $FINDINGS -gt 0 ]]; then
   go_receipt --status DEGRADED \
     --reason "$FINDINGS of the automatable P3 house-style checks failed; see $LOG" \
-    --artifact "$LOG"
+    --artifact "$LOG" "${METRICS[@]}"
   exit "$GO_EXIT_FINDING"
 fi
 
 go_receipt \
   --status PASS \
-  --oracle-cmd "l4 check regcf.l4 && l4 check regcf-wizard.l4 && no ELSE IF chain && @ref within 3 lines of every rule-date site" \
+  --oracle-cmd "l4 check regcf.l4 && l4 check regcf-wizard.l4 && no ELSE IF chain && an @ref inside the declaration block of every dated arm, over at least $MIN_DATED_ARMS matched arms" \
   --oracle-exit 0 \
   --oracle-class structural \
-  --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules. Faithfulness to the source regulation is NOT covered and is carried by HG1." \
-  --artifact "$LOG" \
+  --oracle-because "typechecking is the compiler's own verdict on the module; the two grep checks are the mechanisable half of P3's house rules, and the dated-arm floor stops the second one passing over an empty matched set. Faithfulness to the source regulation is NOT covered and is carried by HG1." \
+  --artifact "$LOG" "${METRICS[@]}" \
   --note "isomorphism against 17 CFR Part 227 is unverified by this stage and is HG1's subject"

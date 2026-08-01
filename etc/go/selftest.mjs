@@ -305,6 +305,148 @@ const lines = readFileSync(journal, "utf8").trimEnd().split("\n");
     v.ok === false && v.problems.some((p) => /journal_schema/.test(p)),
   );
 }
+// ------------------------------------------------------- 3b. the gate payload
+process.stdout.write("\n-- the gate payload --\n");
+
+// The payload must be a function of CONTENT, not of how many times the run has
+// been resumed. It used to render one line per stage_end INCLUDING replays, so
+// the first resume — the one gate-request.sh itself prints — appended fresh
+// rows, changed the payload, and made a valid signature stop verifying over a
+// corpus nobody had touched. gate-verify.sh's `cmp -s` then refused before ever
+// reaching `ssh-keygen -Y verify`.
+{
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-payload-"));
+  const j = resolve(d, "journal.ndjson");
+  append(j, {
+    kind: "run_begin",
+    run_id: "payload-test",
+    milestone: "g1",
+    subject: "regcf",
+    repo_head: "abc",
+    tree_state: "clean",
+    fixed_now: "2025-01-31T00:00:00Z",
+    declared_stages: ["p0-preflight", "p6-tests"],
+  });
+  const real = append(
+    j,
+    base({
+      stage: "p0-preflight",
+      metrics: { "corpus_sha_regcf.l4": "sha256:aaa" },
+    }),
+  );
+  const payload = () =>
+    execFileSync("node", [resolve(HERE, "lib/gate-payload.mjs"), "HG1", d], {
+      encoding: "utf8",
+    });
+  const before = payload();
+  append(
+    j,
+    base({
+      stage: "p0-preflight",
+      oracle: null,
+      replayed_from: real.hash,
+      metrics: { "corpus_sha_regcf.l4": "sha256:aaa" },
+    }),
+  );
+  const after = payload();
+  check(
+    "a replayed receipt does not change the gate payload",
+    before === after,
+  );
+  check(
+    "the payload still lists the receipt that actually executed",
+    before.includes(`p0-preflight PASS ${real.hash}`),
+  );
+  // And the control: a receipt that really executed DOES change it, so the
+  // exclusion above is not just "ignore everything".
+  append(j, base({ stage: "p6-tests" }));
+  check(
+    "a receipt that executed DOES change the gate payload",
+    payload() !== before,
+  );
+}
+
+// ------------------------------------------------- 3c. the gate-ordering check
+process.stdout.write("\n-- gate ordering --\n");
+
+// `go.sh verify --gates` is described in four places as the one check the
+// acting agent cannot pre-satisfy. It inspected `stage_begin` only — a record
+// go.sh writes strictly AFTER deciding the gate, so on a driver journal the
+// check could never fire, and a phase script invoked directly (which the skill
+// tells the reader to do) writes only a `stage_end` and was invisible to it.
+{
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-gateorder-"));
+  const j = resolve(d, "journal.ndjson");
+  append(j, {
+    kind: "run_begin",
+    run_id: "order-test",
+    milestone: "g1",
+    subject: "regcf",
+    declared_stages: ["p6-tests"],
+    gated_stages: JSON.stringify({ HG1: ["p6-tests"], HG2: ["p10-publish"] }),
+  });
+  // gated work performed OUTSIDE the driver: a stage_end and no stage_begin
+  append(j, base({ stage: "p6-tests" }));
+  append(j, {
+    kind: "gate",
+    gate: "HG1",
+    state: "waived",
+    corpus_digest: "sha256:aaa",
+    reason: "after the fact",
+  });
+  const r = spawnSync(
+    "node",
+    [resolve(HERE, "lib/verify-run.mjs"), d, "--gates", "--json"],
+    { encoding: "utf8" },
+  );
+  const out = JSON.parse(r.stdout);
+  check(
+    "a gated stage_end BEFORE its gate is a finding",
+    out.findings.some((f) => f.kind === "gate-order"),
+  );
+  check("that finding makes verify exit non-zero", r.status === 1);
+}
+{
+  // The negative control: the ordinary driver ordering must stay clean.
+  const d = mkdtempSync(resolve(tmpdir(), "l4-go-gateorder-ok-"));
+  const j = resolve(d, "journal.ndjson");
+  append(j, {
+    kind: "run_begin",
+    run_id: "order-ok",
+    milestone: "g1",
+    subject: "regcf",
+    declared_stages: ["p6-tests"],
+    gated_stages: JSON.stringify({ HG1: ["p6-tests"] }),
+  });
+  append(j, {
+    kind: "gate",
+    gate: "HG1",
+    state: "waived",
+    corpus_digest: "sha256:aaa",
+    reason: "first",
+  });
+  append(j, { kind: "stage_begin", stage: "p6-tests", attempt: 1 });
+  append(j, base({ stage: "p6-tests" }));
+  // A SECOND waiver row for the same gate, as a resume would write: it must not
+  // retro-report the stages the first grant legitimately authorised.
+  append(j, {
+    kind: "gate",
+    gate: "HG1",
+    state: "waived",
+    corpus_digest: "sha256:aaa",
+    reason: "resumed",
+  });
+  const r = spawnSync(
+    "node",
+    [resolve(HERE, "lib/verify-run.mjs"), d, "--gates", "--json"],
+    { encoding: "utf8" },
+  );
+  check(
+    "a correctly ordered gate, and a duplicate grant, produce no ordering finding",
+    !JSON.parse(r.stdout).findings.some((f) => f.kind === "gate-order"),
+  );
+}
+
 check(
   "receipt.mjs is the only module that calls append()",
   (() => {
@@ -401,8 +543,22 @@ if (!process.argv.includes("--with-driver")) {
   );
   check("the journal still verifies after a replay", verify(j).ok === true);
 
-  // And the digest actually gates the replay: change an input, and the stage
-  // that declares it must re-execute rather than report `replayed`.
+  // …and everything else the receipt carried. A replay is the LATEST row for
+  // its stage, so render-report.mjs reads it: dropping these silently rewrote
+  // the report on the first resume — every measured number gone, `PASS
+  // (INTERIM)` promoted to a bare `PASS`, and the "claimed, not verified"
+  // caveats deleted.
+  const carried = (field) =>
+    secondPass
+      .filter((r) => r.replayed_from)
+      .every((r) => {
+        const f = firstPass.find((x) => x.stage === r.stage);
+        return JSON.stringify(f?.[field] ?? null) === JSON.stringify(r[field]);
+      });
+  check("replayed receipts keep their metrics", carried("metrics"));
+  check("replayed receipts keep their label", carried("label"));
+  check("replayed receipts keep their notes", carried("notes"));
+
   const verifyOut = execFileSync(
     "bash",
     [resolve(HERE, "go.sh"), "verify", "--run-id", runId, "--gates"],
@@ -416,6 +572,70 @@ if (!process.argv.includes("--with-driver")) {
     "verify re-hashes every recorded artifact",
     /artifacts: (\d+) recorded, \1 still hash as recorded/.test(verifyOut),
   );
+
+  // The negative control this file has promised since it was written, and did
+  // not have: the digest must actually GATE the replay. The `l4` binary is an
+  // input to every stage and is declared by none, so it is the input that went
+  // unnoticed — a run resumed against a rebuilt or substituted binary replayed
+  // every leg without invoking it once, skipping p0's CLI-surface pin and its
+  // upgrade tripwire while the report still named the original binary.
+  {
+    const stub = resolve(rundir, "fake-l4");
+    writeFileSync(stub, "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const before = read(j).filter((r) => r.kind === "stage_end").length;
+    // p0-preflight will report BROKEN against a stub, and go.sh will exit 4;
+    // that IS the point — the stage ran. The assertion is on the receipt.
+    const r = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "run",
+        "--milestone",
+        "g1",
+        "--subject",
+        "regcf",
+        "--run-id",
+        runId,
+      ],
+      { env: { ...env, L4: stub }, encoding: "utf8" },
+    );
+    const after = read(j)
+      .filter((r2) => r2.kind === "stage_end")
+      .slice(before);
+    check(
+      "a substituted l4 binary re-executes p0-preflight instead of replaying it",
+      after.some((r2) => r2.stage === "p0-preflight" && !r2.replayed_from),
+    );
+    check(
+      "…and the run does not report COMPLETE over it",
+      r.status !== 0 && /VERDICT: (g1 )?BROKEN/.test(r.stdout + r.stderr),
+    );
+  }
+
+  // HG2 is not waivable, and the rule lives in the driver rather than only in
+  // prose. It guards anything outward-facing, and no agent decides that alone.
+  {
+    const r = spawnSync(
+      "bash",
+      [
+        resolve(HERE, "go.sh"),
+        "run",
+        "--milestone",
+        "g1",
+        "--subject",
+        "regcf",
+        "--through",
+        "p0-preflight",
+        "--waive",
+        "HG2=an agent decided on its own",
+      ],
+      { env, encoding: "utf8" },
+    );
+    check(
+      "--waive HG2 is refused by the driver, not only by the skill",
+      r.status === 2 && /--waive HG2 is REFUSED/.test(r.stderr),
+    );
+  }
 }
 
 // ------------------------------------------------------------- 5. the report
@@ -440,16 +660,55 @@ check(
   /\{\{[^}]+\}\}/.test(template),
 );
 check(
-  "the report renderer reads the journal and nothing else",
+  "every figure in the report comes from the journal",
   (() => {
     const src = readFileSync(resolve(HERE, "report/render-report.mjs"), "utf8");
     // It may read its own template and the journal. It must not read artifacts,
     // fidelity reports, or anything a phase script produced: every figure comes
-    // from a receipt.
+    // from a receipt. It DOES ask the filesystem whether the artifacts a
+    // receipt names are still there — see artifactState — but takes no number
+    // from them; the bytes and sha256 columns stay the recorded ones.
     return (
       src.includes("journal.ndjson") &&
       !/readFileSync\((?!TEMPLATE)[^)]*fidelity/.test(src)
     );
+  })(),
+);
+check(
+  "the artifacts table contradicts the journal when a recorded artifact is gone",
+  (() => {
+    const d = mkdtempSync(resolve(tmpdir(), "l4-go-gonereport-"));
+    const j = resolve(d, "journal.ndjson");
+    const missing = resolve(d, "never-written.dmn");
+    append(j, {
+      kind: "run_begin",
+      run_id: "gone-test",
+      milestone: "g1",
+      subject: "regcf",
+      declared_stages: ["p7-dmn"],
+    });
+    append(
+      j,
+      base({
+        stage: "p7-dmn",
+        artifacts: [
+          { path: missing, bytes: 225141, sha256: "sha256:deadbeefdeadbeef" },
+        ],
+      }),
+    );
+    append(j, { kind: "run_end", verdict: "COMPLETE", exit: 0 });
+    const r = spawnSync(
+      "node",
+      [resolve(HERE, "report/render-report.mjs"), d],
+      { encoding: "utf8" },
+    );
+    if (r.status !== 0) return false;
+    const md = readFileSync(resolve(d, "report.md"), "utf8");
+    // The recorded figures still print — they are what the receipt said — but
+    // the row must say the file is not there. Printing 225141 bytes and a
+    // sha256 under "Every artifact this run put on disk", with nothing else, is
+    // the defect this replaces.
+    return /\*\*GONE\*\*/.test(md) && /no longer hash as recorded/.test(md);
   })(),
 );
 // Structural, not textual: the entries themselves are inspected, so a new

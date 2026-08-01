@@ -26,10 +26,11 @@ WHAT IT WOULD DO
 BLOCKER
   Ruling R4 is OPEN. The design note R4-FORK-REPRESENTATION.md proposes the
   shape and its §6 says explicitly that no code changes until the demo's
-  encode phase runs. Separately, SPEC.md §8 names the absence of a machine-
-  readable fork register as the other of the two highest-leverage gaps;
-  specs/todo/single-instruction-demo/schemas/fork-register.schema.json ships
-  as the proposed shape and nothing reads it yet.
+  encode phase runs. Separately, SPEC.md defines no machine-readable fork
+  register anywhere, so P5's fork-register completeness check has nothing to
+  join over. specs/todo/single-instruction-demo/schemas/fork-register.schema
+  .json does NOT exist: that directory is empty, and this blocker used to
+  claim the schema shipped.
 
 Nothing was written and no receipt was recorded.
 MSG

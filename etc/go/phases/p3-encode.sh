@@ -27,9 +27,10 @@ BLOCKER
   ambiguity forks are represented; the R4-FORK-REPRESENTATION.md design note
   proposes one Interpretation record threaded as an ordinary GIVEN, and
   until that is ruled, an encoding stage would be writing to be rewritten.
-  Also unmechanisable by construction: SPEC.md §8 records that 'isomorphic,
-  reviewable section by section' has no checkable form and is carried by
-  HG1.
+  Also unmechanisable by construction: SPEC.md §4's P3 stage names the
+  deliverable as 'isomorphic -- a domain expert can review it against the
+  regulation section by section', which has no checkable form and is carried
+  by HG1 (SPEC.md §7.3).
 
 Nothing was written and no receipt was recorded.
 MSG

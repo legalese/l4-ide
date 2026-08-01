@@ -25,14 +25,20 @@ what the corpus deliberately does not model (§5). This page is only about what 
 | 4 | Ladder figures (6 decisions × 4 carriers)      | 24    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
 | 5 | Deployable API / MCP surface                   | 1 `.l4` | `POST /deployments` to `jl4-service`              | `cabal test jl4:jl4-test`       |
 
-Artifacts 3 (BPMN) reproduce **byte for byte from the command line with no flags** other than
-`--rule` (which selects _which_ process, since a BPMN document holds exactly one). That was not
-true before 2026-07-27: the model name was hand-typed in the golden test, so the corpus's DMN model
-had three different names at once. It now comes from the corpus's own outermost `§` heading.
+Artifacts 2 (dmnmd) and 3 (BPMN) reproduce **byte for byte from the command line with no flags**
+other than `--rule` (which selects _which_ process, since a BPMN document holds exactly one).
+Measured 2026-08-02: a bare `--to dmn-md` and three bare `--to bpmn --rule …` invocations all diff
+clean against their goldens. That was not true before 2026-07-27: the model name was hand-typed in
+the golden test, so the corpus's DMN model had three different names at once. It now comes from the
+corpus's own outermost `§` heading.
 
-**Artifacts 1 and 2 (DMN, dmnmd) do NOT — this sentence used to claim they did.** Measured
-2026-08-02: `l4 export regcf.l4 --to dmn` differs from the committed golden on 92 lines, every one
-of the form `main.l4:<position>` in the golden against `regcf.l4:<position>` from the CLI.
+**Artifact 1 (DMN) does NOT — this sentence used to claim it did.** (Artifact 2, dmnmd, does: a bare
+`--to dmn-md` diffs clean against its golden. An earlier draft of this paragraph swept it in with
+the DMN.) Measured 2026-08-02: both files are 3,248 lines and `l4 export regcf.l4 --to dmn` differs
+from the committed golden on **23** of them, every one of the form `main.l4:<position>` in the
+golden against `regcf.l4:<position>` from the CLI. (`diff | wc -l` reports 92 — 23 changed lines ×
+4 lines of diff output each — which is where the figure 92 came from and why it is not the number
+of differing lines.)
 `jl4/tests/DmnExport.hs:3212` typechecks goldens against an empty virtual file system
 (`drgFlavoredWith = drgGeneral emptyVFS id`), so no source URI reaches the `@ref` renderer and
 provenance renders a placeholder. The exporter output is identical in every other byte, and the
@@ -66,24 +72,34 @@ is the corpus.
 
 ### Fidelity: 95 blocking, 21 lossy, 54 advisory (measured 2026-08-02)
 
-Re-derive every number in this section with
-`node etc/go/lib/fidelity-counts.mjs jl4/examples/dmn/expected/regcf-corpus.fidelity.txt --json`.
-The previous heading said 114 / 46 / 18 and its table said `D-LITERALEXPR` 89 and
-`D-RENAME` 37; all five were transcribed once and never re-measured.
+Re-derive every number in this section — the heading AND every row of the table — with
+`node etc/go/lib/fidelity-counts.mjs jl4/examples/dmn/expected/regcf-corpus.fidelity.txt --json`,
+whose `codes` object is exactly the × column below. The table is the whole emitted set: its three
+severity columns sum to the heading, which is the arithmetic that catches a stale row.
+
+This table was itself stale until 2026-08-02, and in a way the earlier repair missed: correcting
+the heading to 95 / 21 / 54 and two of the rows left the table summing to 105 / 20 / 18 against
+its own heading, carrying two codes (`D-NONFEELINPUT`, `D-NONFEELOUTPUT`) the exporter does not
+emit at all, and omitting seven it does.
 
 | Code                 | ×  | Severity | What it means here                                                                                             |
 | -------------------- | -- | -------- | -------------------------------------------------------------------------------------------------------------- |
 | `D-LITERALEXPR`      | 80 | blocking | not a guarded chain, so a boxed literal expression, not a table                                                 |
-| `D-RENAME`           | 11 | lossy    | one FEEL name would have served several elements the module keeps apart, so all but one were renamed apart      |
 | `D-RULEDATE-UNBOUND` | 15 | blocking | `EVAL UNDER RULES EFFECTIVE AT`: a sub-graph under its OWN rule date, which one global DMN input cannot express |
-| `D-SCOPE`            | 9  | lossy    | e.g. **nine** different terms all named `issuer` in the source                                                  |
-| `D-COMPUTEDOUTPUT`   | 9  | advisory | the output entry is an expression, not a constant                                                               |
-| `D-NONFEELINPUT`     | 6  | blocking | column text is L4 source, not FEEL; no engine can compile it                                                    |
+| `D-RENAME`           | 11 | lossy    | one FEEL name would have served several elements the module keeps apart, so all but one were renamed apart      |
+| `D-SCOPE`            | 7  | lossy    | the collision underneath the rename: e.g. two source terms both named `issuer`, four both named `investor`      |
+| `D-REGULATIVE`       | 2  | lossy    | a regulative body with no callers is not emitted; lifecycle is BPMN's job, not a `<decision>`'s                 |
+| `D-PARTIAL`          | 1  | lossy    | `ongoing reporting obligation` could not be certified total, so it is not un-lifted and its call sites stay raw |
+| `D-COMPUTEDOUTPUT`   | 13 | advisory | the output entry is an expression, not a constant, so DMN's own gap/overlap checkers will not check the table   |
+| `D-BKM`              | 10 | advisory | a businessKnowledgeModel candidate, applied to distinct arguments at several call sites — Phase 5's subject     |
+| `D-PARAM-AS-INPUT`   | 10 | advisory | a `GIVEN` parameter became one shared global input; the per-call-site argument binding is discarded             |
+| `D-FIXTURE`          | 7  | advisory | test scaffolding, referenced only from directive arguments; not emitted (`--include-tests` emits it)            |
 | `D-UNDECOMPOSABLE`   | 5  | advisory | guard has no constant endpoint, so no interval analysis                                                         |
-| `D-NONFEELOUTPUT`    | 4  | blocking | output entry is L4 source; **silent** null when it is the default output                                        |
+| `D-INERT`            | 4  | advisory | kept, but forces no reference and no input — an inert prose carrier, typically statutory text plus a constant   |
 | `D-INLINEDLOCAL`     | 2  | advisory | `WHERE` locals inlined; DMN has no scoped intermediate value                                                    |
 | `D-RULEDATE`         | 1  | advisory | the model is temporally parameterised; bind `RULES_EFFECTIVE_DATE` or every dated decision answers null         |
 | `D-ORDERDEPENDENT`   | 1  | advisory | `First` hit policy — DMN §8.2.10's own "has to be used with care"                                               |
+| `D-COMPUTEDFIELD`    | 1  | advisory | a hydrated record's DERIVED components are indistinguishable from supplied ones in `tItemDefinition`            |
 
 `D-FEELNAME` used to appear here nine times and is now **zero by construction**: colliding FEEL names
 are renamed apart rather than collapsed, which is what the `D-RENAME` row counts. Eight of the eleven
@@ -134,12 +150,19 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
 **Measured 2026-08-02: 1,236 lines of law become ONE markdown table**, and 364 lines of loss report.
 This is the most honest artifact in the set and the least useful one, which is why it ships.
 
+### Fidelity: 121 blocking, 0 lossy, 0 advisory (measured 2026-08-02)
+
+Same re-derivation as §1, against `regcf-corpus.md.fidelity.txt`. Every note this target emits is
+blocking, and the × column sums to the heading — which is what catches a stale row. `D-MD-NOCONTEXT`
+was missing from this table until 2026-08-02, so it summed to 120 against a report of 121.
+
 | Code                  | ×   | What it costs                                                       |
 | --------------------- | --- | ------------------------------------------------------------------- |
 | `D-MD-NOLITERAL`      | 80  | dmnmd has no boxed-expression form; the decision is **omitted**      |
 | `D-MD-CELLSYNTAX`     | 34  | a cell dmnmd cannot read; the **whole table** is omitted             |
 | `D-MD-NONIDENTCOLUMN` | 5   | column header must be an identifier; the **whole table** is omitted  |
 | `D-MD-NODRG`          | 1   | 189 information requirements have no markdown form                   |
+| `D-MD-NOCONTEXT`      | 1   | a hydrated boxed context has no dmnmd form; the decision is omitted  |
 
 31 of the 34 `D-MD-CELLSYNTAX` instances name a **date** cell: the rule-date interval tables are the
 one thing the XML target gained and the markdown target cannot hold at all, because dmnmd's cell
@@ -405,13 +428,22 @@ and `227.201` both truncate to `section-227`.
 
 ### Not a defect
 
-- **"The DMN goldens are not CLI-reproducible."** They were, via the documented `--model-name`
-  flag; the measurement that produced the claim used a bare invocation. The real defect underneath
-  was the duplicated title, which is fixed — and the goldens now reproduce with **no flag at all**.
 - **`D-SCOPE`'s parenthetical "does not match the list."** The parenthetical lists _decisions_, not
   terms, so it was never inconsistent. The genuine defect was the hardcoded count, above.
 - **`P-DANGLING` "lost: nothing the source said".** That note was accurate about the state it named;
   what was wrong was that the state existed at all. Fixed upstream of the note.
+
+### Retracted
+
+- **"The DMN goldens are not CLI-reproducible" was dismissed here as "not a defect". That
+  dismissal is withdrawn.** It said the goldens reproduced via a documented `--model-name` flag and
+  then, once the duplicated title was fixed, "with no flag at all". The `--model-name` half was a
+  correct dismissal of the ORIGINAL finding. The stronger claim was not: measured 2026-08-02, a
+  bare `l4 export … --to dmn` differs from `regcf-corpus.dmn` on 23 lines, all of them the `@ref`
+  source-URI placeholder. §0 above carries the retraction and the cause; this bullet existed for
+  three weeks saying the opposite, in the same file, further down, where it read as the settled
+  adjudication. Tracked as D1 in `specs/todo/single-instruction-demo/ORCHESTRATOR.md` §1.1.
+  Artifacts 2 and 3 do reproduce bare, so the dismissal was only ever wrong about the DMN.
 
 ### Open, and deliberately not fixed here
 
